@@ -108,3 +108,15 @@ export async function corpoJson(requisicao: Request): Promise<unknown> {
 export function ehUuid(valor: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
 }
+
+/**
+ * IP do cliente para limitadores. Usa o primeiro item de x-forwarded-for,
+ * que o proxy confiável precisa sobrescrever, ou x-real-ip. Sem cabeçalhos,
+ * devolve "local" para não misturar origens desconhecidas em uma só chave.
+ */
+export function ipDoPedido(requisicao: Request): string {
+  const encaminhado = requisicao.headers.get("x-forwarded-for");
+  const primeiro = encaminhado?.split(",")[0]?.trim();
+  if (primeiro) return primeiro;
+  return requisicao.headers.get("x-real-ip")?.trim() || "local";
+}

@@ -1,5 +1,6 @@
 // Casos de uso de sessão: entrada, saída, identidade corrente e troca
 // da própria senha.
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { conferirSenha, hashearSenha } from "@/infra/auth/hash";
@@ -26,6 +27,14 @@ export const esquemaTrocarSenha = z.object({
   senhaNova: z.string().min(1, "Informe a nova senha."),
 });
 
+// Hash descartável usado quando o e-mail não existe: mantém o custo do scrypt
+// e evita revelar a existência da conta pelo tempo de resposta.
+let hashDescartavel: Promise<string> | null = null;
+function hashDeComparacao(): Promise<string> {
+  hashDescartavel ??= hashearSenha(randomBytes(16).toString("hex"));
+  return hashDescartavel;
+}
+
 /** Autentica o usuário e cria a sessão (cookie HttpOnly). */
 export async function entrar(
   entrada: unknown,
@@ -37,8 +46,9 @@ export async function entrar(
   if (!dados.success) {
     return { ok: false, erro: dados.error.issues[0]?.message ?? "Dados inválidos.", status: 400 };
   }
-  const chave = `entrada:${origem}:${dados.data.email}`;
-  if (!limiteDeTentativas(chave)) {
+  const chaveOrigem = `entrada:ip:${origem}:${dados.data.email}`;
+  const chaveEmail = `entrada:email:${dados.data.email}`;
+  if (!limiteDeTentativas(chaveOrigem) || !limiteDeTentativas(chaveEmail, 30)) {
     return {
       ok: false,
       erro: "Muitas tentativas incorretas. Aguarde alguns minutos e tente novamente.",
@@ -46,7 +56,11 @@ export async function entrar(
     };
   }
   const usuario = await banco().usuario.findFirst({ where: { email: dados.data.email } });
-  if (!usuario || !(await conferirSenha(dados.data.senha, usuario.senhaHash))) {
+  if (!usuario) {
+    await conferirSenha(dados.data.senha, await hashDeComparacao());
+    return { ok: false, erro: "E-mail ou senha incorretos.", status: 401 };
+  }
+  if (!(await conferirSenha(dados.data.senha, usuario.senhaHash))) {
     return { ok: false, erro: "E-mail ou senha incorretos.", status: 401 };
   }
   if (!usuario.ativo) {
@@ -56,7 +70,8 @@ export async function entrar(
       status: 403,
     };
   }
-  limparTentativas(chave);
+  limparTentativas(chaveOrigem);
+  limparTentativas(chaveEmail);
   await criarSessao(usuario.id, segredo, ehProducao);
   return {
     ok: true,
