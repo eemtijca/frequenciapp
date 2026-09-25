@@ -4,7 +4,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 function hostProprio(req: NextRequest): string {
-  return new URL(req.url).host.toLowerCase();
+  const hostPublico =
+    req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ??
+    req.headers.get("host")?.trim() ??
+    new URL(req.url).host;
+  return hostPublico.toLowerCase();
 }
 
 /** Nega mutação cross-site (CSRF). GET/HEAD/OPTIONS passam. */

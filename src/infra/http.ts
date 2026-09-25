@@ -73,12 +73,16 @@ export async function exigirPapel(
  * SameSite=Lax, bloqueia envios de outros sites.
  */
 export function origemPermitida(requisicao: Request): boolean {
-  const origem = requisicao.headers.get("origin");
-  if (!origem) return true;
+  const cabecalhoOrigem = requisicao.headers.get("origin");
+  if (!cabecalhoOrigem) return true;
   try {
     const destino = new URL(requisicao.url);
-    const origemUrl = new URL(origem);
-    return origemUrl.host === destino.host;
+    const origem = new URL(cabecalhoOrigem);
+    const hostPublico =
+      requisicao.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ??
+      requisicao.headers.get("host")?.trim() ??
+      destino.host;
+    return hostPublico.toLowerCase() === origem.host.toLowerCase();
   } catch {
     return false;
   }
