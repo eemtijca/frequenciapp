@@ -39,7 +39,7 @@ export default function VistaGestao({
   onTurmasMudaram,
   onAlunosMudaram,
 }: Props) {
-  const [aba, setAba] = useState<Aba>("turmas");
+  const [aba, setAba] = useState<Aba>("series");
 
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
