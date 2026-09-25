@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  AUTH_SECRET: segredo-dummy-de-32-bytes-para-ci-0000
+  TZ_APP: America/Fortaleza
+
+jobs:
+  build:
+    name: Build Next.js
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build
+        run: npm run build

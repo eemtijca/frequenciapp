@@ -1,0 +1,49 @@
+name: Migrações do banco
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - prisma/migrations/**
+      - prisma/schema.prisma
+      - prisma.config.ts
+  workflow_dispatch:
+
+concurrency:
+  group: db-migrate
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrar:
+    name: Aplicar migrations em produção
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      DIRECT_URL: ${{ secrets.DIRECT_URL_PROD }}
+      TZ_APP: America/Fortaleza
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar segredo de conexão
+        run: test -n "$DIRECT_URL"
+
+      - name: Aplicar migrations
+        run: npm run db:deploy
+
+      - name: Verificar estado final
+        run: npx prisma migrate status

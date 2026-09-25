@@ -15,7 +15,11 @@ WORKDIR /app
 COPY --from=dependencias /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+    DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+    AUTH_SECRET=segredo-dummy-de-32-bytes-para-build-0000 \
+    TZ_APP=America/Fortaleza \
+    npm run build
 
 # 3. Execução (somente o necessário)
 FROM node:24-bookworm-slim AS execucao

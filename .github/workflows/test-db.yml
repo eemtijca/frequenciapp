@@ -1,0 +1,81 @@
+name: Testes com Docker Compose
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: testes-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+  TZ_APP: America/Fortaleza
+  APP_URL: http://127.0.0.1:3000
+
+jobs:
+  testes:
+    name: Compose, migrações e contratos
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar cliente Prisma
+        run: npm run db:generate
+
+      - name: Subir aplicação e banco
+        run: docker compose up -d --build
+
+      - name: Aguardar a aplicação
+        run: |
+          for tentativa in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/saude > /dev/null; then
+              echo "Aplicação disponível após ${tentativa} tentativa(s)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "A aplicação não respondeu no tempo esperado."
+          docker compose logs app
+          exit 1
+
+      - name: Criar administrador de teste
+        env:
+          ADMIN_EMAIL: direcao@escola.exemplo
+          ADMIN_SENHA: DirecaoFrequencia2026
+          ADMIN_NOME: Direção
+        run: npm run criar-admin
+
+      - name: Criar professor de teste
+        env:
+          CONTA_EMAIL: demo@escola.exemplo
+          CONTA_SENHA: DemoFrequencia2026
+          CONTA_NOME: Demo
+        run: npm run criar-conta
+
+      - name: Testes de contratos da API
+        run: npm run test:api
+
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: docker compose logs
+
+      - name: Derrubar o ambiente
+        if: always()
+        run: docker compose down -v --remove-orphans
