@@ -70,7 +70,6 @@ export async function entrar(
   };
 }
 
-/** Encerra a sessão corrente. */
 export async function sair(segredo: string, ehProducao: boolean): Promise<void> {
   await encerrarSessao(segredo, ehProducao);
 }

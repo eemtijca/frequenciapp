@@ -188,9 +188,9 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       </div>
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
-        Guardamos apenas o nome de chamada e as turmas. Nenhum outro dado pessoal é necessário para
-        a frequência. A exclusão apaga também o histórico de faltas do aluno; para retirá-lo da
-        chamada preservando o histórico, desative.
+        Guardamos apenas o nome do aluno e as turmas. Nenhum outro dado pessoal é necessário para a
+        frequência. A exclusão apaga também o histórico de faltas do aluno; para retirá-lo das
+        frequências preservando o histórico, desative.
       </p>
 
       <div className="bg-card overflow-hidden rounded-lg border">
@@ -353,7 +353,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                 onChange={(evento) =>
                   setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
                 }
-                placeholder="Nome de chamada"
+                placeholder="Nome do aluno"
                 className="h-11 rounded-lg"
               />
             </div>

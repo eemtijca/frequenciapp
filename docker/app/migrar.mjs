@@ -1,32 +1,71 @@
-// Migrador idempotente das migrações Prisma. Aplica cada
-// prisma/migrations/*/migration.sql uma vez, na ordem, registrando em
-// _prisma_migrations no mesmo formato do Prisma 7, de modo que um
-// `prisma migrate deploy` posterior reconheça o estado e não reaplique
-// nada. Erros de conexão encerram com código 2 para o entrypoint
-// tentar de novo.
+// Migrador idempotente das migrações Prisma: aplica cada migration.sql uma vez
+// e registra em _prisma_migrations. Erro de conexão encerra com código 2.
 import { readdir, readFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 
+const TIMEOUT_CONEXAO_MS = 5000;
+
+function codigoDoErro(erro) {
+  if (erro && typeof erro === "object" && "code" in erro && typeof erro.code === "string") {
+    return erro.code;
+  }
+  const mensagem = erro instanceof Error ? erro.message : String(erro);
+  if (/timeout|timed out/i.test(mensagem)) return "ETIMEDOUT";
+  if (/getaddrinfo|ENOTFOUND/i.test(mensagem)) return "ENOTFOUND";
+  if (/ECONNREFUSED|connection refused/i.test(mensagem)) return "ECONNREFUSED";
+  return "SEM_CODIGO";
+}
+
+function orientacaoDoErro(codigo) {
+  switch (codigo) {
+    case "ETIMEDOUT":
+    case "ESOCKETTIMEDOUT":
+      return "A conexão expirou. Verifique a rede do contêiner, VPN, firewall e o host do banco.";
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return "Não foi possível resolver o hostname do banco. Confira DIRECT_URL, DATABASE_URL e o DNS.";
+    case "ECONNREFUSED":
+      return "O banco recusou a conexão. Verifique se o PostgreSQL está ouvindo na porta configurada.";
+    case "28P01":
+      return "Usuário ou senha inválidos. Confira as credenciais da connection string.";
+    case "3D000":
+      return "O banco informado não existe. Confira o nome do banco na connection string.";
+    case "42P01":
+      return "O schema esperado não existe. Aplique as migrations ou corrija o schema configurado.";
+    default:
+      return "Verifique as credenciais, o banco e a rede entre os contêineres.";
+  }
+}
+
+function descreverErro(erro) {
+  const codigo = codigoDoErro(erro);
+  const mensagem = erro instanceof Error ? erro.message : String(erro);
+  return `${codigo}: ${mensagem} ${orientacaoDoErro(codigo)}`;
+}
+
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const raiz = path.resolve(aqui, "..", "..");
 const pasta = path.join(raiz, "prisma", "migrations");
 
-const url = process.env.DATABASE_URL;
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url) {
-  console.error("[migrar] DATABASE_URL não definida.");
+  console.error("[migrar] DIRECT_URL ou DATABASE_URL não definida.");
   process.exit(1);
 }
 
-const cliente = new pg.Client({ connectionString: url });
+const cliente = new pg.Client({
+  connectionString: url,
+  connectionTimeoutMillis: TIMEOUT_CONEXAO_MS,
+});
 
 async function conectar() {
   try {
     await cliente.connect();
   } catch (erro) {
-    console.error("[migrar] Sem conexão com o banco:", erro.message);
+    console.error(`[migrar] Sem conexão com o banco (${descreverErro(erro)})`);
     process.exit(2);
   }
 }

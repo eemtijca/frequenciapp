@@ -8,10 +8,10 @@ import {
   marcaDoAluno,
   montarGrade,
   normalizar,
-  resumirChamada,
+  resumirFrequencia,
   rotuloDeTurma,
   type Aluno,
-  type Chamada,
+  type Frequencia,
 } from "@/domain/frequencia";
 
 function aluno(parcial: Partial<Aluno> = {}): Aluno {
@@ -25,7 +25,7 @@ function aluno(parcial: Partial<Aluno> = {}): Aluno {
   };
 }
 
-function chamada(parcial: Partial<Chamada> = {}): Chamada {
+function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
   return {
     dia: parcial.dia ?? "2026-09-10",
     turmaId: parcial.turmaId ?? "turma-a",
@@ -98,39 +98,39 @@ describe("diasDoMes", () => {
 describe("marcaDoAluno", () => {
   it("marca falta quando o aluno está na lista de faltas", () => {
     const alunoUm = aluno();
-    const doDia = [chamada({ faltas: ["aluno-1"] })];
+    const doDia = [frequencia({ faltas: ["aluno-1"] })];
     expect(marcaDoAluno(alunoUm, "2026-09-10", doDia)).toBe("F");
   });
-  it("marca presente quando a turma dele teve chamada", () => {
-    const doDia = [chamada({ turmaId: "turma-a", faltas: [] })];
+  it("marca presente quando a turma dele teve frequência", () => {
+    const doDia = [frequencia({ turmaId: "turma-a", faltas: [] })];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("P");
   });
-  it("devolve vazio quando a turma não foi chamada", () => {
-    const doDia = [chamada({ turmaId: "turma-b" })];
+  it("devolve vazio quando a turma não teve frequência", () => {
+    const doDia = [frequencia({ turmaId: "turma-b" })];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe(null);
   });
-  it("falta prevalece mesmo com outra chamada presente no dia", () => {
+  it("falta prevalece mesmo com outra frequência presente no dia", () => {
     const doDia = [
-      chamada({ turmaId: "turma-a", faltas: [] }),
-      chamada({ turmaId: "turma-b", faltas: ["aluno-1"] }),
+      frequencia({ turmaId: "turma-a", faltas: [] }),
+      frequencia({ turmaId: "turma-b", faltas: ["aluno-1"] }),
     ];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
   });
 });
 
 describe("montarGrade", () => {
-  it("agrupa marcas, faltas e chamadas por aluno", () => {
+  it("agrupa marcas, faltas e frequências por aluno", () => {
     const alunos = [aluno(), aluno({ id: "aluno-2", nome: "Aluno Dois", ordem: 2 })];
-    const chamadas = [
-      chamada({ dia: "2026-09-10", turmaId: "turma-a", faltas: ["aluno-1"] }),
-      chamada({ dia: "2026-09-11", turmaId: "turma-a", faltas: ["aluno-1", "aluno-2"] }),
+    const frequencias = [
+      frequencia({ dia: "2026-09-10", turmaId: "turma-a", faltas: ["aluno-1"] }),
+      frequencia({ dia: "2026-09-11", turmaId: "turma-a", faltas: ["aluno-1", "aluno-2"] }),
     ];
-    const grade = montarGrade(alunos, chamadas, "2026-09");
+    const grade = montarGrade(alunos, frequencias, "2026-09");
     expect(grade.dias.length).toBe(30);
     const primeiro = grade.linhas[0];
     expect(primeiro?.aluno.id).toBe("aluno-1");
     expect(primeiro?.faltas).toBe(2);
-    expect(primeiro?.chamadas).toBe(2);
+    expect(primeiro?.frequencias).toBe(2);
     const segundo = grade.linhas[1];
     expect(segundo?.marcas["2026-09-10"]).toBe("P");
     expect(segundo?.marcas["2026-09-11"]).toBe("F");
@@ -146,15 +146,15 @@ describe("montarGrade", () => {
   });
 });
 
-describe("resumirChamada", () => {
-  it("conta apenas alunos ativos da turma da chamada", () => {
+describe("resumirFrequencia", () => {
+  it("conta apenas alunos ativos da turma da frequência", () => {
     const alunos = [
       aluno({ id: "a1", turmaId: "turma-a" }),
       aluno({ id: "a2", turmaId: "turma-a" }),
       aluno({ id: "a3", turmaId: "turma-a", ativo: false }),
       aluno({ id: "a4", turmaId: "turma-b" }),
     ];
-    const resumo = resumirChamada(chamada({ turmaId: "turma-a" }), alunos, "turma-a");
+    const resumo = resumirFrequencia(frequencia({ turmaId: "turma-a" }), alunos, "turma-a");
     expect(resumo.totalAlunos).toBe(2);
   });
 });

@@ -1,36 +1,54 @@
 # Ambiente
 
-Variáveis de ambiente e execução local. Todas são validadas na partida por zod em `src/infra/ambiente.ts`: configuração ausente ou inválida derruba a aplicação com mensagem clara, sem estado intermediário.
+Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, `AUTH_SECRET`, `TZ_APP` e `NODE_ENV` na partida por zod em `src/infra/ambiente.ts`. Configuração ausente ou inválida derruba o processo com mensagem clara, sem estado intermediário.
 
-## Variáveis
+## Variáveis da aplicação
 
 | Variável     | Obrigatória | Padrão              | Descrição                                                                                           |
 | ------------ | ----------- | ------------------- | --------------------------------------------------------------------------------------------------- |
-| DATABASE_URL | sim         |                     | Connection string PostgreSQL: `postgresql://usuario:senha@host:porta/banco`.                        |
+| DATABASE_URL | sim         |                     | Connection string do runtime da API e do Prisma Client.                                             |
 | AUTH_SECRET  | sim         |                     | Segredo de 32 caracteres ou mais que assina o cookie de sessão. Gere com `openssl rand -base64 32`. |
-| TZ_APP       | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente e o rótulo de datas.                                        |
+| TZ_APP       | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente e os rótulos de datas.                                      |
 | NODE_ENV     | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure.                                      |
 
-Variáveis de script, usadas apenas pelos comandos de linha e nunca pela aplicação:
+## Conexões do Prisma e do Supabase
 
-| Variável    | Comando que usa | Descrição                                               |
-| ----------- | --------------- | ------------------------------------------------------- |
-| ADMIN_EMAIL | `criar-admin`   | E-mail do administrador inicial (primeiro usuário).     |
-| ADMIN_SENHA | `criar-admin`   | Senha do admin, mínimo 8 caracteres com letra e número. |
-| ADMIN_NOME  | `criar-admin`   | Nome de tratamento do administrador.                    |
-| CONTA_EMAIL | `criar-conta`   | E-mail da conta de professor (demonstração e testes).   |
-| CONTA_SENHA | `criar-conta`   | Senha inicial, mínimo 8 caracteres com letra e número.  |
-| CONTA_NOME  | `criar-conta`   | Nome de tratamento exibido no aplicativo.               |
-| SEED_ALUNOS | `seed`          | Alunos sintéticos por turma na semente.                 |
+| Variável     | Uso                                                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| DATABASE_URL | Runtime da API e Prisma Client. No Supabase, Transaction pooler na porta 6543.                                        |
+| DIRECT_URL   | Prisma CLI, migrations, Studio, migrador Docker e scripts administrativos. No Supabase, Session pooler na porta 5432. |
+
+Exemplo de produção:
+
+```text
+DATABASE_URL=postgresql://prisma.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require
+DIRECT_URL=postgresql://prisma.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require
+```
+
+O host, o usuário e a senha devem ser copiados do painel do Supabase. A senha precisa estar codificada para URL. A Transaction pooler é usada pelo runtime serverless. A Session pooler é usada pelo CLI e por operações que preservam estado de conexão.
+
+A conexão do runtime também pode usar uma conexão direta ou o pooler de sessão em ambientes persistentes. O Supabase em Vercel deve usar a Transaction pooler.
+
+## Variáveis de script
+
+| Variável    | Comando que usa          | Descrição                                               |
+| ----------- | ------------------------ | ------------------------------------------------------- |
+| ADMIN_EMAIL | `criar-admin`, bootstrap | E-mail do administrador inicial (primeiro usuário).     |
+| ADMIN_SENHA | `criar-admin`, bootstrap | Senha do admin, mínimo 8 caracteres com letra e número. |
+| ADMIN_NOME  | `criar-admin`, bootstrap | Nome de tratamento do administrador.                    |
+| CONTA_EMAIL | `criar-conta`            | E-mail da conta de professor (demonstração e testes).   |
+| CONTA_SENHA | `criar-conta`            | Senha inicial, mínimo 8 caracteres com letra e número.  |
+| CONTA_NOME  | `criar-conta`            | Nome de tratamento exibido no aplicativo.               |
+| SEED_ALUNOS | `seed`                   | Alunos sintéticos por turma na semente.                 |
 
 ## Execução local sem Docker
 
 Pré-requisitos: Node.js 20.19 ou superior e um PostgreSQL 17 acessível.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env
-# Edite DATABASE_URL e cole um AUTH_SECRET aleatório
+# Edite DATABASE_URL, DIRECT_URL e cole um AUTH_SECRET aleatório
 npx prisma migrate deploy
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin
 CONTA_EMAIL=professor@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Ana' npm run criar-conta
@@ -44,27 +62,27 @@ O aplicativo responde em http://localhost:3000. A página única é dinâmica: c
 
 ```bash
 cp .env.example .env
-# Defina apenas AUTH_SECRET; o restante segue o padrão do compose.yml
+# Defina AUTH_SECRET; o restante segue o padrão do compose.yml
 docker compose up --build
 ```
 
-O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações na partida e inicia o servidor. Os detalhes de orquestração estão em [deploy.md](deploy.md).
+O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações pela `DIRECT_URL` e inicia o servidor. As URLs internas usam o host `db`. Para criar o administrador inicial na partida, defina `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`; o bootstrap não altera uma conta que já exista. Os detalhes de orquestração estão em [deploy.md](deploy.md).
 
 ## Conexão do PostgreSQL
 
 A aplicação aceita qualquer PostgreSQL padrão pela connection string:
 
 - local com usuário e senha próprios;
-- Supabase e provedores similares, usando a conexão direta `:5432` ou o pooler de sessão;
+- Supabase e provedores similares, usando a conexão direta, a Session pooler ou a Transaction pooler;
 - contêiner do Docker Compose deste repositório (`db:5432`).
 
-PostgreSQL 17 é o alvo de desenvolvimento e teste; versões anteriores a 15 não têm suporte, e o 17 é recomendado por reunir as melhorias de vacuum e desempenho relevantes para o volume do aplicativo.
+PostgreSQL 17 é o alvo de desenvolvimento e teste. Versões anteriores a 15 não têm suporte.
 
-O mesmo valor de `DATABASE_URL` serve ao runtime e ao CLI do Prisma. Quando o provedor separar conexão de CLI (pooler de transação `:6543`), exporte também `DIRECT_URL` apontando para a conexão direta no momento de rodar migrações, sem alterar o código.
+A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do host usa `localhost`, para os comandos executados fora do Compose; o serviço `app` usa `db`, definido no `compose.yml`.
 
 ## Fuso horário
 
-`TZ_APP` decide qual é o dia corrente para o estado inicial da Chamada. Datas trafegam como texto `YYYY-MM-DD` do calendário local do professor e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade de Originais e o Histórico filtram por mês civil do mesmo calendário.
+`TZ_APP` decide qual é o dia corrente para o estado inicial da frequência. Datas trafegam como texto `YYYY-MM-DD` do calendário local do professor e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade de Originais e o Histórico filtram por mês civil do mesmo calendário.
 
 ## Verificação rápida
 

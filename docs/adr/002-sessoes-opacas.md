@@ -11,7 +11,7 @@ O acesso é pessoal e privado do professor. O aplicativo original delegava a aut
 ## Decisão
 
 - Sessões opacas: token aleatório de 32 bytes gerado no servidor, guardado no banco apenas como hash SHA-256.
-- Cookie `chamada_sessao` HttpOnly, SameSite=Lax, Secure em produção, com o valor assinado por HMAC curto derivado de `AUTH_SECRET` para impedir forja do conteúdo trafegado.
+- Cookie `frequenciapp_sessao` HttpOnly, SameSite=Lax, Secure em produção, com o valor assinado por HMAC curto derivado de `AUTH_SECRET` para impedir forja do conteúdo trafegado.
 - Validade de 30 dias, expiração registrada e purga de vencidas.
 - Sem cadastro público: a conta nasce do comando idempotente `criar-conta`.
 

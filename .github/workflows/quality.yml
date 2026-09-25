@@ -1,0 +1,48 @@
+name: Qualidade
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: qualidade-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  AUTH_SECRET: segredo-dummy-de-32-bytes-para-ci-0000
+  TZ_APP: America/Fortaleza
+
+jobs:
+  qualidade:
+    name: Formatação, lint, tipos e unidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Verificar formatação
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run tsc
+
+      - name: Testes unitários
+        run: npm run test:unit

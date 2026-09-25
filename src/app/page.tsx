@@ -2,7 +2,7 @@ import { identidadeAtual } from "@/application/sessao";
 import { alunosVisiveis } from "@/application/alunos";
 import { escopoDeTurmas } from "@/application/turmas";
 import { listarSeries } from "@/application/series";
-import { listarChamadasDoMes } from "@/application/chamadas";
+import { listarFrequenciasDoMes } from "@/application/frequencias";
 import { ambiente } from "@/infra/ambiente";
 import { diaLocal } from "@/domain/frequencia";
 import TelaLogin from "@/components/auth/tela-login";
@@ -17,11 +17,11 @@ export default async function Pagina() {
   }
   const dia = diaLocal(new Date(), ambiente.fuso);
   const mes = dia.slice(0, 7);
-  const [escopo, series, alunos, chamadas] = await Promise.all([
+  const [escopo, series, alunos, frequencias] = await Promise.all([
     escopoDeTurmas(usuario),
     listarSeries(),
     alunosVisiveis(usuario),
-    listarChamadasDoMes(usuario.id, mes),
+    listarFrequenciasDoMes(usuario.id, mes),
   ]);
   return (
     <Aplicacao
@@ -31,7 +31,7 @@ export default async function Pagina() {
       turmasIniciais={escopo.turmas}
       origensIniciais={escopo.origens}
       alunosIniciais={alunos}
-      chamadasIniciais={chamadas}
+      frequenciasIniciais={frequencias}
     />
   );
 }

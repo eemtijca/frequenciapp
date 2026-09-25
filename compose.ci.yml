@@ -1,0 +1,9 @@
+# Sobreposição do Compose só para o CI: segredos fictícios e a imagem
+# frequenciapp:ci construída pelo workflow. Espelhe aqui variáveis novas.
+services:
+  app:
+    # Imagem construída pelo passo de build do workflow (com cache).
+    # O `up -d` sem `--build` a reaproveita; sem ela, o Compose compila.
+    image: frequenciapp:ci
+    environment:
+      AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00

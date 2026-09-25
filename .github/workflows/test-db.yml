@@ -1,0 +1,112 @@
+name: Testes com Docker Compose
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: testes-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: write # Necessário para o cache GHA do build Docker.
+
+env:
+  # AUTH_SECRET é exigida na interpolação do compose.yml; o valor em
+  # execução no contêiner vem do compose.ci.yml.
+  AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+  DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+  TZ_APP: America/Fortaleza
+  APP_URL: http://127.0.0.1:3000
+
+jobs:
+  testes:
+    name: Compose, migrações e contratos
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar configurações do Compose
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.yml -f compose.ci.yml config --quiet
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Construir imagem (com cache, valida o Dockerfile)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: frequenciapp:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Gerar cliente Prisma
+        run: npm run db:generate
+
+      - name: Subir aplicação e banco
+        run: docker compose -f compose.yml -f compose.ci.yml up -d
+
+      - name: Aguardar a aplicação
+        run: |
+          for tentativa in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/saude > /dev/null; then
+              echo "Aplicação disponível após ${tentativa} tentativa(s)."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "A aplicação não respondeu no tempo esperado."
+          docker compose -f compose.yml -f compose.ci.yml logs app
+          exit 1
+
+      - name: Validar scripts administrativos no contêiner
+        run: |
+          # Exercita o dotenv e o driver pg dentro da imagem, além do
+          # módulo de decisão do bootstrap (--somente-criar).
+          docker compose -f compose.yml -f compose.ci.yml exec -T \
+            -e ADMIN_EMAIL=bootstrap@escola.exemplo \
+            -e ADMIN_SENHA=BootstrapFrequencia2026 \
+            -e ADMIN_NOME=Bootstrap \
+            app node scripts/criar-admin.mjs --somente-criar
+
+      - name: Criar administrador de teste
+        env:
+          ADMIN_EMAIL: direcao@escola.exemplo
+          ADMIN_SENHA: DirecaoFrequencia2026
+          ADMIN_NOME: Direção
+        run: npm run criar-admin
+
+      - name: Criar professor de teste
+        env:
+          CONTA_EMAIL: demo@escola.exemplo
+          CONTA_SENHA: DemoFrequencia2026
+          CONTA_NOME: Demo
+        run: npm run criar-conta
+
+      - name: Testes de contratos da API
+        run: npm run test:api
+
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: docker compose -f compose.yml -f compose.ci.yml logs
+
+      - name: Derrubar o ambiente
+        if: always()
+        run: docker compose -f compose.yml -f compose.ci.yml down -v --remove-orphans

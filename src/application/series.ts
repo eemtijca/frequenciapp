@@ -45,7 +45,6 @@ export async function listarSeries(): Promise<Serie[]> {
   return linhas.map(paraSerie);
 }
 
-/** Cria uma série. */
 export async function criarSerie(admin: { id: string }, entrada: unknown): Promise<Serie> {
   const dados = esquemaCriarSerie.safeParse(entrada);
   if (!dados.success) {
@@ -61,7 +60,6 @@ export async function criarSerie(admin: { id: string }, entrada: unknown): Promi
   return paraSerie(linha);
 }
 
-/** Atualiza nome ou ordem de uma série. */
 export async function atualizarSerie(
   admin: { id: string },
   id: string,

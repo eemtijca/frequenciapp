@@ -1,13 +1,13 @@
 # Documentação
 
-Índice da documentação do Chamada. Comece pelo [README](../README.md) para o uso rápido; os documentos abaixo aprofundam cada frente.
+Índice da documentação do FrequenciApp. Comece pelo [README](../README.md) para o uso rápido; os documentos abaixo aprofundam cada frente.
 
 | Documento                                | Conteúdo                                              |
 | ---------------------------------------- | ----------------------------------------------------- |
 | [arquitetura.md](arquitetura.md)         | Camadas, fluxo de requisição e organização do código. |
 | [ambiente.md](ambiente.md)               | Variáveis de ambiente e execução local.               |
 | [banco.md](banco.md)                     | Esquema, migrações e rotinas de banco.                |
-| [modelo-de-dados.md](modelo-de-dados.md) | Entidades, regras de frequência e derivacoes.         |
+| [modelo-de-dados.md](modelo-de-dados.md) | Entidades, regras de frequência e derivações.         |
 | [api.md](api.md)                         | Contratos das rotas HTTP.                             |
 | [interface.md](interface.md)             | Interface, movimento, PWA e acessibilidade.           |
 | [testes.md](testes.md)                   | Suítes, convenções e cobertura.                       |

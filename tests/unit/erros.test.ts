@@ -37,18 +37,18 @@ describe("traduzirErro", () => {
     expect(resultado.mensagem).toContain("turma");
   });
 
-  it("traduz duplicidade da chamada do dia", () => {
+  it("traduz duplicidade da frequência do dia", () => {
     const resultado = traduzirErro(
-      erroConhecido("P2002", { target: ["chamadas_professor_id_turma_id_dia_key"] }),
+      erroConhecido("P2002", { target: ["frequencias_professor_id_turma_id_dia_key"] }),
     );
     expect(resultado.status).toBe(409);
-    expect(resultado.mensagem).toContain("chamada");
+    expect(resultado.mensagem).toContain("frequência");
   });
 
   it("traduz registro em uso (P2003) por chave estrangeira", () => {
     const resultado = traduzirErro(erroConhecido("P2003", { field_name: "turmas_turma_id_fkey" }));
     expect(resultado.status).toBe(409);
-    expect(resultado.mensagem).toContain("alunos ou chamadas");
+    expect(resultado.mensagem).toContain("alunos ou frequências");
   });
 
   it("traduz P2003 desconhecida com mensagem genérica de uso", () => {

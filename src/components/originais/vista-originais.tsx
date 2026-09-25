@@ -1,19 +1,18 @@
 "use client";
 
-// Originais: grade de frequência pelas turmas de origem. Linhas são
-// alunos da turma original, colunas são os dias do mês e as células
-// trazem P, F ou vazio quando a turma não foi chamada.
+// Originais: grade pela turma de origem, com alunos nas linhas, dias nas
+// colunas e células P, F ou vazias.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { LoaderCircle, RefreshCw, Table2 } from "lucide-react";
-import type { Aluno, Chamada, Turma } from "@/domain/frequencia";
+import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
 import { montarGrade } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface Props {
   alunos: Aluno[];
-  chamadas: Chamada[];
+  frequencias: Frequencia[];
   mes: string;
   onMes: (mes: string) => void;
   onRecarregar: (mes: string) => Promise<void>;
@@ -22,7 +21,7 @@ interface Props {
 
 export default function VistaOriginais({
   alunos,
-  chamadas,
+  frequencias,
   mes,
   onMes,
   onRecarregar,
@@ -53,8 +52,8 @@ export default function VistaOriginais({
     const alunosDaTurma = alunos.filter(
       (aluno) => aluno.ativo && aluno.turmaOriginalId === turmaEfetiva,
     );
-    return montarGrade(alunosDaTurma, chamadas, mes);
-  }, [alunos, turmaEfetiva, chamadas, mes]);
+    return montarGrade(alunosDaTurma, frequencias, mes);
+  }, [alunos, turmaEfetiva, frequencias, mes]);
 
   async function atualizar() {
     setAtualizando(true);
@@ -80,9 +79,9 @@ export default function VistaOriginais({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Originais</h1>
           <p className="text-muted-foreground text-sm">
-            {chamadas.length === 0
+            {frequencias.length === 0
               ? "Consulta pelas turmas de origem"
-              : `${chamadas.length} ${chamadas.length === 1 ? "chamada no mês" : "chamadas no mês"}${totalFaltas > 0 ? ` · ${totalFaltas} ${totalFaltas === 1 ? "falta" : "faltas"}` : ""}`}
+              : `${frequencias.length} ${frequencias.length === 1 ? "frequência no mês" : "frequências no mês"}${totalFaltas > 0 ? ` · ${totalFaltas} ${totalFaltas === 1 ? "falta" : "faltas"}` : ""}`}
           </p>
         </div>
         <Button
@@ -218,7 +217,7 @@ export default function VistaOriginais({
                           ) : (
                             <span
                               className="text-muted-foreground/50 text-[10px]"
-                              aria-label="sem chamada"
+                              aria-label="sem frequência"
                             />
                           )}
                         </td>
@@ -249,7 +248,7 @@ export default function VistaOriginais({
               </span>
               falta
             </span>
-            <span>célula vazia: turma sem chamada no dia</span>
+            <span>célula vazia: turma sem frequência no dia</span>
           </div>
         </motion.div>
       )}

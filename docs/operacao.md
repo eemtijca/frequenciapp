@@ -1,10 +1,10 @@
 # Operação
 
-Rotinas do operador do Chamada: contas, backup, restauração e higiene de banco.
+Rotinas do operador do FrequenciApp: contas, backup, restauração e higiene de banco.
 
 ## Administrador inicial
 
-O primeiro usuário, com acesso root de configuração, nasce do `.env`:
+O primeiro usuário, com acesso root de configuração, nasce do ambiente:
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin
@@ -12,9 +12,11 @@ ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' n
 
 O comando é idempotente: reexecutar atualiza a senha, o nome e devolve o papel de administrador. A partir dele, o dia a dia de contas acontece na área de Gestão do próprio aplicativo.
 
+Com Docker Compose, preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env` cria o administrador na partida. Esse bootstrap é não destrutivo: se a conta já existir, ele a mantém e não regrava a senha.
+
 ## Contas de professor
 
-Pela área de Gestão (recomendado) ou pelo comando idempotente de demonstração:
+Pela área de Gestão, recomendado, ou pelo comando idempotente de demonstração:
 
 ```bash
 CONTA_EMAIL=professor@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Ana' npm run criar-conta
@@ -26,27 +28,33 @@ Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca 
 delete from sessoes where usuario_id = (select id from usuarios where email = 'professor@escola.br');
 ```
 
+## Conexões administrativas
+
+Use `DIRECT_URL` para operações administrativas, migrations, backup e restauração. No Supabase, essa variável deve apontar para a Session pooler ou para uma conexão direta. A Transaction pooler em `DATABASE_URL` é para o runtime da API.
+
 ## Backup
 
 ```bash
-pg_dump "$DATABASE_URL" -F c -f chamada-$(date +%F).dump
+pg_dump "$DIRECT_URL" -F c -f frequenciapp-$(date +%F).dump
 ```
 
-Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno (texto puro comprimido) e cobre a totalidade dos dados.
+Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno, texto puro comprimido, e cobre a totalidade dos dados.
 
 ## Restauração
 
 Em um banco vazio:
 
 ```bash
-pg_restore --clean --if-exists -d "$DATABASE_URL" chamada-2026-09-25.dump
+pg_restore --clean --if-exists -d "$DIRECT_URL" frequenciapp-2026-09-25.dump
 ```
 
-Conferência pós-restauração:
+Conferência posterior:
 
 ```sql
 select count(*) as alunos from alunos;
-select count(*) as chamadas, count(*) filter (where dia >= date_trunc('month', current_date)) as chamadas_mes from chamadas;
+select count(*) as frequencias,
+       count(*) filter (where dia >= date_trunc('month', current_date)) as frequencias_mes
+  from frequencias;
 ```
 
 ## Higiene
@@ -57,19 +65,19 @@ Sessões vencidas:
 delete from sessoes where expira_em < now();
 ```
 
-Trilha de auditoria antiga, conforme política de retenção definida com a escola:
+Trilha de auditoria antiga, conforme a política de retenção da escola:
 
 ```sql
 delete from auditoria where criado_em < now() - interval '1 year';
 ```
 
-Chamadas de períodos encerrados, quando o professor quiser arquivar em vez de manter:
+Frequências de períodos encerrados, quando o professor quiser arquivar em vez de manter:
 
 ```sql
-delete from chamadas where dia < '2025-12-01';
+delete from frequencias where dia < '2025-12-01';
 ```
 
-A exclusão respeita o histórico: discuta com o professor o período antes de rodar.
+A exclusão respeita o histórico. Confirme o período antes de executar o comando.
 
 ## Verificação de serviço
 
@@ -82,9 +90,9 @@ curl -s https://seu-dominio/api/saude
 ```bash
 git pull
 npm ci
-npx prisma migrate deploy
+DIRECT_URL=... npm run db:deploy
 npm run build
-# reinicie o processo (systemd, Docker ou plataforma)
+# Reinicie o processo do systemd, Docker ou plataforma.
 ```
 
-As migrações são aditivas por padrão; o changelog avisa quando houver passo destrutivo.
+As migrations são aditivas por padrão. O changelog avisa quando houver passo destrutivo.

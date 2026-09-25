@@ -1,6 +1,5 @@
-// Tradução de erros para português claro. Nenhum stack trace, código
-// interno ou termo técnico chega ao usuário: cada falha conhecida vira
-// uma mensagem curta e acionável, com status adequado.
+// Tradução de erros para português claro: cada falha conhecida vira mensagem
+// curta e acionável, sem termo técnico nem stack trace na resposta.
 import {
   PrismaClientInitializationError,
   PrismaClientKnownRequestError,
@@ -29,7 +28,7 @@ const NOMES_DE_CAMPO: Record<string, string> = {
   turmas_serie_id_nome_key: "turma",
   turmas_serie_nome_unico: "turma",
   sessoes_token_hash_key: "sessão",
-  chamadas_professor_id_turma_id_dia_key: "chamada",
+  frequencias_professor_id_turma_id_dia_key: "frequência",
   atribuicoes_pkey: "atribuição",
 };
 
@@ -43,14 +42,14 @@ function nomeAmigavel(alvos: string[] | undefined): string {
 
 /** Traduções de tabelas para mensagens de registro em uso (P2003). */
 const TABELAS_EM_USO: Record<string, string> = {
-  turmas_turma_id_fkey: "Esta turma ainda tem alunos ou chamadas registradas.",
+  turmas_turma_id_fkey: "Esta turma ainda tem alunos ou frequências registradas.",
   turmas_serie_id_fkey: "A série informada não existe mais.",
   alunos_turma_id_fkey: "A turma informada não existe mais.",
   alunos_turma_original_id_fkey: "A turma de origem informada não existe mais.",
-  chamadas_professor_id_fkey: "Este professor tem chamadas registradas.",
-  chamadas_turma_id_fkey: "Esta turma tem chamadas registradas.",
+  frequencias_professor_id_fkey: "Este professor tem frequências registradas.",
+  frequencias_turma_id_fkey: "Esta turma tem frequências registradas.",
   series_id_fkey: "Esta série ainda tem turmas.",
-  faltas_chamada_id_fkey: "A chamada não existe mais.",
+  faltas_frequencia_id_fkey: "A frequência não existe mais.",
   faltas_aluno_id_fkey: "O aluno não existe mais.",
   sessoes_usuario_id_fkey: "A conta não existe mais.",
   atribuicoes_professor_id_fkey: "O professor não existe mais.",
@@ -73,8 +72,8 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
       const campo = nomeAmigavel(alvos);
       return {
         mensagem:
-          campo === "chamada"
-            ? "Esta chamada já foi salva. Recarregue para ver a versão mais recente."
+          campo === "frequência"
+            ? "Esta frequência já foi salva. Recarregue para ver a versão mais recente."
             : campo === "registro"
               ? "Já existe um registro igual. Confira os dados e tente de novo."
               : `Já existe um registro com este ${campo}. Use outro valor.`,

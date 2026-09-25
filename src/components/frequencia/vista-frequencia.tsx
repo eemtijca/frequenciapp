@@ -1,8 +1,7 @@
 "use client";
 
-// Vista da chamada diária: todos presentes por padrão, toque no
-// aluno para marcar falta, toque de novo para voltar a presente.
-// Mantém rascunho em sessionStorage e protege conflitos por revisão.
+// Frequência diária: todos presentes por padrão; toque no aluno para marcar
+// falta e de novo para voltar. Rascunho local e proteção de conflito.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {
@@ -19,7 +18,7 @@ import {
 } from "lucide-react";
 import { addDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
-import type { Aluno, Chamada, Turma } from "@/domain/frequencia";
+import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
@@ -45,8 +44,8 @@ interface Props {
   alunos: Aluno[];
   diaCorrente: string;
   alvo: { dia: string; turmaId: string } | null;
-  onChamadasMudaram: (mes: string) => Promise<void>;
-  onPendencia: (visoes: "chamada"[]) => void;
+  onFrequenciasMudaram: (mes: string) => Promise<void>;
+  onPendencia: (visoes: "frequencia"[]) => void;
 }
 
 function diaSeguinte(dia: string, deslocamento: number): string {
@@ -55,7 +54,7 @@ function diaSeguinte(dia: string, deslocamento: number): string {
 }
 
 function chaveRascunho(professorId: string, dia: string, turmaId: string): string {
-  return `chamada:rascunho:${professorId}:${dia}:${turmaId}`;
+  return `frequencia:rascunho:${professorId}:${dia}:${turmaId}`;
 }
 
 interface Rascunho {
@@ -68,13 +67,13 @@ const MARCAS = {
   visivel: { scale: 1, opacity: 1 },
 } as const;
 
-export default function VistaChamada({
+export default function VistaFrequencia({
   usuario,
   turmas,
   alunos,
   diaCorrente,
   alvo,
-  onChamadasMudaram,
+  onFrequenciasMudaram,
   onPendencia,
 }: Props) {
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
@@ -92,7 +91,7 @@ export default function VistaChamada({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
 
-  // Sincroniza quando o histórico pede para abrir uma chamada específica.
+  // Sincroniza quando o histórico pede para abrir uma frequência específica.
   useEffect(() => {
     if (!alvo) return;
     setTurmaId(alvo.turmaId);
@@ -107,7 +106,7 @@ export default function VistaChamada({
   const turma = turmas.find((t) => t.id === turmaId);
   const chave = `${dia}|${turmaId}`;
 
-  // Carrega a chamada salva do dia e turma, e recupera rascunho local.
+  // Carrega a frequência salva do dia e turma, e recupera rascunho local.
   useEffect(() => {
     if (!dia || !turmaId) return;
     let viva = true;
@@ -122,15 +121,15 @@ export default function VistaChamada({
     setAtualizadoEm("");
     chaveCarregada.current = chave;
 
-    pedir<{ chamada: Chamada | null }>(
-      `/api/chamadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
+    pedir<{ frequencia: Frequencia | null }>(
+      `/api/frequencias?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
     )
       .then((dados) => {
         if (!viva) return;
-        const chamada = dados.chamada;
-        setFaltas(new Set(chamada?.faltas ?? []));
-        setRevisaoSalva(chamada?.revisao ?? 0);
-        setAtualizadoEm(chamada?.atualizadoEm ?? "");
+        const frequencia = dados.frequencia;
+        setFaltas(new Set(frequencia?.faltas ?? []));
+        setRevisaoSalva(frequencia?.revisao ?? 0);
+        setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
         try {
           const bruto = sessionStorage.getItem(chaveRascunho(usuario.id, dia, turmaId));
@@ -138,8 +137,8 @@ export default function VistaChamada({
             const rascunho = JSON.parse(bruto) as Rascunho;
             setFaltas(new Set(rascunho.faltas));
             setSujo(true);
-            if (rascunho.revisao === (chamada?.revisao ?? 0)) {
-              toast("Rascunho recuperado. Confira as faltas e salve a chamada.");
+            if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
+              toast("Rascunho recuperado. Confira as faltas e salve a frequência.");
             } else {
               setConflito(true);
               setErro(
@@ -154,7 +153,7 @@ export default function VistaChamada({
       .catch((excecao: unknown) => {
         if (!viva) return;
         setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a chamada.",
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a frequência.",
         );
       })
       .finally(() => {
@@ -178,7 +177,7 @@ export default function VistaChamada({
   }, [sujo, faltas, revisaoSalva, usuario.id, dia, turmaId]);
 
   useEffect(() => {
-    onPendencia(sujo ? ["chamada"] : []);
+    onPendencia(sujo ? ["frequencia"] : []);
   }, [sujo, onPendencia]);
 
   const ativosDaTurma = useMemo(
@@ -228,8 +227,8 @@ export default function VistaChamada({
     setSalvando(true);
     setErro("");
     try {
-      const dados = await pedir<{ chamada: Chamada }>(
-        "/api/chamadas",
+      const dados = await pedir<{ frequencia: Frequencia }>(
+        "/api/frequencias",
         corpoJson({
           dia,
           turmaId,
@@ -237,9 +236,9 @@ export default function VistaChamada({
           revisao: revisaoSalva,
         }),
       );
-      setFaltas(new Set(dados.chamada.faltas));
-      setRevisaoSalva(dados.chamada.revisao);
-      setAtualizadoEm(dados.chamada.atualizadoEm);
+      setFaltas(new Set(dados.frequencia.faltas));
+      setRevisaoSalva(dados.frequencia.revisao);
+      setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);
       setConflito(false);
       try {
@@ -247,25 +246,25 @@ export default function VistaChamada({
       } catch {
         // rascunho já removido
       }
-      const total = dados.chamada.faltas.length;
+      const total = dados.frequencia.faltas.length;
       toast.success(
         total === 0
-          ? "Chamada salva. Todos presentes."
-          : `Chamada salva com ${total} ${total === 1 ? "falta" : "faltas"}.`,
+          ? "Frequência salva. Todos presentes."
+          : `Frequência salva com ${total} ${total === 1 ? "falta" : "faltas"}.`,
       );
-      await onChamadasMudaram(dia.slice(0, 7));
+      await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
       const falha = excecao instanceof ErroApi ? excecao : null;
       if (falha?.conflito) {
-        const vigente = (falha.corpo as { chamada?: Chamada }).chamada;
+        const vigente = (falha.corpo as { frequencia?: Frequencia }).frequencia;
         if (vigente) {
           setRevisaoSalva(vigente.revisao);
           setAtualizadoEm(vigente.atualizadoEm);
         }
         setConflito(true);
       }
-      setErro(falha?.message ?? "Não foi possível salvar a chamada.");
-      toast.error(falha?.message ?? "Não foi possível salvar a chamada.");
+      setErro(falha?.message ?? "Não foi possível salvar a frequência.");
+      toast.error(falha?.message ?? "Não foi possível salvar a frequência.");
     } finally {
       setSalvando(false);
     }
@@ -289,11 +288,11 @@ export default function VistaChamada({
     : "";
 
   const tituloEstado = carregando
-    ? "Carregando chamada"
+    ? "Carregando frequência"
     : conflito
       ? "Confira o conflito"
       : salvando
-        ? "Salvando chamada"
+        ? "Salvando frequência"
         : erro
           ? sujo
             ? "Falha ao salvar"
@@ -302,7 +301,7 @@ export default function VistaChamada({
             ? "Alterações por salvar"
             : atualizadoEm
               ? "Salva na nuvem"
-              : "Nova chamada";
+              : "Nova frequência";
 
   const detalheEstado = carregando
     ? "Buscando o registro salvo."
@@ -317,10 +316,10 @@ export default function VistaChamada({
             : "Confira as faltas e toque em Salvar.";
 
   return (
-    <section aria-label="Fazer a chamada" className="flex flex-col gap-4">
+    <section aria-label="Registrar frequência" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Chamada diária</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Frequência diária</h1>
           <p className="text-muted-foreground text-sm">
             {carregando ? "" : `${ativosDaTurma.length} alunos ativos`}
           </p>
@@ -365,11 +364,11 @@ export default function VistaChamada({
           <ChevronLeft size={18} />
         </Button>
         <div className="relative flex-1">
-          <label htmlFor="dia-chamada" className="sr-only">
-            Data da chamada
+          <label htmlFor="dia-frequencia" className="sr-only">
+            Data da frequência
           </label>
           <Input
-            id="dia-chamada"
+            id="dia-frequencia"
             type="date"
             value={dia}
             disabled={travado}
@@ -396,7 +395,7 @@ export default function VistaChamada({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da chamada">
+      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
         <button
           type="button"
           aria-pressed={filtro === "faltas"}
@@ -505,7 +504,7 @@ export default function VistaChamada({
         {carregando ? (
           <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
             <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando chamada...
+            Carregando frequência...
           </div>
         ) : turmas.length === 0 ? (
           <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
@@ -529,7 +528,7 @@ export default function VistaChamada({
           <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
             <p className="font-medium">
               {filtro === "faltas" && busca === ""
-                ? "Nenhuma falta nesta chamada."
+                ? "Nenhuma falta nesta frequência."
                 : "Nenhum aluno neste filtro."}
             </p>
             <button

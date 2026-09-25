@@ -1,7 +1,5 @@
-// Casos de uso de usuários: gestão completa pelo administrador. Cria
-// professores e administradores, edita dados, redefine senha, ativa e
-// desativa, define as turmas atribuídas e exclui quando não há
-// histórico. Guardas: nunca remover o último administrador ativo.
+// Gestão de usuários pelo administrador: criar, editar, redefinir senha,
+// ativar, desativar, atribuir turmas e excluir. Nunca sem admin ativo.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { hashearSenha } from "@/infra/auth/hash";
@@ -241,7 +239,7 @@ export async function atualizarUsuario(
 }
 
 /**
- * Exclui um usuário. Bloqueado quando há chamadas registradas: o
+ * Exclui um usuário. Bloqueado quando há frequências registradas: o
  * histórico da escola depende do professor que o registrou. Nesses
  * casos, o caminho é desativar a conta.
  */
@@ -251,12 +249,12 @@ export async function removerUsuario(admin: Identidade, id: string): Promise<voi
   }
   const alvo = await banco().usuario.findUnique({
     where: { id },
-    include: { _count: { select: { chamadas: true } } },
+    include: { _count: { select: { frequencias: true } } },
   });
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
-  if (alvo._count.chamadas > 0) {
+  if (alvo._count.frequencias > 0) {
     throw new ErroHttp(
-      "Este professor tem chamadas registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
+      "Este professor tem frequências registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
       409,
     );
   }

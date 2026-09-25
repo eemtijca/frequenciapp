@@ -1,4 +1,4 @@
-# Chamada. Imagem da aplicação (Next.js standalone).
+# FrequenciApp. Imagem da aplicação (Next.js standalone).
 # Multi-estágio para manter a imagem final pequena.
 
 # 1. Dependências (prisma junto: o postinstall gera o cliente)
@@ -14,8 +14,14 @@ FROM node:24-bookworm-slim AS compilacao
 WORKDIR /app
 COPY --from=dependencias /app/node_modules ./node_modules
 COPY . .
+# O cliente é sempre regenerado no build, independente do que houver no host.
+COPY --from=dependencias /app/generated ./generated
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+    DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+    AUTH_SECRET=segredo-dummy-de-32-bytes-para-build-0000 \
+    TZ_APP=America/Fortaleza \
+    npm run build
 
 # 3. Execução (somente o necessário)
 FROM node:24-bookworm-slim AS execucao
@@ -30,11 +36,15 @@ COPY --from=compilacao /app/.next/standalone ./
 COPY --from=compilacao /app/.next/static ./.next/static
 COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/prisma ./prisma
+COPY --from=compilacao /app/generated ./generated
 COPY --from=compilacao /app/docker ./docker
 COPY --from=compilacao /app/scripts ./scripts
-# driver pg com dependências, para o migrador (fora da árvore standalone)
+# Fecho de dependências do migrador e dos scripts administrativos, que
+# rodam fora da árvore do standalone: pg e transitivas, mais dotenv.
+COPY --from=dependencias /app/node_modules/dotenv ./node_modules/dotenv
 COPY --from=dependencias /app/node_modules/pg ./node_modules/pg
 COPY --from=dependencias /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
+COPY --from=dependencias /app/node_modules/pg-int8 ./node_modules/pg-int8
 COPY --from=dependencias /app/node_modules/pg-pool ./node_modules/pg-pool
 COPY --from=dependencias /app/node_modules/pg-protocol ./node_modules/pg-protocol
 COPY --from=dependencias /app/node_modules/pg-types ./node_modules/pg-types
@@ -43,6 +53,8 @@ COPY --from=dependencias /app/node_modules/postgres-array ./node_modules/postgre
 COPY --from=dependencias /app/node_modules/postgres-bytea ./node_modules/postgres-bytea
 COPY --from=dependencias /app/node_modules/postgres-date ./node_modules/postgres-date
 COPY --from=dependencias /app/node_modules/postgres-interval ./node_modules/postgres-interval
+COPY --from=dependencias /app/node_modules/split2 ./node_modules/split2
+COPY --from=dependencias /app/node_modules/xtend ./node_modules/xtend
 RUN chmod +x ./docker/app/entrypoint.sh
 USER node
 EXPOSE 3000

@@ -278,7 +278,7 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
                       <AlertDialogHeader>
                         <AlertDialogTitle>Excluir a conta de {usuario.nome}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          A exclusão só é possível quando não há chamadas registradas pela conta.
+                          A exclusão só é possível quando não há frequências registradas pela conta.
                           Com histórico, o caminho é desativar.
                         </AlertDialogDescription>
                       </AlertDialogHeader>

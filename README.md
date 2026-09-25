@@ -1,16 +1,16 @@
-# Chamada
+# FrequenciApp
 
-Aplicativo de registro de frequência escolar para escolas. Feito para o uso real em sala: mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a chamada salva.
+Aplicativo de registro de frequência escolar para escolas. Feito para o uso real em sala: mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a frequência salva.
 
-O fluxo segue a prática do professor no papel: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram e salve. Tocar de novo em um aluno marcado devolve a presença. Salvar é necessário mesmo quando ninguém falta, porque a chamada do dia só existe depois de salva.
+O fluxo segue a prática do professor no papel: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram e salve. Tocar de novo em um aluno marcado devolve a presença. Salvar é necessário mesmo quando ninguém falta, porque a frequência do dia só existe depois de salva.
 
 ## Recursos
 
-- **Chamada diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local.
+- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local.
 - **Gestão pela administração**: séries, turmas, alunos e contas de professores em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
 - **Professores e papéis**: o administrador configura tudo e atribui as turmas de cada professor; contas desativadas perdem o acesso na hora.
-- **Proteção contra conflitos**: uma chamada por dia, turma e professor; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
-- **Histórico**: chamadas salvas por mês, abertas em um toque para conferência ou correção.
+- **Proteção contra conflitos**: uma frequência por dia, turma e professor; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
+- **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
 - **Originais**: grade de frequência pelas turmas de origem, com alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
@@ -27,7 +27,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o aplicativo em http://localhost:3000. Em seguida, crie o administrador inicial (primeiro usuário, acesso root de configuração):
+O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o aplicativo em http://localhost:3000. O administrador inicial (primeiro usuário, acesso root de configuração) pode ser criado na partida: basta preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`. O bootstrap não altera uma conta que já exista, então reiniciar o contêiner não regrava a senha. Para criar ou trocar a senha depois, rode o comando que sempre aplica os valores:
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direção' \
@@ -47,7 +47,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 ## Stack
 
 - Next.js 16 (App Router) com TypeScript estrito.
-- PostgreSQL 17 com Prisma ORM 7, acesso por connection string (`DATABASE_URL`) e adaptador oficial `pg`.
+- PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
 - Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administrador e professor.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
 - Tailwind CSS 4 com componentes shadcn/ui personalizados e animações com Motion.
@@ -95,7 +95,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 
 ## Privacidade
 
-O aplicativo guarda o mínimo necessário: nome de chamada dos alunos, turmas e as faltas registradas. Nenhum outro dado pessoal é coletado e nenhum serviço de terceiros recebe dados dos alunos. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
+O aplicativo guarda o mínimo necessário: nome dos alunos, turmas e as faltas registradas. Nenhum outro dado pessoal é coletado e nenhum serviço de terceiros recebe dados dos alunos. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
 
 ## Licença
 

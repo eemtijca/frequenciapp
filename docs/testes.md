@@ -14,7 +14,7 @@ A de unidade roda em qualquer máquina sem banco. A de contratos sobe sozinha na
 
 ## Unidade
 
-- `tests/unit/frequencia.test.ts`: validação de dias e meses contra o calendário real, dias do mês, fuso na resolução do dia corrente, rótulo composto de turma, marca do aluno (falta prevalece, presença exige chamada, vazio sem chamada), montagem da grade por turma de origem, resumo de chamada e normalização de busca com acentos e ordinais.
+- `tests/unit/frequencia.test.ts`: validação de dias e meses contra o calendário real, dias do mês, fuso na resolução do dia corrente, rótulo composto de turma, marca do aluno (falta prevalece, presença exige frequência, vazio sem frequência), montagem da grade por turma de origem, resumo de frequência e normalização de busca com acentos e ordinais.
 - `tests/unit/usuarios.test.ts`: política de senha em todos os caminhos (curta, sem letra, sem número, longa demais, acentos aceitos), primeiro nome de saudação e rótulo de papel.
 - `tests/unit/erros.test.ts`: tradução das exceções do Prisma para português com status correto (duplicidade, registro em uso, sumido, banco ocupado, serialização, validação, conexão), erro desconhecido sem vazar detalhe e classificadores de conflito.
 - `tests/unit/hash.test.ts`: ida e volta do scrypt, recusa de senha errada e de hashes malformados, sais distintos por hash.
@@ -32,7 +32,7 @@ A de unidade roda em qualquer máquina sem banco. A de contratos sobe sozinha na
 - turmas: criação, duplicata na série, série inexistente (404), exclusão com alunos barrada com orientação;
 - professores: criação com política de senha, e-mail duplicado, atualização de nome e turmas, atribuição de turma inexistente, auto-rebaixamento e auto-desativação barrados, conta desativada não entra, exclusão com histórico barrada e sem histórico permitida;
 - alunos: origem padrão na própria turma, ordem sequencial, mudança de turma preservando a origem, turma inexistente;
-- chamadas: criação com falta, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de falta de aluno de outra turma com atomicidade conferida, professor sem atribuição barrado (403), parâmetros inválidos, consulta por dia e por mês;
+- frequências: criação com falta, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de falta de aluno de outra turma com atomicidade conferida, professor sem atribuição barrado (403), parâmetros inválidos, consulta por dia e por mês;
 - conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros aparelhos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas;
 - saída encerrando a sessão e verificação de saúde.

@@ -23,7 +23,6 @@ function scryptAssincrono(
   });
 }
 
-/** Gera o hash de uma senha para armazenamento. */
 export async function hashearSenha(senha: string): Promise<string> {
   const sal = randomBytes(16);
   const chave = await scryptAssincrono(senha, sal, TAMANHO_CHAVE, PARAMETROS);

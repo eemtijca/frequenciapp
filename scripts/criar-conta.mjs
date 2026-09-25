@@ -1,7 +1,5 @@
-// Cria ou atualiza a conta de um professor de forma idempotente.
-// Útil para contas de demonstração e testes; o gerenciamento do dia a
-// dia acontece na área de Gestão do administrador.
-// Uso: CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... npm run criar-conta
+// Cria ou atualiza a conta de um professor (idempotente). Uso:
+// CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... npm run criar-conta
 import { randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
@@ -39,9 +37,9 @@ if (senha.length < 8 || !/[a-zA-ZÀ-ÿ]/.test(senha) || !/[0-9]/.test(senha)) {
   process.exit(1);
 }
 
-const url = process.env.DATABASE_URL;
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url || !(url.startsWith("postgresql://") || url.startsWith("postgres://"))) {
-  console.error("DATABASE_URL deve ser uma connection string PostgreSQL.");
+  console.error("DIRECT_URL ou DATABASE_URL deve ser uma connection string PostgreSQL.");
   process.exit(1);
 }
 

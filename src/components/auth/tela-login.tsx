@@ -49,7 +49,7 @@ export default function TelaLogin() {
             <LockKeyhole size={22} strokeWidth={1.8} />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Chamada</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
             <p className="text-muted-foreground mt-1 text-sm">
               Registro de frequência dos seus alunos.
             </p>

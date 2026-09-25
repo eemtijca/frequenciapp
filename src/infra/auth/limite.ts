@@ -1,7 +1,5 @@
-// Limitador de tentativas em memória, por chave (por exemplo,
-// e-mail mais origem). Suficiente para implantação de instância
-// única; ambientes com múltiplas instâncias devem usar um
-// armazenamento compartilhado, ver docs/seguranca.md.
+// Limitador de tentativas em memória, por chave. Basta para instância única;
+// várias instâncias exigem armazenamento compartilhado (docs/seguranca.md).
 const JANELA_MS = 15 * 60 * 1000;
 const MAXIMO_TENTATIVAS = 10;
 

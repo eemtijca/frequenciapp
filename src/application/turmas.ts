@@ -1,6 +1,5 @@
-// Casos de uso de turmas: gestão completa pelo administrador e
-// listagem pelo escopo de quem pede. Professores veem as turmas
-// atribuídas; administradores veem todas.
+// Turmas: gestão completa pelo administrador e listagem pelo escopo de quem
+// pede. Professor vê as atribuídas; administrador vê todas.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
@@ -172,7 +171,7 @@ export async function atualizarTurma(
 }
 
 /**
- * Exclui uma turma sem alunos e sem chamadas. Com histórico, o caminho
+ * Exclui uma turma sem alunos e sem frequências. Com histórico, o caminho
  * é preservar: a exclusão é barrada com mensagem orientando o que fazer.
  */
 export async function removerTurma(admin: { id: string }, id: string): Promise<void> {
@@ -180,15 +179,16 @@ export async function removerTurma(admin: { id: string }, id: string): Promise<v
     where: { id },
     include: {
       serie: { select: { nome: true } },
-      _count: { select: { alunos: true, chamadas: true } },
+      _count: { select: { alunos: true, frequencias: true } },
     },
   });
   if (!existente) throw new ErroHttp("Turma não encontrada.", 404);
-  const { alunos, chamadas } = existente._count;
-  if (alunos > 0 || chamadas > 0) {
+  const { alunos, frequencias } = existente._count;
+  if (alunos > 0 || frequencias > 0) {
     const partes: string[] = [];
     if (alunos > 0) partes.push(`${alunos} ${alunos === 1 ? "aluno" : "alunos"}`);
-    if (chamadas > 0) partes.push(`${chamadas} ${chamadas === 1 ? "chamada" : "chamadas"}`);
+    if (frequencias > 0)
+      partes.push(`${frequencias} ${frequencias === 1 ? "frequência" : "frequências"}`);
     throw new ErroHttp(
       `Esta turma ainda tem ${partes.join(" e ")}. Mova ou exclua antes de apagar a turma.`,
       409,
@@ -201,8 +201,11 @@ export async function removerTurma(admin: { id: string }, id: string): Promise<v
   });
 }
 
-/** Confere se o professor pode fazer chamada na turma. */
-export async function podeChamarTurma(identidade: Identidade, turmaId: string): Promise<boolean> {
+/** Confere se o professor pode registrar frequência na turma. */
+export async function podeRegistrarFrequencia(
+  identidade: Identidade,
+  turmaId: string,
+): Promise<boolean> {
   if (identidade.papel === "ADMIN") return true;
   const atribuicao = await banco().atribuicao.findUnique({
     where: { professorId_turmaId: { professorId: identidade.id, turmaId } },
