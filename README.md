@@ -1,21 +1,21 @@
 # FrequenciApp
 
-Aplicativo de registro de frequência escolar para escolas. Feito para o uso real em sala: mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a frequência salva.
+Aplicativo da coordenação escolar: chamada única diária, saídas antecipadas e indicadores da escola. Mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a chamada salva.
 
-O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram e salve. Tocar de novo em um aluno marcado devolve a presença. Alunos que saem no meio da aula ficam ausentes apenas nas aulas que perderam. Salvar é necessário mesmo quando ninguém falta, porque a frequência do dia só existe depois de salva.
+O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram, escolha a justificativa quando houver e salve. O Painel mostra a infrequência do dia por série e por turma, a área Saiu mais cedo registra quem saiu antes com justificativa e responsável, e os Relatórios reúnem histórico, grade por período e o resumo por aluno.
 
 ## Recursos
 
-- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local. A saída no meio da aula é registrada por aluno, aula a aula, com chips por aula na linha marcada.
-- **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
-- **Coordenação e administração**: a coordenação registra a frequência, consulta o histórico e a grade; a administração configura tudo. Contas desativadas perdem o acesso na hora.
-- **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
-- **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
-- **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, S, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
-- **Busca em todas as listas**: frequência, histórico, grade, alunos e gestão com filtro local e tolerância a acentos.
-- **PWA completo**: instala no dispositivo como aplicativo, abre em Frequência ou na Grade do mês pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
+- **Chamada diária**: turmas por toque, data com navegação por setas, busca por nome, resumo ao vivo e salvamento com rascunho local. A falta pode receber um código de justificativa e vira FJ; o acumulado do aluno aparece na lista e no resumo de faltas.
+- **Saídas antecipadas**: registro separado da chamada, com momento (aulas, intervalos e almoço), justificativa, observação e responsável pela liberação escolhido na equipe ativa. As saídas do dia por turma e o relatório semanal por aluno completam a área.
+- **Painel do dia**: gráficos de infrequência por série e por turma, total de faltas (F + FJ), taxa de infrequência, cobertura das chamadas e turmas pendentes.
+- **Relatórios**: histórico por mês com filtro de série, grade por turma de origem nos modos dia, semana de aula, período e mês, com a coluna acumulada, e relatório por aluno com faltas, justificadas e saídas.
+- **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe, mais as configurações de recursos e a cópia de segurança em JSON.
+- **Configurações de recursos**: a chamada por aula (chips de aulas e marca S) fica disponível para quando for usada e desligada por padrão; a área de saídas antecipadas pode ser ocultada sem perder registros.
+- **Proteção contra conflitos**: uma chamada por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
+- **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
-- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
+- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador acompanhando o gesto, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
 - **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
 
 ## Começando
@@ -52,7 +52,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 - PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
 - Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração e coordenação.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
-- Tailwind CSS 4 com componentes shadcn/ui personalizados e animações com Motion.
+- Tailwind CSS 4 com componentes shadcn/ui personalizados, animações com Motion e gráficos com Recharts.
 - Service worker próprio para a experiência instalável e o aviso offline.
 - Vitest para testes de unidade e contratos de API.
 

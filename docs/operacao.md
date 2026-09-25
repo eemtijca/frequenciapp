@@ -40,6 +40,10 @@ pg_dump "$DIRECT_URL" -F c -f frequenciapp-$(date +%F).dump
 
 Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno, texto puro comprimido, e cobre a totalidade dos dados.
 
+### Cópia JSON pela Gestão
+
+A administração também pode baixar e importar uma cópia JSON em Gestão, Configurações, Cópia de segurança. Ela reúne séries, turmas, aulas, alunos, chamadas, saídas e configurações, serve para migração entre instalações e conferência, e a importação mescla sem sobrescrever o que já existe. A cópia JSON não substitui o `pg_dump`: para restauração completa e rotinas de operação, use o dump do banco.
+
 ## Restauração
 
 Em um banco vazio:

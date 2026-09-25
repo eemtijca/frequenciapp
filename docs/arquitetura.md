@@ -56,7 +56,7 @@ O cliente mantém rascunho em sessionStorage enquanto houver marcações não sa
 
 ## Página única com visões locais
 
-O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Frequência, Histórico e Grade para todos; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da frequência em aberto.
+O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Saiu mais cedo e Relatórios para todos; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
 
 ## Organização de diretórios
 
@@ -71,7 +71,11 @@ src/
       turmas/               listagem e CRUD do administrador
       horarios/             aulas da turma: listagem, criação, edição e exclusão
       usuarios/             gestão de contas pelo administrador
-      frequencias/          consulta por dia, lista do mês e salvamento
+      responsaveis/         equipe ativa que pode liberar saídas
+      frequencias/          consulta por dia, período ou mês, salvamento e resumo acumulado
+      saidas/               registro, consulta e remoção de saídas antecipadas
+      configuracoes/        leitura e atualização dos recursos da escola
+      backup/               exportação e importação da cópia JSON
       saude/                verificação de saúde
     page.tsx                página única: sessão, pré-busca e shell
     error.tsx               fronteira de erro amigável
@@ -81,19 +85,26 @@ src/
   components/
     aplicacao.tsx           shell com visões e navegação inferior
     auth/                   tela de entrada
-    frequencia/                vista da frequência diária
+    painel/                 indicadores do dia com gráficos
+    frequencia/             vista da chamada diária
+    saidas/                 registro e relatórios das saídas antecipadas
+    relatorios/             sub-abas de histórico, grade e por aluno
     historico/              vista do histórico
-    grade/                  vista da Grade do mês por turma de origem
+    grade/                  grade por turma de origem com modos de período
     alunos/                 lista de consulta da coordenação
-    gestao/                 área do administrador (abas e diálogos)
+    gestao/                 área do administrador (abas, diálogos e configurações)
     conta/                  diálogo de troca de senha
     pwa/                    registro do service worker e avisos
     ui/                     conjunto shadcn/ui personalizado
   domain/
-    frequencia.ts           regras puras de frequência
+    frequencia.ts           regras puras de frequência, justificativas e saídas
+    relatorios.ts           indicadores e relatórios derivados
     usuarios.ts             política de senha, papéis e rótulos
   application/
-    frequencias.ts          carregar, listar e salvar a frequência compartilhada
+    frequencias.ts          carregar, listar, salvar e resumir o acumulado
+    saidas.ts               registrar, listar e remover saídas antecipadas
+    configuracoes.ts        ler e atualizar os recursos da escola
+    backup.ts               exportar e importar a cópia JSON
     alunos.ts               listar e gerenciar alunos
     series.ts               listar e gerenciar séries
     turmas.ts               listar, criar, editar e excluir turmas com aula padrão
@@ -135,3 +146,5 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-009: erros de banco traduzidos para português claro](adr/009-erros-amigaveis.md)
 - [ADR-010: frequência única por turma e dia com faltas por aula](adr/010-frequencia-unica-com-aulas.md)
 - [ADR-011: lembrar o login no dispositivo](adr/011-lembrar-login.md)
+- [ADR-012: chamada diária com faltas justificadas, saídas antecipadas e recursos opcionais](adr/012-chamada-diaria-com-saidas.md)
+- [ADR-013: grade por período e cópia de segurança em JSON](adr/013-grade-por-periodo-e-copia-json.md)

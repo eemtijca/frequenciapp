@@ -42,7 +42,7 @@ Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que 
 - Dois papéis: `ADMIN` gerencia séries, turmas, aulas, alunos e contas; `COORDENACAO` registra a frequência e consulta o histórico e a grade do mês. As duas funções veem os dados escolares, que são o objeto do serviço.
 - Guardas intransponíveis: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta. A frequência é dado da escola: excluir uma conta preserva o histórico e anula a autoria.
 - A guarda do último administrador roda dentro da transação serializável, junto da escrita, para duas alterações simultâneas não deixarem a escola sem acesso de configuração.
-- A frequência é única por turma e dia, com revisão; a checagem de duplicata e de revisão acontece no banco, e o salvamento revalida alunos e aulas dentro da transação. Os contratos de API testam o caso diretamente.
+- A frequência é única por turma e dia, com revisão; a checagem de duplicata e de revisão acontece no banco, e o salvamento revalida alunos e aulas dentro da transação. A saída antecipada é única por aluno e dia, e o registro separado não altera a chamada. Os contratos de API testam os casos diretamente.
 
 ## Trilha de auditoria
 
