@@ -35,6 +35,8 @@ services:
       DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
+      # Implantação sem TLS em rede confiável (ver .env.example).
+      PERMITIR_HTTP: ${PERMITIR_HTTP:-false}
       # Bootstrap opcional do administrador inicial. Quando preenchidas no
       # .env, o entrypoint cria o admin apenas se ele ainda não existir.
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}

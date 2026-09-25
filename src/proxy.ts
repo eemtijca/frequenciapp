@@ -11,6 +11,13 @@ function hostProprio(req: NextRequest): string {
   return hostPublico.toLowerCase();
 }
 
+/** Requisição chegou por HTTPS (direto ou atrás de proxy que informa o protocolo). */
+function pedidoHttps(req: NextRequest): boolean {
+  const encaminhado = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  if (encaminhado) return encaminhado === "https";
+  return new URL(req.url).protocol === "https:";
+}
+
 /** Nega mutação cross-site (CSRF). GET/HEAD/OPTIONS passam. */
 function negarCsrf(req: NextRequest): boolean {
   if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return false;
@@ -43,6 +50,8 @@ export function proxy(request: NextRequest) {
   // Nonce por requisição libera apenas os scripts marcados pelo layout.
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const ehDev = process.env.NODE_ENV === "development";
+  // Sem TLS, forçar upgrade para HTTPS quebraria os recursos da própria página.
+  const exigirHttps = !ehDev && pedidoHttps(request);
 
   const csp = [
     "default-src 'self'",
@@ -59,7 +68,7 @@ export function proxy(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(ehDev ? [] : ["upgrade-insecure-requests"]),
+    ...(exigirHttps ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
   const cabecalhosRequisicao = new Headers(request.headers);

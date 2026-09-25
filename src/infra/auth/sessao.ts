@@ -39,11 +39,12 @@ function hashDoToken(token: string): string {
 /**
  * Cria uma sessão nova e grava o cookie HttpOnly. Com `lembrar`, o cookie é
  * persistente por 30 dias; sem, é cookie de sessão com validade de 12 horas.
+ * `cookiesSeguros` decide o atributo Secure (produção sem HTTP liberado).
  */
 export async function criarSessao(
   usuarioId: string,
   segredo: string,
-  ehProducao: boolean,
+  cookiesSeguros: boolean,
   lembrar: boolean,
 ): Promise<void> {
   const token = randomBytes(32).toString("hex");
@@ -53,7 +54,7 @@ export async function criarSessao(
   armazem.set(NOME_COOKIE, valorAssinado(token, segredo), {
     httpOnly: true,
     sameSite: "lax",
-    secure: ehProducao,
+    secure: cookiesSeguros,
     path: "/",
     ...(lembrar ? { expires: expiraEm } : {}),
   });
@@ -86,7 +87,7 @@ export async function sessaoAtual(segredo: string): Promise<SessaoAtiva | null> 
 }
 
 /** Encerra a sessão corrente e limpa o cookie. */
-export async function encerrarSessao(segredo: string, ehProducao: boolean): Promise<void> {
+export async function encerrarSessao(segredo: string, cookiesSeguros: boolean): Promise<void> {
   const armazem = await cookies();
   const valor = armazem.get(NOME_COOKIE)?.value;
   if (valor) {
@@ -100,7 +101,7 @@ export async function encerrarSessao(segredo: string, ehProducao: boolean): Prom
   armazem.set(NOME_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: ehProducao,
+    secure: cookiesSeguros,
     path: "/",
     maxAge: 0,
   });
