@@ -68,6 +68,16 @@ docker compose up --build
 
 O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações pela `DIRECT_URL` e inicia o servidor. Os detalhes de orquestração estão em [deploy.md](deploy.md).
 
+### GitHub Codespaces
+
+A imagem padrão do Codespaces pode bloquear a comunicação bridge entre os serviços `app` e `db`, mesmo com o PostgreSQL saudável. Use o override versionado:
+
+```bash
+docker compose -f compose.yml -f compose.local.yml up --build
+```
+
+O arquivo `compose.local.yml` mantém o banco no serviço `db`, mas faz o contêiner da aplicação alcançar a porta publicada no host por `host.docker.internal`. Ele é específico para esse ambiente; o comando normal continua sendo `docker compose up --build` fora do Codespaces. Os detalhes de diagnóstico estão em [deploy.md](deploy.md).
+
 ## Conexão do PostgreSQL
 
 A aplicação aceita qualquer PostgreSQL padrão pela connection string:
@@ -78,7 +88,7 @@ A aplicação aceita qualquer PostgreSQL padrão pela connection string:
 
 PostgreSQL 17 é o alvo de desenvolvimento e teste. Versões anteriores a 15 não têm suporte.
 
-A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do host usa `localhost`; o serviço Compose usa `db`.
+A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do host usa `localhost`; o serviço Compose usa `db` por padrão. O override `compose.local.yml` troca apenas o host visto pelo serviço `app` para `host.docker.internal`, necessário em alguns Codespaces.
 
 ## Fuso horário
 

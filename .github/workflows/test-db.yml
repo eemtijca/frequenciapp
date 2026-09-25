@@ -36,6 +36,11 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Validar configurações do Compose
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.yml -f compose.local.yml config --quiet
+
       - name: Gerar cliente Prisma
         run: npm run db:generate
 

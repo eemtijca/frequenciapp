@@ -27,6 +27,12 @@ cp .env.example .env
 docker compose up --build
 ```
 
+No GitHub Codespaces, a rede bridge pode exigir o override local:
+
+```bash
+docker compose -f compose.yml -f compose.local.yml up --build
+```
+
 O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o aplicativo em http://localhost:3000. Em seguida, crie o administrador inicial (primeiro usuário, acesso root de configuração):
 
 ```bash

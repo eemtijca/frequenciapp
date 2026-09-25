@@ -23,6 +23,16 @@ postgresql://frequencia:frequencia@db:5432/frequencia
 
 O `.env` do host usa `localhost`, para permitir executar `npm run criar-admin`, `npm run criar-conta`, `npm run seed` e a suíte de API contra o banco publicado.
 
+### GitHub Codespaces
+
+A imagem padrão do Codespaces pode não permitir o tráfego bridge entre `app` e `db`, embora o healthcheck do PostgreSQL esteja saudável. Use o override local:
+
+```bash
+docker compose -f compose.yml -f compose.local.yml up --build
+```
+
+O override define `host.docker.internal:host-gateway` e faz a aplicação usar a porta PostgreSQL publicada no host do Codespaces. Ele não altera o serviço `db`, não habilita autenticação por senha vazia e não deve ser usado como configuração de produção.
+
 Criação do administrador inicial e da semente dentro do contêiner:
 
 ```bash
@@ -54,7 +64,7 @@ docker run -p 3000:3000 \
   frequenciapp
 ```
 
-O contêiner espera o banco, aplica as migrações e inicia o servidor standalone. O migrador tolera indisponibilidade inicial do banco por até 2 minutos.
+O contêiner espera o banco, aplica as migrações e inicia o servidor standalone. O migrador tenta a conexão por aproximadamente 2 minutos, com timeout de 5 segundos por tentativa e mensagens específicas para timeout, DNS, porta, credenciais e banco inexistente.
 
 ## Supabase
 
