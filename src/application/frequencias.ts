@@ -3,13 +3,11 @@
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
-import { auditar } from "@/infra/auditoria";
 import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade } from "@/infra/erros";
 import { podeRegistrarFrequencia } from "@/application/turmas";
 import {
   ehDiaValido,
   ehMesValido,
-  rotuloDeTurma,
   type Frequencia,
   type ResultadoSalvamento,
 } from "@/domain/frequencia";
@@ -89,10 +87,7 @@ export async function salvarFrequencia(
   }
   const { dia, turmaId, faltas, revisao } = dados.data;
 
-  const turma = await banco().turma.findUnique({
-    where: { id: turmaId },
-    include: { serie: { select: { nome: true } } },
-  });
+  const turma = await banco().turma.findUnique({ where: { id: turmaId } });
   if (!turma) throw new ErroHttp("Turma não encontrada.", 404);
   if (!(await podeRegistrarFrequencia(identidade, turmaId))) {
     throw new ErroHttp("Você não tem esta turma atribuída. Procure o administrador.", 403);
@@ -101,7 +96,6 @@ export async function salvarFrequencia(
   const diaUtc = new Date(`${dia}T12:00:00Z`);
   const ausentes = [...new Set(faltas)];
   const filtroFrequencia = { professorId: identidade.id, dia: diaUtc, turmaId } as const;
-  const alvo = `turma ${rotuloDeTurma(turma.serie.nome, turma.nome)} em ${dia}`;
 
   try {
     return await comTransacao(async (tx) => {
@@ -138,7 +132,6 @@ export async function salvarFrequencia(
           },
           ...COMPLEMENTO,
         });
-        await auditar(tx, identidade.id, "frequencia.salvar", `${alvo} (nova)`);
         return { situacao: "salvo" as const, frequencia: paraFrequencia(criada) };
       }
 
@@ -165,7 +158,6 @@ export async function salvarFrequencia(
           data: ausentes.map((alunoId) => ({ frequenciaId: linha.id, alunoId })),
         });
       }
-      await auditar(tx, identidade.id, "frequencia.salvar", `${alvo} (revisão ${linha.revisao})`);
       return {
         situacao: "salvo" as const,
         frequencia: { ...paraFrequencia(linha), faltas: ausentes },

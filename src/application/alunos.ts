@@ -104,7 +104,7 @@ export async function criarAluno(admin: { id: string }, entrada: unknown): Promi
         ordem: (ultimo?.ordem ?? 0) + 1,
       },
     });
-    await auditar(tx, admin.id, "aluno.criar", dados.data.nome);
+    await auditar(tx, admin.id, "aluno.criar", `aluno:${criado.id}`);
     return criado;
   });
   return paraAluno(linha);
@@ -143,7 +143,7 @@ export async function atualizarAluno(
         ...(dados.data.ativo !== undefined ? { ativo: dados.data.ativo } : {}),
       },
     });
-    await auditar(tx, admin.id, "aluno.atualizar", atualizado.nome);
+    await auditar(tx, admin.id, "aluno.atualizar", `aluno:${id}`);
     return atualizado;
   });
   return paraAluno(linha);
@@ -158,6 +158,6 @@ export async function removerAluno(admin: { id: string }, id: string): Promise<v
   if (!existente) throw new ErroHttp("Aluno não encontrado.", 404);
   await comTransacao(async (tx) => {
     await tx.aluno.delete({ where: { id } });
-    await auditar(tx, admin.id, "aluno.excluir", existente.nome);
+    await auditar(tx, admin.id, "aluno.excluir", `aluno:${id}`);
   });
 }
