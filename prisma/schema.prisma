@@ -1,10 +1,10 @@
 // Esquema do banco. Fonte da verdade para o Prisma Client.
 //
 // Princípio de minimização (LGPD): a tabela faltas guarda apenas os
-// casos de ausência. Presença é o estado implícito de toda frequencia
+// casos de ausência. Presença é o estado implícito de toda frequência
 // salva: quem não tem registro de falta naquele dia esteve presente.
 //
-// Uma frequencia existe por (professor, dia, turma). A coluna revisao
+// Uma frequência existe por (professor, dia, turma). A coluna revisao
 // implementa concorrência otimista entre aparelhos: salvamentos
 // concorrentes são rejeitados com 409 em vez de sobrescrita silenciosa.
 //
@@ -23,7 +23,7 @@ datasource db {
 }
 
 // Papel do usuário. ADMIN gerencia tudo (séries, turmas, alunos e
-// professores); PROFESSOR faz a frequencia das turmas atribuídas.
+// professores); PROFESSOR registra a frequência das turmas atribuídas.
 enum Papel {
   ADMIN
   PROFESSOR
@@ -78,7 +78,7 @@ model Serie {
 }
 
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
-// enquanto houver alunos ou frequencias vinculadas: histórico não fica
+// enquanto houver alunos ou frequências vinculadas: histórico não fica
 // órfão, e o administrador é orientado a mover ou excluir antes.
 model Turma {
   id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -96,7 +96,7 @@ model Turma {
 }
 
 // Atribuição de um professor a uma turma: define quais turmas cada
-// professor pode chamar. O administrador enxerga todas.
+// professor pode registrar. O administrador enxerga todas.
 model Atribuicao {
   professorId String   @map("professor_id") @db.Uuid
   turmaId     String   @map("turma_id") @db.Uuid
@@ -109,7 +109,7 @@ model Atribuicao {
   @@map("atribuicoes")
 }
 
-// Aluno de uma turma. Nome de frequencia, turma atual (de onde parte a
+// Aluno de uma turma. Nome do aluno, turma atual (de onde parte a
 // frequência diária) e turma original (referência de origem para a
 // consulta agrupada). Nenhum outro dado pessoal é armazenado.
 model Aluno {
@@ -129,7 +129,7 @@ model Aluno {
   @@map("alunos")
 }
 
-// Frequencia de um dia e turma por um professor. revisao 1 no primeiro
+// Frequência de um dia e turma por um professor. revisao 1 no primeiro
 // salvamento e crescimento a cada atualização bem-sucedida.
 model Frequencia {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -148,7 +148,7 @@ model Frequencia {
   @@map("frequencias")
 }
 
-// Falta de um aluno em uma frequencia. Presença não gera linha.
+// Falta de um aluno em uma frequência. Presença não gera linha.
 model Falta {
   frequenciaId String     @map("frequencia_id") @db.Uuid
   alunoId      String     @map("aluno_id") @db.Uuid
