@@ -3,17 +3,23 @@ import { describe, expect, it } from "vitest";
 import {
   diaDaSemanaIso,
   diaLocal,
+  diaSeguinte,
   diasDoMes,
   ehDiaValido,
   ehHoraValida,
   ehMesValido,
+  horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
+  mesSeguinte,
   montarGrade,
   normalizar,
+  partesNoFuso,
   resumirFrequencia,
   rotuloAula,
+  rotuloDataCurta,
   rotuloDeTurma,
+  rotuloDiaSemana,
   type Aluno,
   type Frequencia,
   type Horario,
@@ -126,6 +132,65 @@ describe("diaDaSemanaIso", () => {
     expect(diaDaSemanaIso("2026-09-26")).toBe(6);
     expect(diaDaSemanaIso("2026-09-27")).toBe(7);
     expect(diaDaSemanaIso("2026-09-28")).toBe(1);
+  });
+});
+
+describe("diaSeguinte", () => {
+  it("anda em dias dentro do mês", () => {
+    expect(diaSeguinte("2026-09-25", 1)).toBe("2026-09-26");
+    expect(diaSeguinte("2026-09-25", -1)).toBe("2026-09-24");
+  });
+  it("vira mês e ano corretamente", () => {
+    expect(diaSeguinte("2026-09-30", 1)).toBe("2026-10-01");
+    expect(diaSeguinte("2026-01-01", -1)).toBe("2025-12-31");
+    expect(diaSeguinte("2028-02-28", 1)).toBe("2028-02-29");
+  });
+});
+
+describe("mesSeguinte", () => {
+  it("anda em meses dentro do ano", () => {
+    expect(mesSeguinte("2026-09", 1)).toBe("2026-10");
+    expect(mesSeguinte("2026-09", -1)).toBe("2026-08");
+  });
+  it("vira o ano nos dois sentidos", () => {
+    expect(mesSeguinte("2026-12", 1)).toBe("2027-01");
+    expect(mesSeguinte("2026-01", -1)).toBe("2025-12");
+  });
+});
+
+describe("rotuloDiaSemana", () => {
+  it("devolve o dia por extenso", () => {
+    expect(rotuloDiaSemana("2026-09-25")).toBe("sexta-feira");
+    expect(rotuloDiaSemana("2026-09-27")).toBe("domingo");
+  });
+});
+
+describe("rotuloDataCurta", () => {
+  it("monta DD/MM", () => {
+    expect(rotuloDataCurta("2026-09-05")).toBe("05/09");
+  });
+});
+
+describe("horaNoFuso", () => {
+  it("converte o mesmo instante em fusos diferentes", () => {
+    const instante = "2026-09-25T13:30:00Z";
+    expect(horaNoFuso(instante, "America/Fortaleza")).toBe("10:30");
+    expect(horaNoFuso(instante, "Asia/Tokyo")).toBe("22:30");
+  });
+  it("devolve vazio para instante inválido", () => {
+    expect(horaNoFuso("não é data", "America/Fortaleza")).toBe("");
+  });
+});
+
+describe("partesNoFuso", () => {
+  it("resolve o dia da semana e os minutos no fuso pedido", () => {
+    const instante = new Date("2026-09-25T02:30:00Z");
+    const fortaleza = partesNoFuso(instante, "America/Fortaleza");
+    expect(fortaleza.diaSemana).toBe(4);
+    expect(fortaleza.minutos).toBe(23 * 60 + 30);
+    const tokyo = partesNoFuso(instante, "Asia/Tokyo");
+    expect(tokyo.diaSemana).toBe(5);
+    expect(tokyo.minutos).toBe(11 * 60 + 30);
   });
 });
 

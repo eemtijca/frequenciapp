@@ -2,9 +2,11 @@
 // com faltas por aula, proteção de duplicata e conflito por revisão.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
+import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade } from "@/infra/erros";
 import {
+  diaLocal,
   ehDiaValido,
   ehMesValido,
   horariosDoDia,
@@ -117,6 +119,11 @@ export async function salvarFrequencia(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   const { dia, turmaId, revisao } = dados.data;
+
+  // O dia corrente vem do fuso da escola, nunca do relógio do cliente.
+  if (dia > diaLocal(new Date(), ambiente.fuso)) {
+    throw new ErroHttp("Não é possível registrar frequência em dia futuro.", 400);
+  }
 
   const turma = await banco().turma.findUnique({
     where: { id: turmaId },

@@ -125,12 +125,102 @@ export function diasDoMes(mes: string): string[] {
   const [anoTexto = "0", numeroTexto = "0"] = mes.split("-");
   const ano = Number(anoTexto);
   const numero = Number(numeroTexto);
-  const total = new Date(ano, numero, 0).getUTCDate();
+  const total = new Date(Date.UTC(ano, numero, 0)).getUTCDate();
   const dias: string[] = [];
   for (let dia = 1; dia <= total; dia += 1) {
     dias.push(`${mes}-${String(dia).padStart(2, "0")}`);
   }
   return dias;
+}
+
+const NOMES_DOS_DIAS = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
+
+/** Dia da semana por extenso, a partir do dia civil. */
+export function rotuloDiaSemana(dia: string): string {
+  const data = new Date(`${dia}T12:00:00Z`);
+  return NOMES_DOS_DIAS[data.getUTCDay()] ?? "";
+}
+
+/** Data curta DD/MM, para rótulos densos. */
+export function rotuloDataCurta(dia: string): string {
+  const [, mes = "", numero = ""] = dia.split("-");
+  return `${numero}/${mes}`;
+}
+
+/** Dia civil deslocado em dias, sem depender do fuso do processo. */
+export function diaSeguinte(dia: string, deslocamento: number): string {
+  const [anoTexto = "0", mesTexto = "0", numeroTexto = "0"] = dia.split("-");
+  const data = new Date(
+    Date.UTC(Number(anoTexto), Number(mesTexto) - 1, Number(numeroTexto) + deslocamento),
+  );
+  return data.toISOString().slice(0, 10);
+}
+
+/** Mês civil deslocado em meses, formato YYYY-MM. */
+export function mesSeguinte(mes: string, deslocamento: number): string {
+  const [anoTexto = "0", numeroTexto = "0"] = mes.split("-");
+  const data = new Date(Date.UTC(Number(anoTexto), Number(numeroTexto) - 1 + deslocamento, 1));
+  return data.toISOString().slice(0, 7);
+}
+
+/** Hora local de um instante ISO no fuso da escola, formato HH:MM. */
+export function horaNoFuso(instanteIso: string, fuso: string): string {
+  const data = new Date(instanteIso);
+  if (Number.isNaN(data.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: fuso,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(data);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Dia da semana ISO e minutos do dia no fuso da escola, independentes do
+ * fuso do navegador. Espelha a decisão do servidor para a aula corrente.
+ */
+export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; minutos: number } {
+  const nomes: Record<string, number> = {
+    Sun: 7,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  try {
+    const formatador = new Intl.DateTimeFormat("en-US", {
+      timeZone: fuso,
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const partes = formatador.formatToParts(agora);
+    const valor = (tipo: Intl.DateTimeFormatPartTypes): string =>
+      partes.find((parte) => parte.type === tipo)?.value ?? "";
+    const diaSemana = nomes[valor("weekday")] ?? diaDaSemanaIso(diaLocal(agora, fuso));
+    const horas = Number(valor("hour")) % 24;
+    return { diaSemana, minutos: horas * 60 + Number(valor("minute")) };
+  } catch {
+    return {
+      diaSemana: diaDaSemanaIso(diaLocal(agora, fuso)),
+      minutos: agora.getUTCHours() * 60 + agora.getUTCMinutes(),
+    };
+  }
 }
 
 /**

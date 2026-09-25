@@ -208,7 +208,7 @@ Semântica da `revisao`:
 - `0` cria a primeira versão. Se já existe frequência do dia e turma, responde 409 com a versão vigente.
 - `N` atualiza apenas se a versão vigente for `N`; a divergência responde 409 com a versão vigente.
 
-Validações: aulas precisam pertencer à turma, estar ativas e acontecer no dia da semana; a lista de alunos é revalidada contra os alunos ativos da turma dentro da transação, aceitando quem já tinha falta registrada naquela frequência. O salvamento roda em transação serializável (ADR-007).
+Validações: o dia não pode ser futuro (fuso da escola); as aulas precisam pertencer à turma, estar ativas e acontecer no dia da semana; a lista de alunos é revalidada contra os alunos ativos da turma dentro da transação, aceitando quem já tinha falta registrada naquela frequência. O salvamento roda em transação serializável (ADR-007).
 
 Respostas:
 

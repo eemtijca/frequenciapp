@@ -714,6 +714,21 @@ describe("frequências (uma por turma e dia)", () => {
     expect(turmaInvalida.status).toBe(400);
   });
 
+  it("recusa registro em dia futuro", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: "2099-06-15",
+        turmaId: turmaQA?.id,
+        faltas: [],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(400);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("dia futuro");
+  });
+
   it("consulta por dia e por mês com filtros", async () => {
     const porDia = await autenticado(
       cookieCoord,

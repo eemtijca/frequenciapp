@@ -27,6 +27,7 @@ export default async function Pagina() {
     <Aplicacao
       usuario={usuario}
       diaCorrente={dia}
+      fuso={ambiente.fuso}
       seriesIniciais={series}
       turmasIniciais={turmas}
       alunosIniciais={alunos}

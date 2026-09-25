@@ -18,10 +18,9 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { addDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { normalizar } from "@/domain/frequencia";
+import { diaSeguinte, horaNoFuso, normalizar, rotuloDiaSemana } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -45,15 +44,11 @@ interface Props {
   turmas: Turma[];
   alunos: Aluno[];
   diaCorrente: string;
+  fuso: string;
   alvo: { dia: string; turmaId: string } | null;
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "frequencia"[]) => void;
   onAbrirGestao?: () => void;
-}
-
-function diaSeguinte(dia: string, deslocamento: number): string {
-  const base = parseISO(`${dia}T12:00:00`);
-  return format(addDays(base, deslocamento), "yyyy-MM-dd");
 }
 
 function chaveRascunho(professorId: string, dia: string, turmaId: string): string {
@@ -75,6 +70,7 @@ export default function VistaFrequencia({
   turmas,
   alunos,
   diaCorrente,
+  fuso,
   alvo,
   onFrequenciasMudaram,
   onPendencia,
@@ -290,12 +286,8 @@ export default function VistaFrequencia({
   }
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
-  const horaSalva = atualizadoEm
-    ? new Date(atualizadoEm).toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
+  const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
 
   const tituloEstado = carregando
     ? "Carregando frequência"
@@ -363,7 +355,10 @@ export default function VistaFrequencia({
         </div>
         <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
           <CalendarDays size={16} aria-hidden="true" />
-          <span className="numerais-tabulares">{rotuloDia}</span>
+          <span>
+            <span className="numerais-tabulares">{rotuloDia}</span>
+            {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
+          </span>
         </span>
       </div>
 
@@ -408,6 +403,7 @@ export default function VistaFrequencia({
             id="dia-frequencia"
             type="date"
             value={dia}
+            max={diaCorrente}
             disabled={travado}
             onChange={(evento) => {
               if (evento.target.value) setDia(evento.target.value);
@@ -420,12 +416,22 @@ export default function VistaFrequencia({
           size="icon"
           className="size-11 rounded-lg"
           aria-label="Dia seguinte"
-          disabled={travado || !dia}
+          disabled={travado || !dia || dia >= diaCorrente}
           onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
         >
           <ChevronRight size={18} />
         </Button>
       </div>
+      {dia !== diaCorrente && (
+        <button
+          type="button"
+          disabled={travado}
+          onClick={() => setDia(diaCorrente)}
+          className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
+        >
+          Voltar para hoje
+        </button>
+      )}
       {sujo && (
         <p className="text-muted-foreground text-xs">
           Salve ou descarte as alterações para mudar a data ou a turma.

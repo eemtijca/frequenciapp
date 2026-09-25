@@ -4,9 +4,9 @@
 // colunas e células P, F ou vazias.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, RefreshCw, Table2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { montarGrade } from "@/domain/frequencia";
+import { mesSeguinte, montarGrade } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -14,6 +14,8 @@ interface Props {
   alunos: Aluno[];
   frequencias: Frequencia[];
   mes: string;
+  mesCorrente: string;
+  hoje: string;
   onMes: (mes: string) => void;
   onRecarregar: (mes: string) => Promise<void>;
   origens: Turma[];
@@ -23,6 +25,8 @@ export default function VistaOriginais({
   alunos,
   frequencias,
   mes,
+  mesCorrente,
+  hoje,
   onMes,
   onRecarregar,
   origens,
@@ -117,19 +121,41 @@ export default function VistaOriginais({
             </button>
           );
         })}
-        <div className="ml-auto">
-          <label htmlFor="mes-originais" className="sr-only">
-            Mês da consulta
-          </label>
-          <Input
-            id="mes-originais"
-            type="month"
-            value={mes}
-            onChange={(evento) => {
-              if (evento.target.value) onMes(evento.target.value);
-            }}
-            className="numerais-tabulares h-11 w-44 rounded-lg font-medium"
-          />
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-11 rounded-lg"
+            aria-label="Mês anterior"
+            onClick={() => onMes(mesSeguinte(mes, -1))}
+          >
+            <ChevronLeft size={18} />
+          </Button>
+          <div className="relative">
+            <label htmlFor="mes-originais" className="sr-only">
+              Mês da consulta
+            </label>
+            <Input
+              id="mes-originais"
+              type="month"
+              value={mes}
+              max={mesCorrente}
+              onChange={(evento) => {
+                if (evento.target.value) onMes(evento.target.value);
+              }}
+              className="numerais-tabulares h-11 w-44 rounded-lg font-medium"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-11 rounded-lg"
+            aria-label="Mês seguinte"
+            disabled={mes >= mesCorrente}
+            onClick={() => onMes(mesSeguinte(mes, 1))}
+          >
+            <ChevronRight size={18} />
+          </Button>
         </div>
       </div>
 
@@ -172,7 +198,9 @@ export default function VistaOriginais({
                     <th
                       key={dia}
                       scope="col"
-                      className="numerais-tabulares text-muted-foreground w-8 px-1 py-2 text-center text-[11px] font-medium"
+                      className={`numerais-tabulares w-8 px-1 py-2 text-center text-[11px] font-medium ${
+                        dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                      }`}
                     >
                       {dia.slice(8)}
                     </th>
@@ -200,7 +228,10 @@ export default function VistaOriginais({
                     {grade.dias.map((dia) => {
                       const marca = linha.marcas[dia];
                       return (
-                        <td key={dia} className="px-1 py-1.5 text-center">
+                        <td
+                          key={dia}
+                          className={`px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
+                        >
                           {marca === "F" ? (
                             <span
                               className="bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"

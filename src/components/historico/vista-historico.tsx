@@ -3,14 +3,24 @@
 // Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
 import { motion } from "motion/react";
-import { ArrowUpRight, History, LoaderCircle, RefreshCw } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  LoaderCircle,
+  RefreshCw,
+} from "lucide-react";
 import type { Frequencia } from "@/domain/frequencia";
+import { horaNoFuso, mesSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface Props {
   frequencias: Frequencia[];
   mes: string;
+  mesCorrente: string;
+  fuso: string;
   onMes: (mes: string) => void;
   onAbrir: (dia: string, turmaId: string) => void;
   onRecarregar: (mes: string) => Promise<void>;
@@ -18,21 +28,20 @@ interface Props {
   rotuloTurma: (id: string) => string;
 }
 
-const DIAS_DA_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-
 function rotuloDia(dia: string): { numero: string; mesAno: string; semana: string } {
   const [ano, mes, diaDoMes] = dia.split("-");
-  const data = new Date(`${dia}T12:00:00`);
   return {
     numero: diaDoMes ?? "",
     mesAno: `${mes}/${ano}`,
-    semana: DIAS_DA_SEMANA[data.getDay()] ?? "",
+    semana: rotuloDiaSemana(dia).slice(0, 3),
   };
 }
 
 export default function VistaHistorico({
   frequencias,
   mes,
+  mesCorrente,
+  fuso,
   onMes,
   onAbrir,
   onRecarregar,
@@ -87,19 +96,41 @@ export default function VistaHistorico({
         </Button>
       </div>
 
-      <div>
-        <label htmlFor="mes-historico" className="sr-only">
-          Mês do histórico
-        </label>
-        <Input
-          id="mes-historico"
-          type="month"
-          value={mes}
-          onChange={(evento) => {
-            if (evento.target.value) onMes(evento.target.value);
-          }}
-          className="numerais-tabulares h-11 rounded-lg font-medium"
-        />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11 rounded-lg"
+          aria-label="Mês anterior"
+          onClick={() => onMes(mesSeguinte(mes, -1))}
+        >
+          <ChevronLeft size={18} />
+        </Button>
+        <div className="relative flex-1">
+          <label htmlFor="mes-historico" className="sr-only">
+            Mês do histórico
+          </label>
+          <Input
+            id="mes-historico"
+            type="month"
+            value={mes}
+            max={mesCorrente}
+            onChange={(evento) => {
+              if (evento.target.value) onMes(evento.target.value);
+            }}
+            className="numerais-tabulares h-11 rounded-lg font-medium"
+          />
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11 rounded-lg"
+          aria-label="Mês seguinte"
+          disabled={mes >= mesCorrente}
+          onClick={() => onMes(mesSeguinte(mes, 1))}
+        >
+          <ChevronRight size={18} />
+        </Button>
       </div>
 
       {bloqueado && (
@@ -126,12 +157,7 @@ export default function VistaHistorico({
         <ul className="bg-card divide-y overflow-hidden rounded-lg border">
           {ordenadas.map((frequencia) => {
             const rotulo = rotuloDia(frequencia.dia);
-            const hora = frequencia.atualizadoEm
-              ? new Date(frequencia.atualizadoEm).toLocaleTimeString("pt-BR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "";
+            const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
             return (
               <motion.li
                 key={`${frequencia.dia}|${frequencia.turmaId}`}

@@ -16,7 +16,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 
 ## Unidade
 
-- `tests/unit/frequencia.test.ts`: validação de dias, meses e horários contra o calendário real, dia da semana ISO, aulas do dia, dias do mês, fuso na resolução do dia corrente, rótulo composto de turma e de aula, marca do aluno (falta prevalece, presença exige frequência, falta parcial conta como falta, vazio sem frequência), montagem da grade, resumo de frequência e normalização de busca com acentos e ordinais.
+- `tests/unit/frequencia.test.ts`: validação de dias, meses e horários contra o calendário real, dia da semana ISO, aulas do dia, dias do mês, dia seguinte e mês seguinte sem depender do fuso, hora no fuso da escola, fuso na resolução do dia corrente, rótulo composto de turma e de aula, marca do aluno (falta prevalece, presença exige frequência, falta parcial conta como falta, vazio sem frequência), montagem da grade, resumo de frequência e normalização de busca com acentos e ordinais.
 - `tests/unit/usuarios.test.ts`: política de senha em todos os caminhos (curta, sem letra, sem número, longa demais, acentos aceitos), primeiro nome de saudação e rótulo de papel.
 - `tests/unit/erros.test.ts`: tradução das exceções do Prisma para português com status correto (duplicidade, registro em uso, sumido, banco ocupado, serialização, validação, conexão), erro desconhecido sem vazar detalhe e classificadores de conflito.
 - `tests/unit/hash.test.ts`: ida e volta do scrypt, recusa de senha errada e de hashes malformados, sais distintos por hash.
@@ -36,7 +36,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - aulas: criação com janela e dias da semana, ordem repetida (409), horário invertido e dias vazios (400), edição, desativação, exclusão com faltas barrada e sem histórico permitida;
 - equipe: criação com política de senha, e-mail duplicado, atualização de nome, auto-rebaixamento e auto-desativação barrados, conta desativada não entra, reativação, exclusão preservando o histórico com autoria anulada;
 - alunos: origem padrão na própria turma, ordem sequencial, mudança de turma preservando a origem, turma inexistente;
-- frequências: criação com falta em todas as aulas, falta por aula específica, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de aula de outra turma e de aula fora do dia, aluno desativado com falta registrada aceito, aluno desativado novo rejeitado, parâmetros inválidos, consulta por dia e por mês com filtros de turma e de autoria;
+- frequências: criação com falta em todas as aulas, falta por aula específica, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de aula de outra turma e de aula fora do dia, aluno desativado com falta registrada aceito, aluno desativado novo rejeitado, dia futuro recusado, parâmetros inválidos, consulta por dia e por mês com filtros de turma e de autoria;
 - conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros aparelhos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas e a ausência de nomes de alunos;
 - saída encerrando a sessão e verificação de saúde.

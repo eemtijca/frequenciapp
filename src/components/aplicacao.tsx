@@ -35,6 +35,7 @@ export type Visao = "frequencia" | "historico" | "originais" | "alunos" | "gesta
 interface Props {
   usuario: Identidade;
   diaCorrente: string;
+  fuso: string;
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
@@ -57,6 +58,7 @@ const TRANSICAO = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
 export default function Aplicacao({
   usuario,
   diaCorrente,
+  fuso,
   seriesIniciais,
   turmasIniciais,
   alunosIniciais,
@@ -209,6 +211,7 @@ export default function Aplicacao({
                   turmas={turmas}
                   alunos={alunos}
                   diaCorrente={diaCorrente}
+                  fuso={fuso}
                   alvo={alvo}
                   onFrequenciasMudaram={recarregarFrequencias}
                   onPendencia={setPendencias}
@@ -219,6 +222,8 @@ export default function Aplicacao({
                 <VistaHistorico
                   frequencias={frequencias}
                   mes={mes}
+                  mesCorrente={diaCorrente.slice(0, 7)}
+                  fuso={fuso}
                   onMes={setMes}
                   onAbrir={abrirFrequencia}
                   onRecarregar={recarregarFrequencias}
@@ -231,6 +236,8 @@ export default function Aplicacao({
                   alunos={alunos}
                   frequencias={frequencias}
                   mes={mes}
+                  mesCorrente={diaCorrente.slice(0, 7)}
+                  hoje={diaCorrente}
                   onMes={setMes}
                   onRecarregar={recarregarFrequencias}
                   origens={turmas}
