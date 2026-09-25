@@ -172,7 +172,7 @@ export async function atualizarTurma(
 }
 
 /**
- * Exclui uma turma sem alunos e sem frequencias. Com histórico, o caminho
+ * Exclui uma turma sem alunos e sem frequências. Com histórico, o caminho
  * é preservar: a exclusão é barrada com mensagem orientando o que fazer.
  */
 export async function removerTurma(admin: { id: string }, id: string): Promise<void> {
@@ -189,7 +189,7 @@ export async function removerTurma(admin: { id: string }, id: string): Promise<v
     const partes: string[] = [];
     if (alunos > 0) partes.push(`${alunos} ${alunos === 1 ? "aluno" : "alunos"}`);
     if (frequencias > 0)
-      partes.push(`${frequencias} ${frequencias === 1 ? "frequencia" : "frequencias"}`);
+      partes.push(`${frequencias} ${frequencias === 1 ? "frequência" : "frequências"}`);
     throw new ErroHttp(
       `Esta turma ainda tem ${partes.join(" e ")}. Mova ou exclua antes de apagar a turma.`,
       409,

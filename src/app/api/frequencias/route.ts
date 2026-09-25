@@ -1,4 +1,4 @@
-// Frequencias: consulta por dia e turma, lista do mês e salvamento
+// Frequências: consulta por dia e turma, lista do mês e salvamento
 // com proteção de duplicata e conflito de revisão.
 import {
   carregarFrequencia,
@@ -46,7 +46,7 @@ export async function POST(requisicao: Request): Promise<Response> {
     const resultado = await salvarFrequencia(sessao.usuario, await corpoJson(requisicao));
     if (resultado.situacao === "conflito") {
       return erroApi(
-        "Esta frequencia foi salva em outro aparelho. A versão mais recente está abaixo; confira as marcações e salve de novo.",
+        "Esta frequência foi salva em outro aparelho. A versão mais recente está abaixo; confira as marcações e salve de novo.",
         409,
         { conflito: true, frequencia: resultado.frequencia },
       );

@@ -1,4 +1,4 @@
-# Chamada. Imagem da aplicação (Next.js standalone).
+# FrequenciApp. Imagem da aplicação (Next.js standalone).
 # Multi-estágio para manter a imagem final pequena.
 
 # 1. Dependências (prisma junto: o postinstall gera o cliente)

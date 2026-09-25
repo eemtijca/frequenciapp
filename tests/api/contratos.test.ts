@@ -430,7 +430,7 @@ describe("gestão de alunos (admin)", () => {
   });
 });
 
-describe("frequencias (ACID e concorrência)", () => {
+describe("frequências (ACID e concorrência)", () => {
   const cookieQA = { valor: "" };
 
   it("professor de QA entra", async () => {
@@ -439,7 +439,7 @@ describe("frequencias (ACID e concorrência)", () => {
     cookieQA.valor = resultado.cookie;
   });
 
-  it("salva a frequencia do dia com falta", async () => {
+  it("salva a frequência do dia com falta", async () => {
     const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
@@ -530,7 +530,7 @@ describe("frequencias (ACID e concorrência)", () => {
     expect(resposta.status).toBe(400);
     const dados = (await resposta.json()) as { error: string };
     expect(dados.error).toContain("lista de alunos mudou");
-    // Atomicidade: nada foi gravado na frequencia rejeitada.
+    // Atomicidade: nada foi gravado na frequência rejeitada.
     const consulta = await autenticado(
       cookieQA.valor,
       `/api/frequencias?dia=${DIA_TESTE_2}&turmaId=${turmaQA?.id}`,

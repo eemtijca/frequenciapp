@@ -1,9 +1,9 @@
-// Service worker do Chamada: casca offline mínima e respeitosa.
+// Service worker do FrequenciApp: casca offline mínima e respeitosa.
 // Regras:
 // - Dados da API nunca são cacheados (frequência é dado vivo).
 // - Navegação tenta a rede; sem rede, entrega a página offline.
 // - Arquivos estáticos (ícones, manifesto) usam cache com revalidação.
-const VERSAO = "chamada-3";
+const VERSAO = "frequenciapp-3";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",

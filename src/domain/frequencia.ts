@@ -20,7 +20,7 @@ export interface Turma {
   serieNome: string;
 }
 
-/** Aluno de uma turma. Dados mínimos para a finalidade de frequencia. */
+/** Aluno de uma turma. Dados mínimos para a finalidade de frequência. */
 export interface Aluno {
   id: string;
   nome: string;
@@ -30,7 +30,7 @@ export interface Aluno {
   ativo: boolean;
 }
 
-/** Frequencia salva de um dia e turma. Faltas por identificador do aluno. */
+/** Frequência salva de um dia e turma. Faltas por identificador do aluno. */
 export interface Frequencia {
   dia: string;
   turmaId: string;
@@ -89,10 +89,10 @@ export function diasDoMes(mes: string): string[] {
 }
 
 /**
- * Marca de um aluno em um dia, a partir das frequencias do mês.
- * Regra: falta se houver registro de falta em qualquer frequencia do dia;
- * presente se a turma atual do aluno teve frequencia naquele dia; vazio
- * quando a turma não foi frequencia.
+ * Marca de um aluno em um dia, a partir das frequências do mês.
+ * Regra: falta se houver registro de falta em qualquer frequência do dia;
+ * presente se a turma atual do aluno teve frequência naquele dia; vazio
+ * quando a turma não teve frequência.
  */
 export function marcaDoAluno(
   aluno: Aluno,
@@ -147,7 +147,7 @@ export function montarGrade(
 }
 
 /**
- * Resumo de uma frequencia para a lista do histórico.
+ * Resumo de uma frequência para a lista do histórico.
  */
 export interface ResumoFrequencia {
   frequencia: Frequencia;

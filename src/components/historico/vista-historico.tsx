@@ -1,6 +1,6 @@
 "use client";
 
-// Histórico: frequencias salvas de um mês, abertas em um toque.
+// Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, History, LoaderCircle, RefreshCw } from "lucide-react";
@@ -48,7 +48,7 @@ export default function VistaHistorico({
     try {
       await onRecarregar(mes);
     } catch {
-      setErro("Não foi possível buscar as frequencias.");
+      setErro("Não foi possível buscar as frequências.");
     } finally {
       setAtualizando(false);
     }
@@ -61,14 +61,14 @@ export default function VistaHistorico({
   );
 
   return (
-    <section aria-label="Histórico de frequencias" className="flex flex-col gap-4">
+    <section aria-label="Histórico de frequências" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Histórico</h1>
           <p className="text-muted-foreground text-sm">
             {frequencias.length === 0
-              ? "Frequencias salvas do mês"
-              : `${frequencias.length} ${frequencias.length === 1 ? "frequencia salva" : "frequencias salvas"}`}
+              ? "Frequências salvas do mês"
+              : `${frequencias.length} ${frequencias.length === 1 ? "frequência salva" : "frequências salvas"}`}
           </p>
         </div>
         <Button
@@ -104,7 +104,7 @@ export default function VistaHistorico({
 
       {bloqueado && (
         <p className="bg-secondary text-secondary-foreground rounded-lg px-4 py-3 text-sm">
-          Há alterações na frequencia em aberto. Salve antes de abrir outra.
+          Há alterações na frequência em aberto. Salve antes de abrir outra.
         </p>
       )}
 
@@ -117,9 +117,9 @@ export default function VistaHistorico({
       {frequencias.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
           <History size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma frequencia neste mês</p>
+          <p className="font-medium">Nenhuma frequência neste mês</p>
           <p className="text-muted-foreground text-sm">
-            Escolha outro mês ou faça a primeira frequencia do período.
+            Escolha outro mês ou faça a primeira frequência do período.
           </p>
         </div>
       ) : (

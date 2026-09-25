@@ -16,11 +16,11 @@ const fonteNumeros = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Frequencia",
-    template: "%s | Frequencia",
+    default: "FrequenciApp",
+    template: "%s | FrequenciApp",
   },
   description: "Registro de frequência escolar para professores: marque apenas as faltas e salve.",
-  applicationName: "Frequencia",
+  applicationName: "FrequenciApp",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -33,7 +33,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Frequencia",
+    title: "FrequenciApp",
   },
   formatDetection: {
     telephone: false,

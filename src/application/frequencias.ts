@@ -1,6 +1,6 @@
-// Casos de uso da frequencia diária: carregar, listar o mês e salvar
+// Casos de uso da frequência diária: carregar, listar o mês e salvar
 // com proteção de duplicata e conflito por revisão. O salvamento roda
-// em transação Serializable: ou a frequencia inteira (revisão e faltas)
+// em transação Serializable: ou a frequência inteira (revisão e faltas)
 // é gravada, ou nada é; salvamentos concorrentes de outros aparelhos
 // são recusados sem sobrescrita e com repetição automática curta.
 import { z } from "zod";
@@ -45,7 +45,7 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
 
 const COMPLEMENTO = { include: { faltas: { select: { alunoId: true } } } } as const;
 
-/** Frequencia de um dia e turma, ou null quando inexistente. */
+/** Frequência de um dia e turma, ou null quando inexistente. */
 export async function carregarFrequencia(
   professorId: string,
   dia: string,
@@ -58,7 +58,7 @@ export async function carregarFrequencia(
   return linha ? paraFrequencia(linha) : null;
 }
 
-/** Todas as frequencias de um mês do professor. */
+/** Todas as frequências de um mês do professor. */
 export async function listarFrequenciasDoMes(
   professorId: string,
   mes: string,
@@ -75,7 +75,7 @@ export async function listarFrequenciasDoMes(
 }
 
 /**
- * Salva a frequencia de um dia e turma.
+ * Salva a frequência de um dia e turma.
  * revisao 0 cria a primeira versão; duplicata devolve conflito.
  * revisao N atualiza apenas se a versão vigente for N: salvamentos
  * de outro aparelho no intervalo são recusados sem sobrescrita.
@@ -118,7 +118,7 @@ export async function salvarFrequencia(
       const invalidos = ausentes.filter((id) => !idsValidos.has(id));
       if (invalidos.length > 0) {
         throw new ErroHttp(
-          "A lista de alunos mudou enquanto você marcava. Recarregue a frequencia e confira.",
+          "A lista de alunos mudou enquanto você marcava. Recarregue a frequência e confira.",
           400,
         );
       }
@@ -154,14 +154,14 @@ export async function salvarFrequencia(
           where: { professorId_turmaId_dia: filtroFrequencia },
           ...COMPLEMENTO,
         });
-        if (!vigente) throw new ErroHttp("Frequencia não encontrada para atualizar.", 404);
+        if (!vigente) throw new ErroHttp("Frequência não encontrada para atualizar.", 404);
         return { situacao: "conflito" as const, frequencia: paraFrequencia(vigente) };
       }
       const linha = await tx.frequencia.findUnique({
         where: { professorId_turmaId_dia: filtroFrequencia },
         ...COMPLEMENTO,
       });
-      if (!linha) throw new ErroHttp("Frequencia não encontrada para atualizar.", 404);
+      if (!linha) throw new ErroHttp("Frequência não encontrada para atualizar.", 404);
       await tx.falta.deleteMany({ where: { frequenciaId: linha.id } });
       if (ausentes.length > 0) {
         await tx.falta.createMany({

@@ -45,7 +45,7 @@ interface Props {
 }
 
 const ITENS_BASE: { visao: Visao; rotulo: string; icone: typeof ClipboardCheck }[] = [
-  { visao: "frequencia", rotulo: "Frequencia", icone: ClipboardCheck },
+  { visao: "frequencia", rotulo: "Frequência", icone: ClipboardCheck },
   { visao: "historico", rotulo: "Histórico", icone: History },
   { visao: "originais", rotulo: "Originais", icone: UsersRound },
 ];
@@ -164,7 +164,7 @@ export default function Aplicacao({
         <header className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky top-0 z-30 border-b backdrop-blur">
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-semibold tracking-tight">Frequencia</span>
+              <span className="text-lg font-semibold tracking-tight">FrequenciApp</span>
               <span className="text-muted-foreground hidden text-sm sm:inline">
                 {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
               </span>

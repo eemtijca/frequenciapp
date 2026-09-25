@@ -2,7 +2,7 @@
 
 // Originais: grade de frequência pelas turmas de origem. Linhas são
 // alunos da turma original, colunas são os dias do mês e as células
-// trazem P, F ou vazio quando a turma não foi frequencia.
+// trazem P, F ou vazio quando a turma não teve frequência.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { LoaderCircle, RefreshCw, Table2 } from "lucide-react";
@@ -82,7 +82,7 @@ export default function VistaOriginais({
           <p className="text-muted-foreground text-sm">
             {frequencias.length === 0
               ? "Consulta pelas turmas de origem"
-              : `${frequencias.length} ${frequencias.length === 1 ? "frequencia no mês" : "frequencias no mês"}${totalFaltas > 0 ? ` · ${totalFaltas} ${totalFaltas === 1 ? "falta" : "faltas"}` : ""}`}
+              : `${frequencias.length} ${frequencias.length === 1 ? "frequência no mês" : "frequências no mês"}${totalFaltas > 0 ? ` · ${totalFaltas} ${totalFaltas === 1 ? "falta" : "faltas"}` : ""}`}
           </p>
         </div>
         <Button
@@ -218,7 +218,7 @@ export default function VistaOriginais({
                           ) : (
                             <span
                               className="text-muted-foreground/50 text-[10px]"
-                              aria-label="sem frequencia"
+                              aria-label="sem frequência"
                             />
                           )}
                         </td>
@@ -249,7 +249,7 @@ export default function VistaOriginais({
               </span>
               falta
             </span>
-            <span>célula vazia: turma sem frequencia no dia</span>
+            <span>célula vazia: turma sem frequência no dia</span>
           </div>
         </motion.div>
       )}

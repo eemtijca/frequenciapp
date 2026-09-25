@@ -241,7 +241,7 @@ export async function atualizarUsuario(
 }
 
 /**
- * Exclui um usuário. Bloqueado quando há frequencias registradas: o
+ * Exclui um usuário. Bloqueado quando há frequências registradas: o
  * histórico da escola depende do professor que o registrou. Nesses
  * casos, o caminho é desativar a conta.
  */
@@ -256,7 +256,7 @@ export async function removerUsuario(admin: Identidade, id: string): Promise<voi
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
   if (alvo._count.frequencias > 0) {
     throw new ErroHttp(
-      "Este professor tem frequencias registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
+      "Este professor tem frequências registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
       409,
     );
   }

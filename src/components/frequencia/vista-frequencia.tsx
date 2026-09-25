@@ -1,6 +1,6 @@
 "use client";
 
-// Vista da frequencia diária: todos presentes por padrão, toque no
+// Vista da frequência diária: todos presentes por padrão, toque no
 // aluno para marcar falta, toque de novo para voltar a presente.
 // Mantém rascunho em sessionStorage e protege conflitos por revisão.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -92,7 +92,7 @@ export default function VistaFrequencia({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
 
-  // Sincroniza quando o histórico pede para abrir uma frequencia específica.
+  // Sincroniza quando o histórico pede para abrir uma frequência específica.
   useEffect(() => {
     if (!alvo) return;
     setTurmaId(alvo.turmaId);
@@ -107,7 +107,7 @@ export default function VistaFrequencia({
   const turma = turmas.find((t) => t.id === turmaId);
   const chave = `${dia}|${turmaId}`;
 
-  // Carrega a frequencia salva do dia e turma, e recupera rascunho local.
+  // Carrega a frequência salva do dia e turma, e recupera rascunho local.
   useEffect(() => {
     if (!dia || !turmaId) return;
     let viva = true;
@@ -139,7 +139,7 @@ export default function VistaFrequencia({
             setFaltas(new Set(rascunho.faltas));
             setSujo(true);
             if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
-              toast("Rascunho recuperado. Confira as faltas e salve a frequencia.");
+              toast("Rascunho recuperado. Confira as faltas e salve a frequência.");
             } else {
               setConflito(true);
               setErro(
@@ -154,7 +154,7 @@ export default function VistaFrequencia({
       .catch((excecao: unknown) => {
         if (!viva) return;
         setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a frequencia.",
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a frequência.",
         );
       })
       .finally(() => {
@@ -250,8 +250,8 @@ export default function VistaFrequencia({
       const total = dados.frequencia.faltas.length;
       toast.success(
         total === 0
-          ? "Frequencia salva. Todos presentes."
-          : `Frequencia salva com ${total} ${total === 1 ? "falta" : "faltas"}.`,
+          ? "Frequência salva. Todos presentes."
+          : `Frequência salva com ${total} ${total === 1 ? "falta" : "faltas"}.`,
       );
       await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
@@ -264,8 +264,8 @@ export default function VistaFrequencia({
         }
         setConflito(true);
       }
-      setErro(falha?.message ?? "Não foi possível salvar a frequencia.");
-      toast.error(falha?.message ?? "Não foi possível salvar a frequencia.");
+      setErro(falha?.message ?? "Não foi possível salvar a frequência.");
+      toast.error(falha?.message ?? "Não foi possível salvar a frequência.");
     } finally {
       setSalvando(false);
     }
@@ -289,11 +289,11 @@ export default function VistaFrequencia({
     : "";
 
   const tituloEstado = carregando
-    ? "Carregando frequencia"
+    ? "Carregando frequência"
     : conflito
       ? "Confira o conflito"
       : salvando
-        ? "Salvando frequencia"
+        ? "Salvando frequência"
         : erro
           ? sujo
             ? "Falha ao salvar"
@@ -302,7 +302,7 @@ export default function VistaFrequencia({
             ? "Alterações por salvar"
             : atualizadoEm
               ? "Salva na nuvem"
-              : "Nova frequencia";
+              : "Nova frequência";
 
   const detalheEstado = carregando
     ? "Buscando o registro salvo."
@@ -317,10 +317,10 @@ export default function VistaFrequencia({
             : "Confira as faltas e toque em Salvar.";
 
   return (
-    <section aria-label="Fazer a frequencia" className="flex flex-col gap-4">
+    <section aria-label="Registrar frequência" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Frequencia diária</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Frequência diária</h1>
           <p className="text-muted-foreground text-sm">
             {carregando ? "" : `${ativosDaTurma.length} alunos ativos`}
           </p>
@@ -366,7 +366,7 @@ export default function VistaFrequencia({
         </Button>
         <div className="relative flex-1">
           <label htmlFor="dia-frequencia" className="sr-only">
-            Data da frequencia
+            Data da frequência
           </label>
           <Input
             id="dia-frequencia"
@@ -396,7 +396,7 @@ export default function VistaFrequencia({
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequencia">
+      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
         <button
           type="button"
           aria-pressed={filtro === "faltas"}
@@ -505,7 +505,7 @@ export default function VistaFrequencia({
         {carregando ? (
           <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
             <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando frequencia...
+            Carregando frequência...
           </div>
         ) : turmas.length === 0 ? (
           <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
@@ -529,7 +529,7 @@ export default function VistaFrequencia({
           <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
             <p className="font-medium">
               {filtro === "faltas" && busca === ""
-                ? "Nenhuma falta nesta frequencia."
+                ? "Nenhuma falta nesta frequência."
                 : "Nenhum aluno neste filtro."}
             </p>
             <button

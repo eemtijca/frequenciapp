@@ -101,15 +101,15 @@ describe("marcaDoAluno", () => {
     const doDia = [frequencia({ faltas: ["aluno-1"] })];
     expect(marcaDoAluno(alunoUm, "2026-09-10", doDia)).toBe("F");
   });
-  it("marca presente quando a turma dele teve frequencia", () => {
+  it("marca presente quando a turma dele teve frequência", () => {
     const doDia = [frequencia({ turmaId: "turma-a", faltas: [] })];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("P");
   });
-  it("devolve vazio quando a turma não foi frequencia", () => {
+  it("devolve vazio quando a turma não teve frequência", () => {
     const doDia = [frequencia({ turmaId: "turma-b" })];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe(null);
   });
-  it("falta prevalece mesmo com outra frequencia presente no dia", () => {
+  it("falta prevalece mesmo com outra frequência presente no dia", () => {
     const doDia = [
       frequencia({ turmaId: "turma-a", faltas: [] }),
       frequencia({ turmaId: "turma-b", faltas: ["aluno-1"] }),
@@ -119,7 +119,7 @@ describe("marcaDoAluno", () => {
 });
 
 describe("montarGrade", () => {
-  it("agrupa marcas, faltas e frequencias por aluno", () => {
+  it("agrupa marcas, faltas e frequências por aluno", () => {
     const alunos = [aluno(), aluno({ id: "aluno-2", nome: "Aluno Dois", ordem: 2 })];
     const frequencias = [
       frequencia({ dia: "2026-09-10", turmaId: "turma-a", faltas: ["aluno-1"] }),
@@ -147,7 +147,7 @@ describe("montarGrade", () => {
 });
 
 describe("resumirFrequencia", () => {
-  it("conta apenas alunos ativos da turma da frequencia", () => {
+  it("conta apenas alunos ativos da turma da frequência", () => {
     const alunos = [
       aluno({ id: "a1", turmaId: "turma-a" }),
       aluno({ id: "a2", turmaId: "turma-a" }),

@@ -43,14 +43,14 @@ function nomeAmigavel(alvos: string[] | undefined): string {
 
 /** Traduções de tabelas para mensagens de registro em uso (P2003). */
 const TABELAS_EM_USO: Record<string, string> = {
-  turmas_turma_id_fkey: "Esta turma ainda tem alunos ou frequencias registradas.",
+  turmas_turma_id_fkey: "Esta turma ainda tem alunos ou frequências registradas.",
   turmas_serie_id_fkey: "A série informada não existe mais.",
   alunos_turma_id_fkey: "A turma informada não existe mais.",
   alunos_turma_original_id_fkey: "A turma de origem informada não existe mais.",
-  frequencias_professor_id_fkey: "Este professor tem frequencias registradas.",
-  frequencias_turma_id_fkey: "Esta turma tem frequencias registradas.",
+  frequencias_professor_id_fkey: "Este professor tem frequências registradas.",
+  frequencias_turma_id_fkey: "Esta turma tem frequências registradas.",
   series_id_fkey: "Esta série ainda tem turmas.",
-  faltas_frequencia_id_fkey: "A frequencia não existe mais.",
+  faltas_frequencia_id_fkey: "A frequência não existe mais.",
   faltas_aluno_id_fkey: "O aluno não existe mais.",
   sessoes_usuario_id_fkey: "A conta não existe mais.",
   atribuicoes_professor_id_fkey: "O professor não existe mais.",
@@ -74,7 +74,7 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
       return {
         mensagem:
           campo === "frequencia"
-            ? "Esta frequencia já foi salva. Recarregue para ver a versão mais recente."
+            ? "Esta frequência já foi salva. Recarregue para ver a versão mais recente."
             : campo === "registro"
               ? "Já existe um registro igual. Confira os dados e tente de novo."
               : `Já existe um registro com este ${campo}. Use outro valor.`,
