@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 // Cabeçalhos de segurança aplicados a toda resposta.
 // O CSP com nonce vive em src/proxy.ts, na borda da requisição.
+// Fora da Vercel, a saída standalone alimenta a imagem Docker.
 const cabecalhosSeguranca = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -11,7 +12,7 @@ const cabecalhosSeguranca = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {
