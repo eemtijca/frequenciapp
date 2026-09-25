@@ -26,7 +26,7 @@ O relato é respondido em até 7 dias. Correções de segurança entram como lan
 - **Isolamento**: toda consulta carrega o identificador do professor nas cláusulas de banco; não existe rota que atravesse contas.
 - **Entrada**: validação de corpo com zod em todas as mutações; datas e meses conferidos contra o calendário real.
 - **Brute force**: limitador de tentativas de entrada por origem e e-mail, com janela de 15 minutos.
-- **Segredos**: apenas via variáveis de ambiente, validados na partida; `DIRECT_URL` fica restrita ao CLI, migrações e operações administrativas; o `.env` nunca é commitado.
+- **Segredos**: apenas via variáveis de ambiente; `DATABASE_URL` e `AUTH_SECRET` são validados na partida, e `DIRECT_URL` fica restrita ao CLI, às migrations e às operações administrativas; o `.env` nunca é commitado.
 - **Dependências**: nenhuma dependência de serviço de IA; superfície mínima de pacotes.
 
 ## Limitações conhecidas

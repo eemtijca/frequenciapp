@@ -56,8 +56,8 @@ Ações administrativas (criar, atualizar e excluir entidades, gerenciar contas 
 
 ## Segredos
 
-- Apenas `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET` e opcionais de script; validados na partida quando usados.
-- `DIRECT_URL` fica restrita ao Prisma CLI, às migrations e às operações administrativas; o runtime usa somente `DATABASE_URL`.
+- `DATABASE_URL` e `AUTH_SECRET` são validados na partida; `DIRECT_URL` fica restrita ao Prisma CLI, às migrations e às operações administrativas.
+- O runtime usa somente `DATABASE_URL`; opcionais de script são consumidos pelos comandos operacionais.
 - `.env` fora do controle de versão; `.env.example` documenta sem valores.
 - Nunca há chave de serviço de terceiros: o aplicativo não depende de e-mail, armazenamento externo ou inteligência artificial.
 
