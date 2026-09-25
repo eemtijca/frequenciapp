@@ -23,6 +23,7 @@ import type {
   Aluno,
   Configuracoes,
   Frequencia,
+  JustificativaConfigurada,
   ResumoAcumulado,
   Turma,
 } from "@/domain/frequencia";
@@ -31,7 +32,6 @@ import {
   horaNoFuso,
   horariosDoDia,
   JUSTIFICATIVA_OUTROS,
-  JUSTIFICATIVAS,
   normalizar,
   rotuloDiaSemana,
   rotuloJustificativa,
@@ -66,6 +66,7 @@ interface Props {
   fuso: string;
   alvo: { dia: string; turmaId: string } | null;
   configuracoes: Configuracoes;
+  catalogoJustificativas: JustificativaConfigurada[];
   resumo: ResumoAcumulado | null;
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "chamada"[]) => void;
@@ -112,14 +113,6 @@ const MARCAS = {
   visivel: { scale: 1, opacity: 1 },
 } as const;
 
-const OPCOES_JUSTIFICATIVA = [
-  { valor: "", rotulo: "Sem justificativa" },
-  ...JUSTIFICATIVAS.map((item) => ({
-    valor: item.codigo,
-    rotulo: `${item.codigo} · ${item.rotulo}`,
-  })),
-];
-
 export default function VistaFrequencia({
   usuario,
   turmas,
@@ -128,6 +121,7 @@ export default function VistaFrequencia({
   fuso,
   alvo,
   configuracoes,
+  catalogoJustificativas,
   resumo,
   onFrequenciasMudaram,
   onPendencia,
@@ -280,6 +274,16 @@ export default function VistaFrequencia({
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
     return (alunoId: string): AcumuladoAluno | null => mapa.get(alunoId) ?? null;
   }, [resumo]);
+
+  const opcoesJustificativa = useMemo(
+    () => [
+      { valor: "", rotulo: "Sem justificativa" },
+      ...catalogoJustificativas
+        .filter((item) => item.ativo)
+        .map((item) => ({ valor: item.codigo, rotulo: `${item.codigo} · ${item.rotulo}` })),
+    ],
+    [catalogoJustificativas],
+  );
 
   const contagemFaltas = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id)).length;
   const contagemJustificadas = ativosDaTurma.filter((aluno) => justificativas.has(aluno.id)).length;
@@ -682,7 +686,7 @@ export default function VistaFrequencia({
             <span className="numerais-tabulares font-semibold">{rotuloInfrequencia}</span> (F + FJ
             sobre o total). Todos começam presentes; toque no aluno para marcar falta.
           </p>
-          {aulasDoDia.length > 1 && (
+          {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
               <span>Aulas do dia:</span>
               {aulasDoDia.map((aula) => (
@@ -774,7 +778,9 @@ export default function VistaFrequencia({
                             <span className="text-muted-foreground block truncate text-xs">
                               Origem{" "}
                               {turmas.find((t) => t.id === aluno.turmaOriginalId)?.rotulo ?? ""}
-                              {codigo ? ` · ${rotuloJustificativa(codigo)}` : ""}
+                              {codigo
+                                ? ` · ${rotuloJustificativa(codigo, catalogoJustificativas)}`
+                                : ""}
                             </span>
                           </span>
                           <span className="text-muted-foreground shrink-0 text-right text-xs">
@@ -959,7 +965,7 @@ export default function VistaFrequencia({
                               onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
                               disabled={bloqueado}
                               ariaLabel={`Justificativa da falta de ${aluno.nome}`}
-                              opcoes={OPCOES_JUSTIFICATIVA}
+                              opcoes={opcoesJustificativa}
                               className="h-9 max-w-64"
                             />
                             {codigo === JUSTIFICATIVA_OUTROS && (
@@ -977,7 +983,7 @@ export default function VistaFrequencia({
                             )}
                             {codigo && (
                               <span className="text-primary text-xs font-medium">
-                                {rotuloJustificativa(codigo)}
+                                {rotuloJustificativa(codigo, catalogoJustificativas)}
                               </span>
                             )}
                           </div>

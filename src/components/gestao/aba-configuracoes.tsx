@@ -1,13 +1,14 @@
 "use client";
 
-// Configurações de recursos da escola e cópia de segurança em JSON.
-// Restrita à administração, com auditoria no servidor.
+// Configurações de recursos, catálogo de justificativas e cópia de segurança
+// em JSON. Restrita à administração, com auditoria no servidor.
 import { useRef, useState } from "react";
-import { Download, LoaderCircle, Upload } from "lucide-react";
+import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import type { Configuracoes } from "@/domain/frequencia";
+import type { Configuracoes, JustificativaConfigurada } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,8 +25,10 @@ import {
 
 interface Props {
   configuracoes: Configuracoes;
+  justificativas: JustificativaConfigurada[];
   diaCorrente: string;
   onMudanca: (configuracoes: Configuracoes) => void;
+  onJustificativasMudaram: () => Promise<void>;
 }
 
 interface ResultadoImportacao {
@@ -36,13 +39,27 @@ interface ResultadoImportacao {
 
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
 
-export default function AbaConfiguracoes({ configuracoes, diaCorrente, onMudanca }: Props) {
+export default function AbaConfiguracoes({
+  configuracoes,
+  justificativas,
+  diaCorrente,
+  onMudanca,
+  onJustificativasMudaram,
+}: Props) {
   const [salvando, setSalvando] = useState<"frequenciaPorAula" | "saidaAntecipada" | null>(null);
   const [erro, setErro] = useState("");
   const [baixando, setBaixando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
+
+  const [novaCodigo, setNovaCodigo] = useState("");
+  const [novaRotulo, setNovaRotulo] = useState("");
+  const [editando, setEditando] = useState<string | null>(null);
+  const [rotuloEdicao, setRotuloEdicao] = useState("");
+  const [erroJustificativa, setErroJustificativa] = useState("");
+  const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
+  const [excluirAlvo, setExcluirAlvo] = useState<JustificativaConfigurada | null>(null);
 
   async function alternar(chave: "frequenciaPorAula" | "saidaAntecipada", valor: boolean) {
     setSalvando(chave);
@@ -68,6 +85,87 @@ export default function AbaConfiguracoes({ configuracoes, diaCorrente, onMudanca
       );
     } finally {
       setSalvando(null);
+    }
+  }
+
+  async function criarJustificativa() {
+    if (enviandoJustificativa) return;
+    setEnviandoJustificativa(true);
+    setErroJustificativa("");
+    try {
+      await pedir<{ justificativa: JustificativaConfigurada }>(
+        "/api/justificativas",
+        corpoJson({ codigo: novaCodigo, rotulo: novaRotulo }),
+      );
+      setNovaCodigo("");
+      setNovaRotulo("");
+      await onJustificativasMudaram();
+      toast.success("Justificativa adicionada.");
+    } catch (excecao) {
+      setErroJustificativa(
+        excecao instanceof ErroApi
+          ? excecao.message
+          : "Não foi possível adicionar a justificativa.",
+      );
+    } finally {
+      setEnviandoJustificativa(false);
+    }
+  }
+
+  async function salvarRotulo(codigo: string) {
+    if (enviandoJustificativa) return;
+    setEnviandoJustificativa(true);
+    setErroJustificativa("");
+    try {
+      await pedir<{ justificativa: JustificativaConfigurada }>(
+        `/api/justificativas/${encodeURIComponent(codigo)}`,
+        corpoAlteracao("PATCH", { rotulo: rotuloEdicao }),
+      );
+      setEditando(null);
+      setRotuloEdicao("");
+      await onJustificativasMudaram();
+      toast.success("Justificativa atualizada.");
+    } catch (excecao) {
+      setErroJustificativa(
+        excecao instanceof ErroApi
+          ? excecao.message
+          : "Não foi possível atualizar a justificativa.",
+      );
+    } finally {
+      setEnviandoJustificativa(false);
+    }
+  }
+
+  async function alternarAtivo(item: JustificativaConfigurada) {
+    setErroJustificativa("");
+    try {
+      await pedir<{ justificativa: JustificativaConfigurada }>(
+        `/api/justificativas/${encodeURIComponent(item.codigo)}`,
+        corpoAlteracao("PATCH", { ativo: !item.ativo }),
+      );
+      await onJustificativasMudaram();
+      toast.success(item.ativo ? "Justificativa desativada." : "Justificativa reativada.");
+    } catch (excecao) {
+      setErroJustificativa(
+        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
+      );
+    }
+  }
+
+  async function removerJustificativa(item: JustificativaConfigurada) {
+    setErroJustificativa("");
+    try {
+      await pedir<{ ok: boolean }>(`/api/justificativas/${encodeURIComponent(item.codigo)}`, {
+        method: "DELETE",
+      });
+      await onJustificativasMudaram();
+      toast.success("Justificativa excluída.");
+    } catch (excecao) {
+      setErroJustificativa(
+        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a justificativa.",
+      );
+    } finally {
+      setExcluirAlvo(null);
     }
   }
 
@@ -149,8 +247,8 @@ export default function AbaConfiguracoes({ configuracoes, diaCorrente, onMudanca
           <div className="min-w-0">
             <Label htmlFor="config-saida-antecipada">Saída antecipada</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Mostra a área Saiu mais cedo, com registro, saídas do dia e relatório semanal.
-              Desligado, os registros existentes continuam preservados nos relatórios.
+              Mostra a área Saídas, com registro, saídas do dia e relatório semanal. Desligado, os
+              registros existentes continuam preservados nos relatórios.
             </p>
           </div>
           <Switch
@@ -168,12 +266,181 @@ export default function AbaConfiguracoes({ configuracoes, diaCorrente, onMudanca
         )}
       </div>
 
+      <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+        <div>
+          <h2 className="font-medium">Justificativas</h2>
+          <p className="text-muted-foreground text-sm">
+            Valem para a falta justificada e para a saída antecipada. O código é fixo depois de
+            criado, porque o histórico guarda o código; o rótulo e a situação podem mudar. A lista
+            aparece em ordem alfabética.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-end">
+          <div className="flex flex-col gap-1.5 sm:w-32">
+            <Label htmlFor="justificativa-codigo">Código</Label>
+            <Input
+              id="justificativa-codigo"
+              value={novaCodigo}
+              maxLength={10}
+              disabled={enviandoJustificativa}
+              onChange={(evento) => setNovaCodigo(evento.target.value)}
+              placeholder="Ex.: At"
+              className="h-11"
+            />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Label htmlFor="justificativa-rotulo">Rótulo</Label>
+            <Input
+              id="justificativa-rotulo"
+              value={novaRotulo}
+              maxLength={60}
+              disabled={enviandoJustificativa}
+              onChange={(evento) => setNovaRotulo(evento.target.value)}
+              placeholder="Ex.: Atestado"
+              className="h-11"
+            />
+          </div>
+          <Button
+            type="button"
+            className="h-11 rounded-lg sm:w-auto"
+            onClick={() => void criarJustificativa()}
+            disabled={enviandoJustificativa || novaCodigo.trim() === "" || novaRotulo.trim() === ""}
+          >
+            {enviandoJustificativa ? (
+              <LoaderCircle size={16} className="animate-spin" />
+            ) : (
+              <Plus size={16} />
+            )}
+            Adicionar
+          </Button>
+        </div>
+
+        {erroJustificativa && (
+          <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
+            {erroJustificativa}
+          </p>
+        )}
+
+        <ul className="divide-y overflow-hidden rounded-lg border">
+          {justificativas.map((item) => (
+            <li
+              key={item.codigo}
+              className={`flex min-h-14 items-center gap-3 px-3 py-2 ${
+                item.ativo ? "" : "opacity-60"
+              }`}
+            >
+              <span className="bg-secondary text-secondary-foreground numerais-tabulares w-12 shrink-0 rounded-md px-1.5 py-1 text-center text-xs font-semibold">
+                {item.codigo}
+              </span>
+              {editando === item.codigo ? (
+                <>
+                  <Input
+                    value={rotuloEdicao}
+                    maxLength={60}
+                    aria-label={`Rótulo de ${item.codigo}`}
+                    onChange={(evento) => setRotuloEdicao(evento.target.value)}
+                    className="h-10 min-w-0 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-10 shrink-0"
+                    aria-label={`Salvar rótulo de ${item.codigo}`}
+                    onClick={() => void salvarRotulo(item.codigo)}
+                    disabled={enviandoJustificativa || rotuloEdicao.trim().length < 2}
+                  >
+                    <Check size={16} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-10 shrink-0"
+                    aria-label={`Cancelar edição de ${item.codigo}`}
+                    onClick={() => {
+                      setEditando(null);
+                      setRotuloEdicao("");
+                    }}
+                  >
+                    <X size={16} />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {item.rotulo}
+                    {item.ativo ? "" : " · desativada"}
+                  </span>
+                  <Switch
+                    checked={item.ativo}
+                    aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
+                    onCheckedChange={() => void alternarAtivo(item)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-10 shrink-0"
+                    aria-label={`Editar rótulo de ${item.codigo}`}
+                    onClick={() => {
+                      setEditando(item.codigo);
+                      setRotuloEdicao(item.rotulo);
+                    }}
+                  >
+                    <Pencil size={16} />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-falta-texto size-10 shrink-0"
+                    aria-label={`Excluir ${item.codigo}`}
+                    onClick={() => setExcluirAlvo(item)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <AlertDialog
+          open={excluirAlvo !== null}
+          onOpenChange={(aberto) => {
+            if (!aberto) setExcluirAlvo(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir a justificativa {excluirAlvo?.codigo}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                A exclusão só é possível quando não há faltas nem saídas usando o código. Com
+                histórico, o caminho é desativar.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-falta text-falta-foreground hover:bg-falta/90"
+                onClick={() => excluirAlvo && void removerJustificativa(excluirAlvo)}
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+
       <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
         <div>
           <h2 className="font-medium">Cópia de segurança</h2>
           <p className="text-muted-foreground text-sm">
-            A cópia reúne séries, turmas, aulas, alunos, frequências e saídas em um arquivo JSON. A
-            importação adiciona o que falta e nunca sobrescreve o que já existe.
+            A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, justificativas e
+            configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve
+            o que já existe.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

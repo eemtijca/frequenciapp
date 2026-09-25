@@ -15,6 +15,8 @@ Suítes do FrequenciApp com Vitest e Playwright.
 Roda em qualquer ambiente, sem banco e sem rede:
 
 - `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
+- `relatorios.test.ts`: indicadores do dia e relatórios por aluno e por saída.
+- `justificativas.test.ts`: ordenação e validação do catálogo configurável.
 - `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.

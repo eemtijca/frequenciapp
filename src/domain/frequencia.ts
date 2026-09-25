@@ -10,8 +10,16 @@ export interface Justificativa {
   rotulo: string;
 }
 
-/** Catálogo único de justificativas, usado na falta e na saída antecipada. */
-export const JUSTIFICATIVAS: readonly Justificativa[] = [
+/** Justificativa com a situação, como o catálogo é lido da Gestão. */
+export interface JustificativaConfigurada extends Justificativa {
+  ativo: boolean;
+}
+
+/**
+ * Catálogo inicial de justificativas. É o mesmo que a migração e a semente
+ * gravam; o catálogo em uso vem do banco e pode ser editado na Gestão.
+ */
+export const JUSTIFICATIVAS_PADRAO: readonly Justificativa[] = [
   { codigo: "D", rotulo: "Doente" },
   { codigo: "Dat", rotulo: "Doente com atestado" },
   { codigo: "LM", rotulo: "Licença Maternidade" },
@@ -28,6 +36,17 @@ export const JUSTIFICATIVAS: readonly Justificativa[] = [
 
 /** Código que aceita observação escrita. */
 export const JUSTIFICATIVA_OUTROS = "O";
+
+/** Ordena o catálogo pelo rótulo, em português e sem diferenciar caixa. */
+export function ordenarJustificativas<T extends Justificativa>(catalogo: readonly T[]): T[] {
+  return catalogo
+    .slice()
+    .sort(
+      (a, b) =>
+        a.rotulo.localeCompare(b.rotulo, "pt-BR", { sensitivity: "base" }) ||
+        a.codigo.localeCompare(b.codigo, "pt-BR"),
+    );
+}
 
 /** Momento da saída antecipada, com código estável e rótulo. */
 export interface MomentoSaida {
@@ -46,14 +65,20 @@ export const MOMENTOS_SAIDA: readonly MomentoSaida[] = [
   { codigo: "almoco", rotulo: "Almoço" },
 ];
 
-/** Rótulo de uma justificativa, ou texto vazio quando o código não existe. */
-export function rotuloJustificativa(codigo: string | null | undefined): string {
-  return JUSTIFICATIVAS.find((item) => item.codigo === codigo)?.rotulo ?? "";
+/** Rótulo de uma justificativa no catálogo, ou texto vazio quando não existe. */
+export function rotuloJustificativa(
+  codigo: string | null | undefined,
+  catalogo: readonly Justificativa[] = JUSTIFICATIVAS_PADRAO,
+): string {
+  return catalogo.find((item) => item.codigo === codigo)?.rotulo ?? "";
 }
 
-/** Valida um código de justificativa. */
-export function ehJustificativaValida(codigo: string): boolean {
-  return JUSTIFICATIVAS.some((item) => item.codigo === codigo);
+/** Valida um código no catálogo informado. */
+export function ehJustificativaValida(
+  codigo: string,
+  catalogo: readonly Justificativa[] = JUSTIFICATIVAS_PADRAO,
+): boolean {
+  return catalogo.some((item) => item.codigo === codigo);
 }
 
 /** Rótulo de um momento de saída, com o código como reserva. */

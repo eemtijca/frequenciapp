@@ -12,13 +12,18 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Aluno, Responsavel, SaidaAntecipada, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  JustificativaConfigurada,
+  Responsavel,
+  SaidaAntecipada,
+  Turma,
+} from "@/domain/frequencia";
 import {
   diaDaSemanaIso,
   diaSeguinte,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
-  JUSTIFICATIVAS,
   MOMENTOS_SAIDA,
   normalizar,
   rotuloDiaSemana,
@@ -42,6 +47,7 @@ interface Props {
   turmas: Turma[];
   alunos: Aluno[];
   responsaveis: Responsavel[];
+  catalogoJustificativas: JustificativaConfigurada[];
   saidas: SaidaAntecipada[];
   onSaidasMudaram: (mes: string) => Promise<void>;
 }
@@ -54,12 +60,12 @@ export default function VistaSaidas({
   turmas,
   alunos,
   responsaveis,
+  catalogoJustificativas,
   saidas,
   onSaidasMudaram,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turmaFiltro, setTurmaFiltro] = useState("");
-  const [busca, setBusca] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
   const [justificativa, setJustificativa] = useState("");
@@ -84,6 +90,14 @@ export default function VistaSaidas({
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
     return (id: string) => mapa.get(id) ?? "Sem turma";
   }, [turmas]);
+
+  const opcoesJustificativa = useMemo(
+    () =>
+      catalogoJustificativas
+        .filter((item) => item.ativo)
+        .map((item) => ({ valor: item.codigo, rotulo: `${item.codigo} · ${item.rotulo}` })),
+    [catalogoJustificativas],
+  );
 
   const alunosPorId = useMemo(() => new Map(alunos.map((aluno) => [aluno.id, aluno])), [alunos]);
 
@@ -127,22 +141,15 @@ export default function VistaSaidas({
   );
 
   const alunosFiltrados = useMemo(() => {
-    const termo = normalizar(busca);
-    const termos = termo.split(" ").filter(Boolean);
     return alunos
       .filter((aluno) => aluno.ativo)
       .filter((aluno) => (turmaFiltro ? aluno.turmaId === turmaFiltro : true))
-      .filter((aluno) => {
-        if (termos.length === 0) return true;
-        const alvo = normalizar(aluno.nome);
-        return termos.every((parte) => alvo.includes(parte));
-      })
       .sort(
         (a, b) =>
           rotuloTurma(a.turmaId).localeCompare(rotuloTurma(b.turmaId), "pt-BR") ||
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
-  }, [alunos, busca, turmaFiltro, rotuloTurma]);
+  }, [alunos, turmaFiltro, rotuloTurma]);
 
   const gruposPorTurma = useMemo(() => {
     const grupos = new Map<string, { rotulo: string; saidas: SaidaAntecipada[] }>();
@@ -311,30 +318,18 @@ export default function VistaSaidas({
         noValidate
       >
         <h2 className="font-medium">Registro</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-turma">Turma</Label>
-            <Selecionar
-              id="saida-turma"
-              value={turmaFiltro}
-              onValueChange={setTurmaFiltro}
-              placeholder="Todas as turmas"
-              opcoes={[
-                { valor: "", rotulo: "Todas as turmas" },
-                ...turmasComAlunos.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-              ]}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-busca">Buscar aluno</Label>
-            <BarraBusca
-              id="saida-busca"
-              valor={busca}
-              onValor={setBusca}
-              placeholder="Digite o nome do aluno"
-              className="rounded-lg border-0 px-0 py-0"
-            />
-          </div>
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <Label htmlFor="saida-turma">Turma</Label>
+          <Selecionar
+            id="saida-turma"
+            value={turmaFiltro}
+            onValueChange={setTurmaFiltro}
+            placeholder="Todas as turmas"
+            opcoes={[
+              { valor: "", rotulo: "Todas as turmas" },
+              ...turmasComAlunos.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
+            ]}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="saida-aluno">Aluno</Label>
@@ -349,10 +344,6 @@ export default function VistaSaidas({
               rotulo: `${aluno.nome} · ${rotuloTurma(aluno.turmaId)}`,
             }))}
           />
-          <p className="text-muted-foreground text-xs" role="status">
-            {alunosFiltrados.length}{" "}
-            {alunosFiltrados.length === 1 ? "aluno encontrado" : "alunos encontrados"}
-          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
@@ -375,10 +366,7 @@ export default function VistaSaidas({
               value={justificativa}
               onValueChange={setJustificativa}
               placeholder="Selecione a justificativa"
-              opcoes={JUSTIFICATIVAS.map((item) => ({
-                valor: item.codigo,
-                rotulo: `${item.codigo} · ${item.rotulo}`,
-              }))}
+              opcoes={opcoesJustificativa}
             />
           </div>
         </div>
@@ -419,7 +407,7 @@ export default function VistaSaidas({
         <Button
           type="submit"
           size="lg"
-          className="h-11 self-start rounded-lg px-6"
+          className="h-11 w-full rounded-lg px-6 sm:w-auto"
           disabled={enviando}
         >
           {enviando && <LoaderCircle size={16} className="animate-spin" />}
@@ -470,7 +458,7 @@ export default function VistaSaidas({
                               </p>
                               <p className="text-muted-foreground truncate text-xs">
                                 {rotuloMomento(saida.momento)} ·{" "}
-                                {rotuloJustificativa(saida.justificativa)}
+                                {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
                                 {saida.observacao ? ` · ${saida.observacao}` : ""}
                               </p>
                               <p className="text-muted-foreground truncate text-xs">
@@ -619,7 +607,7 @@ export default function VistaSaidas({
                             </p>
                             <p className="text-muted-foreground text-xs">
                               {rotuloMomento(saida.momento)} ·{" "}
-                              {rotuloJustificativa(saida.justificativa)}
+                              {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
                               {saida.observacao ? ` · ${saida.observacao}` : ""}
                             </p>
                             <p className="text-muted-foreground text-xs">

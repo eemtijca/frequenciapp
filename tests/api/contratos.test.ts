@@ -1120,6 +1120,140 @@ describe("cópia de segurança", () => {
   });
 });
 
+describe("catálogo de justificativas", () => {
+  it("coordenação lê o catálogo em ordem alfabética", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/justificativas");
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as {
+      justificativas: { codigo: string; rotulo: string; ativo: boolean }[];
+    };
+    expect(dados.justificativas.length).toBeGreaterThanOrEqual(12);
+    const rotulos = dados.justificativas.map((item) => item.rotulo);
+    const ordenados = [...rotulos].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+    expect(rotulos).toEqual(ordenados);
+    expect(dados.justificativas.some((item) => item.codigo === "D")).toBe(true);
+  });
+
+  it("coordenação não cria, edita nem exclui", async () => {
+    const criar = await autenticado(cookieCoord, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QA", rotulo: "QA Justificativa" }),
+    });
+    expect(criar.status).toBe(403);
+    const editar = await autenticado(cookieCoord, "/api/justificativas/D", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "Outro" }),
+    });
+    expect(editar.status).toBe(403);
+    const excluir = await autenticado(cookieCoord, "/api/justificativas/QA", {
+      method: "DELETE",
+    });
+    expect(excluir.status).toBe(403);
+  });
+
+  it("administração cria e recusa duplicata e dados inválidos", async () => {
+    const criar = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QA", rotulo: "QA Justificativa" }),
+    });
+    expect(criar.status).toBe(201);
+    const dados = (await criar.json()) as { justificativa: { codigo: string; ativo: boolean } };
+    expect(dados.justificativa.codigo).toBe("QA");
+    expect(dados.justificativa.ativo).toBe(true);
+
+    const duplicada = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "qa", rotulo: "Outra" }),
+    });
+    expect(duplicada.status).toBe(409);
+
+    const codigoInvalido = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "1x", rotulo: "Inválida" }),
+    });
+    expect(codigoInvalido.status).toBe(400);
+
+    const rotuloCurto = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QQ", rotulo: "a" }),
+    });
+    expect(rotuloCurto.status).toBe(400);
+  });
+
+  it("administração edita o rótulo e alterna a situação", async () => {
+    const editar = await autenticado(cookieAdmin, "/api/justificativas/QA", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "QA Justificativa Editada" }),
+    });
+    expect(editar.status).toBe(200);
+    const dadosEditar = (await editar.json()) as {
+      justificativa: { rotulo: string; ativo: boolean };
+    };
+    expect(dadosEditar.justificativa.rotulo).toBe("QA Justificativa Editada");
+
+    const desativar = await autenticado(cookieAdmin, "/api/justificativas/QA", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: false }),
+    });
+    expect(desativar.status).toBe(200);
+    expect(
+      ((await desativar.json()) as { justificativa: { ativo: boolean } }).justificativa.ativo,
+    ).toBe(false);
+
+    const inexistente = await autenticado(cookieAdmin, "/api/justificativas/ZZ", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+    expect(inexistente.status).toBe(404);
+  });
+
+  it("recusa justificativa fora do catálogo na chamada e na saída", async () => {
+    const chamada = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_5,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, justificativa: "ZZZ" }],
+        revisao: 0,
+      }),
+    });
+    expect(chamada.status).toBe(400);
+    const dadosChamada = (await chamada.json()) as { error: string };
+    expect(dadosChamada.error).toContain("não está no catálogo");
+
+    const saida = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "ZZZ",
+      }),
+    });
+    expect(saida.status).toBe(400);
+  });
+
+  it("exclusão bloqueada em uso e permitida sem histórico", async () => {
+    const emUso = await autenticado(cookieAdmin, "/api/justificativas/D", { method: "DELETE" });
+    expect(emUso.status).toBe(409);
+    const dadosEmUso = (await emUso.json()) as { error: string };
+    expect(dadosEmUso.error).toContain("em uso");
+
+    const semUso = await autenticado(cookieAdmin, "/api/justificativas/QA", { method: "DELETE" });
+    expect(semUso.status).toBe(200);
+  });
+
+  it("a cópia de segurança inclui o catálogo", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/backup");
+    expect(resposta.status).toBe(200);
+    const copia = (await resposta.json()) as { justificativas?: unknown[] };
+    expect(Array.isArray(copia.justificativas)).toBe(true);
+    expect(copia.justificativas?.length ?? 0).toBeGreaterThanOrEqual(12);
+  });
+});
+
 describe("conta: troca de senha", () => {
   beforeAll(async () => {
     // As baterias de frequência usam a conta QA; aqui voltamos à conta fixa.

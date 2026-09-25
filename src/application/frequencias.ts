@@ -8,7 +8,6 @@ import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade } from "@/infra/erros
 import {
   diaLocal,
   ehDiaValido,
-  ehJustificativaValida,
   ehMesValido,
   horariosDoDia,
   type Frequencia,
@@ -24,12 +23,7 @@ const faltaEntrada = z.object({
     .array(z.string().uuid("Aula inválida."))
     .max(20, "Lista de aulas grande demais.")
     .optional(),
-  justificativa: z
-    .string()
-    .trim()
-    .max(10, "Justificativa inválida.")
-    .refine((codigo) => ehJustificativaValida(codigo), "Justificativa inválida.")
-    .nullish(),
+  justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
   observacao: z
     .string()
     .trim()
@@ -310,6 +304,29 @@ export async function salvarFrequencia(
       justificativa: ausencia.justificativa,
       observacao: ausencia.observacao,
     }));
+
+  // O catálogo de justificativas vem do banco e pode ser editado na Gestão.
+  const codigosDeJustificativa = [
+    ...new Set(
+      ausencias
+        .map((ausencia) => ausencia.justificativa)
+        .filter((codigo): codigo is string => Boolean(codigo)),
+    ),
+  ];
+  if (codigosDeJustificativa.length > 0) {
+    const existentes = await banco().justificativa.findMany({
+      where: { codigo: { in: codigosDeJustificativa } },
+      select: { codigo: true },
+    });
+    const conhecidos = new Set(existentes.map((item) => item.codigo));
+    const desconhecido = codigosDeJustificativa.find((codigo) => !conhecidos.has(codigo));
+    if (desconhecido) {
+      throw new ErroHttp(
+        `A justificativa ${desconhecido} não está no catálogo. Atualize a página e confira.`,
+        400,
+      );
+    }
+  }
 
   const diaUtc = new Date(`${dia}T12:00:00Z`);
   const filtroFrequencia = { turmaId, dia: diaUtc } as const;

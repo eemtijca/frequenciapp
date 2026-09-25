@@ -23,6 +23,7 @@ import type {
   Aluno,
   Configuracoes,
   Frequencia,
+  JustificativaConfigurada,
   ResumoAcumulado,
   Responsavel,
   SaidaAntecipada,
@@ -56,6 +57,7 @@ interface Props {
   alunosIniciais: Aluno[];
   frequenciasIniciais: Frequencia[];
   saidasIniciais: SaidaAntecipada[];
+  justificativasIniciais: JustificativaConfigurada[];
   responsaveisIniciais: Responsavel[];
   configuracoesIniciais: Configuracoes;
   resumoInicial: ResumoAcumulado | null;
@@ -87,7 +89,7 @@ const ITENS_INICIAIS: ItemNav[] = [
   { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
 ];
 
-const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saiu mais cedo", icone: DoorOpen };
+const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas", icone: DoorOpen };
 const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
 
 const ITENS_FIM: ItemNav[] = [
@@ -131,7 +133,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       <motion.span
         animate={ativo ? { scale: 1.08 } : { scale: 1 }}
         transition={{ type: "spring", stiffness: 500, damping: 26 }}
-        className="lg:hidden"
+        className="flex h-5 items-center lg:hidden"
       >
         <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
       </motion.span>
@@ -141,7 +143,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
         aria-hidden="true"
         className="hidden lg:block"
       />
-      <span>{item.rotulo}</span>
+      <span className="whitespace-nowrap">{item.rotulo}</span>
       {pendente && (
         <span
           aria-label="Alterações não salvas"
@@ -162,6 +164,7 @@ export default function Aplicacao({
   alunosIniciais,
   frequenciasIniciais,
   saidasIniciais,
+  justificativasIniciais,
   responsaveisIniciais,
   configuracoesIniciais,
   resumoInicial,
@@ -182,6 +185,8 @@ export default function Aplicacao({
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
   const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
   const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
+  const [justificativas, setJustificativas] =
+    useState<JustificativaConfigurada[]>(justificativasIniciais);
   const [responsaveis] = useState<Responsavel[]>(responsaveisIniciais);
   const [configuracoes, setConfiguracoes] = useState<Configuracoes>(configuracoesIniciais);
   const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
@@ -267,6 +272,13 @@ export default function Aplicacao({
     },
     [recarregarFrequencias, recarregarSaidas],
   );
+
+  const recarregarJustificativas = useCallback(async () => {
+    const dados = await pedir<{ justificativas: JustificativaConfigurada[] }>(
+      "/api/justificativas",
+    );
+    setJustificativas(dados.justificativas);
+  }, []);
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
@@ -519,6 +531,7 @@ export default function Aplicacao({
             fuso={fuso}
             alvo={alvo}
             configuracoes={configuracoes}
+            catalogoJustificativas={justificativas}
             resumo={resumo}
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={setPendencias}
@@ -534,6 +547,7 @@ export default function Aplicacao({
             turmas={turmas}
             alunos={alunos}
             responsaveis={responsaveis}
+            catalogoJustificativas={justificativas}
             saidas={saidas}
             onSaidasMudaram={recarregarSaidas}
           />
@@ -568,6 +582,7 @@ export default function Aplicacao({
             alunos={alunos}
             configuracoes={configuracoes}
             diaCorrente={diaCorrente}
+            justificativas={justificativas}
             onSeriesMudaram={async () => {
               const dados = await pedir<{ series: Serie[] }>("/api/series");
               setSeries(dados.series);
@@ -579,6 +594,7 @@ export default function Aplicacao({
             }}
             onAlunosMudaram={recarregarAlunos}
             onConfiguracoesMudaram={setConfiguracoes}
+            onJustificativasMudaram={recarregarJustificativas}
           />
         )}
       </div>

@@ -9,7 +9,6 @@ import { ehDuplicidade, ErroHttp } from "@/infra/erros";
 import {
   diaLocal,
   ehDiaValido,
-  ehJustificativaValida,
   ehMomentoValido,
   JUSTIFICATIVA_OUTROS,
   type SaidaAntecipada,
@@ -19,8 +18,8 @@ import type { Identidade } from "@/domain/usuarios";
 const justificativaSaida = z
   .string()
   .trim()
-  .max(10, "Justificativa inválida.")
-  .refine((codigo) => ehJustificativaValida(codigo), "Justificativa inválida.");
+  .min(1, "Informe a justificativa.")
+  .max(10, "Justificativa inválida.");
 
 export const esquemaCriarSaida = z.object({
   alunoId: z.string().uuid("Aluno inválido."),
@@ -107,6 +106,17 @@ export async function criarSaida(
   const { alunoId, dia, momento, justificativa } = dados.data;
   if (dia > diaLocal(new Date(), ambiente.fuso)) {
     throw new ErroHttp("Não é possível registrar saída em dia futuro.", 400);
+  }
+  // O catálogo de justificativas vem do banco e pode ser editado na Gestão.
+  const justificativaNoCatalogo = await banco().justificativa.findFirst({
+    where: { codigo: justificativa },
+    select: { id: true },
+  });
+  if (!justificativaNoCatalogo) {
+    throw new ErroHttp(
+      `A justificativa ${justificativa} não está no catálogo. Atualize a página e confira.`,
+      400,
+    );
   }
   const aluno = await banco().aluno.findUnique({ where: { id: alunoId } });
   if (!aluno) throw new ErroHttp("Aluno não encontrado.", 404);
