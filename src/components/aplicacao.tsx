@@ -3,7 +3,7 @@
 // Shell da aplicação: cabeçalho, troca de visões por deslize e navegação
 // inferior no celular, barra lateral no desktop. A administração ganha a
 // visão Gestão no lugar de Alunos.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import {
@@ -150,7 +150,11 @@ export default function Aplicacao({
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
   const pagerRef = useRef<HTMLDivElement | null>(null);
-  const timerVisao = useRef<number | null>(null);
+  // Índice da visão visível, modo programático e controles de quadro.
+  const indiceVisao = useRef(0);
+  const rolagemProgramatica = useRef(false);
+  const quadroRolagem = useRef<number | null>(null);
+  const timerRolagem = useRef<number | null>(null);
   const reduzirMovimento = useReducedMotion() ?? false;
 
   const itemFinal = useMemo(
@@ -161,6 +165,9 @@ export default function Aplicacao({
     () => (itemFinal ? [...ITENS_BASE, itemFinal] : [...ITENS_BASE]),
     [itemFinal],
   );
+  const indiceAtivo = itens.findIndex((item) => item.visao === visao);
+  // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
+  const posicoes = useRef(new Map<Visao, number>());
 
   const rotuloTurma = useCallback(
     (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? "",
@@ -185,9 +192,9 @@ export default function Aplicacao({
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
-      if (timerVisao.current !== null) {
-        window.clearTimeout(timerVisao.current);
-        timerVisao.current = null;
+      if (timerRolagem.current !== null) {
+        window.clearTimeout(timerRolagem.current);
+        timerRolagem.current = null;
       }
       setVisao(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
@@ -195,6 +202,9 @@ export default function Aplicacao({
       if (!pager) return;
       const indice = itens.findIndex((item) => item.visao === proxima);
       if (indice < 0) return;
+      indiceVisao.current = indice;
+      // A rolagem por toque não deve mudar a visão ao passar pelas do meio.
+      rolagemProgramatica.current = true;
       // No desktop a troca é instantânea: o deslize é gesto de celular.
       const ehDesktop =
         typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
@@ -202,13 +212,51 @@ export default function Aplicacao({
         left: indice * pager.clientWidth,
         behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
       });
+      // Rede de segurança para navegadores sem scrollend.
+      timerRolagem.current = window.setTimeout(() => {
+        timerRolagem.current = null;
+        rolagemProgramatica.current = false;
+      }, 700);
     },
     [itens, reduzirMovimento],
   );
 
-  // O deslize monta o painel e o vizinho na hora, mas a visão ativa só muda
-  // quando a rolagem para: assim a pílula não passeia pelas visões do meio.
+  // O indicador acompanha o gesto: a cada quadro, o índice visível vira a
+  // visão ativa. Na rolagem programática (toque na navegação), o estado não
+  // muda, então a pílula vai direto ao destino sem passear pelas do meio.
   const aoRolarPager = useCallback(() => {
+    if (quadroRolagem.current !== null) return;
+    quadroRolagem.current = window.requestAnimationFrame(() => {
+      quadroRolagem.current = null;
+      const pager = pagerRef.current;
+      if (!pager) return;
+      const largura = pager.clientWidth;
+      if (largura === 0) return;
+      const indice = Math.max(
+        0,
+        Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)),
+      );
+      const atual = itens[indice];
+      if (!atual) return;
+      setVisitadas((atuais) =>
+        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
+      );
+      if (rolagemProgramatica.current || indiceVisao.current === indice) return;
+      indiceVisao.current = indice;
+      startTransition(() => {
+        setVisao(atual.visao);
+      });
+    });
+  }, [itens]);
+
+  // Fecha a rolagem no evento nativo quando existir, com o temporizador como
+  // rede de segurança para navegadores sem scrollend.
+  const fecharRolagem = useCallback(() => {
+    if (timerRolagem.current !== null) {
+      window.clearTimeout(timerRolagem.current);
+      timerRolagem.current = null;
+    }
+    rolagemProgramatica.current = false;
     const pager = pagerRef.current;
     if (!pager) return;
     const largura = pager.clientWidth;
@@ -216,26 +264,72 @@ export default function Aplicacao({
     const indice = Math.max(0, Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)));
     const atual = itens[indice];
     if (!atual) return;
-    setVisitadas((atuais) => {
-      const proximas = new Set(atuais);
-      proximas.add(atual.visao);
-      const vizinho = itens[indice + 1] ?? itens[indice - 1];
-      if (vizinho) proximas.add(vizinho.visao);
-      return proximas.size === atuais.size ? atuais : proximas;
-    });
-    if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
-    timerVisao.current = window.setTimeout(() => {
-      timerVisao.current = null;
+    indiceVisao.current = indice;
+    startTransition(() => {
       setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
-    }, 120);
+      setVisitadas((atuais) =>
+        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
+      );
+    });
   }, [itens]);
 
-  // Limpa o temporizador da visão ao desmontar.
+  // Limpa quadro e temporizador ao desmontar.
   useEffect(() => {
     return () => {
-      if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
+      if (quadroRolagem.current !== null) window.cancelAnimationFrame(quadroRolagem.current);
+      if (timerRolagem.current !== null) window.clearTimeout(timerRolagem.current);
     };
   }, []);
+
+  // O evento nativo de fim de rolagem não existe em todos os navegadores.
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+    pager.addEventListener("scrollend", fecharRolagem);
+    return () => pager.removeEventListener("scrollend", fecharRolagem);
+  }, [fecharRolagem]);
+
+  // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
+  // saem da pintura não perderem a posição ao voltar.
+  const guardarRolagem = useCallback((alvo: Visao, evento: React.UIEvent<HTMLElement>) => {
+    posicoes.current.set(alvo, evento.currentTarget.scrollTop);
+  }, []);
+
+  useEffect(() => {
+    const indice = itens.findIndex((item) => item.visao === visao);
+    if (indice < 0) return;
+    const salvo = posicoes.current.get(visao);
+    if (salvo === undefined) return;
+    const quadro = window.requestAnimationFrame(() => {
+      const painel = pagerRef.current?.children[indice];
+      if (painel instanceof HTMLElement && painel.scrollTop !== salvo) painel.scrollTop = salvo;
+    });
+    return () => window.cancelAnimationFrame(quadro);
+  }, [itens, visao]);
+
+  // Monta as áreas depois da primeira pintura: nenhuma tela pesada deve
+  // montar durante o primeiro gesto de deslize.
+  useEffect(() => {
+    const aquecer = () => {
+      startTransition(() => {
+        setVisitadas((atuais) => {
+          const proximas = new Set(atuais);
+          for (const item of itens) proximas.add(item.visao);
+          return proximas.size === atuais.size ? atuais : proximas;
+        });
+      });
+    };
+    const janela = window as Window & {
+      requestIdleCallback?: (retorno: () => void, opcoes?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (janela.requestIdleCallback && janela.cancelIdleCallback) {
+      const id = janela.requestIdleCallback(aquecer, { timeout: 3000 });
+      return () => janela.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(aquecer, 1500);
+    return () => window.clearTimeout(id);
+  }, [itens]);
 
   // Atalho do manifest: abre direto na visão pedida, sem animação.
   const visaoInicialRef = useRef(inicial);
@@ -243,7 +337,10 @@ export default function Aplicacao({
     const pager = pagerRef.current;
     if (!pager) return;
     const indice = itens.findIndex((item) => item.visao === visaoInicialRef.current);
-    if (indice > 0) pager.scrollTo({ left: indice * pager.clientWidth });
+    if (indice > 0) {
+      indiceVisao.current = indice;
+      pager.scrollTo({ left: indice * pager.clientWidth });
+    }
   }, [itens]);
 
   // Ao redimensionar a janela, reencaixa o paginador na visão ativa.
@@ -252,7 +349,10 @@ export default function Aplicacao({
       const pager = pagerRef.current;
       if (!pager) return;
       const indice = itens.findIndex((item) => item.visao === visao);
-      if (indice >= 0) pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
+      if (indice >= 0) {
+        indiceVisao.current = indice;
+        pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
+      }
     }
     window.addEventListener("resize", reencaixar);
     return () => window.removeEventListener("resize", reencaixar);
@@ -529,8 +629,9 @@ export default function Aplicacao({
               onScroll={aoRolarPager}
               className="pagina-sem-barra flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
             >
-              {itens.map((item) => {
+              {itens.map((item, indice) => {
                 const ativo = item.visao === visao;
+                const distante = Math.abs(indice - indiceAtivo) > 1;
                 return (
                   <section
                     key={item.visao}
@@ -538,7 +639,15 @@ export default function Aplicacao({
                     aria-label={item.rotulo}
                     aria-hidden={!ativo}
                     inert={!ativo}
-                    className="h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 pt-4 pb-0 sm:px-6 lg:px-8"
+                    data-distante={distante ? "true" : undefined}
+                    onScroll={(evento) => guardarRolagem(item.visao, evento)}
+                    onPointerDown={() => {
+                      rolagemProgramatica.current = false;
+                    }}
+                    onWheel={() => {
+                      rolagemProgramatica.current = false;
+                    }}
+                    className="pagina-painel h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                   >
                     {visitadas.has(item.visao) ? renderizarVisao(item.visao) : null}
                   </section>

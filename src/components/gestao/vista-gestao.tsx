@@ -2,7 +2,7 @@
 
 // Gestão: área do administrador. Séries, turmas, alunos e equipe em abas
 // curtas, com troca por deslize horizontal no celular e animação no desktop.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { GraduationCap, ListChecks, School, Users } from "lucide-react";
 import type { Aluno, Serie, Turma } from "@/domain/frequencia";
@@ -44,7 +44,11 @@ export default function VistaGestao({
   const [ehDesktop, setEhDesktop] = useState(false);
   const pagerRef = useRef<HTMLDivElement | null>(null);
   const abasRef = useRef<(HTMLButtonElement | null)[]>([]);
-  const timerAba = useRef<number | null>(null);
+  // Índice ativo, modo programático e controles de quadro do deslize.
+  const indiceAba = useRef(0);
+  const rolagemProgramatica = useRef(false);
+  const quadroRolagem = useRef<number | null>(null);
+  const timerRolagem = useRef<number | null>(null);
   const controles = useAnimationControls();
   const reduzirMovimento = useReducedMotion() ?? false;
 
@@ -64,18 +68,26 @@ export default function VistaGestao({
       const indice = ABAS.findIndex((item) => item.aba === proxima);
       if (indice < 0) return;
       const indiceAtual = ABAS.findIndex((item) => item.aba === aba);
-      if (timerAba.current !== null) {
-        window.clearTimeout(timerAba.current);
-        timerAba.current = null;
+      if (timerRolagem.current !== null) {
+        window.clearTimeout(timerRolagem.current);
+        timerRolagem.current = null;
       }
       setAba(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
       const pager = pagerRef.current;
       if (pager) {
+        indiceAba.current = indice;
+        // A rolagem por toque não deve mudar a aba ao passar pelas do meio.
+        rolagemProgramatica.current = true;
         pager.scrollTo({
           left: indice * pager.clientWidth,
           behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
         });
+        // Rede de segurança para navegadores sem scrollend.
+        timerRolagem.current = window.setTimeout(() => {
+          timerRolagem.current = null;
+          rolagemProgramatica.current = false;
+        }, 700);
       }
       if (ehDesktop && !reduzirMovimento && indice !== indiceAtual) {
         controles.set({ x: (indice > indiceAtual ? 1 : -1) * 28, opacity: 0.6 });
@@ -90,9 +102,43 @@ export default function VistaGestao({
     [aba, controles, ehDesktop, reduzirMovimento],
   );
 
-  // O arrasto monta o painel e o vizinho na hora, mas a aba ativa só muda
-  // quando a rolagem para: assim a pílula não passeia pelas abas do meio.
+  // A pílula acompanha o gesto: a cada quadro, o índice visível vira a aba
+  // ativa. Na rolagem programática (toque na aba), o estado não muda, então
+  // a pílula vai direto ao destino sem passear pelas abas do meio.
   const aoRolar = useCallback(() => {
+    if (quadroRolagem.current !== null) return;
+    quadroRolagem.current = window.requestAnimationFrame(() => {
+      quadroRolagem.current = null;
+      const pager = pagerRef.current;
+      if (!pager) return;
+      const largura = pager.clientWidth;
+      if (largura === 0) return;
+      const indice = Math.max(0, Math.min(ABAS.length - 1, Math.round(pager.scrollLeft / largura)));
+      const atual = ABAS[indice];
+      if (!atual) return;
+      setVisitadas((atuais) => {
+        const proximas = new Set(atuais);
+        proximas.add(atual.aba);
+        const vizinha = ABAS[indice + 1] ?? ABAS[indice - 1];
+        if (vizinha) proximas.add(vizinha.aba);
+        return proximas.size === atuais.size ? atuais : proximas;
+      });
+      if (rolagemProgramatica.current || indiceAba.current === indice) return;
+      indiceAba.current = indice;
+      startTransition(() => {
+        setAba(atual.aba);
+      });
+    });
+  }, []);
+
+  // Fecha a rolagem no evento nativo quando existir, com o temporizador como
+  // rede de segurança para navegadores sem scrollend.
+  const fecharRolagem = useCallback(() => {
+    if (timerRolagem.current !== null) {
+      window.clearTimeout(timerRolagem.current);
+      timerRolagem.current = null;
+    }
+    rolagemProgramatica.current = false;
     const pager = pagerRef.current;
     if (!pager) return;
     const largura = pager.clientWidth;
@@ -100,26 +146,28 @@ export default function VistaGestao({
     const indice = Math.max(0, Math.min(ABAS.length - 1, Math.round(pager.scrollLeft / largura)));
     const atual = ABAS[indice];
     if (!atual) return;
-    setVisitadas((atuais) => {
-      const proximas = new Set(atuais);
-      proximas.add(atual.aba);
-      const vizinha = ABAS[indice + 1] ?? ABAS[indice - 1];
-      if (vizinha) proximas.add(vizinha.aba);
-      return proximas.size === atuais.size ? atuais : proximas;
-    });
-    if (timerAba.current !== null) window.clearTimeout(timerAba.current);
-    timerAba.current = window.setTimeout(() => {
-      timerAba.current = null;
+    indiceAba.current = indice;
+    startTransition(() => {
       setAba((anterior) => (anterior === atual.aba ? anterior : atual.aba));
-    }, 120);
+      setVisitadas((atuais) => (atuais.has(atual.aba) ? atuais : new Set(atuais).add(atual.aba)));
+    });
   }, []);
 
-  // Limpa o temporizador da aba ao desmontar.
+  // Limpa quadro e temporizador ao desmontar.
   useEffect(() => {
     return () => {
-      if (timerAba.current !== null) window.clearTimeout(timerAba.current);
+      if (quadroRolagem.current !== null) window.cancelAnimationFrame(quadroRolagem.current);
+      if (timerRolagem.current !== null) window.clearTimeout(timerRolagem.current);
     };
   }, []);
+
+  // O evento nativo de fim de rolagem não existe em todos os navegadores.
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+    pager.addEventListener("scrollend", fecharRolagem);
+    return () => pager.removeEventListener("scrollend", fecharRolagem);
+  }, [fecharRolagem]);
 
   // Ao redimensionar a janela, reencaixa o paginador na aba ativa.
   useEffect(() => {
@@ -157,6 +205,8 @@ export default function VistaGestao({
       </>
     );
   }
+
+  const indiceAtivo = ABAS.findIndex((item) => item.aba === aba);
 
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
@@ -220,8 +270,9 @@ export default function VistaGestao({
           data-pager="gestao"
           className="pagina-sem-barra flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain"
         >
-          {ABAS.map((item) => {
+          {ABAS.map((item, indice) => {
             const ativo = item.aba === aba;
+            const distante = Math.abs(indice - indiceAtivo) > 1;
             return (
               <div
                 key={item.aba}
@@ -230,7 +281,14 @@ export default function VistaGestao({
                 aria-labelledby={`aba-${item.aba}`}
                 aria-hidden={!ativo}
                 inert={!ativo}
-                className="w-full shrink-0 snap-start"
+                data-distante={distante ? "true" : undefined}
+                onPointerDown={() => {
+                  rolagemProgramatica.current = false;
+                }}
+                onWheel={() => {
+                  rolagemProgramatica.current = false;
+                }}
+                className="pagina-painel w-full shrink-0 snap-start"
               >
                 {visitadas.has(item.aba) ? renderizarAba(item.aba) : null}
               </div>

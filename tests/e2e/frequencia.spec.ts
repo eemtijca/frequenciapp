@@ -33,11 +33,16 @@ test.describe("frequência com saída por aula", () => {
     await gatilhoDia.click();
     const painelDia = page.getByRole("dialog", { name: "Data da frequência" });
     await expect(painelDia).toBeVisible();
-    // No celular o seletor abre como folha inferior, encostada na base.
+    // O seletor abre em popover ancorado, inclusive no celular, sem folha inferior.
+    const caixa = await painelDia.boundingBox();
+    const alvo = await gatilhoDia.boundingBox();
+    const larguraJanela = page.viewportSize()?.width ?? 0;
+    expect(caixa).not.toBeNull();
+    expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(larguraJanela + 1);
     if (isMobile) {
-      const caixa = await painelDia.boundingBox();
-      const altura = page.viewportSize()?.height ?? 0;
-      expect((caixa?.y ?? 0) + (caixa?.height ?? 0)).toBeGreaterThan(altura - 40);
+      const centro = (caixa?.x ?? 0) + (caixa?.width ?? 0) / 2;
+      const centroAlvo = (alvo?.x ?? 0) + (alvo?.width ?? 0) / 2;
+      expect(Math.abs(centro - centroAlvo)).toBeLessThan(120);
     }
     // O teclado anda pela grade e Enter escolhe o dia anterior.
     await page.keyboard.press("ArrowLeft");
