@@ -1,14 +1,17 @@
-// Frequência com saída por aula: marcação parcial, persistência, histórico e grade.
+// Chamada com saída por aula: marcação parcial, persistência, histórico,
+// grade e falta justificada. O modo por aula é ligado pela configuração.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
-test.describe("frequência com saída por aula", () => {
-  test.beforeAll(async () => {
+test.describe("chamada com saída por aula", () => {
+  test.beforeAll(async ({ request }) => {
     await criarMassaE2E();
+    await request.patch("/api/configuracoes", { data: { frequenciaPorAula: true } });
   });
 
-  test.afterAll(async () => {
+  test.afterAll(async ({ request }) => {
+    await request.patch("/api/configuracoes", { data: { frequenciaPorAula: false } });
     await limparMassaE2E();
   });
 
@@ -18,8 +21,9 @@ test.describe("frequência com saída por aula", () => {
   }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
+    await trocarVisao(page, "Chamada", "chamada");
 
-    const painel = page.locator('section[aria-label="Registrar frequência"]');
+    const painel = page.locator('section[aria-label="Fazer chamada"]');
     const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) {
       await pilula.click();
@@ -31,7 +35,7 @@ test.describe("frequência com saída por aula", () => {
     const gatilhoDia = painel.locator("#dia-frequencia");
     await expect(gatilhoDia).toHaveAttribute("aria-haspopup", "dialog");
     await gatilhoDia.click();
-    const painelDia = page.getByRole("dialog", { name: "Data da frequência" });
+    const painelDia = page.getByRole("dialog", { name: "Data da chamada" });
     await expect(painelDia).toBeVisible();
     // O seletor abre em popover ancorado, inclusive no celular, sem folha inferior.
     const caixa = await painelDia.boundingBox();
@@ -78,6 +82,7 @@ test.describe("frequência com saída por aula", () => {
     // A marcação sobrevive à recarga.
     await page.reload();
     await aguardarHidratacao(page);
+    await trocarVisao(page, "Chamada", "chamada");
     // Com a semente local, a turma padrão é outra; reabra a turma de teste.
     if (await pilula.isVisible().catch(() => false)) {
       await pilula.click();
@@ -86,7 +91,8 @@ test.describe("frequência com saída por aula", () => {
       timeout: 15_000,
     });
 
-    await trocarVisao(page, "Histórico", "historico");
+    await trocarVisao(page, "Relatórios", "relatorios");
+    await page.getByRole("tab", { name: "Histórico" }).click();
     await expect(page.getByText(/saída parcial/).first()).toBeVisible();
 
     // O seletor de mês abre em painel, aceita teclado e volta para este mês.
@@ -102,8 +108,8 @@ test.describe("frequência com saída por aula", () => {
     await historico.getByRole("button", { name: "Voltar para este mês" }).click();
     await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
 
-    await trocarVisao(page, "Grade", "grade");
-    const grade = page.locator('section[aria-label="Grade do mês"]');
+    await page.getByRole("tab", { name: "Grade" }).click();
+    const grade = page.locator('section[aria-label="Grade de frequência"]');
     // Com a semente local, escolha a turma de origem do teste.
     const pilulaGrade = grade.getByRole("button", { name: /E2E Ano A/ });
     if (await pilulaGrade.isVisible().catch(() => false)) {
@@ -137,5 +143,24 @@ test.describe("frequência com saída por aula", () => {
       .first()
       .evaluate((elemento) => getComputedStyle(elemento).borderRightWidth);
     expect(bordaNome).toBe("1px");
+  });
+
+  test("marca falta justificada com o código do catálogo", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Chamada", "chamada");
+
+    const painel = page.locator('section[aria-label="Fazer chamada"]');
+    const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
+    if (await pilula.isVisible().catch(() => false)) {
+      await pilula.click();
+    }
+    const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
+    await linha.locator("button[aria-pressed]").first().click();
+    await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();
+    await page.getByRole("option", { name: "D · Doente" }).click();
+    await painel.getByRole("button", { name: "Salvar" }).click();
+    await expect(linha.getByText("FJ")).toBeVisible({ timeout: 15_000 });
+    await expect(linha.getByText("Doente").first()).toBeVisible();
   });
 });

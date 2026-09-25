@@ -19,7 +19,7 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
  * a primeira rolagem pode acontecer antes de o React registrar o ouvinte.
  */
 export async function rolarPager(page: Page, indice: number): Promise<void> {
-  await page.locator(".pagina-sem-barra").evaluate((elemento, alvo) => {
+  await page.locator("[data-pager=principal]").evaluate((elemento, alvo) => {
     elemento.scrollTo({ left: elemento.clientWidth * alvo });
     elemento.dispatchEvent(new Event("scroll"));
   }, indice);

@@ -87,8 +87,9 @@ test.describe("abas da Gestão", () => {
       "true",
     );
     // Durante a rolagem suave, a aba ativa fica na clicada, sem saltar pelas do meio.
+    const abasGestao = page.getByRole("tablist", { name: "Áreas de gestão" });
     for (let i = 0; i < 8; i += 1) {
-      const ativa = await page.locator('[role="tab"][aria-selected="true"]').textContent();
+      const ativa = await abasGestao.getByRole("tab", { selected: true }).textContent();
       expect(ativa).toBe("Equipe");
       await page.waitForTimeout(70);
     }

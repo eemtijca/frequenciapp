@@ -3,14 +3,14 @@ import { expect, type Page } from "@playwright/test";
 import { ADMIN_E2E, COORD_E2E } from "./banco";
 import { aguardarHidratacao } from "./pagina";
 
-/** Preenche a tela de entrada e aguarda a visão de Frequência. */
+/** Preenche a tela de entrada e aguarda a visão inicial do Painel. */
 export async function entrar(page: Page, email: string, senha: string): Promise<void> {
   await page.goto("/");
   await aguardarHidratacao(page);
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha", { exact: true }).fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 }
 
 export function entrarAdmin(page: Page): Promise<void> {

@@ -6,11 +6,13 @@ test.describe("navegação", () => {
   test("troca de visão pela navegação", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
-    await trocarVisao(page, "Histórico", "historico");
-    await expect(page.getByRole("heading", { name: "Histórico" })).toBeVisible();
-    await trocarVisao(page, "Grade", "grade");
-    await expect(page.getByRole("heading", { name: "Grade do mês" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
+    await trocarVisao(page, "Chamada", "chamada");
+    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await trocarVisao(page, "Relatórios", "relatorios");
+    await expect(page.getByRole("heading", { name: "Relatórios" })).toBeVisible();
+    await page.getByRole("tab", { name: "Grade" }).click();
+    await expect(page.getByRole("heading", { name: "Grade" })).toBeVisible();
     await trocarVisao(page, "Gestão", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão" })).toBeVisible();
   });
@@ -26,7 +28,7 @@ test.describe("navegação", () => {
         },
         { timeout: 20_000 },
       )
-      .toBe("historico");
+      .toBe("chamada");
     await expect
       .poll(
         async () => {
@@ -35,15 +37,15 @@ test.describe("navegação", () => {
         },
         { timeout: 20_000 },
       )
-      .toBe("frequencia");
+      .toBe("painel");
   });
 
   test("no desktop a troca de visão é instantânea", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    const pager = page.locator(".pagina-sem-barra");
-    await page.getByRole("button", { name: "Histórico" }).click();
+    const pager = page.locator("[data-pager=principal]");
+    await page.getByRole("button", { name: "Chamada" }).click();
     const medida = await pager.evaluate((elemento) => ({
       scrollLeft: elemento.scrollLeft,
       largura: elemento.clientWidth,
@@ -54,7 +56,7 @@ test.describe("navegação", () => {
   test("alterna o tema pelo menu de três opções", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     await aguardarHidratacao(page, 'button[aria-label*="tema" i]');
     const inicioEscuro = await page.locator("html").evaluate((el) => el.classList.contains("dark"));
     const alvo = inicioEscuro ? "Claro" : "Escuro";
