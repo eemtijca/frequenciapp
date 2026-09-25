@@ -150,6 +150,7 @@ export default function Aplicacao({
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
   const pagerRef = useRef<HTMLDivElement | null>(null);
+  const timerVisao = useRef<number | null>(null);
   const reduzirMovimento = useReducedMotion() ?? false;
 
   const itemFinal = useMemo(
@@ -184,6 +185,10 @@ export default function Aplicacao({
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
+      if (timerVisao.current !== null) {
+        window.clearTimeout(timerVisao.current);
+        timerVisao.current = null;
+      }
       setVisao(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
       const pager = pagerRef.current;
@@ -201,7 +206,8 @@ export default function Aplicacao({
     [itens, reduzirMovimento],
   );
 
-  // O deslize atualiza a visão ativa e monta o painel vizinho antes da parada.
+  // O deslize monta o painel e o vizinho na hora, mas a visão ativa só muda
+  // quando a rolagem para: assim a pílula não passeia pelas visões do meio.
   const aoRolarPager = useCallback(() => {
     const pager = pagerRef.current;
     if (!pager) return;
@@ -217,8 +223,19 @@ export default function Aplicacao({
       if (vizinho) proximas.add(vizinho.visao);
       return proximas.size === atuais.size ? atuais : proximas;
     });
-    setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
+    if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
+    timerVisao.current = window.setTimeout(() => {
+      timerVisao.current = null;
+      setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
+    }, 120);
   }, [itens]);
+
+  // Limpa o temporizador da visão ao desmontar.
+  useEffect(() => {
+    return () => {
+      if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
+    };
+  }, []);
 
   // Atalho do manifest: abre direto na visão pedida, sem animação.
   const visaoInicialRef = useRef(inicial);

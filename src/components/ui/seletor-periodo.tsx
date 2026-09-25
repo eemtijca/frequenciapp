@@ -333,6 +333,7 @@ export function SeletorPeriodo({
         {gatilho}
         <Dialog open={aberto} onOpenChange={aoAbrir}>
           <DialogContent
+            folha
             className="sm:max-w-sm"
             showCloseButton={false}
             onOpenAutoFocus={(evento) => evento.preventDefault()}

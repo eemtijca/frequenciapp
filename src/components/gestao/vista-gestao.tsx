@@ -44,6 +44,7 @@ export default function VistaGestao({
   const [ehDesktop, setEhDesktop] = useState(false);
   const pagerRef = useRef<HTMLDivElement | null>(null);
   const abasRef = useRef<(HTMLButtonElement | null)[]>([]);
+  const timerAba = useRef<number | null>(null);
   const controles = useAnimationControls();
   const reduzirMovimento = useReducedMotion() ?? false;
 
@@ -63,6 +64,10 @@ export default function VistaGestao({
       const indice = ABAS.findIndex((item) => item.aba === proxima);
       if (indice < 0) return;
       const indiceAtual = ABAS.findIndex((item) => item.aba === aba);
+      if (timerAba.current !== null) {
+        window.clearTimeout(timerAba.current);
+        timerAba.current = null;
+      }
       setAba(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
       const pager = pagerRef.current;
@@ -85,7 +90,8 @@ export default function VistaGestao({
     [aba, controles, ehDesktop, reduzirMovimento],
   );
 
-  // O arrasto atualiza a aba ativa e monta o painel vizinho antes da parada.
+  // O arrasto monta o painel e o vizinho na hora, mas a aba ativa só muda
+  // quando a rolagem para: assim a pílula não passeia pelas abas do meio.
   const aoRolar = useCallback(() => {
     const pager = pagerRef.current;
     if (!pager) return;
@@ -101,7 +107,18 @@ export default function VistaGestao({
       if (vizinha) proximas.add(vizinha.aba);
       return proximas.size === atuais.size ? atuais : proximas;
     });
-    setAba((anterior) => (anterior === atual.aba ? anterior : atual.aba));
+    if (timerAba.current !== null) window.clearTimeout(timerAba.current);
+    timerAba.current = window.setTimeout(() => {
+      timerAba.current = null;
+      setAba((anterior) => (anterior === atual.aba ? anterior : atual.aba));
+    }, 120);
+  }, []);
+
+  // Limpa o temporizador da aba ao desmontar.
+  useEffect(() => {
+    return () => {
+      if (timerAba.current !== null) window.clearTimeout(timerAba.current);
+    };
   }, []);
 
   // Ao redimensionar a janela, reencaixa o paginador na aba ativa.

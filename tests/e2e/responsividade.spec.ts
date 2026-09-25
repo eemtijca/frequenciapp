@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("responsividade", () => {
-  test("no celular usa a navegação inferior e a folha inferior", async ({ page }) => {
+  test("no celular usa a navegação inferior e centraliza os formulários", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
@@ -15,8 +15,9 @@ test.describe("responsividade", () => {
     await page.getByRole("button", { name: "Nova série" }).click();
     const caixa = await page.locator('[data-slot="dialog-content"]').boundingBox();
     expect(caixa).not.toBeNull();
-    // A folha inferior encosta na base da tela.
-    expect((caixa?.y ?? 0) + (caixa?.height ?? 0)).toBeGreaterThan(780);
+    // O formulário fica centralizado na tela, como no desktop.
+    const centro = (caixa?.y ?? 0) + (caixa?.height ?? 0) / 2;
+    expect(Math.abs(centro - 422)).toBeLessThan(30);
   });
 
   test("no desktop usa a barra lateral", async ({ page }) => {

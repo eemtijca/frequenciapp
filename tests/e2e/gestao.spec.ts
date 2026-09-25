@@ -74,4 +74,23 @@ test.describe("abas da Gestão", () => {
     await grupo.getByRole("button", { name: "Ocultar senha" }).click();
     await expect(campo).toHaveAttribute("type", "password");
   });
+
+  test("a pílula não passeia pelas abas intermediárias", async ({ page }) => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+
+    await page.getByRole("tab", { name: "Equipe" }).click();
+    await expect(page.getByRole("tab", { name: "Equipe" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    // Durante a rolagem suave, a aba ativa fica na clicada, sem saltar pelas do meio.
+    for (let i = 0; i < 8; i += 1) {
+      const ativa = await page.locator('[role="tab"][aria-selected="true"]').textContent();
+      expect(ativa).toBe("Equipe");
+      await page.waitForTimeout(70);
+    }
+  });
 });
