@@ -221,7 +221,8 @@ Respostas:
 
 ### GET /api/saude
 
-- 200 `{"ok": true}`. Sem sessão; serve para verificar se o processo responde.
+- 200 `{"ok": true}` quando o processo responde e o banco atende.
+- 503 `{"error": "..."}` quando o banco não responde. Sem sessão; serve de sonda para o healthcheck e para o CI.
 
 ## Códigos de erro
 

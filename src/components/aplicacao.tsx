@@ -38,10 +38,17 @@ interface Props {
   usuario: Identidade;
   diaCorrente: string;
   fuso: string;
+  visaoInicial?: string;
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
   frequenciasIniciais: Frequencia[];
+}
+
+const VISOES: Visao[] = ["frequencia", "historico", "grade", "alunos", "gestao"];
+
+function visaoValida(valor: string | undefined): Visao | null {
+  return VISOES.find((visao) => visao === valor) ?? null;
 }
 
 interface ItemNav {
@@ -121,14 +128,18 @@ export default function Aplicacao({
   usuario,
   diaCorrente,
   fuso,
+  visaoInicial,
   seriesIniciais,
   turmasIniciais,
   alunosIniciais,
   frequenciasIniciais,
 }: Props) {
   const router = useRouter();
-  const [visao, setVisao] = useState<Visao>("frequencia");
-  const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set(["frequencia"]));
+  const ehAdmin = usuario.papel === "ADMIN";
+  const pedida = visaoValida(visaoInicial);
+  const inicial = pedida && (pedida !== "gestao" || ehAdmin) ? pedida : "frequencia";
+  const [visao, setVisao] = useState<Visao>(inicial);
+  const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set([inicial]));
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
@@ -141,7 +152,6 @@ export default function Aplicacao({
   const pagerRef = useRef<HTMLDivElement | null>(null);
   const reduzirMovimento = useReducedMotion() ?? false;
 
-  const ehAdmin = usuario.papel === "ADMIN";
   const itemFinal = useMemo(
     () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
     [ehAdmin],
@@ -205,6 +215,15 @@ export default function Aplicacao({
       return proximas.size === atuais.size ? atuais : proximas;
     });
     setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
+  }, [itens]);
+
+  // Atalho do manifest: abre direto na visão pedida, sem animação.
+  const visaoInicialRef = useRef(inicial);
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+    const indice = itens.findIndex((item) => item.visao === visaoInicialRef.current);
+    if (indice > 0) pager.scrollTo({ left: indice * pager.clientWidth });
   }, [itens]);
 
   function abrirFrequencia(dia: string, turmaId: string) {

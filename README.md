@@ -13,7 +13,7 @@ O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, tod
 - **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
 - **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, S, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **Busca em todas as listas**: frequência, histórico, grade, alunos e gestão com filtro local e tolerância a acentos.
-- **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
+- **PWA completo**: instala no aparelho como aplicativo, abre em Frequência ou na Grade do mês pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação por deslize**: troca de visões deslizando a tela com o dedo, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
 - **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.

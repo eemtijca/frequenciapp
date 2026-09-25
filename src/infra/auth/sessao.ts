@@ -117,9 +117,3 @@ export async function encerrarOutrasSessoes(segredo: string, usuarioId: string):
     await banco().sessao.deleteMany({ where: { id: { in: remover.map((s) => s.id) } } });
   }
 }
-
-/** Purga sessões vencidas. Frequência pontual pelo operador. */
-export async function purgarSessoesVencidas(): Promise<number> {
-  const resultado = await banco().sessao.deleteMany({ where: { expiraEm: { lt: new Date() } } });
-  return resultado.count;
-}

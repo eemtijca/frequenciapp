@@ -10,8 +10,12 @@ export default function RegistroPwa() {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
     let recarregando = false;
+    // A primeira vez que o worker assume não recarrega a página: só uma
+    // troca de versão depois de já haver controle pede recarga.
+    let controladoAntes = false;
     async function registrar() {
       try {
+        controladoAntes = Boolean(navigator.serviceWorker.controller);
         const registro = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
 
         registro.addEventListener("updatefound", () => {
@@ -37,7 +41,7 @@ export default function RegistroPwa() {
     }
 
     function aoTrocarControlador() {
-      if (recarregando || !navigator.serviceWorker.controller) return;
+      if (recarregando || !controladoAntes || !navigator.serviceWorker.controller) return;
       recarregando = true;
       window.location.reload();
     }

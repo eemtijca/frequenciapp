@@ -115,6 +115,13 @@ jobs:
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
         run: npm run test:e2e:chromium
 
+      - name: Testes de PWA (Playwright)
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+        run: npm run test:pwa -- --project=chromium
+
       - name: Publicar relatório do Playwright
         if: failure()
         uses: actions/upload-artifact@v4

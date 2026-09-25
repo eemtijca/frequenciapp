@@ -85,6 +85,8 @@ A exclusão respeita o histórico. Confirme o período antes de executar o coman
 curl -s https://seu-dominio/api/saude
 ```
 
+A rota consulta o banco: responde `{"ok":true}` com a conexão saudável e 503 quando o banco não responde. O serviço `app` do Compose usa essa rota como healthcheck, então `docker compose ps` mostra `healthy` quando aplicação e banco estão prontos.
+
 ## Implantação de atualização
 
 ```bash

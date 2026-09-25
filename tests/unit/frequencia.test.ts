@@ -15,7 +15,6 @@ import {
   montarGrade,
   normalizar,
   partesNoFuso,
-  resumirFrequencia,
   rotuloAula,
   rotuloDataCurta,
   rotuloDeTurma,
@@ -337,19 +336,6 @@ describe("montarGrade", () => {
     expect(grade.linhas[0]?.parciais).toBe(1);
     expect(grade.linhas[0]?.faltas).toBe(0);
     expect(grade.linhas[0]?.marcas["2026-09-10"]).toBe("S");
-  });
-});
-
-describe("resumirFrequencia", () => {
-  it("conta apenas alunos ativos da turma da frequência", () => {
-    const alunos = [
-      aluno({ id: "a1", turmaId: "turma-a" }),
-      aluno({ id: "a2", turmaId: "turma-a" }),
-      aluno({ id: "a3", turmaId: "turma-a", ativo: false }),
-      aluno({ id: "a4", turmaId: "turma-b" }),
-    ];
-    const resumo = resumirFrequencia(frequencia({ turmaId: "turma-a" }), alunos, "turma-a");
-    expect(resumo.totalAlunos).toBe(2);
   });
 });
 

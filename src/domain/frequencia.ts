@@ -304,23 +304,6 @@ export function montarGrade(
   return { dias, linhas };
 }
 
-/**
- * Resumo de uma frequência para a lista do histórico.
- */
-export interface ResumoFrequencia {
-  frequencia: Frequencia;
-  totalAlunos: number;
-}
-
-export function resumirFrequencia(
-  frequencia: Frequencia,
-  alunos: Aluno[],
-  turmaId: string,
-): ResumoFrequencia {
-  const total = alunos.filter((aluno) => aluno.ativo && aluno.turmaId === turmaId).length;
-  return { frequencia, totalAlunos: total };
-}
-
 /** Normaliza texto para busca: remove acentos, ordinais e caixa. */
 export function normalizar(texto: string): string {
   return texto

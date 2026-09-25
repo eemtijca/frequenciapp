@@ -39,7 +39,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - frequências: criação com falta em todas as aulas, falta por aula específica, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de aula de outra turma e de aula fora do dia, aluno desativado com falta registrada aceito, aluno desativado novo rejeitado, dia futuro recusado, parâmetros inválidos, consulta por dia e por mês com filtros de turma e de autoria;
 - conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros aparelhos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas e a ausência de nomes de alunos;
-- saída encerrando a sessão e verificação de saúde.
+- saída encerrando a sessão e verificação de saúde (200 com o banco acessível e 503 sem ele).
 
 A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e dias de teste isolados) antes e depois, de modo que execuções repetidas não acumulam estado. Rodar com a connection string correta exportada (ver [tests/README.md](../tests/README.md)).
 

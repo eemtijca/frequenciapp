@@ -33,7 +33,7 @@ A combinação cobre navegadores modernos sem tokens por formulário.
 
 - CSP por nonce em cada requisição: scripts limitados ao próprio servidor com `strict-dynamic`; estilos externos com `'unsafe-inline'` para as posições dinâmicas dos componentes; `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`.
 - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` sem câmera, microfone ou geolocalição.
-- Sem `X-Powered-By`.
+- Sem `X-Powered-By`. HSTS é adicionado no caminho self-hosted pelo `next.config.ts`; na Vercel, o cabeçalho vem da plataforma.
 
 Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que não vale em produção.
 
@@ -53,7 +53,7 @@ Ações administrativas (criar, atualizar e excluir entidades escolares, gerenci
 - Corpo JSON validado por zod com limites de tamanho e comprimento; datas e meses conferidos contra o calendário real antes de tocar o banco.
 - Mensagens de erro em português claro e acionável ao cliente (ADR-009); detalhes técnicos apenas no log do servidor.
 - Falhas de banco não vazam SQL nem connection string: códigos Prisma viram frases como "Este registro está em uso por outros dados" e status adequado.
-- Corpos acima de 200 kB são recusados com 413 antes do parse.
+- Corpos acima de 200 kB em bytes são recusados com 413 antes do parse; hashes de senha com parâmetros fora de faixa são recusados sem executar o scrypt.
 
 ## Segredos
 

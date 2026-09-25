@@ -27,7 +27,7 @@ Na lista da Frequência, a linha inteira do aluno é o alvo: um toque marca falt
 
 ## Estados e retorno
 
-- PWA: instalável na tela inicial, página própria quando a internet cai, faixa de offline dentro do aplicativo e aviso com botão Atualizar quando há versão nova.
+- PWA: instalável na tela inicial, atalhos para Frequência e Grade do mês, página própria quando a internet cai, faixa de offline dentro do aplicativo e aviso com botão Atualizar quando há versão nova.
 - Carregamento com esqueleto do shell na primeira visita e mensagens locais nas regiões, sem bloquear a visão inteira.
 - Salvamento com estado explícito na barra fixa: nova frequência, alterações por salvar, salvando, salva na nuvem com hora e autoria.
 - Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida; sessão expirada volta para a tela de entrada.
