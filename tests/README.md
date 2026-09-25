@@ -63,11 +63,12 @@ npx playwright test    # headless, execução serial
 
 - `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
 - `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
-- Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação e troca de visão).
+- Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
+- Specs atuais: autenticação, banco sem turmas, troca de visão, deslize do paginador e tema de três opções.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
 Com o aplicativo já no ar, use `TEST_BASE_URL` e `PLAYWRIGHT_SKIP_WEBSERVER=1`. O CI sobe o Compose, instala o Chromium e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha.
 
 ## Verificação visual e de ponta a ponta
 
-Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, banco vazio, frequência com saída por aula, histórico, grade, gestão completa (série, turma com aulas, aluno e contas), troca de senha, tema claro e escuro, PWA e larguras de celular e desktop.
+Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, banco vazio, deslize entre visões, barra lateral no desktop, frequência com saída por aula, histórico, grade, gestão completa (série, turma com aulas, aluno e contas), troca de senha, tema de três opções, PWA e larguras de celular e desktop.

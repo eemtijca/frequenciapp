@@ -8,7 +8,7 @@ export async function entrar(page: Page, email: string, senha: string): Promise<
   await page.goto("/");
   await aguardarHidratacao(page);
   await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(senha);
+  await page.getByLabel("Senha", { exact: true }).fill(senha);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
 }

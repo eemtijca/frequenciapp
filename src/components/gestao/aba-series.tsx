@@ -131,8 +131,8 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           {series.map((serie) => (
             <motion.li
               key={serie.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.2 }}
               className="flex items-center gap-3 px-4 py-3"
             >

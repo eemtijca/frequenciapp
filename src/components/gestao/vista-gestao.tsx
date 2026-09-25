@@ -42,7 +42,7 @@ export default function VistaGestao({
   const [aba, setAba] = useState<Aba>("turmas");
 
   return (
-    <section aria-label="Gestão da escola" className="flex flex-col gap-4">
+    <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Gestão</h1>
         <p className="text-muted-foreground text-sm">
@@ -92,9 +92,9 @@ export default function VistaGestao({
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={aba}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
           {aba === "series" && <AbaSeries series={series} onMudanca={onSeriesMudaram} />}

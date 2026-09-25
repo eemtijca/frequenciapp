@@ -158,8 +158,8 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
         grupos.map(([serieId, grupo]) => (
           <motion.div
             key={serieId}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             className="bg-card overflow-hidden rounded-lg border"
           >

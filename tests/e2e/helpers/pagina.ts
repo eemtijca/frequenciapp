@@ -15,9 +15,19 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
 }
 
 /**
- * Troca de visão pela navegação inferior. Em desenvolvimento o Fast Refresh
- * pode trocar os nós durante a hidratação, então o clique é repetido até o
- * painel ativo mudar.
+ * Move o paginador para um painel. Dispara o evento de rolagem de propósito:
+ * a primeira rolagem pode acontecer antes de o React registrar o ouvinte.
+ */
+export async function rolarPager(page: Page, indice: number): Promise<void> {
+  await page.locator(".pagina-sem-barra").evaluate((elemento, alvo) => {
+    elemento.scrollTo({ left: elemento.clientWidth * alvo });
+    elemento.dispatchEvent(new Event("scroll"));
+  }, indice);
+}
+
+/**
+ * Troca de visão pela navegação. Em desenvolvimento o Fast Refresh pode trocar
+ * os nós durante a hidratação, então o clique é repetido até o painel mudar.
  */
 export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
   const botao = page

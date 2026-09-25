@@ -39,7 +39,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
   const ativos = alunos.filter((aluno) => aluno.ativo).length;
 
   return (
-    <section aria-label="Lista de alunos" className="flex flex-col gap-4">
+    <section aria-label="Lista de alunos" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Alunos</h1>
@@ -67,8 +67,8 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
         grupos.map(([id, turma, lista]) => (
           <motion.div
             key={id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="bg-card overflow-hidden rounded-lg border"
           >

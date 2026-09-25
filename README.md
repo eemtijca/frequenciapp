@@ -14,7 +14,8 @@ O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, tod
 - **Originais**: grade de frequência pelas turmas de origem, com alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
-- **Tema claro e escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
+- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
+- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
 
 ## Começando
 

@@ -78,7 +78,7 @@ export default function VistaOriginais({
   }, [origens]);
 
   return (
-    <section aria-label="Frequência por turma original" className="flex flex-col gap-4">
+    <section aria-label="Frequência por turma original" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Originais</h1>
@@ -176,8 +176,8 @@ export default function VistaOriginais({
       ) : (
         <motion.div
           key={turmaEfetiva}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className="bg-card overflow-hidden rounded-lg border"
         >

@@ -249,8 +249,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                   {lista.map((aluno) => (
                     <motion.li
                       key={aluno.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ duration: 0.18 }}
                       className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
                     >

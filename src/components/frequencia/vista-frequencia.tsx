@@ -320,7 +320,7 @@ export default function VistaFrequencia({
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
   if (turmas.length === 0) {
     return (
-      <section aria-label="Registrar frequência" className="flex flex-col gap-4">
+      <section aria-label="Registrar frequência" className="flex flex-col gap-4 pb-6">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Frequência diária</h1>
           <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
@@ -628,8 +628,7 @@ export default function VistaFrequencia({
 
       <div
         aria-label="Barra de salvamento"
-        className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed inset-x-0 bottom-14 z-20 mx-auto w-full max-w-3xl border-t px-4 py-3 backdrop-blur sm:px-6"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+        className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6"
       >
         <div className="flex items-center justify-between gap-3">
           <div aria-live="polite" className="min-w-0 flex-1">

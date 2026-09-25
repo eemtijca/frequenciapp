@@ -70,7 +70,7 @@ export default function VistaHistorico({
   );
 
   return (
-    <section aria-label="Histórico de frequências" className="flex flex-col gap-4">
+    <section aria-label="Histórico de frequências" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Histórico</h1>
@@ -161,8 +161,8 @@ export default function VistaHistorico({
             return (
               <motion.li
                 key={`${frequencia.dia}|${frequencia.turmaId}`}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
               >
                 <button

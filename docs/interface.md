@@ -4,7 +4,7 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 
 ## Estrutura
 
-- **Página única** com navegação inferior no mobile: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. Cabeçalho fixo com identidade, papel, tema, troca de senha e saída.
+- **Página única** com troca de visões por deslize e navegação inferior no celular: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. No desktop, barra lateral fixa com a mesma navegação, o cartão da pessoa e as ações. O cabeçalho traz identidade, tema de três opções (sistema, claro e escuro) e menu de perfil.
 - **Frequência**: seletor de turma por toque com contagem, data com setas de dia, seletor nativo, dia da semana e atalho para voltar a hoje, sem permitir dia futuro, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. As aulas do dia aparecem como referência e a saída no meio da aula fica registrada por aluno.
 - **Histórico**: mês com setas e seletor nativo, sem avançar para meses futuros, e lista de frequências com dia, turma, contagem de faltas e hora do último salvamento; abrir uma frequência a leva de volta à Frequência.
 - **Originais**: pílulas de turma de origem, mês com setas, coluna de hoje destacada, grade com primeira coluna fixa e legenda; células com F, ponto de presença ou vazia.
@@ -25,31 +25,33 @@ Na lista da Frequência, a linha inteira do aluno é o alvo: um toque marca falt
 
 ## Estados e retorno
 
-- PWA: instalável na tela inicial, página própria quando a internet cai e aviso com botão Atualizar quando há versão nova do aplicativo.
-- Carregamento com mensagem local, sem bloquear a visão inteira.
-- Salvamento com estado explícito na barra fixa: nova frequência, alterações por salvar, salvando, salva na nuvem com hora e contagem.
-- Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida.
+- PWA: instalável na tela inicial, página própria quando a internet cai, faixa de offline dentro do aplicativo e aviso com botão Atualizar quando há versão nova.
+- Carregamento com esqueleto do shell na primeira visita e mensagens locais nas regiões, sem bloquear a visão inteira.
+- Salvamento com estado explícito na barra fixa: nova frequência, alterações por salvar, salvando, salva na nuvem com hora e autoria.
+- Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida; sessão expirada volta para a tela de entrada.
 - Rascunho em `sessionStorage` enquanto houver marcações não salvas, recuperado ao voltar para o mesmo dia e turma, com aviso quando o rascunho é mais antigo que a versão salva.
-- Aviso de saída da página quando há marcações por salvar.
+- Aviso de saída da página quando há marcações por salvar e confirmação ao sair da conta nessa situação.
 - Confirmação explícita para descartar marcações e para excluir alunos.
 
 ## Acessibilidade
 
-- HTML semântico: `main`, `nav`, `section`, listas e tabelas com `caption` e `scope`.
+- HTML semântico: `main`, `nav`, `aside`, `section`, listas e tabelas com `caption` e `scope`.
+- Atalho para pular para o conteúdo e foco movido para o painel ativo na troca de visão; painéis inativos com `inert`.
 - Alvos de toque grandes, com `aria-pressed` nas linhas de aluno e `aria-current` na navegação.
 - Rótulos visíveis ou `sr-only` em todos os campos e botões de ícone.
 - Foco visível em todos os interativos; contraste AA em texto e controles nos dois temas.
 - Barras de estado usam `aria-live="polite"` para anunciar salvamentos.
-- `prefers-reduced-motion` respeitado por MotionConfig: as animações de transição, entrada de lista e troca de marca param quando o usuário pede.
+- `prefers-reduced-motion` respeitado: as animações e a rolagem suave param quando o usuário pede.
+- Áreas seguras respeitadas no topo, nas laterais e na base, inclusive no aplicativo instalado.
 
 ## Movimento
 
-Animações discretas com Motion, todas com propósito de confirmar estado:
+Animações discretas, todas com propósito de confirmar estado:
 
-- Troca de visão com entrada e saída de 240 ms, curva de desaceleração suave, mantendo a rolagem restaurada.
-- Indicador da navegação inferior desliza para a aba ativa com mola curta.
+- Troca de visão por **deslize horizontal** com o dedo, com encaixe por painel, rolagem vertical própria de cada visão e estado preservado.
+- A única animação de subida é a da tela de entrada; listas entram apenas com opacidade.
+- Indicador da navegação (inferior no celular e lateral no desktop) desliza para a aba ativa com mola curta.
 - Marca P/F da frequência troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
-- Listas entram com deslocamento de 6 a 8 px e opacidade; a grade de Originais repete a entrada quando muda de turma.
 - Diálogos seguem as animações padrão do Radix; a barra de salvamento não se move.
 
 Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo, o movimento só explica o que mudou.

@@ -201,8 +201,8 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
             return (
               <motion.li
                 key={usuario.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.2 }}
                 className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
               >

@@ -11,7 +11,7 @@ test.describe("autenticação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
-    await page.getByLabel("Senha").fill("senha-errada-123");
+    await page.getByLabel("Senha", { exact: true }).fill("senha-errada-123");
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page.getByText("E-mail ou senha incorretos.")).toBeVisible();
   });
@@ -20,11 +20,19 @@ test.describe("autenticação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
-    await page.getByLabel("Senha").fill(ADMIN_E2E.senha);
+    await page.getByLabel("Senha", { exact: true }).fill(ADMIN_E2E.senha);
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
-    await aguardarHidratacao(page, 'button[aria-label="Sair da conta"]');
-    await page.getByRole("button", { name: "Sair da conta" }).click();
+    // No desktop a saída fica na barra lateral; no celular, no menu de perfil.
+    const largura = page.viewportSize()?.width ?? 0;
+    if (largura >= 1024) {
+      await aguardarHidratacao(page, "aside button");
+      await page.getByRole("button", { name: "Sair da conta" }).click();
+    } else {
+      await aguardarHidratacao(page, `button[aria-label="Conta de ${ADMIN_E2E.nome}"]`);
+      await page.getByRole("button", { name: `Conta de ${ADMIN_E2E.nome}` }).click();
+      await page.getByRole("button", { name: "Sair da conta" }).click();
+    }
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible({ timeout: 25_000 });
   });
 });

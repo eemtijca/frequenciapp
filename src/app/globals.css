@@ -158,8 +158,38 @@
   }
 }
 
-/* Rótulo de data nativo legível nos dois temas. */
+/* Campos nativos seguem o tema aplicado na raiz pelo next-themes. */
 input[type="date"],
 input[type="month"] {
-  color-scheme: light dark;
+  color-scheme: inherit;
+}
+
+@layer base {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+}
+
+/* Rolagem fina e temática em todas as áreas internas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent) transparent;
+}
+
+/* Paginador de abas: rolagem horizontal sem barra visível. */
+.pagina-sem-barra {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.pagina-sem-barra::-webkit-scrollbar {
+  display: none;
 }
