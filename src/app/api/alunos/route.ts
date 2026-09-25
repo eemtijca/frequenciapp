@@ -1,6 +1,6 @@
 // Alunos: listagem pelo escopo de quem pede, criação pelo
 // administrador. Filtro opcional por turma.
-import { alunosVisiveis, criarAluno } from "@/application/alunos";
+import { criarAluno, listarTodosAlunos } from "@/application/alunos";
 import {
   corpoJson,
   ehUuid,
@@ -20,7 +20,7 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!sessao.ok) return sessao.resposta;
     const turmaId = new URL(requisicao.url).searchParams.get("turmaId");
     if (turmaId !== null && !ehUuid(turmaId)) return erroApi("Turma inválida.", 400);
-    let alunos = await alunosVisiveis(sessao.usuario);
+    let alunos = await listarTodosAlunos();
     if (turmaId !== null) {
       alunos = alunos.filter((aluno) => aluno.turmaId === turmaId);
     }

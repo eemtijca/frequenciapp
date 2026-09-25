@@ -1,6 +1,6 @@
 // Service worker: casca offline mínima. A API nunca é cacheada; a navegação
 // tenta a rede e os estáticos usam cache com revalidação.
-const VERSAO = "frequenciapp-3";
+const VERSAO = "frequenciapp-4";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",

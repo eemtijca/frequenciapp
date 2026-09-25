@@ -1,21 +1,24 @@
 # Testes
 
-Suítes do FrequenciApp com Vitest.
+Suítes do FrequenciApp com Vitest e Playwright.
 
-| Suíte            | Comando             | Pré-requisitos                                    |
-| ---------------- | ------------------- | ------------------------------------------------- |
-| Unidade          | `npm run test:unit` | Nenhum.                                           |
-| Contratos de API | `npm run test:api`  | Aplicativo no ar, banco migrado, contas de teste. |
-| Ambas            | `npm test`          | Idem, na ordem.                                   |
+| Suíte            | Comando             | Pré-requisitos                                           |
+| ---------------- | ------------------- | -------------------------------------------------------- |
+| Unidade          | `npm run test:unit` | Nenhum.                                                  |
+| Contratos de API | `npm run test:api`  | Aplicativo no ar, banco migrado, contas de teste.        |
+| Ponta a ponta    | `npm run test:e2e`  | Aplicativo no ar e navegadores instalados.               |
+| PWA              | `npm run test:pwa`  | Build de produção no ar (`npm run build` e `npm start`). |
+| API e unidade    | `npm test`          | Idem, na ordem.                                          |
 
 ## Unidade
 
 Roda em qualquer ambiente, sem banco e sem rede:
 
-- `frequencia.test.ts`: domínio da frequência (calendário, rótulos, marca, grade, normalização).
+- `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
 - `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.
+- `decisao-admin.test.ts`: bootstrap do administrador no modo `--somente-criar`.
 - `texto-editorial.test.ts`: guarda da convenção editorial do repositório (sem travessões e demais padrões proibidos).
 
 ## Contratos de API
@@ -28,7 +31,7 @@ npx prisma migrate deploy
 
 # 2. contas de teste (padrões demo@escola.exemplo e direcao@escola.exemplo)
 ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção npm run criar-admin
-CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo npm run criar-conta
+CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo npm run criar-coordenacao
 
 # 3. aplicativo no ar em outra sessão
 npm run dev
@@ -40,13 +43,32 @@ DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm ru
 Variáveis aceitas:
 
 - `APP_URL`: endereço do aplicativo (padrão `http://localhost:3000`).
-- `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais do administrador de teste.
-- `TESTE_EMAIL` e `TESTE_SENHA`: credenciais do professor de teste.
+- `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais da administração de teste.
+- `TESTE_EMAIL` e `TESTE_SENHA`: credenciais da coordenação de teste.
 - `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
 - `DIRECT_URL`: conexão preferida pelos comandos administrativos, quando disponível.
 
-A suíte usa os dias 2026-06-15 e 2026-06-16 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
+A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
+
+## Ponta a ponta com Playwright
+
+Instalação e configuração já estão no repositório:
+
+```bash
+npm i -D @playwright/test
+npx playwright install --with-deps chromium webkit
+npm run dev            # ou docker compose up -d
+npx playwright test    # headless, execução serial
+```
+
+- `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
+- `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
+- Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
+- Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, frequência com saída por aula e seletor de período próprio, troca de visão, deslize do paginador, abas da Gestão com toque, deslize e teclado, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
+- Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
+
+Com o aplicativo já no ar, use `TEST_BASE_URL` e `PLAYWRIGHT_SKIP_WEBSERVER=1`. O CI sobe o Compose, instala o Chromium e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha.
 
 ## Verificação visual e de ponta a ponta
 
-Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e navegação de ponta a ponta por navegador automatizado, cobrindo login com erro e sucesso, gestão completa (série, turma, professor com atribuições e aluno), frequência com marcação e salvamento, histórico, grade de originais, troca de senha com reentrada, registro do service worker, página offline, tema claro e escuro, e larguras de celular e desktop.
+Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, campos de senha com exibir e ocultar, lembrar o acesso no dispositivo (sessão persistente e e-mail preenchido), banco vazio, deslize entre visões (instantâneo no desktop), barra lateral no desktop, abas da Gestão com toque, deslize e teclado, frequência com saída por aula, painel da frequência em duas colunas, seletor de período próprio (popover no desktop, folha no celular, teclado e atalhos), histórico, grade com divisórias, gestão completa (série, turma com aulas, aluno e contas), troca de senha, tema de três opções, login simétrico, campos do login com margem no celular, PWA e larguras de celular e desktop.

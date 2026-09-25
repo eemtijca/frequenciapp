@@ -1,6 +1,6 @@
 import { identidadeAtual } from "@/application/sessao";
-import { alunosVisiveis } from "@/application/alunos";
-import { escopoDeTurmas } from "@/application/turmas";
+import { listarTodosAlunos } from "@/application/alunos";
+import { listarTodasTurmas } from "@/application/turmas";
 import { listarSeries } from "@/application/series";
 import { listarFrequenciasDoMes } from "@/application/frequencias";
 import { ambiente } from "@/infra/ambiente";
@@ -10,26 +10,32 @@ import Aplicacao from "@/components/aplicacao";
 
 export const dynamic = "force-dynamic";
 
-export default async function Pagina() {
+export default async function Pagina({
+  searchParams,
+}: {
+  searchParams: Promise<{ visao?: string }>;
+}) {
   const usuario = await identidadeAtual(ambiente.authSecret);
   if (!usuario) {
     return <TelaLogin />;
   }
+  const parametros = await searchParams;
   const dia = diaLocal(new Date(), ambiente.fuso);
   const mes = dia.slice(0, 7);
-  const [escopo, series, alunos, frequencias] = await Promise.all([
-    escopoDeTurmas(usuario),
+  const [turmas, series, alunos, frequencias] = await Promise.all([
+    listarTodasTurmas(),
     listarSeries(),
-    alunosVisiveis(usuario),
-    listarFrequenciasDoMes(usuario.id, mes),
+    listarTodosAlunos(),
+    listarFrequenciasDoMes(mes),
   ]);
   return (
     <Aplicacao
       usuario={usuario}
       diaCorrente={dia}
+      fuso={ambiente.fuso}
+      visaoInicial={parametros.visao}
       seriesIniciais={series}
-      turmasIniciais={escopo.turmas}
-      origensIniciais={escopo.origens}
+      turmasIniciais={turmas}
       alunosIniciais={alunos}
       frequenciasIniciais={frequencias}
     />

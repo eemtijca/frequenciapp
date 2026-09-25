@@ -11,7 +11,18 @@ const esquema = z.object({
       "DATABASE_URL deve ser uma connection string PostgreSQL (postgresql://usuario:senha@host:porta/banco).",
     ),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET deve ter pelo menos 32 caracteres."),
-  TZ_APP: z.string().min(1).default("America/Fortaleza"),
+  TZ_APP: z
+    .string()
+    .min(1)
+    .default("America/Fortaleza")
+    .refine((fuso) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: fuso });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "TZ_APP deve ser um fuso IANA válido, por exemplo America/Fortaleza."),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

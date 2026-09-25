@@ -1,13 +1,13 @@
 "use client";
 
 // Troca da própria senha: exige a atual, orienta a política e avisa
-// que outros aparelhos serão desconectados.
+// que outros dispositivos serão desconectados.
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CampoSenha } from "@/components/ui/campo-senha";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -50,7 +50,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
     setErro("");
     try {
       await pedir<{ ok: boolean }>("/api/conta/senha", corpoJson({ senhaAtual, senhaNova }));
-      toast.success("Senha trocada. Nos outros aparelhos, entre de novo.");
+      toast.success("Senha trocada. Nos outros dispositivos, entre de novo.");
       fechar(false);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível trocar a senha.");
@@ -75,9 +75,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
         >
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-atual">Senha atual</Label>
-            <Input
+            <CampoSenha
               id="senha-atual"
-              type="password"
               value={senhaAtual}
               required
               autoComplete="current-password"
@@ -87,9 +86,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-nova">Nova senha</Label>
-            <Input
+            <CampoSenha
               id="senha-nova"
-              type="password"
               value={senhaNova}
               required
               minLength={8}
@@ -103,9 +101,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-confirmacao">Confirmar nova senha</Label>
-            <Input
+            <CampoSenha
               id="senha-confirmacao"
-              type="password"
               value={confirmacao}
               required
               minLength={8}

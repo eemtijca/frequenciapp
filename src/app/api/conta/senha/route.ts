@@ -1,5 +1,5 @@
 // Troca da própria senha: exige a senha atual e encerra as outras
-// sessões abertas em outros aparelhos.
+// sessões abertas em outros dispositivos.
 import { ambiente } from "@/infra/ambiente";
 import { trocarSenha } from "@/application/sessao";
 import {

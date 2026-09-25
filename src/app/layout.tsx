@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import CorDoTema from "@/components/pwa/cor-do-tema";
 import "./globals.css";
 
 const fonteInterface = Geist({
@@ -51,11 +53,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function LayoutRaiz({
+export default async function LayoutRaiz({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // O nonce da CSP libera o script de tema; sem ele o tema escuro pisca.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
@@ -66,8 +70,10 @@ export default function LayoutRaiz({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           {children}
+          <CorDoTema />
           <Toaster position="top-center" richColors closeButton={false} />
         </ThemeProvider>
       </body>

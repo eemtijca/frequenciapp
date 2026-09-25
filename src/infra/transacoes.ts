@@ -33,8 +33,3 @@ export async function comTransacao<T>(operacao: Transacao<T>): Promise<T> {
   }
   throw ultimoErro;
 }
-
-/** Transação de leitura consistente para consultas compostas. */
-export async function comLeitura<T>(consulta: Transacao<T>): Promise<T> {
-  return banco().$transaction(consulta, { isolationLevel: "Serializable" });
-}

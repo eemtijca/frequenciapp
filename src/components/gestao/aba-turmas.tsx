@@ -4,12 +4,15 @@
 // agrupadas por série para leitura rápida.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
+import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Serie, Turma } from "@/domain/frequencia";
+import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
+import DialogoAulas from "@/components/gestao/dialogo-aulas";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import {
@@ -48,6 +51,9 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [turmaDasAulas, setTurmaDasAulas] = useState<Turma | null>(null);
+  const [aulasAberto, setAulasAberto] = useState(false);
+  const turmaDasAulasAtual = turmas.find((item) => item.id === turmaDasAulas?.id) ?? turmaDasAulas;
 
   const opcoesSerie = useMemo(
     () => series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
@@ -66,6 +72,23 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
     }
     return [...mapa.entries()].sort((a, b) => (a[1].serie?.ordem ?? 0) - (b[1].serie?.ordem ?? 0));
   }, [turmas, series]);
+
+  const [busca, setBusca] = useState("");
+  const termo = normalizar(busca);
+  const gruposFiltrados = grupos
+    .map(
+      ([serieId, grupo]) =>
+        [
+          serieId,
+          {
+            ...grupo,
+            turmas: grupo.turmas.filter(
+              (turma) => termo === "" || normalizar(turma.rotulo).includes(termo),
+            ),
+          },
+        ] as const,
+    )
+    .filter(([, grupo]) => grupo.turmas.length > 0);
 
   function abrirNovo() {
     setEmEdicao(null);
@@ -155,72 +178,106 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
           </Button>
         </div>
       ) : (
-        grupos.map(([serieId, grupo]) => (
-          <motion.div
-            key={serieId}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-card overflow-hidden rounded-lg border"
-          >
-            <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
-              <h2 className="font-medium">{grupo.serie?.nome ?? "Série"}</h2>
-              <span className="numerais-tabulares text-muted-foreground text-xs">
-                {grupo.turmas.length} {grupo.turmas.length === 1 ? "turma" : "turmas"}
-              </span>
+        <div className="flex flex-col gap-3">
+          <BarraBusca
+            id="busca-turmas"
+            valor={busca}
+            onValor={setBusca}
+            placeholder="Buscar turma"
+          />
+          {gruposFiltrados.length === 0 ? (
+            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+              <p className="font-medium">Nenhuma turma encontrada</p>
+              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
-            <ul className="divide-y">
-              {grupo.turmas.map((turma) => (
-                <li key={turma.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{turma.rotulo}</p>
-                    <p className="text-muted-foreground text-xs">letra {turma.nome}</p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-11"
-                      aria-label={`Editar turma ${turma.rotulo}`}
-                      onClick={() => abrirEdicao(turma)}
-                    >
-                      <Pencil size={16} />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+          ) : (
+            gruposFiltrados.map(([serieId, grupo]) => (
+              <motion.div
+                key={serieId}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="bg-card overflow-hidden rounded-lg border"
+              >
+                <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
+                  <h2 className="font-medium">{grupo.serie?.nome ?? "Série"}</h2>
+                  <span className="numerais-tabulares text-muted-foreground text-xs">
+                    {grupo.turmas.length} {grupo.turmas.length === 1 ? "turma" : "turmas"}
+                  </span>
+                </div>
+                <ul className="divide-y">
+                  {grupo.turmas.map((turma) => (
+                    <li key={turma.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{turma.rotulo}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {turma.horarios.length === 0
+                            ? "sem aulas configuradas"
+                            : `${turma.horarios.length} ${
+                                turma.horarios.length === 1 ? "aula" : "aulas"
+                              }`}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-falta-texto size-11"
-                          aria-label={`Excluir turma ${turma.rotulo}`}
+                          className="size-11"
+                          aria-label={`Aulas de ${turma.rotulo}`}
+                          onClick={() => {
+                            setTurmaDasAulas(turma);
+                            setAulasAberto(true);
+                          }}
                         >
-                          <Trash2 size={16} />
+                          <Clock size={16} />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Excluir a turma {turma.rotulo}?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            A exclusão só é possível quando a turma não tem alunos nem frequências.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            className="bg-falta text-falta-foreground hover:bg-falta/90"
-                            onClick={() => excluir(turma)}
-                          >
-                            Excluir
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-        ))
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-11"
+                          aria-label={`Editar turma ${turma.rotulo}`}
+                          onClick={() => abrirEdicao(turma)}
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-falta-texto size-11"
+                              aria-label={`Excluir turma ${turma.rotulo}`}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Excluir a turma {turma.rotulo}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                A exclusão só é possível quando a turma não tem alunos nem
+                                frequências.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-falta text-falta-foreground hover:bg-falta/90"
+                                onClick={() => excluir(turma)}
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            ))
+          )}
+        </div>
       )}
 
       <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
@@ -241,10 +298,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
               <Selecionar
                 id="serie-turma"
                 value={formulario.serieId}
-                required
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, serieId: evento.target.value }))
-                }
+                onValueChange={(valor) => setFormulario((atual) => ({ ...atual, serieId: valor }))}
                 opcoes={opcoesSerie}
               />
             </div>
@@ -286,6 +340,13 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DialogoAulas
+        turma={turmaDasAulasAtual}
+        aberto={aulasAberto}
+        onAbrir={setAulasAberto}
+        onMudanca={onMudanca}
+      />
     </div>
   );
 }

@@ -8,6 +8,10 @@ import pg from "pg";
 
 const TIMEOUT_CONEXAO_MS = 5000;
 
+// Chave fixa da trava consultiva: dois contêineres subindo ao mesmo tempo
+// serializam as migrações em vez de tentar aplicar a mesma em paralelo.
+const CHAVE_TRAVA = 727001;
+
 function codigoDoErro(erro) {
   if (erro && typeof erro === "object" && "code" in erro && typeof erro.code === "string") {
     return erro.code;
@@ -80,6 +84,7 @@ async function listar() {
 
 async function main() {
   await conectar();
+  await cliente.query("select pg_advisory_lock($1)", [CHAVE_TRAVA]);
 
   await cliente.query(
     `create table if not exists _prisma_migrations (
@@ -94,16 +99,33 @@ async function main() {
      )`,
   );
 
-  const aplicadas = new Set(
-    (await cliente.query("select migration_name from _prisma_migrations")).rows.map(
-      (linha) => linha.migration_name,
-    ),
+  const aplicadas = new Map(
+    (
+      await cliente.query(
+        "select migration_name, checksum from _prisma_migrations where rolled_back_at is null",
+      )
+    ).rows.map((linha) => [linha.migration_name, linha.checksum]),
   );
 
   const pastas = await listar();
   if (pastas.length === 0) {
     console.error("[migrar] Nenhuma migração encontrada em prisma/migrations.");
     process.exit(1);
+  }
+
+  // Migração já aplicada não pode mudar de conteúdo: o banco e o repositório
+  // precisam contar a mesma história. Recrie o ambiente para seguir.
+  for (const nome of pastas) {
+    if (!aplicadas.has(nome)) continue;
+    const sql = await readFile(path.join(pasta, nome, "migration.sql"), "utf8");
+    const checksum = createHash("sha256").update(sql).digest("hex");
+    if (aplicadas.get(nome) !== checksum) {
+      console.error(
+        `[migrar] A migração ${nome} já aplicada teve o conteúdo alterado. ` +
+          "Recrie o banco (migrate reset ou docker compose down -v) antes de continuar.",
+      );
+      process.exit(4);
+    }
   }
 
   let novas = 0;
@@ -133,6 +155,7 @@ async function main() {
   if (novas === 0) {
     console.log("[migrar] Banco já está na última revisão.");
   }
+  await cliente.query("select pg_advisory_unlock($1)", [CHAVE_TRAVA]);
   await cliente.end();
 }
 

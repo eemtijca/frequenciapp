@@ -24,6 +24,10 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
     dados = {};
   }
   if (!resposta.ok) {
+    if (resposta.status === 401 && typeof window !== "undefined") {
+      // O shell escuta e devolve a pessoa para a tela de entrada.
+      window.dispatchEvent(new CustomEvent("sessao-expirada"));
+    }
     const mensagem =
       typeof dados.error === "string" ? dados.error : "Não foi possível concluir a operação.";
     const conflito = dados.conflito === true;

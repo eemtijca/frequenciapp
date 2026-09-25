@@ -15,4 +15,6 @@ server.log
 package-lock.json
 bun.lock
 worklog.md
+playwright-report/
+test-results/
 prisma/migrations/*.sql

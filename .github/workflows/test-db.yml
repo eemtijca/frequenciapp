@@ -93,15 +93,44 @@ jobs:
           ADMIN_NOME: Direção
         run: npm run criar-admin
 
-      - name: Criar professor de teste
+      - name: Criar coordenação de teste
         env:
           CONTA_EMAIL: demo@escola.exemplo
           CONTA_SENHA: DemoFrequencia2026
           CONTA_NOME: Demo
-        run: npm run criar-conta
+        run: npm run criar-coordenacao
 
       - name: Testes de contratos da API
         run: npm run test:api
+
+      - name: Instalar navegadores do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Testes de ponta a ponta (Playwright)
+        env:
+          # localhost: o storageState do Playwright envia o cookie Secure do
+          # build de produção quando o host é tratado como local.
+          TEST_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+        run: npm run test:e2e:chromium
+
+      - name: Testes de PWA (Playwright)
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+        run: npm run test:pwa -- --project=chromium
+
+      - name: Publicar relatório do Playwright
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
       - name: Exibir logs em caso de falha
         if: failure()

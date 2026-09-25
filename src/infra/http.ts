@@ -3,7 +3,7 @@
 import { ambiente } from "@/infra/ambiente";
 import { identidadeAtual } from "@/application/sessao";
 import { ErroHttp, traduzirErro } from "@/infra/erros";
-import type { Identidade, Papel } from "@/domain/usuarios";
+import type { Identidade } from "@/domain/usuarios";
 
 const LIMITE_DE_CORPO = 200_000;
 
@@ -59,13 +59,6 @@ export async function exigirAdmin(): Promise<
   return sessao;
 }
 
-/** Papel exigido por uma rota, para guardas mais declarativas. */
-export async function exigirPapel(
-  papel: Papel,
-): Promise<{ ok: true; usuario: Identidade } | { ok: false; resposta: Response }> {
-  return papel === "ADMIN" ? exigirAdmin() : exigirSessao();
-}
-
 /**
  * Verifica a origem de mutações: quando o navegador envia Origin,
  * o host precisa coincidir com o destino. Combinada com cookies
@@ -94,7 +87,7 @@ export function origemPermitida(requisicao: Request): boolean {
 export async function corpoJson(requisicao: Request): Promise<unknown> {
   const texto = await requisicao.text();
   if (!texto) return null;
-  if (texto.length > LIMITE_DE_CORPO) {
+  if (Buffer.byteLength(texto, "utf8") > LIMITE_DE_CORPO) {
     throw new ErroHttp("O conteúdo enviado é grande demais para processar.", 413);
   }
   try {
@@ -107,4 +100,16 @@ export async function corpoJson(requisicao: Request): Promise<unknown> {
 /** Identificador UUID válido (parâmetros de rota). */
 export function ehUuid(valor: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor);
+}
+
+/**
+ * IP do cliente para limitadores. Usa o primeiro item de x-forwarded-for,
+ * que o proxy confiável precisa sobrescrever, ou x-real-ip. Sem cabeçalhos,
+ * devolve "local" para não misturar origens desconhecidas em uma só chave.
+ */
+export function ipDoPedido(requisicao: Request): string {
+  const encaminhado = requisicao.headers.get("x-forwarded-for");
+  const primeiro = encaminhado?.split(",")[0]?.trim();
+  if (primeiro) return primeiro;
+  return requisicao.headers.get("x-real-ip")?.trim() || "local";
 }

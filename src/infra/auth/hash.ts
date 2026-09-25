@@ -42,6 +42,12 @@ export async function conferirSenha(senha: string, hash: string): Promise<boolea
     !Number.isInteger(custo) ||
     !Number.isInteger(bloco) ||
     !Number.isInteger(paralelismo) ||
+    custo < 1024 ||
+    custo > 1048576 ||
+    bloco < 1 ||
+    bloco > 32 ||
+    paralelismo < 1 ||
+    paralelismo > 16 ||
     salHex === undefined ||
     hashHex === undefined
   ) {
@@ -49,10 +55,15 @@ export async function conferirSenha(senha: string, hash: string): Promise<boolea
   }
   const sal = Buffer.from(salHex, "hex");
   const esperado = Buffer.from(hashHex, "hex");
-  const chave = await scryptAssincrono(senha, sal, esperado.length, {
-    N: custo,
-    r: bloco,
-    p: paralelismo,
-  });
-  return chave.length === esperado.length && timingSafeEqual(chave, esperado);
+  if (sal.length < 8 || esperado.length < 32 || esperado.length > 128) return false;
+  try {
+    const chave = await scryptAssincrono(senha, sal, esperado.length, {
+      N: custo,
+      r: bloco,
+      p: paralelismo,
+    });
+    return chave.length === esperado.length && timingSafeEqual(chave, esperado);
+  } catch {
+    return false;
+  }
 }

@@ -1,13 +1,12 @@
-// Turmas: gestão completa pelo administrador e listagem pelo escopo de quem
-// pede. Professor vê as atribuídas; administrador vê todas.
+// Turmas: gestão completa pela administração e listagem para toda a
+// coordenação. Toda turma nasce com uma aula padrão que cobre o dia.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { rotuloDeTurma } from "@/domain/frequencia";
-import type { Turma } from "@/domain/frequencia";
-import type { Identidade } from "@/domain/usuarios";
+import type { Horario, Turma } from "@/domain/frequencia";
 
 const nomeTurma = z
   .string()
@@ -29,11 +28,47 @@ export const esquemaAtualizarTurma = z
     message: "Nada a atualizar.",
   });
 
+/** Aula padrão de uma turma nova: cobre o dia inteiro, todos os dias. */
+export const AULA_PADRAO: {
+  ordem: number;
+  inicio: string;
+  fim: string;
+  diasSemana: number[];
+} = {
+  ordem: 1,
+  inicio: "00:00",
+  fim: "23:59",
+  diasSemana: [1, 2, 3, 4, 5, 6, 7],
+};
+
+interface LinhaHorario {
+  id: string;
+  turmaId: string;
+  ordem: number;
+  inicio: string;
+  fim: string;
+  diasSemana: number[];
+  ativo: boolean;
+}
+
 interface LinhaTurma {
   id: string;
   nome: string;
   serieId: string;
   serie: { nome: string };
+  horarios: LinhaHorario[];
+}
+
+function paraHorario(linha: LinhaHorario): Horario {
+  return {
+    id: linha.id,
+    turmaId: linha.turmaId,
+    ordem: linha.ordem,
+    inicio: linha.inicio,
+    fim: linha.fim,
+    diasSemana: linha.diasSemana,
+    ativo: linha.ativo,
+  };
 }
 
 function paraTurma(linha: LinhaTurma): Turma {
@@ -43,66 +78,27 @@ function paraTurma(linha: LinhaTurma): Turma {
     serieId: linha.serieId,
     serieNome: linha.serie.nome,
     rotulo: rotuloDeTurma(linha.serie.nome, linha.nome),
+    horarios: linha.horarios.map(paraHorario),
   };
 }
 
-const COM_SERIE = { include: { serie: { select: { nome: true } } } } as const;
+const COM_SERIE_E_HORARIOS = {
+  include: {
+    serie: { select: { nome: true } },
+    horarios: { orderBy: { ordem: "asc" } },
+  },
+} as const;
 
-/** Todas as turmas, na ordem das séries. Uso do administrador. */
+/** Todas as turmas, na ordem das séries. */
 export async function listarTodasTurmas(): Promise<Turma[]> {
   const linhas = await banco().turma.findMany({
     orderBy: [{ serie: { ordem: "asc" } }, { nome: "asc" }],
-    ...COM_SERIE,
+    ...COM_SERIE_E_HORARIOS,
   });
   return linhas.map(paraTurma);
 }
 
-/** Turmas atribuídas a um professor. */
-export async function listarTurmasDoProfessor(professorId: string): Promise<Turma[]> {
-  const linhas = await banco().turma.findMany({
-    where: { atribuicoes: { some: { professorId } } },
-    orderBy: [{ serie: { ordem: "asc" } }, { nome: "asc" }],
-    ...COM_SERIE,
-  });
-  return linhas.map(paraTurma);
-}
-
-/** Escopo de turmas visível para a identidade: as próprias turmas e as
- * origens referenciadas pelos alunos delas (para a grade Originais). */
-export interface EscopoTurmas {
-  turmas: Turma[];
-  origens: Turma[];
-}
-
-/** Turmas visíveis para a identidade: todas para admin, atribuídas
- * para professor, mais as origens referenciadas pelos alunos. */
-export async function escopoDeTurmas(identidade: Identidade): Promise<EscopoTurmas> {
-  if (identidade.papel === "ADMIN") {
-    const todas = await listarTodasTurmas();
-    return { turmas: todas, origens: todas };
-  }
-  const turmas = await listarTurmasDoProfessor(identidade.id);
-  const idsDeTurma = turmas.map((turma) => turma.id);
-  const origensReferenciadas = await banco().aluno.findMany({
-    where: { turmaId: { in: idsDeTurma } },
-    select: { turmaOriginalId: true },
-    distinct: ["turmaOriginalId"],
-  });
-  const idsDeOrigem = origensReferenciadas.map((aluno) => aluno.turmaOriginalId);
-  const faltantes = idsDeOrigem.filter((id) => !idsDeTurma.includes(id));
-  let origens = turmas;
-  if (faltantes.length > 0) {
-    const extras = await banco().turma.findMany({
-      where: { id: { in: faltantes } },
-      orderBy: [{ serie: { ordem: "asc" } }, { nome: "asc" }],
-      ...COM_SERIE,
-    });
-    origens = [...turmas, ...extras.map(paraTurma)];
-  }
-  return { turmas, origens };
-}
-
-/** Cria uma turma em uma série. */
+/** Cria uma turma em uma série e a aula padrão que cobre o dia inteiro. */
 export async function criarTurma(admin: { id: string }, entrada: unknown): Promise<Turma> {
   const dados = esquemaCriarTurma.safeParse(entrada);
   if (!dados.success) {
@@ -111,15 +107,19 @@ export async function criarTurma(admin: { id: string }, entrada: unknown): Promi
   const serie = await banco().serie.findUnique({ where: { id: dados.data.serieId } });
   if (!serie) throw new ErroHttp("Série não encontrada.", 404);
   const duplicada = await banco().turma.findFirst({
-    where: { serieId: dados.data.serieId, nome: dados.data.nome },
+    where: { serieId: dados.data.serieId, nome: { equals: dados.data.nome, mode: "insensitive" } },
   });
   if (duplicada) {
     throw new ErroHttp(`Já existe a turma ${rotuloDeTurma(serie.nome, dados.data.nome)}.`, 409);
   }
   const linha = await comTransacao(async (tx) => {
     const criada = await tx.turma.create({
-      data: { serieId: dados.data.serieId, nome: dados.data.nome },
-      ...COM_SERIE,
+      data: {
+        serieId: dados.data.serieId,
+        nome: dados.data.nome,
+        horarios: { create: { ...AULA_PADRAO } },
+      },
+      ...COM_SERIE_E_HORARIOS,
     });
     await auditar(tx, admin.id, "turma.criar", paraTurma(criada).rotulo);
     return criada;
@@ -137,7 +137,7 @@ export async function atualizarTurma(
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  const existente = await banco().turma.findUnique({ where: { id }, ...COM_SERIE });
+  const existente = await banco().turma.findUnique({ where: { id }, ...COM_SERIE_E_HORARIOS });
   if (!existente) throw new ErroHttp("Turma não encontrada.", 404);
 
   const novaSerieId = dados.data.serieId ?? existente.serieId;
@@ -148,7 +148,7 @@ export async function atualizarTurma(
   }
   if (novaSerieId !== existente.serieId || novoNome !== existente.nome) {
     const duplicada = await banco().turma.findFirst({
-      where: { serieId: novaSerieId, nome: novoNome },
+      where: { serieId: novaSerieId, nome: { equals: novoNome, mode: "insensitive" } },
     });
     if (duplicada && duplicada.id !== id) {
       const serie = await banco().serie.findUnique({ where: { id: novaSerieId } });
@@ -162,7 +162,7 @@ export async function atualizarTurma(
         ...(dados.data.nome !== undefined ? { nome: dados.data.nome } : {}),
         ...(dados.data.serieId !== undefined ? { serieId: dados.data.serieId } : {}),
       },
-      ...COM_SERIE,
+      ...COM_SERIE_E_HORARIOS,
     });
     await auditar(tx, admin.id, "turma.atualizar", paraTurma(atualizada).rotulo);
     return atualizada;
@@ -195,20 +195,12 @@ export async function removerTurma(admin: { id: string }, id: string): Promise<v
     );
   }
   await comTransacao(async (tx) => {
-    await tx.atribuicao.deleteMany({ where: { turmaId: id } });
     await tx.turma.delete({ where: { id } });
-    await auditar(tx, admin.id, "turma.excluir", paraTurma(existente).rotulo);
+    await auditar(
+      tx,
+      admin.id,
+      "turma.excluir",
+      rotuloDeTurma(existente.serie.nome, existente.nome),
+    );
   });
-}
-
-/** Confere se o professor pode registrar frequência na turma. */
-export async function podeRegistrarFrequencia(
-  identidade: Identidade,
-  turmaId: string,
-): Promise<boolean> {
-  if (identidade.papel === "ADMIN") return true;
-  const atribuicao = await banco().atribuicao.findUnique({
-    where: { professorId_turmaId: { professorId: identidade.id, turmaId } },
-  });
-  return atribuicao !== null;
 }

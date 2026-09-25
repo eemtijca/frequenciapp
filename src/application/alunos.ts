@@ -1,12 +1,11 @@
 // Alunos: gestão completa pelo administrador e listagem pelo escopo de quem
-// pede. A turma de origem é preservada para a grade Originais.
+// pede. A turma de origem é preservada para a Grade do mês.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import type { Aluno } from "@/domain/frequencia";
-import type { Identidade } from "@/domain/usuarios";
 
 const nomeAluno = z
   .string()
@@ -62,22 +61,6 @@ export async function listarTodosAlunos(): Promise<Aluno[]> {
   return linhas.map(paraAluno);
 }
 
-/** Alunos das turmas atribuídas a um professor. */
-export async function listarAlunosDoProfessor(professorId: string): Promise<Aluno[]> {
-  const linhas = await banco().aluno.findMany({
-    where: { turma: { atribuicoes: { some: { professorId } } } },
-    orderBy: [{ turma: { serie: { ordem: "asc" } } }, { turma: { nome: "asc" } }, { ordem: "asc" }],
-  });
-  return linhas.map(paraAluno);
-}
-
-/** Alunos visíveis para a identidade. */
-export function alunosVisiveis(identidade: Identidade): Promise<Aluno[]> {
-  return identidade.papel === "ADMIN"
-    ? listarTodosAlunos()
-    : listarAlunosDoProfessor(identidade.id);
-}
-
 /** Cria um aluno no fim da ordem da turma. */
 export async function criarAluno(admin: { id: string }, entrada: unknown): Promise<Aluno> {
   const dados = esquemaCriarAluno.safeParse(entrada);
@@ -104,7 +87,7 @@ export async function criarAluno(admin: { id: string }, entrada: unknown): Promi
         ordem: (ultimo?.ordem ?? 0) + 1,
       },
     });
-    await auditar(tx, admin.id, "aluno.criar", dados.data.nome);
+    await auditar(tx, admin.id, "aluno.criar", `aluno:${criado.id}`);
     return criado;
   });
   return paraAluno(linha);
@@ -143,7 +126,7 @@ export async function atualizarAluno(
         ...(dados.data.ativo !== undefined ? { ativo: dados.data.ativo } : {}),
       },
     });
-    await auditar(tx, admin.id, "aluno.atualizar", atualizado.nome);
+    await auditar(tx, admin.id, "aluno.atualizar", `aluno:${id}`);
     return atualizado;
   });
   return paraAluno(linha);
@@ -158,6 +141,6 @@ export async function removerAluno(admin: { id: string }, id: string): Promise<v
   if (!existente) throw new ErroHttp("Aluno não encontrado.", 404);
   await comTransacao(async (tx) => {
     await tx.aluno.delete({ where: { id } });
-    await auditar(tx, admin.id, "aluno.excluir", existente.nome);
+    await auditar(tx, admin.id, "aluno.excluir", `aluno:${id}`);
   });
 }

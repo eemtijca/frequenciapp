@@ -18,7 +18,7 @@ O público do aplicativo não lê mensagens técnicas. Uma violação de índice
 
 ## Consequências
 
-- Toda a superfície de erro fala a mesma língua: "Já existe um registro com este e-mail", "Este professor tem frequências registradas e não pode ser excluído", "Não foi possível falar com o banco de dados. Tente novamente em instantes".
+- Toda a superfície de erro fala a mesma língua: "Já existe uma conta com este e-mail", "Esta frequência já foi salva. Recarregue para ver a versão mais recente", "Não foi possível falar com o banco de dados. Tente novamente em instantes".
 - Mensagens orientam a ação seguinte (mover alunos, desativar em vez de excluir, aguardar e tentar de novo).
 - O suporte continua com detalhe técnico no log do servidor, indexado por código de erro.
 - Novos códigos Prisma relevantes entram no tradutor com teste.

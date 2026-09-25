@@ -1,26 +1,9 @@
 // Cria ou atualiza o administrador inicial (idempotente). Com --somente-criar,
 // respeita uma conta existente e não regrava a senha (bootstrap do Compose).
-import { randomBytes, scrypt } from "node:crypto";
-import { promisify } from "node:util";
 import pg from "pg";
 import "dotenv/config";
 import { deveGravarAdmin } from "./decisao-admin.mjs";
-
-const scryptAssincrono = promisify(scrypt);
-const CUSTO = 16384;
-const BLOCO = 8;
-const PARALELISMO = 1;
-const TAMANHO = 64;
-
-async function hashear(senha) {
-  const sal = randomBytes(16);
-  const chave = await scryptAssincrono(senha, sal, TAMANHO, {
-    N: CUSTO,
-    r: BLOCO,
-    p: PARALELISMO,
-  });
-  return `scrypt$${CUSTO}$${BLOCO}$${PARALELISMO}$${sal.toString("hex")}$${chave.toString("hex")}`;
-}
+import { hashear, senhaValida } from "./senha.mjs";
 
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const senha = process.env.ADMIN_SENHA;
@@ -34,7 +17,7 @@ if (!email || !senha || !nome) {
   );
   process.exit(1);
 }
-if (senha.length < 8 || !/[a-zA-ZÀ-ÿ]/.test(senha) || !/[0-9]/.test(senha)) {
+if (!senhaValida(senha)) {
   console.error("ADMIN_SENHA deve ter ao menos 8 caracteres, com uma letra e um número.");
   process.exit(1);
 }
@@ -53,13 +36,20 @@ try {
   let jaExiste = false;
   if (somenteCriar) {
     const existente = await cliente.query(
-      "select email, nome from usuarios where lower(email) = $1",
+      "select email, nome, papel, ativo from usuarios where lower(email) = $1",
       [email],
     );
     jaExiste = existente.rowCount > 0;
     if (jaExiste) {
       const conta = existente.rows[0];
-      console.log(`Administrador já existe, mantido: ${conta.email} (${conta.nome})`);
+      if (conta.papel === "ADMIN" && conta.ativo) {
+        console.log(`Administrador já existe, mantido: ${conta.email} (${conta.nome})`);
+      } else {
+        console.warn(
+          `Aviso: ${conta.email} existe como ${conta.papel} ${conta.ativo ? "ativo" : "inativo"} e não foi alterado. ` +
+            "Rode sem --somente-criar ou crie outro administrador para a escola não ficar sem root.",
+        );
+      }
     }
   }
 

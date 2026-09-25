@@ -44,6 +44,8 @@ const eslintConfig = [
       "analysis/**",
       "download/**",
       "skills/**",
+      "playwright-report/**",
+      "test-results/**",
     ],
   },
 ];

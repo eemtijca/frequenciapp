@@ -14,18 +14,18 @@ O comando é idempotente: reexecutar atualiza a senha, o nome e devolve o papel 
 
 Com Docker Compose, preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env` cria o administrador na partida. Esse bootstrap é não destrutivo: se a conta já existir, ele a mantém e não regrava a senha.
 
-## Contas de professor
+## Contas da coordenação
 
 Pela área de Gestão, recomendado, ou pelo comando idempotente de demonstração:
 
 ```bash
-CONTA_EMAIL=professor@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Ana' npm run criar-conta
+CONTA_EMAIL=equipe@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Equipe' npm run criar-coordenacao
 ```
 
-Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca encerra as sessões dos outros aparelhos; pelo comando, as sessões existentes continuam válidas até expirarem. Para encerrar sessões imediatamente:
+Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca encerra as sessões dos outros dispositivos; pelo comando, as sessões existentes continuam válidas até expirarem. Para encerrar sessões imediatamente:
 
 ```sql
-delete from sessoes where usuario_id = (select id from usuarios where email = 'professor@escola.br');
+delete from sessoes where usuario_id = (select id from usuarios where email = 'equipe@escola.br');
 ```
 
 ## Conexões administrativas
@@ -71,7 +71,7 @@ Trilha de auditoria antiga, conforme a política de retenção da escola:
 delete from auditoria where criado_em < now() - interval '1 year';
 ```
 
-Frequências de períodos encerrados, quando o professor quiser arquivar em vez de manter:
+Frequências de períodos encerrados, quando a escola quiser arquivar em vez de manter:
 
 ```sql
 delete from frequencias where dia < '2025-12-01';
@@ -84,6 +84,8 @@ A exclusão respeita o histórico. Confirme o período antes de executar o coman
 ```bash
 curl -s https://seu-dominio/api/saude
 ```
+
+A rota consulta o banco: responde `{"ok":true}` com a conexão saudável e 503 quando o banco não responde. O serviço `app` do Compose usa essa rota como healthcheck, então `docker compose ps` mostra `healthy` quando aplicação e banco estão prontos.
 
 ## Implantação de atualização
 

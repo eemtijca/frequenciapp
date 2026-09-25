@@ -11,19 +11,26 @@ import {
   CloudCheck,
   LoaderCircle,
   RotateCcw,
-  Search,
   Save,
+  School,
+  Settings2,
   TriangleAlert,
-  X,
 } from "lucide-react";
-import { addDays, format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { normalizar } from "@/domain/frequencia";
+import {
+  diaSeguinte,
+  horaNoFuso,
+  horariosDoDia,
+  normalizar,
+  rotuloDiaSemana,
+  type FaltaAluno,
+} from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,14 +50,11 @@ interface Props {
   turmas: Turma[];
   alunos: Aluno[];
   diaCorrente: string;
+  fuso: string;
   alvo: { dia: string; turmaId: string } | null;
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "frequencia"[]) => void;
-}
-
-function diaSeguinte(dia: string, deslocamento: number): string {
-  const base = parseISO(`${dia}T12:00:00`);
-  return format(addDays(base, deslocamento), "yyyy-MM-dd");
+  onAbrirGestao?: () => void;
 }
 
 function chaveRascunho(professorId: string, dia: string, turmaId: string): string {
@@ -58,8 +62,18 @@ function chaveRascunho(professorId: string, dia: string, turmaId: string): strin
 }
 
 interface Rascunho {
-  faltas: string[];
+  versao: 2;
+  faltas: FaltaAluno[];
   revisao: number;
+}
+
+/** Converte as faltas agrupadas do servidor em mapa por aluno. */
+function paraAusencias(faltas: FaltaAluno[]): Map<string, Set<string>> {
+  const mapa = new Map<string, Set<string>>();
+  for (const falta of faltas) {
+    mapa.set(falta.alunoId, new Set(falta.horarios));
+  }
+  return mapa;
 }
 
 const MARCAS = {
@@ -72,13 +86,16 @@ export default function VistaFrequencia({
   turmas,
   alunos,
   diaCorrente,
+  fuso,
   alvo,
   onFrequenciasMudaram,
   onPendencia,
+  onAbrirGestao,
 }: Props) {
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
   const [dia, setDia] = useState(() => alvo?.dia ?? diaCorrente);
-  const [faltas, setFaltas] = useState<Set<string>>(new Set());
+  const [ausencias, setAusencias] = useState<Map<string, Set<string>>>(new Map());
+  const [aulasAbertas, setAulasAbertas] = useState<string | null>(null);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [atualizadoEm, setAtualizadoEm] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -107,8 +124,14 @@ export default function VistaFrequencia({
   const chave = `${dia}|${turmaId}`;
 
   // Carrega a frequência salva do dia e turma, e recupera rascunho local.
+  // Sem turma não há o que carregar: o estado vazio assume o lugar.
   useEffect(() => {
-    if (!dia || !turmaId) return;
+    if (!dia || !turmaId) {
+      setCarregando(false);
+      setErro("");
+      setConflito(false);
+      return;
+    }
     let viva = true;
     setCarregando(true);
     setErro("");
@@ -116,7 +139,8 @@ export default function VistaFrequencia({
     setSujo(false);
     setBusca("");
     setFiltro("todos");
-    setFaltas(new Set());
+    setAusencias(new Map());
+    setAulasAbertas(null);
     setRevisaoSalva(0);
     setAtualizadoEm("");
     chaveCarregada.current = chave;
@@ -127,7 +151,7 @@ export default function VistaFrequencia({
       .then((dados) => {
         if (!viva) return;
         const frequencia = dados.frequencia;
-        setFaltas(new Set(frequencia?.faltas ?? []));
+        setAusencias(paraAusencias(frequencia?.faltas ?? []));
         setRevisaoSalva(frequencia?.revisao ?? 0);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
@@ -135,15 +159,19 @@ export default function VistaFrequencia({
           const bruto = sessionStorage.getItem(chaveRascunho(usuario.id, dia, turmaId));
           if (bruto) {
             const rascunho = JSON.parse(bruto) as Rascunho;
-            setFaltas(new Set(rascunho.faltas));
-            setSujo(true);
-            if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
-              toast("Rascunho recuperado. Confira as faltas e salve a frequência.");
+            if (rascunho.versao !== 2) {
+              sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
             } else {
-              setConflito(true);
-              setErro(
-                "Há um rascunho neste aparelho e uma versão mais nova salva. Confira antes de recarregar.",
-              );
+              setAusencias(paraAusencias(rascunho.faltas));
+              setSujo(true);
+              if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
+                toast("Rascunho recuperado. Confira as faltas e salve a frequência.");
+              } else {
+                setConflito(true);
+                setErro(
+                  "Há um rascunho neste dispositivo e uma versão mais nova salva. Confira antes de recarregar.",
+                );
+              }
             }
           }
         } catch {
@@ -169,12 +197,19 @@ export default function VistaFrequencia({
   useEffect(() => {
     if (!sujo || !dia || !turmaId) return;
     try {
-      const rascunho: Rascunho = { faltas: [...faltas], revisao: revisaoSalva };
+      const rascunho: Rascunho = {
+        versao: 2,
+        faltas: [...ausencias.entries()].map(([alunoId, horarios]) => ({
+          alunoId,
+          horarios: [...horarios],
+        })),
+        revisao: revisaoSalva,
+      };
       sessionStorage.setItem(chaveRascunho(usuario.id, dia, turmaId), JSON.stringify(rascunho));
     } catch {
       sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
     }
-  }, [sujo, faltas, revisaoSalva, usuario.id, dia, turmaId]);
+  }, [sujo, ausencias, revisaoSalva, usuario.id, dia, turmaId]);
 
   useEffect(() => {
     onPendencia(sujo ? ["frequencia"] : []);
@@ -188,8 +223,13 @@ export default function VistaFrequencia({
     [alunos, turmaId],
   );
 
-  const contagemFaltas = ativosDaTurma.filter((aluno) => faltas.has(aluno.id)).length;
+  const aulasDoDia = useMemo(() => (turma ? horariosDoDia(turma.horarios, dia) : []), [turma, dia]);
+  const contagemFaltas = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id)).length;
   const contagemPresencas = ativosDaTurma.length - contagemFaltas;
+  const contagemParciais = ativosDaTurma.filter((aluno) => {
+    const marcadas = ausencias.get(aluno.id)?.size ?? 0;
+    return marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
+  }).length;
 
   const visiveis = useMemo(() => {
     const termo = normalizar(busca);
@@ -197,11 +237,11 @@ export default function VistaFrequencia({
       const combinaBusca = termo === "" || normalizar(aluno.nome).includes(termo);
       const combinaFiltro =
         filtro === "todos" ||
-        (filtro === "faltas" && faltas.has(aluno.id)) ||
-        (filtro === "presentes" && !faltas.has(aluno.id));
+        (filtro === "faltas" && ausencias.has(aluno.id)) ||
+        (filtro === "presentes" && !ausencias.has(aluno.id));
       return combinaBusca && combinaFiltro;
     });
-  }, [ativosDaTurma, busca, filtro, faltas]);
+  }, [ativosDaTurma, busca, filtro, ausencias]);
 
   const bloqueado = carregando || salvando || conflito;
   const travado = bloqueado || sujo;
@@ -210,17 +250,47 @@ export default function VistaFrequencia({
   const alternarFalta = useCallback(
     (alunoId: string) => {
       if (bloqueado || chaveCarregada.current !== chave) return;
-      setFaltas((atuais) => {
-        const proximos = new Set(atuais);
-        if (proximos.has(alunoId)) proximos.delete(alunoId);
-        else proximos.add(alunoId);
-        return proximos;
+      setAusencias((atuais) => {
+        const proximas = new Map(atuais);
+        if (proximas.has(alunoId)) proximas.delete(alunoId);
+        else proximas.set(alunoId, new Set(aulasDoDia.map((aula) => aula.id)));
+        return proximas;
+      });
+      setSujo(true);
+      setErro("");
+    },
+    [aulasDoDia, bloqueado, chave],
+  );
+
+  const alternarAula = useCallback(
+    (alunoId: string, horarioId: string) => {
+      if (bloqueado || chaveCarregada.current !== chave) return;
+      setAusencias((atuais) => {
+        const proximas = new Map(atuais);
+        const aulas = new Set(proximas.get(alunoId) ?? []);
+        if (aulas.has(horarioId)) aulas.delete(horarioId);
+        else aulas.add(horarioId);
+        if (aulas.size === 0) proximas.delete(alunoId);
+        else proximas.set(alunoId, aulas);
+        return proximas;
       });
       setSujo(true);
       setErro("");
     },
     [bloqueado, chave],
   );
+
+  function definirAulas(alunoId: string, ids: string[]) {
+    if (bloqueado || chaveCarregada.current !== chave) return;
+    setAusencias((atuais) => {
+      const proximas = new Map(atuais);
+      if (ids.length === 0) proximas.delete(alunoId);
+      else proximas.set(alunoId, new Set(ids));
+      return proximas;
+    });
+    setSujo(true);
+    setErro("");
+  }
 
   async function salvar() {
     if (!podeSalvar || !dia || !turmaId) return;
@@ -232,11 +302,15 @@ export default function VistaFrequencia({
         corpoJson({
           dia,
           turmaId,
-          faltas: [...faltas],
+          faltas: [...ausencias.entries()].map(([alunoId, horarios]) => ({
+            alunoId,
+            horarios: [...horarios],
+          })),
           revisao: revisaoSalva,
         }),
       );
-      setFaltas(new Set(dados.frequencia.faltas));
+      setAusencias(paraAusencias(dados.frequencia.faltas));
+      setAulasAbertas(null);
       setRevisaoSalva(dados.frequencia.revisao);
       setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);
@@ -280,12 +354,8 @@ export default function VistaFrequencia({
   }
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
-  const horaSalva = atualizadoEm
-    ? new Date(atualizadoEm).toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
+  const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
 
   const tituloEstado = carregando
     ? "Carregando frequência"
@@ -315,6 +385,33 @@ export default function VistaFrequencia({
             ? `Às ${horaSalva} · ${contagemFaltas === 0 ? "todos presentes" : `${contagemFaltas} ${contagemFaltas === 1 ? "falta" : "faltas"}`}`
             : "Confira as faltas e toque em Salvar.";
 
+  // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
+  if (turmas.length === 0) {
+    return (
+      <section aria-label="Registrar frequência" className="flex flex-col gap-4 pb-6">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Frequência diária</h1>
+          <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
+        </div>
+        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+          <School size={28} className="text-muted-foreground" aria-hidden="true" />
+          <p className="font-medium">Nenhuma turma cadastrada</p>
+          <p className="text-muted-foreground text-sm">
+            {usuario.papel === "ADMIN"
+              ? "Cadastre séries, turmas e alunos na área de Gestão para começar."
+              : "Peça à administração para cadastrar as turmas e os alunos da escola."}
+          </p>
+          {usuario.papel === "ADMIN" && onAbrirGestao && (
+            <Button variant="outline" className="mt-2" onClick={onAbrirGestao}>
+              <Settings2 size={16} />
+              Ir para a Gestão
+            </Button>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section aria-label="Registrar frequência" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
@@ -326,326 +423,411 @@ export default function VistaFrequencia({
         </div>
         <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
           <CalendarDays size={16} aria-hidden="true" />
-          <span className="numerais-tabulares">{rotuloDia}</span>
+          <span>
+            <span className="numerais-tabulares">{rotuloDia}</span>
+            {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
+          </span>
         </span>
       </div>
 
-      {turmas.length > 1 && (
-        <div role="group" aria-label="Turma atual" className="flex flex-wrap gap-2">
-          {turmas.map((opcao) => {
-            const ativo = opcao.id === turmaId;
-            const quantidade = alunos.filter((a) => a.ativo && a.turmaId === opcao.id).length;
-            return (
-              <button
-                key={opcao.id}
-                type="button"
-                aria-pressed={ativo}
-                disabled={travado}
-                onClick={() => setTurmaId(opcao.id)}
-                className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
-              >
-                <span>{opcao.rotulo}</span>
-                <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 rounded-lg"
-          aria-label="Dia anterior"
-          disabled={travado || !dia}
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="relative flex-1">
-          <label htmlFor="dia-frequencia" className="sr-only">
-            Data da frequência
-          </label>
-          <Input
-            id="dia-frequencia"
-            type="date"
-            value={dia}
-            disabled={travado}
-            onChange={(evento) => {
-              if (evento.target.value) setDia(evento.target.value);
-            }}
-            className="numerais-tabulares h-11 rounded-lg text-center font-medium"
-          />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 rounded-lg"
-          aria-label="Dia seguinte"
-          disabled={travado || !dia}
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
-      {sujo && (
-        <p className="text-muted-foreground text-xs">
-          Salve ou descarte as alterações para mudar a data ou a turma.
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
-        <button
-          type="button"
-          aria-pressed={filtro === "faltas"}
-          onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
-          className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
-        >
-          <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-            {carregando ? "" : contagemFaltas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Faltas</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={filtro === "presentes"}
-          onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-          className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
-        >
-          <span className="numerais-tabulares text-primary text-2xl font-semibold">
-            {carregando ? "" : contagemPresencas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Presentes</span>
-        </button>
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Todos começam presentes. Toque no aluno somente para marcar falta.
-      </p>
-
-      {(erro || conflito) && (
-        <div
-          role="alert"
-          className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-        >
-          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <div className="flex-1">
-            <p>{erro}</p>
-            {conflito && (
-              <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
-                Recarregar versão salva
-              </Button>
-            )}
-            {!conflito && !sujo && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => setRecarregar((valor) => valor + 1)}
-              >
-                Tentar novamente
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="bg-card overflow-hidden rounded-lg border">
-        <div className="flex items-center gap-2 border-b px-3 py-2.5">
-          <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-          <label htmlFor="busca-aluno" className="sr-only">
-            Buscar aluno
-          </label>
-          <Input
-            id="busca-aluno"
-            value={busca}
-            onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar aluno"
-            className="h-9 border-0 px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
-          />
-          {busca && (
-            <button
-              type="button"
-              aria-label="Limpar busca"
-              onClick={() => setBusca("")}
-              className="text-muted-foreground hover:bg-secondary shrink-0 rounded-md p-1.5"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
-          <span className="numerais-tabulares">
-            {carregando
-              ? ""
-              : `${visiveis.length} ${
-                  filtro === "faltas"
-                    ? "com falta"
-                    : filtro === "presentes"
-                      ? "presentes"
-                      : "alunos"
-                }`}
-          </span>
-          {(filtro !== "todos" || busca !== "") && (
-            <button
-              type="button"
-              className="text-primary font-medium hover:underline"
-              onClick={() => {
-                setFiltro("todos");
-                setBusca("");
-              }}
-            >
-              Ver todos
-            </button>
-          )}
-        </div>
-
-        {carregando ? (
-          <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando frequência...
-          </div>
-        ) : turmas.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
-            <p className="font-medium">Nenhuma turma atribuída a você</p>
-            <p className="text-muted-foreground text-sm">
-              {usuario.papel === "ADMIN"
-                ? "Cadastre séries e turmas na área de Gestão para começar."
-                : "Peça ao administrador para atribuir suas turmas."}
-            </p>
-          </div>
-        ) : ativosDaTurma.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-            <p className="font-medium">Nenhum aluno ativo nesta turma</p>
-            <p className="text-muted-foreground text-sm">
-              {usuario.papel === "ADMIN"
-                ? "Cadastre alunos na área de Gestão."
-                : "Peça ao administrador para cadastrar os alunos desta turma."}
-            </p>
-          </div>
-        ) : visiveis.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-            <p className="font-medium">
-              {filtro === "faltas" && busca === ""
-                ? "Nenhuma falta nesta frequência."
-                : "Nenhum aluno neste filtro."}
-            </p>
-            <button
-              type="button"
-              className="text-primary text-sm font-medium hover:underline"
-              onClick={() => {
-                setFiltro("todos");
-                setBusca("");
-              }}
-            >
-              Mostrar todos
-            </button>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {visiveis.map((aluno) => {
-              const faltando = faltas.has(aluno.id);
-              return (
-                <li key={aluno.id}>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+        <div className="flex flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
+          {turmas.length > 1 && (
+            <div role="group" aria-label="Turma atual" className="flex flex-wrap gap-2">
+              {turmas.map((opcao) => {
+                const ativo = opcao.id === turmaId;
+                const quantidade = alunos.filter((a) => a.ativo && a.turmaId === opcao.id).length;
+                return (
                   <button
+                    key={opcao.id}
                     type="button"
-                    aria-pressed={faltando}
-                    disabled={bloqueado}
-                    aria-label={`${aluno.nome}: ${faltando ? "falta" : "presente"}. Toque para ${faltando ? "voltar a presente" : "marcar falta"}.`}
-                    onClick={() => alternarFalta(aluno.id)}
-                    className={`faixa-toque flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
-                      faltando ? "bg-falta-fraca" : "hover:bg-secondary/60"
-                    }`}
+                    aria-pressed={ativo}
+                    disabled={travado}
+                    onClick={() => setTurmaId(opcao.id)}
+                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
                   >
-                    <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                      {String(aluno.ordem).padStart(2, "0")}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={`block truncate ${faltando ? "font-semibold" : "font-medium"}`}
-                      >
-                        {aluno.nome}
-                      </span>
-                    </span>
-                    <motion.span
-                      key={faltando ? "F" : "P"}
-                      initial={MARCAS.escondido}
-                      animate={MARCAS.visivel}
-                      transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                      className={
-                        faltando
-                          ? "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                          : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
-                      }
-                    >
-                      {faltando ? "F" : "P"}
-                    </motion.span>
+                    <span>{opcao.rotulo}</span>
+                    <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
                   </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Toque de novo em um aluno marcado para voltar a presente.
-      </p>
+                );
+              })}
+            </div>
+          )}
 
-      <div
-        aria-label="Barra de salvamento"
-        className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed inset-x-0 bottom-14 z-20 mx-auto w-full max-w-3xl border-t px-4 py-3 backdrop-blur sm:px-6"
-        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div aria-live="polite" className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{tituloEstado}</p>
-            <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Dia anterior"
+              disabled={travado || !dia}
+              onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+            >
+              <ChevronLeft size={18} />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <SeletorPeriodo
+                id="dia-frequencia"
+                modo="dia"
+                valor={dia}
+                max={diaCorrente}
+                disabled={travado}
+                rotuloAcessivel="Data da frequência"
+                rotulo={rotuloDia}
+                detalhe={diaDaSemana}
+                onValor={setDia}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Dia seguinte"
+              disabled={travado || !dia || dia >= diaCorrente}
+              onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+            >
+              <ChevronRight size={18} />
+            </Button>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {sujo && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
+          {dia !== diaCorrente && (
+            <button
+              type="button"
+              disabled={travado}
+              onClick={() => setDia(diaCorrente)}
+              className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
+            >
+              Voltar para hoje
+            </button>
+          )}
+          {sujo && (
+            <p className="text-muted-foreground text-xs">
+              Salve ou descarte as alterações para mudar a data ou a turma.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
+            <button
+              type="button"
+              aria-pressed={filtro === "faltas"}
+              onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
+              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
+            >
+              <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
+                {carregando ? "" : contagemFaltas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Faltas</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={filtro === "presentes"}
+              onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
+            >
+              <span className="numerais-tabulares text-primary text-2xl font-semibold">
+                {carregando ? "" : contagemPresencas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Presentes</span>
+            </button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Todos começam presentes. Toque no aluno somente para marcar falta.
+          </p>
+          {aulasDoDia.length > 1 && (
+            <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+              <span>Aulas do dia:</span>
+              {aulasDoDia.map((aula) => (
+                <span
+                  key={aula.id}
+                  className="bg-secondary text-secondary-foreground numerais-tabulares rounded-md px-1.5 py-0.5 font-medium"
+                >
+                  {aula.ordem}ª {aula.inicio}
+                </span>
+              ))}
+            </div>
+          )}
+          {!carregando && contagemParciais > 0 && (
+            <p className="text-muted-foreground text-xs">
+              {contagemParciais === 1
+                ? "1 aluno saiu em parte das aulas."
+                : `${contagemParciais} alunos saíram em parte das aulas.`}
+            </p>
+          )}
+
+          {(erro || conflito) && (
+            <div
+              role="alert"
+              className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
+            >
+              <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <div className="flex-1">
+                <p>{erro}</p>
+                {conflito && (
+                  <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
+                    Recarregar versão salva
+                  </Button>
+                )}
+                {!conflito && !sujo && (
                   <Button
                     variant="outline"
-                    size="lg"
-                    className="h-11 rounded-lg"
-                    disabled={salvando}
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setRecarregar((valor) => valor + 1)}
                   >
-                    <RotateCcw size={16} />
-                    Descartar
+                    Tentar novamente
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      As marcações não salvas serão descartadas e a última versão salva será
-                      recarregada.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
-                    <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            <Button
-              size="lg"
-              className="h-11 rounded-lg px-6"
-              onClick={salvar}
-              disabled={!podeSalvar}
-            >
-              {salvando ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : atualizadoEm && !sujo ? (
-                <CloudCheck size={16} />
-              ) : (
-                <Save size={16} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4 xl:order-1">
+          <div className="bg-card overflow-hidden rounded-lg border">
+            <BarraBusca
+              id="busca-aluno"
+              valor={busca}
+              onValor={setBusca}
+              placeholder="Buscar aluno"
+              className="rounded-none border-0 border-b px-3 py-1.5"
+            />
+
+            <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
+              <span className="numerais-tabulares">
+                {carregando
+                  ? ""
+                  : `${visiveis.length} ${
+                      filtro === "faltas"
+                        ? "com falta"
+                        : filtro === "presentes"
+                          ? "presentes"
+                          : "alunos"
+                    }`}
+              </span>
+              {(filtro !== "todos" || busca !== "") && (
+                <button
+                  type="button"
+                  className="text-primary font-medium hover:underline"
+                  onClick={() => {
+                    setFiltro("todos");
+                    setBusca("");
+                  }}
+                >
+                  Ver todos
+                </button>
               )}
-              {salvando ? "Salvando..." : "Salvar"}
-            </Button>
+            </div>
+
+            {carregando ? (
+              <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
+                <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                Carregando frequência...
+              </div>
+            ) : ativosDaTurma.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="font-medium">Nenhum aluno ativo nesta turma</p>
+                <p className="text-muted-foreground text-sm">
+                  {usuario.papel === "ADMIN"
+                    ? "Cadastre alunos na área de Gestão."
+                    : "Peça ao administrador para cadastrar os alunos desta turma."}
+                </p>
+              </div>
+            ) : visiveis.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="font-medium">
+                  {filtro === "faltas" && busca === ""
+                    ? "Nenhuma falta nesta frequência."
+                    : "Nenhum aluno neste filtro."}
+                </p>
+                <button
+                  type="button"
+                  className="text-primary text-sm font-medium hover:underline"
+                  onClick={() => {
+                    setFiltro("todos");
+                    setBusca("");
+                  }}
+                >
+                  Mostrar todos
+                </button>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {visiveis.map((aluno) => {
+                  const faltando = ausencias.has(aluno.id);
+                  const marcadas = ausencias.get(aluno.id)?.size ?? 0;
+                  const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
+                  return (
+                    <li key={aluno.id}>
+                      <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
+                        <button
+                          type="button"
+                          aria-pressed={faltando}
+                          disabled={bloqueado}
+                          aria-label={
+                            faltando
+                              ? `${aluno.nome}: falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                              : `${aluno.nome}: presente. Toque para marcar falta.`
+                          }
+                          onClick={() => alternarFalta(aluno.id)}
+                          className={`faixa-toque flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
+                            faltando ? "" : "hover:bg-secondary/60"
+                          }`}
+                        >
+                          <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+                            {String(aluno.ordem).padStart(2, "0")}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                            >
+                              {aluno.nome}
+                            </span>
+                            {parcial && (
+                              <span className="text-falta-texto block truncate text-xs">
+                                saiu em parte das aulas
+                              </span>
+                            )}
+                          </span>
+                          <motion.span
+                            key={faltando ? "F" : "P"}
+                            initial={MARCAS.escondido}
+                            animate={MARCAS.visivel}
+                            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                            className={
+                              faltando
+                                ? "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
+                            }
+                          >
+                            {faltando ? "F" : "P"}
+                          </motion.span>
+                        </button>
+                        {faltando && aulasDoDia.length > 1 && (
+                          <button
+                            type="button"
+                            aria-expanded={aulasAbertas === aluno.id}
+                            aria-label={`Aulas em que ${aluno.nome} faltou`}
+                            disabled={bloqueado}
+                            onClick={() =>
+                              setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
+                            }
+                            className="text-muted-foreground hover:bg-secondary border-border my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            Aulas
+                          </button>
+                        )}
+                      </div>
+                      {faltando && aulasAbertas === aluno.id && aulasDoDia.length > 1 && (
+                        <div className="bg-secondary/40 border-t px-4 py-2.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {aulasDoDia.map((aula) => {
+                              const marcada = ausencias.get(aluno.id)?.has(aula.id) ?? false;
+                              return (
+                                <button
+                                  key={aula.id}
+                                  type="button"
+                                  aria-pressed={marcada}
+                                  disabled={bloqueado}
+                                  onClick={() => alternarAula(aluno.id, aula.id)}
+                                  className={`numerais-tabulares h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] disabled:opacity-50 ${
+                                    marcada
+                                      ? "border-falta bg-falta text-falta-foreground"
+                                      : "text-muted-foreground hover:border-foreground/30"
+                                  }`}
+                                >
+                                  {aula.ordem}ª {aula.inicio}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                            <button
+                              type="button"
+                              className="text-primary font-medium hover:underline"
+                              onClick={() =>
+                                definirAulas(
+                                  aluno.id,
+                                  aulasDoDia.map((aula) => aula.id),
+                                )
+                              }
+                            >
+                              Todas
+                            </button>
+                            <button
+                              type="button"
+                              className="text-primary font-medium hover:underline"
+                              onClick={() => definirAulas(aluno.id, [])}
+                            >
+                              Nenhuma
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Toque de novo em um aluno marcado para voltar a presente. Use Aulas para registrar a
+            saída no meio da aula.
+          </p>
+
+          <div
+            aria-label="Barra de salvamento"
+            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 xl:mx-0"
+          >
+            <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
+              <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">
+                <p className="truncate text-sm font-medium">{tituloEstado}</p>
+                <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 xl:w-full">
+                {sujo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="h-11 rounded-lg xl:flex-1"
+                        disabled={salvando}
+                      >
+                        <RotateCcw size={16} />
+                        Descartar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          As marcações não salvas serão descartadas e a última versão salva será
+                          recarregada.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
+                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  size="lg"
+                  className="h-11 rounded-lg px-6 xl:flex-1 xl:px-0"
+                  onClick={salvar}
+                  disabled={!podeSalvar}
+                >
+                  {salvando ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : atualizadoEm && !sujo ? (
+                    <CloudCheck size={16} />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {salvando ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

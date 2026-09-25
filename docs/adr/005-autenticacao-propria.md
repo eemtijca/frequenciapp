@@ -6,11 +6,11 @@ Aceita.
 
 ## Contexto
 
-O aplicativo é de uso pessoal do professor. Cadastro público aberto ampliaria a superfície de abuso (contas descartáveis, spam de entrada) sem benefício para o caso real de uma ou poucas contas por implantação.
+O aplicativo é de uso pessoal da equipe da escola. Cadastro público aberto ampliaria a superfície de abuso (contas descartáveis, spam de entrada) sem benefício para o caso real de uma ou poucas contas por implantação.
 
 ## Decisão
 
-- A conta é criada pelo comando de operação `npm run criar-conta`, idempotente, com variáveis de ambiente.
+- A conta é criada pelo comando de operação `npm run criar-coordenacao`, idempotente, com variáveis de ambiente.
 - Entrada por e-mail e senha, com limitador de tentativas por origem e e-mail.
 - Sem fluxo de recuperação por e-mail: a redefinição é operacional, pelo mesmo comando, que também atualiza a senha.
 - O schema separa `usuarios` de `sessoes`, permitindo contas múltiplas com isolamento por dono quando a implantação quiser.
