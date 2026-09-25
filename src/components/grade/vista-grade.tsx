@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { mesSeguinte, montarGrade, normalizar, rotuloMes } from "@/domain/frequencia";
+import { diasDoMes, mesSeguinte, montarGrade, normalizar, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
@@ -61,7 +61,7 @@ export default function VistaGrade({
     return montarGrade(
       alunosDaTurma,
       frequencias,
-      mes,
+      diasDoMes(mes),
       origens.flatMap((turma) => turma.horarios),
     );
   }, [alunos, turmaEfetiva, frequencias, mes, origens]);

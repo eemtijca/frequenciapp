@@ -2,7 +2,69 @@
 // ou de banco: tudo aqui é testável de forma isolada.
 
 /** Marca de frequência de um aluno em um dia. */
-export type Marca = "P" | "S" | "F";
+export type Marca = "P" | "S" | "F" | "FJ";
+
+/** Justificativa de falta ou de saída, com código estável e rótulo. */
+export interface Justificativa {
+  codigo: string;
+  rotulo: string;
+}
+
+/** Catálogo único de justificativas, usado na falta e na saída antecipada. */
+export const JUSTIFICATIVAS: readonly Justificativa[] = [
+  { codigo: "D", rotulo: "Doente" },
+  { codigo: "Dat", rotulo: "Doente com atestado" },
+  { codigo: "LM", rotulo: "Licença Maternidade" },
+  { codigo: "G", rotulo: "Grávida" },
+  { codigo: "T", rotulo: "Transporte" },
+  { codigo: "Vi", rotulo: "Viagem" },
+  { codigo: "CM", rotulo: "Consulta Médica" },
+  { codigo: "De", rotulo: "Dentista" },
+  { codigo: "Lt", rotulo: "Luto" },
+  { codigo: "O", rotulo: "Outros" },
+  { codigo: "C", rotulo: "Consulta" },
+  { codigo: "S", rotulo: "Suspensão" },
+];
+
+/** Código que aceita observação escrita. */
+export const JUSTIFICATIVA_OUTROS = "O";
+
+/** Momento da saída antecipada, com código estável e rótulo. */
+export interface MomentoSaida {
+  codigo: string;
+  rotulo: string;
+}
+
+/** Momentos da saída, iguais aos do aplicativo de referência. */
+export const MOMENTOS_SAIDA: readonly MomentoSaida[] = [
+  ...Array.from({ length: 9 }, (_, indice) => ({
+    codigo: `aula_${indice + 1}`,
+    rotulo: `${indice + 1}ª aula`,
+  })),
+  { codigo: "intervalo_1", rotulo: "1º intervalo" },
+  { codigo: "intervalo_2", rotulo: "2º intervalo" },
+  { codigo: "almoco", rotulo: "Almoço" },
+];
+
+/** Rótulo de uma justificativa, ou texto vazio quando o código não existe. */
+export function rotuloJustificativa(codigo: string | null | undefined): string {
+  return JUSTIFICATIVAS.find((item) => item.codigo === codigo)?.rotulo ?? "";
+}
+
+/** Valida um código de justificativa. */
+export function ehJustificativaValida(codigo: string): boolean {
+  return JUSTIFICATIVAS.some((item) => item.codigo === codigo);
+}
+
+/** Rótulo de um momento de saída, com o código como reserva. */
+export function rotuloMomento(codigo: string): string {
+  return MOMENTOS_SAIDA.find((item) => item.codigo === codigo)?.rotulo ?? codigo;
+}
+
+/** Valida um código de momento de saída. */
+export function ehMomentoValido(codigo: string): boolean {
+  return MOMENTOS_SAIDA.some((item) => item.codigo === codigo);
+}
 
 /** Série escolar (por exemplo, "1º ano"). */
 export interface Serie {
@@ -42,10 +104,59 @@ export interface Aluno {
   ativo: boolean;
 }
 
-/** Falta de um aluno nas aulas indicadas. Presença é implícita. */
+/** Falta de um aluno nas aulas indicadas, com justificativa opcional. */
 export interface FaltaAluno {
   alunoId: string;
   horarios: string[];
+  justificativa?: string | null;
+  observacao?: string | null;
+}
+
+/** Saída antecipada registrada pela coordenação, separada da chamada. */
+export interface SaidaAntecipada {
+  id: string;
+  alunoId: string;
+  dia: string;
+  momento: string;
+  justificativa: string;
+  observacao: string | null;
+  liberadoPorId: string | null;
+  liberadoPorNome: string | null;
+  criadoEm: string;
+}
+
+/** Recursos configuráveis pela administração na Gestão. */
+export interface Configuracoes {
+  frequenciaPorAula: boolean;
+  saidaAntecipada: boolean;
+}
+
+/** Padrões de fábrica dos recursos. */
+export const CONFIGURACOES_PADRAO: Configuracoes = {
+  frequenciaPorAula: false,
+  saidaAntecipada: true,
+};
+
+/** Acumulado de um aluno desde a primeira chamada salva. */
+export interface AcumuladoAluno {
+  alunoId: string;
+  faltas: number;
+  faltasJustificadas: number;
+  diasComRegistro: number;
+}
+
+/** Resumo acumulado da escola, usado na Chamada e no Painel. */
+export interface ResumoAcumulado {
+  primeiroDia: string | null;
+  diasLetivos: number;
+  porAluno: AcumuladoAluno[];
+}
+
+/** Pessoa da equipe que pode liberar uma saída. */
+export interface Responsavel {
+  id: string;
+  nome: string;
+  papel: "ADMIN" | "COORDENACAO";
 }
 
 /** Frequência salva de um dia e turma, compartilhada pela coordenação. */
@@ -131,6 +242,38 @@ export function diasDoMes(mes: string): string[] {
     dias.push(`${mes}-${String(dia).padStart(2, "0")}`);
   }
   return dias;
+}
+
+/** Limite de dias de um período de consulta. */
+export const LIMITE_DIAS_PERIODO = 366;
+
+/** Dias civis de um intervalo inclusivo, com limite de segurança. */
+export function diasEntre(de: string, ate: string): string[] {
+  const dias: string[] = [];
+  let atual = de;
+  while (atual <= ate && dias.length < LIMITE_DIAS_PERIODO) {
+    dias.push(atual);
+    atual = diaSeguinte(atual, 1);
+  }
+  return dias;
+}
+
+/** Segunda a sexta da semana de um dia. */
+export function semanaDeAula(dia: string): string[] {
+  const segunda = diaSeguinte(dia, -(diaDaSemanaIso(dia) - 1));
+  return [0, 1, 2, 3, 4].map((deslocamento) => diaSeguinte(segunda, deslocamento));
+}
+
+/** Modos de período da grade e dos relatórios. */
+export type ModoPeriodo = "dia" | "semana" | "periodo" | "mes";
+
+/** Dias de um período conforme o modo escolhido na interface. */
+export function diasDoPeriodo(modo: ModoPeriodo, de: string, ate?: string): string[] {
+  if (modo === "dia") return [de];
+  if (modo === "semana") return semanaDeAula(de);
+  if (modo === "mes") return diasDoMes(de.slice(0, 7));
+  const fim = ate && ate >= de ? ate : de;
+  return diasEntre(de, fim);
 }
 
 const NOMES_DOS_DIAS = [
@@ -272,10 +415,11 @@ export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; mi
 
 /**
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
- * aulas. Regra: falta em todas as aulas vira F; falta em parte vira S
- * (saiu antes ou chegou depois); sem falta e com frequência vira P; vazio
- * quando a turma não teve frequência. A falta prevalece mesmo em aula que
- * saiu da grade depois do registro.
+ * aulas. Regra: falta em todas as aulas vira F, ou FJ quando todas as faltas
+ * do dia têm justificativa; falta em parte vira S (saiu antes ou chegou
+ * depois); sem falta e com frequência vira P; vazio quando a turma não teve
+ * frequência. A falta prevalece mesmo em aula que saiu da grade depois do
+ * registro.
  */
 export function marcaDoAluno(
   aluno: Aluno,
@@ -283,11 +427,16 @@ export function marcaDoAluno(
   frequenciasDoDia: Frequencia[],
   horarios: Horario[],
 ): Marca | null {
-  const faltasDoAluno = new Set<string>();
+  // Aula para situação de justificativa: todas as faltas da mesma aula
+  // precisam estar justificadas para a marca ser FJ.
+  const faltasDoAluno = new Map<string, boolean>();
   for (const frequencia of frequenciasDoDia) {
     for (const falta of frequencia.faltas) {
       if (falta.alunoId !== aluno.id) continue;
-      for (const horarioId of falta.horarios) faltasDoAluno.add(horarioId);
+      const justificada = Boolean(falta.justificativa);
+      for (const horarioId of falta.horarios) {
+        faltasDoAluno.set(horarioId, (faltasDoAluno.get(horarioId) ?? true) && justificada);
+      }
     }
   }
   const temFrequencia = frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId);
@@ -297,12 +446,14 @@ export function marcaDoAluno(
   );
 
   if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
+  const tudoJustificado = [...faltasDoAluno.values()].every(Boolean);
+  const marcaIntegral = tudoJustificado ? "FJ" : "F";
   // Sem frequência da turma no dia, a falta de outra turma prevalece.
-  if (!temFrequencia) return "F";
+  if (!temFrequencia) return marcaIntegral;
   const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id)).length;
-  if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return "F";
+  if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return marcaIntegral;
   if (faltando > 0) return "S";
-  return "F";
+  return marcaIntegral;
 }
 
 /**
@@ -313,22 +464,22 @@ export interface LinhaGrade {
   aluno: Aluno;
   marcas: Record<string, Marca | undefined>;
   faltas: number;
+  justificadas: number;
   parciais: number;
   frequencias: number;
 }
 
 export function montarGrade(
   alunosDaTurma: Aluno[],
-  frequenciasDoMes: Frequencia[],
-  mes: string,
+  frequenciasDoPeriodo: Frequencia[],
+  dias: string[],
   horarios: Horario[] = [],
 ): { dias: string[]; linhas: LinhaGrade[] } {
-  const dias = diasDoMes(mes);
   const porDia = new Map<string, Frequencia[]>();
   for (const dia of dias) {
     porDia.set(
       dia,
-      frequenciasDoMes.filter((frequencia) => frequencia.dia === dia),
+      frequenciasDoPeriodo.filter((frequencia) => frequencia.dia === dia),
     );
   }
   const linhas = alunosDaTurma
@@ -337,16 +488,18 @@ export function montarGrade(
     .map((aluno) => {
       const marcas: Record<string, Marca | undefined> = {};
       let faltas = 0;
+      let justificadas = 0;
       let parciais = 0;
       let frequencias = 0;
       for (const dia of dias) {
         const marca = marcaDoAluno(aluno, dia, porDia.get(dia) ?? [], horarios);
         if (marca === "F") faltas += 1;
+        if (marca === "FJ") justificadas += 1;
         if (marca === "S") parciais += 1;
         if (marca !== null) frequencias += 1;
         marcas[dia] = marca ?? undefined;
       }
-      return { aluno, marcas, faltas, parciais, frequencias };
+      return { aluno, marcas, faltas, justificadas, parciais, frequencias };
     });
   return { dias, linhas };
 }
