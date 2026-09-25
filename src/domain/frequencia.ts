@@ -2,7 +2,7 @@
 // ou de banco: tudo aqui é testável de forma isolada.
 
 /** Marca de frequência de um aluno em um dia. */
-export type Marca = "P" | "F";
+export type Marca = "P" | "S" | "F";
 
 /** Série escolar (por exemplo, "1º ano"). */
 export interface Serie {
@@ -224,35 +224,49 @@ export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; mi
 }
 
 /**
- * Marca de um aluno em um dia, a partir das frequências do mês.
- * Regra: falta se houver registro de falta em qualquer aula do dia;
- * presente se a turma atual do aluno teve frequência naquele dia; vazio
- * quando a turma não teve frequência.
+ * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
+ * aulas. Regra: falta em todas as aulas vira F; falta em parte vira S
+ * (saiu antes ou chegou depois); sem falta e com frequência vira P; vazio
+ * quando a turma não teve frequência. A falta prevalece mesmo em aula que
+ * saiu da grade depois do registro.
  */
 export function marcaDoAluno(
   aluno: Aluno,
   dia: string,
   frequenciasDoDia: Frequencia[],
+  horarios: Horario[],
 ): Marca | null {
-  if (
-    frequenciasDoDia.some((frequencia) =>
-      frequencia.faltas.some((falta) => falta.alunoId === aluno.id),
-    )
-  ) {
-    return "F";
+  const faltasDoAluno = new Set<string>();
+  for (const frequencia of frequenciasDoDia) {
+    for (const falta of frequencia.faltas) {
+      if (falta.alunoId !== aluno.id) continue;
+      for (const horarioId of falta.horarios) faltasDoAluno.add(horarioId);
+    }
   }
-  if (frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId)) return "P";
-  return null;
+  const temFrequencia = frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId);
+  const aulasDaTurma = horariosDoDia(
+    horarios.filter((horario) => horario.turmaId === aluno.turmaId),
+    dia,
+  );
+
+  if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
+  // Sem frequência da turma no dia, a falta de outra turma prevalece.
+  if (!temFrequencia) return "F";
+  const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id)).length;
+  if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return "F";
+  if (faltando > 0) return "S";
+  return "F";
 }
 
 /**
  * Grade de consulta por turma original: linhas são alunos da turma
- * original, colunas são os dias do mês e as células são P, F ou vazio.
+ * original, colunas são os dias do mês e as células são P, S, F ou vazio.
  */
 export interface LinhaGrade {
   aluno: Aluno;
   marcas: Record<string, Marca | undefined>;
   faltas: number;
+  parciais: number;
   frequencias: number;
 }
 
@@ -260,6 +274,7 @@ export function montarGrade(
   alunosDaTurma: Aluno[],
   frequenciasDoMes: Frequencia[],
   mes: string,
+  horarios: Horario[] = [],
 ): { dias: string[]; linhas: LinhaGrade[] } {
   const dias = diasDoMes(mes);
   const porDia = new Map<string, Frequencia[]>();
@@ -275,14 +290,16 @@ export function montarGrade(
     .map((aluno) => {
       const marcas: Record<string, Marca | undefined> = {};
       let faltas = 0;
+      let parciais = 0;
       let frequencias = 0;
       for (const dia of dias) {
-        const marca = marcaDoAluno(aluno, dia, porDia.get(dia) ?? []);
+        const marca = marcaDoAluno(aluno, dia, porDia.get(dia) ?? [], horarios);
         if (marca === "F") faltas += 1;
+        if (marca === "S") parciais += 1;
         if (marca !== null) frequencias += 1;
         marcas[dia] = marca ?? undefined;
       }
-      return { aluno, marcas, faltas, frequencias };
+      return { aluno, marcas, faltas, parciais, frequencias };
     });
   return { dias, linhas };
 }

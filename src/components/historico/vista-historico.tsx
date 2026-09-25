@@ -11,14 +11,21 @@ import {
   LoaderCircle,
   RefreshCw,
 } from "lucide-react";
-import type { Frequencia } from "@/domain/frequencia";
-import { horaNoFuso, mesSeguinte, normalizar, rotuloDiaSemana } from "@/domain/frequencia";
+import type { Frequencia, Turma } from "@/domain/frequencia";
+import {
+  horaNoFuso,
+  horariosDoDia,
+  mesSeguinte,
+  normalizar,
+  rotuloDiaSemana,
+} from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 
 interface Props {
   frequencias: Frequencia[];
+  turmas: Turma[];
   mes: string;
   mesCorrente: string;
   fuso: string;
@@ -40,6 +47,7 @@ function rotuloDia(dia: string): { numero: string; mesAno: string; semana: strin
 
 export default function VistaHistorico({
   frequencias,
+  turmas,
   mes,
   mesCorrente,
   fuso,
@@ -181,6 +189,24 @@ export default function VistaHistorico({
               {filtradas.map((frequencia) => {
                 const rotulo = rotuloDia(frequencia.dia);
                 const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
+                const turma = turmas.find((item) => item.id === frequencia.turmaId);
+                const aulasDoDia = horariosDoDia(turma?.horarios ?? [], frequencia.dia);
+                const parciais = frequencia.faltas.filter(
+                  (falta) => aulasDoDia.length > 0 && falta.horarios.length < aulasDoDia.length,
+                ).length;
+                const resumo =
+                  frequencia.faltas.length === 0
+                    ? "Todos presentes"
+                    : `${frequencia.faltas.length} ${
+                        frequencia.faltas.length === 1 ? "falta" : "faltas"
+                      }${
+                        parciais > 0
+                          ? ` · ${parciais} ${parciais === 1 ? "saída parcial" : "saídas parciais"}`
+                          : ""
+                      }`;
+                const autoria = hora
+                  ? ` · salva às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
+                  : "";
                 return (
                   <motion.li
                     key={`${frequencia.dia}|${frequencia.turmaId}`}
@@ -210,10 +236,8 @@ export default function VistaHistorico({
                           </span>
                         </span>
                         <span className="text-muted-foreground block truncate text-sm">
-                          {frequencia.faltas.length === 0
-                            ? "Todos presentes"
-                            : `${frequencia.faltas.length} ${frequencia.faltas.length === 1 ? "falta" : "faltas"}`}
-                          {hora ? ` · salva às ${hora}` : ""}
+                          {resumo}
+                          {autoria}
                         </span>
                       </span>
                       <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />

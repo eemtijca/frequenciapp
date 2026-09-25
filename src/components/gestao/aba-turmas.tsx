@@ -4,7 +4,7 @@
 // agrupadas por série para leitura rápida.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
+import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Serie, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
@@ -12,6 +12,7 @@ import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import DialogoAulas from "@/components/gestao/dialogo-aulas";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import {
@@ -50,6 +51,9 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [turmaDasAulas, setTurmaDasAulas] = useState<Turma | null>(null);
+  const [aulasAberto, setAulasAberto] = useState(false);
+  const turmaDasAulasAtual = turmas.find((item) => item.id === turmaDasAulas?.id) ?? turmaDasAulas;
 
   const opcoesSerie = useMemo(
     () => series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
@@ -206,9 +210,27 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                     <li key={turma.id} className="flex items-center gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{turma.rotulo}</p>
-                        <p className="text-muted-foreground text-xs">letra {turma.nome}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {turma.horarios.length === 0
+                            ? "sem aulas configuradas"
+                            : `${turma.horarios.length} ${
+                                turma.horarios.length === 1 ? "aula" : "aulas"
+                              }`}
+                        </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-11"
+                          aria-label={`Aulas de ${turma.rotulo}`}
+                          onClick={() => {
+                            setTurmaDasAulas(turma);
+                            setAulasAberto(true);
+                          }}
+                        >
+                          <Clock size={16} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -318,6 +340,13 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DialogoAulas
+        turma={turmaDasAulasAtual}
+        aberto={aulasAberto}
+        onAbrir={setAulasAberto}
+        onMudanca={onMudanca}
+      />
     </div>
   );
 }

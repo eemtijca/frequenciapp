@@ -96,3 +96,58 @@ export async function contarSeries(): Promise<number> {
     return resultado.rows[0]?.total ?? 0;
   });
 }
+
+/**
+ * Cria a massa da suíte de frequência: série E2E Ano, turma A, três aulas
+ * de segunda a domingo e dois alunos. Chamada no beforeAll do spec.
+ */
+export async function criarMassaE2E(): Promise<void> {
+  await comBanco(async (cliente) => {
+    await cliente.query(
+      "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
+    );
+    await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query(
+      "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
+    );
+    await cliente.query("delete from series where nome = 'E2E Ano'");
+    const serie = await cliente.query(
+      "insert into series (nome, ordem) values ('E2E Ano', 99) returning id",
+    );
+    const serieId = serie.rows[0]?.id as string;
+    const turma = await cliente.query(
+      "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
+      [serieId],
+    );
+    const turmaId = turma.rows[0]?.id as string;
+    const aulas: [number, string, string][] = [
+      [1, "07:00", "07:50"],
+      [2, "07:50", "08:40"],
+      [3, "08:40", "09:30"],
+    ];
+    for (const [ordem, inicio, fim] of aulas) {
+      await cliente.query(
+        "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, $2, $3, $4, $5, true)",
+        [turmaId, ordem, inicio, fim, [1, 2, 3, 4, 5, 6, 7]],
+      );
+    }
+    await cliente.query(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Aluno Um', $1, $1, 1, true), ('E2E Aluno Dois', $1, $1, 2, true)",
+      [turmaId],
+    );
+  });
+}
+
+/** Remove a massa da suíte de frequência, incluindo as frequências criadas. */
+export async function limparMassaE2E(): Promise<void> {
+  await comBanco(async (cliente) => {
+    await cliente.query(
+      "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
+    );
+    await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query(
+      "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
+    );
+    await cliente.query("delete from series where nome = 'E2E Ano'");
+  });
+}

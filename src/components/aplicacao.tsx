@@ -285,6 +285,7 @@ export default function Aplicacao({
         {alvoVisao === "historico" && (
           <VistaHistorico
             frequencias={frequencias}
+            turmas={turmas}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
             fuso={fuso}

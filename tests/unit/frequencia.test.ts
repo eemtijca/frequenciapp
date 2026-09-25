@@ -226,17 +226,52 @@ describe("diasDoMes", () => {
 });
 
 describe("marcaDoAluno", () => {
-  it("marca falta quando o aluno está na lista de faltas", () => {
+  it("marca falta quando o aluno falta na única aula do dia", () => {
     const doDia = [frequencia({ faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }] })];
-    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("F");
   });
   it("marca presente quando a turma dele teve frequência", () => {
     const doDia = [frequencia({ turmaId: "turma-a", faltas: [] })];
-    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("P");
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("P");
   });
   it("devolve vazio quando a turma não teve frequência", () => {
     const doDia = [frequencia({ turmaId: "turma-b" })];
-    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe(null);
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe(null);
+  });
+  it("marca parcial quando falta em parte das aulas", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
+      }),
+    ];
+    const grade = [
+      horario({ id: "aula-1", ordem: 1 }),
+      horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, grade)).toBe("S");
+  });
+  it("marca falta quando falta em todas as aulas", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1", "aula-2"] }],
+      }),
+    ];
+    const grade = [
+      horario({ id: "aula-1", ordem: 1 }),
+      horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, grade)).toBe("F");
+  });
+  it("mantém falta registrada em aula que saiu da grade", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-9"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("F");
   });
   it("falta prevalece mesmo com outra frequência presente no dia", () => {
     const doDia = [
@@ -246,16 +281,7 @@ describe("marcaDoAluno", () => {
         faltas: [{ alunoId: "aluno-1", horarios: ["aula-9"] }],
       }),
     ];
-    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
-  });
-  it("considera falta parcial como falta no dia", () => {
-    const doDia = [
-      frequencia({
-        turmaId: "turma-a",
-        faltas: [{ alunoId: "aluno-1", horarios: ["aula-3"] }],
-      }),
-    ];
-    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("F");
   });
 });
 
@@ -295,6 +321,22 @@ describe("montarGrade", () => {
     ];
     const grade = montarGrade(alunos, [], "2026-09");
     expect(grade.linhas.map((linha) => linha.aluno.id)).toEqual(["c", "b", "a"]);
+  });
+  it("conta dias parciais quando a falta cobre parte das aulas", () => {
+    const frequencias = [
+      frequencia({
+        dia: "2026-09-10",
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
+      }),
+    ];
+    const grade = montarGrade([aluno()], frequencias, "2026-09", [
+      horario({ id: "aula-1", ordem: 1 }),
+      horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
+    ]);
+    expect(grade.linhas[0]?.parciais).toBe(1);
+    expect(grade.linhas[0]?.faltas).toBe(0);
+    expect(grade.linhas[0]?.marcas["2026-09-10"]).toBe("S");
   });
 });
 

@@ -108,14 +108,15 @@ A trilha registra ações administrativas e trocas de senha sempre na mesma tran
 
 ## Derivação da marca
 
-A marca de um aluno em um dia segue três regras, nesta ordem:
+A marca de um aluno em um dia considera a grade de aulas da turma e as faltas registradas:
 
-1. **Falta** quando existe registro de falta em qualquer frequência do dia. A regra vale mesmo depois de o aluno mudar de turma.
-2. **Presente** quando a turma atual do aluno teve frequência naquele dia e não há falta dele.
-3. **Vazia** quando a turma não teve frequência; células vazias na grade significam ausência de frequência, não presença.
+1. **F** quando o aluno falta em todas as aulas do dia, ou quando a falta está registrada em aula que saiu da grade. A falta prevalece mesmo depois de o aluno mudar de turma.
+2. **S** (presença parcial) quando o aluno falta em parte das aulas e esteve presente no restante, caso de quem saiu antes do fim ou chegou depois.
+3. **P** quando a turma atual teve frequência naquele dia e não há falta do aluno.
+4. **Vazia** quando a turma não teve frequência; células vazias na grade significam ausência de frequência, não presença.
 
 A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pelo servidor e pela interface, para manter a grade do mês e o Histórico coerentes com a frequência.
 
 ## Grade por turma de origem
 
-A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do mês. Cada linha carrega o total de dias com falta e o total de dias com frequência. A primeira coluna fica fixa durante a rolagem horizontal.
+A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do mês. Cada linha carrega o total de dias com falta, o total de dias com presença parcial e o total de dias com frequência. A primeira coluna fica fixa durante a rolagem horizontal.

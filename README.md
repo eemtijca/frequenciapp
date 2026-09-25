@@ -6,12 +6,12 @@ O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, tod
 
 ## Recursos
 
-- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local. A saída no meio da aula é registrada por aluno, aula a aula.
+- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local. A saída no meio da aula é registrada por aluno, aula a aula, com chips por aula na linha marcada.
 - **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
 - **Coordenação e administração**: a coordenação registra a frequência, consulta o histórico e a grade; a administração configura tudo. Contas desativadas perdem o acesso na hora.
 - **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
-- **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
+- **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, S, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **Busca em todas as listas**: frequência, histórico, grade, alunos e gestão com filtro local e tolerância a acentos.
 - **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.

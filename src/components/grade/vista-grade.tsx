@@ -58,8 +58,13 @@ export default function VistaGrade({
     const alunosDaTurma = alunos.filter(
       (aluno) => aluno.ativo && aluno.turmaOriginalId === turmaEfetiva,
     );
-    return montarGrade(alunosDaTurma, frequencias, mes);
-  }, [alunos, turmaEfetiva, frequencias, mes]);
+    return montarGrade(
+      alunosDaTurma,
+      frequencias,
+      mes,
+      origens.flatMap((turma) => turma.horarios),
+    );
+  }, [alunos, turmaEfetiva, frequencias, mes, origens]);
 
   const termo = normalizar(busca);
   const linhas = grade.linhas.filter(
@@ -226,9 +231,17 @@ export default function VistaGrade({
                     ))}
                     <th
                       scope="col"
+                      title="Dias com falta"
                       className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
                     >
                       F
+                    </th>
+                    <th
+                      scope="col"
+                      title="Dias com presença parcial"
+                      className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
+                    >
+                      S
                     </th>
                   </tr>
                 </thead>
@@ -254,9 +267,18 @@ export default function VistaGrade({
                             {marca === "F" ? (
                               <span
                                 className="bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
+                                role="img"
                                 aria-label={`${linha.aluno.nome} com falta em ${dia}`}
                               >
                                 F
+                              </span>
+                            ) : marca === "S" ? (
+                              <span
+                                className="border-falta text-falta-texto inline-flex size-5 items-center justify-center rounded-[4px] border text-[10px] font-bold"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
+                              >
+                                S
                               </span>
                             ) : marca === "P" ? (
                               <span
@@ -267,7 +289,8 @@ export default function VistaGrade({
                             ) : (
                               <span
                                 className="text-muted-foreground/50 text-[10px]"
-                                aria-label="sem frequência"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
                               />
                             )}
                           </td>
@@ -275,6 +298,9 @@ export default function VistaGrade({
                       })}
                       <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
                         {linha.faltas > 0 ? linha.faltas : ""}
+                      </td>
+                      <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
+                        {linha.parciais > 0 ? linha.parciais : ""}
                       </td>
                     </tr>
                   ))}
@@ -298,6 +324,15 @@ export default function VistaGrade({
                 F
               </span>
               falta
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
+                aria-hidden="true"
+              >
+                S
+              </span>
+              presente em parte das aulas
             </span>
             <span>célula vazia: turma sem frequência no dia</span>
           </div>
