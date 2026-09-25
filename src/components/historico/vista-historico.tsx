@@ -12,9 +12,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { Frequencia } from "@/domain/frequencia";
-import { horaNoFuso, mesSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
+import { horaNoFuso, mesSeguinte, normalizar, rotuloDiaSemana } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 
 interface Props {
   frequencias: Frequencia[];
@@ -50,6 +51,7 @@ export default function VistaHistorico({
 }: Props) {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
+  const [busca, setBusca] = useState("");
 
   async function atualizar() {
     setAtualizando(true);
@@ -68,6 +70,14 @@ export default function VistaHistorico({
       b.dia.localeCompare(a.dia) ||
       rotuloTurma(b.turmaId).localeCompare(rotuloTurma(a.turmaId), "pt-BR"),
   );
+  const termo = normalizar(busca);
+  const filtradas = ordenadas.filter((frequencia) => {
+    if (termo === "") return true;
+    const alvo = normalizar(
+      `${rotuloTurma(frequencia.turmaId)} ${frequencia.dia} ${frequencia.atualizadoPorNome ?? ""}`,
+    );
+    return alvo.includes(termo);
+  });
 
   return (
     <section aria-label="Histórico de frequências" className="flex flex-col gap-4 pb-6">
@@ -154,51 +164,66 @@ export default function VistaHistorico({
           </p>
         </div>
       ) : (
-        <ul className="bg-card divide-y overflow-hidden rounded-lg border">
-          {ordenadas.map((frequencia) => {
-            const rotulo = rotuloDia(frequencia.dia);
-            const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
-            return (
-              <motion.li
-                key={`${frequencia.dia}|${frequencia.turmaId}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <button
-                  type="button"
-                  disabled={bloqueado}
-                  onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
-                  className="hover:bg-secondary/60 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-50"
-                >
-                  <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
-                    <span className="numerais-tabulares text-lg font-semibold">
-                      {rotulo.numero}
-                    </span>
-                    <span className="text-muted-foreground text-[10px] uppercase">
-                      {rotulo.semana}
-                    </span>
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
-                      Turma {rotuloTurma(frequencia.turmaId)}
-                      <span className="numerais-tabulares text-muted-foreground ml-2 text-xs">
-                        {rotulo.mesAno}
+        <div className="flex flex-col gap-3">
+          <BarraBusca
+            id="busca-historico"
+            valor={busca}
+            onValor={setBusca}
+            placeholder="Buscar por turma, dia ou autoria"
+          />
+          {filtradas.length === 0 ? (
+            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+              <p className="font-medium">Nenhuma frequência encontrada</p>
+              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
+            </div>
+          ) : (
+            <ul className="bg-card divide-y overflow-hidden rounded-lg border">
+              {filtradas.map((frequencia) => {
+                const rotulo = rotuloDia(frequencia.dia);
+                const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
+                return (
+                  <motion.li
+                    key={`${frequencia.dia}|${frequencia.turmaId}`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <button
+                      type="button"
+                      disabled={bloqueado}
+                      onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
+                      className="hover:bg-secondary/60 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-50"
+                    >
+                      <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
+                        <span className="numerais-tabulares text-lg font-semibold">
+                          {rotulo.numero}
+                        </span>
+                        <span className="text-muted-foreground text-[10px] uppercase">
+                          {rotulo.semana}
+                        </span>
                       </span>
-                    </span>
-                    <span className="text-muted-foreground block truncate text-sm">
-                      {frequencia.faltas.length === 0
-                        ? "Todos presentes"
-                        : `${frequencia.faltas.length} ${frequencia.faltas.length === 1 ? "falta" : "faltas"}`}
-                      {hora ? ` · salva às ${hora}` : ""}
-                    </span>
-                  </span>
-                  <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />
-                </button>
-              </motion.li>
-            );
-          })}
-        </ul>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          Turma {rotuloTurma(frequencia.turmaId)}
+                          <span className="numerais-tabulares text-muted-foreground ml-2 text-xs">
+                            {rotulo.mesAno}
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground block truncate text-sm">
+                          {frequencia.faltas.length === 0
+                            ? "Todos presentes"
+                            : `${frequencia.faltas.length} ${frequencia.faltas.length === 1 ? "falta" : "faltas"}`}
+                          {hora ? ` · salva às ${hora}` : ""}
+                        </span>
+                      </span>
+                      <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />
+                    </button>
+                  </motion.li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
     </section>
   );

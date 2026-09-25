@@ -6,9 +6,11 @@ import { motion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Serie } from "@/domain/frequencia";
+import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -47,6 +49,11 @@ export default function AbaSeries({ series, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [busca, setBusca] = useState("");
+  const termo = normalizar(busca);
+  const filtradas = series.filter(
+    (serie) => termo === "" || normalizar(serie.nome).includes(termo),
+  );
 
   function abrirNovo() {
     const proxima = series.length > 0 ? Math.max(...series.map((s) => s.ordem)) + 1 : 1;
@@ -114,6 +121,10 @@ export default function AbaSeries({ series, onMudanca }: Props) {
         </Button>
       </div>
 
+      {series.length > 0 && (
+        <BarraBusca id="busca-series" valor={busca} onValor={setBusca} placeholder="Buscar série" />
+      )}
+
       {series.length === 0 ? (
         <div className="bg-card flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
           <GraduationCap size={28} className="text-muted-foreground" aria-hidden="true" />
@@ -126,9 +137,14 @@ export default function AbaSeries({ series, onMudanca }: Props) {
             Criar série
           </Button>
         </div>
+      ) : filtradas.length === 0 ? (
+        <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+          <p className="font-medium">Nenhuma série encontrada</p>
+          <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
+        </div>
       ) : (
         <ul className="bg-card divide-y overflow-hidden rounded-lg border">
-          {series.map((serie) => (
+          {filtradas.map((serie) => (
             <motion.li
               key={serie.id}
               initial={{ opacity: 0 }}

@@ -11,7 +11,8 @@ O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, tod
 - **Coordenação e administração**: a coordenação registra a frequência, consulta o histórico e a grade; a administração configura tudo. Contas desativadas perdem o acesso na hora.
 - **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
-- **Originais**: grade de frequência pelas turmas de origem, com alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
+- **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
+- **Busca em todas as listas**: frequência, histórico, grade, alunos e gestão com filtro local e tolerância a acentos.
 - **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação por deslize**: troca de visões deslizando a tela com o dedo, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.

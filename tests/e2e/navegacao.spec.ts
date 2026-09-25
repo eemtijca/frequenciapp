@@ -9,8 +9,8 @@ test.describe("navegação", () => {
     await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
     await trocarVisao(page, "Histórico", "historico");
     await expect(page.getByRole("heading", { name: "Histórico" })).toBeVisible();
-    await trocarVisao(page, "Originais", "originais");
-    await expect(page.getByRole("heading", { name: "Originais" })).toBeVisible();
+    await trocarVisao(page, "Grade", "grade");
+    await expect(page.getByRole("heading", { name: "Grade do mês" })).toBeVisible();
     await trocarVisao(page, "Gestão", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão" })).toBeVisible();
   });

@@ -7,9 +7,11 @@ import { motion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
+import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import {
@@ -76,6 +78,11 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
   const administradoresAtivos = useMemo(
     () => (usuarios ?? []).filter((u) => u.papel === "ADMIN" && u.ativo).length,
     [usuarios],
+  );
+  const [busca, setBusca] = useState("");
+  const termo = normalizar(busca);
+  const usuariosFiltrados = (usuarios ?? []).filter(
+    (usuario) => termo === "" || normalizar(`${usuario.nome} ${usuario.email}`).includes(termo),
   );
 
   function abrirNovo() {
@@ -193,106 +200,123 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
           </Button>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {(usuarios ?? []).map((usuario) => {
-            const propria = usuario.id === usuarioId;
-            const ultimoAdmin =
-              usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
-            return (
-              <motion.li
-                key={usuario.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.2 }}
-                className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
-              >
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 truncate font-medium">
-                      {usuario.nome}
-                      <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                        {rotuloDePapel(usuario.papel)}
-                      </span>
-                      {propria && (
-                        <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                          Você
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-muted-foreground truncate text-sm">{usuario.email}</p>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                      {usuario.ativo ? "ativa" : "desativada"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-11"
-                      aria-label={`Editar conta de ${usuario.nome}`}
-                      onClick={() => abrirEdicao(usuario)}
-                    >
-                      <Pencil size={16} />
-                    </Button>
-                    {!propria && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11"
-                        aria-label={
-                          usuario.ativo
-                            ? `Desativar conta de ${usuario.nome}`
-                            : `Reativar conta de ${usuario.nome}`
-                        }
-                        disabled={ultimoAdmin}
-                        title={
-                          ultimoAdmin
-                            ? "A escola precisa de ao menos um administrador ativo."
-                            : undefined
-                        }
-                        onClick={() => alternarAtivo(usuario)}
-                      >
-                        <Power size={16} />
-                      </Button>
-                    )}
-                    {!propria && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+        <div className="flex flex-col gap-3">
+          <BarraBusca
+            id="busca-equipe"
+            valor={busca}
+            onValor={setBusca}
+            placeholder="Buscar por nome ou e-mail"
+          />
+          {usuariosFiltrados.length === 0 ? (
+            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+              <p className="font-medium">Nenhuma conta encontrada</p>
+              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {usuariosFiltrados.map((usuario) => {
+                const propria = usuario.id === usuarioId;
+                const ultimoAdmin =
+                  usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
+                return (
+                  <motion.li
+                    key={usuario.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                    className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
+                  >
+                    <div className="flex items-center gap-3 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-2 truncate font-medium">
+                          {usuario.nome}
+                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                            {rotuloDePapel(usuario.papel)}
+                          </span>
+                          {propria && (
+                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                              Você
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-muted-foreground truncate text-sm">{usuario.email}</p>
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {usuario.ativo ? "ativa" : "desativada"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-11"
+                          aria-label={`Editar conta de ${usuario.nome}`}
+                          onClick={() => abrirEdicao(usuario)}
+                        >
+                          <Pencil size={16} />
+                        </Button>
+                        {!propria && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-falta-texto size-11"
-                            aria-label={`Excluir conta de ${usuario.nome}`}
+                            className="size-11"
+                            aria-label={
+                              usuario.ativo
+                                ? `Desativar conta de ${usuario.nome}`
+                                : `Reativar conta de ${usuario.nome}`
+                            }
+                            disabled={ultimoAdmin}
+                            title={
+                              ultimoAdmin
+                                ? "A escola precisa de ao menos um administrador ativo."
+                                : undefined
+                            }
+                            onClick={() => alternarAtivo(usuario)}
                           >
-                            <Trash2 size={16} />
+                            <Power size={16} />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Excluir a conta de {usuario.nome}?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              A exclusão remove o acesso. As frequências da escola são preservadas,
-                              sem a autoria desta conta.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-falta text-falta-foreground hover:bg-falta/90"
-                              onClick={() => excluir(usuario)}
-                            >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </div>
-              </motion.li>
-            );
-          })}
-        </ul>
+                        )}
+                        {!propria && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-falta-texto size-11"
+                                aria-label={`Excluir conta de ${usuario.nome}`}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Excluir a conta de {usuario.nome}?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  A exclusão remove o acesso. As frequências da escola são
+                                  preservadas, sem a autoria desta conta.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-falta text-falta-foreground hover:bg-falta/90"
+                                  onClick={() => excluir(usuario)}
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </div>
+                    </div>
+                  </motion.li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
 
       <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
@@ -373,10 +397,10 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                 id="papel-usuario"
                 value={formulario.papel}
                 disabled={emEdicao?.id === usuarioId}
-                onChange={(evento) =>
+                onValueChange={(valor) =>
                   setFormulario((atual) => ({
                     ...atual,
-                    papel: evento.target.value === "ADMIN" ? "ADMIN" : "COORDENACAO",
+                    papel: valor === "ADMIN" ? "ADMIN" : "COORDENACAO",
                   }))
                 }
                 opcoes={[

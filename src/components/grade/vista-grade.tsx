@@ -1,14 +1,15 @@
 "use client";
 
-// Originais: grade pela turma de origem, com alunos nas linhas, dias nas
+// Grade do mês: turma de origem com alunos nas linhas, dias nas
 // colunas e células P, F ou vazias.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { mesSeguinte, montarGrade } from "@/domain/frequencia";
+import { mesSeguinte, montarGrade, normalizar } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 
 interface Props {
   alunos: Aluno[];
@@ -21,7 +22,7 @@ interface Props {
   origens: Turma[];
 }
 
-export default function VistaOriginais({
+export default function VistaGrade({
   alunos,
   frequencias,
   mes,
@@ -47,6 +48,7 @@ export default function VistaOriginais({
   }, [alunos, origens]);
 
   const [turmaId, setTurmaId] = useState(() => turmasOriginais[0]?.id ?? "");
+  const [busca, setBusca] = useState("");
 
   const turmaEfetiva = turmasOriginais.some((t) => t.id === turmaId)
     ? turmaId
@@ -58,6 +60,11 @@ export default function VistaOriginais({
     );
     return montarGrade(alunosDaTurma, frequencias, mes);
   }, [alunos, turmaEfetiva, frequencias, mes]);
+
+  const termo = normalizar(busca);
+  const linhas = grade.linhas.filter(
+    (linha) => termo === "" || normalizar(linha.aluno.nome).includes(termo),
+  );
 
   async function atualizar() {
     setAtualizando(true);
@@ -78,10 +85,10 @@ export default function VistaOriginais({
   }, [origens]);
 
   return (
-    <section aria-label="Frequência por turma original" className="flex flex-col gap-4 pb-6">
+    <section aria-label="Grade do mês" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Originais</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Grade do mês</h1>
           <p className="text-muted-foreground text-sm">
             {frequencias.length === 0
               ? "Consulta pelas turmas de origem"
@@ -132,11 +139,11 @@ export default function VistaOriginais({
             <ChevronLeft size={18} />
           </Button>
           <div className="relative">
-            <label htmlFor="mes-originais" className="sr-only">
+            <label htmlFor="mes-grade" className="sr-only">
               Mês da consulta
             </label>
             <Input
-              id="mes-originais"
+              id="mes-grade"
               type="month"
               value={mes}
               max={mesCorrente}
@@ -181,87 +188,100 @@ export default function VistaOriginais({
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className="bg-card overflow-hidden rounded-lg border"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <caption className="sr-only">
-                Frequência dos alunos da turma original {rotuloDe(turmaEfetiva)} no período
-              </caption>
-              <thead>
-                <tr className="border-b">
-                  <th
-                    scope="col"
-                    className="coluna-fixa bg-card text-muted-foreground min-w-36 px-3 py-2 text-left text-xs font-medium"
-                  >
-                    Aluno
-                  </th>
-                  {grade.dias.map((dia) => (
+          <BarraBusca
+            id="busca-grade"
+            valor={busca}
+            onValor={setBusca}
+            placeholder="Buscar aluno"
+            className="rounded-none border-0 border-b px-3 py-1.5"
+          />
+          {linhas.length === 0 ? (
+            <div className="text-muted-foreground flex min-h-40 items-center justify-center px-6 text-center text-sm">
+              Nenhum aluno encontrado para esta busca.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <caption className="sr-only">
+                  Frequência dos alunos da turma original {rotuloDe(turmaEfetiva)} no período
+                </caption>
+                <thead>
+                  <tr className="border-b">
                     <th
-                      key={dia}
                       scope="col"
-                      className={`numerais-tabulares w-8 px-1 py-2 text-center text-[11px] font-medium ${
-                        dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                      }`}
+                      className="coluna-fixa bg-card text-muted-foreground min-w-36 px-3 py-2 text-left text-xs font-medium"
                     >
-                      {dia.slice(8)}
+                      Aluno
                     </th>
-                  ))}
-                  <th
-                    scope="col"
-                    className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
-                  >
-                    F
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {grade.linhas.map((linha) => (
-                  <tr key={linha.aluno.id} className="border-b last:border-b-0">
+                    {grade.dias.map((dia) => (
+                      <th
+                        key={dia}
+                        scope="col"
+                        className={`numerais-tabulares w-8 px-1 py-2 text-center text-[11px] font-medium ${
+                          dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                        }`}
+                      >
+                        {dia.slice(8)}
+                      </th>
+                    ))}
                     <th
-                      scope="row"
-                      className="coluna-fixa bg-card max-w-44 truncate px-3 py-1.5 text-left font-normal"
+                      scope="col"
+                      className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
                     >
-                      <span className="block truncate text-sm">{linha.aluno.nome}</span>
-                      <span className="text-muted-foreground block truncate text-[10px]">
-                        atual {turmaAtualDe(linha.aluno.turmaId)}
-                      </span>
+                      F
                     </th>
-                    {grade.dias.map((dia) => {
-                      const marca = linha.marcas[dia];
-                      return (
-                        <td
-                          key={dia}
-                          className={`px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
-                        >
-                          {marca === "F" ? (
-                            <span
-                              className="bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
-                              aria-label={`${linha.aluno.nome} com falta em ${dia}`}
-                            >
-                              F
-                            </span>
-                          ) : marca === "P" ? (
-                            <span
-                              className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                              role="img"
-                              aria-label={`${linha.aluno.nome} presente em ${dia}`}
-                            />
-                          ) : (
-                            <span
-                              className="text-muted-foreground/50 text-[10px]"
-                              aria-label="sem frequência"
-                            />
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
-                      {linha.faltas > 0 ? linha.faltas : ""}
-                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {linhas.map((linha) => (
+                    <tr key={linha.aluno.id} className="border-b last:border-b-0">
+                      <th
+                        scope="row"
+                        className="coluna-fixa bg-card max-w-44 truncate px-3 py-1.5 text-left font-normal"
+                      >
+                        <span className="block truncate text-sm">{linha.aluno.nome}</span>
+                        <span className="text-muted-foreground block truncate text-[10px]">
+                          atual {turmaAtualDe(linha.aluno.turmaId)}
+                        </span>
+                      </th>
+                      {grade.dias.map((dia) => {
+                        const marca = linha.marcas[dia];
+                        return (
+                          <td
+                            key={dia}
+                            className={`px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
+                          >
+                            {marca === "F" ? (
+                              <span
+                                className="bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
+                                aria-label={`${linha.aluno.nome} com falta em ${dia}`}
+                              >
+                                F
+                              </span>
+                            ) : marca === "P" ? (
+                              <span
+                                className="bg-primary/60 inline-flex size-1.5 rounded-full"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} presente em ${dia}`}
+                              />
+                            ) : (
+                              <span
+                                className="text-muted-foreground/50 text-[10px]"
+                                aria-label="sem frequência"
+                              />
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
+                        {linha.faltas > 0 ? linha.faltas : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="text-muted-foreground flex flex-wrap items-center gap-4 border-t px-4 py-2.5 text-xs">
             <span className="flex items-center gap-1.5">
               <span

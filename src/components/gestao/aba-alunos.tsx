@@ -4,13 +4,14 @@
 // excluir, agrupados por turma com busca por nome.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, Pencil, Plus, Power, Search, Trash2, UserRound, X } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import {
@@ -194,29 +195,13 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       </p>
 
       <div className="bg-card overflow-hidden rounded-lg border">
-        <div className="flex items-center gap-2 border-b px-3 py-2.5">
-          <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-          <label htmlFor="busca-gestao-aluno" className="sr-only">
-            Buscar aluno
-          </label>
-          <Input
-            id="busca-gestao-aluno"
-            value={busca}
-            onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar aluno"
-            className="h-9 border-0 px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
-          />
-          {busca && (
-            <button
-              type="button"
-              aria-label="Limpar busca"
-              onClick={() => setBusca("")}
-              className="text-muted-foreground hover:bg-secondary shrink-0 rounded-md p-1.5"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
+        <BarraBusca
+          id="busca-gestao-aluno"
+          valor={busca}
+          onValor={setBusca}
+          placeholder="Buscar aluno"
+          className="rounded-none border-0 border-b px-3 py-1.5"
+        />
 
         {turmas.length === 0 ? (
           <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
@@ -362,14 +347,14 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               <Selecionar
                 id="turma-aluno-gestao"
                 value={formulario.turmaId}
-                required
-                onChange={(evento) =>
+                buscavel
+                onValueChange={(valor) =>
                   setFormulario((atual) => ({
                     ...atual,
-                    turmaId: evento.target.value,
+                    turmaId: valor,
                     turmaOriginalId:
                       emEdicao === null || atual.turmaOriginalId === atual.turmaId
-                        ? evento.target.value
+                        ? valor
                         : atual.turmaOriginalId,
                   }))
                 }
@@ -381,13 +366,14 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               <Selecionar
                 id="origem-aluno-gestao"
                 value={formulario.turmaOriginalId}
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, turmaOriginalId: evento.target.value }))
+                buscavel
+                onValueChange={(valor) =>
+                  setFormulario((atual) => ({ ...atual, turmaOriginalId: valor }))
                 }
                 opcoes={opcoesTurma}
               />
               <p className="text-muted-foreground text-xs">
-                Para a grade Originais. Por padrão é a própria turma; mude quando o aluno veio de
+                Para a Grade do mês. Por padrão é a própria turma; mude quando o aluno veio de
                 outra.
               </p>
             </div>

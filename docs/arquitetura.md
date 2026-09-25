@@ -83,7 +83,7 @@ src/
     auth/                   tela de entrada
     frequencia/                vista da frequência diária
     historico/              vista do histórico
-    originais/              vista da grade por turma de origem
+    grade/                  vista da Grade do mês por turma de origem
     alunos/                 lista de consulta da coordenação
     gestao/                 área do administrador (abas e diálogos)
     conta/                  diálogo de troca de senha

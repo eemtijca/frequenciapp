@@ -74,7 +74,7 @@
   --falta-foreground: oklch(0.985 0.002 90);
   --falta-texto: oklch(0.46 0.16 27);
   --border: oklch(0.905 0.006 90);
-  --input: oklch(0.895 0.006 90);
+  --input: oklch(0.65 0.008 90);
   --ring: oklch(0.55 0.1 160);
   --chart-1: oklch(0.5 0.11 160);
   --chart-2: oklch(0.5 0.16 27);
@@ -111,8 +111,8 @@
   --falta-fraca: oklch(0.3 0.045 27);
   --falta-foreground: oklch(0.985 0.002 90);
   --falta-texto: oklch(0.72 0.17 27);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 16%);
+  --border: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 20%);
   --ring: oklch(0.6 0.1 160);
   --chart-1: oklch(0.7 0.13 160);
   --chart-2: oklch(0.55 0.17 27);
@@ -150,7 +150,7 @@
   .faixa-toque {
     min-height: 3rem;
   }
-  /* Primeira coluna fixa da grade de Originais durante a rolagem. */
+  /* Primeira coluna fixa da grade durante a rolagem horizontal. */
   .coluna-fixa {
     position: sticky;
     left: 0;
@@ -176,6 +176,19 @@ input[type="month"] {
   a,
   [role="button"] {
     touch-action: manipulation;
+  }
+  :where(
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    [role="button"],
+    [role="tab"],
+    [role="radio"]
+  ):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 

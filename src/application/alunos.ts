@@ -1,5 +1,5 @@
 // Alunos: gestão completa pelo administrador e listagem pelo escopo de quem
-// pede. A turma de origem é preservada para a grade Originais.
+// pede. A turma de origem é preservada para a Grade do mês.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";

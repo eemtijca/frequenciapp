@@ -2,10 +2,12 @@
 
 // Alunos: lista de consulta do professor, agrupada por turma. O
 // cadastro e a edição acontecem na área de Gestão do administrador.
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
+import { normalizar } from "@/domain/frequencia";
+import { BarraBusca } from "@/components/ui/barra-busca";
 
 interface Props {
   alunos: Aluno[];
@@ -37,6 +39,17 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
   }, [alunos, turmas]);
 
   const ativos = alunos.filter((aluno) => aluno.ativo).length;
+  const [busca, setBusca] = useState("");
+  const termo = normalizar(busca);
+  const gruposFiltrados =
+    termo === ""
+      ? grupos
+      : grupos
+          .map(
+            ([id, turma, lista]) =>
+              [id, turma, lista.filter((aluno) => normalizar(aluno.nome).includes(termo))] as const,
+          )
+          .filter(([, , lista]) => lista.length > 0);
 
   return (
     <section aria-label="Lista de alunos" className="flex flex-col gap-4 pb-6">
@@ -55,6 +68,10 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
         pelo administrador da escola, na área de Gestão.
       </p>
 
+      {alunos.length > 0 && (
+        <BarraBusca id="busca-alunos" valor={busca} onValor={setBusca} placeholder="Buscar aluno" />
+      )}
+
       {alunos.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
@@ -63,8 +80,13 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
             Peça ao administrador para cadastrar os alunos e atribuir as turmas a você.
           </p>
         </div>
+      ) : gruposFiltrados.length === 0 ? (
+        <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+          <p className="font-medium">Nenhum aluno encontrado</p>
+          <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
+        </div>
       ) : (
-        grupos.map(([id, turma, lista]) => (
+        gruposFiltrados.map(([id, turma, lista]) => (
           <motion.div
             key={id}
             initial={{ opacity: 0 }}

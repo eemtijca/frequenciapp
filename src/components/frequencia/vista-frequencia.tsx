@@ -13,10 +13,8 @@ import {
   RotateCcw,
   Save,
   School,
-  Search,
   Settings2,
   TriangleAlert,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
@@ -25,6 +23,7 @@ import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BarraBusca } from "@/components/ui/barra-busca";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -494,29 +493,13 @@ export default function VistaFrequencia({
       )}
 
       <div className="bg-card overflow-hidden rounded-lg border">
-        <div className="flex items-center gap-2 border-b px-3 py-2.5">
-          <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-          <label htmlFor="busca-aluno" className="sr-only">
-            Buscar aluno
-          </label>
-          <Input
-            id="busca-aluno"
-            value={busca}
-            onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar aluno"
-            className="h-9 border-0 px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
-          />
-          {busca && (
-            <button
-              type="button"
-              aria-label="Limpar busca"
-              onClick={() => setBusca("")}
-              className="text-muted-foreground hover:bg-secondary shrink-0 rounded-md p-1.5"
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
+        <BarraBusca
+          id="busca-aluno"
+          valor={busca}
+          onValor={setBusca}
+          placeholder="Buscar aluno"
+          className="rounded-none border-0 border-b px-3 py-1.5"
+        />
 
         <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
           <span className="numerais-tabulares">

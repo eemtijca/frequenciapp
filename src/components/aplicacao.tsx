@@ -26,13 +26,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
 import VistaHistorico from "@/components/historico/vista-historico";
-import VistaOriginais from "@/components/originais/vista-originais";
+import VistaGrade from "@/components/grade/vista-grade";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
-export type Visao = "frequencia" | "historico" | "originais" | "alunos" | "gestao";
+export type Visao = "frequencia" | "historico" | "grade" | "alunos" | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -53,7 +53,7 @@ interface ItemNav {
 const ITENS_BASE: ItemNav[] = [
   { visao: "frequencia", rotulo: "Frequência", icone: ClipboardCheck },
   { visao: "historico", rotulo: "Histórico", icone: History },
-  { visao: "originais", rotulo: "Originais", icone: UsersRound },
+  { visao: "grade", rotulo: "Grade", icone: UsersRound },
 ];
 
 const ITENS_FIM: ItemNav[] = [
@@ -64,7 +64,7 @@ const ITENS_FIM: ItemNav[] = [
 const LARGURAS: Record<Visao, string> = {
   frequencia: "max-w-2xl",
   historico: "max-w-3xl",
-  originais: "max-w-5xl",
+  grade: "max-w-5xl",
   alunos: "max-w-3xl",
   gestao: "max-w-5xl",
 };
@@ -295,8 +295,8 @@ export default function Aplicacao({
             rotuloTurma={rotuloTurma}
           />
         )}
-        {alvoVisao === "originais" && (
-          <VistaOriginais
+        {alvoVisao === "grade" && (
+          <VistaGrade
             alunos={alunos}
             frequencias={frequencias}
             mes={mes}
