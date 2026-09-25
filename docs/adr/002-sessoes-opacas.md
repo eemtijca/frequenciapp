@@ -6,14 +6,14 @@ Aceita.
 
 ## Contexto
 
-O acesso é pessoal e privado do professor. O aplicativo original delegava a autenticação a um adaptador neutro não implementado, o que deixava o salvamento desativado. A reconstrução precisa de autenticação própria, simples de operar e sem dependência de provedores de identidade.
+O acesso é pessoal e privado da equipe da escola. O aplicativo original delegava a autenticação a um adaptador neutro não implementado, o que deixava o salvamento desativado. A reconstrução precisa de autenticação própria, simples de operar e sem dependência de provedores de identidade.
 
 ## Decisão
 
 - Sessões opacas: token aleatório de 32 bytes gerado no servidor, guardado no banco apenas como hash SHA-256.
 - Cookie `frequenciapp_sessao` HttpOnly, SameSite=Lax, Secure em produção, com o valor assinado por HMAC curto derivado de `AUTH_SECRET` para impedir forja do conteúdo trafegado.
 - Validade de 30 dias, expiração registrada e purga de vencidas.
-- Sem cadastro público: a conta nasce do comando idempotente `criar-conta`.
+- Sem cadastro público: a conta nasce do comando idempotente `criar-coordenacao`.
 
 ## Alternativas descartadas
 

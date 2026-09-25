@@ -2,14 +2,14 @@
 
 Aplicativo de registro de frequência escolar para escolas. Feito para o uso real em sala: mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a frequência salva.
 
-O fluxo segue a prática do professor no papel: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram e salve. Tocar de novo em um aluno marcado devolve a presença. Salvar é necessário mesmo quando ninguém falta, porque a frequência do dia só existe depois de salva.
+O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram e salve. Tocar de novo em um aluno marcado devolve a presença. Alunos que saem no meio da aula ficam ausentes apenas nas aulas que perderam. Salvar é necessário mesmo quando ninguém falta, porque a frequência do dia só existe depois de salva.
 
 ## Recursos
 
-- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local.
-- **Gestão pela administração**: séries, turmas, alunos e contas de professores em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
-- **Professores e papéis**: o administrador configura tudo e atribui as turmas de cada professor; contas desativadas perdem o acesso na hora.
-- **Proteção contra conflitos**: uma frequência por dia, turma e professor; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
+- **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local. A saída no meio da aula é registrada por aluno, aula a aula.
+- **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
+- **Coordenação e administração**: a coordenação registra a frequência, consulta o histórico e a grade; a administração configura tudo. Contas desativadas perdem o acesso na hora.
+- **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
 - **Originais**: grade de frequência pelas turmas de origem, com alunos nas linhas, dias nas colunas e células P, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **PWA completo**: instala no aparelho como aplicativo, página de aviso quando a internet cai e atualização com um toque quando há versão nova.
@@ -34,11 +34,11 @@ ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direçã
   docker compose exec app npm run criar-admin
 ```
 
-Com o administrador no aparelho, o restante (professores, séries, turmas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de demonstração e a semente:
+Com o administrador no aparelho, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e a semente:
 
 ```bash
-CONTA_EMAIL=professor@escola.br CONTA_SENHA='outra senha forte' CONTA_NOME='Ana' \
-  docker compose exec app npm run criar-conta
+CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha forte' CONTA_NOME='Equipe' \
+  docker compose exec app npm run criar-coordenacao
 SEED_ALUNOS=12 docker compose exec app npm run seed
 ```
 
@@ -48,7 +48,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 
 - Next.js 16 (App Router) com TypeScript estrito.
 - PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
-- Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administrador e professor.
+- Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração e coordenação.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
 - Tailwind CSS 4 com componentes shadcn/ui personalizados e animações com Motion.
 - Service worker próprio para a experiência instalável e o aviso offline.
@@ -56,23 +56,25 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 
 ## Comandos
 
-| Comando                | Efeito                                                  |
-| ---------------------- | ------------------------------------------------------- |
-| `npm run dev`          | Servidor de desenvolvimento em http://localhost:3000.   |
-| `npm run build`        | Build de produção.                                      |
-| `npm start`            | Serve o build de produção.                              |
-| `npm run lint`         | ESLint com regras estritas.                             |
-| `npm run format:check` | Prettier em modo verificação.                           |
-| `npm run format`       | Prettier corrigindo formatação.                         |
-| `npm run tsc`          | Verificação de tipos sem emissão.                       |
-| `npm test`             | Testes de unidade e contratos de API.                   |
-| `npm run test:unit`    | Apenas os testes de unidade.                            |
-| `npm run test:api`     | Contratos de API com o aplicativo no ar.                |
-| `npm run db:migrate`   | Cria e aplica migrações em desenvolvimento.             |
-| `npm run db:deploy`    | Aplica migrações pendentes em produção.                 |
-| `npm run criar-admin`  | Cria ou atualiza o administrador inicial (idempotente). |
-| `npm run criar-conta`  | Cria ou atualiza uma conta de professor (idempotente).  |
-| `npm run seed`         | Semeia séries, turmas e alunos sintéticos.              |
+| Comando                     | Efeito                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| `npm run dev`               | Servidor de desenvolvimento em http://localhost:3000.    |
+| `npm run build`             | Build de produção.                                       |
+| `npm start`                 | Serve o build de produção.                               |
+| `npm run lint`              | ESLint com regras estritas.                              |
+| `npm run format:check`      | Prettier em modo verificação.                            |
+| `npm run format`            | Prettier corrigindo formatação.                          |
+| `npm run tsc`               | Verificação de tipos sem emissão.                        |
+| `npm test`                  | Testes de unidade e contratos de API.                    |
+| `npm run test:unit`         | Apenas os testes de unidade.                             |
+| `npm run test:api`          | Contratos de API com o aplicativo no ar.                 |
+| `npm run test:e2e`          | Ponta a ponta com Playwright (headless).                 |
+| `npm run test:pwa`          | PWA contra o build de produção.                          |
+| `npm run db:migrate`        | Cria e aplica migrações em desenvolvimento.              |
+| `npm run db:deploy`         | Aplica migrações pendentes em produção.                  |
+| `npm run criar-admin`       | Cria ou atualiza o administrador inicial (idempotente).  |
+| `npm run criar-coordenacao` | Cria ou atualiza uma conta de coordenação (idempotente). |
+| `npm run seed`              | Semeia séries, turmas, aulas e alunos sintéticos.        |
 
 ## Documentação
 

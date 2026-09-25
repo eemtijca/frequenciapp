@@ -1,6 +1,6 @@
 # Arquitetura
 
-Next.js 16 (App Router) com TypeScript estrito sobre PostgreSQL 17 via Prisma 7 (adaptador `pg`). A aplicação é um único processo Node que serve a página do aplicativo, as rotas de API e o service worker.
+Next.js 16 (App Router) com TypeScript estrito sobre PostgreSQL 17 via Prisma 7 (adaptador `pg`). A aplicação é um único processo Node que serve a página do aplicativo, as rotas de API e o service worker. A coordenação registra uma frequência por turma e dia, compartilhada pela equipe, e a administração cuida das contas e dos cadastros.
 
 ## Visão geral
 
@@ -18,8 +18,8 @@ flowchart LR
 
 ## Camadas
 
-- `src/domain/`: regras puras, sem dependência de framework ou banco. `frequencia.ts` traz os tipos de série, turma, aluno e frequência, a validação de calendário, a derivação da marca do aluno no dia e a montagem da grade por turma de origem; `usuarios.ts` traz a política de senha, os papéis e os rótulos de exibição. Tudo aqui é testável de forma isolada e é compartilhado entre servidor e cliente.
-- `src/application/`: casos de uso. `frequencias.ts` carrega, lista e salva com o controle de revisão em transação serializável; `alunos.ts`, `series.ts`, `turmas.ts` e `usuarios.ts` gerenciam as entidades escolares e as contas; `sessao.ts` autentica, resolve a identidade e troca a própria senha. Validação de entrada com zod, decisões de negócio e mapeamento das linhas de banco para os tipos do domínio.
+- `src/domain/`: regras puras, sem dependência de framework ou banco. `frequencia.ts` traz os tipos de série, turma, aula, aluno e frequência, a validação de calendário e de horário, a derivação da marca do aluno no dia e a montagem da grade por turma de origem; `usuarios.ts` traz a política de senha, os papéis e os rótulos de exibição. Tudo aqui é testável de forma isolada e é compartilhado entre servidor e cliente.
+- `src/application/`: casos de uso. `frequencias.ts` carrega, lista e salva a frequência compartilhada com o controle de revisão em transação serializável; `alunos.ts`, `series.ts`, `turmas.ts`, `horarios.ts` e `usuarios.ts` gerenciam as entidades escolares e as contas; `sessao.ts` autentica, resolve a identidade e troca a própria senha. Validação de entrada com zod, decisões de negócio e mapeamento das linhas de banco para os tipos do domínio.
 - `src/infra/`: integrações. `banco.ts` é o singleton do PrismaClient com o adaptador `pg`; `ambiente.ts` valida as variáveis com falha antecipada; `auth/` concentra hash de senha, sessões opacas e limitador de tentativas; `transacoes.ts` executa transações ACID com repetição automática; `erros.ts` traduz qualquer exceção para português claro; `http.ts` reúne os auxiliares comuns das rotas; `auditoria.ts` registra as ações administrativas.
 - `src/app/` e `src/components/`: apresentação. A página única, as rotas de API como adaptadores finos dos casos de uso e os componentes de interface, com o conjunto shadcn/ui personalizado em `components/ui`, as animações com Motion e o registro da PWA.
 
@@ -47,16 +47,16 @@ sequenceDiagram
 
 ## Concorrência da frequência (ACID)
 
-Uma frequência existe por (professor, dia, turma), garantida por restrição única no banco. O salvamento inteiro roda dentro de uma transação interativa com isolamento `Serializable`: a validação das faltas contra a lista atual de alunos, a criação ou atualização da revisão e a troca das faltas acontecem juntas, ou nada acontece. Conflitos de serialização (P2034) são refeitos automaticamente até três vezes com pausa crescente; ao fim, o caminho converte o empate em conflito 409 com a versão vigente, nunca em sobrescrita.
+Uma frequência existe por (turma, dia), garantida por restrição única no banco. O salvamento inteiro roda dentro de uma transação interativa com isolamento `Serializable`: a validação das faltas contra a lista atual de alunos e das aulas contra a grade da turma, a criação ou atualização da revisão e a troca das faltas acontecem juntas, ou nada acontece. Conflitos de serialização (P2034) são refeitos automaticamente até três vezes com pausa crescente; ao fim, o caminho converte o empate em conflito 409 com a versão vigente, nunca em sobrescrita.
 
 - `revisao 0` cria a primeira versão; se a frequência já existe, a API responde 409 com a versão vigente.
 - `revisao N` atualiza apenas se a versão vigente for exatamente N, com incremento atômico; em caso de divergência, responde 409 com a versão vigente.
 
-O cliente mantém rascunho em sessionStorage enquanto houver marcações não salvas, e o 409 preserva as marcações locais oferecendo a recarga da versão salva. Assim, dois aparelhos nunca sobrescrevem a frequência um do outro sem aviso.
+O cliente mantém rascunho em sessionStorage enquanto houver marcações não salvas, e o 409 preserva as marcações locais oferecendo a recarga da versão salva. Assim, duas pessoas da coordenação nunca sobrescrevem a mesma chamada sem aviso.
 
 ## Página única com visões locais
 
-O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Frequência, Histórico e Originais para todos; Alunos (somente leitura) para professores; Gestão para administradores. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da frequência em aberto.
+O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Frequência, Histórico e Grade para todos; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da frequência em aberto.
 
 ## Organização de diretórios
 
@@ -66,11 +66,12 @@ src/
     api/                    rotas HTTP (adaptadores finos dos casos de uso)
       auth/                 entrar, sair e sessão corrente
       conta/                troca da própria senha
-      alunos/               listagem (escopo) e CRUD do administrador
+      alunos/               listagem e CRUD do administrador
       series/               CRUD de séries
-      turmas/               escopo de quem pede e CRUD do administrador
+      turmas/               listagem e CRUD do administrador
+      horarios/             aulas da turma: listagem, criação, edição e exclusão
       usuarios/             gestão de contas pelo administrador
-      frequencias/             consulta por dia, lista do mês e salvamento
+      frequencias/          consulta por dia, lista do mês e salvamento
       saude/                verificação de saúde
     page.tsx                página única: sessão, pré-busca e shell
     error.tsx               fronteira de erro amigável
@@ -83,7 +84,7 @@ src/
     frequencia/                vista da frequência diária
     historico/              vista do histórico
     originais/              vista da grade por turma de origem
-    alunos/                 lista de consulta do professor
+    alunos/                 lista de consulta da coordenação
     gestao/                 área do administrador (abas e diálogos)
     conta/                  diálogo de troca de senha
     pwa/                    registro do service worker e avisos
@@ -92,11 +93,12 @@ src/
     frequencia.ts           regras puras de frequência
     usuarios.ts             política de senha, papéis e rótulos
   application/
-    frequencias.ts             carregar, listar e salvar frequências
+    frequencias.ts          carregar, listar e salvar a frequência compartilhada
     alunos.ts               listar e gerenciar alunos
     series.ts               listar e gerenciar séries
-    turmas.ts               escopo, CRUD e permissão de frequência
-    usuarios.ts             gestão de contas e atribuições
+    turmas.ts               listar, criar, editar e excluir turmas com aula padrão
+    horarios.ts             aulas da turma: criar, editar, desativar e excluir
+    usuarios.ts             gestão de contas e papéis
     sessao.ts               entrada, saída, identidade e senha
   infra/
     ambiente.ts             validação de variáveis com zod
@@ -115,7 +117,7 @@ prisma.config.ts            configuração do CLI do Prisma 7
 generated/                  cliente Prisma gerado (fora do git)
 public/                     manifest, service worker, offline e ícones
 docker/                     entrypoint e migrador do contêiner
-scripts/                    criar-admin, criar-conta e seed
+scripts/                    criar-admin, criar-coordenacao e seed
 docs/                       esta documentação
 tests/                      Vitest (unidade e contratos)
 ```
@@ -127,7 +129,8 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-003: faltas normalizadas, presença implícita](adr/003-faltas-normalizadas.md)
 - [ADR-004: página única com visões locais](adr/004-pagina-unica.md)
 - [ADR-005: autenticação própria sem cadastro público](adr/005-autenticacao-propria.md)
-- [ADR-006: papéis de administrador e professor com gestão central](adr/006-papeis-e-gestao.md)
+- [ADR-006: papéis de administração e coordenação com gestão central](adr/006-papeis-e-gestao.md)
 - [ADR-007: transações serializáveis com repetição automática](adr/007-transacoes-acid.md)
 - [ADR-008: PWA com service worker próprio](adr/008-pwa.md)
 - [ADR-009: erros de banco traduzidos para português claro](adr/009-erros-amigaveis.md)
+- [ADR-010: frequência única por turma e dia com faltas por aula](adr/010-frequencia-unica-com-aulas.md)

@@ -1,15 +1,15 @@
 # Interface
 
-Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo original: o professor em sala quer marcar faltas o mais rápido possível, com uma mão, sem decoração no caminho.
+Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo original: a coordenação em sala quer marcar faltas o mais rápido possível, com uma mão, sem decoração no caminho.
 
 ## Estrutura
 
-- **Página única** com navegação inferior no mobile: Frequência, Histórico e Originais para todos, mais Alunos (consulta) para professores ou Gestão para administradores. Cabeçalho fixo com identidade, papel, tema, troca de senha e saída.
-- **Frequência**: seletor de turma por toque com contagem, data com setas de dia e seletor nativo, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas.
+- **Página única** com navegação inferior no mobile: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. Cabeçalho fixo com identidade, papel, tema, troca de senha e saída.
+- **Frequência**: seletor de turma por toque com contagem, data com setas de dia e seletor nativo, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. As aulas do dia aparecem como referência e a saída no meio da aula fica registrada por aluno.
 - **Histórico**: mês por seletor nativo e lista de frequências com dia, turma, contagem de faltas e hora do último salvamento; abrir uma frequência a leva de volta à Frequência.
 - **Originais**: pílulas de turma de origem, mês, grade com primeira coluna fixa e legenda; células com F, ponto de presença ou vazia.
-- **Alunos** (professor): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
-- **Gestão** (administrador): abas curtas de Séries, Turmas, Alunos e Professores, com formulários em diálogo, ações de editar, desativar e excluir com confirmação, e pílulas de turma na conta de cada professor.
+- **Alunos** (coordenação): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
+- **Gestão** (administração): abas curtas de Séries, Turmas, Alunos e Equipe, com formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas.
 
 ## Fluxo de um toque
 

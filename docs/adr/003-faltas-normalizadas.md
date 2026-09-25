@@ -19,4 +19,4 @@ O aplicativo original armazenava a marca completa de cada aluno (P ou F) como ma
 - Minimização de dados: uma frequência com todos presentes não grava nenhuma linha de marca, e a operação comum (uma ou duas faltas) grava o mínimo.
 - A complicação de confirmação de presenças antigas em branco desaparece: não existe estado intermediário.
 - A grade por turma de origem, o histórico e a frequência usam a mesma derivação, testada de forma isolada.
-- Aluno movido de turma conserva as faltas do período anterior, porque a regra da falta olha todas as frequências do dia do professor.
+- Aluno movido de turma conserva as faltas do período anterior, porque a regra da falta olha todas as frequências do dia.

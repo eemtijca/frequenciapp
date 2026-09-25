@@ -36,9 +36,9 @@ A conexão do runtime também pode usar uma conexão direta ou o pooler de sess�
 | ADMIN_EMAIL | `criar-admin`, bootstrap | E-mail do administrador inicial (primeiro usuário).     |
 | ADMIN_SENHA | `criar-admin`, bootstrap | Senha do admin, mínimo 8 caracteres com letra e número. |
 | ADMIN_NOME  | `criar-admin`, bootstrap | Nome de tratamento do administrador.                    |
-| CONTA_EMAIL | `criar-conta`            | E-mail da conta de professor (demonstração e testes).   |
-| CONTA_SENHA | `criar-conta`            | Senha inicial, mínimo 8 caracteres com letra e número.  |
-| CONTA_NOME  | `criar-conta`            | Nome de tratamento exibido no aplicativo.               |
+| CONTA_EMAIL | `criar-coordenacao`      | E-mail da conta de coordenação (demonstração e testes). |
+| CONTA_SENHA | `criar-coordenacao`      | Senha inicial, mínimo 8 caracteres com letra e número.  |
+| CONTA_NOME  | `criar-coordenacao`      | Nome de tratamento exibido no aplicativo.               |
 | SEED_ALUNOS | `seed`                   | Alunos sintéticos por turma na semente.                 |
 
 ## Execução local sem Docker
@@ -51,7 +51,7 @@ cp .env.example .env
 # Edite DATABASE_URL, DIRECT_URL e cole um AUTH_SECRET aleatório
 npx prisma migrate deploy
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin
-CONTA_EMAIL=professor@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Ana' npm run criar-conta
+CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Equipe' npm run criar-coordenacao
 npm run seed  # opcional, séries, turmas e alunos sintéticos
 npm run dev
 ```
@@ -82,7 +82,7 @@ A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do h
 
 ## Fuso horário
 
-`TZ_APP` decide qual é o dia corrente para o estado inicial da frequência. Datas trafegam como texto `YYYY-MM-DD` do calendário local do professor e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade de Originais e o Histórico filtram por mês civil do mesmo calendário.
+`TZ_APP` decide qual é o dia corrente para o estado inicial da frequência. Datas trafegam como texto `YYYY-MM-DD` do calendário da escola e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade e o Histórico filtram por mês civil do mesmo calendário.
 
 ## Verificação rápida
 

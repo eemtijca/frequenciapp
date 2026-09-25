@@ -11,7 +11,7 @@ npm ci
 cp .env.example .env  # preencha AUTH_SECRET com um segredo aleatório
 npx prisma migrate deploy
 npm run criar-admin   # com ADMIN_EMAIL, ADMIN_SENHA e ADMIN_NOME no ambiente
-npm run criar-conta   # opcional: professor de demonstração (CONTA_*)
+npm run criar-coordenacao   # opcional: coordenação de demonstração (CONTA_*)
 npm run seed          # opcional: séries, turmas e alunos sintéticos
 npm run dev
 ```
@@ -28,22 +28,22 @@ Para criar o administrador inicial na partida, defina `ADMIN_EMAIL`, `ADMIN_SENH
 
 Comandos úteis na raiz:
 
-| Comando                  | Efeito                                             |
-| ------------------------ | -------------------------------------------------- |
-| `npm run dev`            | Servidor de desenvolvimento em localhost:3000.     |
-| `docker compose up`      | Sobe banco e aplicativo via Docker Compose.        |
-| `docker compose down`    | Derruba o ambiente.                                |
-| `npm run criar-admin`    | Cria o administrador inicial de forma idempotente. |
-| `npm run criar-conta`    | Cria conta de professor de forma idempotente.      |
-| `npm run seed`           | Semeia alunos sintéticos de desenvolvimento.       |
-| `npx prisma generate`    | Regenera o cliente Prisma (o postinstall também).  |
-| `npx prisma migrate dev` | Cria e aplica migrações em desenvolvimento.        |
+| Comando                     | Efeito                                             |
+| --------------------------- | -------------------------------------------------- |
+| `npm run dev`               | Servidor de desenvolvimento em localhost:3000.     |
+| `docker compose up`         | Sobe banco e aplicativo via Docker Compose.        |
+| `docker compose down`       | Derruba o ambiente.                                |
+| `npm run criar-admin`       | Cria o administrador inicial de forma idempotente. |
+| `npm run criar-coordenacao` | Cria conta de coordenação de forma idempotente.    |
+| `npm run seed`              | Semeia alunos sintéticos de desenvolvimento.       |
+| `npx prisma generate`       | Regenera o cliente Prisma (o postinstall também).  |
+| `npx prisma migrate dev`    | Cria e aplica migrações em desenvolvimento.        |
 
 ## Fluxo de contribuição e pull requests
 
 ### Issues e discussão
 
-Descreva o problema ou a proposta antes de codificar quando a mudança for estrutural. Para bugs, inclua passos de reprodução, comportamento observado, comportamento esperado e o commit afetado. Nunca anexe dados reais de professores ou alunos.
+Descreva o problema ou a proposta antes de codificar quando a mudança for estrutural. Para bugs, inclua passos de reprodução, comportamento observado, comportamento esperado e o commit afetado. Nunca anexe dados reais de pessoas ou alunos.
 
 ### Branches
 
