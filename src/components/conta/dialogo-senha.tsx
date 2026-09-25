@@ -7,7 +7,7 @@ import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CampoSenha } from "@/components/ui/campo-senha";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -75,9 +75,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
         >
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-atual">Senha atual</Label>
-            <Input
+            <CampoSenha
               id="senha-atual"
-              type="password"
               value={senhaAtual}
               required
               autoComplete="current-password"
@@ -87,9 +86,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-nova">Nova senha</Label>
-            <Input
+            <CampoSenha
               id="senha-nova"
-              type="password"
               value={senhaNova}
               required
               minLength={8}
@@ -103,9 +101,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="senha-confirmacao">Confirmar nova senha</Label>
-            <Input
+            <CampoSenha
               id="senha-confirmacao"
-              type="password"
               value={confirmacao}
               required
               minLength={8}

@@ -18,10 +18,11 @@ import {
   mesSeguinte,
   normalizar,
   rotuloDiaSemana,
+  rotuloMes,
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
   frequencias: Frequencia[];
@@ -118,31 +119,27 @@ export default function VistaHistorico({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 rounded-lg"
+          className="size-11 shrink-0 rounded-lg"
           aria-label="Mês anterior"
           onClick={() => onMes(mesSeguinte(mes, -1))}
         >
           <ChevronLeft size={18} />
         </Button>
-        <div className="relative flex-1">
-          <label htmlFor="mes-historico" className="sr-only">
-            Mês do histórico
-          </label>
-          <Input
+        <div className="min-w-0 flex-1">
+          <SeletorPeriodo
             id="mes-historico"
-            type="month"
-            value={mes}
+            modo="mes"
+            valor={mes}
             max={mesCorrente}
-            onChange={(evento) => {
-              if (evento.target.value) onMes(evento.target.value);
-            }}
-            className="numerais-tabulares h-11 rounded-lg font-medium"
+            rotuloAcessivel="Mês do histórico"
+            rotulo={rotuloMes(mes)}
+            onValor={onMes}
           />
         </div>
         <Button
           variant="outline"
           size="icon"
-          className="size-11 rounded-lg"
+          className="size-11 shrink-0 rounded-lg"
           aria-label="Mês seguinte"
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
@@ -150,6 +147,15 @@ export default function VistaHistorico({
           <ChevronRight size={18} />
         </Button>
       </div>
+      {mes !== mesCorrente && (
+        <button
+          type="button"
+          onClick={() => onMes(mesCorrente)}
+          className="text-primary self-start text-sm font-medium hover:underline"
+        >
+          Voltar para este mês
+        </button>
+      )}
 
       {bloqueado && (
         <p className="bg-secondary text-secondary-foreground rounded-lg px-4 py-3 text-sm">

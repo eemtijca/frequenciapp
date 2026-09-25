@@ -6,10 +6,10 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { mesSeguinte, montarGrade, normalizar } from "@/domain/frequencia";
+import { mesSeguinte, montarGrade, normalizar, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
   alunos: Aluno[];
@@ -139,31 +139,27 @@ export default function VistaGrade({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 rounded-lg"
+          className="size-11 shrink-0 rounded-lg"
           aria-label="Mês anterior"
           onClick={() => onMes(mesSeguinte(mes, -1))}
         >
           <ChevronLeft size={18} />
         </Button>
-        <div className="relative flex-1">
-          <label htmlFor="mes-grade" className="sr-only">
-            Mês da consulta
-          </label>
-          <Input
+        <div className="min-w-0 flex-1">
+          <SeletorPeriodo
             id="mes-grade"
-            type="month"
-            value={mes}
+            modo="mes"
+            valor={mes}
             max={mesCorrente}
-            onChange={(evento) => {
-              if (evento.target.value) onMes(evento.target.value);
-            }}
-            className="numerais-tabulares h-11 rounded-lg font-medium"
+            rotuloAcessivel="Mês da consulta"
+            rotulo={rotuloMes(mes)}
+            onValor={onMes}
           />
         </div>
         <Button
           variant="outline"
           size="icon"
-          className="size-11 rounded-lg"
+          className="size-11 shrink-0 rounded-lg"
           aria-label="Mês seguinte"
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
@@ -171,6 +167,15 @@ export default function VistaGrade({
           <ChevronRight size={18} />
         </Button>
       </div>
+      {mes !== mesCorrente && (
+        <button
+          type="button"
+          onClick={() => onMes(mesCorrente)}
+          className="text-primary self-start text-sm font-medium hover:underline"
+        >
+          Voltar para este mês
+        </button>
+      )}
 
       {erro && (
         <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">

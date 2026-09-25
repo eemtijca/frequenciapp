@@ -30,6 +30,7 @@ import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -464,41 +465,17 @@ export default function VistaFrequencia({
             >
               <ChevronLeft size={18} />
             </Button>
-            <div className="relative min-w-0 flex-1">
-              <div
-                aria-hidden="true"
-                className={`border-input bg-background flex h-11 items-center justify-center gap-2 overflow-hidden rounded-lg border px-3 ${
-                  travado ? "opacity-50" : ""
-                }`}
-              >
-                <CalendarDays size={16} className="text-muted-foreground shrink-0" />
-                <span className="numerais-tabulares truncate text-sm font-semibold">
-                  {rotuloDia}
-                </span>
-                {diaDaSemana && (
-                  <span className="text-muted-foreground truncate text-sm xl:hidden">
-                    {diaDaSemana}
-                  </span>
-                )}
-                {dia === diaCorrente && (
-                  <span className="bg-primary/15 text-primary shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold">
-                    Hoje
-                  </span>
-                )}
-              </div>
-              <label htmlFor="dia-frequencia" className="sr-only">
-                Data da frequência
-              </label>
-              <input
+            <div className="min-w-0 flex-1">
+              <SeletorPeriodo
                 id="dia-frequencia"
-                type="date"
-                value={dia}
+                modo="dia"
+                valor={dia}
                 max={diaCorrente}
                 disabled={travado}
-                onChange={(evento) => {
-                  if (evento.target.value) setDia(evento.target.value);
-                }}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                rotuloAcessivel="Data da frequência"
+                rotulo={rotuloDia}
+                detalhe={diaDaSemana}
+                onValor={setDia}
               />
             </div>
             <Button

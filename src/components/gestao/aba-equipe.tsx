@@ -10,6 +10,7 @@ import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
@@ -373,9 +374,8 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                   aria-hidden="true"
                   className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
                 />
-                <Input
+                <CampoSenha
                   id="senha-usuario"
-                  type="password"
                   value={formulario.senha}
                   autoComplete="new-password"
                   minLength={emEdicao ? 0 : 8}

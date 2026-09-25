@@ -143,6 +143,53 @@ const NOMES_DOS_DIAS = [
   "sábado",
 ];
 
+const NOMES_DOS_MESES = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+/** Nome do mês por extenso e capitalizado, a partir do mês civil. */
+export function nomeDoMes(mes: string): string {
+  const numero = Number(mes.split("-")[1] ?? "0");
+  const nome = NOMES_DOS_MESES[numero - 1] ?? "";
+  return nome === "" ? "" : `${nome.charAt(0).toUpperCase()}${nome.slice(1)}`;
+}
+
+/** Mês por extenso com ano, para rótulos amigáveis. */
+export function rotuloMes(mes: string): string {
+  const nome = nomeDoMes(mes);
+  const ano = mes.split("-")[0] ?? "";
+  return nome === "" ? "" : `${nome} de ${ano}`;
+}
+
+/**
+ * Células da grade do mês em semanas que começam no domingo, com vazios
+ * antes do dia 1 e depois do último dia, sem linhas vazias no fim.
+ */
+export function celulasDoMes(mes: string): (string | null)[] {
+  const dias = diasDoMes(mes);
+  const celulas: (string | null)[] = [];
+  const primeiro = dias[0];
+  if (primeiro) {
+    const deslocamento = diaDaSemanaIso(primeiro) % 7;
+    for (let i = 0; i < deslocamento; i += 1) celulas.push(null);
+  }
+  celulas.push(...dias);
+  const total = Math.ceil(celulas.length / 7) * 7;
+  while (celulas.length < total) celulas.push(null);
+  return celulas;
+}
+
 /** Dia da semana por extenso, a partir do dia civil. */
 export function rotuloDiaSemana(dia: string): string {
   const data = new Date(`${dia}T12:00:00Z`);

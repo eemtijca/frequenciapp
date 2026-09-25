@@ -4,8 +4,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion } from "motion/react";
-import { CalendarCheck, Eye, EyeOff, LoaderCircle, LockKeyhole, WifiOff } from "lucide-react";
+import { CalendarCheck, LoaderCircle, LockKeyhole, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorTema } from "@/components/ui/seletor-tema";
@@ -21,7 +22,6 @@ export default function TelaLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
 
@@ -131,33 +131,21 @@ export default function TelaLogin() {
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="senha">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="senha"
-                    type={mostrarSenha ? "text" : "password"}
-                    name="password"
-                    autoComplete="current-password"
-                    required
-                    value={senha}
-                    aria-invalid={erro ? true : undefined}
-                    aria-describedby={erro ? "erro-entrada" : undefined}
-                    onChange={(evento) => {
-                      setSenha(evento.target.value);
-                      if (erro) setErro("");
-                    }}
-                    placeholder="Sua senha de acesso"
-                    className="h-12 pr-12"
-                  />
-                  <button
-                    type="button"
-                    aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
-                    aria-pressed={mostrarSenha}
-                    onClick={() => setMostrarSenha((atual) => !atual)}
-                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 flex size-9 -translate-y-1/2 items-center justify-center rounded-md transition-colors"
-                  >
-                    {mostrarSenha ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
-                </div>
+                <CampoSenha
+                  id="senha"
+                  name="password"
+                  autoComplete="current-password"
+                  required
+                  value={senha}
+                  aria-invalid={erro ? true : undefined}
+                  aria-describedby={erro ? "erro-entrada" : undefined}
+                  onChange={(evento) => {
+                    setSenha(evento.target.value);
+                    if (erro) setErro("");
+                  }}
+                  placeholder="Sua senha de acesso"
+                  className="h-12"
+                />
               </div>
 
               {erro && (

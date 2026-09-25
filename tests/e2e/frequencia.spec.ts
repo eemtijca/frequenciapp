@@ -26,14 +26,20 @@ test.describe("frequência com saída por aula", () => {
     }
     await expect(painel.getByText("E2E Aluno Um")).toBeVisible();
 
-    // A barra de data mostra o rótulo amigável e o campo cobre todo o controle.
+    // O seletor próprio mostra o rótulo amigável e abre o painel no clique.
     await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
-    const campoDia = painel.locator("#dia-frequencia");
-    const caixaDia = await campoDia.boundingBox();
-    const caixaControle = await campoDia.locator("xpath=..").boundingBox();
-    expect(caixaDia?.width ?? 0).toBeGreaterThan(150);
-    expect(Math.abs((caixaDia?.width ?? 0) - (caixaControle?.width ?? 0))).toBeLessThanOrEqual(1);
-    expect(Math.abs((caixaDia?.height ?? 0) - (caixaControle?.height ?? 0))).toBeLessThanOrEqual(1);
+    const gatilhoDia = painel.locator("#dia-frequencia");
+    await expect(gatilhoDia).toHaveAttribute("aria-haspopup", "dialog");
+    await gatilhoDia.click();
+    const painelDia = page.getByRole("dialog", { name: "Data da frequência" });
+    await expect(painelDia).toBeVisible();
+    // O teclado anda pela grade e Enter escolhe o dia anterior.
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    await expect(painelDia).toBeHidden();
+    await expect(painel.getByRole("button", { name: "Voltar para hoje" })).toBeVisible();
+    await painel.getByRole("button", { name: "Voltar para hoje" }).click();
+    await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
 
     // No desktop, a lista fica à esquerda e o painel de informações à direita.
     if (!isMobile) {
@@ -72,6 +78,19 @@ test.describe("frequência com saída por aula", () => {
     await trocarVisao(page, "Histórico", "historico");
     await expect(page.getByText(/saída parcial/).first()).toBeVisible();
 
+    // O seletor de mês abre em painel, aceita teclado e volta para este mês.
+    const historico = page.locator('section[aria-label="Histórico de frequências"]');
+    await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
+    await historico.locator("#mes-historico").click();
+    const painelMes = page.getByRole("dialog", { name: "Mês do histórico" });
+    await expect(painelMes).toBeVisible();
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Enter");
+    await expect(painelMes).toBeHidden();
+    await expect(historico.getByRole("button", { name: "Voltar para este mês" })).toBeVisible();
+    await historico.getByRole("button", { name: "Voltar para este mês" }).click();
+    await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
+
     await trocarVisao(page, "Grade", "grade");
     const grade = page.locator('section[aria-label="Grade do mês"]');
     // Com a semente local, escolha a turma de origem do teste.
@@ -82,6 +101,15 @@ test.describe("frequência com saída por aula", () => {
     await expect(
       grade.getByRole("img", { name: /presente em parte das aulas/ }).first(),
     ).toBeVisible();
+
+    // O seletor de mês da Grade abre, fecha com Esc e mantém este mês.
+    await expect(grade.getByText("Este mês", { exact: true })).toBeVisible();
+    await grade.locator("#mes-grade").click();
+    const painelGrade = page.getByRole("dialog", { name: "Mês da consulta" });
+    await expect(painelGrade).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(painelGrade).toBeHidden();
+    await expect(grade.getByText("Este mês", { exact: true })).toBeVisible();
 
     // O seletor de mês ocupa a largura da tela, como nas outras telas.
     const larguraMes = (await grade.locator("#mes-grade").boundingBox())?.width ?? 0;

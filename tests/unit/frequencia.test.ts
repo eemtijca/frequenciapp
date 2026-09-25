@@ -1,6 +1,7 @@
 // Domínio da frequência: datas, horas, aulas, marca do aluno e grade.
 import { describe, expect, it } from "vitest";
 import {
+  celulasDoMes,
   diaDaSemanaIso,
   diaLocal,
   diaSeguinte,
@@ -13,12 +14,14 @@ import {
   marcaDoAluno,
   mesSeguinte,
   montarGrade,
+  nomeDoMes,
   normalizar,
   partesNoFuso,
   rotuloAula,
   rotuloDataCurta,
   rotuloDeTurma,
   rotuloDiaSemana,
+  rotuloMes,
   type Aluno,
   type Frequencia,
   type Horario,
@@ -221,6 +224,42 @@ describe("diasDoMes", () => {
   });
   it("sabe meses de 31 dias", () => {
     expect(diasDoMes("2026-01").length).toBe(31);
+  });
+});
+
+describe("nomeDoMes e rotuloMes", () => {
+  it("nomeia o mês capitalizado", () => {
+    expect(nomeDoMes("2026-01")).toBe("Janeiro");
+    expect(nomeDoMes("2026-09")).toBe("Setembro");
+    expect(nomeDoMes("2026-12")).toBe("Dezembro");
+  });
+  it("junta o mês por extenso ao ano", () => {
+    expect(rotuloMes("2026-09")).toBe("Setembro de 2026");
+    expect(rotuloMes("2027-03")).toBe("Março de 2027");
+  });
+  it("devolve vazio para mês inválido", () => {
+    expect(nomeDoMes("2026-13")).toBe("");
+    expect(rotuloMes("2026-00")).toBe("");
+  });
+});
+
+describe("celulasDoMes", () => {
+  it("alinha o dia 1 na semana que começa no domingo", () => {
+    const celulas = celulasDoMes("2026-09");
+    expect(celulas.length).toBe(35);
+    // 2026-09-01 é uma terça-feira: domingo e segunda ficam vazios.
+    expect(celulas.slice(0, 2)).toEqual([null, null]);
+    expect(celulas[2]).toBe("2026-09-01");
+    expect(celulas[31]).toBe("2026-09-30");
+    expect(celulas.slice(32).every((celula) => celula === null)).toBe(true);
+  });
+  it("preenche o mês que começa no domingo sem vazios à esquerda", () => {
+    // 2026-02-01 é um domingo e o mês fecha em quatro semanas.
+    const celulas = celulasDoMes("2026-02");
+    expect(celulas.length).toBe(28);
+    expect(celulas[0]).toBe("2026-02-01");
+    expect(celulas[27]).toBe("2026-02-28");
+    expect(celulas.filter(Boolean).length).toBe(28);
   });
 });
 

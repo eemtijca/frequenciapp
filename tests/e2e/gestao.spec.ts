@@ -58,4 +58,20 @@ test.describe("abas da Gestão", () => {
       "true",
     );
   });
+
+  test("campo de senha da equipe mostra e oculta", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: "Equipe" }).click();
+    await page.getByRole("button", { name: "Nova conta" }).click();
+
+    const campo = page.locator("#senha-usuario");
+    await expect(campo).toHaveAttribute("type", "password");
+    const grupo = campo.locator("xpath=..");
+    await grupo.getByRole("button", { name: "Mostrar senha" }).click();
+    await expect(campo).toHaveAttribute("type", "text");
+    await grupo.getByRole("button", { name: "Ocultar senha" }).click();
+    await expect(campo).toHaveAttribute("type", "password");
+  });
 });

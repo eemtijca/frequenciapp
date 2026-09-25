@@ -5,11 +5,11 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 ## Estrutura
 
 - **Página única** com troca de visões por deslize e navegação inferior no celular: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. No desktop, barra lateral fixa com a mesma navegação, o cartão da pessoa, o tema e as ações empilhadas (trocar senha e sair), e o conteúdo ocupa toda a largura, com troca de visão instantânea. O cabeçalho traz identidade, tema de três opções (sistema, claro e escuro) e menu de perfil.
-- **Frequência**: seletor de turma por toque com contagem, barra de data com setas de dia, rótulo amigável (data, dia da semana e selo Hoje) e seletor nativo que abre ao tocar em qualquer ponto do controle, sem permitir dia futuro, atalho para voltar a hoje, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. No desktop, a lista fica à esquerda e o painel de turma, data, resumo e salvamento à direita, fixo durante a rolagem. As aulas do dia aparecem como referência e cada aluno marcado ganha o botão Aulas, com chips para registrar a saída no meio da aula.
-- **Histórico**: mês com setas e seletor nativo, sem avançar para meses futuros, e lista de frequências com dia, turma, contagem de faltas e hora do último salvamento; abrir uma frequência a leva de volta à Frequência.
-- **Grade do mês**: pílulas de turma de origem, mês em linha própria com setas e seletor nativo, coluna de hoje destacada, busca por aluno, grade com primeira coluna fixa, divisórias verticais entre os dias e depois dos nomes, e legenda; células com F (falta), S (presente em parte das aulas) ou ponto de presença.
+- **Frequência**: seletor de turma por toque com contagem, barra de data com setas de dia, rótulo amigável (data, dia da semana e selo Hoje) e seletor próprio que abre em popover ancorado no desktop e folha inferior no celular, com calendário do mês, teclado e atalho Hoje, sem permitir dia futuro; atalho para voltar a hoje, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. No desktop, a lista fica à esquerda e o painel de turma, data, resumo e salvamento à direita, fixo durante a rolagem. As aulas do dia aparecem como referência e cada aluno marcado ganha o botão Aulas, com chips para registrar a saída no meio da aula.
+- **Histórico**: mês com setas, seletor próprio com grade de meses e atalho para voltar ao mês corrente, sem avançar para meses futuros, e lista de frequências com dia, turma, contagem de faltas e hora do último salvamento; abrir uma frequência a leva de volta à Frequência.
+- **Grade do mês**: pílulas de turma de origem, mês em linha própria com setas, seletor próprio e atalho para voltar ao mês corrente, coluna de hoje destacada, busca por aluno, grade com primeira coluna fixa, divisórias verticais entre os dias e depois dos nomes, e legenda; células com F (falta), S (presente em parte das aulas) ou ponto de presença.
 - **Buscas**: toda lista longa tem barra de busca com rótulo acessível e limpar. O Histórico filtra por turma, dia e autoria; a Grade, por aluno; a Gestão, por nome ou e-mail.
-- **Controles**: seletor acessível com teclado e filtro para listas longas; diálogos viram folha inferior no celular e modal centralizado no desktop.
+- **Controles**: seletor de período acessível com teclado (setas, Home, End, PageUp e PageDown), filtro para listas longas e botão de exibir/ocultar em todo campo de senha; diálogos viram folha inferior no celular e modal centralizado no desktop.
 - **Alunos** (coordenação): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
 - **Gestão** (administração): abas curtas de Séries, Turmas, Alunos e Equipe, com deslize curto do conteúdo no desktop, arrasto do dedo no celular, formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas.
 
@@ -40,7 +40,8 @@ Na lista da Frequência, a linha inteira do aluno é o alvo: um toque marca falt
 - HTML semântico: `main`, `nav`, `aside`, `section`, listas e tabelas com `caption` e `scope`.
 - Atalho para pular para o conteúdo e foco movido para o painel ativo na troca de visão; painéis inativos com `inert`.
 - Alvos de toque grandes, com `aria-pressed` nas linhas de aluno e `aria-current` na navegação.
-- Rótulos visíveis ou `sr-only` em todos os campos e botões de ícone.
+- Rótulos visíveis ou `sr-only` em todos os campos e botões de ícone; o botão de exibir senha alterna entre "Mostrar senha" e "Ocultar senha".
+- Seletor de período com foco no dia ou mês escolhido ao abrir, navegação por setas, Home, End, PageUp e PageDown, `aria-pressed` na célula ativa e foco devolvido ao gatilho ao fechar.
 - Foco visível em todos os interativos; contraste AA em texto e controles nos dois temas.
 - Barras de estado usam `aria-live="polite"` para anunciar salvamentos.
 - `prefers-reduced-motion` respeitado: as animações e a rolagem suave param quando o usuário pede.

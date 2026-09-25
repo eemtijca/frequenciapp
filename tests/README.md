@@ -64,11 +64,11 @@ npx playwright test    # headless, execução serial
 - `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
 - `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
 - Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
-- Specs atuais: autenticação, banco sem turmas, frequência com saída por aula, troca de visão, deslize do paginador, abas da Gestão com toque, deslize e teclado, responsividade (barra lateral, folha inferior e login simétrico) e tema de três opções.
+- Specs atuais: autenticação com campos de senha exibir/ocultar, banco sem turmas, frequência com saída por aula e seletor de período próprio, troca de visão, deslize do paginador, abas da Gestão com toque, deslize e teclado, responsividade (barra lateral, folha inferior e login simétrico) e tema de três opções.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
 Com o aplicativo já no ar, use `TEST_BASE_URL` e `PLAYWRIGHT_SKIP_WEBSERVER=1`. O CI sobe o Compose, instala o Chromium e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha.
 
 ## Verificação visual e de ponta a ponta
 
-Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, banco vazio, deslize entre visões (instantâneo no desktop), barra lateral no desktop, abas da Gestão com toque, deslize e teclado, frequência com saída por aula, painel da frequência em duas colunas, barra de data com alvo ampliado, histórico, grade com divisórias, gestão completa (série, turma com aulas, aluno e contas), troca de senha, tema de três opções, login simétrico, PWA e larguras de celular e desktop.
+Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, campos de senha com exibir e ocultar, banco vazio, deslize entre visões (instantâneo no desktop), barra lateral no desktop, abas da Gestão com toque, deslize e teclado, frequência com saída por aula, painel da frequência em duas colunas, seletor de período próprio (popover no desktop, folha no celular, teclado e atalhos), histórico, grade com divisórias, gestão completa (série, turma com aulas, aluno e contas), troca de senha, tema de três opções, login simétrico, PWA e larguras de celular e desktop.
