@@ -1,6 +1,6 @@
 // Sessões opacas: token aleatório em cookie HttpOnly, guardado só como hash
 // SHA-256 e assinado por AUTH_SECRET. Conta desativada cai na hora.
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { banco } from "@/infra/banco";
 import type { Identidade } from "@/domain/usuarios";
@@ -13,16 +13,23 @@ interface SessaoAtiva {
   usuario: Identidade;
 }
 
+/** Assinatura HMAC-SHA256 truncada: 128 bits bastam para o cookie. */
+function assinaturaDe(token: string, segredo: string): string {
+  return createHmac("sha256", segredo).update(token).digest("hex").slice(0, 32);
+}
+
 function valorAssinado(token: string, segredo: string): string {
-  const assinatura = createHash("sha256").update(`${token}.${segredo}`).digest("hex").slice(0, 32);
-  return `${token}.${assinatura}`;
+  return `${token}.${assinaturaDe(token, segredo)}`;
 }
 
 function conferirValor(valor: string, segredo: string): string | null {
   const [token, assinatura] = valor.split(".");
   if (!token || !assinatura) return null;
-  const esperada = createHash("sha256").update(`${token}.${segredo}`).digest("hex").slice(0, 32);
-  return assinatura === esperada ? token : null;
+  const esperada = assinaturaDe(token, segredo);
+  const recebida = Buffer.from(assinatura, "utf8");
+  const calculada = Buffer.from(esperada, "utf8");
+  if (recebida.length !== calculada.length) return null;
+  return timingSafeEqual(recebida, calculada) ? token : null;
 }
 
 function hashDoToken(token: string): string {
