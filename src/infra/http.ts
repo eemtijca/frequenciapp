@@ -84,10 +84,15 @@ export function origemPermitida(requisicao: Request): boolean {
  * Corpo JSON da requisição. Corpo vazio devolve null; JSON inválido ou
  * grande demais devolve erro claro em vez de falha silenciosa.
  */
-export async function corpoJson(requisicao: Request): Promise<unknown> {
+export function corpoJson(requisicao: Request): Promise<unknown> {
+  return corpoJsonComLimite(requisicao, LIMITE_DE_CORPO);
+}
+
+/** Corpo JSON com limite próprio, para rotas de importação de cópia. */
+export async function corpoJsonComLimite(requisicao: Request, limite: number): Promise<unknown> {
   const texto = await requisicao.text();
   if (!texto) return null;
-  if (Buffer.byteLength(texto, "utf8") > LIMITE_DE_CORPO) {
+  if (Buffer.byteLength(texto, "utf8") > limite) {
     throw new ErroHttp("O conteúdo enviado é grande demais para processar.", 413);
   }
   try {

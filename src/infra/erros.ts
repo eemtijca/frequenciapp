@@ -31,6 +31,8 @@ const MENSAGENS_DE_DUPLICIDADE: Record<string, string> = {
   frequencias_turma_id_dia_key:
     "Esta frequência já foi salva. Recarregue para ver a versão mais recente.",
   horarios_turma_id_ordem_key: "Já existe uma aula com esta ordem nesta turma.",
+  saidas_antecipadas_aluno_id_dia_key:
+    "Este aluno já tem uma saída nesta data. Remova o registro anterior para corrigir.",
   faltas_pkey: "Esta falta já estava registrada.",
 };
 
