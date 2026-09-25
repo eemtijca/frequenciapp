@@ -45,7 +45,7 @@ export default function TelaLogin() {
   return (
     <MotionConfig reducedMotion="user">
       <div
-        className="relative flex min-h-dvh flex-col lg:grid lg:grid-cols-[1.05fr_1fr]"
+        className="relative flex min-h-dvh flex-col lg:grid lg:grid-cols-2"
         style={{
           paddingTop: "env(safe-area-inset-top)",
           paddingBottom: "env(safe-area-inset-bottom)",

@@ -26,4 +26,14 @@ test.describe("responsividade", () => {
     await expect(page.locator("aside")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
   });
+
+  test("as metades do login são simétricas", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.context().clearCookies();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "FrequenciApp" })).toBeVisible();
+    const aside = await page.locator("aside").boundingBox();
+    const principal = await page.locator("main").boundingBox();
+    expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
+  });
 });

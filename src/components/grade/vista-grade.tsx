@@ -133,42 +133,43 @@ export default function VistaGrade({
             </button>
           );
         })}
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-11 rounded-lg"
-            aria-label="Mês anterior"
-            onClick={() => onMes(mesSeguinte(mes, -1))}
-          >
-            <ChevronLeft size={18} />
-          </Button>
-          <div className="relative">
-            <label htmlFor="mes-grade" className="sr-only">
-              Mês da consulta
-            </label>
-            <Input
-              id="mes-grade"
-              type="month"
-              value={mes}
-              max={mesCorrente}
-              onChange={(evento) => {
-                if (evento.target.value) onMes(evento.target.value);
-              }}
-              className="numerais-tabulares h-11 w-44 rounded-lg font-medium"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-11 rounded-lg"
-            aria-label="Mês seguinte"
-            disabled={mes >= mesCorrente}
-            onClick={() => onMes(mesSeguinte(mes, 1))}
-          >
-            <ChevronRight size={18} />
-          </Button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11 rounded-lg"
+          aria-label="Mês anterior"
+          onClick={() => onMes(mesSeguinte(mes, -1))}
+        >
+          <ChevronLeft size={18} />
+        </Button>
+        <div className="relative flex-1">
+          <label htmlFor="mes-grade" className="sr-only">
+            Mês da consulta
+          </label>
+          <Input
+            id="mes-grade"
+            type="month"
+            value={mes}
+            max={mesCorrente}
+            onChange={(evento) => {
+              if (evento.target.value) onMes(evento.target.value);
+            }}
+            className="numerais-tabulares h-11 rounded-lg font-medium"
+          />
         </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-11 rounded-lg"
+          aria-label="Mês seguinte"
+          disabled={mes >= mesCorrente}
+          onClick={() => onMes(mesSeguinte(mes, 1))}
+        >
+          <ChevronRight size={18} />
+        </Button>
       </div>
 
       {erro && (

@@ -69,11 +69,11 @@ const ITENS_FIM: ItemNav[] = [
 ];
 
 const LARGURAS: Record<Visao, string> = {
-  frequencia: "max-w-2xl",
-  historico: "max-w-3xl",
-  grade: "max-w-5xl",
-  alunos: "max-w-3xl",
-  gestao: "max-w-5xl",
+  frequencia: "max-w-2xl lg:max-w-none",
+  historico: "max-w-3xl lg:max-w-none",
+  grade: "max-w-5xl lg:max-w-none",
+  alunos: "max-w-3xl lg:max-w-none",
+  gestao: "max-w-5xl lg:max-w-none",
 };
 
 interface ItemNavegacaoProps {
@@ -190,9 +190,12 @@ export default function Aplicacao({
       if (!pager) return;
       const indice = itens.findIndex((item) => item.visao === proxima);
       if (indice < 0) return;
+      // No desktop a troca é instantânea: o deslize é gesto de celular.
+      const ehDesktop =
+        typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
       pager.scrollTo({
         left: indice * pager.clientWidth,
-        behavior: reduzirMovimento ? "auto" : "smooth",
+        behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
       });
     },
     [itens, reduzirMovimento],
@@ -225,6 +228,18 @@ export default function Aplicacao({
     const indice = itens.findIndex((item) => item.visao === visaoInicialRef.current);
     if (indice > 0) pager.scrollTo({ left: indice * pager.clientWidth });
   }, [itens]);
+
+  // Ao redimensionar a janela, reencaixa o paginador na visão ativa.
+  useEffect(() => {
+    function reencaixar() {
+      const pager = pagerRef.current;
+      if (!pager) return;
+      const indice = itens.findIndex((item) => item.visao === visao);
+      if (indice >= 0) pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
+    }
+    window.addEventListener("resize", reencaixar);
+    return () => window.removeEventListener("resize", reencaixar);
+  }, [itens, visao]);
 
   function abrirFrequencia(dia: string, turmaId: string) {
     setAlvo({ dia, turmaId });
@@ -353,7 +368,7 @@ export default function Aplicacao({
   return (
     <MotionConfig reducedMotion="user">
       <div
-        className="mx-auto flex h-dvh w-full max-w-6xl flex-col lg:flex-row"
+        className="flex h-dvh w-full flex-col lg:flex-row"
         style={{
           paddingLeft: "env(safe-area-inset-left)",
           paddingRight: "env(safe-area-inset-right)",

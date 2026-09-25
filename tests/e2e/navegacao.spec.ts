@@ -38,6 +38,19 @@ test.describe("navegação", () => {
       .toBe("frequencia");
   });
 
+  test("no desktop a troca de visão é instantânea", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const pager = page.locator(".pagina-sem-barra");
+    await page.getByRole("button", { name: "Histórico" }).click();
+    const medida = await pager.evaluate((elemento) => ({
+      scrollLeft: elemento.scrollLeft,
+      largura: elemento.clientWidth,
+    }));
+    expect(medida.scrollLeft).toBe(medida.largura);
+  });
+
   test("alterna o tema pelo menu de três opções", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);

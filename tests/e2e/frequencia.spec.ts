@@ -41,6 +41,10 @@ test.describe("frequência com saída por aula", () => {
     // A marcação sobrevive à recarga.
     await page.reload();
     await aguardarHidratacao(page);
+    // Com a semente local, a turma padrão é outra; reabra a turma de teste.
+    if (await pilula.isVisible().catch(() => false)) {
+      await pilula.click();
+    }
     await expect(painel.getByText("saiu em parte das aulas").first()).toBeVisible({
       timeout: 15_000,
     });
@@ -50,8 +54,17 @@ test.describe("frequência com saída por aula", () => {
 
     await trocarVisao(page, "Grade", "grade");
     const grade = page.locator('section[aria-label="Grade do mês"]');
+    // Com a semente local, escolha a turma de origem do teste.
+    const pilulaGrade = grade.getByRole("button", { name: /E2E Ano A/ });
+    if (await pilulaGrade.isVisible().catch(() => false)) {
+      await pilulaGrade.click();
+    }
     await expect(
       grade.getByRole("img", { name: /presente em parte das aulas/ }).first(),
     ).toBeVisible();
+
+    // O seletor de mês ocupa a largura da tela, como nas outras telas.
+    const larguraMes = (await grade.locator("#mes-grade").boundingBox())?.width ?? 0;
+    expect(larguraMes).toBeGreaterThan(200);
   });
 });

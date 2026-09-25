@@ -430,401 +430,407 @@ export default function VistaFrequencia({
         </span>
       </div>
 
-      {turmas.length > 1 && (
-        <div role="group" aria-label="Turma atual" className="flex flex-wrap gap-2">
-          {turmas.map((opcao) => {
-            const ativo = opcao.id === turmaId;
-            const quantidade = alunos.filter((a) => a.ativo && a.turmaId === opcao.id).length;
-            return (
-              <button
-                key={opcao.id}
-                type="button"
-                aria-pressed={ativo}
-                disabled={travado}
-                onClick={() => setTurmaId(opcao.id)}
-                className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
-              >
-                <span>{opcao.rotulo}</span>
-                <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)] xl:items-start">
+        <div className="flex flex-col gap-4 xl:sticky xl:top-4">
+          {turmas.length > 1 && (
+            <div role="group" aria-label="Turma atual" className="flex flex-wrap gap-2">
+              {turmas.map((opcao) => {
+                const ativo = opcao.id === turmaId;
+                const quantidade = alunos.filter((a) => a.ativo && a.turmaId === opcao.id).length;
+                return (
+                  <button
+                    key={opcao.id}
+                    type="button"
+                    aria-pressed={ativo}
+                    disabled={travado}
+                    onClick={() => setTurmaId(opcao.id)}
+                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <span>{opcao.rotulo}</span>
+                    <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 rounded-lg"
-          aria-label="Dia anterior"
-          disabled={travado || !dia}
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="relative flex-1">
-          <label htmlFor="dia-frequencia" className="sr-only">
-            Data da frequência
-          </label>
-          <Input
-            id="dia-frequencia"
-            type="date"
-            value={dia}
-            max={diaCorrente}
-            disabled={travado}
-            onChange={(evento) => {
-              if (evento.target.value) setDia(evento.target.value);
-            }}
-            className="numerais-tabulares h-11 rounded-lg text-center font-medium"
-          />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 rounded-lg"
-          aria-label="Dia seguinte"
-          disabled={travado || !dia || dia >= diaCorrente}
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
-      {dia !== diaCorrente && (
-        <button
-          type="button"
-          disabled={travado}
-          onClick={() => setDia(diaCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
-        >
-          Voltar para hoje
-        </button>
-      )}
-      {sujo && (
-        <p className="text-muted-foreground text-xs">
-          Salve ou descarte as alterações para mudar a data ou a turma.
-        </p>
-      )}
-
-      <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
-        <button
-          type="button"
-          aria-pressed={filtro === "faltas"}
-          onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
-          className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
-        >
-          <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-            {carregando ? "" : contagemFaltas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Faltas</span>
-        </button>
-        <button
-          type="button"
-          aria-pressed={filtro === "presentes"}
-          onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-          className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
-        >
-          <span className="numerais-tabulares text-primary text-2xl font-semibold">
-            {carregando ? "" : contagemPresencas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Presentes</span>
-        </button>
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Todos começam presentes. Toque no aluno somente para marcar falta.
-      </p>
-      {aulasDoDia.length > 1 && (
-        <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-          <span>Aulas do dia:</span>
-          {aulasDoDia.map((aula) => (
-            <span
-              key={aula.id}
-              className="bg-secondary text-secondary-foreground numerais-tabulares rounded-md px-1.5 py-0.5 font-medium"
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 rounded-lg"
+              aria-label="Dia anterior"
+              disabled={travado || !dia}
+              onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
             >
-              {aula.ordem}ª {aula.inicio}
-            </span>
-          ))}
-        </div>
-      )}
-      {!carregando && contagemParciais > 0 && (
-        <p className="text-muted-foreground text-xs">
-          {contagemParciais === 1
-            ? "1 aluno saiu em parte das aulas."
-            : `${contagemParciais} alunos saíram em parte das aulas.`}
-        </p>
-      )}
-
-      {(erro || conflito) && (
-        <div
-          role="alert"
-          className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-        >
-          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <div className="flex-1">
-            <p>{erro}</p>
-            {conflito && (
-              <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
-                Recarregar versão salva
-              </Button>
-            )}
-            {!conflito && !sujo && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={() => setRecarregar((valor) => valor + 1)}
-              >
-                Tentar novamente
-              </Button>
-            )}
+              <ChevronLeft size={18} />
+            </Button>
+            <div className="relative flex-1">
+              <label htmlFor="dia-frequencia" className="sr-only">
+                Data da frequência
+              </label>
+              <Input
+                id="dia-frequencia"
+                type="date"
+                value={dia}
+                max={diaCorrente}
+                disabled={travado}
+                onChange={(evento) => {
+                  if (evento.target.value) setDia(evento.target.value);
+                }}
+                className="numerais-tabulares h-11 rounded-lg text-center font-medium"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 rounded-lg"
+              aria-label="Dia seguinte"
+              disabled={travado || !dia || dia >= diaCorrente}
+              onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+            >
+              <ChevronRight size={18} />
+            </Button>
           </div>
-        </div>
-      )}
-
-      <div className="bg-card overflow-hidden rounded-lg border">
-        <BarraBusca
-          id="busca-aluno"
-          valor={busca}
-          onValor={setBusca}
-          placeholder="Buscar aluno"
-          className="rounded-none border-0 border-b px-3 py-1.5"
-        />
-
-        <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
-          <span className="numerais-tabulares">
-            {carregando
-              ? ""
-              : `${visiveis.length} ${
-                  filtro === "faltas"
-                    ? "com falta"
-                    : filtro === "presentes"
-                      ? "presentes"
-                      : "alunos"
-                }`}
-          </span>
-          {(filtro !== "todos" || busca !== "") && (
+          {dia !== diaCorrente && (
             <button
               type="button"
-              className="text-primary font-medium hover:underline"
-              onClick={() => {
-                setFiltro("todos");
-                setBusca("");
-              }}
+              disabled={travado}
+              onClick={() => setDia(diaCorrente)}
+              className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
             >
-              Ver todos
+              Voltar para hoje
             </button>
+          )}
+          {sujo && (
+            <p className="text-muted-foreground text-xs">
+              Salve ou descarte as alterações para mudar a data ou a turma.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3" aria-label="Resumo da frequência">
+            <button
+              type="button"
+              aria-pressed={filtro === "faltas"}
+              onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
+              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
+            >
+              <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
+                {carregando ? "" : contagemFaltas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Faltas</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={filtro === "presentes"}
+              onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2 transition-colors active:scale-[0.98]"
+            >
+              <span className="numerais-tabulares text-primary text-2xl font-semibold">
+                {carregando ? "" : contagemPresencas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Presentes</span>
+            </button>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Todos começam presentes. Toque no aluno somente para marcar falta.
+          </p>
+          {aulasDoDia.length > 1 && (
+            <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+              <span>Aulas do dia:</span>
+              {aulasDoDia.map((aula) => (
+                <span
+                  key={aula.id}
+                  className="bg-secondary text-secondary-foreground numerais-tabulares rounded-md px-1.5 py-0.5 font-medium"
+                >
+                  {aula.ordem}ª {aula.inicio}
+                </span>
+              ))}
+            </div>
+          )}
+          {!carregando && contagemParciais > 0 && (
+            <p className="text-muted-foreground text-xs">
+              {contagemParciais === 1
+                ? "1 aluno saiu em parte das aulas."
+                : `${contagemParciais} alunos saíram em parte das aulas.`}
+            </p>
+          )}
+
+          {(erro || conflito) && (
+            <div
+              role="alert"
+              className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
+            >
+              <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+              <div className="flex-1">
+                <p>{erro}</p>
+                {conflito && (
+                  <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
+                    Recarregar versão salva
+                  </Button>
+                )}
+                {!conflito && !sujo && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setRecarregar((valor) => valor + 1)}
+                  >
+                    Tentar novamente
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
-        {carregando ? (
-          <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando frequência...
-          </div>
-        ) : ativosDaTurma.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-            <p className="font-medium">Nenhum aluno ativo nesta turma</p>
-            <p className="text-muted-foreground text-sm">
-              {usuario.papel === "ADMIN"
-                ? "Cadastre alunos na área de Gestão."
-                : "Peça ao administrador para cadastrar os alunos desta turma."}
-            </p>
-          </div>
-        ) : visiveis.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-            <p className="font-medium">
-              {filtro === "faltas" && busca === ""
-                ? "Nenhuma falta nesta frequência."
-                : "Nenhum aluno neste filtro."}
-            </p>
-            <button
-              type="button"
-              className="text-primary text-sm font-medium hover:underline"
-              onClick={() => {
-                setFiltro("todos");
-                setBusca("");
-              }}
-            >
-              Mostrar todos
-            </button>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {visiveis.map((aluno) => {
-              const faltando = ausencias.has(aluno.id);
-              const marcadas = ausencias.get(aluno.id)?.size ?? 0;
-              const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
-              return (
-                <li key={aluno.id}>
-                  <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
-                    <button
-                      type="button"
-                      aria-pressed={faltando}
-                      disabled={bloqueado}
-                      aria-label={
-                        faltando
-                          ? `${aluno.nome}: falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
-                          : `${aluno.nome}: presente. Toque para marcar falta.`
-                      }
-                      onClick={() => alternarFalta(aluno.id)}
-                      className={`faixa-toque flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
-                        faltando ? "" : "hover:bg-secondary/60"
-                      }`}
-                    >
-                      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                        {String(aluno.ordem).padStart(2, "0")}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`block truncate ${faltando ? "font-semibold" : "font-medium"}`}
-                        >
-                          {aluno.nome}
-                        </span>
-                        {parcial && (
-                          <span className="text-falta-texto block truncate text-xs">
-                            saiu em parte das aulas
-                          </span>
-                        )}
-                      </span>
-                      <motion.span
-                        key={faltando ? "F" : "P"}
-                        initial={MARCAS.escondido}
-                        animate={MARCAS.visivel}
-                        transition={{ type: "spring", stiffness: 500, damping: 28 }}
-                        className={
-                          faltando
-                            ? "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                            : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
-                        }
-                      >
-                        {faltando ? "F" : "P"}
-                      </motion.span>
-                    </button>
-                    {faltando && aulasDoDia.length > 1 && (
-                      <button
-                        type="button"
-                        aria-expanded={aulasAbertas === aluno.id}
-                        aria-label={`Aulas em que ${aluno.nome} faltou`}
-                        disabled={bloqueado}
-                        onClick={() =>
-                          setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
-                        }
-                        className="text-muted-foreground hover:bg-secondary border-border my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
-                      >
-                        Aulas
-                      </button>
-                    )}
-                  </div>
-                  {faltando && aulasAbertas === aluno.id && aulasDoDia.length > 1 && (
-                    <div className="bg-secondary/40 border-t px-4 py-2.5">
-                      <div className="flex flex-wrap gap-1.5">
-                        {aulasDoDia.map((aula) => {
-                          const marcada = ausencias.get(aluno.id)?.has(aula.id) ?? false;
-                          return (
-                            <button
-                              key={aula.id}
-                              type="button"
-                              aria-pressed={marcada}
-                              disabled={bloqueado}
-                              onClick={() => alternarAula(aluno.id, aula.id)}
-                              className={`numerais-tabulares h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] disabled:opacity-50 ${
-                                marcada
-                                  ? "border-falta bg-falta text-falta-foreground"
-                                  : "text-muted-foreground hover:border-foreground/30"
-                              }`}
-                            >
-                              {aula.ordem}ª {aula.inicio}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                        <button
-                          type="button"
-                          className="text-primary font-medium hover:underline"
-                          onClick={() =>
-                            definirAulas(
-                              aluno.id,
-                              aulasDoDia.map((aula) => aula.id),
-                            )
-                          }
-                        >
-                          Todas
-                        </button>
-                        <button
-                          type="button"
-                          className="text-primary font-medium hover:underline"
-                          onClick={() => definirAulas(aluno.id, [])}
-                        >
-                          Nenhuma
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        Toque de novo em um aluno marcado para voltar a presente. Use Aulas para registrar a saída
-        no meio da aula.
-      </p>
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="bg-card overflow-hidden rounded-lg border">
+            <BarraBusca
+              id="busca-aluno"
+              valor={busca}
+              onValor={setBusca}
+              placeholder="Buscar aluno"
+              className="rounded-none border-0 border-b px-3 py-1.5"
+            />
 
-      <div
-        aria-label="Barra de salvamento"
-        className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div aria-live="polite" className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{tituloEstado}</p>
-            <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {sujo && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="h-11 rounded-lg"
-                    disabled={salvando}
-                  >
-                    <RotateCcw size={16} />
-                    Descartar
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      As marcações não salvas serão descartadas e a última versão salva será
-                      recarregada.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
-                    <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            <Button
-              size="lg"
-              className="h-11 rounded-lg px-6"
-              onClick={salvar}
-              disabled={!podeSalvar}
-            >
-              {salvando ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : atualizadoEm && !sujo ? (
-                <CloudCheck size={16} />
-              ) : (
-                <Save size={16} />
+            <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
+              <span className="numerais-tabulares">
+                {carregando
+                  ? ""
+                  : `${visiveis.length} ${
+                      filtro === "faltas"
+                        ? "com falta"
+                        : filtro === "presentes"
+                          ? "presentes"
+                          : "alunos"
+                    }`}
+              </span>
+              {(filtro !== "todos" || busca !== "") && (
+                <button
+                  type="button"
+                  className="text-primary font-medium hover:underline"
+                  onClick={() => {
+                    setFiltro("todos");
+                    setBusca("");
+                  }}
+                >
+                  Ver todos
+                </button>
               )}
-              {salvando ? "Salvando..." : "Salvar"}
-            </Button>
+            </div>
+
+            {carregando ? (
+              <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
+                <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                Carregando frequência...
+              </div>
+            ) : ativosDaTurma.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="font-medium">Nenhum aluno ativo nesta turma</p>
+                <p className="text-muted-foreground text-sm">
+                  {usuario.papel === "ADMIN"
+                    ? "Cadastre alunos na área de Gestão."
+                    : "Peça ao administrador para cadastrar os alunos desta turma."}
+                </p>
+              </div>
+            ) : visiveis.length === 0 ? (
+              <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+                <p className="font-medium">
+                  {filtro === "faltas" && busca === ""
+                    ? "Nenhuma falta nesta frequência."
+                    : "Nenhum aluno neste filtro."}
+                </p>
+                <button
+                  type="button"
+                  className="text-primary text-sm font-medium hover:underline"
+                  onClick={() => {
+                    setFiltro("todos");
+                    setBusca("");
+                  }}
+                >
+                  Mostrar todos
+                </button>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {visiveis.map((aluno) => {
+                  const faltando = ausencias.has(aluno.id);
+                  const marcadas = ausencias.get(aluno.id)?.size ?? 0;
+                  const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
+                  return (
+                    <li key={aluno.id}>
+                      <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
+                        <button
+                          type="button"
+                          aria-pressed={faltando}
+                          disabled={bloqueado}
+                          aria-label={
+                            faltando
+                              ? `${aluno.nome}: falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                              : `${aluno.nome}: presente. Toque para marcar falta.`
+                          }
+                          onClick={() => alternarFalta(aluno.id)}
+                          className={`faixa-toque flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
+                            faltando ? "" : "hover:bg-secondary/60"
+                          }`}
+                        >
+                          <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+                            {String(aluno.ordem).padStart(2, "0")}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span
+                              className={`block truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                            >
+                              {aluno.nome}
+                            </span>
+                            {parcial && (
+                              <span className="text-falta-texto block truncate text-xs">
+                                saiu em parte das aulas
+                              </span>
+                            )}
+                          </span>
+                          <motion.span
+                            key={faltando ? "F" : "P"}
+                            initial={MARCAS.escondido}
+                            animate={MARCAS.visivel}
+                            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                            className={
+                              faltando
+                                ? "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
+                            }
+                          >
+                            {faltando ? "F" : "P"}
+                          </motion.span>
+                        </button>
+                        {faltando && aulasDoDia.length > 1 && (
+                          <button
+                            type="button"
+                            aria-expanded={aulasAbertas === aluno.id}
+                            aria-label={`Aulas em que ${aluno.nome} faltou`}
+                            disabled={bloqueado}
+                            onClick={() =>
+                              setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
+                            }
+                            className="text-muted-foreground hover:bg-secondary border-border my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                          >
+                            Aulas
+                          </button>
+                        )}
+                      </div>
+                      {faltando && aulasAbertas === aluno.id && aulasDoDia.length > 1 && (
+                        <div className="bg-secondary/40 border-t px-4 py-2.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {aulasDoDia.map((aula) => {
+                              const marcada = ausencias.get(aluno.id)?.has(aula.id) ?? false;
+                              return (
+                                <button
+                                  key={aula.id}
+                                  type="button"
+                                  aria-pressed={marcada}
+                                  disabled={bloqueado}
+                                  onClick={() => alternarAula(aluno.id, aula.id)}
+                                  className={`numerais-tabulares h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] disabled:opacity-50 ${
+                                    marcada
+                                      ? "border-falta bg-falta text-falta-foreground"
+                                      : "text-muted-foreground hover:border-foreground/30"
+                                  }`}
+                                >
+                                  {aula.ordem}ª {aula.inicio}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                            <button
+                              type="button"
+                              className="text-primary font-medium hover:underline"
+                              onClick={() =>
+                                definirAulas(
+                                  aluno.id,
+                                  aulasDoDia.map((aula) => aula.id),
+                                )
+                              }
+                            >
+                              Todas
+                            </button>
+                            <button
+                              type="button"
+                              className="text-primary font-medium hover:underline"
+                              onClick={() => definirAulas(aluno.id, [])}
+                            >
+                              Nenhuma
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Toque de novo em um aluno marcado para voltar a presente. Use Aulas para registrar a
+            saída no meio da aula.
+          </p>
+
+          <div
+            aria-label="Barra de salvamento"
+            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 xl:mx-0"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div aria-live="polite" className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{tituloEstado}</p>
+                <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {sujo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="h-11 rounded-lg"
+                        disabled={salvando}
+                      >
+                        <RotateCcw size={16} />
+                        Descartar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          As marcações não salvas serão descartadas e a última versão salva será
+                          recarregada.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
+                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  size="lg"
+                  className="h-11 rounded-lg px-6"
+                  onClick={salvar}
+                  disabled={!podeSalvar}
+                >
+                  {salvando ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : atualizadoEm && !sujo ? (
+                    <CloudCheck size={16} />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {salvando ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
