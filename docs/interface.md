@@ -13,7 +13,7 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 - **Controles**: seletor de período acessível com teclado (setas, Home, End, PageUp e PageDown), filtro para listas longas e botão de exibir/ocultar em todo campo de senha; formulários em modal centralizado no celular e no desktop, e o seletor de período sempre em popover ancorado ao gatilho.
 - **Entrada**: campos com largura confortável no celular, opção "Manter conectado neste dispositivo" (marcada por padrão) e e-mail lembrado no dispositivo para a próxima visita; a senha fica com o gerenciador do navegador.
 - **Alunos** (coordenação): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
-- **Gestão** (administração): abas curtas de Séries, Turmas, Alunos, Equipe e Configurações, com deslize curto do conteúdo no desktop, arrasto do dedo no celular, formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas. Configurações liga e desliga os recursos (chamada por aula e saída antecipada) e reúne a cópia de segurança em JSON, com o resultado da importação.
+- **Gestão** (administração): abas curtas de Séries, Turmas, Alunos, Equipe e Configurações, com deslize curto do conteúdo no desktop, arrasto do dedo no celular, formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas. Configurações liga e desliga os recursos (chamada por aula e saída antecipada), edita o catálogo de justificativas em ordem alfabética (adicionar, renomear, ativar, desativar e excluir sem uso) e reúne a cópia de segurança em JSON, com o resultado da importação.
 
 ## Fluxo de um toque
 
@@ -56,7 +56,7 @@ Animações discretas, todas com propósito de confirmar estado:
 - Troca de visão por **deslize horizontal** com o dedo no celular, com encaixe por painel; a visão ativa e o indicador acompanham o gesto, e a rolagem programática por toque vai direto ao destino sem passar pelas visões do meio. No desktop a troca é instantânea. Cada visão tem rolagem vertical própria e estado preservado; os painéis vizinhos são pré-montados e os distantes saem da pintura até chegarem perto.
 - A única animação de subida é a da tela de entrada; listas entram apenas com opacidade.
 - Indicador da navegação (inferior no celular e lateral no desktop) desliza para a aba ativa com mola curta.
-- Abas da Gestão: no celular acompanham o arrasto do paginador; no desktop um deslize curto no conteúdo confirma a troca, sem percorrer a largura do painel.
+- Abas da Gestão e dos Relatórios: no celular acompanham o arrasto do paginador; no desktop a troca é instantânea com um deslize curto de 0,15 s no conteúdo, sem percorrer a largura do painel.
 - Marca P/F/FJ da chamada troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
 - Diálogos seguem as animações padrão do Radix; a barra de salvamento não se move.
 

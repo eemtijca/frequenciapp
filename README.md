@@ -10,8 +10,8 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - **Saídas antecipadas**: registro separado da chamada, com momento (aulas, intervalos e almoço), justificativa, observação e responsável pela liberação escolhido na equipe ativa. As saídas do dia por turma e o relatório semanal por aluno completam a área.
 - **Painel do dia**: gráficos de infrequência por série e por turma, total de faltas (F + FJ), taxa de infrequência, cobertura das chamadas e turmas pendentes.
 - **Relatórios**: histórico por mês com filtro de série, grade por turma de origem nos modos dia, semana de aula, período e mês, com a coluna acumulada, e relatório por aluno com faltas, justificadas e saídas.
-- **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe, mais as configurações de recursos e a cópia de segurança em JSON.
-- **Configurações de recursos**: a chamada por aula (chips de aulas e marca S) fica disponível para quando for usada e desligada por padrão; a área de saídas antecipadas pode ser ocultada sem perder registros.
+- **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe, mais as configurações de recursos, o catálogo de justificativas e a cópia de segurança em JSON.
+- **Configurações de recursos**: a chamada por aula (chips de aulas e marca S) fica disponível para quando for usada e desligada por padrão; a área de saídas antecipadas pode ser ocultada sem perder registros; o catálogo de justificativas é editável, em ordem alfabética, com código fixo e situação.
 - **Proteção contra conflitos**: uma chamada por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.

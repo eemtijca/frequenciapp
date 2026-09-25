@@ -75,6 +75,7 @@ src/
       frequencias/          consulta por dia, período ou mês, salvamento e resumo acumulado
       saidas/               registro, consulta e remoção de saídas antecipadas
       configuracoes/        leitura e atualização dos recursos da escola
+      justificativas/       catálogo de justificativas: leitura e gestão
       backup/               exportação e importação da cópia JSON
       saude/                verificação de saúde
     page.tsx                página única: sessão, pré-busca e shell
@@ -104,6 +105,7 @@ src/
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas
     configuracoes.ts        ler e atualizar os recursos da escola
+    justificativas.ts       ler e gerenciar o catálogo de justificativas
     backup.ts               exportar e importar a cópia JSON
     alunos.ts               listar e gerenciar alunos
     series.ts               listar e gerenciar séries
@@ -148,3 +150,4 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-011: lembrar o login no dispositivo](adr/011-lembrar-login.md)
 - [ADR-012: chamada diária com faltas justificadas, saídas antecipadas e recursos opcionais](adr/012-chamada-diaria-com-saidas.md)
 - [ADR-013: grade por período e cópia de segurança em JSON](adr/013-grade-por-periodo-e-copia-json.md)
+- [ADR-014: catálogo de justificativas configurável](adr/014-justificativas-configuraveis.md)

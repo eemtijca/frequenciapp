@@ -16,6 +16,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `faltas`             | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.       |
 | `saidas_antecipadas` | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
 | `configuracoes`      | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
+| `justificativas`     | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
 | `auditoria`          | Trilha de ações administrativas: quem, o quê e quando.                                  |
 
 Restrições de integridade relevantes:
@@ -24,6 +25,7 @@ Restrições de integridade relevantes:
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
 - `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`.
 - `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
+- `justificativas` tem unicidade funcional em `lower(codigo)` e é o catálogo usado na validação da chamada e da saída.
 - `horarios` tem unicidade de (`turma_id`, `ordem`), exclusão em cascata com a turma e checks de formato de hora, intervalo e dias da semana.
 - `series`, `turmas` e `alunos` se protegem por `ON DELETE RESTRICT`.
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.

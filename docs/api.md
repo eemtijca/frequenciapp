@@ -2,7 +2,7 @@
 
 Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009).
 
-Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas de papel: rotas de cadastro, de contas, de configurações de recursos e de cópia de segurança exigem `ADMIN`; chamada, relatórios, saídas e consultas aceitam qualquer sessão ativa.
+Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas de papel: rotas de cadastro, de contas, de configurações de recursos, do catálogo de justificativas e de cópia de segurança exigem `ADMIN`; chamada, relatórios, saídas e consultas aceitam qualquer sessão ativa.
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
@@ -280,6 +280,32 @@ Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada? }`. Apenas administraçã
 
 - 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 403 sem papel de administração.
 
+## Justificativas
+
+### GET /api/justificativas
+
+- 200 `{"justificativas": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Qualquer sessão.
+
+### POST /api/justificativas
+
+Corpo: `{ "codigo": string, "rotulo": string }`. Apenas administração, com auditoria.
+
+- 201 `{"justificativa": Justificativa}`.
+- 400 código fora do formato (letras e números, começando por letra, até 10) ou rótulo fora de 2 a 60 caracteres.
+- 403 sem papel de administração; 409 código repetido sem diferenciar caixa.
+
+### PATCH /api/justificativas/{codigo}
+
+Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico guarda o código.
+
+- 200 `{"justificativa": Justificativa}`; 404 inexistente; 400 corpo inválido.
+
+### DELETE /api/justificativas/{codigo}
+
+- 200 `{"ok": true}`.
+- 409 quando há faltas ou saídas usando o código, com a orientação de desativar.
+- 404 inexistente.
+
 ## Responsáveis
 
 ### GET /api/responsaveis
@@ -290,7 +316,7 @@ Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada? }`. Apenas administraçã
 
 ### GET /api/backup
 
-- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "configuracoes" }`. Apenas administração, com auditoria.
+- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "justificativas", "configuracoes" }`. Apenas administração, com auditoria.
 
 ### POST /api/backup
 
