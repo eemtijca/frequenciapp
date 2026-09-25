@@ -1,6 +1,5 @@
-// Tradução de erros para português claro. Nenhum stack trace, código
-// interno ou termo técnico chega ao usuário: cada falha conhecida vira
-// uma mensagem curta e acionável, com status adequado.
+// Tradução de erros para português claro: cada falha conhecida vira mensagem
+// curta e acionável, sem termo técnico nem stack trace na resposta.
 import {
   PrismaClientInitializationError,
   PrismaClientKnownRequestError,

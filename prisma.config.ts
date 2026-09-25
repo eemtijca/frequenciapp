@@ -1,6 +1,5 @@
-// Configuração do Prisma 7 (CLI e migrações).
-// O runtime usa o adaptador pg em src/infra/banco.ts; o CLI prefere
-// a conexão de sessão para evitar usar o pooler de transações.
+// Configuração do Prisma 7 (CLI e migrações). O CLI prefere DIRECT_URL
+// (conexão de sessão) para evitar o pooler de transações.
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 

@@ -1,8 +1,5 @@
-// Sessões opacas: token aleatório em cookie HttpOnly, guardado no
-// banco apenas como hash SHA-256. O segredo AUTH_SECRET assina o
-// cookie para impedir forja do valor trafegado. A identidade inclui o
-// papel e a conta precisa seguir ativa: desativar um professor derruba
-// a sessão na próxima requisição.
+// Sessões opacas: token aleatório em cookie HttpOnly, guardado só como hash
+// SHA-256 e assinado por AUTH_SECRET. Conta desativada cai na hora.
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { banco } from "@/infra/banco";

@@ -1,6 +1,5 @@
-// Trilha de auditoria: registra quem fez o quê, sem dados pessoais de
-// alunos. Frequência sempre dentro da mesma transação da ação auditada:
-// ou a ação e o registro acontecem juntos, ou nada acontece.
+// Trilha de auditoria: registra quem fez o quê, sem dados de alunos, sempre
+// na mesma transação da ação auditada.
 import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 

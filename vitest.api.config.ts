@@ -1,6 +1,5 @@
-// Configuração do Vitest: contratos de API contra o aplicativo no ar.
-// Pré-requisito: aplicativo respondendo em APP_URL (padrão :3000) com
-// banco migrado e a conta de teste criada (ver tests/README.md).
+// Vitest dos contratos de API contra o aplicativo no ar (APP_URL), com banco
+// migrado e contas de teste (ver tests/README.md).
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";

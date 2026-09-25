@@ -1,10 +1,5 @@
-// Contratos da API contra o aplicativo no ar. Pré-requisitos:
-// aplicativo em APP_URL, banco migrado, admin criado pelo criar-admin e
-// professor de teste pelo criar-conta (padrões abaixo). A suíte cria e
-// limpa a própria massa em dias de teste isolados.
-//
-// Rodar com a connection string correta:
-//   DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm run test:api
+// Contratos da API contra o aplicativo no ar (APP_URL), com banco migrado e
+// contas de teste. A suíte cria e limpa a própria massa em dias isolados.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 

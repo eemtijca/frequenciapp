@@ -39,7 +39,6 @@ export function primeiroNome(nomeCompleto: string): string {
   return nomeCompleto.trim().split(/\s+/)[0] ?? nomeCompleto;
 }
 
-/** Rótulo amigável do papel. */
 export function rotuloDePapel(papel: Papel): string {
   return papel === "ADMIN" ? "Administrador" : "Professor(a)";
 }

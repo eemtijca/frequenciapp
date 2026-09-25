@@ -1,9 +1,7 @@
 "use client";
 
-// Shell da aplicação: cabeçalho, troca de visões e navegação inferior.
-// Uma única página com visões locais, como o fluxo original do app.
-// Administradores ganham a visão Gestão no lugar de Alunos (somente
-// leitura para professores, edição completa para administradores).
+// Shell da aplicação: cabeçalho, troca de visões e navegação inferior em uma
+// única página. Administradores ganham a visão Gestão no lugar de Alunos.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";

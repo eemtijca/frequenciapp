@@ -1,6 +1,5 @@
-// Casos de uso de turmas: gestão completa pelo administrador e
-// listagem pelo escopo de quem pede. Professores veem as turmas
-// atribuídas; administradores veem todas.
+// Turmas: gestão completa pelo administrador e listagem pelo escopo de quem
+// pede. Professor vê as atribuídas; administrador vê todas.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";

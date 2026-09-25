@@ -1,8 +1,7 @@
 "use client";
 
-// Originais: grade de frequência pelas turmas de origem. Linhas são
-// alunos da turma original, colunas são os dias do mês e as células
-// trazem P, F ou vazio quando a turma não teve frequência.
+// Originais: grade pela turma de origem, com alunos nas linhas, dias nas
+// colunas e células P, F ou vazias.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { LoaderCircle, RefreshCw, Table2 } from "lucide-react";

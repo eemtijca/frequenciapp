@@ -1,7 +1,5 @@
-// Casos de uso de usuários: gestão completa pelo administrador. Cria
-// professores e administradores, edita dados, redefine senha, ativa e
-// desativa, define as turmas atribuídas e exclui quando não há
-// histórico. Guardas: nunca remover o último administrador ativo.
+// Gestão de usuários pelo administrador: criar, editar, redefinir senha,
+// ativar, desativar, atribuir turmas e excluir. Nunca sem admin ativo.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { hashearSenha } from "@/infra/auth/hash";

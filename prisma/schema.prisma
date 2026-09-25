@@ -1,17 +1,5 @@
-// Esquema do banco. Fonte da verdade para o Prisma Client.
-//
-// Princípio de minimização (LGPD): a tabela faltas guarda apenas os
-// casos de ausência. Presença é o estado implícito de toda frequência
-// salva: quem não tem registro de falta naquele dia esteve presente.
-//
-// Uma frequência existe por (professor, dia, turma). A coluna revisao
-// implementa concorrência otimista entre aparelhos: salvamentos
-// concorrentes são rejeitados com 409 em vez de sobrescrita silenciosa.
-//
-// Objetos mantidos apenas no SQL das migrações, porque o Prisma não os
-// representa no schema:
-// - Índices únicos funcionais em lower(email) e lower(nome) de séries.
-// Não "corrija" essas divergências no schema: elas são intencionais.
+// Esquema do banco, fonte da verdade do Prisma Client. Faltas guardam só
+// ausências; índices funcionais e a revisão vivem nas migrações, de propósito.
 
 generator client {
   provider = "prisma-client"

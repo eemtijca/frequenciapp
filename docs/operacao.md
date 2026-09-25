@@ -12,6 +12,8 @@ ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' n
 
 O comando é idempotente: reexecutar atualiza a senha, o nome e devolve o papel de administrador. A partir dele, o dia a dia de contas acontece na área de Gestão do próprio aplicativo.
 
+Com Docker Compose, preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env` cria o administrador na partida. Esse bootstrap é não destrutivo: se a conta já existir, ele a mantém e não regrava a senha.
+
 ## Contas de professor
 
 Pela área de Gestão, recomendado, ou pelo comando idempotente de demonstração:

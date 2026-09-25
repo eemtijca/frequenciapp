@@ -1,8 +1,7 @@
 "use client";
 
-// Vista da frequência diária: todos presentes por padrão, toque no
-// aluno para marcar falta, toque de novo para voltar a presente.
-// Mantém rascunho em sessionStorage e protege conflitos por revisão.
+// Frequência diária: todos presentes por padrão; toque no aluno para marcar
+// falta e de novo para voltar. Rascunho local e proteção de conflito.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import {

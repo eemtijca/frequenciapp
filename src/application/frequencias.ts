@@ -1,8 +1,5 @@
-// Casos de uso da frequência diária: carregar, listar o mês e salvar
-// com proteção de duplicata e conflito por revisão. O salvamento roda
-// em transação Serializable: ou a frequência inteira (revisão e faltas)
-// é gravada, ou nada é; salvamentos concorrentes de outros aparelhos
-// são recusados sem sobrescrita e com repetição automática curta.
+// Frequência diária: carregar, listar o mês e salvar com proteção de duplicata
+// e conflito por revisão, em transação Serializable.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";

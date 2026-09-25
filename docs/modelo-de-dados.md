@@ -15,7 +15,7 @@ Entidades, invariantes e derivações. O modelo mantém uma frequência por dia 
 | criadoEm     | data     |                                                    |
 | atualizadoEm | data     |                                                    |
 
-Não há telefone, CPF, matrícula ou qualquer outro dado pessoal. O administrador inicial é criado pelo comando `criar-admin` com credenciais do ambiente. O restante das contas nasce na área de Gestão.
+Não há telefone, CPF, matrícula ou qualquer outro dado pessoal. O administrador inicial é criado pelo comando `criar-admin` com credenciais do ambiente ou, no Compose, pelo entrypoint na partida, sem alterar uma conta existente. O restante das contas nasce na área de Gestão.
 
 Invariantes de segurança da camada de aplicação: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta e desativar uma conta encerra as sessões dela na hora.
 

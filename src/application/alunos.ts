@@ -1,6 +1,5 @@
-// Casos de uso de alunos: gestão completa pelo administrador e
-// listagem pelo escopo de quem pede. A turma de origem é preservada
-// para a grade de consulta "Originais".
+// Alunos: gestão completa pelo administrador e listagem pelo escopo de quem
+// pede. A turma de origem é preservada para a grade Originais.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";

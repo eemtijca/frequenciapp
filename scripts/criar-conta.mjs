@@ -1,7 +1,5 @@
-// Cria ou atualiza a conta de um professor de forma idempotente.
-// Útil para contas de demonstração e testes; o gerenciamento do dia a
-// dia acontece na área de Gestão do administrador.
-// Uso: CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... npm run criar-conta
+// Cria ou atualiza a conta de um professor (idempotente). Uso:
+// CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... npm run criar-conta
 import { randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";

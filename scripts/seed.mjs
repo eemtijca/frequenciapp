@@ -1,8 +1,5 @@
-// Semente de desenvolvimento: séries, turmas, alunos sintéticos e
-// atribuições para a conta de professor existente. Nenhum dado real de
-// pessoa é usado, por conformidade com a LGPD (dados fictícios apenas
-// para desenvolvimento e demonstração).
-// Uso: SEED_ALUNOS=12 npm run seed  (após criar a conta com criar-conta)
+// Semente de desenvolvimento (séries, turmas e alunos sintéticos) para a
+// conta de professor existente. Sem dados reais, conforme a LGPD.
 import pg from "pg";
 import "dotenv/config";
 

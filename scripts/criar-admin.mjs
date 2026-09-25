@@ -1,13 +1,10 @@
-// Cria ou atualiza o administrador inicial (primeiro usuário, acesso
-// root) de forma idempotente. Credenciais vêm do .env:
-//   ADMIN_EMAIL=... ADMIN_SENHA=... ADMIN_NOME=...
-// Uso: npm run criar-admin
-// Com --somente-criar, respeita uma conta existente e não regrava a
-// senha (usado pelo entrypoint do Compose no bootstrap).
+// Cria ou atualiza o administrador inicial (idempotente). Com --somente-criar,
+// respeita uma conta existente e não regrava a senha (bootstrap do Compose).
 import { randomBytes, scrypt } from "node:crypto";
 import { promisify } from "node:util";
 import pg from "pg";
 import "dotenv/config";
+import { deveGravarAdmin } from "./decisao-admin.mjs";
 
 const scryptAssincrono = promisify(scrypt);
 const CUSTO = 16384;
@@ -66,7 +63,7 @@ try {
     }
   }
 
-  if (!jaExiste) {
+  if (deveGravarAdmin({ existe: jaExiste, somenteCriar })) {
     const senhaHash = await hashear(senha);
     const resultado = await cliente.query(
       `insert into usuarios (email, senha_hash, nome, papel, ativo, criado_em, atualizado_em)

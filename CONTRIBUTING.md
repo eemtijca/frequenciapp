@@ -98,6 +98,7 @@ Corrija as falhas antes de pedir nova revisão. Pull requests sem verificações
 ## Padrões de código
 
 - Código e comentários em português, curtos e diretos.
+- Artefatos gerados pelo Prisma (`prisma/migrations/*/migration.sql` e `migration_lock.toml`) mantêm os marcadores em inglês e não são editados à mão.
 - Domínio em português (`frequências`, `faltas`, `alunos`); infraestrutura em inglês quando for termo consagrado (`prisma`, `middleware`).
 - Camadas: `src/domain` não importa nada de fora; `src/application` orquestra domínio e infraestrutura; `src/infra` isola Prisma, autenticação e HTTP; `src/app` e `src/components` são apresentação.
 - TypeScript estrito, sem `any` e sem asserções não nulas; o ESLint reprova ambos.

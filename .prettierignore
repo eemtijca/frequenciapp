@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.devcontainer/devcontainer-lock.json
 out/
 build/
 generated/

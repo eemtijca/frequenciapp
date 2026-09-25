@@ -11,7 +11,7 @@ O aplicativo original era pessoal: cada professor dono do próprio roster, sem n
 ## Decisão
 
 - Dois papéis na tabela de usuários: `ADMIN` (acesso root de configuração) e `PROFESSOR`.
-- O administrador inicial é criado pelo comando `criar-admin` com credenciais do `.env`; o restante nasce na área de Gestão, sem cadastro público.
+- O administrador inicial é criado pelo comando `criar-admin` com credenciais do `.env` e, no Compose, pelo entrypoint na partida (`--somente-criar`, sem alterar conta existente); o restante nasce na área de Gestão, sem cadastro público.
 - Entidades escolares normalizadas: séries, turmas, alunos com turma e turma de origem, e tabela de atribuições (professor, turma).
 - Professores veem e chamam apenas as turmas atribuídas; administradores veem tudo.
 - Guardas de segurança: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta, nunca excluir conta com frequências registradas.

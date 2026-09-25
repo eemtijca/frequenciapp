@@ -5,7 +5,7 @@ Detalhamento das decisões de segurança. O resumo para reportar falhas está em
 ## Autenticação
 
 - Senhas com scrypt (N 16384, r 8, p 1, chave de 64 bytes, sal de 16 bytes por conta), comparação em tempo constante. Formato do hash versionado em texto, o que permite trocar parâmetros no futuro sem quebrar contas existentes.
-- O administrador inicial é criado pelo comando `npm run criar-admin` com credenciais do `.env` (idempotente); o restante das contas nasce na área de Gestão, sem cadastro público.
+- O administrador inicial é criado pelo comando `npm run criar-admin` com credenciais do `.env` (idempotente) ou, no Compose, pelo entrypoint na partida (modo `--somente-criar`, que preserva uma conta existente); o restante das contas nasce na área de Gestão, sem cadastro público.
 - Política de senha em toda criação e redefinição: mínimo de 8 caracteres com ao menos uma letra e um número, verificada também por regra pura testada em unidade.
 - Contas desativadas não entram; a sessão de uma conta desativada é encerrada na primeira requisição seguinte.
 - Tentativas de entrada limitadas a 10 por janela de 15 minutos, por origem e e-mail, em memória, com contador limpo no sucesso. Ambientes com múltiplas instâncias devem levar o limitador para um armazenamento compartilhado ou colocar o limite no proxy.

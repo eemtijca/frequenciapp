@@ -1,7 +1,5 @@
-// Guarda editorial do repositório: nenhum travessão (em-dash ou
-// meia-risca), reticências tipográficas, aspas curvas, setas ou
-// pluralização com parênteses em código, documentação ou
-// configuração. Convenção do projeto, verificada por teste.
+// Guarda editorial: reprova travessões, aspas curvas, setas e plural com
+// parênteses em código, documentação e configuração.
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

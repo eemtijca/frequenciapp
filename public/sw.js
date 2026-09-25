@@ -1,8 +1,5 @@
-// Service worker do FrequenciApp: casca offline mínima e respeitosa.
-// Regras:
-// - Dados da API nunca são cacheados (frequência é dado vivo).
-// - Navegação tenta a rede; sem rede, entrega a página offline.
-// - Arquivos estáticos (ícones, manifesto) usam cache com revalidação.
+// Service worker: casca offline mínima. A API nunca é cacheada; a navegação
+// tenta a rede e os estáticos usam cache com revalidação.
 const VERSAO = "frequenciapp-3";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [

@@ -76,6 +76,16 @@ jobs:
           docker compose -f compose.yml -f compose.ci.yml logs app
           exit 1
 
+      - name: Validar scripts administrativos no contêiner
+        run: |
+          # Exercita o dotenv e o driver pg dentro da imagem, além do
+          # módulo de decisão do bootstrap (--somente-criar).
+          docker compose -f compose.yml -f compose.ci.yml exec -T \
+            -e ADMIN_EMAIL=bootstrap@escola.exemplo \
+            -e ADMIN_SENHA=BootstrapFrequencia2026 \
+            -e ADMIN_NOME=Bootstrap \
+            app node scripts/criar-admin.mjs --somente-criar
+
       - name: Criar administrador de teste
         env:
           ADMIN_EMAIL: direcao@escola.exemplo

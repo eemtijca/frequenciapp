@@ -1,7 +1,5 @@
-// Transações ACID com repetição automática. Toda escrita que toca mais
-// de uma linha passa por aqui: o PostgreSQL garante atomicidade e
-// isolamento, e conflitos de serialização (P2034) são refeitos com
-// pequena pausa em vez de falhar na cara do usuário.
+// Transações ACID com repetição automática: conflitos de serialização (P2034)
+// são refeitos com pequena pausa antes de devolver o erro.
 import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ehConflitoDeSerializacao } from "@/infra/erros";

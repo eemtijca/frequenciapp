@@ -1,8 +1,5 @@
-# FrequenciApp. Sobreposição do Compose somente para o CI (test-db.yml).
-# Reaproveita compose.yml e adiciona apenas o necessário aos testes:
-# segredos fictícios e a imagem já construída pelo workflow.
-# ATENÇÃO: se compose.yml ganhar variável obrigatória nova, ela precisa
-# ser espelhada aqui.
+# Sobreposição do Compose só para o CI: segredos fictícios e a imagem
+# frequenciapp:ci construída pelo workflow. Espelhe aqui variáveis novas.
 services:
   app:
     # Imagem construída pelo passo de build do workflow (com cache).

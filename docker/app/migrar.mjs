@@ -1,9 +1,5 @@
-// Migrador idempotente das migrações Prisma. Aplica cada
-// prisma/migrations/*/migration.sql uma vez, na ordem, registrando em
-// _prisma_migrations no mesmo formato do Prisma 7, de modo que um
-// `prisma migrate deploy` posterior reconheça o estado e não reaplique
-// nada. Erros de conexão encerram com código 2 para o entrypoint
-// tentar de novo.
+// Migrador idempotente das migrações Prisma: aplica cada migration.sql uma vez
+// e registra em _prisma_migrations. Erro de conexão encerra com código 2.
 import { readdir, readFile } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";

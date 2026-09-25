@@ -1,7 +1,5 @@
-# FrequenciApp. Orquestração local: aplicação + PostgreSQL.
-# Sobe tudo com: docker compose up --build
-# A aplicação usa o pool local e aplica as migrações pela conexão direta.
-# As URLs internas usam o host `db`; o `.env` do host usa `localhost`.
+# Orquestração local: aplicação + PostgreSQL. Sobe com
+# `docker compose up --build`; as URLs internas usam o host `db`.
 
 name: frequenciapp
 

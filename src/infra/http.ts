@@ -1,6 +1,5 @@
-// Auxiliares comuns das rotas de API: resposta JSON sem cache, guarda
-// de sessão e de papel, verificação de origem contra CSRF, leitura
-// limitada do corpo e executor que traduz qualquer exceção.
+// Auxiliares das rotas: resposta JSON sem cache, guardas de sessão e papel,
+// defesa CSRF, leitura limitada do corpo e tradução de qualquer exceção.
 import { ambiente } from "@/infra/ambiente";
 import { identidadeAtual } from "@/application/sessao";
 import { ErroHttp, traduzirErro } from "@/infra/erros";
