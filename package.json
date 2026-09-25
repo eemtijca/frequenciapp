@@ -18,6 +18,12 @@
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.api.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:api": "vitest run --config vitest.api.config.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:install": "playwright install --with-deps chromium webkit",
+    "test:pwa": "playwright test --config=playwright.pwa.config.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -58,6 +64,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24",
     "@types/pg": "^8.15.4",

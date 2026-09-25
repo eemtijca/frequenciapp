@@ -24,6 +24,11 @@ server.log
 # Cobertura de testes
 /coverage
 
+# Playwright
+/tests/e2e/.auth/
+/playwright-report/
+/test-results/
+
 # Sistema
 .DS_Store
 *.pem
