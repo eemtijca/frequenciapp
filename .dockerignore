@@ -16,5 +16,6 @@ coverage
 dev.log
 server.log
 worklog.md
-docker-compose*.yml
+compose*.yml
 bun.lock
+generated/

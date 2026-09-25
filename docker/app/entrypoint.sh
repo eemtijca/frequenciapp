@@ -32,5 +32,14 @@ while [ "$i" -le "$maximo_tentativas" ]; do
   i=$((i + 1))
 done
 
+# Bootstrap do administrador inicial quando as variáveis estiverem
+# definidas no .env. O modo --somente-criar não altera uma conta
+# existente, então reiniciar o contêiner não regrava a senha.
+if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_SENHA:-}" ]; then
+  echo "[entrada] Verificando o administrador inicial..."
+  node ./scripts/criar-admin.mjs --somente-criar \
+    || echo "[entrada] Aviso: falha ao configurar o admin."
+fi
+
 echo "[entrada] Iniciando o servidor..."
 exec node server.js

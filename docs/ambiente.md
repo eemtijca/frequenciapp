@@ -31,15 +31,15 @@ A conexão do runtime também pode usar uma conexão direta ou o pooler de sess�
 
 ## Variáveis de script
 
-| Variável    | Comando que usa | Descrição                                               |
-| ----------- | --------------- | ------------------------------------------------------- |
-| ADMIN_EMAIL | `criar-admin`   | E-mail do administrador inicial (primeiro usuário).     |
-| ADMIN_SENHA | `criar-admin`   | Senha do admin, mínimo 8 caracteres com letra e número. |
-| ADMIN_NOME  | `criar-admin`   | Nome de tratamento do administrador.                    |
-| CONTA_EMAIL | `criar-conta`   | E-mail da conta de professor (demonstração e testes).   |
-| CONTA_SENHA | `criar-conta`   | Senha inicial, mínimo 8 caracteres com letra e número.  |
-| CONTA_NOME  | `criar-conta`   | Nome de tratamento exibido no aplicativo.               |
-| SEED_ALUNOS | `seed`          | Alunos sintéticos por turma na semente.                 |
+| Variável    | Comando que usa          | Descrição                                               |
+| ----------- | ------------------------ | ------------------------------------------------------- |
+| ADMIN_EMAIL | `criar-admin`, bootstrap | E-mail do administrador inicial (primeiro usuário).     |
+| ADMIN_SENHA | `criar-admin`, bootstrap | Senha do admin, mínimo 8 caracteres com letra e número. |
+| ADMIN_NOME  | `criar-admin`, bootstrap | Nome de tratamento do administrador.                    |
+| CONTA_EMAIL | `criar-conta`            | E-mail da conta de professor (demonstração e testes).   |
+| CONTA_SENHA | `criar-conta`            | Senha inicial, mínimo 8 caracteres com letra e número.  |
+| CONTA_NOME  | `criar-conta`            | Nome de tratamento exibido no aplicativo.               |
+| SEED_ALUNOS | `seed`                   | Alunos sintéticos por turma na semente.                 |
 
 ## Execução local sem Docker
 
@@ -66,17 +66,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações pela `DIRECT_URL` e inicia o servidor. Os detalhes de orquestração estão em [deploy.md](deploy.md).
-
-### GitHub Codespaces
-
-A imagem padrão do Codespaces pode bloquear a comunicação bridge entre os serviços `app` e `db`, mesmo com o PostgreSQL saudável. Use o override versionado:
-
-```bash
-docker compose -f compose.yml -f compose.local.yml up --build
-```
-
-O arquivo `compose.local.yml` mantém o banco no serviço `db`, mas faz o contêiner da aplicação alcançar a porta publicada no host por `host.docker.internal`. Ele é específico para esse ambiente; o comando normal continua sendo `docker compose up --build` fora do Codespaces. Os detalhes de diagnóstico estão em [deploy.md](deploy.md).
+O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações pela `DIRECT_URL` e inicia o servidor. As URLs internas usam o host `db`. Para criar o administrador inicial na partida, defina `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`; o bootstrap não altera uma conta que já exista. Os detalhes de orquestração estão em [deploy.md](deploy.md).
 
 ## Conexão do PostgreSQL
 
@@ -88,7 +78,7 @@ A aplicação aceita qualquer PostgreSQL padrão pela connection string:
 
 PostgreSQL 17 é o alvo de desenvolvimento e teste. Versões anteriores a 15 não têm suporte.
 
-A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do host usa `localhost`; o serviço Compose usa `db` por padrão. O override `compose.local.yml` troca apenas o host visto pelo serviço `app` para `host.docker.internal`, necessário em alguns Codespaces.
+A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do host usa `localhost`, para os comandos executados fora do Compose; o serviço `app` usa `db`, definido no `compose.yml`.
 
 ## Fuso horário
 

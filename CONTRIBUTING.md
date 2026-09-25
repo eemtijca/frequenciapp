@@ -24,11 +24,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-No GitHub Codespaces, use o override local quando a bridge entre `app` e `db` estiver bloqueada:
-
-```bash
-docker compose -f compose.yml -f compose.local.yml up --build
-```
+Para criar o administrador inicial na partida, defina `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`. O bootstrap não altera uma conta que já exista.
 
 Comandos úteis na raiz:
 

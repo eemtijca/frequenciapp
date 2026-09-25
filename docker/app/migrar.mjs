@@ -30,7 +30,7 @@ function orientacaoDoErro(codigo) {
       return "A conexão expirou. Verifique a rede do contêiner, VPN, firewall e o host do banco.";
     case "ENOTFOUND":
     case "EAI_AGAIN":
-      return "Não foi possível resolver o hostname do banco. Confira DB_HOST, DIRECT_URL e o DNS.";
+      return "Não foi possível resolver o hostname do banco. Confira DIRECT_URL, DATABASE_URL e o DNS.";
     case "ECONNREFUSED":
       return "O banco recusou a conexão. Verifique se o PostgreSQL está ouvindo na porta configurada.";
     case "28P01":

@@ -23,17 +23,7 @@ postgresql://frequencia:frequencia@db:5432/frequencia
 
 O `.env` do host usa `localhost`, para permitir executar `npm run criar-admin`, `npm run criar-conta`, `npm run seed` e a suíte de API contra o banco publicado.
 
-### GitHub Codespaces
-
-A imagem padrão do Codespaces pode não permitir o tráfego bridge entre `app` e `db`, embora o healthcheck do PostgreSQL esteja saudável. Use o override local:
-
-```bash
-docker compose -f compose.yml -f compose.local.yml up --build
-```
-
-O override define `host.docker.internal:host-gateway` e faz a aplicação usar a porta PostgreSQL publicada no host do Codespaces. Ele não altera o serviço `db`, não habilita autenticação por senha vazia e não deve ser usado como configuração de produção.
-
-Criação do administrador inicial e da semente dentro do contêiner:
+Ao preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`, o entrypoint cria o administrador inicial na partida. O modo de bootstrap é não destrutivo: se a conta já existir, ele não regrava a senha nem altera o nome. Para criar ou atualizar a senha explicitamente, use o comando abaixo (que sempre aplica os valores):
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' \

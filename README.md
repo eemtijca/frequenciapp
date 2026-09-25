@@ -27,13 +27,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-No GitHub Codespaces, a rede bridge pode exigir o override local:
-
-```bash
-docker compose -f compose.yml -f compose.local.yml up --build
-```
-
-O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o aplicativo em http://localhost:3000. Em seguida, crie o administrador inicial (primeiro usuário, acesso root de configuração):
+O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o aplicativo em http://localhost:3000. O administrador inicial (primeiro usuário, acesso root de configuração) pode ser criado na partida: basta preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`. O bootstrap não altera uma conta que já exista, então reiniciar o contêiner não regrava a senha. Para criar ou trocar a senha depois, rode o comando que sempre aplica os valores:
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direção' \

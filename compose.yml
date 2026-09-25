@@ -1,7 +1,7 @@
 # FrequenciApp. Orquestração local: aplicação + PostgreSQL.
 # Sobe tudo com: docker compose up --build
 # A aplicação usa o pool local e aplica as migrações pela conexão direta.
-# DB_HOST permite trocar o hostname do PostgreSQL; o padrão é `db`.
+# As URLs internas usam o host `db`; o `.env` do host usa `localhost`.
 
 name: frequenciapp
 
@@ -33,10 +33,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://frequencia:frequencia@${DB_HOST:-db}:5432/frequencia
-      DIRECT_URL: postgresql://frequencia:frequencia@${DB_HOST:-db}:5432/frequencia
+      DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+      DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
+      # Bootstrap opcional do administrador inicial. Quando preenchidas no
+      # .env, o entrypoint cria o admin apenas se ele ainda não existir.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_SENHA: ${ADMIN_SENHA:-}
+      ADMIN_NOME: ${ADMIN_NOME:-}
     command: ["./docker/app/entrypoint.sh"]
 
 volumes:
