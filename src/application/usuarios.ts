@@ -1,6 +1,7 @@
 // Gestão de usuários pelo administrador: criar, editar, redefinir senha,
 // ativar, desativar, atribuir turmas e excluir. Nunca sem admin ativo.
 import { z } from "zod";
+import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { hashearSenha } from "@/infra/auth/hash";
 import { comTransacao } from "@/infra/transacoes";
@@ -81,9 +82,11 @@ export async function listarUsuarios(): Promise<UsuarioComTurmas[]> {
   return linhas.map(paraUsuario);
 }
 
-/** Conta administradores ativos (para guarda do último root). */
-async function totalDeAdminsAtivos(): Promise<number> {
-  return banco().usuario.count({ where: { papel: "ADMIN", ativo: true } });
+/** Conta administradores ativos dentro do cliente informado (transação ou base). */
+async function totalDeAdminsAtivos(
+  cliente: Prisma.TransactionClient | ReturnType<typeof banco> = banco(),
+): Promise<number> {
+  return cliente.usuario.count({ where: { papel: "ADMIN", ativo: true } });
 }
 
 /** Cria um usuário com senha e, quando professor, as turmas atribuídas. */
@@ -157,21 +160,6 @@ export async function atualizarUsuario(
   const alvo = await banco().usuario.findUnique({ where: { id }, ...COM_TURMAS });
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
 
-  if (alvo.papel === "ADMIN") {
-    const rebaixa = dados.data.papel !== undefined && dados.data.papel !== "ADMIN";
-    const desativa = dados.data.ativo === false;
-    if (rebaixa || desativa) {
-      const admins = await totalDeAdminsAtivos();
-      const semAlvo = admins - (alvo.ativo ? 1 : 0);
-      if (semAlvo < 1) {
-        throw new ErroHttp(
-          "A escola precisa de ao menos um administrador ativo. Crie outro administrador antes.",
-          409,
-        );
-      }
-    }
-  }
-
   if (dados.data.email && dados.data.email !== alvo.email) {
     const duplicado = await banco().usuario.findFirst({ where: { email: dados.data.email } });
     if (duplicado) throw new ErroHttp("Já existe uma conta com este e-mail.", 409);
@@ -194,6 +182,22 @@ export async function atualizarUsuario(
   const senhaHash = dados.data.senha ? await hashearSenha(dados.data.senha) : undefined;
 
   const linha = await comTransacao(async (tx) => {
+    // Guarda do último administrador dentro da transação: leitura e escrita
+    // juntas impedem que duas alterações simultâneas deixem a escola sem root.
+    if (alvo.papel === "ADMIN") {
+      const rebaixa = dados.data.papel !== undefined && dados.data.papel !== "ADMIN";
+      const desativa = dados.data.ativo === false;
+      if (rebaixa || desativa) {
+        const admins = await totalDeAdminsAtivos(tx);
+        const semAlvo = admins - (alvo.ativo ? 1 : 0);
+        if (semAlvo < 1) {
+          throw new ErroHttp(
+            "A escola precisa de ao menos um administrador ativo. Crie outro administrador antes.",
+            409,
+          );
+        }
+      }
+    }
     await tx.usuario.update({
       where: { id },
       data: {
@@ -247,27 +251,31 @@ export async function removerUsuario(admin: Identidade, id: string): Promise<voi
   if (id === admin.id) {
     throw new ErroHttp("Você não pode excluir a sua própria conta. Use outro administrador.", 400);
   }
-  const alvo = await banco().usuario.findUnique({
-    where: { id },
-    include: { _count: { select: { frequencias: true } } },
-  });
+  const alvo = await banco().usuario.findUnique({ where: { id } });
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
-  if (alvo._count.frequencias > 0) {
-    throw new ErroHttp(
-      "Este professor tem frequências registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
-      409,
-    );
-  }
-  if (alvo.papel === "ADMIN" && alvo.ativo) {
-    const admins = await totalDeAdminsAtivos();
-    if (admins <= 1) {
+  await comTransacao(async (tx) => {
+    // Contagens e exclusão na mesma transação: não há janela para outra pessoa
+    // excluir o último administrador ou registrar frequência no intervalo.
+    const alvoAtual = await tx.usuario.findUnique({
+      where: { id },
+      include: { _count: { select: { frequencias: true } } },
+    });
+    if (!alvoAtual) throw new ErroHttp("Usuário não encontrado.", 404);
+    if (alvoAtual._count.frequencias > 0) {
       throw new ErroHttp(
-        "A escola precisa de ao menos um administrador ativo. Crie outro administrador antes.",
+        "Este professor tem frequências registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
         409,
       );
     }
-  }
-  await comTransacao(async (tx) => {
+    if (alvoAtual.papel === "ADMIN" && alvoAtual.ativo) {
+      const admins = await totalDeAdminsAtivos(tx);
+      if (admins <= 1) {
+        throw new ErroHttp(
+          "A escola precisa de ao menos um administrador ativo. Crie outro administrador antes.",
+          409,
+        );
+      }
+    }
     await tx.sessao.deleteMany({ where: { usuarioId: id } });
     await tx.atribuicao.deleteMany({ where: { professorId: id } });
     await tx.usuario.delete({ where: { id } });
