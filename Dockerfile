@@ -59,4 +59,6 @@ RUN chmod +x ./docker/app/entrypoint.sh
 USER node
 EXPOSE 3000
 ENV PORT=3000
+# Escuta em todas as interfaces: o healthcheck e o proxy interno usam 127.0.0.1.
+ENV HOSTNAME=0.0.0.0
 CMD ["./docker/app/entrypoint.sh"]
