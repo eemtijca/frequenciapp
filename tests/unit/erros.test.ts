@@ -37,7 +37,7 @@ describe("traduzirErro", () => {
     expect(resultado.mensagem).toContain("turma");
   });
 
-  it("traduz duplicidade da frequencia do dia", () => {
+  it("traduz duplicidade da frequência do dia", () => {
     const resultado = traduzirErro(
       erroConhecido("P2002", { target: ["frequencias_professor_id_turma_id_dia_key"] }),
     );

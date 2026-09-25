@@ -595,7 +595,7 @@ describe("remoções com histórico", () => {
     expect(dados.error).toContain("turmas");
   });
 
-  it("professor com frequencias não é excluído", async () => {
+  it("professor com frequências não é excluído", async () => {
     const resposta = await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
       method: "DELETE",
     });
