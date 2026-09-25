@@ -53,13 +53,20 @@ try {
   let jaExiste = false;
   if (somenteCriar) {
     const existente = await cliente.query(
-      "select email, nome from usuarios where lower(email) = $1",
+      "select email, nome, papel, ativo from usuarios where lower(email) = $1",
       [email],
     );
     jaExiste = existente.rowCount > 0;
     if (jaExiste) {
       const conta = existente.rows[0];
-      console.log(`Administrador já existe, mantido: ${conta.email} (${conta.nome})`);
+      if (conta.papel === "ADMIN" && conta.ativo) {
+        console.log(`Administrador já existe, mantido: ${conta.email} (${conta.nome})`);
+      } else {
+        console.warn(
+          `Aviso: ${conta.email} existe como ${conta.papel} ${conta.ativo ? "ativo" : "inativo"} e não foi alterado. ` +
+            "Rode sem --somente-criar ou crie outro administrador para a escola não ficar sem root.",
+        );
+      }
     }
   }
 
