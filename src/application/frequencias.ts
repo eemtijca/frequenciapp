@@ -422,7 +422,8 @@ export async function salvarFrequencia(
         frequencia: {
           ...paraFrequencia(linha),
           faltas: ausencias.map((ausencia) => {
-            if (!ausencia.justificativa) return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };
+            if (!ausencia.justificativa)
+              return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };
             return {
               alunoId: ausencia.alunoId,
               horarios: ausencia.horarios,
