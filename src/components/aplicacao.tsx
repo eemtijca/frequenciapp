@@ -217,6 +217,7 @@ export default function Aplicacao({
                   alvo={alvo}
                   onFrequenciasMudaram={recarregarFrequencias}
                   onPendencia={setPendencias}
+                  onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
                 />
               )}
               {visao === "historico" && (

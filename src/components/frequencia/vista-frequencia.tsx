@@ -11,8 +11,10 @@ import {
   CloudCheck,
   LoaderCircle,
   RotateCcw,
-  Search,
   Save,
+  School,
+  Search,
+  Settings2,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -46,6 +48,7 @@ interface Props {
   alvo: { dia: string; turmaId: string } | null;
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "frequencia"[]) => void;
+  onAbrirGestao?: () => void;
 }
 
 function diaSeguinte(dia: string, deslocamento: number): string {
@@ -75,6 +78,7 @@ export default function VistaFrequencia({
   alvo,
   onFrequenciasMudaram,
   onPendencia,
+  onAbrirGestao,
 }: Props) {
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
   const [dia, setDia] = useState(() => alvo?.dia ?? diaCorrente);
@@ -107,8 +111,14 @@ export default function VistaFrequencia({
   const chave = `${dia}|${turmaId}`;
 
   // Carrega a frequência salva do dia e turma, e recupera rascunho local.
+  // Sem turma não há o que carregar: o estado vazio assume o lugar.
   useEffect(() => {
-    if (!dia || !turmaId) return;
+    if (!dia || !turmaId) {
+      setCarregando(false);
+      setErro("");
+      setConflito(false);
+      return;
+    }
     let viva = true;
     setCarregando(true);
     setErro("");
@@ -315,6 +325,33 @@ export default function VistaFrequencia({
             ? `Às ${horaSalva} · ${contagemFaltas === 0 ? "todos presentes" : `${contagemFaltas} ${contagemFaltas === 1 ? "falta" : "faltas"}`}`
             : "Confira as faltas e toque em Salvar.";
 
+  // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
+  if (turmas.length === 0) {
+    return (
+      <section aria-label="Registrar frequência" className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Frequência diária</h1>
+          <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
+        </div>
+        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+          <School size={28} className="text-muted-foreground" aria-hidden="true" />
+          <p className="font-medium">Nenhuma turma cadastrada</p>
+          <p className="text-muted-foreground text-sm">
+            {usuario.papel === "ADMIN"
+              ? "Cadastre séries, turmas e alunos na área de Gestão para começar."
+              : "Peça à administração para cadastrar as turmas e os alunos da escola."}
+          </p>
+          {usuario.papel === "ADMIN" && onAbrirGestao && (
+            <Button variant="outline" className="mt-2" onClick={onAbrirGestao}>
+              <Settings2 size={16} />
+              Ir para a Gestão
+            </Button>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section aria-label="Registrar frequência" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
@@ -505,15 +542,6 @@ export default function VistaFrequencia({
           <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
             <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
             Carregando frequência...
-          </div>
-        ) : turmas.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
-            <p className="font-medium">Nenhuma turma atribuída a você</p>
-            <p className="text-muted-foreground text-sm">
-              {usuario.papel === "ADMIN"
-                ? "Cadastre séries e turmas na área de Gestão para começar."
-                : "Peça ao administrador para atribuir suas turmas."}
-            </p>
           </div>
         ) : ativosDaTurma.length === 0 ? (
           <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
