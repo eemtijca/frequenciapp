@@ -215,7 +215,7 @@ export default function VistaGrade({
                   <tr className="border-b">
                     <th
                       scope="col"
-                      className="coluna-fixa bg-card text-muted-foreground min-w-36 px-3 py-2 text-left text-xs font-medium"
+                      className="coluna-fixa bg-card text-muted-foreground min-w-36 border-r px-3 py-2 text-left text-xs font-medium"
                     >
                       Aluno
                     </th>
@@ -223,7 +223,7 @@ export default function VistaGrade({
                       <th
                         key={dia}
                         scope="col"
-                        className={`numerais-tabulares w-8 px-1 py-2 text-center text-[11px] font-medium ${
+                        className={`numerais-tabulares w-8 border-l px-1 py-2 text-center text-[11px] font-medium ${
                           dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
                         }`}
                       >
@@ -233,14 +233,14 @@ export default function VistaGrade({
                     <th
                       scope="col"
                       title="Dias com falta"
-                      className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
+                      className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
                     >
                       F
                     </th>
                     <th
                       scope="col"
                       title="Dias com presença parcial"
-                      className="numerais-tabulares text-muted-foreground px-2 py-2 text-center text-[11px] font-medium"
+                      className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
                     >
                       S
                     </th>
@@ -251,7 +251,7 @@ export default function VistaGrade({
                     <tr key={linha.aluno.id} className="border-b last:border-b-0">
                       <th
                         scope="row"
-                        className="coluna-fixa bg-card max-w-44 truncate px-3 py-1.5 text-left font-normal"
+                        className="coluna-fixa bg-card max-w-44 truncate border-r px-3 py-1.5 text-left font-normal"
                       >
                         <span className="block truncate text-sm">{linha.aluno.nome}</span>
                         <span className="text-muted-foreground block truncate text-[10px]">
@@ -263,7 +263,7 @@ export default function VistaGrade({
                         return (
                           <td
                             key={dia}
-                            className={`px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
+                            className={`border-l px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
                           >
                             {marca === "F" ? (
                               <span
@@ -297,10 +297,10 @@ export default function VistaGrade({
                           </td>
                         );
                       })}
-                      <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
+                      <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
                         {linha.faltas > 0 ? linha.faltas : ""}
                       </td>
-                      <td className="numerais-tabulares text-falta-texto px-2 py-1.5 text-center text-sm font-semibold">
+                      <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
                         {linha.parciais > 0 ? linha.parciais : ""}
                       </td>
                     </tr>

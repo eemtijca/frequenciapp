@@ -4,14 +4,14 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 
 ## Estrutura
 
-- **Página única** com troca de visões por deslize e navegação inferior no celular: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. No desktop, barra lateral fixa com a mesma navegação, o cartão da pessoa e as ações. O cabeçalho traz identidade, tema de três opções (sistema, claro e escuro) e menu de perfil.
-- **Frequência**: seletor de turma por toque com contagem, data com setas de dia, seletor nativo, dia da semana e atalho para voltar a hoje, sem permitir dia futuro, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. As aulas do dia aparecem como referência e cada aluno marcado ganha o botão Aulas, com chips para registrar a saída no meio da aula.
+- **Página única** com troca de visões por deslize e navegação inferior no celular: Frequência, Histórico e a grade do mês para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. No desktop, barra lateral fixa com a mesma navegação, o cartão da pessoa, o tema e as ações empilhadas (trocar senha e sair), e o conteúdo ocupa toda a largura, com troca de visão instantânea. O cabeçalho traz identidade, tema de três opções (sistema, claro e escuro) e menu de perfil.
+- **Frequência**: seletor de turma por toque com contagem, barra de data com setas de dia, rótulo amigável (data, dia da semana e selo Hoje) e seletor nativo que abre ao tocar em qualquer ponto do controle, sem permitir dia futuro, atalho para voltar a hoje, resumo clicável de faltas e presentes que também filtra a lista, busca por nome e a lista de alunos com divisórias finas. No desktop, a lista fica à esquerda e o painel de turma, data, resumo e salvamento à direita, fixo durante a rolagem. As aulas do dia aparecem como referência e cada aluno marcado ganha o botão Aulas, com chips para registrar a saída no meio da aula.
 - **Histórico**: mês com setas e seletor nativo, sem avançar para meses futuros, e lista de frequências com dia, turma, contagem de faltas e hora do último salvamento; abrir uma frequência a leva de volta à Frequência.
-- **Grade do mês**: pílulas de turma de origem, mês com setas, coluna de hoje destacada, busca por aluno, grade com primeira coluna fixa e legenda; células com F (falta), S (presente em parte das aulas) ou ponto de presença.
+- **Grade do mês**: pílulas de turma de origem, mês em linha própria com setas e seletor nativo, coluna de hoje destacada, busca por aluno, grade com primeira coluna fixa, divisórias verticais entre os dias e depois dos nomes, e legenda; células com F (falta), S (presente em parte das aulas) ou ponto de presença.
 - **Buscas**: toda lista longa tem barra de busca com rótulo acessível e limpar. O Histórico filtra por turma, dia e autoria; a Grade, por aluno; a Gestão, por nome ou e-mail.
 - **Controles**: seletor acessível com teclado e filtro para listas longas; diálogos viram folha inferior no celular e modal centralizado no desktop.
 - **Alunos** (coordenação): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
-- **Gestão** (administração): abas curtas de Séries, Turmas, Alunos e Equipe, com formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas.
+- **Gestão** (administração): abas curtas de Séries, Turmas, Alunos e Equipe, com deslize curto do conteúdo no desktop, arrasto do dedo no celular, formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas.
 
 ## Fluxo de um toque
 
@@ -50,9 +50,10 @@ Na lista da Frequência, a linha inteira do aluno é o alvo: um toque marca falt
 
 Animações discretas, todas com propósito de confirmar estado:
 
-- Troca de visão por **deslize horizontal** com o dedo, com encaixe por painel, rolagem vertical própria de cada visão e estado preservado.
+- Troca de visão por **deslize horizontal** com o dedo no celular, com encaixe por painel; no desktop a troca é instantânea e o foco vai para o painel ativo, sem rolagem longa. Cada visão tem rolagem vertical própria e estado preservado.
 - A única animação de subida é a da tela de entrada; listas entram apenas com opacidade.
 - Indicador da navegação (inferior no celular e lateral no desktop) desliza para a aba ativa com mola curta.
+- Abas da Gestão: no celular acompanham o arrasto do paginador; no desktop um deslize curto no conteúdo confirma a troca, sem percorrer a largura do painel.
 - Marca P/F da frequência troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
 - Diálogos seguem as animações padrão do Radix; a barra de salvamento não se move.
 

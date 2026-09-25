@@ -38,4 +38,24 @@ test.describe("abas da Gestão", () => {
       "true",
     );
   });
+
+  test("no desktop a troca é instantânea com deslize curto", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+
+    const pager = page.locator("[data-pager=gestao]");
+    await page.getByRole("tab", { name: "Alunos" }).click();
+    const medida = await pager.evaluate((elemento) => ({
+      scrollLeft: elemento.scrollLeft,
+      largura: elemento.clientWidth,
+    }));
+    // Sem rolagem longa: o paginador já está no painel de destino.
+    expect(medida.scrollLeft).toBe(medida.largura * 2);
+    await expect(page.getByRole("tab", { name: "Alunos" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
 });

@@ -12,7 +12,10 @@ test.describe("frequência com saída por aula", () => {
     await limparMassaE2E();
   });
 
-  test("registra saída parcial, mantém no histórico e mostra S na grade", async ({ page }) => {
+  test("registra saída parcial, mantém no histórico e mostra S na grade", async ({
+    page,
+    isMobile,
+  }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
 
@@ -22,6 +25,23 @@ test.describe("frequência com saída por aula", () => {
       await pilula.click();
     }
     await expect(painel.getByText("E2E Aluno Um")).toBeVisible();
+
+    // A barra de data mostra o rótulo amigável e o campo cobre todo o controle.
+    await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
+    const campoDia = painel.locator("#dia-frequencia");
+    const caixaDia = await campoDia.boundingBox();
+    const caixaControle = await campoDia.locator("xpath=..").boundingBox();
+    expect(caixaDia?.width ?? 0).toBeGreaterThan(150);
+    expect(Math.abs((caixaDia?.width ?? 0) - (caixaControle?.width ?? 0))).toBeLessThanOrEqual(1);
+    expect(Math.abs((caixaDia?.height ?? 0) - (caixaControle?.height ?? 0))).toBeLessThanOrEqual(1);
+
+    // No desktop, a lista fica à esquerda e o painel de informações à direita.
+    if (!isMobile) {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      const lista = await painel.locator("div[class*='xl:order-1']").boundingBox();
+      const info = await painel.locator("div[class*='xl:order-2']").boundingBox();
+      expect(lista?.x ?? 0).toBeLessThan(info?.x ?? 0);
+    }
 
     const linha = painel.locator("ul li").first();
     await linha.locator("button[aria-pressed]").first().click();
@@ -66,5 +86,17 @@ test.describe("frequência com saída por aula", () => {
     // O seletor de mês ocupa a largura da tela, como nas outras telas.
     const larguraMes = (await grade.locator("#mes-grade").boundingBox())?.width ?? 0;
     expect(larguraMes).toBeGreaterThan(200);
+
+    // A grade tem divisórias verticais entre os dias e depois dos nomes.
+    const bordaDia = await grade
+      .locator("tbody td")
+      .first()
+      .evaluate((elemento) => getComputedStyle(elemento).borderLeftWidth);
+    expect(bordaDia).toBe("1px");
+    const bordaNome = await grade
+      .locator("tbody th")
+      .first()
+      .evaluate((elemento) => getComputedStyle(elemento).borderRightWidth);
+    expect(bordaNome).toBe("1px");
   });
 });

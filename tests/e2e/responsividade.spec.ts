@@ -25,6 +25,17 @@ test.describe("responsividade", () => {
     await aguardarHidratacao(page);
     await expect(page.locator("aside")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
+
+    // As ações da conta cabem na barra lateral, sem estourar a largura.
+    const semEstouro = await page
+      .locator("aside")
+      .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
+    expect(semEstouro).toBe(true);
+    const asideCaixa = await page.locator("aside").boundingBox();
+    const sairCaixa = await page.getByRole("button", { name: "Sair da conta" }).boundingBox();
+    expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
+      (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
+    );
   });
 
   test("as metades do login são simétricas", async ({ page }) => {

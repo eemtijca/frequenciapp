@@ -29,7 +29,6 @@ import {
 import type { Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import {
   AlertDialog,
@@ -430,8 +429,8 @@ export default function VistaFrequencia({
         </span>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[20rem_minmax(0,1fr)] xl:items-start">
-        <div className="flex flex-col gap-4 xl:sticky xl:top-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+        <div className="flex flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
           {turmas.length > 1 && (
             <div role="group" aria-label="Turma atual" className="flex flex-wrap gap-2">
               {turmas.map((opcao) => {
@@ -458,18 +457,39 @@ export default function VistaFrequencia({
             <Button
               variant="outline"
               size="icon"
-              className="size-11 rounded-lg"
+              className="size-11 shrink-0 rounded-lg"
               aria-label="Dia anterior"
               disabled={travado || !dia}
               onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
             >
               <ChevronLeft size={18} />
             </Button>
-            <div className="relative flex-1">
+            <div className="relative min-w-0 flex-1">
+              <div
+                aria-hidden="true"
+                className={`border-input bg-background flex h-11 items-center justify-center gap-2 overflow-hidden rounded-lg border px-3 ${
+                  travado ? "opacity-50" : ""
+                }`}
+              >
+                <CalendarDays size={16} className="text-muted-foreground shrink-0" />
+                <span className="numerais-tabulares truncate text-sm font-semibold">
+                  {rotuloDia}
+                </span>
+                {diaDaSemana && (
+                  <span className="text-muted-foreground truncate text-sm xl:hidden">
+                    {diaDaSemana}
+                  </span>
+                )}
+                {dia === diaCorrente && (
+                  <span className="bg-primary/15 text-primary shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold">
+                    Hoje
+                  </span>
+                )}
+              </div>
               <label htmlFor="dia-frequencia" className="sr-only">
                 Data da frequência
               </label>
-              <Input
+              <input
                 id="dia-frequencia"
                 type="date"
                 value={dia}
@@ -478,13 +498,13 @@ export default function VistaFrequencia({
                 onChange={(evento) => {
                   if (evento.target.value) setDia(evento.target.value);
                 }}
-                className="numerais-tabulares h-11 rounded-lg text-center font-medium"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
               />
             </div>
             <Button
               variant="outline"
               size="icon"
-              className="size-11 rounded-lg"
+              className="size-11 shrink-0 rounded-lg"
               aria-label="Dia seguinte"
               disabled={travado || !dia || dia >= diaCorrente}
               onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
@@ -584,7 +604,7 @@ export default function VistaFrequencia({
           )}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4 xl:order-1">
           <div className="bg-card overflow-hidden rounded-lg border">
             <BarraBusca
               id="busca-aluno"
@@ -780,19 +800,19 @@ export default function VistaFrequencia({
             aria-label="Barra de salvamento"
             className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 xl:mx-0"
           >
-            <div className="flex items-center justify-between gap-3">
-              <div aria-live="polite" className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
+              <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">
                 <p className="truncate text-sm font-medium">{tituloEstado}</p>
                 <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2 xl:w-full">
                 {sujo && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
                         variant="outline"
                         size="lg"
-                        className="h-11 rounded-lg"
+                        className="h-11 rounded-lg xl:flex-1"
                         disabled={salvando}
                       >
                         <RotateCcw size={16} />
@@ -816,7 +836,7 @@ export default function VistaFrequencia({
                 )}
                 <Button
                   size="lg"
-                  className="h-11 rounded-lg px-6"
+                  className="h-11 rounded-lg px-6 xl:flex-1 xl:px-0"
                   onClick={salvar}
                   disabled={!podeSalvar}
                 >

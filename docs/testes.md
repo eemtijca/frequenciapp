@@ -45,7 +45,7 @@ A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e 
 
 ## Ponta a ponta
 
-Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), banco vazio sem carregamento infinito, troca de visão pela navegação e por deslize, tema de três opções e, nas fases seguintes, frequência com saída por aula, histórico, grade, gestão e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
+Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), banco vazio sem carregamento infinito, troca de visão pela navegação (instantânea no desktop) e por deslize, tema de três opções, abas da Gestão com toque, deslize e teclado, responsividade e login simétrico e, nas fases seguintes, frequência com saída por aula, painel em duas colunas no desktop, barra de data com alvo ampliado, histórico, grade com divisórias e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
 
 ## Convenções
 

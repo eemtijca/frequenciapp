@@ -412,11 +412,11 @@ export default function Aplicacao({
               </span>
               <SeletorTema />
             </div>
-            <div className="mt-1 flex items-center gap-0.5">
+            <div className="mt-1 flex flex-col gap-0.5">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-11 flex-1 justify-start gap-2"
+                className="h-11 w-full justify-start gap-2"
                 onClick={() => setSenhaAberta(true)}
               >
                 <KeyRound size={16} />
@@ -425,7 +425,7 @@ export default function Aplicacao({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-11 flex-1 justify-start gap-2"
+                className="h-11 w-full justify-start gap-2"
                 onClick={sair}
               >
                 <LogOut size={16} />

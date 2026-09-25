@@ -3,7 +3,7 @@
 // Gestão: área do administrador. Séries, turmas, alunos e equipe em abas
 // curtas, com troca por deslize horizontal no celular e animação no desktop.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { GraduationCap, ListChecks, School, Users } from "lucide-react";
 import type { Aluno, Serie, Turma } from "@/domain/frequencia";
 import AbaSeries from "@/components/gestao/aba-series";
@@ -41,25 +41,48 @@ export default function VistaGestao({
 }: Props) {
   const [aba, setAba] = useState<Aba>("series");
   const [visitadas, setVisitadas] = useState<Set<Aba>>(() => new Set(["series"]));
+  const [ehDesktop, setEhDesktop] = useState(false);
   const pagerRef = useRef<HTMLDivElement | null>(null);
   const abasRef = useRef<(HTMLButtonElement | null)[]>([]);
+  const controles = useAnimationControls();
   const reduzirMovimento = useReducedMotion() ?? false;
+
+  // No desktop o painel é largo demais para a rolagem suave: a troca é
+  // instantânea e o conteúdo faz um deslize curto. No celular, o paginador
+  // nativo com arrasto continua valendo.
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const atualizar = () => setEhDesktop(media.matches);
+    atualizar();
+    media.addEventListener("change", atualizar);
+    return () => media.removeEventListener("change", atualizar);
+  }, []);
 
   const trocarAba = useCallback(
     (proxima: Aba, focar = false) => {
+      const indice = ABAS.findIndex((item) => item.aba === proxima);
+      if (indice < 0) return;
+      const indiceAtual = ABAS.findIndex((item) => item.aba === aba);
       setAba(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
       const pager = pagerRef.current;
-      const indice = ABAS.findIndex((item) => item.aba === proxima);
-      if (pager && indice >= 0) {
+      if (pager) {
         pager.scrollTo({
           left: indice * pager.clientWidth,
-          behavior: reduzirMovimento ? "auto" : "smooth",
+          behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
+        });
+      }
+      if (ehDesktop && !reduzirMovimento && indice !== indiceAtual) {
+        controles.set({ x: (indice > indiceAtual ? 1 : -1) * 28, opacity: 0.6 });
+        void controles.start({
+          x: 0,
+          opacity: 1,
+          transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
         });
       }
       if (focar) abasRef.current[indice]?.focus();
     },
-    [reduzirMovimento],
+    [aba, controles, ehDesktop, reduzirMovimento],
   );
 
   // O arrasto atualiza a aba ativa e monta o painel vizinho antes da parada.
@@ -173,29 +196,31 @@ export default function VistaGestao({
         })}
       </div>
 
-      <div
-        ref={pagerRef}
-        onScroll={aoRolar}
-        data-pager="gestao"
-        className="pagina-sem-barra flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain"
-      >
-        {ABAS.map((item) => {
-          const ativo = item.aba === aba;
-          return (
-            <div
-              key={item.aba}
-              id={`painel-${item.aba}`}
-              role="tabpanel"
-              aria-labelledby={`aba-${item.aba}`}
-              aria-hidden={!ativo}
-              inert={!ativo}
-              className="w-full shrink-0 snap-start"
-            >
-              {visitadas.has(item.aba) ? renderizarAba(item.aba) : null}
-            </div>
-          );
-        })}
-      </div>
+      <motion.div animate={controles} initial={false} className="min-w-0">
+        <div
+          ref={pagerRef}
+          onScroll={aoRolar}
+          data-pager="gestao"
+          className="pagina-sem-barra flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        >
+          {ABAS.map((item) => {
+            const ativo = item.aba === aba;
+            return (
+              <div
+                key={item.aba}
+                id={`painel-${item.aba}`}
+                role="tabpanel"
+                aria-labelledby={`aba-${item.aba}`}
+                aria-hidden={!ativo}
+                inert={!ativo}
+                className="w-full shrink-0 snap-start"
+              >
+                {visitadas.has(item.aba) ? renderizarAba(item.aba) : null}
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
     </section>
   );
 }
