@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+generated/
+coverage/
+analysis/
+.postgres/
+.sandbox-tools/
+download/
+skills/
+dev.log
+server.log
+package-lock.json
+bun.lock
+worklog.md
+prisma/migrations/*.sql

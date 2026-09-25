@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sem conexão · Chamada</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        background: #f9f7f2;
+        color: #3d3a34;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #1c1b19;
+          color: #eceae6;
+        }
+        .cartao {
+          background: #26241f !important;
+          border-color: #ffffff1f !important;
+        }
+        .letra {
+          color: #b6b2a9 !important;
+        }
+      }
+      .cartao {
+        background: #ffffff;
+        border: 1px solid #e3ded4;
+        border-radius: 16px;
+        max-width: 360px;
+        width: 100%;
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .emblema {
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        background: #17784d;
+        color: #faf9f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+      }
+      h1 {
+        font-size: 19px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      .letra {
+        color: #6f6a60;
+        margin-top: 8px;
+      }
+      button {
+        margin-top: 20px;
+        width: 100%;
+        min-height: 44px;
+        border: 0;
+        border-radius: 10px;
+        background: #17784d;
+        color: #faf9f6;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="cartao">
+      <div class="emblema" aria-hidden="true">
+        <svg
+          width="26"
+          height="26"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M3 12h4M3 6h4M3 18h4" />
+          <path d="M11 8l3 3 5-6" />
+        </svg>
+      </div>
+      <h1>Você está sem conexão</h1>
+      <p>
+        A chamada precisa de internet para salvar. As marcações que estiverem na tela não se perdem:
+        reconecte e toque em Salvar.
+      </p>
+      <p class="letra">Verifique o sinal ou os dados móveis e tente de novo.</p>
+      <button type="button" onclick="window.location.reload()">Tentar de novo</button>
+    </main>
+  </body>
+</html>

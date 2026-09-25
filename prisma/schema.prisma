@@ -1,0 +1,176 @@
+// Esquema do banco. Fonte da verdade para o Prisma Client.
+//
+// Princípio de minimização (LGPD): a tabela faltas guarda apenas os
+// casos de ausência. Presença é o estado implícito de toda chamada
+// salva: quem não tem registro de falta naquele dia esteve presente.
+//
+// Uma chamada existe por (professor, dia, turma). A coluna revisao
+// implementa concorrência otimista entre aparelhos: salvamentos
+// concorrentes são rejeitados com 409 em vez de sobrescrita silenciosa.
+//
+// Objetos mantidos apenas no SQL das migrações, porque o Prisma não os
+// representa no schema:
+// - Índices únicos funcionais em lower(email) e lower(nome) de séries.
+// Não "corrija" essas divergências no schema: elas são intencionais.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Papel do usuário. ADMIN gerencia tudo (séries, turmas, alunos e
+// professores); PROFESSOR faz a chamada das turmas atribuídas.
+enum Papel {
+  ADMIN
+  PROFESSOR
+
+  @@map("papel")
+}
+
+// Usuário da aplicação. Sem dados além do necessário: nome de
+// tratamento, e-mail para acesso, hash da senha e papel.
+model Usuario {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String
+  senhaHash    String    @map("senha_hash")
+  nome         String
+  papel        Papel     @default(PROFESSOR)
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
+  sessoes      Sessao[]
+  chamadas     Chamada[]
+  atribuicoes  Atribuicao[]
+  auditorias   Auditoria[]
+
+  @@index([papel])
+  @@map("usuarios")
+}
+
+// Sessão opaca: o token trafega em cookie HttpOnly apenas como hash.
+model Sessao {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  usuarioId String   @map("usuario_id") @db.Uuid
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  expiraEm  DateTime @map("expira_em") @db.Timestamptz
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEm])
+  @@map("sessoes")
+}
+
+// Série escolar (por exemplo, "1º ano"). Referência para as turmas.
+model Serie {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome      String
+  ordem     Int
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  turmas    Turma[]
+
+  @@index([ordem])
+  @@map("series")
+}
+
+// Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
+// enquanto houver alunos ou chamadas vinculadas: histórico não fica
+// órfão, e o administrador é orientado a mover ou excluir antes.
+model Turma {
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serieId     String        @map("serie_id") @db.Uuid
+  nome        String
+  criadoEm    DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  serie       Serie         @relation(fields: [serieId], references: [id], onDelete: Restrict)
+  alunos      Aluno[]       @relation("AlunoTurma")
+  origemDe    Aluno[]       @relation("AlunoTurmaOriginal")
+  chamadas    Chamada[]
+  atribuicoes Atribuicao[]
+
+  @@unique([serieId, nome])
+  @@map("turmas")
+}
+
+// Atribuição de um professor a uma turma: define quais turmas cada
+// professor pode chamar. O administrador enxerga todas.
+model Atribuicao {
+  professorId String   @map("professor_id") @db.Uuid
+  turmaId     String   @map("turma_id") @db.Uuid
+  criadoEm    DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  professor   Usuario  @relation(fields: [professorId], references: [id], onDelete: Cascade)
+  turma       Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@id([professorId, turmaId])
+  @@index([turmaId])
+  @@map("atribuicoes")
+}
+
+// Aluno de uma turma. Nome de chamada, turma atual (de onde parte a
+// frequência diária) e turma original (referência de origem para a
+// consulta agrupada). Nenhum outro dado pessoal é armazenado.
+model Aluno {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId         String   @map("turma_id") @db.Uuid
+  turmaOriginalId String   @map("turma_original_id") @db.Uuid
+  nome            String
+  ordem           Int
+  ativo           Boolean  @default(true)
+  criadoEm        DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  turma           Turma    @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
+  turmaOriginal   Turma    @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
+  faltas          Falta[]
+
+  @@index([turmaId, ordem])
+  @@index([turmaOriginalId])
+  @@map("alunos")
+}
+
+// Chamada de um dia e turma por um professor. revisao 1 no primeiro
+// salvamento e crescimento a cada atualização bem-sucedida.
+model Chamada {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  professorId  String    @map("professor_id") @db.Uuid
+  turmaId      String    @map("turma_id") @db.Uuid
+  dia          DateTime  @db.Date
+  revisao      Int       @default(1)
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
+  professor    Usuario   @relation(fields: [professorId], references: [id], onDelete: Restrict)
+  turma        Turma     @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  faltas       Falta[]
+
+  @@unique([professorId, turmaId, dia])
+  @@index([professorId, dia])
+  @@index([turmaId, dia])
+  @@map("chamadas")
+}
+
+// Falta de um aluno em uma chamada. Presença não gera linha.
+model Falta {
+  chamadaId String  @map("chamada_id") @db.Uuid
+  alunoId   String  @map("aluno_id") @db.Uuid
+  chamada   Chamada @relation(fields: [chamadaId], references: [id], onDelete: Cascade)
+  aluno     Aluno   @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@id([chamadaId, alunoId])
+  @@index([alunoId])
+  @@map("faltas")
+}
+
+// Trilha de auditoria de ações administrativas. Apenas identificadores
+// e nomes de ação: nenhum dado pessoal de aluno é registrado.
+model Auditoria {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId String?  @map("usuario_id") @db.Uuid
+  acao      String
+  alvo      String
+  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([criadoEm])
+  @@index([usuarioId])
+  @@map("auditoria")
+}

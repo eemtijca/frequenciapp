@@ -1,0 +1,57 @@
+# Dependências
+node_modules
+
+# Build
+/.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# Ambiente: nunca commitar segredos
+.env
+.env.*
+!.env.example
+
+# Banco local e artefatos de execução
+*.db
+*.sqlite
+prisma/dev.db
+dev.log
+server.log
+*.dump
+
+# Cobertura de testes
+/coverage
+
+# Sistema
+.DS_Store
+*.pem
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Plataforma
+.vercel
+
+# Sandbox local (não fazem parte do entregável)
+bun.lock
+Caddyfile
+.zscripts/
+analysis/
+.postgres/
+.sandbox-tools/
+download/
+skills/
+dev.log
+server.log
+worklog.md
+
+# Sandbox local (continuação)
+.postgres17/
+sandbox/
+
+# Cliente Prisma gerado (prisma generate)
+generated/
+tool-results/

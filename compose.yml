@@ -1,0 +1,41 @@
+# Chamada. Orquestração local: aplicação + PostgreSQL.
+# Sobe tudo com: docker compose up --build
+# A aplicação lê DATABASE_URL e aplica as migrações na partida.
+
+name: chamada
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chamada
+      POSTGRES_PASSWORD: chamada
+      POSTGRES_DB: chamada
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chamada -d chamada"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://chamada:chamada@db:5432/chamada
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      TZ_APP: ${TZ_APP:-America/Fortaleza}
+    command: ["./docker/app/entrypoint.sh"]
+
+volumes:
+  pgdata:
