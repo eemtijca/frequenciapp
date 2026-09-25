@@ -20,7 +20,7 @@ Roda em qualquer ambiente, sem banco e sem rede:
 
 ## Contratos de API
 
-A suíte aponta para o aplicativo em execução. O banco de testes precisa estar acessível para a limpeza da massa; exporte a connection string no comando porque ambientes locais podem ter outro valor de `DATABASE_URL` no shell:
+A suíte aponta para o aplicativo em execução. O banco de testes precisa estar acessível para a limpeza da massa; exporte a connection string no comando porque ambientes locais podem ter outro valor de `DATABASE_URL` no shell. Os scripts administrativos preferem `DIRECT_URL` quando a variável está definida:
 
 ```bash
 # 1. banco migrado
@@ -43,6 +43,7 @@ Variáveis aceitas:
 - `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais do administrador de teste.
 - `TESTE_EMAIL` e `TESTE_SENHA`: credenciais do professor de teste.
 - `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
+- `DIRECT_URL`: conexão preferida pelos comandos administrativos, quando disponível.
 
 A suíte usa os dias 2026-06-15 e 2026-06-16 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
 
