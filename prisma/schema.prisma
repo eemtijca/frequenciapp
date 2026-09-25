@@ -33,6 +33,9 @@ model Usuario {
   sessoes                Sessao[]
   frequenciasCriadas     Frequencia[] @relation("FrequenciaCriadaPor")
   frequenciasAtualizadas Frequencia[] @relation("FrequenciaAtualizadaPor")
+  saidasLiberadas        SaidaAntecipada[] @relation("SaidaLiberadaPor")
+  saidasCriadas          SaidaAntecipada[] @relation("SaidaCriadaPor")
+  configuracoesAtualizadas Configuracao[] @relation("ConfiguracaoAtualizadaPor")
   auditorias             Auditoria[]
 
   @@index([papel])
@@ -96,6 +99,7 @@ model Aluno {
   turma           Turma    @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
   turmaOriginal   Turma    @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
   faltas          Falta[]
+  saidas          SaidaAntecipada[]
 
   @@index([turmaId, ordem])
   @@index([turmaOriginalId])
@@ -142,19 +146,56 @@ model Frequencia {
   @@map("frequencias")
 }
 
-// Falta de um aluno em uma aula da frequência. Presença não gera linha.
+// Falta de um aluno em uma aula da frequência. Presença não gera linha. A
+// justificativa é o código do catálogo e vale para a falta e para a saída.
 model Falta {
-  frequenciaId String     @map("frequencia_id") @db.Uuid
-  alunoId      String     @map("aluno_id") @db.Uuid
-  horarioId    String     @map("horario_id") @db.Uuid
-  frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
-  aluno        Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  horario      Horario    @relation(fields: [horarioId], references: [id], onDelete: Restrict)
+  frequenciaId  String     @map("frequencia_id") @db.Uuid
+  alunoId       String     @map("aluno_id") @db.Uuid
+  horarioId     String     @map("horario_id") @db.Uuid
+  justificativa String?    @db.VarChar(10)
+  observacao    String?    @db.VarChar(200)
+  frequencia    Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
+  aluno         Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  horario       Horario    @relation(fields: [horarioId], references: [id], onDelete: Restrict)
 
   @@id([frequenciaId, alunoId, horarioId])
   @@index([alunoId])
   @@index([horarioId])
   @@map("faltas")
+}
+
+// Saída antecipada registrada pela direção ou coordenação. É separada da
+// chamada: a presença ou falta do dia permanece como foi marcada.
+model SaidaAntecipada {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alunoId       String   @map("aluno_id") @db.Uuid
+  dia           DateTime @db.Date
+  momento       String   @db.VarChar(20)
+  justificativa String   @db.VarChar(10)
+  observacao    String?  @db.VarChar(200)
+  liberadoPorId String?  @map("liberado_por_id") @db.Uuid
+  criadoPorId   String?  @map("criado_por_id") @db.Uuid
+  criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  aluno         Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  liberadoPor   Usuario? @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
+  criadoPor     Usuario? @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([alunoId, dia])
+  @@index([dia])
+  @@index([alunoId, dia])
+  @@map("saidas_antecipadas")
+}
+
+// Recursos configuráveis pela administração. Linha única criada na migração.
+model Configuracao {
+  id                String   @id @default("principal")
+  frequenciaPorAula Boolean  @default(false) @map("frequencia_por_aula")
+  saidaAntecipada   Boolean  @default(true) @map("saida_antecipada")
+  atualizadoEm      DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?  @map("atualizado_por_id") @db.Uuid
+  atualizadoPor     Usuario? @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("configuracoes")
 }
 
 // Trilha de auditoria de ações administrativas. Apenas identificadores

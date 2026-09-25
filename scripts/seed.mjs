@@ -136,8 +136,57 @@ try {
     }
   }
 
+  // Chamada e saída sintéticas para os indicadores terem o que mostrar:
+  // uma falta justificada, uma falta simples e uma saída antecipada.
+  const ultimoDiaLetivo = (() => {
+    const data = new Date();
+    data.setDate(data.getDate() - 1);
+    while (data.getDay() === 0 || data.getDay() === 6) data.setDate(data.getDate() - 1);
+    return data.toISOString().slice(0, 10);
+  })();
+  const turmaExemplo = idsDeTurmas["1º ano A"];
+  if (turmaExemplo) {
+    const alunosDaTurma = await cliente.query(
+      "select id from alunos where turma_id = $1 order by ordem limit 3",
+      [turmaExemplo],
+    );
+    const aulasDaTurma = await cliente.query(
+      "select id from horarios where turma_id = $1 order by ordem limit 1",
+      [turmaExemplo],
+    );
+    if (alunosDaTurma.rowCount >= 2 && aulasDaTurma.rowCount === 1) {
+      const criada = await cliente.query(
+        `insert into frequencias (turma_id, dia, revisao, criado_por_id, atualizado_por_id, atualizado_em)
+         values ($1, $2, 1, $3, $3, now())
+         on conflict (turma_id, dia) do nothing
+         returning id`,
+        [turmaExemplo, ultimoDiaLetivo, coordenacao.rows[0].id],
+      );
+      const frequenciaId = criada.rows[0]?.id;
+      if (frequenciaId) {
+        await cliente.query(
+          `insert into faltas (frequencia_id, aluno_id, horario_id, justificativa, observacao)
+           values ($1, $2, $3, 'D', null), ($1, $4, $3, null, null)
+           on conflict do nothing`,
+          [
+            frequenciaId,
+            alunosDaTurma.rows[0].id,
+            aulasDaTurma.rows[0].id,
+            alunosDaTurma.rows[1].id,
+          ],
+        );
+        await cliente.query(
+          `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_id, criado_por_id)
+           values ($1, $2, 'aula_2', 'CM', null, $3, $3)
+           on conflict (aluno_id, dia) do nothing`,
+          [alunosDaTurma.rows[0].id, ultimoDiaLetivo, coordenacao.rows[0].id],
+        );
+      }
+    }
+  }
+
   console.log(
-    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos.`,
+    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos, uma chamada com F e FJ em ${ultimoDiaLetivo} e uma saída antecipada.`,
   );
 } catch (erro) {
   console.error("Falha ao semear:", erro.message);
