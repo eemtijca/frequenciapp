@@ -29,7 +29,7 @@ const NOMES_DE_CAMPO: Record<string, string> = {
   turmas_serie_id_nome_key: "turma",
   turmas_serie_nome_unico: "turma",
   sessoes_token_hash_key: "sessão",
-  frequencias_professor_id_turma_id_dia_key: "frequencia",
+  frequencias_professor_id_turma_id_dia_key: "frequência",
   atribuicoes_pkey: "atribuição",
 };
 
@@ -73,7 +73,7 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
       const campo = nomeAmigavel(alvos);
       return {
         mensagem:
-          campo === "frequencia"
+          campo === "frequência"
             ? "Esta frequência já foi salva. Recarregue para ver a versão mais recente."
             : campo === "registro"
               ? "Já existe um registro igual. Confira os dados e tente de novo."

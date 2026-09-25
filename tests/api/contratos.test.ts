@@ -539,7 +539,7 @@ describe("frequências (ACID e concorrência)", () => {
     expect(vigente.frequencia?.faltas).toEqual([]);
   });
 
-  it("professor sem atribuição não salva frequencia", async () => {
+  it("professor sem atribuição não salva frequência", async () => {
     const resposta = await autenticado(cookieProf, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE_2, turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
