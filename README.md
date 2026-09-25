@@ -9,11 +9,11 @@ O fluxo segue a prática da coordenação no papel: escolha a turma e o dia, tod
 - **Frequência diária**: turmas por toque, data com navegação por setas, busca por nome, filtros por falta e presença, resumo ao vivo e salvamento com rascunho local. A saída no meio da aula é registrada por aluno, aula a aula, com chips por aula na linha marcada.
 - **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe em formulários curtos, com mensagens claras quando algo depende de outra ação (por exemplo, excluir turma com alunos).
 - **Coordenação e administração**: a coordenação registra a frequência, consulta o histórico e a grade; a administração configura tudo. Contas desativadas perdem o acesso na hora.
-- **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro aparelho são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
+- **Proteção contra conflitos**: uma frequência por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **Histórico**: frequências salvas por mês, abertas em um toque para conferência ou correção.
 - **Grade do mês**: grade de frequência pelas turmas de origem, com busca por aluno, alunos nas linhas, dias nas colunas e células P, S, F ou vazias; primeira coluna fixa durante a rolagem horizontal.
 - **Busca em todas as listas**: frequência, histórico, grade, alunos e gestão com filtro local e tolerância a acentos.
-- **PWA completo**: instala no aparelho como aplicativo, abre em Frequência ou na Grade do mês pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
+- **PWA completo**: instala no dispositivo como aplicativo, abre em Frequência ou na Grade do mês pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação por deslize**: troca de visões deslizando a tela com o dedo, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
 - **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
@@ -36,7 +36,7 @@ ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direçã
   docker compose exec app npm run criar-admin
 ```
 
-Com o administrador no aparelho, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e a semente:
+Com o administrador no dispositivo, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e a semente:
 
 ```bash
 CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha forte' CONTA_NOME='Equipe' \

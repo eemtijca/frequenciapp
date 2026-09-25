@@ -67,6 +67,22 @@ async function entrar(email: string, senha: string): Promise<{ status: number; c
   return { status: resposta.status, cookie: bruto.split(";")[0] ?? "" };
 }
 
+/** Validade da sessão mais recente de um e-mail, em milissegundos. */
+async function validadeDaSessaoMaisNova(email: string): Promise<number> {
+  if (!banco) return 0;
+  const { rows } = await banco.query<{ expira_em: Date }>(
+    `select s.expira_em
+       from sessoes s
+       join usuarios u on u.id = s.usuario_id
+      where u.email = $1
+      order by s.criado_em desc
+      limit 1`,
+    [email],
+  );
+  const expiraEm = rows[0]?.expira_em;
+  return expiraEm ? expiraEm.getTime() - Date.now() : 0;
+}
+
 interface Serie {
   id: string;
   nome: string;
@@ -158,6 +174,32 @@ describe("autenticação", () => {
     const resposta = await autenticado(cookieCoord, "/api/auth/sessao");
     const dados = (await resposta.json()) as { usuario: UsuarioApi | null };
     expect(dados.usuario?.papel).toBe("COORDENACAO");
+  });
+
+  it("mantém a sessão por 30 dias quando pede para lembrar", async () => {
+    const resposta = await requisicao("/api/auth/entrar", {
+      method: "POST",
+      body: JSON.stringify({ email: EMAIL_COORD, senha: SENHA_COORD, lembrar: true }),
+    });
+    expect(resposta.status).toBe(200);
+    const bruto = resposta.headers.get("set-cookie") ?? "";
+    expect(bruto).toMatch(/Expires=/i);
+    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    expect(validade).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
+  });
+
+  it("usa cookie de sessão e validade curta sem lembrar", async () => {
+    const resposta = await requisicao("/api/auth/entrar", {
+      method: "POST",
+      body: JSON.stringify({ email: EMAIL_COORD, senha: SENHA_COORD, lembrar: false }),
+    });
+    expect(resposta.status).toBe(200);
+    const bruto = resposta.headers.get("set-cookie") ?? "";
+    expect(bruto).not.toMatch(/Expires=/i);
+    expect(bruto).not.toMatch(/Max-Age=/i);
+    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    expect(validade).toBeGreaterThan(11 * 60 * 60 * 1000);
+    expect(validade).toBeLessThan(13 * 60 * 60 * 1000);
   });
 
   it("exige sessão para listar turmas", async () => {
@@ -842,7 +884,7 @@ describe("conta: troca de senha", () => {
     expect(resposta.status).toBe(400);
   });
 
-  it("troca a senha e desconecta outros aparelhos", async () => {
+  it("troca a senha e desconecta outros dispositivos", async () => {
     const outroAparelho = await entrar(EMAIL_COORD, SENHA_COORD);
     expect(outroAparelho.status).toBe(200);
 

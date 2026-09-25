@@ -82,7 +82,7 @@ Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, todos os dias),
 | atualizadoPorId | uuid    | Quem salvou por último; anulável.                 |
 | atualizadoEm    | data    | Momento do último salvamento.                     |
 
-A unicidade de (turma, dia) faz o banco rejeitar duplicatas: existe **uma frequência por turma e dia**, compartilhada por toda a coordenação. A revisão implementa concorrência otimista entre aparelhos dentro de uma transação serializável (ADR-007), e a autoria sobrevive à exclusão da conta.
+A unicidade de (turma, dia) faz o banco rejeitar duplicatas: existe **uma frequência por turma e dia**, compartilhada por toda a coordenação. A revisão implementa concorrência otimista entre dispositivos dentro de uma transação serializável (ADR-007), e a autoria sobrevive à exclusão da conta.
 
 ## Falta (falta)
 

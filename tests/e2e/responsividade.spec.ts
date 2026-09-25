@@ -48,4 +48,14 @@ test.describe("responsividade", () => {
     const principal = await page.locator("main").boundingBox();
     expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
   });
+
+  test("no celular os campos do login têm margem confortável", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.context().clearCookies();
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "FrequenciApp" })).toBeVisible();
+    const campo = await page.locator("#email").boundingBox();
+    expect(campo?.width ?? 0).toBeLessThanOrEqual(330);
+    expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
+  });
 });

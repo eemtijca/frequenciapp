@@ -16,7 +16,7 @@ const OPCOES = [
 
 /**
  * Configuração da grade de aulas (aulas por turma) chega na Fase 5; este
- * componente cuida apenas da preferência de tema do aparelho.
+ * componente cuida apenas da preferência de tema do dispositivo.
  */
 export function SeletorTema({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();

@@ -1,7 +1,7 @@
 "use client";
 
 // Troca da própria senha: exige a atual, orienta a política e avisa
-// que outros aparelhos serão desconectados.
+// que outros dispositivos serão desconectados.
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -50,7 +50,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
     setErro("");
     try {
       await pedir<{ ok: boolean }>("/api/conta/senha", corpoJson({ senhaAtual, senhaNova }));
-      toast.success("Senha trocada. Nos outros aparelhos, entre de novo.");
+      toast.success("Senha trocada. Nos outros dispositivos, entre de novo.");
       fechar(false);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível trocar a senha.");

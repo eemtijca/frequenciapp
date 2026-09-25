@@ -37,7 +37,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - equipe: criação com política de senha, e-mail duplicado, atualização de nome, auto-rebaixamento e auto-desativação barrados, conta desativada não entra, reativação, exclusão preservando o histórico com autoria anulada;
 - alunos: origem padrão na própria turma, ordem sequencial, mudança de turma preservando a origem, turma inexistente;
 - frequências: criação com falta em todas as aulas, falta por aula específica, duplicata com 409 e versão vigente, **salvamentos concorrentes em paralelo com exatamente um vencedor**, atualização com revisão vigente e recusa de obsoleta, rejeição de aula de outra turma e de aula fora do dia, aluno desativado com falta registrada aceito, aluno desativado novo rejeitado, dia futuro recusado, parâmetros inválidos, consulta por dia e por mês com filtros de turma e de autoria;
-- conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros aparelhos desconectados;
+- conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros dispositivos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas e a ausência de nomes de alunos;
 - saída encerrando a sessão e verificação de saúde (200 com o banco acessível e 503 sem ele).
 
@@ -45,7 +45,7 @@ A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e 
 
 ## Ponta a ponta
 
-Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), campos de senha com exibir e ocultar, banco vazio sem carregamento infinito, troca de visão pela navegação (instantânea no desktop) e por deslize, tema de três opções, abas da Gestão com toque, deslize e teclado, responsividade e login simétrico e, nas fases seguintes, frequência com saída por aula, painel em duas colunas no desktop, seletor de período próprio com teclado e atalhos, histórico, grade com divisórias e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
+Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), campos de senha com exibir e ocultar, lembrar o acesso no dispositivo com sessão persistente e e-mail preenchido, banco vazio sem carregamento infinito, troca de visão pela navegação (instantânea no desktop) e por deslize, tema de três opções, abas da Gestão com toque, deslize e teclado, responsividade, login simétrico, campos do login com margem no celular e, nas fases seguintes, frequência com saída por aula, painel em duas colunas no desktop, seletor de período próprio com teclado e atalhos, histórico, grade com divisórias e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
 
 ## Convenções
 

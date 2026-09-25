@@ -3,10 +3,10 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { banco } from "@/infra/banco";
+import { duracaoDaSessao } from "@/domain/sessao";
 import type { Identidade } from "@/domain/usuarios";
 
 export const NOME_COOKIE = "frequenciapp_sessao";
-const DIAS_DE_VALIDADE = 30;
 
 interface SessaoAtiva {
   id: string;
@@ -36,14 +36,18 @@ function hashDoToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Cria uma sessão nova e grava o cookie HttpOnly. */
+/**
+ * Cria uma sessão nova e grava o cookie HttpOnly. Com `lembrar`, o cookie é
+ * persistente por 30 dias; sem, é cookie de sessão com validade de 12 horas.
+ */
 export async function criarSessao(
   usuarioId: string,
   segredo: string,
   ehProducao: boolean,
+  lembrar: boolean,
 ): Promise<void> {
   const token = randomBytes(32).toString("hex");
-  const expiraEm = new Date(Date.now() + DIAS_DE_VALIDADE * 24 * 60 * 60 * 1000);
+  const expiraEm = new Date(Date.now() + duracaoDaSessao(lembrar));
   await banco().sessao.create({ data: { tokenHash: hashDoToken(token), usuarioId, expiraEm } });
   const armazem = await cookies();
   armazem.set(NOME_COOKIE, valorAssinado(token, segredo), {
@@ -51,7 +55,7 @@ export async function criarSessao(
     sameSite: "lax",
     secure: ehProducao,
     path: "/",
-    expires: expiraEm,
+    ...(lembrar ? { expires: expiraEm } : {}),
   });
 }
 

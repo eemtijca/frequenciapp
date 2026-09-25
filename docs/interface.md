@@ -10,6 +10,7 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 - **Grade do mês**: pílulas de turma de origem, mês em linha própria com setas, seletor próprio e atalho para voltar ao mês corrente, coluna de hoje destacada, busca por aluno, grade com primeira coluna fixa, divisórias verticais entre os dias e depois dos nomes, e legenda; células com F (falta), S (presente em parte das aulas) ou ponto de presença.
 - **Buscas**: toda lista longa tem barra de busca com rótulo acessível e limpar. O Histórico filtra por turma, dia e autoria; a Grade, por aluno; a Gestão, por nome ou e-mail.
 - **Controles**: seletor de período acessível com teclado (setas, Home, End, PageUp e PageDown), filtro para listas longas e botão de exibir/ocultar em todo campo de senha; formulários em modal centralizado no celular e no desktop, e o seletor de período como folha inferior no celular.
+- **Entrada**: campos com largura confortável no celular, opção "Manter conectado neste dispositivo" (marcada por padrão) e e-mail lembrado no dispositivo para a próxima visita; a senha fica com o gerenciador do navegador.
 - **Alunos** (coordenação): lista de consulta agrupada por turma com origem destacada quando difere da atual; o cadastro mora na Gestão.
 - **Gestão** (administração): abas curtas de Séries, Turmas, Alunos e Equipe, com deslize curto do conteúdo no desktop, arrasto do dedo no celular, formulários em diálogo, aulas por turma e ações de editar, desativar e excluir com confirmação. A própria conta aparece marcada, sem ações perigosas.
 

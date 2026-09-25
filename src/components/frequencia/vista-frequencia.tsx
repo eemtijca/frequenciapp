@@ -169,7 +169,7 @@ export default function VistaFrequencia({
               } else {
                 setConflito(true);
                 setErro(
-                  "Há um rascunho neste aparelho e uma versão mais nova salva. Confira antes de recarregar.",
+                  "Há um rascunho neste dispositivo e uma versão mais nova salva. Confira antes de recarregar.",
                 );
               }
             }

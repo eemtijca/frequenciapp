@@ -82,7 +82,7 @@ A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do h
 
 ## Fuso horário
 
-`TZ_APP` decide qual é o dia corrente para o estado inicial da frequência e é validado como fuso IANA na partida. O servidor envia o fuso e o dia corrente à interface, e toda formatação de data e hora usa esse fuso, nunca o relógio do aparelho. O dia futuro é recusado na API e desabilitado na interface. Datas trafegam como texto `YYYY-MM-DD` do calendário da escola e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade e o Histórico filtram por mês civil do mesmo calendário.
+`TZ_APP` decide qual é o dia corrente para o estado inicial da frequência e é validado como fuso IANA na partida. O servidor envia o fuso e o dia corrente à interface, e toda formatação de data e hora usa esse fuso, nunca o relógio do dispositivo. O dia futuro é recusado na API e desabilitado na interface. Datas trafegam como texto `YYYY-MM-DD` do calendário da escola e são armazenadas como `date` no banco em meio-dia UTC, imune a deslocamentos de fuso na gravação. A grade e o Histórico filtram por mês civil do mesmo calendário.
 
 ## Verificação rápida
 

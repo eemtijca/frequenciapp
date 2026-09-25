@@ -1,7 +1,7 @@
 "use client";
 
 // Tela de entrada: cartão único no celular e painel institucional no desktop.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion } from "motion/react";
 import { CalendarCheck, LoaderCircle, LockKeyhole, WifiOff } from "lucide-react";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+
+const CHAVE_EMAIL = "frequenciapp:email";
 
 const DESTAQUES = [
   { Icone: CalendarCheck, texto: "Chamada do dia com saída por aula" },
@@ -22,8 +24,19 @@ export default function TelaLogin() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [lembrar, setLembrar] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+
+  // Preenche o e-mail lembrado neste dispositivo, se houver.
+  useEffect(() => {
+    try {
+      const salvo = window.localStorage.getItem(CHAVE_EMAIL);
+      if (salvo) setEmail(salvo);
+    } catch {
+      // Sem armazenamento local: segue sem lembrar.
+    }
+  }, []);
 
   async function submeter(evento: React.FormEvent) {
     evento.preventDefault();
@@ -31,7 +44,16 @@ export default function TelaLogin() {
     setEnviando(true);
     setErro("");
     try {
-      await pedir<{ usuario: { nome: string } }>("/api/auth/entrar", corpoJson({ email, senha }));
+      await pedir<{ usuario: { nome: string } }>(
+        "/api/auth/entrar",
+        corpoJson({ email, senha, lembrar }),
+      );
+      try {
+        if (lembrar) window.localStorage.setItem(CHAVE_EMAIL, email.trim().toLowerCase());
+        else window.localStorage.removeItem(CHAVE_EMAIL);
+      } catch {
+        // Sem armazenamento local: o login continua.
+      }
       router.refresh();
     } catch (excecao) {
       const mensagem =
@@ -84,12 +106,12 @@ export default function TelaLogin() {
           </ul>
         </aside>
 
-        <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+        <main className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="flex w-full max-w-sm flex-col gap-8"
+            className="flex w-full max-w-xs flex-col gap-8 sm:max-w-sm"
           >
             <div className="flex flex-col items-center gap-3 text-center lg:items-start lg:text-left">
               <div
@@ -147,6 +169,17 @@ export default function TelaLogin() {
                   className="h-12"
                 />
               </div>
+
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="lembrar"
+                  checked={lembrar}
+                  onChange={(evento) => setLembrar(evento.target.checked)}
+                  className="accent-primary size-5 shrink-0"
+                />
+                Manter conectado neste dispositivo
+              </label>
 
               {erro && (
                 <motion.p

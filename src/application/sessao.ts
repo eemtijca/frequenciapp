@@ -20,6 +20,8 @@ import type { Identidade } from "@/domain/usuarios";
 export const esquemaEntrada = z.object({
   email: z.string().trim().toLowerCase().email("E-mail inválido."),
   senha: z.string().min(1, "Informe a senha."),
+  // Sem o campo, a sessão continua lembrada por 30 dias, como antes.
+  lembrar: z.boolean().optional().default(true),
 });
 
 export const esquemaTrocarSenha = z.object({
@@ -72,7 +74,7 @@ export async function entrar(
   }
   limparTentativas(chaveOrigem);
   limparTentativas(chaveEmail);
-  await criarSessao(usuario.id, segredo, ehProducao);
+  await criarSessao(usuario.id, segredo, ehProducao, dados.data.lembrar);
   return {
     ok: true,
     usuario: {
@@ -97,7 +99,7 @@ export async function identidadeAtual(segredo: string): Promise<Identidade | nul
 
 /**
  * Troca a própria senha: exige a atual, aplica a política e encerra as
- * outras sessões abertas deste usuário em outros aparelhos.
+ * outras sessões abertas deste usuário em outros dispositivos.
  */
 export async function trocarSenha(
   identidade: Identidade,

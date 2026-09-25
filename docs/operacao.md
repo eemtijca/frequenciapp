@@ -22,7 +22,7 @@ Pela área de Gestão, recomendado, ou pelo comando idempotente de demonstraçã
 CONTA_EMAIL=equipe@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Equipe' npm run criar-coordenacao
 ```
 
-Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca encerra as sessões dos outros aparelhos; pelo comando, as sessões existentes continuam válidas até expirarem. Para encerrar sessões imediatamente:
+Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca encerra as sessões dos outros dispositivos; pelo comando, as sessões existentes continuam válidas até expirarem. Para encerrar sessões imediatamente:
 
 ```sql
 delete from sessoes where usuario_id = (select id from usuarios where email = 'equipe@escola.br');

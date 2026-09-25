@@ -6,7 +6,7 @@ Aceita.
 
 ## Contexto
 
-O salvamento da frequência escreve em duas tabelas (a frequência e suas faltas) e depende da lista atual de alunos da turma. Sem transação, uma falha no meio deixaria a frequência sem faltas ou com faltas de alunos que já mudaram de turma. Com concorrência de dois aparelhos, é preciso garantir que exatamente um salvamento vença e o outro receba conflito claro.
+O salvamento da frequência escreve em duas tabelas (a frequência e suas faltas) e depende da lista atual de alunos da turma. Sem transação, uma falha no meio deixaria a frequência sem faltas ou com faltas de alunos que já mudaram de turma. Com concorrência de dois dispositivos, é preciso garantir que exatamente um salvamento vença e o outro receba conflito claro.
 
 ## Decisão
 

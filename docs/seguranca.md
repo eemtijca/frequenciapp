@@ -14,9 +14,9 @@ Detalhamento das decisões de segurança. O resumo para reportar falhas está em
 
 - Token aleatório de 32 bytes gerado no servidor; o navegador recebe apenas o valor assinado com HMAC-SHA256 derivado de `AUTH_SECRET` no cookie `frequenciapp_sessao`, comparado em tempo constante.
 - O banco guarda o hash SHA-256 do token, nunca o token; roubo do banco não permite reusar sessões diretamente.
-- Cookie HttpOnly, SameSite=Lax, path `/`, Secure em produção, validade de 30 dias com expiração registrada.
+- Cookie HttpOnly, SameSite=Lax, path `/`, Secure em produção. Com a opção "Manter conectado neste dispositivo", a validade é de 30 dias com expiração registrada; sem ela, o cookie é de sessão (some ao fechar o navegador) e a validade no servidor é de 12 horas.
 - Sessões vencidas são apagadas no primeiro uso detectado e podem ser purgadas em rotina (ver [operacao.md](operacao.md)).
-- Trocar a senha encerra as sessões dos outros aparelhos; o aparelho corrente continua válido.
+- Trocar a senha encerra as sessões dos outros dispositivos; o dispositivo corrente continua válido.
 - A identidade de sessão carrega o papel; guardas de papel (`exigirAdmin`) fecham as rotas de gestão.
 
 ## CSRF

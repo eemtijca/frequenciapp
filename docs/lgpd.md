@@ -4,14 +4,14 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 
 ## Dados tratados
 
-| Dado                                      | Finalidade                                      | Retenção                                                  |
-| ----------------------------------------- | ----------------------------------------------- | --------------------------------------------------------- |
-| Nome do aluno                             | Identificar o aluno na frequência e na grade.   | Enquanto a escola mantiver o cadastro; exclusão a pedido. |
-| Turma atual e de origem                   | Organizar frequências e a consulta agrupada.    | Idem.                                                     |
-| Registro de faltas por dia e aula         | Registrar a frequência, finalidade do sistema.  | Idem, junto com as frequências.                           |
-| E-mail e hash de senha da equipe          | Autenticar o acesso pessoal.                    | Conta ativa; sessões expiram em 30 dias.                  |
-| Nome da administração e da coordenação    | Tratamento e saudação; identificação da equipe. | Conta ativa.                                              |
-| Trilha de auditoria (quem, o quê, quando) | Prestar contas de ações administrativas.        | Conforme política da escola; sem dados de alunos.         |
+| Dado                                      | Finalidade                                      | Retenção                                                                            |
+| ----------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nome do aluno                             | Identificar o aluno na frequência e na grade.   | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
+| Turma atual e de origem                   | Organizar frequências e a consulta agrupada.    | Idem.                                                                               |
+| Registro de faltas por dia e aula         | Registrar a frequência, finalidade do sistema.  | Idem, junto com as frequências.                                                     |
+| E-mail e hash de senha da equipe          | Autenticar o acesso pessoal.                    | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
+| Nome da administração e da coordenação    | Tratamento e saudação; identificação da equipe. | Conta ativa.                                                                        |
+| Trilha de auditoria (quem, o quê, quando) | Prestar contas de ações administrativas.        | Conforme política da escola; sem dados de alunos.                                   |
 
 Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
 

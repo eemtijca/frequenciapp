@@ -20,7 +20,7 @@ O relato é respondido em até 7 dias. Correções de segurança entram como lan
 ## Práticas adotadas
 
 - **Senhas**: hash com scrypt (custo 16384, chave de 64 bytes, sal aleatório por conta) e comparação em tempo constante. Nenhuma senha trafega em log.
-- **Sessões**: token aleatório de 32 bytes em cookie HttpOnly, SameSite=Lax e Secure em produção; o banco guarda apenas o hash SHA-256 do token, com expiração de 30 dias e purga de vencidas.
+- **Sessões**: token aleatório de 32 bytes em cookie HttpOnly, SameSite=Lax e Secure em produção; o banco guarda apenas o hash SHA-256 do token. Com "Manter conectado neste dispositivo", a validade é de 30 dias; sem a opção, o cookie é de sessão e a validade no servidor é de 12 horas. Vencidas são purgadas.
 - **CSRF**: mutações cross-site bloqueadas no proxy por `sec-fetch-site` e comparação de origem; as rotas também verificam o cabeçalho Origin.
 - **Cabeçalhos**: CSP com nonce por requisição, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy` e `Permissions-Policy` restritivos.
 - **Isolamento**: as rotas de cadastro e de contas exigem papel de administração, e a frequência é única por turma e dia, com revisão e revalidação de alunos e aulas dentro da transação.
