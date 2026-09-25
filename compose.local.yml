@@ -1,0 +1,13 @@
+# Override para GitHub Codespaces e outros ambientes Docker restritos.
+# Use com: docker compose -f compose.yml -f compose.local.yml up --build
+#
+# O Docker do Codespaces pode bloquear a comunicação bridge entre os
+# serviços `app` e `db`. O override usa a porta PostgreSQL publicada no
+# host do Codespaces, sem expor a senha da aplicação fora do Compose.
+services:
+  app:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DATABASE_URL: postgresql://frequencia:frequencia@host.docker.internal:5432/frequencia
+      DIRECT_URL: postgresql://frequencia:frequencia@host.docker.internal:5432/frequencia
