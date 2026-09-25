@@ -1,6 +1,6 @@
 # Testes
 
-Suítes do Chamada com Vitest.
+Suítes do FrequenciApp com Vitest.
 
 | Suíte            | Comando             | Pré-requisitos                                    |
 | ---------------- | ------------------- | ------------------------------------------------- |
@@ -27,14 +27,14 @@ A suíte aponta para o aplicativo em execução. O banco de testes precisa estar
 npx prisma migrate deploy
 
 # 2. contas de teste (padrões demo@escola.exemplo e direcao@escola.exemplo)
-ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoChamada2026 ADMIN_NOME=Direção npm run criar-admin
-CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoChamada2026 CONTA_NOME=Demo npm run criar-conta
+ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção npm run criar-admin
+CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo npm run criar-conta
 
 # 3. aplicativo no ar em outra sessão
 npm run dev
 
 # 4. suíte
-DATABASE_URL=postgresql://chamada:chamada@localhost:5432/chamada npm run test:api
+DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm run test:api
 ```
 
 Variáveis aceitas:
@@ -48,4 +48,4 @@ A suíte usa os dias 2026-06-15 e 2026-06-16 como dias isolados de teste, cria e
 
 ## Verificação visual e de ponta a ponta
 
-Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e navegação de ponta a ponta por navegador automatizado, cobrindo login com erro e sucesso, gestão completa (série, turma, professor com atribuições e aluno), chamada com marcação e salvamento, histórico, grade de originais, troca de senha com reentrada, registro do service worker, página offline, tema claro e escuro, e larguras de celular e desktop.
+Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e navegação de ponta a ponta por navegador automatizado, cobrindo login com erro e sucesso, gestão completa (série, turma, professor com atribuições e aluno), frequência com marcação e salvamento, histórico, grade de originais, troca de senha com reentrada, registro do service worker, página offline, tema claro e escuro, e larguras de celular e desktop.

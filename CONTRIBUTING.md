@@ -1,13 +1,13 @@
 # Contribuindo
 
-Guia de desenvolvimento do Chamada: como preparar o ambiente, propor mudanças, escrever código, testar e documentar. Dúvidas e propostas podem ser abertas como issue; o detalhamento técnico está em [docs/](docs/README.md). Para vulnerabilidades, siga [SECURITY.md](SECURITY.md) e nunca abra issue pública com dados sensíveis.
+Guia de desenvolvimento do FrequenciApp: como preparar o ambiente, propor mudanças, escrever código, testar e documentar. Dúvidas e propostas podem ser abertas como issue; o detalhamento técnico está em [docs/](docs/README.md). Para vulnerabilidades, siga [SECURITY.md](SECURITY.md) e nunca abra issue pública com dados sensíveis.
 
 ## Ambiente de desenvolvimento
 
 Pré-requisitos: Node.js 20.19 ou superior e Docker com Compose no modo recomendado, ou um PostgreSQL 17 próprio, conforme [docs/ambiente.md](docs/ambiente.md).
 
 ```bash
-npm install
+npm ci
 cp .env.example .env  # preencha AUTH_SECRET com um segredo aleatório
 npx prisma migrate deploy
 npm run criar-admin   # com ADMIN_EMAIL, ADMIN_SENHA e ADMIN_NOME no ambiente
@@ -56,7 +56,7 @@ Parta da `main` atualizada e use o padrão `tipo/descricao-curta`:
 Siga o padrão Conventional Commits, em português, no imperativo e descrevendo o efeito da mudança. Use escopo entre parênteses quando ajudar a localizar a área:
 
 ```text
-feat(chamada): marca falta com um toque na linha do aluno
+feat(frequencia): marca falta com um toque na linha do aluno
 fix(api): corrige rejeição de falta de aluno movido de turma
 docs: descreve a grade por turma de origem
 test(unit): cobre o desempate de datas na grade
@@ -96,7 +96,7 @@ Corrija as falhas antes de pedir nova revisão. Pull requests sem verificações
 ## Padrões de código
 
 - Código e comentários em português, curtos e diretos.
-- Domínio em português (`chamadas`, `faltas`, `alunos`); infraestrutura em inglês quando for termo consagrado (`prisma`, `middleware`).
+- Domínio em português (`frequências`, `faltas`, `alunos`); infraestrutura em inglês quando for termo consagrado (`prisma`, `middleware`).
 - Camadas: `src/domain` não importa nada de fora; `src/application` orquestra domínio e infraestrutura; `src/infra` isola Prisma, autenticação e HTTP; `src/app` e `src/components` são apresentação.
 - TypeScript estrito, sem `any` e sem asserções não nulas; o ESLint reprova ambos.
 - Segredos apenas via ambiente, validados na partida por zod (`src/infra/ambiente.ts`).
@@ -106,7 +106,7 @@ Corrija as falhas antes de pedir nova revisão. Pull requests sem verificações
 
 ### Banco e migrações
 
-Crie migrações com `npx prisma migrate dev --nome ajuste`. Nunca edite uma migração aplicada; qualquer ajuste entra como migração nova. O schema é a fonte da verdade em `prisma/schema.prisma`, e os comandos do dia a dia estão em [docs/banco.md](docs/banco.md).
+Crie migrações com `npx prisma migrate dev --name ajuste`. Nunca edite uma migração aplicada; qualquer ajuste entra como migração nova. A migration inicial desta reconstrução pode ser reescrita antes do primeiro deploy de produção. Depois do primeiro deploy, a regra passa a ser aplicada sem exceção. O schema é a fonte da verdade em `prisma/schema.prisma`, e os comandos do dia a dia estão em [docs/banco.md](docs/banco.md).
 
 ### Formatação e análise estática
 

@@ -11,7 +11,9 @@ O aplicativo original usava SQLite local com Drizzle e dependia de integrações
 ## Decisão
 
 - PostgreSQL 17 como banco único, na versão testada e recomendada.
-- `DATABASE_URL` como única chave de acesso, válida para runtime e CLI; `DIRECT_URL` documentado para provedores com pooler de transação.
+- `DATABASE_URL` para o runtime da API e o Prisma Client. No Supabase, usa a Transaction pooler com `pgbouncer=true` e `sslmode=require`.
+- `DIRECT_URL` para Prisma CLI, migrations, Studio e scripts administrativos. No Supabase, usa a Session pooler ou uma conexão direta.
+- `prisma.config.ts` prioriza `DIRECT_URL` para o CLI, com fallback local para geração do cliente durante o build.
 - Prisma 7 com o gerador novo `prisma-client` e código gerado em `generated/` (fora do controle de versão): cliente sem processo Rust, importado pelo runtime junto com o adaptador oficial `pg` (`PrismaPg`). O CLI lê a connection string de `prisma.config.ts`.
 - Unicidades insensíveis a caixa (e-mail, série, turma por série) ficam em índices funcionais no SQL das migrações, porque o gerador não as representa.
 

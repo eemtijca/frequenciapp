@@ -2,7 +2,7 @@
 
 Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009).
 
-Autenticação por cookie `chamada_sessao` (HttpOnly, SameSite=Lax, Secure em produção). Guardas de papel: rotas de gestão exigem `ADMIN`; o restante aceita qualquer sessão ativa e filtra pelo escopo de quem pede.
+Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção). Guardas de papel: rotas de gestão exigem `ADMIN`; o restante aceita qualquer sessão ativa e filtra pelo escopo de quem pede.
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
@@ -37,7 +37,7 @@ Encerra a sessão corrente e limpa o cookie.
 Troca a própria senha. Corpo: `{ "senhaAtual": string, "senhaNova": string }`. As outras sessões abertas deste usuário são encerradas.
 
 - 200 `{"ok": true}`.
-- 400 quando a senha atual não confere, a nova fora da política (mínimo 8 caracteres, uma letra e um número) ou o corpo é inválido.
+- 400 quando a senha atual não confere, a nova está fora da política (mínimo 8 caracteres, uma letra e um número) ou o corpo é inválido.
 
 ## Séries (administração)
 
@@ -50,7 +50,7 @@ Troca a própria senha. Corpo: `{ "senhaAtual": string, "senhaNova": string }`. 
 Corpo: `{ "nome": string, "ordem": number }`.
 
 - 201 `{"serie": Serie}`.
-- 400 validação; 401 sem sessão; 403 sem papel de administrador; 409 nome repetido (sem diferenciar caixa).
+- 400 validação; 401 sem sessão; 403 sem papel de administrador; 409 nome repetido sem diferenciar caixa.
 
 ### PATCH /api/series/{id}
 
@@ -66,25 +66,25 @@ Corpo parcial: `{ nome?, ordem? }`.
 
 ### GET /api/turmas
 
-- 200 `{"turmas": Turma[], "origens": Turma[]}`. Administrador recebe todas; professor recebe as atribuídas e as origens referenciadas pelos alunos delas.
+- 200 `{"turmas": Turma[], "origens": Turma[]}`. O administrador recebe todas; o professor recebe as atribuídas e as origens referenciadas pelos alunos delas.
 
-Turma: `{ id, nome, serieId, serieNome, rotulo }`, com rótulo composto (por exemplo, "1º ano A").
+Turma: `{ id, nome, serieId, serieNome, rotulo }`, com rótulo composto, por exemplo "1º ano A".
 
 ### POST /api/turmas
 
 Corpo: `{ "serieId": string, "nome": string }`.
 
-- 201 `{"turma": Turma}`; 404 série inexistente; 409 turma repetida na série; 403 sem papel de administrador.
+- 201 `{"turma":Turma}`; 404 série inexistente; 409 turma repetida na série; 403 sem papel de administrador.
 
 ### PATCH /api/turmas/{id}
 
 Corpo parcial: `{ nome?, serieId? }`.
 
-- 200 `{"turma": Turma}`; 404 turma ou série inexistente; 409 rótulo repetido.
+- 200 `{"turma":Turma}`; 404 turma ou série inexistente; 409 rótulo repetido.
 
 ### DELETE /api/turmas/{id}
 
-- 200 `{"ok": true}`; 409 quando ainda há alunos ou chamadas, com orientação de mover ou excluir antes.
+- 200 `{"ok": true}`; 409 quando ainda existem alunos ou frequências, com orientação para mover ou excluir antes.
 
 ## Alunos
 
@@ -92,7 +92,7 @@ Corpo parcial: `{ nome?, serieId? }`.
 
 Parâmetro opcional `turmaId`.
 
-- 200 `{"alunos": Aluno[]}` no escopo de quem pede (todos para administrador, turmas atribuídas para professor), ordenados por turma e ordem.
+- 200 `{"alunos": Aluno[]}` no escopo de quem pede (todos para o administrador, turmas atribuídas para o professor), ordenados por turma e ordem.
 - 400 quando `turmaId` não é um identificador válido.
 
 Aluno: `{ id, nome, turmaId, turmaOriginalId, ordem, ativo }`.
@@ -129,52 +129,52 @@ Corpo: `{ "nome": string, "email": string, "senha": string, "papel"?: "ADMIN" | 
 
 - 201 `{"usuario": UsuarioComTurmas}`.
 - 400 senha fora da política, e-mail inválido ou turmas repetidas.
-- 409 e-mail já usado (sem diferenciar caixa).
+- 409 e-mail já usado sem diferenciar caixa.
 
 ### PATCH /api/usuarios/{id}
 
 Corpo parcial: `{ nome?, email?, senha?, papel?, ativo?, turmas?: string[] }`. `turmas` substitui o conjunto completo. `ativo: false` encerra as sessões da conta.
 
 - 200 `{"usuario": UsuarioComTurmas}`.
-- 400 quando o alvo é o próprio administrador com rebaixamento ou desativação; turma inexistente na lista.
-- 409 quando a escola ficaria sem administrador ativo, ou e-mail já usado.
+- 400 quando o alvo é o próprio administrador com rebaixamento ou desativação, ou quando a lista contém uma turma inexistente.
+- 409 quando a escola ficaria sem administrador ativo, ou o e-mail já é usado.
 
 ### DELETE /api/usuarios/{id}
 
 - 200 `{"ok": true}`.
 - 400 quando o alvo é o próprio administrador.
-- 409 quando a conta tem chamadas registradas (orienta desativar) ou seria o último administrador ativo.
+- 409 quando a conta tem frequências registradas (orienta desativar) ou seria o último administrador ativo.
 
-## Chamadas
+## Frequências
 
-### GET /api/chamadas?dia=YYYY-MM-DD&turmaId=uuid
+### GET /api/frequencias?dia=YYYY-MM-DD&turmaId=uuid
 
-- 200 `{"chamada": Chamada | null}`.
+- 200 `{"frequencia": Frequencia | null}`.
 - 400 quando dia ou turma são inválidos.
 
-Chamada: `{ dia, turmaId, revisao, atualizadoEm, faltas: string[] }` com os identificadores dos alunos ausentes.
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, faltas: string[] }` com os identificadores dos alunos ausentes.
 
-### GET /api/chamadas?mes=YYYY-MM
+### GET /api/frequencias?mes=YYYY-MM
 
-- 200 `{"chamadas": Chamada[]}` do mês, em ordem de dia e turma.
+- 200 `{"frequencias": Frequencia[]}` do mês, em ordem de dia e turma.
 
-### POST /api/chamadas
+### POST /api/frequencias
 
 Corpo: `{ "dia": string, "turmaId": string, "faltas": string[], "revisao": number }`.
 
-Permissão: professor precisa da turma atribuída; administrador pode chamar qualquer turma.
+Permissão: o professor precisa da turma atribuída; o administrador pode registrar qualquer turma.
 
 Semântica da `revisao`:
 
-- `0` cria a primeira versão. Se já existe chamada do dia e turma, responde 409 com a versão vigente.
+- `0` cria a primeira versão. Se já existe frequência do dia e turma, responde 409 com a versão vigente.
 - `N` atualiza apenas se a versão vigente for `N`; a divergência responde 409 com a versão vigente.
 
 O salvamento roda em transação serializável; a lista de faltas é revalidada contra os alunos ativos da turma dentro da transação (ADR-007).
 
 Respostas:
 
-- 200 `{"chamada": Chamada}` com a revisão incrementada.
-- 409 `{"error", "conflito": true, "chamada": Chamada}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
+- 200 `{"frequencia": Frequencia}` com a revisão incrementada.
+- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
 - 400 quando faltas apontam alunos de outra turma ou a validação falha.
 - 403 sem atribuição da turma ou sem sessão.
 - 404 turma inexistente.

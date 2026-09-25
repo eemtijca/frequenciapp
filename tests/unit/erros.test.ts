@@ -42,13 +42,13 @@ describe("traduzirErro", () => {
       erroConhecido("P2002", { target: ["frequencias_professor_id_turma_id_dia_key"] }),
     );
     expect(resultado.status).toBe(409);
-    expect(resultado.mensagem).toContain("frequencia");
+    expect(resultado.mensagem).toContain("frequência");
   });
 
   it("traduz registro em uso (P2003) por chave estrangeira", () => {
     const resultado = traduzirErro(erroConhecido("P2003", { field_name: "turmas_turma_id_fkey" }));
     expect(resultado.status).toBe(409);
-    expect(resultado.mensagem).toContain("alunos ou frequencias");
+    expect(resultado.mensagem).toContain("alunos ou frequências");
   });
 
   it("traduz P2003 desconhecida com mensagem genérica de uso", () => {
