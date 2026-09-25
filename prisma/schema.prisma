@@ -186,7 +186,9 @@ model SaidaAntecipada {
   @@map("saidas_antecipadas")
 }
 
-// Recursos configuráveis pela administração. Linha única criada na migração.
+// Configurações de recursos e catálogo de justificativas. A linha de
+// configurações é única, criada na migração; as justificativas nascem com os
+// códigos padrão e podem ser editadas pela administração.
 model Configuracao {
   id                String   @id @default("principal")
   frequenciaPorAula Boolean  @default(false) @map("frequencia_por_aula")
@@ -196,6 +198,18 @@ model Configuracao {
   atualizadoPor     Usuario? @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("configuracoes")
+}
+
+// Catálogo de justificativas de falta e de saída. O código é estável, porque
+// a chamada e a saída guardam o código; rótulo e situação são editáveis.
+model Justificativa {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo   String   @db.VarChar(10)
+  rotulo   String   @db.VarChar(60)
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  @@map("justificativas")
 }
 
 // Trilha de auditoria de ações administrativas. Apenas identificadores
