@@ -57,6 +57,9 @@ worklog.md
 .postgres17/
 sandbox/
 
+# Referência funcional do aplicativo original (análise local, nunca commitar)
+apporiginal.html
+
 # Cliente Prisma gerado (prisma generate)
 generated/
 tool-results/
