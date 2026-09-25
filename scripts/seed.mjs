@@ -1,5 +1,5 @@
-// Semente de desenvolvimento (séries, turmas e alunos sintéticos) para a
-// conta de professor existente. Sem dados reais, conforme a LGPD.
+// Semente de desenvolvimento (séries, turmas, aulas e alunos sintéticos) para
+// a conta de coordenação existente. Sem dados reais, conforme a LGPD.
 import pg from "pg";
 import "dotenv/config";
 
@@ -7,7 +7,9 @@ const email = process.env.CONTA_EMAIL?.trim().toLowerCase();
 const totalPorTurma = Number(process.env.SEED_ALUNOS ?? 12);
 
 if (!email) {
-  console.error("Defina CONTA_EMAIL (a conta precisa existir; crie com npm run criar-conta).");
+  console.error(
+    "Defina CONTA_EMAIL (a conta precisa existir; crie com npm run criar-coordenacao).",
+  );
   process.exit(1);
 }
 if (!Number.isInteger(totalPorTurma) || totalPorTurma < 1 || totalPorTurma > 99) {
@@ -27,20 +29,31 @@ const SERIES = [
   { nome: "3º ano", ordem: 3, turmas: ["A", "B", "C"] },
 ];
 
+// Grade sintética de cinco aulas, de segunda a sexta.
+const AULAS = [
+  { ordem: 1, inicio: "07:00", fim: "07:50" },
+  { ordem: 2, inicio: "07:50", fim: "08:40" },
+  { ordem: 3, inicio: "08:40", fim: "09:30" },
+  { ordem: 4, inicio: "09:50", fim: "10:40" },
+  { ordem: 5, inicio: "10:40", fim: "11:30" },
+];
+const DIAS_UTEIS = [1, 2, 3, 4, 5];
+
 const cliente = new pg.Client({ connectionString: url });
 
 try {
   await cliente.connect();
 
-  const professor = await cliente.query(
-    "select id from usuarios where lower(email) = $1 and papel = 'PROFESSOR'",
+  const coordenacao = await cliente.query(
+    "select id from usuarios where lower(email) = $1 and papel = 'COORDENACAO'",
     [email],
   );
-  if (professor.rowCount === 0) {
-    console.error(`Conta de professor ${email} não encontrada. Rode npm run criar-conta antes.`);
+  if (coordenacao.rowCount === 0) {
+    console.error(
+      `Conta de coordenação ${email} não encontrada. Rode npm run criar-coordenacao antes.`,
+    );
     process.exit(2);
   }
-  const professorId = professor.rows[0].id;
 
   const existentes = await cliente.query("select count(*)::int as total from series");
   if (existentes.rows[0].total > 0) {
@@ -49,7 +62,6 @@ try {
   }
 
   const idsDeTurmas = {};
-  const idsDoTerceiro = [];
   for (const serie of SERIES) {
     const criada = await cliente.query(
       `insert into series (nome, ordem, criado_em) values ($1, $2, now())
@@ -79,13 +91,20 @@ try {
           ])
         ).rows[0].id;
       idsDeTurmas[rotulo] = turmaId;
-      if (serie.nome === "3º ano") idsDoTerceiro.push(turmaId);
+
+      for (const aula of AULAS) {
+        await cliente.query(
+          `insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo, criado_em)
+           values ($1, $2, $3, $4, $5, true, now())
+           on conflict (turma_id, ordem) do nothing`,
+          [turmaId, aula.ordem, aula.inicio, aula.fim, DIAS_UTEIS],
+        );
+      }
     }
   }
 
   // Alunos sintéticos com origem cruzada no 3º ano (cena de reorganização
-  // de turmas, que exercita a grade Originais).
-  const terceiro = SERIES.find((serie) => serie.nome === "3º ano");
+  // de turmas, que exercita a grade do mês).
   let semeados = 0;
   for (const serie of SERIES) {
     for (const letra of serie.turmas) {
@@ -117,21 +136,8 @@ try {
     }
   }
 
-  // O professor de demonstração recebe as turmas do 3º ano.
-  for (const turmaId of idsDoTerceiro) {
-    await cliente.query(
-      `insert into atribuicoes (professor_id, turma_id, criado_em) values ($1, $2, now())
-       on conflict (professor_id, turma_id) do nothing`,
-      [professorId, turmaId],
-    );
-  }
-  void terceiro;
-
   console.log(
-    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${semeados} alunos sintéticos.`,
-  );
-  console.log(
-    `Professor ${email} com ${idsDoTerceiro.length} turmas atribuídas (3º ano A, B e C).`,
+    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos.`,
   );
 } catch (erro) {
   console.error("Falha ao semear:", erro.message);

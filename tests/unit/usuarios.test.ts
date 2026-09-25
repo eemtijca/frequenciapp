@@ -38,7 +38,7 @@ describe("primeiroNome", () => {
 
 describe("rotuloDePapel", () => {
   it("traduz os papéis", () => {
-    expect(rotuloDePapel("ADMIN")).toBe("Administrador");
-    expect(rotuloDePapel("PROFESSOR")).toBe("Professor(a)");
+    expect(rotuloDePapel("ADMIN")).toBe("Administração");
+    expect(rotuloDePapel("COORDENACAO")).toBe("Coordenação");
   });
 });

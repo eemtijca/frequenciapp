@@ -1,5 +1,5 @@
 // Utilidades comuns dos testes de ponta a ponta.
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 /**
  * Aguarda a hidratação do React. O HTML do servidor pode estar visível antes
@@ -12,4 +12,24 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
     if (!alvo) return false;
     return Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"));
   }, seletor);
+}
+
+/**
+ * Troca de visão pela navegação inferior. Em desenvolvimento o Fast Refresh
+ * pode trocar os nós durante a hidratação, então o clique é repetido até o
+ * painel ativo mudar.
+ */
+export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
+  const botao = page
+    .getByRole("navigation", { name: "Seções do aplicativo" })
+    .getByRole("button", { name: rotulo });
+  await expect
+    .poll(
+      async () => {
+        await botao.click({ force: true });
+        return page.locator("main").getAttribute("data-visao");
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(visao);
 }

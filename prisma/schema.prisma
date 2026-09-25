@@ -1,5 +1,5 @@
-// Esquema do banco, fonte da verdade do Prisma Client. Faltas guardam só
-// ausências; índices funcionais e a revisão vivem nas migrações, de propósito.
+// Esquema do banco, fonte da verdade do Prisma Client. A frequência é única
+// por turma e dia, compartilhada pela coordenação, e cada falta guarda a aula.
 
 generator client {
   provider = "prisma-client"
@@ -10,11 +10,11 @@ datasource db {
   provider = "postgresql"
 }
 
-// Papel do usuário. ADMIN gerencia tudo (séries, turmas, alunos e
-// professores); PROFESSOR registra a frequência das turmas atribuídas.
+// Papel do usuário. ADMIN cuida de contas e cadastros; COORDENACAO faz a
+// frequência, consulta o histórico e a grade do mês.
 enum Papel {
   ADMIN
-  PROFESSOR
+  COORDENACAO
 
   @@map("papel")
 }
@@ -22,18 +22,18 @@ enum Papel {
 // Usuário da aplicação. Sem dados além do necessário: nome de
 // tratamento, e-mail para acesso, hash da senha e papel.
 model Usuario {
-  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email        String
-  senhaHash    String       @map("senha_hash")
-  nome         String
-  papel        Papel        @default(PROFESSOR)
-  ativo        Boolean      @default(true)
-  criadoEm     DateTime     @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm DateTime     @updatedAt @map("atualizado_em") @db.Timestamptz
-  sessoes      Sessao[]
-  frequencias  Frequencia[]
-  atribuicoes  Atribuicao[]
-  auditorias   Auditoria[]
+  id                     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                  String
+  senhaHash              String       @map("senha_hash")
+  nome                   String
+  papel                  Papel        @default(COORDENACAO)
+  ativo                  Boolean      @default(true)
+  criadoEm               DateTime     @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm           DateTime     @updatedAt @map("atualizado_em") @db.Timestamptz
+  sessoes                Sessao[]
+  frequenciasCriadas     Frequencia[] @relation("FrequenciaCriadaPor")
+  frequenciasAtualizadas Frequencia[] @relation("FrequenciaAtualizadaPor")
+  auditorias             Auditoria[]
 
   @@index([papel])
   @@map("usuarios")
@@ -66,8 +66,7 @@ model Serie {
 }
 
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
-// enquanto houver alunos ou frequências vinculadas: histórico não fica
-// órfão, e o administrador é orientado a mover ou excluir antes.
+// enquanto houver alunos ou frequências vinculadas.
 model Turma {
   id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   serieId     String       @map("serie_id") @db.Uuid
@@ -77,24 +76,10 @@ model Turma {
   alunos      Aluno[]      @relation("AlunoTurma")
   origemDe    Aluno[]      @relation("AlunoTurmaOriginal")
   frequencias Frequencia[]
-  atribuicoes Atribuicao[]
+  horarios    Horario[]
 
   @@unique([serieId, nome])
   @@map("turmas")
-}
-
-// Atribuição de um professor a uma turma: define quais turmas cada
-// professor pode registrar. O administrador enxerga todas.
-model Atribuicao {
-  professorId String   @map("professor_id") @db.Uuid
-  turmaId     String   @map("turma_id") @db.Uuid
-  criadoEm    DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  professor   Usuario  @relation(fields: [professorId], references: [id], onDelete: Cascade)
-  turma       Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
-
-  @@id([professorId, turmaId])
-  @@index([turmaId])
-  @@map("atribuicoes")
 }
 
 // Aluno de uma turma. Nome do aluno, turma atual (de onde parte a
@@ -117,34 +102,58 @@ model Aluno {
   @@map("alunos")
 }
 
-// Frequência de um dia e turma por um professor. revisao 1 no primeiro
-// salvamento e crescimento a cada atualização bem-sucedida.
-model Frequencia {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  professorId  String   @map("professor_id") @db.Uuid
-  turmaId      String   @map("turma_id") @db.Uuid
-  dia          DateTime @db.Date
-  revisao      Int      @default(1)
-  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
-  professor    Usuario  @relation(fields: [professorId], references: [id], onDelete: Restrict)
-  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Restrict)
-  faltas       Falta[]
+// Aula da turma: ordem, janela de horário e dias da semana em que acontece.
+// A aula padrão cobre o dia inteiro para nenhuma turma ficar sem chamada.
+model Horario {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId    String   @map("turma_id") @db.Uuid
+  ordem      Int
+  inicio     String   @db.VarChar(5)
+  fim        String   @db.VarChar(5)
+  diasSemana Int[]    @map("dias_semana")
+  ativo      Boolean  @default(true)
+  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  turma      Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  faltas     Falta[]
 
-  @@unique([professorId, turmaId, dia])
-  @@index([professorId, dia])
-  @@index([turmaId, dia])
+  @@unique([turmaId, ordem])
+  @@index([turmaId])
+  @@map("horarios")
+}
+
+// Frequência de um dia e turma, compartilhada pela coordenação. revisao 1 no
+// primeiro salvamento e crescimento a cada atualização bem-sucedida; a autoria
+// fica anulável para o histórico não depender da conta.
+model Frequencia {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId         String   @map("turma_id") @db.Uuid
+  dia             DateTime @db.Date
+  revisao         Int      @default(1)
+  criadoPorId     String?  @map("criado_por_id") @db.Uuid
+  atualizadoPorId String?  @map("atualizado_por_id") @db.Uuid
+  atualizadoEm    DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  turma           Turma    @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor       Usuario? @relation("FrequenciaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor   Usuario? @relation("FrequenciaAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  faltas          Falta[]
+
+  @@unique([turmaId, dia])
+  @@index([dia])
   @@map("frequencias")
 }
 
-// Falta de um aluno em uma frequência. Presença não gera linha.
+// Falta de um aluno em uma aula da frequência. Presença não gera linha.
 model Falta {
   frequenciaId String     @map("frequencia_id") @db.Uuid
   alunoId      String     @map("aluno_id") @db.Uuid
+  horarioId    String     @map("horario_id") @db.Uuid
   frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
   aluno        Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  horario      Horario    @relation(fields: [horarioId], references: [id], onDelete: Restrict)
 
-  @@id([frequenciaId, alunoId])
+  @@id([frequenciaId, alunoId, horarioId])
   @@index([alunoId])
+  @@index([horarioId])
   @@map("faltas")
 }
 

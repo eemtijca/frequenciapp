@@ -9,35 +9,35 @@ import type { Aluno, Serie, Turma } from "@/domain/frequencia";
 import AbaSeries from "@/components/gestao/aba-series";
 import AbaTurmas from "@/components/gestao/aba-turmas";
 import AbaAlunos from "@/components/gestao/aba-alunos";
-import AbaProfessores from "@/components/gestao/aba-professores";
+import AbaEquipe from "@/components/gestao/aba-equipe";
 
-export type Aba = "series" | "turmas" | "alunos" | "professores";
+export type Aba = "series" | "turmas" | "alunos" | "equipe";
 
 interface Props {
+  usuarioId: string;
   series: Serie[];
   turmas: Turma[];
   alunos: Aluno[];
   onSeriesMudaram: () => Promise<void>;
   onTurmasMudaram: () => Promise<void>;
   onAlunosMudaram: () => Promise<void>;
-  rotuloTurma: (id: string) => string;
 }
 
 const ABAS: { aba: Aba; rotulo: string; icone: typeof School }[] = [
   { aba: "series", rotulo: "Séries", icone: GraduationCap },
   { aba: "turmas", rotulo: "Turmas", icone: School },
   { aba: "alunos", rotulo: "Alunos", icone: ListChecks },
-  { aba: "professores", rotulo: "Professores", icone: Users },
+  { aba: "equipe", rotulo: "Equipe", icone: Users },
 ];
 
 export default function VistaGestao({
+  usuarioId,
   series,
   turmas,
   alunos,
   onSeriesMudaram,
   onTurmasMudaram,
   onAlunosMudaram,
-  rotuloTurma,
 }: Props) {
   const [aba, setAba] = useState<Aba>("turmas");
 
@@ -104,9 +104,7 @@ export default function VistaGestao({
           {aba === "alunos" && (
             <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
           )}
-          {aba === "professores" && (
-            <AbaProfessores turmas={turmas} onMudanca={onTurmasMudaram} rotuloTurma={rotuloTurma} />
-          )}
+          {aba === "equipe" && <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} />}
         </motion.div>
       </AnimatePresence>
     </section>

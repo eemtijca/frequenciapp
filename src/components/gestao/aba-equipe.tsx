@@ -1,22 +1,12 @@
 "use client";
 
-// Aba de professores: contas, papéis, senhas e turmas atribuídas.
-// A senha de cada professor é definida aqui; ele pode trocá-la depois.
+// Aba de equipe: contas da coordenação e da administração, com papel,
+// senha e situação. Sem atribuições de turma.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import {
-  Check,
-  KeyRound,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  Power,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import type { Turma } from "@/domain/frequencia";
-import { rotuloDePapel, type UsuarioComTurmas } from "@/domain/usuarios";
+import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,26 +32,24 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface Props {
-  turmas: Turma[];
+  usuarioId: string;
   onMudanca: () => Promise<void>;
-  rotuloTurma: (id: string) => string;
 }
 
 interface Formulario {
   nome: string;
   email: string;
   senha: string;
-  papel: "ADMIN" | "PROFESSOR";
-  turmas: string[];
+  papel: Papel;
 }
 
-const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "PROFESSOR", turmas: [] };
+const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO" };
 
-export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props) {
-  const [usuarios, setUsuarios] = useState<UsuarioComTurmas[] | null>(null);
+export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
+  const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [dialogoAberto, setDialogoAberto] = useState(false);
-  const [emEdicao, setEmEdicao] = useState<UsuarioComTurmas | null>(null);
+  const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
@@ -69,11 +57,11 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
   const recarregar = useCallback(async () => {
     setCarregando(true);
     try {
-      const dados = await pedir<{ usuarios: UsuarioComTurmas[] }>("/api/usuarios");
+      const dados = await pedir<{ usuarios: UsuarioDTO[] }>("/api/usuarios");
       setUsuarios(dados.usuarios);
     } catch (excecao) {
       const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar os professores.";
+        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a equipe.";
       toast.error(mensagem);
       setUsuarios([]);
     } finally {
@@ -85,9 +73,9 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
     void recarregar();
   }, [recarregar]);
 
-  const rotulo = useMemo(
-    () => (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? rotuloTurma(id),
-    [turmas, rotuloTurma],
+  const administradoresAtivos = useMemo(
+    () => (usuarios ?? []).filter((u) => u.papel === "ADMIN" && u.ativo).length,
+    [usuarios],
   );
 
   function abrirNovo() {
@@ -97,26 +85,16 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
     setDialogoAberto(true);
   }
 
-  function abrirEdicao(usuario: UsuarioComTurmas) {
+  function abrirEdicao(usuario: UsuarioDTO) {
     setEmEdicao(usuario);
     setFormulario({
       nome: usuario.nome,
       email: usuario.email,
       senha: "",
       papel: usuario.papel,
-      turmas: [...usuario.turmas],
     });
     setErro("");
     setDialogoAberto(true);
-  }
-
-  function alternarTurma(turmaId: string) {
-    setFormulario((atual) => ({
-      ...atual,
-      turmas: atual.turmas.includes(turmaId)
-        ? atual.turmas.filter((id) => id !== turmaId)
-        : [...atual.turmas, turmaId],
-    }));
   }
 
   async function submeter() {
@@ -129,16 +107,15 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
           nome: formulario.nome,
           email: formulario.email,
           papel: formulario.papel,
-          turmas: formulario.turmas,
         };
         if (formulario.senha !== "") corpo.senha = formulario.senha;
-        await pedir<{ usuario: UsuarioComTurmas }>(
+        await pedir<{ usuario: UsuarioDTO }>(
           `/api/usuarios/${emEdicao.id}`,
           corpoAlteracao("PATCH", corpo),
         );
         toast.success("Conta atualizada.");
       } else {
-        await pedir<{ usuario: UsuarioComTurmas }>("/api/usuarios", corpoJson(formulario));
+        await pedir<{ usuario: UsuarioDTO }>("/api/usuarios", corpoJson(formulario));
         toast.success("Conta criada.");
       }
       setDialogoAberto(false);
@@ -151,9 +128,9 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
     }
   }
 
-  async function alternarAtivo(usuario: UsuarioComTurmas) {
+  async function alternarAtivo(usuario: UsuarioDTO) {
     try {
-      await pedir<{ usuario: UsuarioComTurmas }>(
+      await pedir<{ usuario: UsuarioDTO }>(
         `/api/usuarios/${usuario.id}`,
         corpoAlteracao("PATCH", { ativo: !usuario.ativo }),
       );
@@ -166,7 +143,7 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
     }
   }
 
-  async function excluir(usuario: UsuarioComTurmas) {
+  async function excluir(usuario: UsuarioDTO) {
     try {
       await pedir<{ ok: boolean }>(`/api/usuarios/${usuario.id}`, corpoAlteracao("DELETE"));
       toast.success("Conta excluída.");
@@ -184,7 +161,7 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
         <p className="text-muted-foreground text-sm">
           {usuarios === null
             ? "Carregando..."
-            : `${usuarios.filter((u) => u.papel === "PROFESSOR").length} professores · ${usuarios.filter((u) => u.papel === "ADMIN").length} administradores`}
+            : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
         </p>
         <Button size="lg" className="h-11 rounded-lg" onClick={abrirNovo}>
           <Plus size={16} />
@@ -193,8 +170,9 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
       </div>
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
-        Cada professor entra com o próprio e-mail e senha. Marque as turmas que ele pode chamar. Ao
-        desativar, o acesso é bloqueado na hora.
+        Cada pessoa entra com o próprio e-mail e senha. A coordenação faz a frequência e consulta o
+        histórico; a administração também cuida de contas e cadastros. Ao desativar, o acesso é
+        bloqueado na hora.
       </p>
 
       {carregando ? (
@@ -207,7 +185,7 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma conta além da sua</p>
           <p className="text-muted-foreground text-sm">
-            Crie a conta de cada professor para liberar o acesso.
+            Crie a conta de cada pessoa da equipe para liberar o acesso.
           </p>
           <Button variant="outline" className="mt-2" onClick={abrirNovo}>
             <Plus size={16} />
@@ -216,101 +194,104 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
         </div>
       ) : (
         <ul className="flex flex-col gap-3">
-          {(usuarios ?? []).map((usuario) => (
-            <motion.li
-              key={usuario.id}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-              className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
-            >
-              <div className="flex items-center gap-3 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 truncate font-medium">
-                    {usuario.nome}
-                    <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
-                      {rotuloDePapel(usuario.papel)}
-                    </span>
-                  </p>
-                  <p className="text-muted-foreground truncate text-sm">{usuario.email}</p>
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    {usuario.turmas.length === 0
-                      ? "sem turmas atribuídas"
-                      : `${usuario.turmas.length} ${usuario.turmas.length === 1 ? "turma" : "turmas"}`}
-                    {!usuario.ativo ? " · desativada" : ""}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-11"
-                    aria-label={`Editar conta de ${usuario.nome}`}
-                    onClick={() => abrirEdicao(usuario)}
-                  >
-                    <Pencil size={16} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-11"
-                    aria-label={
-                      usuario.ativo
-                        ? `Desativar conta de ${usuario.nome}`
-                        : `Reativar conta de ${usuario.nome}`
-                    }
-                    onClick={() => alternarAtivo(usuario)}
-                  >
-                    <Power size={16} />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+          {(usuarios ?? []).map((usuario) => {
+            const propria = usuario.id === usuarioId;
+            const ultimoAdmin =
+              usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
+            return (
+              <motion.li
+                key={usuario.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
+              >
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 truncate font-medium">
+                      {usuario.nome}
+                      <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                        {rotuloDePapel(usuario.papel)}
+                      </span>
+                      {propria && (
+                        <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                          Você
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-muted-foreground truncate text-sm">{usuario.email}</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                      {usuario.ativo ? "ativa" : "desativada"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-11"
+                      aria-label={`Editar conta de ${usuario.nome}`}
+                      onClick={() => abrirEdicao(usuario)}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    {!propria && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-falta-texto size-11"
-                        aria-label={`Excluir conta de ${usuario.nome}`}
+                        className="size-11"
+                        aria-label={
+                          usuario.ativo
+                            ? `Desativar conta de ${usuario.nome}`
+                            : `Reativar conta de ${usuario.nome}`
+                        }
+                        disabled={ultimoAdmin}
+                        title={
+                          ultimoAdmin
+                            ? "A escola precisa de ao menos um administrador ativo."
+                            : undefined
+                        }
+                        onClick={() => alternarAtivo(usuario)}
                       >
-                        <Trash2 size={16} />
+                        <Power size={16} />
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir a conta de {usuario.nome}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          A exclusão só é possível quando não há frequências registradas pela conta.
-                          Com histórico, o caminho é desativar.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          className="bg-falta text-falta-foreground hover:bg-falta/90"
-                          onClick={() => excluir(usuario)}
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </div>
-              {usuario.turmas.length > 0 && (
-                <div className="border-t px-4 py-2.5">
-                  <div className="flex flex-wrap gap-1.5">
-                    {usuario.turmas.map((turmaId) => (
-                      <span
-                        key={turmaId}
-                        className="bg-secondary text-secondary-foreground rounded-md px-2 py-1 text-xs font-medium"
-                      >
-                        {rotulo(turmaId)}
-                      </span>
-                    ))}
+                    )}
+                    {!propria && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-falta-texto size-11"
+                            aria-label={`Excluir conta de ${usuario.nome}`}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir a conta de {usuario.nome}?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              A exclusão remove o acesso. As frequências da escola são preservadas,
+                              sem a autoria desta conta.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-falta text-falta-foreground hover:bg-falta/90"
+                              onClick={() => excluir(usuario)}
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </div>
-              )}
-            </motion.li>
-          ))}
+              </motion.li>
+            );
+          })}
         </ul>
       )}
 
@@ -354,7 +335,7 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
                 onChange={(evento) =>
                   setFormulario((atual) => ({ ...atual, email: evento.target.value }))
                 }
-                placeholder="professor@escola.br"
+                placeholder="pessoa@escola.br"
                 className="h-11 rounded-lg"
               />
             </div>
@@ -370,9 +351,9 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
                 />
                 <Input
                   id="senha-usuario"
-                  type="text"
+                  type="password"
                   value={formulario.senha}
-                  autoComplete="off"
+                  autoComplete="new-password"
                   minLength={emEdicao ? 0 : 8}
                   required={emEdicao === null}
                   onChange={(evento) =>
@@ -391,44 +372,24 @@ export default function AbaProfessores({ turmas, onMudanca, rotuloTurma }: Props
               <Selecionar
                 id="papel-usuario"
                 value={formulario.papel}
+                disabled={emEdicao?.id === usuarioId}
                 onChange={(evento) =>
                   setFormulario((atual) => ({
                     ...atual,
-                    papel: evento.target.value === "ADMIN" ? "ADMIN" : "PROFESSOR",
+                    papel: evento.target.value === "ADMIN" ? "ADMIN" : "COORDENACAO",
                   }))
                 }
                 opcoes={[
-                  { valor: "PROFESSOR", rotulo: "Professor(a)" },
-                  { valor: "ADMIN", rotulo: "Administrador (acesso total)" },
+                  { valor: "COORDENACAO", rotulo: "Coordenação" },
+                  { valor: "ADMIN", rotulo: "Administração (acesso total)" },
                 ]}
               />
+              {emEdicao?.id === usuarioId && (
+                <p className="text-muted-foreground text-xs">
+                  O próprio acesso de administração não pode ser removido.
+                </p>
+              )}
             </div>
-            {formulario.papel === "PROFESSOR" && turmas.length > 0 && (
-              <fieldset className="flex flex-col gap-2">
-                <legend className="text-sm font-medium">Turmas desta conta</legend>
-                <div className="flex flex-wrap gap-1.5">
-                  {turmas.map((turma) => {
-                    const marcada = formulario.turmas.includes(turma.id);
-                    return (
-                      <button
-                        key={turma.id}
-                        type="button"
-                        aria-pressed={marcada}
-                        onClick={() => alternarTurma(turma.id)}
-                        className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors active:scale-[0.97] ${
-                          marcada
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "text-muted-foreground hover:border-foreground/30"
-                        }`}
-                      >
-                        {marcada && <Check size={13} aria-hidden="true" />}
-                        {turma.rotulo}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-            )}
             {erro && (
               <p
                 role="alert"

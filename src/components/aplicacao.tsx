@@ -37,7 +37,6 @@ interface Props {
   diaCorrente: string;
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
-  origensIniciais: Turma[];
   alunosIniciais: Aluno[];
   frequenciasIniciais: Frequencia[];
 }
@@ -60,7 +59,6 @@ export default function Aplicacao({
   diaCorrente,
   seriesIniciais,
   turmasIniciais,
-  origensIniciais,
   alunosIniciais,
   frequenciasIniciais,
 }: Props) {
@@ -69,7 +67,6 @@ export default function Aplicacao({
   const [visao, setVisao] = useState<Visao>("frequencia");
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
-  const [origens, setOrigens] = useState<Turma[]>(origensIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
   const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
@@ -96,9 +93,8 @@ export default function Aplicacao({
     () => false,
   );
   const rotuloTurma = useCallback(
-    (id: string) =>
-      turmas.find((t) => t.id === id)?.rotulo ?? origens.find((t) => t.id === id)?.rotulo ?? "",
-    [turmas, origens],
+    (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? "",
+    [turmas],
   );
 
   const recarregarAlunos = useCallback(async () => {
@@ -107,9 +103,8 @@ export default function Aplicacao({
   }, []);
 
   const recarregarEscopo = useCallback(async () => {
-    const dados = await pedir<{ turmas: Turma[]; origens: Turma[] }>("/api/turmas");
+    const dados = await pedir<{ turmas: Turma[] }>("/api/turmas");
     setTurmas(dados.turmas);
-    setOrigens(dados.origens);
   }, []);
 
   const recarregarFrequencias = useCallback(async (novoMes: string) => {
@@ -238,12 +233,13 @@ export default function Aplicacao({
                   mes={mes}
                   onMes={setMes}
                   onRecarregar={recarregarFrequencias}
-                  origens={origens}
+                  origens={turmas}
                 />
               )}
               {visao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
               {visao === "gestao" && ehAdmin && (
                 <VistaGestao
+                  usuarioId={usuario.id}
                   series={series}
                   turmas={turmas}
                   alunos={alunos}
@@ -257,7 +253,6 @@ export default function Aplicacao({
                     setSeries(dados.series);
                   }}
                   onAlunosMudaram={recarregarAlunos}
-                  rotuloTurma={rotuloTurma}
                 />
               )}
             </motion.div>

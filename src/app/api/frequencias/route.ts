@@ -1,5 +1,5 @@
-// Frequências: consulta por dia e turma, lista do mês e salvamento
-// com proteção de duplicata e conflito de revisão.
+// Frequências: consulta por dia e turma, lista do mês com filtros e
+// salvamento compartilhado com proteção de duplicata e conflito de revisão.
 import {
   carregarFrequencia,
   diaValidoOuParametro,
@@ -25,16 +25,27 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!sessao.ok) return sessao.resposta;
     const parametros = new URL(requisicao.url).searchParams;
 
+    const turmaId = parametros.get("turmaId")?.trim() ?? "";
+    const registradoPor = parametros.get("registradoPor")?.trim() ?? "";
+    if (turmaId && !ehUuid(turmaId)) return erroApi("Turma inválida.", 400);
+    if (registradoPor && !ehUuid(registradoPor)) return erroApi("Autoria inválida.", 400);
+
     const mes = mesValidoOuParametro(parametros.get("mes"));
-    if (mes) return json({ frequencias: await listarFrequenciasDoMes(sessao.usuario.id, mes) });
+    if (mes) {
+      return json({
+        frequencias: await listarFrequenciasDoMes(mes, {
+          ...(turmaId ? { turmaId } : {}),
+          ...(registradoPor ? { registradoPor } : {}),
+        }),
+      });
+    }
 
     const dia = diaValidoOuParametro(parametros.get("dia"));
     if (dia === null) {
       return erroApi("Informe um mês (mes=YYYY-MM) ou um dia (dia=YYYY-MM-DD).", 400);
     }
-    const turmaId = parametros.get("turmaId")?.trim() ?? "";
-    if (!ehUuid(turmaId)) return erroApi("Informe a turma (turmaId).", 400);
-    return json({ frequencia: await carregarFrequencia(sessao.usuario.id, dia, turmaId) });
+    if (!turmaId) return erroApi("Informe a turma (turmaId).", 400);
+    return json({ frequencia: await carregarFrequencia(turmaId, dia) });
   });
 }
 
@@ -46,7 +57,7 @@ export async function POST(requisicao: Request): Promise<Response> {
     const resultado = await salvarFrequencia(sessao.usuario, await corpoJson(requisicao));
     if (resultado.situacao === "conflito") {
       return erroApi(
-        "Esta frequência foi salva em outro aparelho. A versão mais recente está abaixo; confira as marcações e salve de novo.",
+        "Esta frequência foi atualizada por outra pessoa. A versão mais recente está abaixo; confira as marcações e salve de novo.",
         409,
         { conflito: true, frequencia: resultado.frequencia },
       );

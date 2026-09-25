@@ -2,7 +2,7 @@
 // e nomes de exibição: testáveis de forma isolada.
 
 /** Papel do usuário na aplicação. */
-export type Papel = "ADMIN" | "PROFESSOR";
+export type Papel = "ADMIN" | "COORDENACAO";
 
 /** Usuário visível pela interface. Sem segredos. */
 export interface UsuarioDTO {
@@ -11,11 +11,6 @@ export interface UsuarioDTO {
   email: string;
   papel: Papel;
   ativo: boolean;
-}
-
-/** UsuarioDTO com as turmas atribuídas (ids). */
-export interface UsuarioComTurmas extends UsuarioDTO {
-  turmas: string[];
 }
 
 /** Identidade da sessão corrente. */
@@ -40,5 +35,5 @@ export function primeiroNome(nomeCompleto: string): string {
 }
 
 export function rotuloDePapel(papel: Papel): string {
-  return papel === "ADMIN" ? "Administrador" : "Professor(a)";
+  return papel === "ADMIN" ? "Administração" : "Coordenação";
 }

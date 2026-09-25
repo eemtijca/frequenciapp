@@ -50,6 +50,10 @@ export async function criarSerie(admin: { id: string }, entrada: unknown): Promi
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
+  const duplicada = await banco().serie.findFirst({
+    where: { nome: { equals: dados.data.nome, mode: "insensitive" } },
+  });
+  if (duplicada) throw new ErroHttp("Já existe uma série com este nome.", 409);
   const linha = await comTransacao(async (tx) => {
     const criada = await tx.serie.create({
       data: { nome: dados.data.nome, ordem: dados.data.ordem },
@@ -72,7 +76,9 @@ export async function atualizarSerie(
   const existente = await banco().serie.findUnique({ where: { id } });
   if (!existente) throw new ErroHttp("Série não encontrada.", 404);
   if (dados.data.nome !== undefined && dados.data.nome !== existente.nome) {
-    const duplicada = await banco().serie.findFirst({ where: { nome: dados.data.nome } });
+    const duplicada = await banco().serie.findFirst({
+      where: { nome: { equals: dados.data.nome, mode: "insensitive" } },
+    });
     if (duplicada) throw new ErroHttp("Já existe uma série com este nome.", 409);
   }
   const linha = await comTransacao(async (tx) => {

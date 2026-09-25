@@ -137,7 +137,7 @@ export default function VistaFrequencia({
       .then((dados) => {
         if (!viva) return;
         const frequencia = dados.frequencia;
-        setFaltas(new Set(frequencia?.faltas ?? []));
+        setFaltas(new Set((frequencia?.faltas ?? []).map((falta) => falta.alunoId)));
         setRevisaoSalva(frequencia?.revisao ?? 0);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
@@ -246,7 +246,7 @@ export default function VistaFrequencia({
           revisao: revisaoSalva,
         }),
       );
-      setFaltas(new Set(dados.frequencia.faltas));
+      setFaltas(new Set(dados.frequencia.faltas.map((falta) => falta.alunoId)));
       setRevisaoSalva(dados.frequencia.revisao);
       setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);

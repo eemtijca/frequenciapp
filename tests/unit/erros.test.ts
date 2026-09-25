@@ -39,7 +39,7 @@ describe("traduzirErro", () => {
 
   it("traduz duplicidade da frequência do dia", () => {
     const resultado = traduzirErro(
-      erroConhecido("P2002", { target: ["frequencias_professor_id_turma_id_dia_key"] }),
+      erroConhecido("P2002", { target: ["frequencias_turma_id_dia_key"] }),
     );
     expect(resultado.status).toBe(409);
     expect(resultado.mensagem).toContain("frequência");

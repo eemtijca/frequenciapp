@@ -1,18 +1,17 @@
 // Fumaça do shell: troca de visão pela navegação inferior e alternância de tema.
 import { expect, test } from "@playwright/test";
-import { aguardarHidratacao } from "./helpers/pagina";
+import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("navegação", () => {
   test("troca de visão pela navegação inferior", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
-    const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo" });
-    await navegacao.getByRole("button", { name: "Histórico" }).click();
+    await trocarVisao(page, "Histórico", "historico");
     await expect(page.getByRole("heading", { name: "Histórico" })).toBeVisible();
-    await navegacao.getByRole("button", { name: "Originais" }).click();
+    await trocarVisao(page, "Originais", "originais");
     await expect(page.getByRole("heading", { name: "Originais" })).toBeVisible();
-    await navegacao.getByRole("button", { name: "Gestão" }).click();
+    await trocarVisao(page, "Gestão", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão" })).toBeVisible();
   });
 
@@ -28,7 +27,7 @@ test.describe("navegação", () => {
     await expect
       .poll(
         async () => {
-          await botao.click();
+          await botao.click({ force: true });
           return page.locator("html").getAttribute("class");
         },
         { timeout: 15_000 },

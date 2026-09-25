@@ -11,13 +11,25 @@ export interface Serie {
   ordem: number;
 }
 
-/** Turma de uma série, com rótulo composto para exibição. */
+/** Aula da turma: ordem, janela de horário e dias da semana em que acontece. */
+export interface Horario {
+  id: string;
+  turmaId: string;
+  ordem: number;
+  inicio: string;
+  fim: string;
+  diasSemana: number[];
+  ativo: boolean;
+}
+
+/** Turma de uma série, com rótulo composto e aulas configuradas. */
 export interface Turma {
   id: string;
   serieId: string;
   nome: string;
   rotulo: string;
   serieNome: string;
+  horarios: Horario[];
 }
 
 /** Aluno de uma turma. Dados mínimos para a finalidade de frequência. */
@@ -30,13 +42,20 @@ export interface Aluno {
   ativo: boolean;
 }
 
-/** Frequência salva de um dia e turma. Faltas por identificador do aluno. */
+/** Falta de um aluno nas aulas indicadas. Presença é implícita. */
+export interface FaltaAluno {
+  alunoId: string;
+  horarios: string[];
+}
+
+/** Frequência salva de um dia e turma, compartilhada pela coordenação. */
 export interface Frequencia {
   dia: string;
   turmaId: string;
   revisao: number;
   atualizadoEm: string;
-  faltas: string[];
+  atualizadoPorNome: string | null;
+  faltas: FaltaAluno[];
 }
 
 /** Resultado do salvamento: conflito devolve a versão vigente. */
@@ -46,6 +65,11 @@ export type ResultadoSalvamento =
 /** Rótulo de exibição de uma turma: série + nome, por exemplo "1º ano A". */
 export function rotuloDeTurma(serieNome: string, turmaNome: string): string {
   return `${serieNome.trim()} ${turmaNome.trim()}`.trim();
+}
+
+/** Rótulo curto de uma aula: ordem + janela, por exemplo "Aula 1 · 07:00 às 07:50". */
+export function rotuloAula(horario: Horario): string {
+  return `${horario.ordem}ª aula · ${horario.inicio} às ${horario.fim}`;
 }
 
 /** Dia local no fuso do professor, formato YYYY-MM-DD. */
@@ -75,6 +99,27 @@ export function ehMesValido(mes: string): boolean {
   return ano >= 2000 && numero >= 1 && numero <= 12;
 }
 
+/** Valida horário no formato HH:MM (00:00 a 23:59). */
+export function ehHoraValida(hora: string): boolean {
+  return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(hora);
+}
+
+/** Dia da semana ISO de um dia civil: 1 é segunda e 7 é domingo. */
+export function diaDaSemanaIso(dia: string): number {
+  const data = new Date(`${dia}T12:00:00Z`);
+  const domingoZero = data.getUTCDay();
+  return domingoZero === 0 ? 7 : domingoZero;
+}
+
+/** Aulas ativas de uma turma que acontecem no dia da semana informado. */
+export function horariosDoDia(horarios: Horario[], dia: string): Horario[] {
+  const diaSemana = diaDaSemanaIso(dia);
+  return horarios
+    .filter((horario) => horario.ativo && horario.diasSemana.includes(diaSemana))
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
 /** Dias de um mês, para as colunas da grade. */
 export function diasDoMes(mes: string): string[] {
   const [anoTexto = "0", numeroTexto = "0"] = mes.split("-");
@@ -90,7 +135,7 @@ export function diasDoMes(mes: string): string[] {
 
 /**
  * Marca de um aluno em um dia, a partir das frequências do mês.
- * Regra: falta se houver registro de falta em qualquer frequência do dia;
+ * Regra: falta se houver registro de falta em qualquer aula do dia;
  * presente se a turma atual do aluno teve frequência naquele dia; vazio
  * quando a turma não teve frequência.
  */
@@ -99,7 +144,13 @@ export function marcaDoAluno(
   dia: string,
   frequenciasDoDia: Frequencia[],
 ): Marca | null {
-  if (frequenciasDoDia.some((frequencia) => frequencia.faltas.includes(aluno.id))) return "F";
+  if (
+    frequenciasDoDia.some((frequencia) =>
+      frequencia.faltas.some((falta) => falta.alunoId === aluno.id),
+    )
+  ) {
+    return "F";
+  }
   if (frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId)) return "P";
   return null;
 }

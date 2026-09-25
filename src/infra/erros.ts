@@ -19,41 +19,40 @@ export class ErroHttp extends Error {
   }
 }
 
-/** Traduções de campos para mensagens de duplicidade. */
-const NOMES_DE_CAMPO: Record<string, string> = {
-  email: "e-mail",
-  nome: "nome",
-  usuarios_email_unico: "e-mail",
-  series_nome_unico: "série",
-  turmas_serie_id_nome_key: "turma",
-  turmas_serie_nome_unico: "turma",
-  sessoes_token_hash_key: "sessão",
-  frequencias_professor_id_turma_id_dia_key: "frequência",
-  atribuicoes_pkey: "atribuição",
+/** Traduções de duplicidade para mensagens específicas por campo. */
+const MENSAGENS_DE_DUPLICIDADE: Record<string, string> = {
+  email: "Já existe uma conta com este e-mail.",
+  usuarios_email_unico: "Já existe uma conta com este e-mail.",
+  nome: "Já existe um registro com este nome.",
+  series_nome_unico: "Já existe uma série com este nome.",
+  turmas_serie_id_nome_key: "Já existe uma turma com este nome nesta série.",
+  turmas_serie_nome_unico: "Já existe uma turma com este nome nesta série.",
+  sessoes_token_hash_key: "Sessão repetida. Entre novamente.",
+  frequencias_turma_id_dia_key:
+    "Esta frequência já foi salva. Recarregue para ver a versão mais recente.",
+  horarios_turma_id_ordem_key: "Já existe uma aula com esta ordem nesta turma.",
+  faltas_pkey: "Esta falta já estava registrada.",
 };
 
-function nomeAmigavel(alvos: string[] | undefined): string {
+function mensagemDeDuplicidade(alvos: string[] | undefined): string {
   for (const alvo of alvos ?? []) {
-    const nome = NOMES_DE_CAMPO[alvo];
-    if (nome) return nome;
+    const mensagem = MENSAGENS_DE_DUPLICIDADE[alvo];
+    if (mensagem) return mensagem;
   }
-  return "registro";
+  return "Já existe um registro igual. Confira os dados e tente de novo.";
 }
 
 /** Traduções de tabelas para mensagens de registro em uso (P2003). */
 const TABELAS_EM_USO: Record<string, string> = {
   turmas_turma_id_fkey: "Esta turma ainda tem alunos ou frequências registradas.",
-  turmas_serie_id_fkey: "A série informada não existe mais.",
   alunos_turma_id_fkey: "A turma informada não existe mais.",
   alunos_turma_original_id_fkey: "A turma de origem informada não existe mais.",
-  frequencias_professor_id_fkey: "Este professor tem frequências registradas.",
   frequencias_turma_id_fkey: "Esta turma tem frequências registradas.",
-  series_id_fkey: "Esta série ainda tem turmas.",
   faltas_frequencia_id_fkey: "A frequência não existe mais.",
   faltas_aluno_id_fkey: "O aluno não existe mais.",
+  faltas_horario_id_fkey: "Esta aula tem faltas registradas.",
   sessoes_usuario_id_fkey: "A conta não existe mais.",
-  atribuicoes_professor_id_fkey: "O professor não existe mais.",
-  atribuicoes_turma_id_fkey: "A turma não existe mais.",
+  auditoria_usuario_id_fkey: "A conta não existe mais.",
 };
 
 interface ErroConhecido {
@@ -69,16 +68,7 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
         : typeof erro.meta?.target === "string"
           ? [erro.meta.target as string]
           : undefined;
-      const campo = nomeAmigavel(alvos);
-      return {
-        mensagem:
-          campo === "frequência"
-            ? "Esta frequência já foi salva. Recarregue para ver a versão mais recente."
-            : campo === "registro"
-              ? "Já existe um registro igual. Confira os dados e tente de novo."
-              : `Já existe um registro com este ${campo}. Use outro valor.`,
-        status: 409,
-      };
+      return { mensagem: mensagemDeDuplicidade(alvos), status: 409 };
     }
     case "P2003": {
       const chave = typeof erro.meta?.field_name === "string" ? erro.meta.field_name : "";

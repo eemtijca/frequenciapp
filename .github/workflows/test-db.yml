@@ -93,12 +93,12 @@ jobs:
           ADMIN_NOME: Direção
         run: npm run criar-admin
 
-      - name: Criar professor de teste
+      - name: Criar coordenação de teste
         env:
           CONTA_EMAIL: demo@escola.exemplo
           CONTA_SENHA: DemoFrequencia2026
           CONTA_NOME: Demo
-        run: npm run criar-conta
+        run: npm run criar-coordenacao
 
       - name: Testes de contratos da API
         run: npm run test:api

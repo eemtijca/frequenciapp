@@ -6,7 +6,6 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import type { Aluno } from "@/domain/frequencia";
-import type { Identidade } from "@/domain/usuarios";
 
 const nomeAluno = z
   .string()
@@ -60,22 +59,6 @@ export async function listarTodosAlunos(): Promise<Aluno[]> {
     orderBy: [{ turma: { serie: { ordem: "asc" } } }, { turma: { nome: "asc" } }, { ordem: "asc" }],
   });
   return linhas.map(paraAluno);
-}
-
-/** Alunos das turmas atribuídas a um professor. */
-export async function listarAlunosDoProfessor(professorId: string): Promise<Aluno[]> {
-  const linhas = await banco().aluno.findMany({
-    where: { turma: { atribuicoes: { some: { professorId } } } },
-    orderBy: [{ turma: { serie: { ordem: "asc" } } }, { turma: { nome: "asc" } }, { ordem: "asc" }],
-  });
-  return linhas.map(paraAluno);
-}
-
-/** Alunos visíveis para a identidade. */
-export function alunosVisiveis(identidade: Identidade): Promise<Aluno[]> {
-  return identidade.papel === "ADMIN"
-    ? listarTodosAlunos()
-    : listarAlunosDoProfessor(identidade.id);
 }
 
 /** Cria um aluno no fim da ordem da turma. */

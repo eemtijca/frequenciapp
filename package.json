@@ -28,7 +28,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "criar-admin": "node scripts/criar-admin.mjs",
-    "criar-conta": "node scripts/criar-conta.mjs",
+    "criar-coordenacao": "node scripts/criar-coordenacao.mjs",
     "seed": "node scripts/seed.mjs",
     "postinstall": "prisma generate"
   },

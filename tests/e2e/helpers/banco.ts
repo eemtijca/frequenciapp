@@ -11,7 +11,7 @@ const PARALELISMO = 1;
 const TAMANHO = 64;
 
 /** Papel de quem faz a frequência; acompanha o enum do schema. */
-const PAPEL_COORDENACAO = "PROFESSOR";
+const PAPEL_COORDENACAO = "COORDENACAO";
 
 export const ADMIN_E2E = {
   email: "direcao@escola.exemplo",

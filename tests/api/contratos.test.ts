@@ -6,13 +6,17 @@ import pg from "pg";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
 const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
-const EMAIL_PROF = process.env.TESTE_EMAIL ?? "demo@escola.exemplo";
-const SENHA_PROF = process.env.TESTE_SENHA ?? "DemoFrequencia2026";
-const DIA_TESTE = "2026-06-15";
-const DIA_TESTE_2 = "2026-06-16";
+const EMAIL_COORD = process.env.TESTE_EMAIL ?? "demo@escola.exemplo";
+const SENHA_COORD = process.env.TESTE_SENHA ?? "DemoFrequencia2026";
+const DIAS_TESTE = ["2026-06-15", "2026-06-16", "2026-06-17", "2026-06-18", "2026-06-19"];
+const DIA_TESTE = DIAS_TESTE[0] as string;
+const DIA_TESTE_2 = DIAS_TESTE[1] as string;
+const DIA_TESTE_3 = DIAS_TESTE[2] as string;
+const DIA_TESTE_4 = DIAS_TESTE[3] as string;
+const DIA_TESTE_5 = DIAS_TESTE[4] as string;
 
 let cookieAdmin = "";
-let cookieProf = "";
+let cookieCoord = "";
 let banco: pg.Client | null = null;
 
 async function limparMassa() {
@@ -20,20 +24,17 @@ async function limparMassa() {
   if (!conexao || !conexao.startsWith("postgresql://")) return;
   banco = new pg.Client({ connectionString: conexao });
   await banco.connect();
-  await banco.query("delete from frequencias where dia in ($1, $2)", [DIA_TESTE, DIA_TESTE_2]);
+  await banco.query("delete from frequencias where dia = any($1::date[])", [DIAS_TESTE]);
   await banco.query("delete from alunos where nome like 'QA%'");
-  await banco.query(
-    "delete from atribuicoes where professor_id in (select id from usuarios where email like 'qa-%')",
-  );
   await banco.query(
     "delete from sessoes where usuario_id in (select id from usuarios where email like 'qa-%')",
   );
-  await banco.query("delete from auditoria where alvo like '%qa-%' or alvo like 'QA%'");
   await banco.query("delete from usuarios where email like 'qa-%'");
   await banco.query(
     "delete from turmas where serie_id in (select id from series where nome = 'QA Ano')",
   );
   await banco.query("delete from series where nome = 'QA Ano'");
+  await banco.query("delete from auditoria where alvo like '%qa-%' or alvo like 'QA%'");
 }
 
 async function requisicao(caminho: string, opcoes: RequestInit = {}): Promise<Response> {
@@ -70,11 +71,21 @@ interface Serie {
   id: string;
   nome: string;
 }
+interface HorarioApi {
+  id: string;
+  turmaId: string;
+  ordem: number;
+  inicio: string;
+  fim: string;
+  diasSemana: number[];
+  ativo: boolean;
+}
 interface TurmaApi {
   id: string;
   nome: string;
   rotulo: string;
   serieId: string;
+  horarios: HorarioApi[];
 }
 interface AlunoApi {
   id: string;
@@ -88,15 +99,22 @@ interface UsuarioApi {
   id: string;
   nome: string;
   email: string;
-  papel: "ADMIN" | "PROFESSOR";
+  papel: "ADMIN" | "COORDENACAO";
   ativo: boolean;
-  turmas: string[];
+}
+interface FrequenciaApi {
+  dia: string;
+  turmaId: string;
+  revisao: number;
+  atualizadoPorNome: string | null;
+  faltas: { alunoId: string; horarios: string[] }[];
 }
 
 let serieQA: Serie | null = null;
 let turmaQA: TurmaApi | null = null;
 let turmaQB: TurmaApi | null = null;
-let professorQA: UsuarioApi | null = null;
+let aulaQA: HorarioApi | null = null;
+let coordQA: UsuarioApi | null = null;
 let alunoQA: AlunoApi | null = null;
 
 beforeAll(async () => {
@@ -112,7 +130,7 @@ describe("autenticação", () => {
   it("recusa credenciais erradas com mensagem genérica", async () => {
     const resposta = await requisicao("/api/auth/entrar", {
       method: "POST",
-      body: JSON.stringify({ email: EMAIL_PROF, senha: "errada" }),
+      body: JSON.stringify({ email: EMAIL_COORD, senha: "errada" }),
     });
     expect(resposta.status).toBe(401);
     const dados = (await resposta.json()) as { error: string };
@@ -133,13 +151,13 @@ describe("autenticação", () => {
     expect(dados.usuario.papel).toBe("ADMIN");
   });
 
-  it("entra com o professor de teste", async () => {
-    const resultado = await entrar(EMAIL_PROF, SENHA_PROF);
+  it("entra com a coordenação de teste", async () => {
+    const resultado = await entrar(EMAIL_COORD, SENHA_COORD);
     expect(resultado.status).toBe(200);
-    cookieProf = resultado.cookie;
-    const resposta = await autenticado(cookieProf, "/api/auth/sessao");
+    cookieCoord = resultado.cookie;
+    const resposta = await autenticado(cookieCoord, "/api/auth/sessao");
     const dados = (await resposta.json()) as { usuario: UsuarioApi | null };
-    expect(dados.usuario?.papel).toBe("PROFESSOR");
+    expect(dados.usuario?.papel).toBe("COORDENACAO");
   });
 
   it("exige sessão para listar turmas", async () => {
@@ -148,7 +166,7 @@ describe("autenticação", () => {
   });
 
   it("recusa JSON inválido com mensagem clara", async () => {
-    const resposta = await autenticado(cookieProf, "/api/frequencias", {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: "{isso não é json",
     });
@@ -158,7 +176,7 @@ describe("autenticação", () => {
   });
 
   it("recusa corpo grande demais", async () => {
-    const resposta = await autenticado(cookieProf, "/api/frequencias", {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ x: "a".repeat(300000) }),
     });
@@ -171,7 +189,7 @@ describe("autenticação", () => {
       headers: {
         "Content-Type": "application/json",
         Origin: "http://externo.example",
-        Cookie: cookieProf,
+        Cookie: cookieCoord,
       },
       body: JSON.stringify({ dia: DIA_TESTE, turmaId: "x", faltas: [], revisao: 0 }),
     });
@@ -180,8 +198,8 @@ describe("autenticação", () => {
 });
 
 describe("gestão de séries e turmas (admin)", () => {
-  it("professor não cria série", async () => {
-    const resposta = await autenticado(cookieProf, "/api/series", {
+  it("coordenação não cria série", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/series", {
       method: "POST",
       body: JSON.stringify({ nome: "QA Ano", ordem: 9 }),
     });
@@ -205,6 +223,8 @@ describe("gestão de séries e turmas (admin)", () => {
       body: JSON.stringify({ nome: "qa ano", ordem: 10 }),
     });
     expect(resposta.status).toBe(409);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("série");
   });
 
   it("recusa série com dados inválidos", async () => {
@@ -220,7 +240,7 @@ describe("gestão de séries e turmas (admin)", () => {
     expect(ordemQuebrada.status).toBe(400);
   });
 
-  it("cria duas turmas na série", async () => {
+  it("cria duas turmas na série com aula padrão", async () => {
     const respostaA = await autenticado(cookieAdmin, "/api/turmas", {
       method: "POST",
       body: JSON.stringify({ serieId: serieQA?.id, nome: "A" }),
@@ -228,6 +248,12 @@ describe("gestão de séries e turmas (admin)", () => {
     expect(respostaA.status).toBe(201);
     turmaQA = ((await respostaA.json()) as { turma: TurmaApi }).turma;
     expect(turmaQA?.rotulo).toBe("QA Ano A");
+    expect(turmaQA?.horarios).toHaveLength(1);
+    expect(turmaQA?.horarios[0]?.ordem).toBe(1);
+    expect(turmaQA?.horarios[0]?.inicio).toBe("00:00");
+    expect(turmaQA?.horarios[0]?.fim).toBe("23:59");
+    expect(turmaQA?.horarios[0]?.diasSemana).toHaveLength(7);
+    aulaQA = turmaQA?.horarios[0] ?? null;
 
     const respostaB = await autenticado(cookieAdmin, "/api/turmas", {
       method: "POST",
@@ -237,12 +263,14 @@ describe("gestão de séries e turmas (admin)", () => {
     turmaQB = ((await respostaB.json()) as { turma: TurmaApi }).turma;
   });
 
-  it("recusa turma duplicada na mesma série", async () => {
+  it("recusa turma duplicada na mesma série mesmo com caixa diferente", async () => {
     const resposta = await autenticado(cookieAdmin, "/api/turmas", {
       method: "POST",
       body: JSON.stringify({ serieId: serieQA?.id, nome: "a" }),
     });
     expect(resposta.status).toBe(409);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("turma");
   });
 
   it("recusa turma em série inexistente", async () => {
@@ -254,75 +282,151 @@ describe("gestão de séries e turmas (admin)", () => {
   });
 });
 
-describe("gestão de professores (admin)", () => {
-  it("professor não lista usuários", async () => {
-    const resposta = await autenticado(cookieProf, "/api/usuarios");
+describe("gestão de aulas (admin)", () => {
+  it("coordenação não cria aula", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 2,
+        inicio: "07:00",
+        fim: "07:50",
+        diasSemana: [1, 2, 3, 4, 5],
+      }),
+    });
+    expect(resposta.status).toBe(403);
+  });
+
+  it("admin cria aula com horário e dias da semana", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 2,
+        inicio: "07:00",
+        fim: "07:50",
+        diasSemana: [1, 2, 3, 4, 5],
+      }),
+    });
+    expect(resposta.status).toBe(201);
+    const dados = (await resposta.json()) as { horario: HorarioApi };
+    expect(dados.horario.ordem).toBe(2);
+    expect(dados.horario.diasSemana).toEqual([1, 2, 3, 4, 5]);
+    aulaQA = dados.horario;
+  });
+
+  it("recusa horário invertido, dias vazios e ordem repetida", async () => {
+    const invertido = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 3,
+        inicio: "10:00",
+        fim: "09:00",
+        diasSemana: [1],
+      }),
+    });
+    expect(invertido.status).toBe(400);
+    const semDias = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 3,
+        inicio: "09:00",
+        fim: "09:50",
+        diasSemana: [],
+      }),
+    });
+    expect(semDias.status).toBe(400);
+    const repetida = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 2,
+        inicio: "09:00",
+        fim: "09:50",
+        diasSemana: [1],
+      }),
+    });
+    expect(repetida.status).toBe(409);
+  });
+
+  it("admin edita a janela e desativa a aula", async () => {
+    const resposta = await autenticado(cookieAdmin, `/api/horarios/${aulaQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ inicio: "07:10", ativo: false }),
+    });
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as { horario: HorarioApi };
+    expect(dados.horario.inicio).toBe("07:10");
+    expect(dados.horario.ativo).toBe(false);
+
+    const reativar = await autenticado(cookieAdmin, `/api/horarios/${aulaQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+    expect(reativar.status).toBe(200);
+  });
+});
+
+describe("gestão de equipe (admin)", () => {
+  it("coordenação não lista usuários", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/usuarios");
     expect(resposta.status).toBe(403);
   });
 
   it("recusa senha fora da política", async () => {
     const curta = await autenticado(cookieAdmin, "/api/usuarios", {
       method: "POST",
-      body: JSON.stringify({ nome: "QA Prof", email: "qa-prof@escola.exemplo", senha: "123" }),
+      body: JSON.stringify({ nome: "QA Equipe", email: "qa-equipe@escola.exemplo", senha: "123" }),
     });
     expect(curta.status).toBe(400);
 
     const semNumero = await autenticado(cookieAdmin, "/api/usuarios", {
       method: "POST",
       body: JSON.stringify({
-        nome: "QA Prof",
-        email: "qa-prof@escola.exemplo",
+        nome: "QA Equipe",
+        email: "qa-equipe@escola.exemplo",
         senha: "semnumeros",
       }),
     });
     expect(semNumero.status).toBe(400);
   });
 
-  it("cria professor de teste com turmas atribuídas", async () => {
+  it("cria conta de coordenação de teste", async () => {
     const resposta = await autenticado(cookieAdmin, "/api/usuarios", {
       method: "POST",
       body: JSON.stringify({
-        nome: "QA Prof",
-        email: "qa-prof@escola.exemplo",
-        senha: "QaProf2026",
-        papel: "PROFESSOR",
-        turmas: [turmaQA?.id],
+        nome: "QA Equipe",
+        email: "qa-equipe@escola.exemplo",
+        senha: "QaEquipe2026",
       }),
     });
     expect(resposta.status).toBe(201);
-    professorQA = ((await resposta.json()) as { usuario: UsuarioApi }).usuario;
-    expect(professorQA?.turmas).toEqual([turmaQA?.id]);
+    coordQA = ((await resposta.json()) as { usuario: UsuarioApi }).usuario;
+    expect(coordQA?.papel).toBe("COORDENACAO");
   });
 
   it("recusa e-mail duplicado mesmo com caixa diferente", async () => {
     const resposta = await autenticado(cookieAdmin, "/api/usuarios", {
       method: "POST",
       body: JSON.stringify({
-        nome: "QA Prof",
-        email: "QA-PROF@escola.exemplo",
-        senha: "QaProf2026",
+        nome: "QA Equipe",
+        email: "QA-EQUIPE@escola.exemplo",
+        senha: "QaEquipe2026",
       }),
     });
     expect(resposta.status).toBe(409);
   });
 
-  it("atualiza nome e turmas do professor", async () => {
-    const resposta = await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
+  it("atualiza o nome da conta", async () => {
+    const resposta = await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ nome: "QA Prof Dois", turmas: [turmaQA?.id, turmaQB?.id] }),
+      body: JSON.stringify({ nome: "QA Equipe Dois" }),
     });
     expect(resposta.status).toBe(200);
     const dados = (await resposta.json()) as { usuario: UsuarioApi };
-    expect(dados.usuario.nome).toBe("QA Prof Dois");
-    expect(dados.usuario.turmas.length).toBe(2);
-  });
-
-  it("recusa atribuição de turma inexistente", async () => {
-    const resposta = await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ turmas: ["00000000-0000-0000-0000-000000000000"] }),
-    });
-    expect(resposta.status).toBe(400);
+    expect(dados.usuario.nome).toBe("QA Equipe Dois");
   });
 
   it("admin não rebaixa nem desativa a própria conta", async () => {
@@ -333,7 +437,7 @@ describe("gestão de professores (admin)", () => {
 
     const demove = await autenticado(cookieAdmin, `/api/usuarios/${eu?.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ papel: "PROFESSOR" }),
+      body: JSON.stringify({ papel: "COORDENACAO" }),
     });
     expect(demove.status).toBe(400);
     const desativa = await autenticado(cookieAdmin, `/api/usuarios/${eu?.id}`, {
@@ -343,34 +447,26 @@ describe("gestão de professores (admin)", () => {
     expect(desativa.status).toBe(400);
   });
 
-  it("conta desativada não entra e sai da sessão", async () => {
-    await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
+  it("conta desativada não entra e volta ao reativar", async () => {
+    await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
       method: "PATCH",
       body: JSON.stringify({ ativo: false }),
     });
-    const tentativa = await entrar("qa-prof@escola.exemplo", "QaProf2026");
+    const tentativa = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
     expect(tentativa.status).toBe(403);
-    const dados = (await (
-      await fetch(`${APP_URL}/api/auth/entrar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_URL },
-        body: JSON.stringify({ email: "qa-prof@escola.exemplo", senha: "QaProf2026" }),
-      })
-    ).json()) as { error: string };
-    expect(dados.error).toContain("desativada");
 
-    await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
+    await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
       method: "PATCH",
       body: JSON.stringify({ ativo: true }),
     });
-    const reativada = await entrar("qa-prof@escola.exemplo", "QaProf2026");
+    const reativada = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
     expect(reativada.status).toBe(200);
   });
 });
 
 describe("gestão de alunos (admin)", () => {
-  it("professor não cadastra aluno", async () => {
-    const resposta = await autenticado(cookieProf, "/api/alunos", {
+  it("coordenação não cadastra aluno", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/alunos", {
       method: "POST",
       body: JSON.stringify({ nome: "QA Aluno", turmaId: turmaQA?.id }),
     });
@@ -425,17 +521,15 @@ describe("gestão de alunos (admin)", () => {
   });
 });
 
-describe("frequências (ACID e concorrência)", () => {
-  const cookieQA = { valor: "" };
-
-  it("professor de QA entra", async () => {
-    const resultado = await entrar("qa-prof@escola.exemplo", "QaProf2026");
+describe("frequências (uma por turma e dia)", () => {
+  it("coordenação de QA entra", async () => {
+    const resultado = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
     expect(resultado.status).toBe(200);
-    cookieQA.valor = resultado.cookie;
+    cookieCoord = resultado.cookie;
   });
 
-  it("salva a frequência do dia com falta", async () => {
-    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
+  it("salva a frequência do dia com falta em todas as aulas", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE,
@@ -445,13 +539,16 @@ describe("frequências (ACID e concorrência)", () => {
       }),
     });
     expect(resposta.status).toBe(200);
-    const dados = (await resposta.json()) as { frequencia: { revisao: number; faltas: string[] } };
+    const dados = (await resposta.json()) as { frequencia: FrequenciaApi };
     expect(dados.frequencia.revisao).toBe(1);
-    expect(dados.frequencia.faltas).toEqual([alunoQA?.id]);
+    expect(dados.frequencia.atualizadoPorNome).toBe("QA Equipe Dois");
+    expect(dados.frequencia.faltas).toHaveLength(1);
+    expect(dados.frequencia.faltas[0]?.alunoId).toBe(alunoQA?.id);
+    expect(dados.frequencia.faltas[0]?.horarios.length).toBeGreaterThan(1);
   });
 
   it("bloqueia duplicata do mesmo dia e turma com conflito 409", async () => {
-    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE, turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
     });
@@ -470,12 +567,12 @@ describe("frequências (ACID e concorrência)", () => {
     const [primeira, segunda] = await Promise.all([
       fetch(`${APP_URL}/api/frequencias`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieQA.valor },
+        headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieCoord },
         body: corpo,
       }),
       fetch(`${APP_URL}/api/frequencias`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieQA.valor },
+        headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieCoord },
         body: corpo,
       }),
     ]);
@@ -484,18 +581,16 @@ describe("frequências (ACID e concorrência)", () => {
   });
 
   it("atualiza com a revisão vigente e recusa revisão obsoleta", async () => {
-    const atualizacao = await autenticado(cookieQA.valor, "/api/frequencias", {
+    const atualizacao = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE, turmaId: turmaQA?.id, faltas: [], revisao: 1 }),
     });
     expect(atualizacao.status).toBe(200);
-    const dados = (await atualizacao.json()) as {
-      frequencia: { revisao: number; faltas: string[] };
-    };
+    const dados = (await atualizacao.json()) as { frequencia: FrequenciaApi };
     expect(dados.frequencia.revisao).toBe(2);
     expect(dados.frequencia.faltas).toEqual([]);
 
-    const obsoleta = await autenticado(cookieQA.valor, "/api/frequencias", {
+    const obsoleta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE,
@@ -507,67 +602,166 @@ describe("frequências (ACID e concorrência)", () => {
     expect(obsoleta.status).toBe(409);
   });
 
-  it("recusa faltas de alunos de outra turma dentro da mesma transação", async () => {
-    const deFora = await autenticado(cookieAdmin, "/api/alunos", {
-      method: "POST",
-      body: JSON.stringify({ nome: "QA Aluno Turma B", turmaId: turmaQB?.id }),
-    });
-    const alunoDeFora = ((await deFora.json()) as { aluno: AlunoApi }).aluno;
-    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
+  it("salva falta apenas nas aulas informadas", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
-        dia: DIA_TESTE_2,
+        dia: DIA_TESTE_3,
         turmaId: turmaQA?.id,
-        faltas: [alunoDeFora.id],
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaQA?.id] }],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as { frequencia: FrequenciaApi };
+    expect(dados.frequencia.faltas).toEqual([{ alunoId: alunoQA?.id, horarios: [aulaQA?.id] }]);
+  });
+
+  it("recusa aula de outra turma", async () => {
+    const aulaDeFora = turmaQB?.horarios[0]?.id;
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_4,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeFora] }],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(400);
+  });
+
+  it("recusa aula que não acontece no dia da semana", async () => {
+    const criada = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 9,
+        inicio: "12:00",
+        fim: "12:50",
+        diasSemana: [7],
+      }),
+    });
+    expect(criada.status).toBe(201);
+    const aulaDeDomingo = ((await criada.json()) as { horario: HorarioApi }).horario;
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_5,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeDomingo.id] }],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(400);
+  });
+
+  it("aceita aluno desativado que já tinha falta registrada", async () => {
+    await autenticado(cookieAdmin, `/api/alunos/${alunoQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: false }),
+    });
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_3,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaQA?.id] }],
+        revisao: 1,
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    await autenticado(cookieAdmin, `/api/alunos/${alunoQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+  });
+
+  it("recusa falta de aluno desativado sem registro anterior", async () => {
+    const criado = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "POST",
+      body: JSON.stringify({ nome: "QA Aluno Inativo", turmaId: turmaQA?.id }),
+    });
+    const inativo = ((await criado.json()) as { aluno: AlunoApi }).aluno;
+    await autenticado(cookieAdmin, `/api/alunos/${inativo.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: false }),
+    });
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_4,
+        turmaId: turmaQA?.id,
+        faltas: [inativo.id],
         revisao: 0,
       }),
     });
     expect(resposta.status).toBe(400);
     const dados = (await resposta.json()) as { error: string };
     expect(dados.error).toContain("lista de alunos mudou");
-    // Atomicidade: nada foi gravado na frequência rejeitada.
-    const consulta = await autenticado(
-      cookieQA.valor,
-      `/api/frequencias?dia=${DIA_TESTE_2}&turmaId=${turmaQA?.id}`,
-    );
-    const vigente = (await consulta.json()) as { frequencia: { faltas: string[] } | null };
-    expect(vigente.frequencia?.faltas).toEqual([]);
-  });
-
-  it("professor sem atribuição não salva frequência", async () => {
-    const resposta = await autenticado(cookieProf, "/api/frequencias", {
-      method: "POST",
-      body: JSON.stringify({ dia: DIA_TESTE_2, turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
-    });
-    expect(resposta.status).toBe(403);
   });
 
   it("recusa dia inválido e turma inválida", async () => {
     const diaInvalido = await autenticado(
-      cookieQA.valor,
+      cookieCoord,
       `/api/frequencias?dia=2026-02-30&turmaId=${turmaQA?.id}`,
     );
     expect(diaInvalido.status).toBe(400);
     const turmaInvalida = await autenticado(
-      cookieQA.valor,
+      cookieCoord,
       `/api/frequencias?dia=${DIA_TESTE}&turmaId=abc`,
     );
     expect(turmaInvalida.status).toBe(400);
   });
 
-  it("consulta por dia e por mês", async () => {
+  it("consulta por dia e por mês com filtros", async () => {
     const porDia = await autenticado(
-      cookieQA.valor,
+      cookieCoord,
       `/api/frequencias?dia=${DIA_TESTE}&turmaId=${turmaQA?.id}`,
     );
     expect(porDia.status).toBe(200);
-    const dadosDia = (await porDia.json()) as { frequencia: { revisao: number } | null };
+    const dadosDia = (await porDia.json()) as { frequencia: FrequenciaApi | null };
     expect(dadosDia.frequencia?.revisao).toBe(2);
 
-    const porMes = await autenticado(cookieQA.valor, "/api/frequencias?mes=2026-06");
+    const porMes = await autenticado(cookieCoord, "/api/frequencias?mes=2026-06");
     expect(porMes.status).toBe(200);
-    const dadosMes = (await porMes.json()) as { frequencias: { dia: string; turmaId: string }[] };
+    const dadosMes = (await porMes.json()) as { frequencias: FrequenciaApi[] };
     expect(dadosMes.frequencias.some((frequencia) => frequencia.dia === DIA_TESTE)).toBe(true);
+
+    const porTurma = await autenticado(
+      cookieCoord,
+      `/api/frequencias?mes=2026-06&turmaId=${turmaQB?.id}`,
+    );
+    const dadosTurma = (await porTurma.json()) as { frequencias: FrequenciaApi[] };
+    expect(dadosTurma.frequencias.every((frequencia) => frequencia.turmaId === turmaQB?.id)).toBe(
+      true,
+    );
+
+    const listaUsuarios = await autenticado(cookieAdmin, "/api/usuarios");
+    const usuarios = ((await listaUsuarios.json()) as { usuarios: UsuarioApi[] }).usuarios;
+    const autora = usuarios.find((usuario) => usuario.email === "qa-equipe@escola.exemplo");
+    const porAutoria = await autenticado(
+      cookieCoord,
+      `/api/frequencias?mes=2026-06&registradoPor=${autora?.id}`,
+    );
+    expect(porAutoria.status).toBe(200);
+    const dadosAutoria = (await porAutoria.json()) as { frequencias: FrequenciaApi[] };
+    expect(dadosAutoria.frequencias.length).toBeGreaterThan(0);
+  });
+
+  it("preserva o histórico ao excluir a conta autora", async () => {
+    const excluir = await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
+      method: "DELETE",
+    });
+    expect(excluir.status).toBe(200);
+    const consulta = await autenticado(
+      cookieAdmin,
+      `/api/frequencias?dia=${DIA_TESTE}&turmaId=${turmaQA?.id}`,
+    );
+    const dados = (await consulta.json()) as { frequencia: FrequenciaApi | null };
+    expect(dados.frequencia).not.toBeNull();
+    expect(dados.frequencia?.atualizadoPorNome).toBe(null);
+    coordQA = null;
   });
 });
 
@@ -590,8 +784,8 @@ describe("remoções com histórico", () => {
     expect(dados.error).toContain("turmas");
   });
 
-  it("professor com frequências não é excluído", async () => {
-    const resposta = await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
+  it("aula com faltas registradas não é excluída", async () => {
+    const resposta = await autenticado(cookieAdmin, `/api/horarios/${aulaQA?.id}`, {
       method: "DELETE",
     });
     expect(resposta.status).toBe(409);
@@ -599,17 +793,19 @@ describe("remoções com histórico", () => {
     expect(dados.error).toContain("Desative");
   });
 
-  it("professor sem histórico é excluído", async () => {
-    const criado = await autenticado(cookieAdmin, "/api/usuarios", {
+  it("aula sem histórico é excluída", async () => {
+    const criada = await autenticado(cookieAdmin, "/api/horarios", {
       method: "POST",
       body: JSON.stringify({
-        nome: "QA Temporário",
-        email: "qa-temp@escola.exemplo",
-        senha: "QaTemp2026",
+        turmaId: turmaQB?.id,
+        ordem: 2,
+        inicio: "08:00",
+        fim: "08:50",
+        diasSemana: [1],
       }),
     });
-    const temporario = ((await criado.json()) as { usuario: UsuarioApi }).usuario;
-    const resposta = await autenticado(cookieAdmin, `/api/usuarios/${temporario.id}`, {
+    const aula = ((await criada.json()) as { horario: HorarioApi }).horario;
+    const resposta = await autenticado(cookieAdmin, `/api/horarios/${aula.id}`, {
       method: "DELETE",
     });
     expect(resposta.status).toBe(200);
@@ -617,8 +813,14 @@ describe("remoções com histórico", () => {
 });
 
 describe("conta: troca de senha", () => {
+  beforeAll(async () => {
+    // As baterias de frequência usam a conta QA; aqui voltamos à conta fixa.
+    const reentrada = await entrar(EMAIL_COORD, SENHA_COORD);
+    cookieCoord = reentrada.cookie;
+  });
+
   it("recusa senha atual errada", async () => {
-    const resposta = await autenticado(cookieProf, "/api/conta/senha", {
+    const resposta = await autenticado(cookieCoord, "/api/conta/senha", {
       method: "POST",
       body: JSON.stringify({ senhaAtual: "errada", senhaNova: "NovaSenha2026" }),
     });
@@ -626,18 +828,18 @@ describe("conta: troca de senha", () => {
   });
 
   it("troca a senha e desconecta outros aparelhos", async () => {
-    const outroAparelho = await entrar(EMAIL_PROF, SENHA_PROF);
+    const outroAparelho = await entrar(EMAIL_COORD, SENHA_COORD);
     expect(outroAparelho.status).toBe(200);
 
-    const resposta = await autenticado(cookieProf, "/api/conta/senha", {
+    const resposta = await autenticado(cookieCoord, "/api/conta/senha", {
       method: "POST",
-      body: JSON.stringify({ senhaAtual: SENHA_PROF, senhaNova: "NovaSenha2026" }),
+      body: JSON.stringify({ senhaAtual: SENHA_COORD, senhaNova: "NovaSenha2026" }),
     });
     expect(resposta.status).toBe(200);
 
-    const comNova = await entrar(EMAIL_PROF, "NovaSenha2026");
+    const comNova = await entrar(EMAIL_COORD, "NovaSenha2026");
     expect(comNova.status).toBe(200);
-    const comAntiga = await entrar(EMAIL_PROF, SENHA_PROF);
+    const comAntiga = await entrar(EMAIL_COORD, SENHA_COORD);
     expect(comAntiga.status).toBe(401);
 
     const sessaoDoOutro = await autenticado(outroAparelho.cookie, "/api/auth/sessao");
@@ -645,33 +847,36 @@ describe("conta: troca de senha", () => {
     expect(dados.usuario).toBe(null);
 
     // Volta a senha original para o restante das baterias.
-    cookieProf = comNova.cookie;
-    const voltar = await autenticado(cookieProf, "/api/conta/senha", {
+    cookieCoord = comNova.cookie;
+    const voltar = await autenticado(cookieCoord, "/api/conta/senha", {
       method: "POST",
-      body: JSON.stringify({ senhaAtual: "NovaSenha2026", senhaNova: SENHA_PROF }),
+      body: JSON.stringify({ senhaAtual: "NovaSenha2026", senhaNova: SENHA_COORD }),
     });
     expect(voltar.status).toBe(200);
-    const reentrada = await entrar(EMAIL_PROF, SENHA_PROF);
-    cookieProf = reentrada.cookie;
+    const reentrada = await entrar(EMAIL_COORD, SENHA_COORD);
+    cookieCoord = reentrada.cookie;
     expect(reentrada.status).toBe(200);
   });
 });
 
 describe("trilha de auditoria", () => {
-  it("registrou as ações administrativas", async () => {
+  it("registrou as ações administrativas sem nomes de alunos", async () => {
     // Sem DATABASE_URL a consulta direta ao banco não existe e o
     // resultado vazio geraria falso negativo sem explicação.
     expect(banco, "DATABASE_URL é obrigatória para os contratos (ver tests/README.md)").not.toBe(
       null,
     );
     const resultado = await banco?.query(
-      "select acao from auditoria where acao in ('serie.criar', 'usuario.criar', 'aluno.criar', 'usuario.excluir') order by acao",
+      "select acao, alvo from auditoria where acao in ('serie.criar', 'usuario.criar', 'aluno.criar', 'usuario.excluir', 'horario.criar') order by acao",
     );
-    const acoes = (resultado?.rows ?? []).map((linha: { acao: string }) => linha.acao);
+    const linhas = (resultado?.rows ?? []) as { acao: string; alvo: string }[];
+    const acoes = linhas.map((linha) => linha.acao);
     expect(acoes).toContain("serie.criar");
     expect(acoes).toContain("usuario.criar");
     expect(acoes).toContain("aluno.criar");
     expect(acoes).toContain("usuario.excluir");
+    expect(acoes).toContain("horario.criar");
+    expect(linhas.every((linha) => !linha.alvo.includes("QA Aluno"))).toBe(true);
   });
 });
 
@@ -692,9 +897,9 @@ describe("limite de tentativas de entrada", () => {
 
 describe("saída", () => {
   it("encerra a sessão e bloqueia a listagem", async () => {
-    const resposta = await autenticado(cookieProf, "/api/auth/sair", { method: "POST" });
+    const resposta = await autenticado(cookieCoord, "/api/auth/sair", { method: "POST" });
     expect(resposta.status).toBe(200);
-    const aposSair = await autenticado(cookieProf, "/api/turmas");
+    const aposSair = await autenticado(cookieCoord, "/api/turmas");
     expect(aposSair.status).toBe(401);
   });
 

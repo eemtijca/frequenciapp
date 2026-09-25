@@ -1,6 +1,5 @@
-// Turmas: escopo de quem pede (atribuídas e origens para professor,
-// todas para administrador) e criação pelo administrador.
-import { criarTurma, escopoDeTurmas } from "@/application/turmas";
+// Turmas: listagem para toda a coordenação e criação pela administração.
+import { criarTurma, listarTodasTurmas } from "@/application/turmas";
 import {
   corpoJson,
   erroApi,
@@ -17,8 +16,7 @@ export async function GET(): Promise<Response> {
   return executarRota(async () => {
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
-    const escopo = await escopoDeTurmas(sessao.usuario);
-    return json({ turmas: escopo.turmas, origens: escopo.origens });
+    return json({ turmas: await listarTodasTurmas() });
   });
 }
 

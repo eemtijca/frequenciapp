@@ -1,17 +1,22 @@
-// Domínio da frequência: validações de data, rótulos, marca do aluno e grade.
+// Domínio da frequência: datas, horas, aulas, marca do aluno e grade.
 import { describe, expect, it } from "vitest";
 import {
+  diaDaSemanaIso,
   diaLocal,
   diasDoMes,
   ehDiaValido,
+  ehHoraValida,
   ehMesValido,
+  horariosDoDia,
   marcaDoAluno,
   montarGrade,
   normalizar,
   resumirFrequencia,
+  rotuloAula,
   rotuloDeTurma,
   type Aluno,
   type Frequencia,
+  type Horario,
 } from "@/domain/frequencia";
 
 function aluno(parcial: Partial<Aluno> = {}): Aluno {
@@ -31,7 +36,20 @@ function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
     turmaId: parcial.turmaId ?? "turma-a",
     revisao: parcial.revisao ?? 1,
     atualizadoEm: parcial.atualizadoEm ?? "2026-09-10T12:00:00Z",
+    atualizadoPorNome: parcial.atualizadoPorNome ?? null,
     faltas: parcial.faltas ?? [],
+  };
+}
+
+function horario(parcial: Partial<Horario> = {}): Horario {
+  return {
+    id: parcial.id ?? "aula-1",
+    turmaId: parcial.turmaId ?? "turma-a",
+    ordem: parcial.ordem ?? 1,
+    inicio: parcial.inicio ?? "07:00",
+    fim: parcial.fim ?? "07:50",
+    diasSemana: parcial.diasSemana ?? [1, 2, 3, 4, 5],
+    ativo: parcial.ativo ?? true,
   };
 }
 
@@ -62,6 +80,20 @@ describe("ehMesValido", () => {
   });
 });
 
+describe("ehHoraValida", () => {
+  it("aceita horários reais do dia", () => {
+    expect(ehHoraValida("00:00")).toBe(true);
+    expect(ehHoraValida("07:05")).toBe(true);
+    expect(ehHoraValida("23:59")).toBe(true);
+  });
+  it("recusa formatos e horas impossíveis", () => {
+    expect(ehHoraValida("24:00")).toBe(false);
+    expect(ehHoraValida("7:00")).toBe(false);
+    expect(ehHoraValida("07:60")).toBe(false);
+    expect(ehHoraValida("")).toBe(false);
+  });
+});
+
 describe("rotuloDeTurma", () => {
   it("compõe série e turma com espaços controlados", () => {
     expect(rotuloDeTurma("1º ano", "A")).toBe("1º ano A");
@@ -72,11 +104,44 @@ describe("rotuloDeTurma", () => {
   });
 });
 
+describe("rotuloAula", () => {
+  it("compõe ordem e janela de horário", () => {
+    expect(rotuloAula(horario({ ordem: 2, inicio: "07:50", fim: "08:40" }))).toBe(
+      "2ª aula · 07:50 às 08:40",
+    );
+  });
+});
+
 describe("diaLocal", () => {
   it("resolve o dia no fuso pedido", () => {
     const instante = new Date("2026-09-25T02:30:00Z");
     expect(diaLocal(instante, "America/Fortaleza")).toBe("2026-09-24");
     expect(diaLocal(instante, "Asia/Tokyo")).toBe("2026-09-25");
+  });
+});
+
+describe("diaDaSemanaIso", () => {
+  it("resolve o dia da semana com segunda 1 e domingo 7", () => {
+    expect(diaDaSemanaIso("2026-09-25")).toBe(5);
+    expect(diaDaSemanaIso("2026-09-26")).toBe(6);
+    expect(diaDaSemanaIso("2026-09-27")).toBe(7);
+    expect(diaDaSemanaIso("2026-09-28")).toBe(1);
+  });
+});
+
+describe("horariosDoDia", () => {
+  const grade = [
+    horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
+    horario({ id: "aula-1", ordem: 1 }),
+    horario({ id: "aula-3", ordem: 3, diasSemana: [6, 7] }),
+    horario({ id: "aula-4", ordem: 4, ativo: false }),
+  ];
+  it("filtra pelo dia da semana e pela situação, ordenando por ordem", () => {
+    const aulas = horariosDoDia(grade, "2026-09-25");
+    expect(aulas.map((aula) => aula.id)).toEqual(["aula-1", "aula-2"]);
+  });
+  it("devolve vazio quando nenhuma aula acontece no dia", () => {
+    expect(horariosDoDia([horario({ diasSemana: [6, 7] })], "2026-09-25")).toEqual([]);
   });
 });
 
@@ -97,9 +162,8 @@ describe("diasDoMes", () => {
 
 describe("marcaDoAluno", () => {
   it("marca falta quando o aluno está na lista de faltas", () => {
-    const alunoUm = aluno();
-    const doDia = [frequencia({ faltas: ["aluno-1"] })];
-    expect(marcaDoAluno(alunoUm, "2026-09-10", doDia)).toBe("F");
+    const doDia = [frequencia({ faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }] })];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
   });
   it("marca presente quando a turma dele teve frequência", () => {
     const doDia = [frequencia({ turmaId: "turma-a", faltas: [] })];
@@ -112,7 +176,19 @@ describe("marcaDoAluno", () => {
   it("falta prevalece mesmo com outra frequência presente no dia", () => {
     const doDia = [
       frequencia({ turmaId: "turma-a", faltas: [] }),
-      frequencia({ turmaId: "turma-b", faltas: ["aluno-1"] }),
+      frequencia({
+        turmaId: "turma-b",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-9"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
+  });
+  it("considera falta parcial como falta no dia", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-3"] }],
+      }),
     ];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia)).toBe("F");
   });
@@ -122,8 +198,19 @@ describe("montarGrade", () => {
   it("agrupa marcas, faltas e frequências por aluno", () => {
     const alunos = [aluno(), aluno({ id: "aluno-2", nome: "Aluno Dois", ordem: 2 })];
     const frequencias = [
-      frequencia({ dia: "2026-09-10", turmaId: "turma-a", faltas: ["aluno-1"] }),
-      frequencia({ dia: "2026-09-11", turmaId: "turma-a", faltas: ["aluno-1", "aluno-2"] }),
+      frequencia({
+        dia: "2026-09-10",
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
+      }),
+      frequencia({
+        dia: "2026-09-11",
+        turmaId: "turma-a",
+        faltas: [
+          { alunoId: "aluno-1", horarios: ["aula-1", "aula-2"] },
+          { alunoId: "aluno-2", horarios: ["aula-1"] },
+        ],
+      }),
     ];
     const grade = montarGrade(alunos, frequencias, "2026-09");
     expect(grade.dias.length).toBe(30);
