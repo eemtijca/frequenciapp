@@ -241,7 +241,7 @@ export async function atualizarUsuario(
 }
 
 /**
- * Exclui um usuário. Bloqueado quando há chamadas registradas: o
+ * Exclui um usuário. Bloqueado quando há frequencias registradas: o
  * histórico da escola depende do professor que o registrou. Nesses
  * casos, o caminho é desativar a conta.
  */
@@ -251,12 +251,12 @@ export async function removerUsuario(admin: Identidade, id: string): Promise<voi
   }
   const alvo = await banco().usuario.findUnique({
     where: { id },
-    include: { _count: { select: { chamadas: true } } },
+    include: { _count: { select: { frequencias: true } } },
   });
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
-  if (alvo._count.chamadas > 0) {
+  if (alvo._count.frequencias > 0) {
     throw new ErroHttp(
-      "Este professor tem chamadas registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
+      "Este professor tem frequencias registradas e não pode ser excluído. Desative a conta para preservar o histórico.",
       409,
     );
   }

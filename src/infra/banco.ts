@@ -10,7 +10,10 @@ const globalComBanco = globalThis as unknown as {
 };
 
 function criarCliente(): PrismaClient {
-  const adaptador = new PrismaPg({ connectionString: ambiente.databaseUrl });
+  // O Supabase usa pool de transações no runtime. Instâncias serverless
+  // começam com uma conexão e podem ser ajustadas após observar a demanda.
+  const max = process.env.VERCEL ? 1 : 10;
+  const adaptador = new PrismaPg({ connectionString: ambiente.databaseUrl, max });
   return new PrismaClient({ adapter: adaptador, log: ["warn", "error"] });
 }
 

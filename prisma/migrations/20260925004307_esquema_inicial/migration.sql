@@ -69,7 +69,7 @@ CREATE TABLE "alunos" (
 );
 
 -- CreateTable
-CREATE TABLE "chamadas" (
+CREATE TABLE "frequencias" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "professor_id" UUID NOT NULL,
     "turma_id" UUID NOT NULL,
@@ -77,15 +77,15 @@ CREATE TABLE "chamadas" (
     "revisao" INTEGER NOT NULL DEFAULT 1,
     "atualizado_em" TIMESTAMPTZ NOT NULL,
 
-    CONSTRAINT "chamadas_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "frequencias_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "faltas" (
-    "chamada_id" UUID NOT NULL,
+    "frequencia_id" UUID NOT NULL,
     "aluno_id" UUID NOT NULL,
 
-    CONSTRAINT "faltas_pkey" PRIMARY KEY ("chamada_id","aluno_id")
+    CONSTRAINT "faltas_pkey" PRIMARY KEY ("frequencia_id","aluno_id")
 );
 
 -- CreateTable
@@ -127,13 +127,13 @@ CREATE INDEX "alunos_turma_id_ordem_idx" ON "alunos"("turma_id", "ordem");
 CREATE INDEX "alunos_turma_original_id_idx" ON "alunos"("turma_original_id");
 
 -- CreateIndex
-CREATE INDEX "chamadas_professor_id_dia_idx" ON "chamadas"("professor_id", "dia");
+CREATE INDEX "frequencias_professor_id_dia_idx" ON "frequencias"("professor_id", "dia");
 
 -- CreateIndex
-CREATE INDEX "chamadas_turma_id_dia_idx" ON "chamadas"("turma_id", "dia");
+CREATE INDEX "frequencias_turma_id_dia_idx" ON "frequencias"("turma_id", "dia");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "chamadas_professor_id_turma_id_dia_key" ON "chamadas"("professor_id", "turma_id", "dia");
+CREATE UNIQUE INDEX "frequencias_professor_id_turma_id_dia_key" ON "frequencias"("professor_id", "turma_id", "dia");
 
 -- CreateIndex
 CREATE INDEX "faltas_aluno_id_idx" ON "faltas"("aluno_id");
@@ -163,13 +163,13 @@ ALTER TABLE "alunos" ADD CONSTRAINT "alunos_turma_id_fkey" FOREIGN KEY ("turma_i
 ALTER TABLE "alunos" ADD CONSTRAINT "alunos_turma_original_id_fkey" FOREIGN KEY ("turma_original_id") REFERENCES "turmas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chamadas" ADD CONSTRAINT "chamadas_professor_id_fkey" FOREIGN KEY ("professor_id") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "frequencias" ADD CONSTRAINT "frequencias_professor_id_fkey" FOREIGN KEY ("professor_id") REFERENCES "usuarios"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "chamadas" ADD CONSTRAINT "chamadas_turma_id_fkey" FOREIGN KEY ("turma_id") REFERENCES "turmas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "frequencias" ADD CONSTRAINT "frequencias_turma_id_fkey" FOREIGN KEY ("turma_id") REFERENCES "turmas"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "faltas" ADD CONSTRAINT "faltas_chamada_id_fkey" FOREIGN KEY ("chamada_id") REFERENCES "chamadas"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "faltas" ADD CONSTRAINT "faltas_frequencia_id_fkey" FOREIGN KEY ("frequencia_id") REFERENCES "frequencias"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "faltas" ADD CONSTRAINT "faltas_aluno_id_fkey" FOREIGN KEY ("aluno_id") REFERENCES "alunos"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -184,6 +184,6 @@ CREATE UNIQUE INDEX "series_nome_unico" ON "series" (lower("nome"));
 CREATE UNIQUE INDEX "turmas_serie_nome_unico" ON "turmas" ("serie_id", lower("nome"));
 
 -- Integridade numérica no banco, independente da aplicação.
-ALTER TABLE "chamadas" ADD CONSTRAINT "chamadas_revisao_positiva" CHECK ("revisao" >= 1);
+ALTER TABLE "frequencias" ADD CONSTRAINT "frequencias_revisao_positiva" CHECK ("revisao" >= 1);
 ALTER TABLE "alunos" ADD CONSTRAINT "alunos_ordem_positiva" CHECK ("ordem" >= 1);
 ALTER TABLE "series" ADD CONSTRAINT "series_ordem_positiva" CHECK ("ordem" >= 1);

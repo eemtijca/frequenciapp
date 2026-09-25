@@ -20,11 +20,11 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Aluno, Chamada, Serie, Turma } from "@/domain/frequencia";
+import type { Aluno, Frequencia, Serie, Turma } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import VistaChamada from "@/components/chamada/vista-chamada";
+import VistaFrequencia from "@/components/frequencia/vista-frequencia";
 import VistaHistorico from "@/components/historico/vista-historico";
 import VistaOriginais from "@/components/originais/vista-originais";
 import VistaAlunos from "@/components/alunos/vista-alunos";
@@ -32,7 +32,7 @@ import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
-export type Visao = "chamada" | "historico" | "originais" | "alunos" | "gestao";
+export type Visao = "frequencia" | "historico" | "originais" | "alunos" | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -41,11 +41,11 @@ interface Props {
   turmasIniciais: Turma[];
   origensIniciais: Turma[];
   alunosIniciais: Aluno[];
-  chamadasIniciais: Chamada[];
+  frequenciasIniciais: Frequencia[];
 }
 
 const ITENS_BASE: { visao: Visao; rotulo: string; icone: typeof ClipboardCheck }[] = [
-  { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
+  { visao: "frequencia", rotulo: "Frequencia", icone: ClipboardCheck },
   { visao: "historico", rotulo: "Histórico", icone: History },
   { visao: "originais", rotulo: "Originais", icone: UsersRound },
 ];
@@ -64,22 +64,22 @@ export default function Aplicacao({
   turmasIniciais,
   origensIniciais,
   alunosIniciais,
-  chamadasIniciais,
+  frequenciasIniciais,
 }: Props) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
-  const [visao, setVisao] = useState<Visao>("chamada");
+  const [visao, setVisao] = useState<Visao>("frequencia");
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
   const [origens, setOrigens] = useState<Turma[]>(origensIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
-  const [chamadas, setChamadas] = useState<Chamada[]>(chamadasIniciais);
+  const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const rolagens = useRef<Record<Visao, number>>({
-    chamada: 0,
+    frequencia: 0,
     historico: 0,
     originais: 0,
     alunos: 0,
@@ -114,10 +114,10 @@ export default function Aplicacao({
     setOrigens(dados.origens);
   }, []);
 
-  const recarregarChamadas = useCallback(async (novoMes: string) => {
+  const recarregarFrequencias = useCallback(async (novoMes: string) => {
     setMes(novoMes);
-    const dados = await pedir<{ chamadas: Chamada[] }>(`/api/chamadas?mes=${novoMes}`);
-    setChamadas(dados.chamadas);
+    const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+    setFrequencias(dados.frequencias);
   }, []);
 
   useEffect(() => {
@@ -140,9 +140,9 @@ export default function Aplicacao({
     });
   }
 
-  function abrirChamada(dia: string, turmaId: string) {
+  function abrirFrequencia(dia: string, turmaId: string) {
     setAlvo({ dia, turmaId });
-    trocarVisao("chamada");
+    trocarVisao("frequencia");
     window.scrollTo({ top: 0, behavior: "instant" });
   }
 
@@ -164,7 +164,7 @@ export default function Aplicacao({
         <header className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky top-0 z-30 border-b backdrop-blur">
           <div className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <div className="flex items-baseline gap-2">
-              <span className="text-lg font-semibold tracking-tight">Chamada</span>
+              <span className="text-lg font-semibold tracking-tight">Frequencia</span>
               <span className="text-muted-foreground hidden text-sm sm:inline">
                 {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
               </span>
@@ -210,35 +210,35 @@ export default function Aplicacao({
               exit={{ opacity: 0, y: -8 }}
               transition={TRANSICAO}
             >
-              {visao === "chamada" && (
-                <VistaChamada
+              {visao === "frequencia" && (
+                <VistaFrequencia
                   usuario={usuario}
                   turmas={turmas}
                   alunos={alunos}
                   diaCorrente={diaCorrente}
                   alvo={alvo}
-                  onChamadasMudaram={recarregarChamadas}
+                  onFrequenciasMudaram={recarregarFrequencias}
                   onPendencia={setPendencias}
                 />
               )}
               {visao === "historico" && (
                 <VistaHistorico
-                  chamadas={chamadas}
+                  frequencias={frequencias}
                   mes={mes}
                   onMes={setMes}
-                  onAbrir={abrirChamada}
-                  onRecarregar={recarregarChamadas}
-                  bloqueado={pendencias.includes("chamada")}
+                  onAbrir={abrirFrequencia}
+                  onRecarregar={recarregarFrequencias}
+                  bloqueado={pendencias.includes("frequencia")}
                   rotuloTurma={rotuloTurma}
                 />
               )}
               {visao === "originais" && (
                 <VistaOriginais
                   alunos={alunos}
-                  chamadas={chamadas}
+                  frequencias={frequencias}
                   mes={mes}
                   onMes={setMes}
-                  onRecarregar={recarregarChamadas}
+                  onRecarregar={recarregarFrequencias}
                   origens={origens}
                 />
               )}
@@ -296,7 +296,7 @@ export default function Aplicacao({
                     <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
                   </motion.span>
                   <span>{item.rotulo}</span>
-                  {item.visao === "chamada" && pendencias.includes("chamada") && (
+                  {item.visao === "frequencia" && pendencias.includes("frequencia") && (
                     <span
                       aria-label="Alterações não salvas"
                       className="bg-falta absolute size-1.5 translate-x-4 -translate-y-4 rounded-full"

@@ -201,7 +201,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                         <AlertDialogHeader>
                           <AlertDialogTitle>Excluir a turma {turma.rotulo}?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            A exclusão só é possível quando a turma não tem alunos nem chamadas.
+                            A exclusão só é possível quando a turma não tem alunos nem frequencias.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

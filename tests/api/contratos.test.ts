@@ -4,15 +4,15 @@
 // limpa a própria massa em dias de teste isolados.
 //
 // Rodar com a connection string correta:
-//   DATABASE_URL=postgresql://chamada:chamada@localhost:5432/chamada npm run test:api
+//   DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm run test:api
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
-const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoChamada2026";
+const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
 const EMAIL_PROF = process.env.TESTE_EMAIL ?? "demo@escola.exemplo";
-const SENHA_PROF = process.env.TESTE_SENHA ?? "DemoChamada2026";
+const SENHA_PROF = process.env.TESTE_SENHA ?? "DemoFrequencia2026";
 const DIA_TESTE = "2026-06-15";
 const DIA_TESTE_2 = "2026-06-16";
 
@@ -25,7 +25,7 @@ async function limparMassa() {
   if (!conexao || !conexao.startsWith("postgresql://")) return;
   banco = new pg.Client({ connectionString: conexao });
   await banco.connect();
-  await banco.query("delete from chamadas where dia in ($1, $2)", [DIA_TESTE, DIA_TESTE_2]);
+  await banco.query("delete from frequencias where dia in ($1, $2)", [DIA_TESTE, DIA_TESTE_2]);
   await banco.query("delete from alunos where nome like 'QA%'");
   await banco.query(
     "delete from atribuicoes where professor_id in (select id from usuarios where email like 'qa-%')",
@@ -131,7 +131,7 @@ describe("autenticação", () => {
     });
     expect(resposta.status).toBe(200);
     const bruto = resposta.headers.get("set-cookie") ?? "";
-    expect(bruto).toContain("chamada_sessao=");
+    expect(bruto).toContain("frequenciapp_sessao=");
     expect(bruto).toContain("HttpOnly");
     cookieAdmin = bruto.split(";")[0] ?? "";
     const dados = (await resposta.json()) as { usuario: UsuarioApi };
@@ -153,7 +153,7 @@ describe("autenticação", () => {
   });
 
   it("recusa JSON inválido com mensagem clara", async () => {
-    const resposta = await autenticado(cookieProf, "/api/chamadas", {
+    const resposta = await autenticado(cookieProf, "/api/frequencias", {
       method: "POST",
       body: "{isso não é json",
     });
@@ -163,7 +163,7 @@ describe("autenticação", () => {
   });
 
   it("recusa corpo grande demais", async () => {
-    const resposta = await autenticado(cookieProf, "/api/chamadas", {
+    const resposta = await autenticado(cookieProf, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ x: "a".repeat(300000) }),
     });
@@ -171,7 +171,7 @@ describe("autenticação", () => {
   });
 
   it("bloqueia mutações de origem externa (CSRF)", async () => {
-    const resposta = await fetch(`${APP_URL}/api/chamadas`, {
+    const resposta = await fetch(`${APP_URL}/api/frequencias`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -430,7 +430,7 @@ describe("gestão de alunos (admin)", () => {
   });
 });
 
-describe("chamadas (ACID e concorrência)", () => {
+describe("frequencias (ACID e concorrência)", () => {
   const cookieQA = { valor: "" };
 
   it("professor de QA entra", async () => {
@@ -439,8 +439,8 @@ describe("chamadas (ACID e concorrência)", () => {
     cookieQA.valor = resultado.cookie;
   });
 
-  it("salva a chamada do dia com falta", async () => {
-    const resposta = await autenticado(cookieQA.valor, "/api/chamadas", {
+  it("salva a frequencia do dia com falta", async () => {
+    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE,
@@ -450,13 +450,13 @@ describe("chamadas (ACID e concorrência)", () => {
       }),
     });
     expect(resposta.status).toBe(200);
-    const dados = (await resposta.json()) as { chamada: { revisao: number; faltas: string[] } };
-    expect(dados.chamada.revisao).toBe(1);
-    expect(dados.chamada.faltas).toEqual([alunoQA?.id]);
+    const dados = (await resposta.json()) as { frequencia: { revisao: number; faltas: string[] } };
+    expect(dados.frequencia.revisao).toBe(1);
+    expect(dados.frequencia.faltas).toEqual([alunoQA?.id]);
   });
 
   it("bloqueia duplicata do mesmo dia e turma com conflito 409", async () => {
-    const resposta = await autenticado(cookieQA.valor, "/api/chamadas", {
+    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE, turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
     });
@@ -473,12 +473,12 @@ describe("chamadas (ACID e concorrência)", () => {
       revisao: 0,
     });
     const [primeira, segunda] = await Promise.all([
-      fetch(`${APP_URL}/api/chamadas`, {
+      fetch(`${APP_URL}/api/frequencias`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieQA.valor },
         body: corpo,
       }),
-      fetch(`${APP_URL}/api/chamadas`, {
+      fetch(`${APP_URL}/api/frequencias`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: APP_URL, Cookie: cookieQA.valor },
         body: corpo,
@@ -489,16 +489,18 @@ describe("chamadas (ACID e concorrência)", () => {
   });
 
   it("atualiza com a revisão vigente e recusa revisão obsoleta", async () => {
-    const atualizacao = await autenticado(cookieQA.valor, "/api/chamadas", {
+    const atualizacao = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE, turmaId: turmaQA?.id, faltas: [], revisao: 1 }),
     });
     expect(atualizacao.status).toBe(200);
-    const dados = (await atualizacao.json()) as { chamada: { revisao: number; faltas: string[] } };
-    expect(dados.chamada.revisao).toBe(2);
-    expect(dados.chamada.faltas).toEqual([]);
+    const dados = (await atualizacao.json()) as {
+      frequencia: { revisao: number; faltas: string[] };
+    };
+    expect(dados.frequencia.revisao).toBe(2);
+    expect(dados.frequencia.faltas).toEqual([]);
 
-    const obsoleta = await autenticado(cookieQA.valor, "/api/chamadas", {
+    const obsoleta = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE,
@@ -516,7 +518,7 @@ describe("chamadas (ACID e concorrência)", () => {
       body: JSON.stringify({ nome: "QA Aluno Turma B", turmaId: turmaQB?.id }),
     });
     const alunoDeFora = ((await deFora.json()) as { aluno: AlunoApi }).aluno;
-    const resposta = await autenticado(cookieQA.valor, "/api/chamadas", {
+    const resposta = await autenticado(cookieQA.valor, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE_2,
@@ -528,17 +530,17 @@ describe("chamadas (ACID e concorrência)", () => {
     expect(resposta.status).toBe(400);
     const dados = (await resposta.json()) as { error: string };
     expect(dados.error).toContain("lista de alunos mudou");
-    // Atomicidade: nada foi gravado na chamada rejeitada.
+    // Atomicidade: nada foi gravado na frequencia rejeitada.
     const consulta = await autenticado(
       cookieQA.valor,
-      `/api/chamadas?dia=${DIA_TESTE_2}&turmaId=${turmaQA?.id}`,
+      `/api/frequencias?dia=${DIA_TESTE_2}&turmaId=${turmaQA?.id}`,
     );
-    const vigente = (await consulta.json()) as { chamada: { faltas: string[] } | null };
-    expect(vigente.chamada?.faltas).toEqual([]);
+    const vigente = (await consulta.json()) as { frequencia: { faltas: string[] } | null };
+    expect(vigente.frequencia?.faltas).toEqual([]);
   });
 
-  it("professor sem atribuição não salva chamada", async () => {
-    const resposta = await autenticado(cookieProf, "/api/chamadas", {
+  it("professor sem atribuição não salva frequencia", async () => {
+    const resposta = await autenticado(cookieProf, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({ dia: DIA_TESTE_2, turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
     });
@@ -548,12 +550,12 @@ describe("chamadas (ACID e concorrência)", () => {
   it("recusa dia inválido e turma inválida", async () => {
     const diaInvalido = await autenticado(
       cookieQA.valor,
-      `/api/chamadas?dia=2026-02-30&turmaId=${turmaQA?.id}`,
+      `/api/frequencias?dia=2026-02-30&turmaId=${turmaQA?.id}`,
     );
     expect(diaInvalido.status).toBe(400);
     const turmaInvalida = await autenticado(
       cookieQA.valor,
-      `/api/chamadas?dia=${DIA_TESTE}&turmaId=abc`,
+      `/api/frequencias?dia=${DIA_TESTE}&turmaId=abc`,
     );
     expect(turmaInvalida.status).toBe(400);
   });
@@ -561,16 +563,16 @@ describe("chamadas (ACID e concorrência)", () => {
   it("consulta por dia e por mês", async () => {
     const porDia = await autenticado(
       cookieQA.valor,
-      `/api/chamadas?dia=${DIA_TESTE}&turmaId=${turmaQA?.id}`,
+      `/api/frequencias?dia=${DIA_TESTE}&turmaId=${turmaQA?.id}`,
     );
     expect(porDia.status).toBe(200);
-    const dadosDia = (await porDia.json()) as { chamada: { revisao: number } | null };
-    expect(dadosDia.chamada?.revisao).toBe(2);
+    const dadosDia = (await porDia.json()) as { frequencia: { revisao: number } | null };
+    expect(dadosDia.frequencia?.revisao).toBe(2);
 
-    const porMes = await autenticado(cookieQA.valor, "/api/chamadas?mes=2026-06");
+    const porMes = await autenticado(cookieQA.valor, "/api/frequencias?mes=2026-06");
     expect(porMes.status).toBe(200);
-    const dadosMes = (await porMes.json()) as { chamadas: { dia: string; turmaId: string }[] };
-    expect(dadosMes.chamadas.some((chamada) => chamada.dia === DIA_TESTE)).toBe(true);
+    const dadosMes = (await porMes.json()) as { frequencias: { dia: string; turmaId: string }[] };
+    expect(dadosMes.frequencias.some((frequencia) => frequencia.dia === DIA_TESTE)).toBe(true);
   });
 });
 
@@ -593,7 +595,7 @@ describe("remoções com histórico", () => {
     expect(dados.error).toContain("turmas");
   });
 
-  it("professor com chamadas não é excluído", async () => {
+  it("professor com frequencias não é excluído", async () => {
     const resposta = await autenticado(cookieAdmin, `/api/usuarios/${professorQA?.id}`, {
       method: "DELETE",
     });

@@ -18,9 +18,9 @@ if (!Number.isInteger(totalPorTurma) || totalPorTurma < 1 || totalPorTurma > 99)
   process.exit(1);
 }
 
-const url = process.env.DATABASE_URL;
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url || !(url.startsWith("postgresql://") || url.startsWith("postgres://"))) {
-  console.error("DATABASE_URL deve ser uma connection string PostgreSQL.");
+  console.error("DIRECT_URL ou DATABASE_URL deve ser uma connection string PostgreSQL.");
   process.exit(1);
 }
 

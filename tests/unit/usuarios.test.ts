@@ -4,7 +4,7 @@ import { primeiroNome, problemaDeSenha, rotuloDePapel } from "@/domain/usuarios"
 
 describe("problemaDeSenha", () => {
   it("aprova senhas dentro da política", () => {
-    expect(problemaDeSenha("DemoChamada2026")).toBe(null);
+    expect(problemaDeSenha("DemoFrequencia2026")).toBe(null);
     expect(problemaDeSenha("a1b2c3d4")).toBe(null);
     expect(problemaDeSenha("Trocar@123")).toBe(null);
   });

@@ -1,10 +1,10 @@
 // Esquema do banco. Fonte da verdade para o Prisma Client.
 //
 // Princípio de minimização (LGPD): a tabela faltas guarda apenas os
-// casos de ausência. Presença é o estado implícito de toda chamada
+// casos de ausência. Presença é o estado implícito de toda frequencia
 // salva: quem não tem registro de falta naquele dia esteve presente.
 //
-// Uma chamada existe por (professor, dia, turma). A coluna revisao
+// Uma frequencia existe por (professor, dia, turma). A coluna revisao
 // implementa concorrência otimista entre aparelhos: salvamentos
 // concorrentes são rejeitados com 409 em vez de sobrescrita silenciosa.
 //
@@ -23,7 +23,7 @@ datasource db {
 }
 
 // Papel do usuário. ADMIN gerencia tudo (séries, turmas, alunos e
-// professores); PROFESSOR faz a chamada das turmas atribuídas.
+// professores); PROFESSOR faz a frequencia das turmas atribuídas.
 enum Papel {
   ADMIN
   PROFESSOR
@@ -43,7 +43,7 @@ model Usuario {
   criadoEm     DateTime  @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
   sessoes      Sessao[]
-  chamadas     Chamada[]
+  frequencias     Frequencia[]
   atribuicoes  Atribuicao[]
   auditorias   Auditoria[]
 
@@ -78,7 +78,7 @@ model Serie {
 }
 
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
-// enquanto houver alunos ou chamadas vinculadas: histórico não fica
+// enquanto houver alunos ou frequencias vinculadas: histórico não fica
 // órfão, e o administrador é orientado a mover ou excluir antes.
 model Turma {
   id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -88,7 +88,7 @@ model Turma {
   serie       Serie         @relation(fields: [serieId], references: [id], onDelete: Restrict)
   alunos      Aluno[]       @relation("AlunoTurma")
   origemDe    Aluno[]       @relation("AlunoTurmaOriginal")
-  chamadas    Chamada[]
+  frequencias    Frequencia[]
   atribuicoes Atribuicao[]
 
   @@unique([serieId, nome])
@@ -109,7 +109,7 @@ model Atribuicao {
   @@map("atribuicoes")
 }
 
-// Aluno de uma turma. Nome de chamada, turma atual (de onde parte a
+// Aluno de uma turma. Nome de frequencia, turma atual (de onde parte a
 // frequência diária) e turma original (referência de origem para a
 // consulta agrupada). Nenhum outro dado pessoal é armazenado.
 model Aluno {
@@ -129,9 +129,9 @@ model Aluno {
   @@map("alunos")
 }
 
-// Chamada de um dia e turma por um professor. revisao 1 no primeiro
+// Frequencia de um dia e turma por um professor. revisao 1 no primeiro
 // salvamento e crescimento a cada atualização bem-sucedida.
-model Chamada {
+model Frequencia {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   professorId  String    @map("professor_id") @db.Uuid
   turmaId      String    @map("turma_id") @db.Uuid
@@ -145,17 +145,17 @@ model Chamada {
   @@unique([professorId, turmaId, dia])
   @@index([professorId, dia])
   @@index([turmaId, dia])
-  @@map("chamadas")
+  @@map("frequencias")
 }
 
-// Falta de um aluno em uma chamada. Presença não gera linha.
+// Falta de um aluno em uma frequencia. Presença não gera linha.
 model Falta {
-  chamadaId String  @map("chamada_id") @db.Uuid
+  frequenciaId String  @map("frequencia_id") @db.Uuid
   alunoId   String  @map("aluno_id") @db.Uuid
-  chamada   Chamada @relation(fields: [chamadaId], references: [id], onDelete: Cascade)
+  frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
   aluno     Aluno   @relation(fields: [alunoId], references: [id], onDelete: Cascade)
 
-  @@id([chamadaId, alunoId])
+  @@id([frequenciaId, alunoId])
   @@index([alunoId])
   @@map("faltas")
 }

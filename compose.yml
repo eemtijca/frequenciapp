@@ -1,23 +1,23 @@
-# Chamada. Orquestração local: aplicação + PostgreSQL.
+# FrequenciApp. Orquestração local: aplicação + PostgreSQL.
 # Sobe tudo com: docker compose up --build
-# A aplicação lê DATABASE_URL e aplica as migrações na partida.
+# A aplicação usa o pool local e aplica as migrações pela conexão direta.
 
-name: chamada
+name: frequenciapp
 
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: chamada
-      POSTGRES_PASSWORD: chamada
-      POSTGRES_DB: chamada
+      POSTGRES_USER: frequencia
+      POSTGRES_PASSWORD: frequencia
+      POSTGRES_DB: frequencia
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U chamada -d chamada"]
+      test: ["CMD-SHELL", "pg_isready -U frequencia -d frequencia"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -32,7 +32,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://chamada:chamada@db:5432/chamada
+      DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+      DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
     command: ["./docker/app/entrypoint.sh"]

@@ -20,7 +20,7 @@ export interface Turma {
   serieNome: string;
 }
 
-/** Aluno de uma turma. Dados mínimos para a finalidade de chamada. */
+/** Aluno de uma turma. Dados mínimos para a finalidade de frequencia. */
 export interface Aluno {
   id: string;
   nome: string;
@@ -30,8 +30,8 @@ export interface Aluno {
   ativo: boolean;
 }
 
-/** Chamada salva de um dia e turma. Faltas por identificador do aluno. */
-export interface Chamada {
+/** Frequencia salva de um dia e turma. Faltas por identificador do aluno. */
+export interface Frequencia {
   dia: string;
   turmaId: string;
   revisao: number;
@@ -41,7 +41,7 @@ export interface Chamada {
 
 /** Resultado do salvamento: conflito devolve a versão vigente. */
 export type ResultadoSalvamento =
-  { situacao: "salvo"; chamada: Chamada } | { situacao: "conflito"; chamada: Chamada };
+  { situacao: "salvo"; frequencia: Frequencia } | { situacao: "conflito"; frequencia: Frequencia };
 
 /** Rótulo de exibição de uma turma: série + nome, por exemplo "1º ano A". */
 export function rotuloDeTurma(serieNome: string, turmaNome: string): string {
@@ -89,14 +89,18 @@ export function diasDoMes(mes: string): string[] {
 }
 
 /**
- * Marca de um aluno em um dia, a partir das chamadas do mês.
- * Regra: falta se houver registro de falta em qualquer chamada do dia;
- * presente se a turma atual do aluno teve chamada naquele dia; vazio
- * quando a turma não foi chamada.
+ * Marca de um aluno em um dia, a partir das frequencias do mês.
+ * Regra: falta se houver registro de falta em qualquer frequencia do dia;
+ * presente se a turma atual do aluno teve frequencia naquele dia; vazio
+ * quando a turma não foi frequencia.
  */
-export function marcaDoAluno(aluno: Aluno, dia: string, chamadasDoDia: Chamada[]): Marca | null {
-  if (chamadasDoDia.some((chamada) => chamada.faltas.includes(aluno.id))) return "F";
-  if (chamadasDoDia.some((chamada) => chamada.turmaId === aluno.turmaId)) return "P";
+export function marcaDoAluno(
+  aluno: Aluno,
+  dia: string,
+  frequenciasDoDia: Frequencia[],
+): Marca | null {
+  if (frequenciasDoDia.some((frequencia) => frequencia.faltas.includes(aluno.id))) return "F";
+  if (frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId)) return "P";
   return null;
 }
 
@@ -108,20 +112,20 @@ export interface LinhaGrade {
   aluno: Aluno;
   marcas: Record<string, Marca | undefined>;
   faltas: number;
-  chamadas: number;
+  frequencias: number;
 }
 
 export function montarGrade(
   alunosDaTurma: Aluno[],
-  chamadasDoMes: Chamada[],
+  frequenciasDoMes: Frequencia[],
   mes: string,
 ): { dias: string[]; linhas: LinhaGrade[] } {
   const dias = diasDoMes(mes);
-  const porDia = new Map<string, Chamada[]>();
+  const porDia = new Map<string, Frequencia[]>();
   for (const dia of dias) {
     porDia.set(
       dia,
-      chamadasDoMes.filter((chamada) => chamada.dia === dia),
+      frequenciasDoMes.filter((frequencia) => frequencia.dia === dia),
     );
   }
   const linhas = alunosDaTurma
@@ -130,29 +134,33 @@ export function montarGrade(
     .map((aluno) => {
       const marcas: Record<string, Marca | undefined> = {};
       let faltas = 0;
-      let chamadas = 0;
+      let frequencias = 0;
       for (const dia of dias) {
         const marca = marcaDoAluno(aluno, dia, porDia.get(dia) ?? []);
         if (marca === "F") faltas += 1;
-        if (marca !== null) chamadas += 1;
+        if (marca !== null) frequencias += 1;
         marcas[dia] = marca ?? undefined;
       }
-      return { aluno, marcas, faltas, chamadas };
+      return { aluno, marcas, faltas, frequencias };
     });
   return { dias, linhas };
 }
 
 /**
- * Resumo de uma chamada para a lista do histórico.
+ * Resumo de uma frequencia para a lista do histórico.
  */
-export interface ResumoChamada {
-  chamada: Chamada;
+export interface ResumoFrequencia {
+  frequencia: Frequencia;
   totalAlunos: number;
 }
 
-export function resumirChamada(chamada: Chamada, alunos: Aluno[], turmaId: string): ResumoChamada {
+export function resumirFrequencia(
+  frequencia: Frequencia,
+  alunos: Aluno[],
+  turmaId: string,
+): ResumoFrequencia {
   const total = alunos.filter((aluno) => aluno.ativo && aluno.turmaId === turmaId).length;
-  return { chamada, totalAlunos: total };
+  return { frequencia, totalAlunos: total };
 }
 
 /** Normaliza texto para busca: remove acentos, ordinais e caixa. */

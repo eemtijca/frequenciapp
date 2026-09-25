@@ -71,7 +71,7 @@ const REGRAS: Regra[] = [
   { nome: "segunda pessoa explícita", regex: /\bvocês?\b/i },
   {
     nome: "pluralização com parênteses",
-    regex: /\b(?:aluno|professor|chamada|turma|falta|presença|conta|sessão)\(s\)/i,
+    regex: /\b(?:aluno|professor|frequencia|turma|falta|presença|conta|sessão)\(s\)/i,
   },
 ];
 

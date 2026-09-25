@@ -1,15 +1,15 @@
 "use client";
 
-// Histórico: chamadas salvas de um mês, abertas em um toque.
+// Histórico: frequencias salvas de um mês, abertas em um toque.
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, History, LoaderCircle, RefreshCw } from "lucide-react";
-import type { Chamada } from "@/domain/frequencia";
+import type { Frequencia } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface Props {
-  chamadas: Chamada[];
+  frequencias: Frequencia[];
   mes: string;
   onMes: (mes: string) => void;
   onAbrir: (dia: string, turmaId: string) => void;
@@ -31,7 +31,7 @@ function rotuloDia(dia: string): { numero: string; mesAno: string; semana: strin
 }
 
 export default function VistaHistorico({
-  chamadas,
+  frequencias,
   mes,
   onMes,
   onAbrir,
@@ -48,27 +48,27 @@ export default function VistaHistorico({
     try {
       await onRecarregar(mes);
     } catch {
-      setErro("Não foi possível buscar as chamadas.");
+      setErro("Não foi possível buscar as frequencias.");
     } finally {
       setAtualizando(false);
     }
   }
 
-  const ordenadas = [...chamadas].sort(
+  const ordenadas = [...frequencias].sort(
     (a, b) =>
       b.dia.localeCompare(a.dia) ||
       rotuloTurma(b.turmaId).localeCompare(rotuloTurma(a.turmaId), "pt-BR"),
   );
 
   return (
-    <section aria-label="Histórico de chamadas" className="flex flex-col gap-4">
+    <section aria-label="Histórico de frequencias" className="flex flex-col gap-4">
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Histórico</h1>
           <p className="text-muted-foreground text-sm">
-            {chamadas.length === 0
-              ? "Chamadas salvas do mês"
-              : `${chamadas.length} ${chamadas.length === 1 ? "chamada salva" : "chamadas salvas"}`}
+            {frequencias.length === 0
+              ? "Frequencias salvas do mês"
+              : `${frequencias.length} ${frequencias.length === 1 ? "frequencia salva" : "frequencias salvas"}`}
           </p>
         </div>
         <Button
@@ -104,7 +104,7 @@ export default function VistaHistorico({
 
       {bloqueado && (
         <p className="bg-secondary text-secondary-foreground rounded-lg px-4 py-3 text-sm">
-          Há alterações na chamada em aberto. Salve antes de abrir outra.
+          Há alterações na frequencia em aberto. Salve antes de abrir outra.
         </p>
       )}
 
@@ -114,27 +114,27 @@ export default function VistaHistorico({
         </p>
       )}
 
-      {chamadas.length === 0 ? (
+      {frequencias.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
           <History size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma chamada neste mês</p>
+          <p className="font-medium">Nenhuma frequencia neste mês</p>
           <p className="text-muted-foreground text-sm">
-            Escolha outro mês ou faça a primeira chamada do período.
+            Escolha outro mês ou faça a primeira frequencia do período.
           </p>
         </div>
       ) : (
         <ul className="bg-card divide-y overflow-hidden rounded-lg border">
-          {ordenadas.map((chamada) => {
-            const rotulo = rotuloDia(chamada.dia);
-            const hora = chamada.atualizadoEm
-              ? new Date(chamada.atualizadoEm).toLocaleTimeString("pt-BR", {
+          {ordenadas.map((frequencia) => {
+            const rotulo = rotuloDia(frequencia.dia);
+            const hora = frequencia.atualizadoEm
+              ? new Date(frequencia.atualizadoEm).toLocaleTimeString("pt-BR", {
                   hour: "2-digit",
                   minute: "2-digit",
                 })
               : "";
             return (
               <motion.li
-                key={`${chamada.dia}|${chamada.turmaId}`}
+                key={`${frequencia.dia}|${frequencia.turmaId}`}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -142,7 +142,7 @@ export default function VistaHistorico({
                 <button
                   type="button"
                   disabled={bloqueado}
-                  onClick={() => onAbrir(chamada.dia, chamada.turmaId)}
+                  onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
                   className="hover:bg-secondary/60 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-50"
                 >
                   <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
@@ -155,15 +155,15 @@ export default function VistaHistorico({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">
-                      Turma {rotuloTurma(chamada.turmaId)}
+                      Turma {rotuloTurma(frequencia.turmaId)}
                       <span className="numerais-tabulares text-muted-foreground ml-2 text-xs">
                         {rotulo.mesAno}
                       </span>
                     </span>
                     <span className="text-muted-foreground block truncate text-sm">
-                      {chamada.faltas.length === 0
+                      {frequencia.faltas.length === 0
                         ? "Todos presentes"
-                        : `${chamada.faltas.length} ${chamada.faltas.length === 1 ? "falta" : "faltas"}`}
+                        : `${frequencia.faltas.length} ${frequencia.faltas.length === 1 ? "falta" : "faltas"}`}
                       {hora ? ` · salva às ${hora}` : ""}
                     </span>
                   </span>

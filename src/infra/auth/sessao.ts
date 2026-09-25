@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 import { banco } from "@/infra/banco";
 import type { Identidade } from "@/domain/usuarios";
 
-export const NOME_COOKIE = "chamada_sessao";
+export const NOME_COOKIE = "frequenciapp_sessao";
 const DIAS_DE_VALIDADE = 30;
 
 interface SessaoAtiva {
@@ -114,7 +114,7 @@ export async function encerrarOutrasSessoes(segredo: string, usuarioId: string):
   }
 }
 
-/** Purga sessões vencidas. Chamada pontual pelo operador. */
+/** Purga sessões vencidas. Frequencia pontual pelo operador. */
 export async function purgarSessoesVencidas(): Promise<number> {
   const resultado = await banco().sessao.deleteMany({ where: { expiraEm: { lt: new Date() } } });
   return resultado.count;

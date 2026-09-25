@@ -4,9 +4,10 @@
 set -eu
 
 echo "[entrada] Aguardando o banco..."
-# O endereço é mascarado para não expor a senha nos logs.
-mascarado=$(echo "$DATABASE_URL" | sed -E 's#(://[^:]+:)[^@]+@#\1***@#')
-echo "[entrada] Destino: $mascarado"
+# O endereço da migração é mascarado para não expor a senha nos logs.
+url_migracao="${DIRECT_URL:-$DATABASE_URL}"
+mascarado=$(echo "$url_migracao" | sed -E 's#(://[^:]+:)[^@]+@#\1***@#')
+echo "[entrada] Destino da migração: $mascarado"
 # Até 120 s de espera (60 tentativas de 2 s).
 i=1
 while [ "$i" -le 60 ]; do
