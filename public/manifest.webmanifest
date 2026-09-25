@@ -1,7 +1,7 @@
 {
   "name": "FrequenciApp",
   "short_name": "FrequenciApp",
-  "description": "Registro de frequência escolar para a coordenação: marque apenas as faltas e salve.",
+  "description": "Chamada diária, saídas antecipadas e indicadores da escola para a direção e a coordenação.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -41,17 +41,17 @@
   ],
   "shortcuts": [
     {
-      "name": "Registrar frequência",
-      "short_name": "Frequência",
+      "name": "Fazer a chamada",
+      "short_name": "Chamada",
       "description": "Abrir a chamada do dia",
-      "url": "/?visao=frequencia",
+      "url": "/?visao=chamada",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
-      "name": "Grade do mês",
-      "short_name": "Grade",
-      "description": "Consultar a grade do mês",
-      "url": "/?visao=grade",
+      "name": "Painel do dia",
+      "short_name": "Painel",
+      "description": "Ver a infrequência e as saídas do dia",
+      "url": "/?visao=painel",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]

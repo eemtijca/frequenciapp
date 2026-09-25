@@ -233,7 +233,7 @@ export function resumoPorAluno(
     faltas,
     justificadas,
     parciais,
-    saidas: saidas.filter((saida) => saida.alunoId === aluno.id).length,
+    saidas: saidas.filter((saida) => saida.alunoId === aluno.id && dias.includes(saida.dia)).length,
   };
 }
 

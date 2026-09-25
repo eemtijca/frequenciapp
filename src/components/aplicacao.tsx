@@ -7,32 +7,44 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import {
+  ChartPie,
   ClipboardCheck,
-  History,
+  DoorOpen,
   KeyRound,
   LogOut,
   Settings2,
+  Table2,
   UserRound,
   Users,
-  UsersRound,
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Aluno, Frequencia, Serie, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  Configuracoes,
+  Frequencia,
+  ResumoAcumulado,
+  Responsavel,
+  SaidaAntecipada,
+  Serie,
+  Turma,
+} from "@/domain/frequencia";
+import { diasDoMes } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
-import VistaHistorico from "@/components/historico/vista-historico";
-import VistaGrade from "@/components/grade/vista-grade";
+import VistaPainel from "@/components/painel/vista-painel";
+import VistaSaidas from "@/components/saidas/vista-saidas";
+import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
-export type Visao = "frequencia" | "historico" | "grade" | "alunos" | "gestao";
+export type Visao = "painel" | "chamada" | "saidas" | "relatorios" | "alunos" | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -43,12 +55,25 @@ interface Props {
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
   frequenciasIniciais: Frequencia[];
+  saidasIniciais: SaidaAntecipada[];
+  responsaveisIniciais: Responsavel[];
+  configuracoesIniciais: Configuracoes;
+  resumoInicial: ResumoAcumulado | null;
 }
 
-const VISOES: Visao[] = ["frequencia", "historico", "grade", "alunos", "gestao"];
+const VISOES: Visao[] = ["painel", "chamada", "saidas", "relatorios", "alunos", "gestao"];
 
 function visaoValida(valor: string | undefined): Visao | null {
+  // Valores antigos do manifest e de links continuam abrindo a área certa.
+  if (valor === "frequencia") return "chamada";
+  if (valor === "historico" || valor === "grade") return "relatorios";
   return VISOES.find((visao) => visao === valor) ?? null;
+}
+
+function abaRelatoriosDe(valor: string | undefined): AbaRelatorio | undefined {
+  if (valor === "historico") return "historico";
+  if (valor === "grade") return "grade";
+  return undefined;
 }
 
 interface ItemNav {
@@ -57,11 +82,13 @@ interface ItemNav {
   icone: typeof ClipboardCheck;
 }
 
-const ITENS_BASE: ItemNav[] = [
-  { visao: "frequencia", rotulo: "Frequência", icone: ClipboardCheck },
-  { visao: "historico", rotulo: "Histórico", icone: History },
-  { visao: "grade", rotulo: "Grade", icone: UsersRound },
+const ITENS_INICIAIS: ItemNav[] = [
+  { visao: "painel", rotulo: "Painel", icone: ChartPie },
+  { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
 ];
+
+const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saiu mais cedo", icone: DoorOpen };
+const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
 
 const ITENS_FIM: ItemNav[] = [
   { visao: "alunos", rotulo: "Alunos", icone: Users },
@@ -69,9 +96,10 @@ const ITENS_FIM: ItemNav[] = [
 ];
 
 const LARGURAS: Record<Visao, string> = {
-  frequencia: "max-w-2xl lg:max-w-none",
-  historico: "max-w-3xl lg:max-w-none",
-  grade: "max-w-5xl lg:max-w-none",
+  painel: "max-w-5xl lg:max-w-none",
+  chamada: "max-w-2xl lg:max-w-none",
+  saidas: "max-w-3xl lg:max-w-none",
+  relatorios: "max-w-5xl lg:max-w-none",
   alunos: "max-w-3xl lg:max-w-none",
   gestao: "max-w-5xl lg:max-w-none",
 };
@@ -133,22 +161,39 @@ export default function Aplicacao({
   turmasIniciais,
   alunosIniciais,
   frequenciasIniciais,
+  saidasIniciais,
+  responsaveisIniciais,
+  configuracoesIniciais,
+  resumoInicial,
 }: Props) {
   const router = useRouter();
   const ehAdmin = usuario.papel === "ADMIN";
   const pedida = visaoValida(visaoInicial);
-  const inicial = pedida && (pedida !== "gestao" || ehAdmin) ? pedida : "frequencia";
+  const inicial =
+    pedida &&
+    (pedida !== "gestao" || ehAdmin) &&
+    (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
+      ? pedida
+      : "painel";
   const [visao, setVisao] = useState<Visao>(inicial);
   const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set([inicial]));
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
   const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
+  const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
+  const [responsaveis] = useState<Responsavel[]>(responsaveisIniciais);
+  const [configuracoes, setConfiguracoes] = useState<Configuracoes>(configuracoesIniciais);
+  const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
+  const [versaoFrequencias, setVersaoFrequencias] = useState(0);
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
+    abaRelatoriosDe(visaoInicial),
+  );
   const pagerRef = useRef<HTMLDivElement | null>(null);
   // Índice da visão visível, modo programático e controles de quadro.
   const indiceVisao = useRef(0);
@@ -161,10 +206,13 @@ export default function Aplicacao({
     () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
     [ehAdmin],
   );
-  const itens = useMemo<ItemNav[]>(
-    () => (itemFinal ? [...ITENS_BASE, itemFinal] : [...ITENS_BASE]),
-    [itemFinal],
-  );
+  const itens = useMemo<ItemNav[]>(() => {
+    const lista = [...ITENS_INICIAIS];
+    if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
+    lista.push(ITEM_RELATORIOS);
+    if (itemFinal) lista.push(itemFinal);
+    return lista;
+  }, [configuracoes.saidaAntecipada, itemFinal]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
   const posicoes = useRef(new Map<Visao, number>());
@@ -184,11 +232,41 @@ export default function Aplicacao({
     setTurmas(dados.turmas);
   }, []);
 
-  const recarregarFrequencias = useCallback(async (novoMes: string) => {
-    setMes(novoMes);
-    const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
-    setFrequencias(dados.frequencias);
+  const recarregarFrequencias = useCallback(
+    async (novoMes: string) => {
+      setMes(novoMes);
+      const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+      setFrequencias(dados.frequencias);
+      setVersaoFrequencias((valor) => valor + 1);
+      try {
+        const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
+          `/api/frequencias/resumo?ate=${diaCorrente}`,
+        );
+        setResumo(resumoDados.resumo);
+      } catch {
+        // O acumulado é complementar: a chamada segue sem ele.
+      }
+    },
+    [diaCorrente],
+  );
+
+  const recarregarSaidas = useCallback(async (novoMes: string) => {
+    const dias = diasDoMes(novoMes);
+    const primeiro = dias[0] ?? `${novoMes}-01`;
+    const ultimo = dias[dias.length - 1] ?? `${novoMes}-28`;
+    const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+      `/api/saidas?de=${primeiro}&ate=${ultimo}`,
+    );
+    setSaidas(dados.saidas);
   }, []);
+
+  // Troca de mês nos relatórios recarrega frequências e saídas juntas.
+  const recarregarMes = useCallback(
+    async (novoMes: string) => {
+      await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+    },
+    [recarregarFrequencias, recarregarSaidas],
+  );
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
@@ -360,10 +438,10 @@ export default function Aplicacao({
 
   function abrirFrequencia(dia: string, turmaId: string) {
     setAlvo({ dia, turmaId });
-    trocarVisao("frequencia");
+    trocarVisao("chamada");
     requestAnimationFrame(() => {
       const pager = pagerRef.current;
-      const indice = itens.findIndex((item) => item.visao === "frequencia");
+      const indice = itens.findIndex((item) => item.visao === "chamada");
       const painel = pager?.children[indice];
       if (painel instanceof HTMLElement) painel.scrollTo({ top: 0 });
     });
@@ -405,7 +483,7 @@ export default function Aplicacao({
 
   async function sair() {
     if (pendencias.length > 0) {
-      const confirmar = window.confirm("Há alterações não salvas na frequência. Sair mesmo assim?");
+      const confirmar = window.confirm("Há alterações não salvas na chamada. Sair mesmo assim?");
       if (!confirmar) return;
     }
     try {
@@ -420,7 +498,19 @@ export default function Aplicacao({
   function renderizarVisao(alvoVisao: Visao) {
     return (
       <div className={`mx-auto w-full ${LARGURAS[alvoVisao]}`}>
-        {alvoVisao === "frequencia" && (
+        {alvoVisao === "painel" && (
+          <VistaPainel
+            diaCorrente={diaCorrente}
+            mes={mes}
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            frequencias={frequencias}
+            saidas={saidas}
+            onRecarregar={recarregarMes}
+          />
+        )}
+        {alvoVisao === "chamada" && (
           <VistaFrequencia
             usuario={usuario}
             turmas={turmas}
@@ -428,35 +518,45 @@ export default function Aplicacao({
             diaCorrente={diaCorrente}
             fuso={fuso}
             alvo={alvo}
+            configuracoes={configuracoes}
+            resumo={resumo}
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={setPendencias}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
           />
         )}
-        {alvoVisao === "historico" && (
-          <VistaHistorico
-            frequencias={frequencias}
-            turmas={turmas}
-            mes={mes}
-            mesCorrente={diaCorrente.slice(0, 7)}
+        {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
+          <VistaSaidas
+            usuarioId={usuario.id}
+            diaCorrente={diaCorrente}
             fuso={fuso}
-            onMes={setMes}
-            onAbrir={abrirFrequencia}
-            onRecarregar={recarregarFrequencias}
-            bloqueado={pendencias.includes("frequencia")}
-            rotuloTurma={rotuloTurma}
+            mes={mes}
+            turmas={turmas}
+            alunos={alunos}
+            responsaveis={responsaveis}
+            saidas={saidas}
+            onSaidasMudaram={recarregarSaidas}
           />
         )}
-        {alvoVisao === "grade" && (
-          <VistaGrade
-            alunos={alunos}
-            frequencias={frequencias}
+        {alvoVisao === "relatorios" && (
+          <VistaRelatorios
+            abaInicial={abaRelatoriosInicial}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
-            hoje={diaCorrente}
-            onMes={setMes}
+            diaCorrente={diaCorrente}
+            fuso={fuso}
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            frequencias={frequencias}
+            saidas={saidas}
+            resumo={resumo}
+            versao={versaoFrequencias}
+            bloqueado={pendencias.includes("chamada")}
+            rotuloTurma={rotuloTurma}
+            onMes={recarregarMes}
+            onAbrir={abrirFrequencia}
             onRecarregar={recarregarFrequencias}
-            origens={turmas}
           />
         )}
         {alvoVisao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
@@ -466,6 +566,8 @@ export default function Aplicacao({
             series={series}
             turmas={turmas}
             alunos={alunos}
+            configuracoes={configuracoes}
+            diaCorrente={diaCorrente}
             onSeriesMudaram={async () => {
               const dados = await pedir<{ series: Serie[] }>("/api/series");
               setSeries(dados.series);
@@ -476,6 +578,7 @@ export default function Aplicacao({
               setSeries(dados.series);
             }}
             onAlunosMudaram={recarregarAlunos}
+            onConfiguracoesMudaram={setConfiguracoes}
           />
         )}
       </div>
@@ -510,7 +613,7 @@ export default function Aplicacao({
                 key={item.visao}
                 item={item}
                 ativo={visao === item.visao}
-                pendente={item.visao === "frequencia" && pendencias.includes("frequencia")}
+                pendente={item.visao === "chamada" && pendencias.includes("chamada")}
                 indicador="indicador-lateral"
                 onTrocar={trocarVisao}
               />
@@ -626,6 +729,7 @@ export default function Aplicacao({
           >
             <div
               ref={pagerRef}
+              data-pager="principal"
               onScroll={aoRolarPager}
               className="pagina-sem-barra flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
             >
@@ -661,13 +765,16 @@ export default function Aplicacao({
             className="bg-background/95 supports-[backdrop-filter]:bg-background/85 shrink-0 border-t backdrop-blur lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
-            <div className="grid grid-cols-4">
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
+            >
               {itens.map((item) => (
                 <ItemNavegacao
                   key={item.visao}
                   item={item}
                   ativo={visao === item.visao}
-                  pendente={item.visao === "frequencia" && pendencias.includes("frequencia")}
+                  pendente={item.visao === "chamada" && pendencias.includes("chamada")}
                   indicador="indicador-inferior"
                   onTrocar={trocarVisao}
                 />

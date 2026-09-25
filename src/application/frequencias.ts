@@ -101,11 +101,12 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     faltas: [...porAluno.entries()].map(([alunoId, grupo]) => {
       const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
       const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
+      if (!justificativa) return { alunoId, horarios: grupo.horarios };
       return {
         alunoId,
         horarios: grupo.horarios,
         justificativa,
-        observacao: unica ? grupo.observacao : null,
+        observacao: grupo.observacao,
       };
     }),
   };
@@ -420,12 +421,15 @@ export async function salvarFrequencia(
         situacao: "salvo" as const,
         frequencia: {
           ...paraFrequencia(linha),
-          faltas: ausencias.map((ausencia) => ({
-            alunoId: ausencia.alunoId,
-            horarios: ausencia.horarios,
-            justificativa: ausencia.justificativa,
-            observacao: ausencia.observacao,
-          })),
+          faltas: ausencias.map((ausencia) => {
+            if (!ausencia.justificativa) return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };
+            return {
+              alunoId: ausencia.alunoId,
+              horarios: ausencia.horarios,
+              justificativa: ausencia.justificativa,
+              observacao: ausencia.observacao,
+            };
+          }),
         },
       };
     });

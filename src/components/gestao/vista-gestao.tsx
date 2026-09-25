@@ -4,23 +4,27 @@
 // curtas, com troca por deslize horizontal no celular e animação no desktop.
 import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { motion, useAnimationControls, useReducedMotion } from "motion/react";
-import { GraduationCap, ListChecks, School, Users } from "lucide-react";
-import type { Aluno, Serie, Turma } from "@/domain/frequencia";
+import { GraduationCap, ListChecks, School, Settings2, Users } from "lucide-react";
+import type { Aluno, Configuracoes, Serie, Turma } from "@/domain/frequencia";
 import AbaSeries from "@/components/gestao/aba-series";
 import AbaTurmas from "@/components/gestao/aba-turmas";
 import AbaAlunos from "@/components/gestao/aba-alunos";
 import AbaEquipe from "@/components/gestao/aba-equipe";
+import AbaConfiguracoes from "@/components/gestao/aba-configuracoes";
 
-export type Aba = "series" | "turmas" | "alunos" | "equipe";
+export type Aba = "series" | "turmas" | "alunos" | "equipe" | "configuracoes";
 
 interface Props {
   usuarioId: string;
   series: Serie[];
   turmas: Turma[];
   alunos: Aluno[];
+  configuracoes: Configuracoes;
+  diaCorrente: string;
   onSeriesMudaram: () => Promise<void>;
   onTurmasMudaram: () => Promise<void>;
   onAlunosMudaram: () => Promise<void>;
+  onConfiguracoesMudaram: (configuracoes: Configuracoes) => void;
 }
 
 const ABAS: { aba: Aba; rotulo: string; icone: typeof School }[] = [
@@ -28,6 +32,7 @@ const ABAS: { aba: Aba; rotulo: string; icone: typeof School }[] = [
   { aba: "turmas", rotulo: "Turmas", icone: School },
   { aba: "alunos", rotulo: "Alunos", icone: ListChecks },
   { aba: "equipe", rotulo: "Equipe", icone: Users },
+  { aba: "configuracoes", rotulo: "Configurações", icone: Settings2 },
 ];
 
 export default function VistaGestao({
@@ -35,9 +40,12 @@ export default function VistaGestao({
   series,
   turmas,
   alunos,
+  configuracoes,
+  diaCorrente,
   onSeriesMudaram,
   onTurmasMudaram,
   onAlunosMudaram,
+  onConfiguracoesMudaram,
 }: Props) {
   const [aba, setAba] = useState<Aba>("series");
   const [visitadas, setVisitadas] = useState<Set<Aba>>(() => new Set(["series"]));
@@ -202,6 +210,13 @@ export default function VistaGestao({
           <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
         )}
         {valor === "equipe" && <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} />}
+        {valor === "configuracoes" && (
+          <AbaConfiguracoes
+            configuracoes={configuracoes}
+            diaCorrente={diaCorrente}
+            onMudanca={onConfiguracoesMudaram}
+          />
+        )}
       </>
     );
   }
@@ -221,7 +236,7 @@ export default function VistaGestao({
         role="tablist"
         aria-label="Áreas de gestão"
         onKeyDown={aoTeclar}
-        className="bg-secondary/60 grid grid-cols-4 gap-1 rounded-lg p-1"
+        className="bg-secondary/60 grid grid-cols-5 gap-1 rounded-lg p-1"
       >
         {ABAS.map((item, indice) => {
           const Icone = item.icone;
