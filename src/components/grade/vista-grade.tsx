@@ -5,7 +5,15 @@
 // acumulada (F + FJ) de todo o histórico.
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronLeft, ChevronRight, Download, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  LoaderCircle,
+  RefreshCw,
+  Send,
+  Table2,
+} from "lucide-react";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -17,6 +25,7 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
+import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -71,6 +80,8 @@ export default function VistaGrade({
   const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  const [envioAberto, setEnvioAberto] = useState(false);
+  const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
@@ -219,6 +230,18 @@ export default function VistaGrade({
           </p>
         </div>
         <div className="flex items-center gap-1">
+          {estadoPlanilha?.podeEnviar && (
+            <Button
+              variant="outline"
+              className="h-10"
+              aria-label="Enviar para a planilha"
+              onClick={() => setEnvioAberto(true)}
+              disabled={grade.linhas.length === 0 || carregandoPeriodo}
+            >
+              <Send size={16} />
+              <span className="hidden sm:inline">Enviar para a planilha</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -544,6 +567,19 @@ export default function VistaGrade({
             <span>Baixar planilha: todos os alunos ativos da turma de origem</span>
           </div>
         </motion.div>
+      )}
+
+      {estadoPlanilha?.podeEnviar && grade.dias.length > 0 && (
+        <DialogoEnvio
+          aberto={envioAberto}
+          onAbrir={setEnvioAberto}
+          turmaOriginalId={turmaEfetiva}
+          rotulo={rotuloDe(turmaEfetiva)}
+          de={grade.dias[0] ?? hoje}
+          ate={grade.dias[grade.dias.length - 1] ?? hoje}
+          modoCompleto={estadoPlanilha.modo === "completo"}
+          aoConcluir={() => void recarregarPlanilha()}
+        />
       )}
     </section>
   );

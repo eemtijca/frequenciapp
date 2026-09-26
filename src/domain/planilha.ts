@@ -349,12 +349,7 @@ export function detectarEsquema(aba: AbaBruta, anoReferencia: number): AbaEsquem
   const ultimaLinhaDados = detectarUltimaLinha(valores, linhaCabecalho, primeiraColunaTexto);
   const ultimaColunaDados = detectarUltimaColuna(valores, linhaCabecalho);
   const mesclagens = (aba.mesclagens ?? []).filter((intervalo) => intervaloCobreColunas(intervalo));
-  const assinatura = assinarAba(
-    aba.nome,
-    cabecalho,
-    [ultimaLinhaDados, ultimaColunaDados],
-    mesclagens,
-  );
+  const assinatura = assinarAba(aba.nome, cabecalho, mesclagens);
   return {
     nome: aba.nome,
     oculta: Boolean(aba.oculta),
@@ -452,16 +447,9 @@ function intervaloCobreColunas(intervalo: string): boolean {
   return letra1 !== "" && letra2 !== "" && letra1 !== letra2;
 }
 
-/** Assinatura de uma aba: nome, cabeçalho, limites e mesclagens. */
-export function assinarAba(
-  nome: string,
-  cabecalho: string[],
-  limites: number[],
-  mesclagens: string[],
-): string {
-  return hashTexto(
-    JSON.stringify([nome, cabecalho.map(textoLimpo), limites, mesclagens.slice().sort()]),
-  );
+/** Assinatura de uma aba: nome, cabeçalho e mesclagens. Igual à do script. */
+export function assinarAba(nome: string, cabecalho: string[], mesclagens: string[]): string {
+  return hashTexto(JSON.stringify([nome, cabecalho.map(textoLimpo), mesclagens.slice().sort()]));
 }
 
 /** Assinatura da planilha inteira, usada para detectar deriva de esquema. */

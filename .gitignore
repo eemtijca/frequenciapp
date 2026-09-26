@@ -40,6 +40,9 @@ yarn-error.log*
 # Plataforma
 .vercel
 
+# Apps Script local
+gas/.clasp.json
+
 # Sandbox local (não fazem parte do entregável)
 bun.lock
 Caddyfile
