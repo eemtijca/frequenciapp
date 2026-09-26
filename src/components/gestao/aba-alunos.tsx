@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -137,10 +138,11 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           turmaOriginalId: origemEmMassa,
         }),
       );
-      toast.success(
+      avisarSucesso(
         dados.atualizados === 1
           ? "Origem de 1 aluno atualizada."
           : `Origem de ${dados.atualizados} alunos atualizada.`,
+        "As faltas antigas continuam contando na turma de origem anterior.",
       );
       cancelarSelecao();
       await onMudanca();
@@ -186,10 +188,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ aluno: Aluno }>(`/api/alunos/${emEdicao.id}`, corpoAlteracao("PATCH", corpo));
-        toast.success("Aluno atualizado.");
+        avisarSucesso("Aluno atualizado.", "A lista da Chamada já mostra os dados novos.");
       } else {
         await pedir<{ aluno: Aluno }>("/api/alunos", corpoJson(corpo));
-        toast.success("Aluno cadastrado.");
+        avisarSucesso("Aluno cadastrado.", "O aluno entra na chamada de hoje e nos próximos dias.");
       }
       setDialogoAberto(false);
       await onMudanca();

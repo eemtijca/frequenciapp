@@ -18,6 +18,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -458,7 +459,7 @@ export default function VistaFrequencia({
       }
       const total = dados.frequencia.faltas.length;
       const justificadas = dados.frequencia.faltas.filter((falta) => falta.justificativa).length;
-      toast.success(
+      avisarSucesso(
         total === 0
           ? "Chamada salva. Todos presentes."
           : `Chamada salva com ${total} ${total === 1 ? "falta" : "faltas"}${
@@ -466,6 +467,7 @@ export default function VistaFrequencia({
                 ? ` (${justificadas} ${justificadas === 1 ? "justificada" : "justificadas"})`
                 : ""
             }.`,
+        "Pode conferir no Histórico ou seguir para outra turma.",
       );
       await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
@@ -492,6 +494,9 @@ export default function VistaFrequencia({
       // rascunho já removido
     }
     setRecarregar((valor) => valor + 1);
+    toast("Rascunho descartado.", {
+      description: "As marcações voltaram para a última versão salva.",
+    });
   }
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";

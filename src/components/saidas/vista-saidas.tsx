@@ -12,6 +12,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type {
   Aluno,
   JustificativaConfigurada,
@@ -222,7 +223,10 @@ export default function VistaSaidas({
           liberadoPorId: responsavelId,
         }),
       );
-      toast.success("Saída registrada.");
+      avisarSucesso(
+        "Saída registrada.",
+        "O registro aparece em Saídas, no dia de hoje, e nos relatórios.",
+      );
       setAlunoId("");
       setMomento("");
       setJustificativa("");

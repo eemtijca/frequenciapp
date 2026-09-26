@@ -19,6 +19,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type {
   Aluno,
   Configuracoes,
@@ -403,6 +404,7 @@ export default function Aplicacao({
       toast.error("Não foi possível sair. Tente novamente.");
       return;
     }
+    avisarSucesso("Sessão encerrada.");
     router.refresh();
   }
 

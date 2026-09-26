@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -122,10 +123,10 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
           `/api/usuarios/${emEdicao.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        toast.success("Conta atualizada.");
+        avisarSucesso("Conta atualizada.", "Os dados novos valem no próximo acesso.");
       } else {
         await pedir<{ usuario: UsuarioDTO }>("/api/usuarios", corpoJson(formulario));
-        toast.success("Conta criada.");
+        avisarSucesso("Conta criada.", "A pessoa entra com o e-mail e a senha cadastrados.");
       }
       setDialogoAberto(false);
       await recarregar();
@@ -143,7 +144,12 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
         `/api/usuarios/${usuario.id}`,
         corpoAlteracao("PATCH", { ativo: !usuario.ativo }),
       );
-      toast.success(usuario.ativo ? "Conta desativada." : "Conta reativada.");
+      avisarSucesso(
+        usuario.ativo ? "Conta desativada." : "Conta reativada.",
+        usuario.ativo
+          ? "A pessoa perde o acesso, mas o histórico é preservado."
+          : "A pessoa volta a entrar com a senha de sempre.",
+      );
       await recarregar();
     } catch (excecao) {
       const mensagem =
@@ -155,7 +161,10 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
   async function excluir(usuario: UsuarioDTO) {
     try {
       await pedir<{ ok: boolean }>(`/api/usuarios/${usuario.id}`, corpoAlteracao("DELETE"));
-      toast.success("Conta excluída.");
+      avisarSucesso(
+        "Conta excluída.",
+        "O histórico fica sem autoria e as faltas continuam salvas.",
+      );
       await recarregar();
     } catch (excecao) {
       const mensagem =

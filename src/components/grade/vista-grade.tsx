@@ -27,6 +27,7 @@ import {
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -192,7 +193,13 @@ export default function VistaGrade({
   // Exporta o dataframe da turma de origem no período exibido. A busca da
   // tela não interfere: a planilha leva todos os alunos ativos da turma.
   function baixarPlanilha() {
-    if (grade.linhas.length === 0) return;
+    if (grade.linhas.length === 0) {
+      avisarInfo(
+        "Nada para exportar neste período.",
+        "Escolha outro período ou confira a turma de origem.",
+      );
+      return;
+    }
     const turma = turmaPlanilhaDaGrade(
       turmaEfetiva,
       rotuloDe(turmaEfetiva),
@@ -209,6 +216,7 @@ export default function VistaGrade({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    avisarSucesso("Planilha baixada.", "O arquivo leva todos os alunos ativos da turma de origem.");
   }
 
   return (

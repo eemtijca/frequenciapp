@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -82,10 +83,10 @@ export default function AbaSeries({ series, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ serie: Serie }>(`/api/series/${emEdicao.id}`, corpoAlteracao("PATCH", dados));
-        toast.success("Série atualizada.");
+        avisarSucesso("Série atualizada.", "O nome novo já aparece na Chamada e nos Relatórios.");
       } else {
         await pedir<{ serie: Serie }>("/api/series", corpoJson(dados));
-        toast.success("Série criada.");
+        avisarSucesso("Série criada.", "Agora é possível cadastrar turmas nesta série.");
       }
       setDialogoAberto(false);
       await onMudanca();

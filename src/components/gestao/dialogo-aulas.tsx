@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -117,13 +118,13 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
           `/api/horarios/${formulario.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        toast.success("Aula atualizada.");
+        avisarSucesso("Aula atualizada.", "A grade da turma já mostra os horários novos.");
       } else {
         await pedir<{ horario: Horario }>(
           "/api/horarios",
           corpoJson({ turmaId: turma.id, ...corpo }),
         );
-        toast.success("Aula criada.");
+        avisarSucesso("Aula criada.", "Ela entra na grade da turma nos dias marcados.");
       }
       setFormulario(null);
       await onMudanca();
@@ -140,7 +141,12 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
         `/api/horarios/${aula.id}`,
         corpoAlteracao("PATCH", { ativo: !aula.ativo }),
       );
-      toast.success(aula.ativo ? "Aula desativada." : "Aula reativada.");
+      avisarSucesso(
+        aula.ativo ? "Aula desativada." : "Aula reativada.",
+        aula.ativo
+          ? "As faltas já registradas continuam guardadas."
+          : "Ela volta a aparecer na grade da turma.",
+      );
       await onMudanca();
     } catch (excecao) {
       const mensagem =

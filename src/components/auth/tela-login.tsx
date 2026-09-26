@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { avisarSucesso } from "@/lib/avisos";
 
 const CHAVE_EMAIL = "frequenciapp:email";
 
@@ -53,6 +54,7 @@ export default function TelaLogin() {
       } catch {
         // Sem armazenamento local: o login continua.
       }
+      avisarSucesso("Entrada confirmada.");
       router.refresh();
     } catch (excecao) {
       const mensagem =

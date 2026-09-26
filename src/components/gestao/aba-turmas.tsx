@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type { Serie, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -113,10 +114,10 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ turma: Turma }>(`/api/turmas/${emEdicao.id}`, corpoAlteracao("PATCH", dados));
-        toast.success("Turma atualizada.");
+        avisarSucesso("Turma atualizada.", "A mudança vale para a Chamada e os Relatórios.");
       } else {
         await pedir<{ turma: Turma }>("/api/turmas", corpoJson(dados));
-        toast.success("Turma criada.");
+        avisarSucesso("Turma criada.", "Ela já aparece na Chamada, nos Relatórios e na Gestão.");
       }
       setDialogoAberto(false);
       await onMudanca();

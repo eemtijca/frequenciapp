@@ -5,6 +5,7 @@
 import { useRef, useState } from "react";
 import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
 import type { Configuracoes, JustificativaConfigurada } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -103,7 +104,10 @@ export default function AbaConfiguracoes({
       setNovaCodigo("");
       setNovaRotulo("");
       await onJustificativasMudaram();
-      toast.success("Justificativa adicionada.");
+      avisarSucesso(
+        "Justificativa adicionada.",
+        "Ela já aparece no seletor da Chamada e das Saídas.",
+      );
     } catch (excecao) {
       setErroJustificativa(
         excecao instanceof ErroApi
@@ -127,7 +131,7 @@ export default function AbaConfiguracoes({
       setEditando(null);
       setRotuloEdicao("");
       await onJustificativasMudaram();
-      toast.success("Justificativa atualizada.");
+      avisarSucesso("Justificativa atualizada.", "O seletor da Chamada já mostra o rótulo novo.");
     } catch (excecao) {
       setErroJustificativa(
         excecao instanceof ErroApi
@@ -147,7 +151,12 @@ export default function AbaConfiguracoes({
         corpoAlteracao("PATCH", { ativo: !item.ativo }),
       );
       await onJustificativasMudaram();
-      toast.success(item.ativo ? "Justificativa desativada." : "Justificativa reativada.");
+      avisarSucesso(
+        item.ativo ? "Justificativa desativada." : "Justificativa reativada.",
+        item.ativo
+          ? "O histórico que usa o código continua intacto."
+          : "Ela volta a aparecer no seletor da Chamada.",
+      );
     } catch (excecao) {
       setErroJustificativa(
         excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
@@ -173,8 +182,10 @@ export default function AbaConfiguracoes({
   }
 
   async function baixarCopia() {
+    const aviso = "backup-baixar";
     setBaixando(true);
     setErro("");
+    toast.loading("Baixando a cópia de segurança...", { id: aviso });
     try {
       const dados = await pedir<unknown>("/api/backup");
       const conteudo = JSON.stringify(dados, null, 2);
@@ -187,7 +198,11 @@ export default function AbaConfiguracoes({
       link.click();
       link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      toast.success("Cópia preparada. Confira o download no navegador.");
+      avisarSucesso(
+        "Cópia preparada. Confira o download no navegador.",
+        "Guarde o arquivo em lugar seguro: é com ele que os dados voltam, se precisar.",
+        aviso,
+      );
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
     } finally {
@@ -196,9 +211,11 @@ export default function AbaConfiguracoes({
   }
 
   async function importar(arquivo: File) {
+    const aviso = "backup-importar";
     setImportando(true);
     setErro("");
     setResultado(null);
+    toast.loading("Importando a cópia de segurança...", { id: aviso });
     try {
       if (arquivo.size > LIMITE_ARQUIVO) {
         throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
@@ -211,7 +228,7 @@ export default function AbaConfiguracoes({
       }
       const dados = await pedir<ResultadoImportacao>("/api/backup", corpoJson(corpo));
       setResultado(dados);
-      toast.success("Importação concluída.");
+      avisarSucesso("Importação concluída.", "Confira o resumo na tela antes de continuar.", aviso);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : (excecao as Error).message);
     } finally {

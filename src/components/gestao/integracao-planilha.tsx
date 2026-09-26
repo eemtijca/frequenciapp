@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, ClipboardCopy, FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
@@ -196,8 +197,10 @@ export default function IntegracaoPlanilha({
   }
 
   async function testar() {
+    const aviso = "planilha-testar";
     setTestando(true);
     setTeste(null);
+    toast.loading("Testando a conexão com a planilha...", { id: aviso });
     try {
       const dados = await pedir<{
         ping: { planilha: { nome: string }; abas: unknown[]; avisos?: string[] };
@@ -207,16 +210,22 @@ export default function IntegracaoPlanilha({
         abas: dados.ping.abas.length,
         avisos: dados.ping.avisos ?? [],
       });
-      toast.success("Conexão confirmada.");
+      avisarSucesso("Conexão confirmada.", undefined, aviso);
     } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível conectar.");
+      avisarErro(excecao, {
+        contexto: "Não foi possível conectar.",
+        descricao: "Confira o endereço e a internet, e tente de novo em instantes.",
+        id: aviso,
+      });
     } finally {
       setTestando(false);
     }
   }
 
   async function lerEstrutura() {
+    const aviso = "planilha-estrutura";
     setLendo(true);
+    toast.loading("Lendo as abas da planilha...", { id: aviso });
     try {
       const dados = await pedir<{
         planilha: { nome: string; url: string; fuso: string; versao: number };
@@ -238,11 +247,18 @@ export default function IntegracaoPlanilha({
         }
         return proximo;
       });
-      toast.success(`${dados.abas.length} ${dados.abas.length === 1 ? "aba lida" : "abas lidas"}.`);
-    } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível ler a planilha.",
+      avisarSucesso(
+        `${dados.abas.length} ${dados.abas.length === 1 ? "aba lida" : "abas lidas"}.`,
+        "Confira o mapa de turmas antes de salvar.",
+        aviso,
       );
+    } catch (excecao) {
+      avisarErro(excecao, {
+        contexto: "Não foi possível ler a planilha.",
+        descricao: "Confira a conexão e o token, e tente de novo em instantes.",
+        tentarDeNovo: () => void lerEstrutura(),
+        id: aviso,
+      });
     } finally {
       setLendo(false);
     }
@@ -258,15 +274,25 @@ export default function IntegracaoPlanilha({
       return;
     }
     setSalvando(true);
+    const aviso = "planilha-mapa";
+    toast.loading("Salvando a estrutura...", { id: aviso });
     try {
       const dados = await pedir<{ integracao: IntegracaoAdmin }>(
         "/api/planilha/mapa",
         corpoJson({ planilha, abas, mapa: itens }),
       );
       setIntegracao(dados.integracao);
-      toast.success("Estrutura salva.");
+      avisarSucesso(
+        "Estrutura salva.",
+        "Agora a Grade pode enviar as faltas para esta planilha.",
+        aviso,
+      );
     } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar o mapa.");
+      avisarErro(excecao, {
+        contexto: "Não foi possível salvar o mapa.",
+        descricao: "Confira o mapa de turmas e tente de novo em instantes.",
+        id: aviso,
+      });
     } finally {
       setSalvando(false);
     }
@@ -283,12 +309,36 @@ export default function IntegracaoPlanilha({
       setTokenVisivel(dados.token);
       setSenha("");
       setSenhaAberta(null);
-      if (senhaAberta === "gerar") toast.success("Token gerado. Atualize o Script Property.");
+      if (senhaAberta === "gerar") {
+        avisarSucesso(
+          "Token gerado. Atualize o Script Property.",
+          "Copie o código e cole nas configurações do Apps Script da planilha.",
+        );
+      } else {
+        avisarSucesso(
+          "Token revelado.",
+          "Copie e cole no Apps Script da planilha para a integração funcionar.",
+        );
+      }
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Senha incorreta.");
     } finally {
       setEnviandoSenha(false);
+    }
+  }
+
+  async function copiarToken() {
+    if (!tokenVisivel) return;
+    try {
+      await navigator.clipboard.writeText(tokenVisivel);
+      avisarSucesso("Token copiado.", "Cole nas configurações do Apps Script da planilha.");
+    } catch {
+      avisarErro(null, {
+        contexto: "Não foi possível copiar o token.",
+        descricao: "Selecione o código e copie manualmente.",
+        tentarDeNovo: () => void copiarToken(),
+      });
     }
   }
 
@@ -302,7 +352,10 @@ export default function IntegracaoPlanilha({
       setFrase("");
       setSenha("");
       setDestrave(false);
-      toast.success("Modo completo ativo.");
+      avisarSucesso(
+        "Modo completo ativo.",
+        "As ações destrutivas ficam liberadas pelo prazo escolhido e toda remoção guarda cópia antes.",
+      );
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível destravar.");
@@ -314,7 +367,10 @@ export default function IntegracaoPlanilha({
   async function voltarConservador() {
     try {
       await pedir("/api/planilha/modo-conservador", corpoJson({}));
-      toast.success("Modo conservador restaurado.");
+      avisarSucesso(
+        "Modo conservador restaurado.",
+        "As ações destrutivas voltaram a ficar bloqueadas.",
+      );
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível encerrar.");
@@ -324,7 +380,10 @@ export default function IntegracaoPlanilha({
   async function criarAba(nome: string) {
     try {
       await pedir("/api/planilha/criar-aba", corpoJson({ nome }));
-      toast.success("Aba criada. Use Conferir estrutura para mapear.");
+      avisarSucesso(
+        "Aba criada. Use Conferir estrutura para mapear.",
+        "A nova aba recebe a estrutura no próximo envio.",
+      );
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar a aba.");
     }
@@ -356,7 +415,10 @@ export default function IntegracaoPlanilha({
       setRestaurar(null);
       setFrase("");
       setSenha("");
-      toast.success("Cópia restaurada. Confira a estrutura de novo.");
+      avisarSucesso(
+        "Cópia restaurada. Confira a estrutura de novo.",
+        "A versão anterior foi substituída pela cópia escolhida.",
+      );
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
@@ -384,7 +446,10 @@ export default function IntegracaoPlanilha({
       setMapa({});
       setPlanilha(null);
       setTokenVisivel(null);
-      toast.success("Integração desconectada. A planilha não foi alterada.");
+      avisarSucesso(
+        "Integração desconectada. A planilha não foi alterada.",
+        "Nada foi apagado no Google Planilhas.",
+      );
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
@@ -464,10 +529,7 @@ export default function IntegracaoPlanilha({
               type="button"
               variant="outline"
               className="h-11"
-              onClick={() => {
-                void navigator.clipboard.writeText(tokenVisivel);
-                toast.success("Token copiado.");
-              }}
+              onClick={() => void copiarToken()}
             >
               <ClipboardCopy size={16} />
               Copiar
