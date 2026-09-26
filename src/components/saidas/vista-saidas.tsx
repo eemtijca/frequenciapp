@@ -37,6 +37,16 @@ import {
 import { relatorioSaidas } from "@/domain/relatorios";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -82,6 +92,7 @@ export default function VistaSaidas({
   const [carregandoDia, setCarregandoDia] = useState(false);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [turmaAberta, setTurmaAberta] = useState<string | null>(null);
+  const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
 
   const [relatorioAberto, setRelatorioAberto] = useState(false);
   const [diaRelatorio, setDiaRelatorio] = useState(diaCorrente);
@@ -250,12 +261,14 @@ export default function VistaSaidas({
   }
 
   function remover(saida: SaidaAntecipada) {
+    setSaidaRemover(saida);
+  }
+
+  function confirmarRemocao() {
+    if (!saidaRemover) return;
+    const saida = saidaRemover;
+    setSaidaRemover(null);
     void executarRemocao(saida.id, async () => {
-      const aluno = alunosPorId.get(saida.alunoId);
-      const confirmar = window.confirm(
-        `Remover a saída de ${aluno?.nome ?? "aluno"} em ${saida.dia.split("-").reverse().join("/")}?`,
-      );
-      if (!confirmar) return;
       try {
         await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
         toast.success("Saída removida.");
@@ -667,6 +680,31 @@ export default function VistaSaidas({
           </>
         )}
       </div>
+      <AlertDialog
+        open={saidaRemover !== null}
+        onOpenChange={(aberto) => !aberto && setSaidaRemover(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover esta saída?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A saída de {alunosPorId.get(saidaRemover?.alunoId ?? "")?.nome ?? "aluno"} em{" "}
+              {saidaRemover?.dia.split("-").reverse().join("/") ?? ""} sai da lista do dia e dos
+              relatórios.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-falta text-falta-foreground hover:bg-falta/90"
+              onClick={confirmarRemocao}
+              disabled={saidaRemover !== null && removendoId === saidaRemover.id}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

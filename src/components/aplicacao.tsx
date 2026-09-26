@@ -35,6 +35,16 @@ import type {
 import { diasDoMes } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
@@ -208,6 +218,7 @@ export default function Aplicacao({
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
+  const [saidaComPendencia, setSaidaComPendencia] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
   const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
@@ -412,11 +423,7 @@ export default function Aplicacao({
     };
   }, [pendencias, router]);
 
-  const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
-    if (pendencias.length > 0) {
-      const confirmar = window.confirm("Há alterações não salvas na chamada. Sair mesmo assim?");
-      if (!confirmar) return;
-    }
+  const { executando: saindo, executar: executarSaida } = useAcaoUnica(async () => {
     try {
       await pedir<{ ok: boolean }>("/api/auth/sair", { method: "POST" });
     } catch {
@@ -426,6 +433,19 @@ export default function Aplicacao({
     avisarSucesso("Sessão encerrada.");
     router.refresh();
   });
+
+  function sair() {
+    if (pendencias.length > 0) {
+      setSaidaComPendencia(true);
+      return;
+    }
+    void executarSaida();
+  }
+
+  function confirmarSaida() {
+    setSaidaComPendencia(false);
+    void executarSaida();
+  }
 
   function renderizarVisao(alvoVisao: Visao) {
     return (
@@ -724,6 +744,23 @@ export default function Aplicacao({
           </nav>
         </div>
       </div>
+
+      <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Há alterações não salvas na chamada</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se sair agora, as marcações não salvas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarSaida} disabled={saindo}>
+              Sair mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <DialogoSenha aberto={senhaAberta} onAbrir={setSenhaAberta} />
       <RegistroPwa />
