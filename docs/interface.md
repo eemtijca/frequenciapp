@@ -19,6 +19,8 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 
 Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, um segundo toque devolve a presença. O indicador F ou FJ à direita e o fundo levemente avermelhado confirmam o estado; o seletor de justificativa fica logo abaixo da linha marcada. Todos os alunos começam presentes, então o movimento comum é tocar apenas nos ausentes, como na caderneta de papel. Alvos de toque têm no mínimo 48 pixels de altura na lista e 44 nas ações secundárias.
 
+Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora novos toques, para o toque duplo acidental não duplicar chamadas, cadastros, arquivos ou envios. Alternâncias locais, como marcar falta e trocar filtros, continuam respondendo a cada toque. Um toque acidental repetido em ações sem resposta de rede também é absorvido por uma janela curta.
+
 ## Tema e paleta
 
 - Papel neutro quente de fundo, tinta grafite e um único acento verde institucional para presença e ações primárias.
@@ -35,7 +37,9 @@ Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, u
 - Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida; sessão expirada volta para a tela de entrada.
 - Rascunho em `sessionStorage` enquanto houver marcações não salvas, recuperado ao voltar para o mesmo dia e turma, com aviso quando o rascunho é mais antigo que a versão salva.
 - Aviso de saída da página quando há marcações por salvar e confirmação ao sair da conta nessa situação.
-- Confirmação explícita para descartar marcações e para excluir alunos.
+- Confirmação explícita para descartar marcações, sair com a chamada em aberto e remover saídas.
+- Toasts em todas as ações, no topo da tela: sucesso em verde e erro em vermelho, com título curto e descrição em linguagem simples. Toda mensagem diz o que aconteceu, o que mudou e o que fazer agora; falhas repetíveis oferecem "Tentar de novo".
+- Operações longas da planilha e da cópia de segurança mostram um aviso de andamento com o mesmo identificador até virarem sucesso ou erro, com contagens no resultado.
 
 ## Acessibilidade
 
@@ -46,7 +50,7 @@ Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, u
 - Seletor de período com foco no dia ou mês escolhido ao abrir, navegação por setas, Home, End, PageUp e PageDown, `aria-pressed` na célula ativa e foco devolvido ao gatilho ao fechar.
 - Foco visível em todos os interativos; contraste AA em texto e controles nos dois temas.
 - Barras de estado usam `aria-live="polite"` para anunciar salvamentos.
-- `prefers-reduced-motion` respeitado: as animações param quando o sistema pede.
+- `prefers-reduced-motion` respeitado: transições e animações decorativas param quando o sistema pede, mas spinners e esqueletos de carregamento continuam animando para comunicar espera.
 - Áreas seguras respeitadas no topo, nas laterais e na base, inclusive no aplicativo instalado.
 
 ## Movimento
@@ -58,7 +62,8 @@ Animações discretas, todas com propósito de confirmar estado:
 - Indicador da navegação: no celular é um elemento único sob o botão ativo; no desktop a aba ativa recebe uma pílula com mola curta.
 - Abas da Gestão e dos Relatórios: troca por toque, botões e teclado; no desktop o conteúdo faz um deslize curto de 0,15 s.
 - Marca P/F/FJ da chamada troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
-- Diálogos seguem as animações padrão do Radix; a barra de salvamento não se move.
+- Botões, chips, abas e controles respondem ao toque encolhendo de leve por 150 ms; com movimento reduzido, a escala some e só a cor responde.
+- Diálogos seguem as animações padrão do Radix; a barra de salvamento da Chamada flutua como um painel arredondado com sombra no fim da rolagem, para o cartão da lista terminar visível e arredondado.
 
 Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo, o movimento só explica o que mudou.
 
