@@ -35,6 +35,7 @@ interface PlanoResumo {
   novasColunas: { dia: string; antesDe: string | null }[];
   novosAlunos: { nome: string }[];
   substituir: { celula: string; valor: string; anterior: string }[];
+  candidatosRemocaoLinhas: { linha: number; nome: string }[];
 }
 
 interface Simulacao {
@@ -71,6 +72,7 @@ export default function DialogoEnvio({
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
+  const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
 
   const entradas = useCallback(
     () => ({
@@ -80,8 +82,18 @@ export default function DialogoEnvio({
       permitirInserirColunas: criarColunas,
       permitirNovosAlunos: novosAlunos,
       substituirDivergencias: modoCompleto && substituir,
+      removerLinhas: modoCompleto ? removerMarcadas : undefined,
     }),
-    [turmaOriginalId, de, ate, criarColunas, novosAlunos, modoCompleto, substituir],
+    [
+      turmaOriginalId,
+      de,
+      ate,
+      criarColunas,
+      novosAlunos,
+      modoCompleto,
+      substituir,
+      removerMarcadas,
+    ],
   );
 
   const simular = useCallback(async () => {
@@ -172,6 +184,24 @@ export default function DialogoEnvio({
                 Atualizar células divergentes
               </label>
             )}
+            {modoCompleto &&
+              plano?.candidatosRemocaoLinhas.map((item) => (
+                <label key={item.linha} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={removerMarcadas.includes(item.linha)}
+                    onChange={(evento) =>
+                      setRemoverMarcadas((atuais) =>
+                        evento.target.checked
+                          ? [...atuais, item.linha]
+                          : atuais.filter((linha) => linha !== item.linha),
+                      )
+                    }
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Remover {item.nome} (linha {item.linha})
+                </label>
+              ))}
           </div>
 
           {carregando && (

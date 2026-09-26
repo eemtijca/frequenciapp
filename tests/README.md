@@ -17,6 +17,8 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
 - `relatorios.test.ts`: indicadores do dia e relatórios por aluno e por saída.
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
+- `planilha.test.ts`: dataframe, esquema da planilha, CSV e planejamento conservador.
+- `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês das APIs do Google.
 - `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.

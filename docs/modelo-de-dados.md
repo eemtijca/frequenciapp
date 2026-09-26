@@ -136,6 +136,18 @@ Os recursos são ligados e desligados na Gestão, com auditoria. Desligar não a
 
 O catálogo nasce com os 12 códigos do aplicativo de referência e é editado em Gestão, Configurações, Justificativas. A exclusão é bloqueada quando há faltas ou saídas usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo.
 
+## Integração com a planilha (integracao_planilha)
+
+Linha única da integração opcional com o Google Planilhas. Guarda a situação, o endereço `/exec`, o token compartilhado, o esquema lido, a assinatura para detectar deriva, a autoria e a janela do modo completo (`modo`, `modoCompletoAte`). Token e esquema ficam fora da cópia JSON e o endereço nunca chega ao navegador.
+
+## Sincronização da planilha (sincronizacao_planilha)
+
+Histórico de envios, uma linha por turma de origem: período, modalidade (conservador ou completo), contagens de células preenchidas, substituídas, limpas, removidas e puladas, alunos e colunas criados, hash do plano, resultado, erro opcional, autoria e data. Serve ao cálculo de chamadas alteradas depois do último envio e à prestação de contas.
+
+## Esquema da planilha
+
+O aplicativo lê o esquema de cada aba (linha de cabeçalho, coluna de aluno, colunas de dia com data, coluna de total inclusive por fórmula, mesclagens, congelamento e limites) e guarda o mapa aba por turma de origem. Uma assinatura do cabeçalho é revalidada antes de cada escrita. O dataframe da turma de origem, montado a partir da Grade, alimenta o CSV e o envio: alunos ativos, turma atual, P, F, FJ e S por dia e totais.
+
 ## Auditoria (auditoria)
 
 | Campo     | Tipo  | Observação                                     |

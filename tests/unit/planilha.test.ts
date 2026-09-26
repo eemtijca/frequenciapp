@@ -403,6 +403,22 @@ describe("planejarSincronizacao", () => {
     expect(plano.removerLinhas).toEqual([{ linha: 3, nome: "Bruno" }]);
   });
 
+  it("lista como candidata a linha criada para aluno fora da turma", () => {
+    const aba: AbaBruta = {
+      ...ABA,
+      valores: [
+        ABA.valores[0] ?? [],
+        ["Alice", "3º ano A", "P", "", ""],
+        ["Bruno", "3º ano A", "P", "", ""],
+        ["Carla", "3º ano A", "P", "", ""],
+      ],
+    };
+    const conteudoMarcado: LeituraAba = { ...conteudoDaAba(aba), linhasCriadas: [3, 4] };
+    const plano = planejarSincronizacao(esquema, turma, conteudoMarcado, opcoes());
+    expect(plano.candidatosRemocaoLinhas).toEqual([{ linha: 4, nome: "Carla" }]);
+    expect(plano.removerLinhas).toHaveLength(0);
+  });
+
   it("é idempotente: aplicar o plano zera a próxima simulação", () => {
     const plano = planejarSincronizacao(esquema, turma, conteudo, opcoes());
     const depois = conteudo.valores.map((linha) => linha.slice());

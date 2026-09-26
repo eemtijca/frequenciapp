@@ -144,6 +144,14 @@ Exclui o aluno e as faltas dele, em cascata.
 
 - 200 `{"ok": true}`; 404 inexistente.
 
+### PATCH /api/alunos
+
+Define a turma de origem de vários alunos de uma vez. A turma atual não muda. Apenas administração, com auditoria.
+
+Corpo: `{ "ids": uuid[], "turmaOriginalId": uuid }`, de 1 a 500 alunos.
+
+- 200 `{"atualizados": number}`; 400 seleção vazia ou inválida; 403 sem papel de administração; 404 turma ou aluno inexistente.
+
 ## Usuários (administração)
 
 ### GET /api/usuarios
@@ -311,6 +319,84 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 ### GET /api/responsaveis
 
 - 200 `{"responsaveis": [{"id", "nome", "papel"}]}` com a equipe ativa que pode liberar saídas. Qualquer sessão.
+
+## Planilha
+
+Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). O endpoint e o token nunca saem do servidor. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+
+### GET /api/planilha/estado
+
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. Qualquer sessão.
+
+### GET /api/planilha e PATCH /api/planilha
+
+Leitura e edição da configuração: `{ ativa?, endpoint? }`. Apenas administração. O token volta mascarado.
+
+- 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
+
+### POST /api/planilha/token
+
+Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administração, com a senha conferida e limite de tentativas.
+
+- 200 `{"token": string}`; 400 senha incorreta; 429 tentativas em excesso.
+
+### POST /api/planilha/testar
+
+Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App e guarda a versão do script.
+
+- 200 `{"ping": {...}}`; 400 endereço ou token ausente; 502 sem resposta.
+
+### POST /api/planilha/estrutura
+
+Lê o esquema de todas as abas e sugere o mapa por turma de origem.
+
+- 200 `{ "planilha", "abas", "sugestoes", "problemas" }`. Apenas administração.
+
+### POST /api/planilha/mapa
+
+Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOriginalId"}] }`. Salva o esquema e a assinatura.
+
+- 200 `{"integracao": {...}}`; 400 ou 404 para aba ou turma inválida.
+
+### POST /api/planilha/simular
+
+Corpo: `{ "turmaOriginalId"?, "todas"?, "de", "ate", "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Devolve a prévia e o `planoHashGeral`.
+
+- 200 com planos e resumos; 400 sem estrutura ou período inválido; 502 sem resposta da planilha.
+
+### POST /api/planilha/aplicar
+
+Mesmo corpo da simulação mais `planoHashGeral`. Recalcula tudo, exige o mesmo hash e envia por turma. Operações destrutivas exigem o modo completo.
+
+- 200 `{"resultados", "resumo"}`; 400 sem prévia; 409 quando os dados mudaram; 429 envios em excesso; 502 falha na planilha.
+
+### POST /api/planilha/modo-completo
+
+Corpo: `{ "frase": "EDITAR PLANILHA", "senha": string, "duracaoMinutos"?: 5 | 15 | 30 | 60 }`. Apenas administração.
+
+- 200 `{"modo": "completo", "modoCompletoAte"}`; 400 frase, senha ou duração inválidas; 429 tentativas em excesso.
+
+### POST /api/planilha/modo-conservador
+
+Volta ao modo conservador. Qualquer sessão.
+
+- 200 `{"modo": "conservador"}`.
+
+### GET /api/planilha/copias?aba=...
+
+Lista as cópias ocultas de uma aba. Apenas administração.
+
+### POST /api/planilha/restaurar
+
+Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardando a versão atual e invalidando o esquema. Apenas administração.
+
+- 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
+
+### POST /api/planilha/desconectar
+
+Apaga token e esquema e desliga a integração. Apenas administração. A planilha não é alterada.
+
+- 200 `{"ok": true}`.
 
 ## Cópia de segurança
 

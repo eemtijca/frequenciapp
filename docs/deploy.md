@@ -100,6 +100,10 @@ Configure no projeto Vercel, para produção e previews:
 
 Não defina a senha do Supabase no repositório. Use as configurações de ambiente da Vercel.
 
+### Saída de rede
+
+A integração opcional com o Google Planilhas exige que o servidor alcance `script.google.com` e, no redirecionamento do Content Service, `script.googleusercontent.com`. Em redes com firewall de saída, libere esses hosts; sem eles o aplicativo segue funcionando e apenas o teste de conexão e o envio falham, com mensagem clara.
+
 ### Ordem de publicação
 
 1. provisionar o projeto Supabase e a role do aplicativo;

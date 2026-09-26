@@ -9,14 +9,15 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - **Chamada diária**: turmas por toque, data com navegação por setas, busca por nome, resumo ao vivo e salvamento com rascunho local. A falta pode receber um código de justificativa e vira FJ; o acumulado do aluno aparece na lista e no resumo de faltas.
 - **Saídas antecipadas**: registro separado da chamada, com momento (aulas, intervalos e almoço), justificativa, observação e responsável pela liberação escolhido na equipe ativa. As saídas do dia por turma e o relatório semanal por aluno completam a área.
 - **Painel do dia**: gráficos de infrequência por série e por turma, total de faltas (F + FJ), taxa de infrequência, cobertura das chamadas e turmas pendentes.
-- **Relatórios**: histórico por mês com filtro de série, grade por turma de origem nos modos dia, semana de aula, período e mês, com a coluna acumulada, e relatório por aluno com faltas, justificadas e saídas.
+- **Relatórios**: histórico por mês com filtro de série, grade por turma de origem nos modos dia, semana de aula, período e mês, com a coluna acumulada, exportação CSV da turma de origem e relatório por aluno com faltas, justificadas e saídas.
 - **Gestão pela administração**: séries, turmas, aulas, alunos e contas da equipe, mais as configurações de recursos, o catálogo de justificativas e a cópia de segurança em JSON.
 - **Configurações de recursos**: a chamada por aula (chips de aulas e marca S) fica disponível para quando for usada e desligada por padrão; a área de saídas antecipadas pode ser ocultada sem perder registros; o catálogo de justificativas é editável, em ordem alfabética, com código fixo e situação.
 - **Proteção contra conflitos**: uma chamada por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
-- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador acompanhando o gesto, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
-- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
+- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador da barra inferior preso à rolagem quadro a quadro, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
+- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e o interruptor por dispositivo, e interface pensada para uma mão.
+- **Google Planilhas opcional**: a frequência das turmas atuais é reorganizada por turma de origem e gravada na planilha da escola, com esquema conferido, prévia obrigatória e escrita conservadora: só célula vazia, nunca fórmula, nunca substituição. O modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou, sempre com cópia de segurança.
 
 ## Começando
 
@@ -88,6 +89,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 | [docs/modelo-de-dados.md](docs/modelo-de-dados.md)                                         | Entidades e regras de frequência.                  |
 | [docs/api.md](docs/api.md)                                                                 | Contratos das rotas HTTP.                          |
 | [docs/interface.md](docs/interface.md)                                                     | Decisões de interface, movimento e acessibilidade. |
+| [docs/planilha.md](docs/planilha.md)                                                       | Integração opcional com Google Planilhas.          |
 | [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                    |
 | [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.            |
 | [docs/seguranca.md](docs/seguranca.md)                                                     | Autenticação, sessões, CSRF, papéis e cabeçalhos.  |
@@ -99,7 +101,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 
 ## Privacidade
 
-O aplicativo guarda o mínimo necessário: nome dos alunos, turmas e as faltas registradas. Nenhum outro dado pessoal é coletado e nenhum serviço de terceiros recebe dados dos alunos. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
+O aplicativo guarda o mínimo necessário: nome dos alunos, turmas e as faltas registradas. Nenhum outro dado pessoal é coletado e nenhum serviço de terceiros recebe dados dos alunos. A integração opcional com o Google Planilhas, desligada por padrão, envia a frequência para a conta Google da própria escola, nunca para terceiros contratados. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
 
 ## Licença
 

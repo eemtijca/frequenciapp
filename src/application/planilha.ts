@@ -576,6 +576,7 @@ export async function simularEnvio(entrada: unknown) {
       novosAlunos: plano.novosAlunos,
       removerLinhas: plano.removerLinhas,
       removerColunas: plano.removerColunas,
+      candidatosRemocaoLinhas: plano.candidatosRemocaoLinhas,
       amostra: amostraDeCelulas(plano),
       assinatura: plano.assinatura,
     })),

@@ -533,6 +533,7 @@ export interface PlanoSincronizacao {
   novosAlunos: AlunoNovoPlano[];
   removerLinhas: RemocaoPlano[];
   removerColunas: { coluna: number; letra: string; rotulo: string }[];
+  candidatosRemocaoLinhas: RemocaoPlano[];
   resumo: ResumoPlano;
   avisos: string[];
 }
@@ -754,6 +755,20 @@ export function planejarSincronizacao(
           })
       : [];
 
+  // Linhas criadas pela integração para alunos que não estão mais na turma
+  // ativa: candidatas à remoção, sempre listadas e desmarcadas por padrão.
+  const nomesDaTurma = new Set(turma.linhas.map((linha) => normalizar(linha.nome)));
+  const colunaAlunoIndice = esquema.colunas.find((coluna) => coluna.tipo === "aluno")?.indice ?? 1;
+  const candidatosRemocaoLinhas: RemocaoPlano[] = [];
+  for (const linha of conteudo.linhasCriadas ?? []) {
+    const relativa = linha - conteudo.linhaInicial;
+    const bruto = conteudo.valores[relativa]?.[colunaAlunoIndice - conteudo.colunaInicial] ?? "";
+    const nome = textoLimpo(bruto);
+    if (nome !== "" && !nomesDaTurma.has(normalizar(nome))) {
+      candidatosRemocaoLinhas.push({ linha, nome });
+    }
+  }
+
   const resumo: ResumoPlano = {
     preencher: celulasPreencher.length,
     substituir: celulasSubstituir.length,
@@ -778,6 +793,7 @@ export function planejarSincronizacao(
     novosAlunos,
     removerLinhas,
     removerColunas,
+    candidatosRemocaoLinhas,
     resumo,
     avisos,
   };
