@@ -855,7 +855,7 @@ export default function IntegracaoPlanilha({
                     role="radio"
                     aria-checked={duracao === minutos}
                     onClick={() => setDuracao(minutos)}
-                    className="aria-[checked=true]:bg-background aria-[checked=true]:text-foreground text-muted-foreground min-h-10 rounded-md px-1 text-xs font-medium aria-[checked=true]:shadow-sm"
+                    className="aria-[checked=true]:bg-background aria-[checked=true]:text-foreground text-muted-foreground pressionavel min-h-10 rounded-md px-1 text-xs font-medium aria-[checked=true]:shadow-sm"
                   >
                     {minutos} min
                   </button>

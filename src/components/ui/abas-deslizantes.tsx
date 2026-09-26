@@ -100,7 +100,7 @@ export default function AbasDeslizantes<T extends string>({
               aria-controls={`painel-${item.valor}`}
               tabIndex={ativo ? 0 : -1}
               onClick={() => trocarAba(item.valor)}
-              className="relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
+              className="pressionavel relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
             >
               {ativo &&
                 (semMovimento ? (

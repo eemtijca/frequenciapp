@@ -163,7 +163,7 @@ export default function TelaLogin() {
               />
             </div>
 
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+            <label className="pressionavel flex min-h-11 cursor-pointer items-center gap-3 text-sm">
               <input
                 type="checkbox"
                 name="lembrar"

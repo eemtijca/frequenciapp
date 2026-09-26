@@ -20,7 +20,7 @@ function CampoSenha({ className, ...props }: Props) {
         aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
         aria-pressed={visivel}
         onClick={() => setVisivel((atual) => !atual)}
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring absolute top-1/2 right-1 flex size-11 -translate-y-1/2 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring pressionavel absolute top-1/2 right-1 flex size-11 -translate-y-1/2 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
       >
         {visivel ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
       </button>

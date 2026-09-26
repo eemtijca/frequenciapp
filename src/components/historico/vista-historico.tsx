@@ -157,7 +157,7 @@ export default function VistaHistorico({
         <button
           type="button"
           onClick={() => onMes(mesCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline"
+          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para este mês
         </button>
@@ -169,7 +169,7 @@ export default function VistaHistorico({
             type="button"
             aria-pressed={serieFiltro === ""}
             onClick={() => setSerieFiltro("")}
-            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
           >
             Todas
           </button>
@@ -179,7 +179,7 @@ export default function VistaHistorico({
               type="button"
               aria-pressed={serieFiltro === serie.id}
               onClick={() => setSerieFiltro(serie.id)}
-              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
             >
               {serie.nome}
             </button>
@@ -266,7 +266,7 @@ export default function VistaHistorico({
                       type="button"
                       disabled={bloqueado}
                       onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
-                      className="hover:bg-secondary/60 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-50"
+                      className="hover:bg-secondary/60 pressionavel flex w-full items-center gap-3 px-4 py-3 text-left transition-colors disabled:opacity-50"
                     >
                       <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
                         <span className="numerais-tabulares text-lg font-semibold">

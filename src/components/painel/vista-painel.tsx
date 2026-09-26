@@ -201,7 +201,7 @@ export default function VistaPainel({
         <button
           type="button"
           onClick={() => setDia(diaCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline"
+          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para hoje
         </button>
@@ -264,7 +264,7 @@ export default function VistaPainel({
           type="button"
           aria-pressed={filtro === "escola"}
           onClick={() => setFiltro("escola")}
-          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
         >
           Escola
         </button>
@@ -274,7 +274,7 @@ export default function VistaPainel({
             type="button"
             aria-pressed={filtro === serie.id}
             onClick={() => setFiltro(serie.id)}
-            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
           >
             {serie.nome}
           </button>

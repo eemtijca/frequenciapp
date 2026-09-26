@@ -327,7 +327,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                       type="button"
                       aria-pressed={marcado}
                       onClick={() => alternarDia(dia.valor)}
-                      className={`h-9 rounded-lg border px-3 text-xs font-medium transition-colors active:scale-[0.98] ${
+                      className={`pressionavel h-9 rounded-lg border px-3 text-xs font-medium transition-colors ${
                         marcado
                           ? "border-primary bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:border-foreground/30"

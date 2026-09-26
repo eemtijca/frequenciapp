@@ -9,7 +9,7 @@ export default function NaoEncontrada() {
       </p>
       <Link
         href="/"
-        className="text-primary mt-2 rounded-lg px-4 py-2.5 text-sm font-medium hover:underline"
+        className="text-primary pressionavel mt-2 rounded-lg px-4 py-2.5 text-sm font-medium hover:underline"
       >
         Voltar ao início
       </Link>

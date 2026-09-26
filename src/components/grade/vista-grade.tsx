@@ -283,7 +283,7 @@ export default function VistaGrade({
               type="button"
               aria-pressed={ativo}
               onClick={() => setTurmaId(turma.id)}
-              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors"
             >
               <span>{turma.rotulo}</span>
               <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -381,7 +381,7 @@ export default function VistaGrade({
           <button
             type="button"
             onClick={() => onMes(mesCorrente)}
-            className="text-primary self-start text-sm font-medium hover:underline"
+            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
           >
             Voltar para este mês
           </button>

@@ -362,7 +362,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                           aria-pressed={selecionados.has(aluno.id)}
                           aria-label={`Selecionar ${aluno.nome}`}
                           onClick={() => alternarSelecao(aluno.id)}
-                          className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
+                          className="pressionavel -ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
                         >
                           <span
                             className={`flex size-5 items-center justify-center rounded border ${

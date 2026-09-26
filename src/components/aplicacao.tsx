@@ -123,7 +123,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       type="button"
       aria-current={ativo ? "page" : undefined}
       onClick={() => onTrocar(item.visao)}
-      className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors active:scale-[0.98] lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
+      className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary pressionavel relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
     >
       {ativo &&
         indicador &&
@@ -607,7 +607,7 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => setSenhaAberta(true)}
-                        className="hover:bg-accent flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        className="hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
                       >
                         <KeyRound size={16} aria-hidden="true" />
                         Trocar minha senha
@@ -615,7 +615,7 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => void sair()}
-                        className="text-falta-texto hover:bg-accent flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        className="text-falta-texto hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
                       >
                         <LogOut size={16} aria-hidden="true" />
                         Sair da conta

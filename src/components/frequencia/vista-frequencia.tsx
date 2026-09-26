@@ -593,7 +593,7 @@ export default function VistaFrequencia({
                     aria-pressed={ativo}
                     disabled={travado}
                     onClick={() => setTurmaId(opcao.id)}
-                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
+                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     <span>{opcao.rotulo}</span>
                     <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -643,7 +643,7 @@ export default function VistaFrequencia({
               type="button"
               disabled={travado}
               onClick={() => setDia(diaCorrente)}
-              className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
+              className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
             >
               Voltar para hoje
             </button>
@@ -659,7 +659,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "faltas"}
               onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
-              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                 {carregando ? "" : contagemFaltas}
@@ -672,7 +672,7 @@ export default function VistaFrequencia({
               onClick={() =>
                 setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
               }
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemJustificadas}
@@ -683,7 +683,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "presentes"}
               onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemPresencas}
@@ -721,7 +721,7 @@ export default function VistaFrequencia({
             type="button"
             aria-expanded={resumoAberto}
             onClick={() => setResumoAberto((atual) => !atual)}
-            className="text-primary self-start text-sm font-medium hover:underline"
+            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
           >
             {resumoAberto ? "Ocultar resumo de faltas" : "Ver resumo de faltas"}
           </button>
@@ -847,7 +847,7 @@ export default function VistaFrequencia({
               {(filtro !== "todos" || busca !== "") && (
                 <button
                   type="button"
-                  className="text-primary font-medium hover:underline"
+                  className="text-primary pressionavel font-medium hover:underline"
                   onClick={() => {
                     setFiltro("todos");
                     setBusca("");
@@ -881,7 +881,7 @@ export default function VistaFrequencia({
                 </p>
                 <button
                   type="button"
-                  className="text-primary text-sm font-medium hover:underline"
+                  className="text-primary pressionavel text-sm font-medium hover:underline"
                   onClick={() => {
                     setFiltro("todos");
                     setBusca("");
@@ -914,7 +914,7 @@ export default function VistaFrequencia({
                               : `${aluno.nome}: presente. Toque para marcar falta.`
                           }
                           onClick={() => alternarFalta(aluno.id)}
-                          className={`faixa-toque flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
+                          className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
                             faltando ? "" : "hover:bg-secondary/60"
                           }`}
                         >
@@ -972,7 +972,7 @@ export default function VistaFrequencia({
                             onClick={() =>
                               setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
                             }
-                            className="text-muted-foreground hover:bg-secondary border-border my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            className="text-muted-foreground hover:bg-secondary border-border pressionavel my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
                           >
                             Aulas
                           </button>
@@ -1026,7 +1026,7 @@ export default function VistaFrequencia({
                                         aria-pressed={marcada}
                                         disabled={bloqueado}
                                         onClick={() => alternarAula(aluno.id, aula.id)}
-                                        className={`numerais-tabulares h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] disabled:opacity-50 ${
+                                        className={`numerais-tabulares pressionavel h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                                           marcada
                                             ? "border-falta bg-falta text-falta-foreground"
                                             : "text-muted-foreground hover:border-foreground/30"
@@ -1040,7 +1040,7 @@ export default function VistaFrequencia({
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
                                   <button
                                     type="button"
-                                    className="text-primary font-medium hover:underline"
+                                    className="text-primary pressionavel font-medium hover:underline"
                                     onClick={() =>
                                       definirAulas(
                                         aluno.id,
@@ -1052,7 +1052,7 @@ export default function VistaFrequencia({
                                   </button>
                                   <button
                                     type="button"
-                                    className="text-primary font-medium hover:underline"
+                                    className="text-primary pressionavel font-medium hover:underline"
                                     onClick={() => definirAulas(aluno.id, [])}
                                   >
                                     Nenhuma

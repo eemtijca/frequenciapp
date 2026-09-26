@@ -466,7 +466,7 @@ export default function VistaSaidas({
                     type="button"
                     aria-expanded={aberto}
                     onClick={() => setTurmaAberta((atual) => (atual === chave ? null : chave))}
-                    className="hover:bg-secondary/60 flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm transition-colors"
+                    className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm transition-colors"
                   >
                     <span className="min-w-0 flex-1 truncate font-medium">{grupo.rotulo}</span>
                     <span className="numerais-tabulares text-muted-foreground text-xs">
@@ -526,7 +526,7 @@ export default function VistaSaidas({
             setRelatorioAberto(abrir);
             if (abrir && saidasSemana === null) void carregarRelatorio();
           }}
-          className="flex min-h-11 items-center justify-between gap-2 text-left font-medium"
+          className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-11 items-center justify-between gap-2 rounded-md text-left font-medium transition-colors"
         >
           <span>Relatório por aluno</span>
           <span className="text-muted-foreground text-xs">

@@ -43,7 +43,7 @@ export function BarraBusca({
           type="button"
           aria-label="Limpar busca"
           onClick={() => onValor("")}
-          className="text-muted-foreground hover:bg-secondary shrink-0 rounded-md p-1.5"
+          className="text-muted-foreground hover:bg-secondary pressionavel flex size-11 shrink-0 items-center justify-center rounded-md"
         >
           <X size={16} />
         </button>

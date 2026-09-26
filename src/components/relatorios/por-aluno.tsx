@@ -281,7 +281,7 @@ export default function PorAluno({
                   type="button"
                   aria-expanded={aberto}
                   onClick={() => setExpandido((atual) => (atual === aluno.id ? null : aluno.id))}
-                  className="hover:bg-secondary/60 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                  className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{aluno.nome}</span>
