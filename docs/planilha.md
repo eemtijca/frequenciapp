@@ -32,7 +32,7 @@ Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome d
 
 ## Enviar
 
-O envio é manual, com prévia obrigatória. Na Grade, o botão envia a turma de origem e o período selecionados; no card da Gestão é possível enviar o mês de todas as turmas.
+O envio é manual, com prévia obrigatória. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem e o período selecionados; no card da Gestão, "Enviar o mês de todas as turmas" envia o mês escolhido para todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
 
 A prévia mostra:
 
@@ -47,12 +47,14 @@ Depois de revisar, o envio recalcula tudo e exige o mesmo hash de plano. Se algu
 
 O destrave é feito em Gestão, Configurações, Google Planilhas, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 
-- atualização de células divergentes, inclusive nome e turma atual;
+- atualização de células divergentes, inclusive nome e turma atual quando o aluno é encontrado pelo nome normalizado (renomeações completas sem correspondência pedem ajuste manual, porque não há identificador na planilha);
 - limpeza de células indicadas;
 - remoção de linhas criadas pela integração para alunos que saíram da turma;
 - remoção de colunas de dia e de abas criadas pela integração, com confirmação.
 
-Fórmula nunca é sobrescrita, nem no modo completo. A remoção só acontece em linha, coluna ou aba com o marcador da integração. Qualquer sessão pode voltar ao conservador, e a janela expira sozinha.
+Fórmula nunca é sobrescrita, nem no modo completo. A remoção só acontece em linha, coluna ou aba com o marcador da integração. Cabeçalho com mesclagem sobre coluna de dia bloqueia a prévia e pede ajuste manual. Qualquer sessão pode voltar ao conservador, e a janela expira sozinha; perto do fim, o card oferece Estender, sempre com senha de novo.
+
+Quando a falha no envio é de rede, o registro fica como parcial, porque parte do plano pode ter sido aplicada; recusa explícita do script fica como falha.
 
 ## Cópias de segurança
 
@@ -64,6 +66,9 @@ Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_
 | ---------------------------------------- | ---------------------------------------------------------------- |
 | Não autorizado                           | Token do aplicativo diferente do `FREQUENCIAPP_TOKEN` do script. |
 | A estrutura da planilha mudou            | Cabeçalho, nome de aba ou mesclagem alterados; confira de novo.  |
+| A mesclagem cobre colunas de dia         | Ajuste o cabeçalho na planilha antes de enviar.                  |
+| O script usa outro fuso                  | Divergência com `TZ_APP`; as datas podem sair deslocadas.        |
+| O script está na versão antiga           | Publique a versão atual do `gas/Codigo.gs`.                      |
 | Aba não encontrada                       | A aba mapeada foi renomeada ou removida.                         |
 | A linha não foi criada pela integração   | A remoção é recusada de propósito para dado manual.              |
 | Não foi possível falar com a planilha    | Rede de saída bloqueada ou implantação despublicada.             |

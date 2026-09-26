@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { VERSAO_SCRIPT } from "@/domain/planilha";
 
 interface Celula {
   valor: string;
@@ -575,5 +576,11 @@ describe("Apps Script", () => {
     });
     expect(resposta.ok).toBe(true);
     expect(contexto.planilha.getSheetByName("3º ano A")).not.toBeNull();
+  });
+
+  it("mantém a versão do script igual à esperada pelo aplicativo", () => {
+    const codigo = readFileSync(path.resolve("gas/Codigo.gs"), "utf8");
+    const encontrada = Number(codigo.match(/var VERSAO = (\d+)/)?.[1] ?? 0);
+    expect(encontrada).toBe(VERSAO_SCRIPT);
   });
 });

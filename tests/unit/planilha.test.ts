@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   campoCsv,
+  colunasDoIntervalo,
   dataDoRotulo,
   detectarEsquema,
   detectarLinhaCabecalho,
@@ -10,6 +11,7 @@ import {
   nomeArquivoCsv,
   paraCsv,
   planejarSincronizacao,
+  resultadoDeFalha,
   validarEndpoint,
   type AbaBruta,
   type LeituraAba,
@@ -203,6 +205,7 @@ describe("detectarEsquema", () => {
   it("registra mesclagem que cobre colunas", () => {
     const esquema = detectarEsquema({ ...ABA, mesclagens: ["C1:D1"] }, 2026);
     expect(esquema.mesclagens).toEqual(["C1:D1"]);
+    expect(esquema.bloqueio).toContain("C1:D1");
   });
 
   it("marca a aba criada pela integração", () => {
@@ -446,5 +449,63 @@ describe("planejarSincronizacao", () => {
     );
     expect(segunda.preencher).toHaveLength(0);
     expect(segunda.resumo.puladasOcupadas).toBe(0);
+  });
+
+  it("não planeja nada quando a mesclagem cobre coluna de dia", () => {
+    const comMescla = detectarEsquema({ ...ABA, mesclagens: ["C1:D1"] }, 2026);
+    const plano = planejarSincronizacao(
+      comMescla,
+      turma,
+      conteudo,
+      opcoes({ modo: "completo", substituirDivergencias: true }),
+    );
+    expect(plano.bloqueado).toBe(true);
+    expect(plano.preencher).toHaveLength(0);
+    expect(plano.substituir).toHaveLength(0);
+    expect(plano.avisos[0]).toContain("mesclagem");
+  });
+
+  it("atualiza nome e turma atual no modo completo, nunca no conservador", () => {
+    const aba: AbaBruta = {
+      ...ABA,
+      valores: [
+        ABA.valores[0] ?? [],
+        ["  alice  ", "Outra turma", "P", "", ""],
+        ["Bruno", "3º ano A", "", "", ""],
+      ],
+    };
+    const esquemaNome = detectarEsquema(aba, 2026);
+    const conteudoNome = conteudoDaAba(aba);
+    const completo = planejarSincronizacao(
+      esquemaNome,
+      turma,
+      conteudoNome,
+      opcoes({ modo: "completo", substituirDivergencias: true }),
+    );
+    expect(completo.substituir.find((celula) => celula.campo === "nome")).toMatchObject({
+      celula: "A2",
+      valor: "Alice",
+      anterior: "alice",
+    });
+    expect(completo.substituir.find((celula) => celula.campo === "turma")).toMatchObject({
+      celula: "B2",
+      valor: "3º ano A",
+      anterior: "Outra turma",
+    });
+    const conservador = planejarSincronizacao(esquemaNome, turma, conteudoNome, opcoes());
+    expect(conservador.substituir.filter((celula) => celula.campo)).toHaveLength(0);
+  });
+});
+
+describe("auxiliares da integração", () => {
+  it("classifica falha de rede como parcial e recusa como falha", () => {
+    expect(resultadoDeFalha(true)).toBe("FALHA");
+    expect(resultadoDeFalha(false)).toBe("PARCIAL");
+  });
+
+  it("converte intervalo A1 em índices de coluna", () => {
+    expect(colunasDoIntervalo("C1")).toEqual([3]);
+    expect(colunasDoIntervalo("C1:E1")).toEqual([3, 4, 5]);
+    expect(colunasDoIntervalo("A1:A1")).toEqual([1]);
   });
 });

@@ -26,6 +26,8 @@ interface AbaFalsa {
 export interface GasFalso {
   url: string;
   definirToken(valor: string): void;
+  definirFuso(valor: string): void;
+  definirRecusarAplicar(valor: boolean): void;
   definirAba(
     nome: string,
     valores: string[][],
@@ -62,6 +64,8 @@ export async function criarGasFalso(): Promise<GasFalso> {
   const chamadas: string[] = [];
   const resultados = new Map<string, string>();
   let token = "segredo-de-teste";
+  let fuso = "America/Fortaleza";
+  let recusarAplicar = false;
   let contadorCopia = 0;
 
   function aba(nome: string): AbaFalsa | undefined {
@@ -159,7 +163,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
               nome: "Planilha de teste",
               id: "falsa",
               url: "https://docs.google.com/spreadsheets/d/falsa",
-              fuso: "America/Fortaleza",
+              fuso,
             },
             abas: abas.map((item) => ({
               nome: item.nome,
@@ -178,7 +182,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
               nome: "Planilha de teste",
               id: "falsa",
               url: "https://docs.google.com/spreadsheets/d/falsa",
-              fuso: "America/Fortaleza",
+              fuso,
               versao: 1,
             },
             abas: abas.map((item) => {
@@ -277,6 +281,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
         return { ok: true, versao: 1, dados: contagem };
       }
       case "aplicar": {
+        if (recusarAplicar) return { ok: false, erro: "Recusa de teste." };
         const item = aba(nomeAba);
         if (!item) return { ok: false, erro: "Aba não encontrada." };
         const cabecalhoLinha = Number(corpo.cabecalhoLinha ?? 1);
@@ -499,6 +504,12 @@ export async function criarGasFalso(): Promise<GasFalso> {
     url: `http://127.0.0.1:${porta}/exec`,
     definirToken: (valor) => {
       token = valor;
+    },
+    definirFuso: (valor) => {
+      fuso = valor;
+    },
+    definirRecusarAplicar: (valor) => {
+      recusarAplicar = valor;
     },
     definirAba: (nome, valores, opcoes) => {
       const nova: AbaFalsa = {

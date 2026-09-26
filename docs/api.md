@@ -342,9 +342,9 @@ Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administraçã
 
 ### POST /api/planilha/testar
 
-Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App e guarda a versão do script.
+Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso do script difere de `TZ_APP` ou quando a versão publicada está atrasada.
 
-- 200 `{"ping": {...}}`; 400 endereço ou token ausente; 502 sem resposta.
+- 200 `{"ping": { ..., "avisos": string[] }}`; 400 endereço ou token ausente; 502 sem resposta.
 
 ### POST /api/planilha/estrutura
 
@@ -360,9 +360,9 @@ Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOrigin
 
 ### POST /api/planilha/simular
 
-Corpo: `{ "turmaOriginalId"?, "todas"?, "de", "ate", "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Devolve a prévia e o `planoHashGeral`.
+Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. Devolve a prévia, o `planoHashGeral` e, por turma, `bloqueado` quando a estrutura impede a escrita.
 
-- 200 com planos e resumos; 400 sem estrutura ou período inválido; 502 sem resposta da planilha.
+- 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 
 ### POST /api/planilha/aplicar
 

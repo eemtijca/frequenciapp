@@ -31,7 +31,21 @@ async function limparMassa() {
   await banco.query(
     "delete from sincronizacoes_planilha where turma_original_id in (select id from turmas where serie_id in (select id from series where nome = 'QP Ano'))",
   );
-  await banco.query("delete from integracoes_planilha");
+  await banco.query(
+    `insert into integracoes_planilha (id, ativa, modo, atualizado_em)
+     values ('principal', false, 'CONSERVADOR', now())
+     on conflict (id) do update set
+       ativa = false,
+       endpoint = null,
+       token = null,
+       versao_script = null,
+       esquema = null,
+       assinatura_esquema = null,
+       esquema_em = null,
+       modo = 'CONSERVADOR',
+       modo_completo_ate = null,
+       atualizado_em = now()`,
+  );
   await banco.query(
     "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'QP Ano'))",
   );
@@ -181,6 +195,17 @@ describe("integração com a planilha", () => {
     gas?.definirToken(token);
   });
 
+  it("avisa quando o fuso do script difere do aplicativo", async () => {
+    gas?.definirFuso("America/Sao_Paulo");
+    const teste = await autenticado("/api/planilha/testar", {
+      method: "POST",
+      body: JSON.stringify({ endpoint: gas?.url }),
+    });
+    const ping = await json<{ ping: { avisos: string[] } }>(teste);
+    expect(ping.ping.avisos.some((aviso) => aviso.includes("fuso"))).toBe(true);
+    gas?.definirFuso("America/Fortaleza");
+  });
+
   it("lê a estrutura e salva o mapa por turma de origem", async () => {
     const estrutura = await autenticado("/api/planilha/estrutura", {
       method: "POST",
@@ -247,6 +272,83 @@ describe("integração com a planilha", () => {
     expect(gas?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
   });
 
+  it("simula o mês de todas as turmas mapeadas", async () => {
+    const simulado = await json<{
+      modalidade: string;
+      planos: { turmaOriginalId: string }[];
+    }>(
+      await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify({
+          todas: true,
+          de: DIA,
+          ate: DIA,
+          permitirInserirColunas: true,
+          permitirNovosAlunos: true,
+        }),
+      }),
+    );
+    expect(simulado.modalidade).toBe("conservador");
+    expect(simulado.planos).toHaveLength(1);
+    expect(simulado.planos[0]?.turmaOriginalId).toBe(turmaAId);
+  });
+
+  it("registra falha de recusa e mostra o último erro", async () => {
+    gas?.definirAba(
+      "QP Ano A",
+      [
+        ["Aluno", "Turma atual", "10/09", "Total"],
+        ["QP Alice", "QP Ano A", "P", ""],
+        ["QP Bruno", "QP Ano A", "", ""],
+      ],
+      { formulas: { D2: '=CONT.SE(C2:C3;"F")' } },
+    );
+    const simulado = await json<{
+      planoHashGeral: string;
+      planos: { resumo: { preencher: number } }[];
+    }>(
+      await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify({
+          turmaOriginalId: turmaAId,
+          de: DIA,
+          ate: DIA,
+          permitirInserirColunas: true,
+          permitirNovosAlunos: true,
+        }),
+      }),
+    );
+    expect(simulado.planos[0]?.resumo.preencher).toBe(1);
+
+    gas?.definirRecusarAplicar(true);
+    const aplicado = await autenticado("/api/planilha/aplicar", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaOriginalId: turmaAId,
+        de: DIA,
+        ate: DIA,
+        permitirInserirColunas: true,
+        permitirNovosAlunos: true,
+        planoHashGeral: simulado.planoHashGeral,
+      }),
+    });
+    gas?.definirRecusarAplicar(false);
+    expect(aplicado.status).toBe(200);
+    const resultado = await json<{ resumo: { falhas: number } }>(aplicado);
+    expect(resultado.resumo.falhas).toBe(1);
+    expect(gas?.valor("QP Ano A", 3, 3)).toBe("");
+
+    const config = await json<{
+      integracao: {
+        alteradasDepois: number;
+        ultimoErro: { resultado: string; erro: string | null } | null;
+      };
+    }>(await autenticado("/api/planilha"));
+    expect(config.integracao.alteradasDepois).toBeGreaterThanOrEqual(0);
+    expect(config.integracao.ultimoErro?.resultado).toBe("FALHA");
+    expect(config.integracao.ultimoErro?.erro).toContain("Recusa de teste");
+  });
+
   it("recusa prévia com hash diferente", async () => {
     const resposta = await autenticado("/api/planilha/aplicar", {
       method: "POST",
@@ -306,12 +408,13 @@ describe("integração com a planilha", () => {
     expect(simulado.modalidade).toBe("completo");
     expect(simulado.planos[0]?.resumo.substituir).toBe(0);
 
-    // Divergência manual: a planilha marca presença onde o app registrou falta.
+    // Divergência manual: a planilha marca presença onde o app registrou falta
+    // e mantém o nome antigo em caixa diferente.
     gas?.definirAba(
       "QP Ano A",
       [
         ["Aluno", "Turma atual", "10/09", "Total"],
-        ["QP Alice", "QP Ano A", "P", ""],
+        ["qp alice", "QP Ano A", "P", ""],
         ["QP Bruno", "QP Ano A", "P", ""],
       ],
       { formulas: { D2: '=CONT.SE(C2:C3;"F")' } },
@@ -333,7 +436,7 @@ describe("integração com a planilha", () => {
         }),
       }),
     );
-    expect(comDivergencia.planos[0]?.resumo.substituir).toBe(1);
+    expect(comDivergencia.planos[0]?.resumo.substituir).toBe(2);
 
     const aplicado = await autenticado("/api/planilha/aplicar", {
       method: "POST",
@@ -349,6 +452,7 @@ describe("integração com a planilha", () => {
     });
     expect(aplicado.status).toBe(200);
     expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
+    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
     expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(true);
   });
 
@@ -512,6 +616,36 @@ describe("integração com a planilha", () => {
     });
     expect(manual.status).toBe(502);
     expect(gas?.abas()).toContain("QP Manual");
+  });
+
+  it("recusa operação destrutiva depois de a janela expirar", async () => {
+    await banco?.query(
+      "update integracoes_planilha set modo = 'COMPLETO', modo_completo_ate = now() - interval '1 minute' where id = 'principal'",
+    );
+    const simulado = await json<{
+      modalidade: string;
+      planos: { resumo: { substituir: number } }[];
+    }>(
+      await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify({
+          turmaOriginalId: turmaAId,
+          de: DIA,
+          ate: DIA,
+          substituirDivergencias: true,
+          permitirInserirColunas: true,
+          permitirNovosAlunos: true,
+        }),
+      }),
+    );
+    expect(simulado.modalidade).toBe("conservador");
+    expect(simulado.planos[0]?.resumo.substituir).toBe(0);
+
+    const remocao = await autenticado("/api/planilha/remover-aba", {
+      method: "POST",
+      body: JSON.stringify({ aba: "QP Manual", frase: "EDITAR PLANILHA", senha: SENHA_ADMIN }),
+    });
+    expect(remocao.status).toBe(400);
   });
 
   it("volta ao conservador e desconecta", async () => {
