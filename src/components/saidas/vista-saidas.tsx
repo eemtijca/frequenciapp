@@ -22,8 +22,10 @@ import type {
 import {
   diaDaSemanaIso,
   diaSeguinte,
+  ehMomentoDeAula,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
+  LIMITE_TEXTO_SAIDA,
   MOMENTOS_SAIDA,
   normalizar,
   rotuloDiaSemana,
@@ -69,6 +71,7 @@ export default function VistaSaidas({
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
   const [justificativa, setJustificativa] = useState("");
+  const [texto, setTexto] = useState("");
   const [observacao, setObservacao] = useState("");
   const [responsavelId, setResponsavelId] = useState(usuarioId);
   const [enviando, setEnviando] = useState(false);
@@ -102,6 +105,7 @@ export default function VistaSaidas({
   const alunosPorId = useMemo(() => new Map(alunos.map((aluno) => [aluno.id, aluno])), [alunos]);
 
   const compartilhado = dia.startsWith(mes);
+  const duranteAula = ehMomentoDeAula(momento);
 
   useEffect(() => {
     if (compartilhado) {
@@ -212,7 +216,9 @@ export default function VistaSaidas({
           dia,
           momento,
           justificativa,
-          observacao: justificativa === JUSTIFICATIVA_OUTROS ? observacao : undefined,
+          texto: duranteAula && texto.trim() !== "" ? texto : undefined,
+          observacao:
+            !duranteAula && justificativa === JUSTIFICATIVA_OUTROS ? observacao : undefined,
           liberadoPorId: responsavelId,
         }),
       );
@@ -220,6 +226,7 @@ export default function VistaSaidas({
       setAlunoId("");
       setMomento("");
       setJustificativa("");
+      setTexto("");
       setObservacao("");
       if (compartilhado) {
         await onSaidasMudaram(dia.slice(0, 7));
@@ -370,7 +377,27 @@ export default function VistaSaidas({
             />
           </div>
         </div>
-        {justificativa === JUSTIFICATIVA_OUTROS && (
+        {duranteAula ? (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="saida-texto">Texto da justificativa</Label>
+              <span className="text-muted-foreground numerais-tabulares text-xs">
+                {texto.length}/{LIMITE_TEXTO_SAIDA}
+              </span>
+            </div>
+            <Input
+              id="saida-texto"
+              value={texto}
+              maxLength={LIMITE_TEXTO_SAIDA}
+              onChange={(evento) => setTexto(evento.target.value)}
+              placeholder="Opcional: descreva a saída durante a aula"
+              className="h-11"
+            />
+            <p className="text-muted-foreground text-xs">
+              Opcional, até {LIMITE_TEXTO_SAIDA} caracteres. Aparece nos relatórios.
+            </p>
+          </div>
+        ) : justificativa === JUSTIFICATIVA_OUTROS ? (
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="saida-observacao">Observação</Label>
             <Input
@@ -382,7 +409,7 @@ export default function VistaSaidas({
               className="h-11"
             />
           </div>
-        )}
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
           <Selecionar
@@ -459,7 +486,11 @@ export default function VistaSaidas({
                               <p className="text-muted-foreground truncate text-xs">
                                 {rotuloMomento(saida.momento)} ·{" "}
                                 {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
-                                {saida.observacao ? ` · ${saida.observacao}` : ""}
+                                {saida.texto
+                                  ? ` · ${saida.texto}`
+                                  : saida.observacao
+                                    ? ` · ${saida.observacao}`
+                                    : ""}
                               </p>
                               <p className="text-muted-foreground truncate text-xs">
                                 Liberado por {saida.liberadoPorNome ?? "registro anterior"}
@@ -608,7 +639,11 @@ export default function VistaSaidas({
                             <p className="text-muted-foreground text-xs">
                               {rotuloMomento(saida.momento)} ·{" "}
                               {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
-                              {saida.observacao ? ` · ${saida.observacao}` : ""}
+                              {saida.texto
+                                ? ` · ${saida.texto}`
+                                : saida.observacao
+                                  ? ` · ${saida.observacao}`
+                                  : ""}
                             </p>
                             <p className="text-muted-foreground text-xs">
                               Liberado por {saida.liberadoPorNome ?? "registro anterior"}

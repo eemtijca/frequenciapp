@@ -260,11 +260,13 @@ Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma 
 - 200 `{"saidas": Saida[]}` em ordem de dia e registro.
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
-Saida: `{ id, alunoId, dia, momento, justificativa, observacao, liberadoPorId, liberadoPorNome, criadoEm }`.
+Saida: `{ id, alunoId, dia, momento, justificativa, observacao, texto, liberadoPorId, liberadoPorNome, criadoEm }`.
 
 ### POST /api/saidas
 
-Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa": string, "observacao"?: string, "liberadoPorId"?: string }`.
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa": string, "texto"?: string, "observacao"?: string, "liberadoPorId"?: string }`.
+
+A justificativa do catálogo é sempre obrigatória. O `texto` é opcional, de até 100 caracteres, e só vale quando o momento é uma aula; a `observacao` vale para intervalos e almoço. Os dois são recusados fora do seu momento, e o texto aparece nos relatórios no lugar da observação.
 
 - 201 `{"saida": Saida}`. Sem `liberadoPorId`, o responsável é quem registrou.
 - 400 para momento ou justificativa fora do catálogo, aluno inválido, dia inválido, data futura ou responsável inválido.

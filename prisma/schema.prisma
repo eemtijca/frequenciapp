@@ -195,7 +195,8 @@ model Falta {
 }
 
 // Saída antecipada registrada pela direção ou coordenação. É separada da
-// chamada: a presença ou falta do dia permanece como foi marcada.
+// chamada: a presença ou falta do dia permanece como foi marcada. O texto
+// livre vale apenas para saídas durante a aula.
 model SaidaAntecipada {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   alunoId       String   @map("aluno_id") @db.Uuid
@@ -203,6 +204,7 @@ model SaidaAntecipada {
   momento       String   @db.VarChar(20)
   justificativa String   @db.VarChar(10)
   observacao    String?  @db.VarChar(200)
+  texto         String?  @db.VarChar(100)
   liberadoPorId String?  @map("liberado_por_id") @db.Uuid
   criadoPorId   String?  @map("criado_por_id") @db.Uuid
   criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz

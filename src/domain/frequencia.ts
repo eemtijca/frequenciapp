@@ -65,6 +65,9 @@ export const MOMENTOS_SAIDA: readonly MomentoSaida[] = [
   { codigo: "almoco", rotulo: "Almoço" },
 ];
 
+/** Limite do texto livre da saída durante a aula. */
+export const LIMITE_TEXTO_SAIDA = 100;
+
 /** Rótulo de uma justificativa no catálogo, ou texto vazio quando não existe. */
 export function rotuloJustificativa(
   codigo: string | null | undefined,
@@ -89,6 +92,11 @@ export function rotuloMomento(codigo: string): string {
 /** Valida um código de momento de saída. */
 export function ehMomentoValido(codigo: string): boolean {
   return MOMENTOS_SAIDA.some((item) => item.codigo === codigo);
+}
+
+/** Verdadeiro quando a saída aconteceu durante uma aula. */
+export function ehMomentoDeAula(codigo: string): boolean {
+  return codigo.startsWith("aula_");
 }
 
 /** Série escolar (por exemplo, "1º ano"). */
@@ -145,6 +153,8 @@ export interface SaidaAntecipada {
   momento: string;
   justificativa: string;
   observacao: string | null;
+  /** Texto livre da saída durante a aula, opcional. */
+  texto: string | null;
   liberadoPorId: string | null;
   liberadoPorNome: string | null;
   criadoEm: string;

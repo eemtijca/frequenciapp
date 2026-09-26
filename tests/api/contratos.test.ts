@@ -1074,6 +1074,97 @@ describe("saídas antecipadas", () => {
     const dados = (await conferencia.json()) as { saidas: { id: string }[] };
     expect(dados.saidas.some((saida) => saida.id === saidaQA?.id)).toBe(false);
   });
+
+  it("recusa texto fora de aula, acima de 100 e observação em aula", async () => {
+    const foraDeAula = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "intervalo_1",
+        justificativa: "D",
+        texto: "Saiu para beber água",
+      }),
+    });
+    expect(foraDeAula.status).toBe(400);
+
+    const longo = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "D",
+        texto: "a".repeat(101),
+      }),
+    });
+    expect(longo.status).toBe(400);
+    expect(((await longo.json()) as { error: string }).error).toContain("100 caracteres");
+
+    const observacao = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "O",
+        observacao: "Na aula use o texto",
+      }),
+    });
+    expect(observacao.status).toBe(400);
+  });
+
+  it("registra saída durante a aula com o texto opcional", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "D",
+        texto: "Saiu para a coordenação",
+      }),
+    });
+    expect(resposta.status).toBe(201);
+    const criada = (await resposta.json()) as {
+      saida: { id: string; texto: string | null; observacao: string | null };
+    };
+    expect(criada.saida.texto).toBe("Saiu para a coordenação");
+    expect(criada.saida.observacao).toBeNull();
+
+    const lista = await autenticado(cookieCoord, `/api/saidas?dia=${DIA_TESTE_5}`);
+    const dados = (await lista.json()) as { saidas: { id: string; texto: string | null }[] };
+    expect(dados.saidas.find((item) => item.id === criada.saida.id)?.texto).toBe(
+      "Saiu para a coordenação",
+    );
+
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+  });
+
+  it("mantém Outros sem texto na aula e preserva o texto na cópia JSON", async () => {
+    const semTexto = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_4,
+        momento: "aula_3",
+        justificativa: "O",
+      }),
+    });
+    expect(semTexto.status).toBe(201);
+    const criada = (await semTexto.json()) as { saida: { id: string; texto: string | null } };
+    expect(criada.saida.texto).toBeNull();
+
+    const copia = await autenticado(cookieAdmin, "/api/backup");
+    expect(copia.status).toBe(200);
+    const documento = (await copia.json()) as {
+      saidas: { id: string; texto?: string | null }[];
+    };
+    const naCopia = documento.saidas.find((item) => item.id === criada.saida.id);
+    expect(naCopia?.texto ?? null).toBeNull();
+
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+  });
 });
 
 describe("configurações e responsáveis", () => {

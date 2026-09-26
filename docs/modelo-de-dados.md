@@ -98,17 +98,18 @@ A presença não gera linha: quem não tem falta na frequência do dia esteve pr
 
 ## Saída antecipada (saida_antecipada)
 
-| Campo         | Tipo  | Observação                                        |
-| ------------- | ----- | ------------------------------------------------- |
-| id            | uuid  | Gerado pelo banco.                                |
-| alunoId       | uuid  | Aluno que saiu; cascata na exclusão do aluno.     |
-| dia           | date  | Dia civil da saída.                               |
-| momento       | texto | Código do momento: aulas, intervalos e almoço.    |
-| justificativa | texto | Código do catálogo.                               |
-| observacao    | texto | Observação opcional.                              |
-| liberadoPorId | uuid  | Quem liberou; anulável quando a conta é excluída. |
-| criadoPorId   | uuid  | Quem registrou; anulável.                         |
-| criadoEm      | data  | Momento do registro.                              |
+| Campo         | Tipo  | Observação                                                    |
+| ------------- | ----- | ------------------------------------------------------------- |
+| id            | uuid  | Gerado pelo banco.                                            |
+| alunoId       | uuid  | Aluno que saiu; cascata na exclusão do aluno.                 |
+| dia           | date  | Dia civil da saída.                                           |
+| momento       | texto | Código do momento: aulas, intervalos e almoço.                |
+| justificativa | texto | Código do catálogo, obrigatório.                              |
+| observacao    | texto | Observação opcional de intervalos e almoço.                   |
+| texto         | texto | Texto opcional de até 100 caracteres da saída durante a aula. |
+| liberadoPorId | uuid  | Quem liberou; anulável quando a conta é excluída.             |
+| criadoPorId   | uuid  | Quem registrou; anulável.                                     |
+| criadoEm      | data  | Momento do registro.                                          |
 
 A unicidade de (aluno, dia) impede dois registros no mesmo dia; a correção é remover o registro com auditoria. A saída não altera a presença nem a falta do dia: é uma informação separada, usada nos relatórios e nos indicadores.
 
