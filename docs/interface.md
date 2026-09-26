@@ -25,7 +25,7 @@ Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, u
 - O vermelho é estritamente semântico: aparece somente onde comunica falta ou erro.
 - Tema claro e escuro com preferência do sistema e troca manual persistida; as duas variações mantêm contraste AA.
 - Raio de canto único (14 px) em cartões, botões e campos; uma única família de forma em toda a interface.
-- Tipografia Geist para interface e Geist Mono com numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
+- Tipografia Plus Jakarta Sans para interface e JetBrains Mono com numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
 
 ## Estados e retorno
 
