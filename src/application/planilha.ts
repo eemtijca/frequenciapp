@@ -10,17 +10,19 @@ import { ErroHttp } from "@/infra/erros";
 import { ambiente } from "@/infra/ambiente";
 import { conferirSenha } from "@/infra/auth/hash";
 import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
-import { chamarGas } from "@/infra/planilha";
+import { chamarGas, ErroGas } from "@/infra/planilha";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
 import {
   DURACOES_MODO_COMPLETO,
   FRASE_MODO_COMPLETO,
+  VERSAO_SCRIPT,
   detectarEsquema,
   hashTexto,
   montarTurmaPlanilha,
   planejarSincronizacao,
+  resultadoDeFalha,
   validarEndpoint,
   type AbaEsquema,
   type AbaBruta,
@@ -179,6 +181,17 @@ function esquemaSalvo(linha: LinhaIntegracao): EsquemaSalvo | null {
   return candidato;
 }
 
+/** Chamadas alteradas desde o último envio bem-sucedido. */
+async function contarAlteradasDepois(): Promise<number> {
+  const ultima = await banco().sincronizacaoPlanilha.findFirst({
+    where: { resultado: { not: "FALHA" } },
+    orderBy: { criadoEm: "desc" },
+    select: { criadoEm: true },
+  });
+  if (!ultima) return 0;
+  return banco().frequencia.count({ where: { atualizadoEm: { gt: ultima.criadoEm } } });
+}
+
 /** Estado público da integração, para o selo e o botão da Grade. */
 export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
   const linha = await lerLinha();
@@ -189,20 +202,12 @@ export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
       data: { modo: "CONSERVADOR", modoCompletoAte: null },
     });
   }
-  const ultima = await banco().sincronizacaoPlanilha.findFirst({
-    where: { resultado: { not: "FALHA" } },
-    orderBy: { criadoEm: "desc" },
-    select: { criadoEm: true },
-  });
-  const alteradasDepois = ultima
-    ? await banco().frequencia.count({ where: { atualizadoEm: { gt: ultima.criadoEm } } })
-    : 0;
   return {
     ativa: linha.ativa,
     modo: completo ? "completo" : "conservador",
     modoCompletoAte: completo && linha.modoCompletoAte ? linha.modoCompletoAte.toISOString() : null,
     podeEnviar: Boolean(linha.ativa && linha.endpoint && linha.token),
-    alteradasDepois,
+    alteradasDepois: await contarAlteradasDepois(),
   };
 }
 
@@ -232,6 +237,16 @@ export async function lerIntegracaoAdmin() {
       criadoEm: true,
     },
   });
+  const ultimoErro = await banco().sincronizacaoPlanilha.findFirst({
+    where: { resultado: { in: ["FALHA", "PARCIAL"] } },
+    orderBy: { criadoEm: "desc" },
+    select: {
+      erro: true,
+      resultado: true,
+      criadoEm: true,
+      turmaOriginal: { select: { nome: true, serie: { select: { nome: true } } } },
+    },
+  });
   return {
     ativa: linha.ativa,
     endpoint: linha.endpoint,
@@ -245,6 +260,17 @@ export async function lerIntegracaoAdmin() {
       ? (linha.modoCompletoAte?.toISOString() ?? null)
       : null,
     atualizadoEm: linha.atualizadoEm.toISOString(),
+    alteradasDepois: await contarAlteradasDepois(),
+    ultimoErro: ultimoErro
+      ? {
+          erro: ultimoErro.erro,
+          resultado: ultimoErro.resultado,
+          criadoEm: ultimoErro.criadoEm.toISOString(),
+          turma: ultimoErro.turmaOriginal
+            ? `${ultimoErro.turmaOriginal.serie.nome} ${ultimoErro.turmaOriginal.nome}`
+            : null,
+        }
+      : null,
     sincronizacoes: sincronizacoes.map((item) => ({
       ...item,
       de: item.de.toISOString().slice(0, 10),
@@ -344,11 +370,22 @@ export async function testarConexao(admin: { id: string }, entrada: unknown) {
     planilha: { nome: string; url: string; fuso: string };
     abas: { nome: string; linhas: number; colunas: number; oculta: boolean }[];
   }>(endpoint, linha.token, { acao: "ping" });
+  const avisos: string[] = [];
+  if (ping.planilha.fuso !== ambiente.fuso) {
+    avisos.push(
+      `O script usa o fuso ${ping.planilha.fuso}, diferente do fuso da escola (${ambiente.fuso}). As datas podem sair deslocadas.`,
+    );
+  }
+  if (ping.versao !== VERSAO_SCRIPT) {
+    avisos.push(
+      `O script publicado está na versão ${ping.versao}; a esperada é ${VERSAO_SCRIPT}. Publique a versão atual do gas/Codigo.gs.`,
+    );
+  }
   await banco().integracaoPlanilha.update({
     where: { id: ID },
     data: { endpoint, versaoScript: String(ping.versao) },
   });
-  return ping;
+  return { ...ping, avisos };
 }
 
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
@@ -573,10 +610,13 @@ async function montarSimulacao(
 }
 
 /** Prévia do envio, sem gravar nada. */
-export async function simularEnvio(entrada: unknown) {
+export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
   const dados = esquemaEnvio.safeParse(entrada);
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  }
+  if (!limiteDeTentativas(`planilha:simular:${usuario.id}`, 60)) {
+    throw new ErroHttp("Muitas prévias em sequência. Aguarde alguns minutos.", 429);
   }
   const linha = await lerLinha();
   const simulacao = await montarSimulacao(linha, dados.data);
@@ -587,6 +627,7 @@ export async function simularEnvio(entrada: unknown) {
       turmaOriginalId: plano.turmaOriginalId,
       rotulo: plano.rotulo,
       aba: plano.aba,
+      bloqueado: plano.bloqueado ?? false,
       resumo: plano.resumo,
       avisos: plano.avisos.slice(0, 10),
       novasColunas: plano.novasColunas,
@@ -670,12 +711,14 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       });
     } catch (erro) {
       const mensagem = erro instanceof ErroHttp ? erro.message : "Falha ao enviar para a planilha.";
+      // Falha de rede pode ter aplicado parte do plano; recusa explícita, não.
+      const parcial = erro instanceof ErroGas && !erro.recusado;
       await registrarSincronizacao(
         usuario.id,
         plano,
         simulacao.modalidade,
         {},
-        "FALHA",
+        resultadoDeFalha(!parcial),
         dados.data.de,
         dados.data.ate,
         mensagem,
@@ -684,18 +727,20 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
         turmaOriginalId: plano.turmaOriginalId,
         rotulo: plano.rotulo,
         aba: plano.aba,
-        resultado: "falha",
+        resultado: parcial ? "parcial" : "falha",
         erro: mensagem,
       });
     }
   }
   const falhas = resultados.filter((item) => item.resultado === "falha").length;
+  const parciais = resultados.filter((item) => item.resultado === "parcial").length;
   return {
     resultados,
     resumo: {
       turmas: resultados.length,
       falhas,
-      sucesso: resultados.length - falhas,
+      parciais,
+      sucesso: resultados.length - falhas - parciais,
     },
   };
 }

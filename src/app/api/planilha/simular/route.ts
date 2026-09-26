@@ -17,6 +17,6 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
-    return json(await simularEnvio(await corpoJson(requisicao)));
+    return json(await simularEnvio(sessao.usuario, await corpoJson(requisicao)));
   });
 }

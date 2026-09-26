@@ -1,8 +1,9 @@
 "use client";
 
-// Diálogo de envio da Grade: prévia obrigatória, opções aditivas marcadas e
+// Diálogo de envio: prévia obrigatória, opções aditivas marcadas e
 // divergências só com o modo completo. Nada é gravado sem confirmação.
-import { useCallback, useEffect, useState } from "react";
+// Com "todas", envia o mês de cada turma de origem mapeada.
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
@@ -19,6 +20,7 @@ interface PlanoResumo {
   turmaOriginalId: string;
   rotulo: string;
   aba: string;
+  bloqueado: boolean;
   resumo: {
     preencher: number;
     substituir: number;
@@ -34,7 +36,7 @@ interface PlanoResumo {
   avisos: string[];
   novasColunas: { dia: string; antesDe: string | null }[];
   novosAlunos: { nome: string }[];
-  substituir: { celula: string; valor: string; anterior: string }[];
+  substituir: { celula: string; valor: string; anterior: string; campo?: "nome" | "turma" }[];
   candidatosRemocaoLinhas: { linha: number; nome: string }[];
   candidatosRemocaoColunas: { coluna: number; letra: string; rotulo: string }[];
 }
@@ -48,12 +50,29 @@ interface Simulacao {
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
-  turmaOriginalId: string;
+  /** Ausente quando o envio é de todas as turmas mapeadas. */
+  turmaOriginalId?: string;
   rotulo: string;
   de: string;
   ate: string;
   modoCompleto: boolean;
+  todas?: boolean;
   aoConcluir: () => void;
+}
+
+function useOnline(): boolean {
+  return useSyncExternalStore(
+    (ouvinte) => {
+      window.addEventListener("online", ouvinte);
+      window.addEventListener("offline", ouvinte);
+      return () => {
+        window.removeEventListener("online", ouvinte);
+        window.removeEventListener("offline", ouvinte);
+      };
+    },
+    () => navigator.onLine,
+    () => true,
+  );
 }
 
 export default function DialogoEnvio({
@@ -64,8 +83,10 @@ export default function DialogoEnvio({
   de,
   ate,
   modoCompleto,
+  todas = false,
   aoConcluir,
 }: Props) {
+  const online = useOnline();
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -78,16 +99,17 @@ export default function DialogoEnvio({
 
   const entradas = useCallback(
     () => ({
-      turmaOriginalId,
+      ...(todas ? { todas: true } : { turmaOriginalId }),
       de,
       ate,
       permitirInserirColunas: criarColunas,
       permitirNovosAlunos: novosAlunos,
       substituirDivergencias: modoCompleto && substituir,
-      removerLinhas: modoCompleto ? removerMarcadas : undefined,
-      removerColunas: modoCompleto ? removerColunasMarcadas : undefined,
+      removerLinhas: !todas && modoCompleto ? removerMarcadas : undefined,
+      removerColunas: !todas && modoCompleto ? removerColunasMarcadas : undefined,
     }),
     [
+      todas,
       turmaOriginalId,
       de,
       ate,
@@ -122,13 +144,17 @@ export default function DialogoEnvio({
     setEnviando(true);
     setErro("");
     try {
-      const dados = await pedir<{ resumo: { turmas: number; falhas: number; sucesso: number } }>(
+      const dados = await pedir<{
+        resumo: { turmas: number; falhas: number; parciais: number; sucesso: number };
+      }>(
         "/api/planilha/aplicar",
         corpoJson({ ...entradas(), planoHashGeral: simulacao.planoHashGeral }),
       );
       toast.success(
-        dados.resumo.falhas === 0
-          ? `${dados.resumo.sucesso} ${dados.resumo.sucesso === 1 ? "turma enviada" : "turmas enviadas"}.`
+        dados.resumo.falhas + dados.resumo.parciais === 0
+          ? `${dados.resumo.sucesso} ${
+              dados.resumo.sucesso === 1 ? "turma enviada" : "turmas enviadas"
+            }.`
           : `${dados.resumo.sucesso} de ${dados.resumo.turmas} turmas enviadas.`,
       );
       onAbrir(false);
@@ -140,7 +166,9 @@ export default function DialogoEnvio({
     }
   }
 
+  const bloqueado = simulacao?.planos.some((item) => item.bloqueado) ?? false;
   const plano = simulacao?.planos[0];
+  const detalhado = !todas && plano;
 
   return (
     <Dialog open={aberto} onOpenChange={onAbrir}>
@@ -155,6 +183,12 @@ export default function DialogoEnvio({
           {modoCompleto && (
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
               Modo completo ativo. As opções destrutivas vêm desmarcadas.
+            </p>
+          )}
+
+          {!online && (
+            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
+              Sem conexão. O envio fica indisponível até a internet voltar.
             </p>
           )}
 
@@ -185,10 +219,10 @@ export default function DialogoEnvio({
                   onChange={(evento) => setSubstituir(evento.target.checked)}
                   className="size-4 accent-[var(--primary)]"
                 />
-                Atualizar células divergentes
+                Atualizar divergências, nomes e turma atual
               </label>
             )}
-            {modoCompleto &&
+            {detalhado &&
               plano?.candidatosRemocaoLinhas.map((item) => (
                 <label key={item.linha} className="flex items-center gap-2">
                   <input
@@ -206,7 +240,7 @@ export default function DialogoEnvio({
                   Remover {item.nome} (linha {item.linha})
                 </label>
               ))}
-            {modoCompleto &&
+            {detalhado &&
               plano?.candidatosRemocaoColunas.map((item) => (
                 <label key={`coluna-${item.coluna}`} className="flex items-center gap-2">
                   <input
@@ -233,7 +267,31 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          {plano && !carregando && (
+          {bloqueado && (
+            <p
+              role="alert"
+              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs"
+            >
+              {simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
+                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."}
+            </p>
+          )}
+
+          {simulacao && !carregando && !bloqueado && todas && (
+            <ul className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
+              {simulacao.planos.map((item) => (
+                <li key={item.turmaOriginalId}>
+                  <span className="font-medium">{item.rotulo}</span> · {item.resumo.preencher} a
+                  preencher · {item.resumo.novasColunas} colunas · {item.resumo.novosAlunos} alunos
+                  {modoCompleto && item.resumo.substituir > 0
+                    ? ` · ${item.resumo.substituir} substituições`
+                    : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {detalhado && !bloqueado && (
             <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
               <span className="font-medium">Aba {plano.aba}</span>
               <span>
@@ -256,7 +314,16 @@ export default function DialogoEnvio({
                   Divergências:{" "}
                   {plano.substituir
                     .slice(0, 5)
-                    .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
+                    .map(
+                      (item) =>
+                        `${item.celula} ${item.anterior || "vazia"} para ${item.valor}${
+                          item.campo === "nome"
+                            ? " (nome)"
+                            : item.campo === "turma"
+                              ? " (turma)"
+                              : ""
+                        }`,
+                    )
                     .join(", ")}
                   {plano.substituir.length > 5 ? " ..." : ""}
                 </span>
@@ -286,7 +353,7 @@ export default function DialogoEnvio({
           <Button
             type="button"
             onClick={() => void enviar()}
-            disabled={enviando || carregando || !plano}
+            disabled={enviando || carregando || !simulacao || bloqueado || !online}
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
             Enviar

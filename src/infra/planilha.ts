@@ -22,6 +22,17 @@ export interface OpcoesGas {
   retentavel?: boolean;
 }
 
+/** Falha de script (recusa) contra falha de rede (pode ter aplicado parte). */
+export class ErroGas extends ErroHttp {
+  recusado: boolean;
+
+  constructor(mensagem: string, recusado: boolean) {
+    super(mensagem, 502);
+    this.name = "ErroGas";
+    this.recusado = recusado;
+  }
+}
+
 /**
  * Chama uma ação do Web App. Erros devolvidos pelo script não são repetidos;
  * falhas de rede tentam de novo com espera crescente.
@@ -45,17 +56,17 @@ export async function chamarGas<T>(
         signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
       });
       if (!resposta.ok) {
-        throw new ErroHttp("A planilha respondeu com erro. Confira a publicação do script.", 502);
+        throw new ErroGas("A planilha respondeu com erro. Confira a publicação do script.", false);
       }
       const texto = await resposta.text();
       let envelope: Envelope<T>;
       try {
         envelope = JSON.parse(texto) as Envelope<T>;
       } catch {
-        throw new ErroHttp("O script da planilha respondeu em formato inesperado.", 502);
+        throw new ErroGas("O script da planilha respondeu em formato inesperado.", true);
       }
       if (!envelope.ok || envelope.dados === undefined) {
-        throw new ErroHttp(envelope.erro || "O script recusou a operação.", 502);
+        throw new ErroGas(envelope.erro || "O script recusou a operação.", true);
       }
       return envelope.dados;
     } catch (erro) {
@@ -64,10 +75,10 @@ export async function chamarGas<T>(
       if (tentativa < tentativas - 1) await esperar(300 * (tentativa + 1));
     }
   }
-  throw new ErroHttp(
+  throw new ErroGas(
     ultimaFalha instanceof Error && ultimaFalha.name === "TimeoutError"
       ? "A planilha demorou demais para responder. Tente de novo."
       : "Não foi possível falar com a planilha agora. Tente de novo.",
-    502,
+    false,
   );
 }

@@ -20,7 +20,7 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
    Configurações, Google Planilhas. Se o script for autônomo, crie também
    `PLANILHA_ID` com o identificador da planilha.
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como
-   você e permita acesso a qualquer pessoa. Autorize a conta.
+   a própria conta e permita acesso a qualquer pessoa. Autorize a conta.
 5. Copie o endereço terminado em `/exec` e cole no aplicativo, em Gestão.
 6. Use Testar conexão e Leia a estrutura antes do primeiro envio.
 

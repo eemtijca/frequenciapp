@@ -14,6 +14,14 @@ export const FRASE_MODO_COMPLETO = "EDITAR PLANILHA";
 export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
+/** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
+export const VERSAO_SCRIPT = 1;
+
+/** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
+export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
+  return recusado ? "FALHA" : "PARCIAL";
+}
+
 /** Endpoint aceito: Web App do Google. Fora de produção o teste aceita local. */
 export function validarEndpoint(valor: string, permitirLocal: boolean): string | null {
   let url: URL;
@@ -189,6 +197,8 @@ export interface AbaEsquema {
   oculta: boolean;
   /** Verdadeiro quando a aba foi criada pela integração (marcador). */
   criada?: boolean;
+  /** Motivo que impede a escrita, como mesclagem sobre colunas de dia. */
+  bloqueio?: string;
   totalLinhas: number;
   totalColunas: number;
   congeladas: { linhas: number; colunas: number };
@@ -353,10 +363,20 @@ export function detectarEsquema(aba: AbaBruta, anoReferencia: number): AbaEsquem
   const ultimaColunaDados = detectarUltimaColuna(valores, linhaCabecalho);
   const mesclagens = (aba.mesclagens ?? []).filter((intervalo) => intervaloCobreColunas(intervalo));
   const assinatura = assinarAba(aba.nome, cabecalho, mesclagens);
+  const bloqueio = mesclagens.find((intervalo) =>
+    colunasDoIntervalo(intervalo).some(
+      (indice) => colunas.find((coluna) => coluna.indice === indice)?.tipo === "dia",
+    ),
+  );
   return {
     nome: aba.nome,
     oculta: Boolean(aba.oculta),
     criada: Boolean(aba.criada),
+    ...(bloqueio
+      ? {
+          bloqueio: `A mesclagem ${bloqueio} cobre colunas de dia. Ajuste o cabeçalho na planilha.`,
+        }
+      : {}),
     totalLinhas: aba.linhas ?? valores.length,
     totalColunas: aba.colunas ?? Math.max(cabecalho.length, ultimaColunaDados),
     congeladas: {
@@ -451,6 +471,25 @@ function intervaloCobreColunas(intervalo: string): boolean {
   return letra1 !== "" && letra2 !== "" && letra1 !== letra2;
 }
 
+/** Índices de coluna de um intervalo A1, por exemplo C1:E1 vira [3, 4, 5]. */
+export function colunasDoIntervalo(intervalo: string): number[] {
+  const paraIndice = (referencia: string): number => {
+    const letras = (referencia.match(/^[A-Za-z]+/) ?? [""])[0]?.toUpperCase() ?? "";
+    let valor = 0;
+    for (const letra of letras) {
+      valor = valor * 26 + (letra.charCodeAt(0) - 64);
+    }
+    return valor;
+  };
+  const partes = intervalo.split(":");
+  const inicio = paraIndice(partes[0] ?? "");
+  if (partes.length === 1) return inicio > 0 ? [inicio] : [];
+  const fim = paraIndice(partes[1] ?? "");
+  const colunas: number[] = [];
+  for (let indice = inicio; indice <= fim && indice > 0; indice += 1) colunas.push(indice);
+  return colunas;
+}
+
 /** Assinatura de uma aba: nome, cabeçalho e mesclagens. Igual à do script. */
 export function assinarAba(nome: string, cabecalho: string[], mesclagens: string[]): string {
   return hashTexto(JSON.stringify([nome, cabecalho.map(textoLimpo), mesclagens.slice().sort()]));
@@ -488,6 +527,8 @@ export interface CelulaPlano {
   alunoId: string;
   alunoNome: string;
   dia: string;
+  /** Identificação substituída no modo completo; ausente nas marcas de dia. */
+  campo?: "nome" | "turma";
 }
 
 export interface ColunaNovaPlano {
@@ -546,6 +587,7 @@ export interface PlanoSincronizacao {
   removerColunas: ColunaCriada[];
   candidatosRemocaoLinhas: RemocaoPlano[];
   candidatosRemocaoColunas: ColunaCriada[];
+  bloqueado?: boolean;
   resumo: ResumoPlano;
   avisos: string[];
 }
@@ -601,10 +643,47 @@ export function planejarSincronizacao(
   const colunasDia = new Map<string, ColunaEsquema>();
   let colunaTotal: ColunaEsquema | null = null;
   let colunaTurma: ColunaEsquema | null = null;
+  let colunaAluno: ColunaEsquema | null = null;
   for (const coluna of esquema.colunas) {
     if (coluna.tipo === "dia" && coluna.data) colunasDia.set(coluna.data, coluna);
     if (coluna.tipo === "total" && !colunaTotal) colunaTotal = coluna;
     if (coluna.tipo === "turma" && !colunaTurma) colunaTurma = coluna;
+    if (coluna.tipo === "aluno" && !colunaAluno) colunaAluno = coluna;
+  }
+
+  // Mesclagem sobre coluna de dia impede qualquer escrita: o ajuste é manual.
+  if (esquema.bloqueio) {
+    const resumo: ResumoPlano = {
+      preencher: 0,
+      substituir: 0,
+      limpar: 0,
+      novasColunas: 0,
+      novosAlunos: 0,
+      removerLinhas: 0,
+      removerColunas: 0,
+      puladasFormula: 0,
+      puladasOcupadas: 0,
+      ambiguidades: 0,
+    };
+    const plano: Omit<PlanoSincronizacao, "planoHash"> = {
+      turmaOriginalId: turma.turmaOriginalId,
+      rotulo: turma.rotulo,
+      aba: esquema.nome,
+      assinatura: esquema.assinatura,
+      preencher: [],
+      substituir: [],
+      limpar: [],
+      novasColunas: [],
+      novosAlunos: [],
+      removerLinhas: [],
+      removerColunas: [],
+      candidatosRemocaoLinhas: [],
+      candidatosRemocaoColunas: [],
+      bloqueado: true,
+      resumo,
+      avisos: [esquema.bloqueio],
+    };
+    return { ...plano, planoHash: hashTexto(JSON.stringify(plano)) };
   }
 
   const novasColunas: ColunaNovaPlano[] = [];
@@ -733,6 +812,45 @@ export function planejarSincronizacao(
           alunoId: linha.alunoId,
           alunoNome: linha.nome,
           dia,
+        });
+      }
+    }
+    // No modo completo, nome e turma atual divergentes também são corrigidos.
+    if (existente && modoCompleto && opcoes.substituirDivergencias) {
+      const relativaLinha = numeroLinha - conteudo.linhaInicial;
+      const identificacoes: {
+        coluna: ColunaEsquema;
+        valor: string;
+        campo: "nome" | "turma";
+      }[] = [];
+      if (colunaAluno)
+        identificacoes.push({ coluna: colunaAluno, valor: linha.nome, campo: "nome" });
+      if (colunaTurma) {
+        identificacoes.push({ coluna: colunaTurma, valor: linha.turmaAtual, campo: "turma" });
+      }
+      for (const item of identificacoes) {
+        if (item.valor === "") continue;
+        const atual = textoLimpo(
+          conteudo.valores[relativaLinha]?.[item.coluna.indice - conteudo.colunaInicial],
+        );
+        if (atual === item.valor) continue;
+        const comFormula = Boolean(
+          conteudo.formula[relativaLinha]?.[item.coluna.indice - conteudo.colunaInicial],
+        );
+        if (comFormula) {
+          puladasFormula += 1;
+          continue;
+        }
+        celulasSubstituir.push({
+          linha: numeroLinha,
+          coluna: item.coluna.indice,
+          celula: celulaA1(numeroLinha, item.coluna.indice),
+          valor: item.valor,
+          anterior: atual,
+          alunoId: linha.alunoId,
+          alunoNome: linha.nome,
+          dia: "",
+          campo: item.campo,
         });
       }
     }

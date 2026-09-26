@@ -7,12 +7,15 @@ import { Check, ClipboardCopy, FileSpreadsheet, LoaderCircle, RotateCcw } from "
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO, type AbaEsquema } from "@/domain/planilha";
+import { diasDoMes, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Selecionar } from "@/components/ui/selecionar";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { CampoSenha } from "@/components/ui/campo-senha";
+import DialogoEnvio from "@/components/grade/dialogo-envio";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +55,13 @@ interface IntegracaoAdmin {
   esquemaEm: string | null;
   modo: "conservador" | "completo";
   modoCompletoAte: string | null;
+  alteradasDepois: number;
+  ultimoErro: {
+    erro: string | null;
+    resultado: string;
+    criadoEm: string;
+    turma: string | null;
+  } | null;
   sincronizacoes: {
     id: string;
     de: string;
@@ -70,8 +80,10 @@ interface MapaAba {
 
 export default function IntegracaoPlanilha({
   turmas,
+  diaCorrente,
 }: {
   turmas: { id: string; rotulo: string }[];
+  diaCorrente: string;
 }) {
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -79,7 +91,7 @@ export default function IntegracaoPlanilha({
   const [salvando, setSalvando] = useState(false);
   const [endpoint, setEndpoint] = useState("");
   const [testando, setTestando] = useState(false);
-  const [teste, setTeste] = useState<{ nome: string; abas: number } | null>(null);
+  const [teste, setTeste] = useState<{ nome: string; abas: number; avisos: string[] } | null>(null);
   const [lendo, setLendo] = useState(false);
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [abas, setAbas] = useState<AbaEsquema[]>([]);
@@ -103,6 +115,8 @@ export default function IntegracaoPlanilha({
   >([]);
   const [restaurar, setRestaurar] = useState<{ aba: string; copia: string } | null>(null);
   const [abaRemover, setAbaRemover] = useState<string | null>(null);
+  const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
+  const [envioAberto, setEnvioAberto] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -139,7 +153,15 @@ export default function IntegracaoPlanilha({
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
+  const restanteMinutos =
+    completoAtivo && integracao?.modoCompletoAte
+      ? Math.max(
+          0,
+          Math.ceil((new Date(integracao.modoCompletoAte).getTime() - Date.now()) / 60_000),
+        )
+      : null;
   const turmasSemAba = turmas.filter((turma) => !Object.values(mapa).includes(turma.id));
+  const diasEnvio = diasDoMes(mesEnvio);
 
   async function alternarAtiva(valor: boolean) {
     setSalvando(true);
@@ -177,11 +199,14 @@ export default function IntegracaoPlanilha({
     setTestando(true);
     setTeste(null);
     try {
-      const dados = await pedir<{ ping: { planilha: { nome: string }; abas: unknown[] } }>(
-        "/api/planilha/testar",
-        corpoJson({ endpoint }),
-      );
-      setTeste({ nome: dados.ping.planilha.nome, abas: dados.ping.abas.length });
+      const dados = await pedir<{
+        ping: { planilha: { nome: string }; abas: unknown[]; avisos?: string[] };
+      }>("/api/planilha/testar", corpoJson({ endpoint }));
+      setTeste({
+        nome: dados.ping.planilha.nome,
+        abas: dados.ping.abas.length,
+        avisos: dados.ping.avisos ?? [],
+      });
       toast.success("Conexão confirmada.");
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível conectar.");
@@ -404,15 +429,25 @@ export default function IntegracaoPlanilha({
               hour: "2-digit",
               minute: "2-digit",
             })}
+            {restanteMinutos !== null && restanteMinutos <= 5
+              ? ` · restam ${restanteMinutos} min`
+              : ""}
           </span>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8"
-            onClick={() => void voltarConservador()}
-          >
-            Voltar ao conservador
-          </Button>
+          <span className="flex items-center gap-1">
+            {restanteMinutos !== null && restanteMinutos <= 5 && (
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => setDestrave(true)}>
+                Estender
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8"
+              onClick={() => void voltarConservador()}
+            >
+              Voltar ao conservador
+            </Button>
+          </span>
         </div>
       )}
 
@@ -494,9 +529,16 @@ export default function IntegracaoPlanilha({
           </Button>
         </div>
         {teste && (
-          <p className="text-muted-foreground text-xs">
-            Conectado a {teste.nome} · {teste.abas} {teste.abas === 1 ? "aba" : "abas"}
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-muted-foreground text-xs">
+              Conectado a {teste.nome} · {teste.abas} {teste.abas === 1 ? "aba" : "abas"}
+            </p>
+            {teste.avisos.map((aviso) => (
+              <p key={aviso} className="text-falta-texto text-xs">
+                {aviso}
+              </p>
+            ))}
+          </div>
         )}
       </div>
 
@@ -645,6 +687,52 @@ export default function IntegracaoPlanilha({
                 </div>
               ))}
           </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border p-3">
+        <p className="text-xs font-medium">5. Envio do mês</p>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          Envia o mês escolhido para todas as turmas de origem mapeadas, com a mesma prévia e as
+          mesmas regras do envio pela Grade.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="w-full sm:w-56">
+            <SeletorPeriodo
+              id="planilha-mes-envio"
+              modo="mes"
+              valor={mesEnvio}
+              max={diaCorrente.slice(0, 7)}
+              rotuloAcessivel="Mês do envio para a planilha"
+              rotulo={rotuloMes(mesEnvio)}
+              onValor={setMesEnvio}
+            />
+          </div>
+          <Button
+            type="button"
+            className="h-11"
+            disabled={!integracao?.ativa || !integracao.esquema || !integracao.temToken}
+            onClick={() => setEnvioAberto(true)}
+          >
+            Enviar o mês de todas as turmas
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-lg border p-3">
+        <p className="text-xs font-medium">Situação</p>
+        <p className="text-muted-foreground text-xs">
+          {integracao?.alteradasDepois ?? 0}{" "}
+          {integracao?.alteradasDepois === 1
+            ? "chamada alterada desde o último envio"
+            : "chamadas alteradas desde o último envio"}
+        </p>
+        {integracao?.ultimoErro && (
+          <p className="text-falta-texto text-xs">
+            {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
+            {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
+            {integracao.ultimoErro.erro ?? "sem detalhe"}
+          </p>
         )}
       </div>
 
@@ -894,6 +982,20 @@ export default function IntegracaoPlanilha({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DialogoEnvio
+        aberto={envioAberto}
+        onAbrir={setEnvioAberto}
+        rotulo="todas as turmas"
+        de={diasEnvio[0] ?? diaCorrente}
+        ate={diasEnvio[diasEnvio.length - 1] ?? diaCorrente}
+        modoCompleto={completoAtivo}
+        todas
+        aoConcluir={() => {
+          void carregar();
+          void carregarCopias();
+        }}
+      />
 
       {erro && (
         <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm">

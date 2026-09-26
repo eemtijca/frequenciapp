@@ -269,7 +269,7 @@ export default function AbaConfiguracoes({
         )}
       </div>
 
-      <IntegracaoPlanilha turmas={turmas} />
+      <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
 
       <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
         <div>
