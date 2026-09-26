@@ -79,4 +79,21 @@ test.describe("abas da Gestão", () => {
       await page.waitForTimeout(70);
     }
   });
+
+  test("a aba de configurações encurta no celular e volta ao nome cheio no desktop", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 412, height: 915 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+
+    // O nome acessível segue completo, mesmo com o rótulo curto na tela.
+    const aba = page.getByRole("tab", { name: "Configurações" });
+    await expect(aba).toBeVisible();
+    expect(await aba.innerText()).toBe("Config.");
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect.poll(async () => aba.innerText()).toBe("Configurações");
+  });
 });
