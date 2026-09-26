@@ -152,7 +152,11 @@ describe("integração com a planilha", () => {
   it("coordenação não configura a integração", async () => {
     const entrada = await requisicao("/api/auth/entrar", {
       method: "POST",
-      body: JSON.stringify({ email: "demo@escola.exemplo", senha: "DemoFrequencia2026" }),
+      body: JSON.stringify({
+        email: "demo@escola.exemplo",
+        senha: "DemoFrequencia2026",
+        lembrar: false,
+      }),
     });
     const cookieCoord = entrada.headers.get("set-cookie")?.split(";")[0] ?? "";
     const resposta = await fetch(`${APP_URL}/api/planilha`, {

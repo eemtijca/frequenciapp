@@ -1,5 +1,6 @@
 // Contratos da API contra o aplicativo no ar (APP_URL), com banco migrado e
 // contas de teste. A suíte cria e limpa a própria massa em dias isolados.
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
@@ -67,17 +68,15 @@ async function entrar(email: string, senha: string): Promise<{ status: number; c
   return { status: resposta.status, cookie: bruto.split(";")[0] ?? "" };
 }
 
-/** Validade da sessão mais recente de um e-mail, em milissegundos. */
-async function validadeDaSessaoMaisNova(email: string): Promise<number> {
+/** Validade da sessão criada por uma resposta de login, em milissegundos. */
+async function validadeDaSessaoDoCookie(bruto: string): Promise<number> {
   if (!banco) return 0;
+  const valor = bruto.split(";")[0]?.split("=")[1] ?? "";
+  const token = valor.split(".")[0] ?? "";
+  const hash = createHash("sha256").update(token).digest("hex");
   const { rows } = await banco.query<{ expira_em: Date }>(
-    `select s.expira_em
-       from sessoes s
-       join usuarios u on u.id = s.usuario_id
-      where u.email = $1
-      order by s.criado_em desc
-      limit 1`,
-    [email],
+    "select expira_em from sessoes where token_hash = $1",
+    [hash],
   );
   const expiraEm = rows[0]?.expira_em;
   return expiraEm ? expiraEm.getTime() - Date.now() : 0;
@@ -185,7 +184,7 @@ describe("autenticação", () => {
     expect(resposta.status).toBe(200);
     const bruto = resposta.headers.get("set-cookie") ?? "";
     expect(bruto).toMatch(/Expires=/i);
-    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    const validade = await validadeDaSessaoDoCookie(bruto);
     expect(validade).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
   });
 
@@ -198,7 +197,7 @@ describe("autenticação", () => {
     const bruto = resposta.headers.get("set-cookie") ?? "";
     expect(bruto).not.toMatch(/Expires=/i);
     expect(bruto).not.toMatch(/Max-Age=/i);
-    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    const validade = await validadeDaSessaoDoCookie(bruto);
     expect(validade).toBeGreaterThan(11 * 60 * 60 * 1000);
     expect(validade).toBeLessThan(13 * 60 * 60 * 1000);
   });
