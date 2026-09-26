@@ -7,7 +7,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -58,6 +60,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   const { executando: carregando, executar: recarregar } = useAcaoUnica(async () => {
     try {
@@ -132,6 +135,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a conta.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível salvar a conta." });
     } finally {
       setEnviando(false);
@@ -429,14 +433,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                 </p>
               )}
             </div>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
                 Cancelar

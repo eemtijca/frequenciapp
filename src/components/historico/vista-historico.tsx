@@ -22,7 +22,9 @@ import {
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -64,6 +66,7 @@ export default function VistaHistorico({
 }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
 
@@ -73,6 +76,7 @@ export default function VistaHistorico({
       await onRecarregar(mes);
     } catch (excecao) {
       setErro("Não foi possível buscar as frequências.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível buscar as frequências." });
     }
   });
@@ -192,11 +196,7 @@ export default function VistaHistorico({
         </p>
       )}
 
-      {erro && (
-        <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {frequencias.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">

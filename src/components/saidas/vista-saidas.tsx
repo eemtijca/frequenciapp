@@ -3,17 +3,12 @@
 // Saiu mais cedo: registro da saída antecipada, saídas do dia por turma e
 // relatório semanal por aluno. Separado da chamada.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  DoorOpen,
-  LoaderCircle,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, DoorOpen, LoaderCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   Aluno,
   JustificativaConfigurada,
@@ -88,6 +83,7 @@ export default function VistaSaidas({
   const [responsavelId, setResponsavelId] = useState(usuarioId);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [doDia, setDoDia] = useState<SaidaAntecipada[] | null>(null);
   const [carregandoDia, setCarregandoDia] = useState(false);
   const [recarregarDia, setRecarregarDia] = useState(0);
@@ -153,6 +149,7 @@ export default function VistaSaidas({
           setErro(
             excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar as saídas.",
           );
+          setErroVariante(estadoDeErro(excecao));
         }
       })
       .finally(() => {
@@ -254,6 +251,7 @@ export default function VistaSaidas({
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
       setErro(mensagem);
+      setErroVariante(estadoDeErro(excecao));
       toast.error(mensagem);
     } finally {
       setEnviando(false);
@@ -442,15 +440,7 @@ export default function VistaSaidas({
             }))}
           />
         </div>
-        {erro && (
-          <p
-            role="alert"
-            className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-          >
-            <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-            {erro}
-          </p>
-        )}
+        {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         <Button
           type="submit"
           size="lg"

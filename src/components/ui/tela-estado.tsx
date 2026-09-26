@@ -255,9 +255,27 @@ export function AvisoCompacto({
         )}
       >
         <Icone size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-        <span className="min-w-0">
+        <span className="min-w-0 flex-1">
           <span className="font-medium">{titulo ?? preset.titulo}</span>
           {texto ? <span className="block text-xs opacity-90">{texto}</span> : null}
+          {acao ? (
+            <span className="mt-2 flex">
+              {acao.href ? (
+                <Button asChild variant="outline" size="sm" className="h-8 rounded-md">
+                  <Link href={acao.href}>{acao.rotulo}</Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-md"
+                  onClick={acao.onClick}
+                >
+                  {acao.rotulo}
+                </Button>
+              )}
+            </span>
+          ) : null}
         </span>
       </div>
     );

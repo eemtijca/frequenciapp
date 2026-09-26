@@ -7,7 +7,9 @@ import { Check, ClipboardCopy, FileSpreadsheet, LoaderCircle, RotateCcw } from "
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
@@ -90,6 +92,7 @@ export default function IntegracaoPlanilha({
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
   const [endpoint, setEndpoint] = useState("");
   const [testando, setTestando] = useState(false);
@@ -143,6 +146,7 @@ export default function IntegracaoPlanilha({
       setErro("");
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível ler a integração.");
+      setErroVariante(estadoDeErro(excecao));
     } finally {
       setCarregando(false);
     }
@@ -1099,11 +1103,7 @@ export default function IntegracaoPlanilha({
         }}
       />
 
-      {erro && (
-        <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm">
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
     </div>
   );
 }
