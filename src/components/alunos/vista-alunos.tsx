@@ -1,7 +1,7 @@
 "use client";
 
-// Alunos: lista de consulta do professor, agrupada por turma. O
-// cadastro e a edição acontecem na área de Gestão do administrador.
+// Alunos: lista de consulta do professor, agrupada por turma atual ou por
+// turma de origem. O cadastro e a edição acontecem na área de Gestão.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { UserRound, Users } from "lucide-react";
@@ -14,32 +14,49 @@ interface Props {
   turmas: Turma[];
 }
 
+type Agrupamento = "atual" | "origem";
+
+const AGRUPAMENTOS: { valor: Agrupamento; rotulo: string }[] = [
+  { valor: "atual", rotulo: "Turma atual" },
+  { valor: "origem", rotulo: "Turma de origem" },
+];
+
 export default function VistaAlunos({ alunos, turmas }: Props) {
-  const origem = useMemo(() => {
+  const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
+  const [busca, setBusca] = useState("");
+
+  const rotuloDe = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
     return (id: string, fallback: string) => mapa.get(id) ?? fallback;
   }, [turmas]);
 
   const grupos = useMemo(() => {
+    const porTurma = agrupamento === "atual";
     const mapa = new Map<string, { turma: Turma | undefined; alunos: Aluno[] }>();
     for (const aluno of alunos) {
-      const item = mapa.get(aluno.turmaId) ?? {
-        turma: turmas.find((t) => t.id === aluno.turmaId),
+      const chave = porTurma ? aluno.turmaId : aluno.turmaOriginalId;
+      const item = mapa.get(chave) ?? {
+        turma: turmas.find((turma) => turma.id === chave),
         alunos: [],
       };
       item.alunos.push(aluno);
-      mapa.set(aluno.turmaId, item);
+      mapa.set(chave, item);
     }
     return [...mapa.entries()]
       .sort((a, b) => (a[1].turma?.rotulo ?? "").localeCompare(b[1].turma?.rotulo ?? "", "pt-BR"))
-      .map(
-        ([id, item]) =>
-          [id, item.turma, item.alunos.slice().sort((a, b) => a.ordem - b.ordem)] as const,
-      );
-  }, [alunos, turmas]);
+      .map(([id, item]) => {
+        const lista = item.alunos
+          .slice()
+          .sort((a, b) =>
+            porTurma
+              ? a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR")
+              : a.nome.localeCompare(b.nome, "pt-BR"),
+          );
+        return [id, item.turma, lista] as const;
+      });
+  }, [agrupamento, alunos, turmas]);
 
   const ativos = alunos.filter((aluno) => aluno.ativo).length;
-  const [busca, setBusca] = useState("");
   const termo = normalizar(busca);
   const gruposFiltrados =
     termo === ""
@@ -67,6 +84,33 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
         Lista de consulta das suas turmas. Inclusões, mudanças de turma e desligamentos são feitos
         pelo administrador da escola, na área de Gestão.
       </p>
+
+      <div
+        role="group"
+        aria-label="Agrupamento da lista"
+        className="bg-secondary/60 grid grid-cols-2 gap-1 rounded-lg p-1"
+      >
+        {AGRUPAMENTOS.map((opcao) => {
+          const ativo = agrupamento === opcao.valor;
+          return (
+            <button
+              key={opcao.valor}
+              type="button"
+              aria-pressed={ativo}
+              onClick={() => setAgrupamento(opcao.valor)}
+              className="aria-[pressed=true]:bg-background aria-[pressed=true]:text-foreground text-muted-foreground relative flex min-h-10 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors aria-[pressed=true]:shadow-sm"
+            >
+              {opcao.rotulo}
+            </button>
+          );
+        })}
+      </div>
+
+      {agrupamento === "origem" && (
+        <p className="text-muted-foreground -mt-2 text-xs leading-relaxed">
+          A lista segue a turma de origem da matrícula, a mesma da Grade e da planilha.
+        </p>
+      )}
 
       {alunos.length > 0 && (
         <BarraBusca id="busca-alunos" valor={busca} onValor={setBusca} placeholder="Buscar aluno" />
@@ -111,9 +155,14 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{aluno.nome}</p>
-                    {aluno.turmaOriginalId !== aluno.turmaId && (
+                    {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId && (
                       <p className="text-muted-foreground text-xs">
-                        Origem {origem(aluno.turmaOriginalId, "outra turma")}
+                        Origem {rotuloDe(aluno.turmaOriginalId, "outra turma")}
+                      </p>
+                    )}
+                    {agrupamento === "origem" && aluno.turmaId !== aluno.turmaOriginalId && (
+                      <p className="text-muted-foreground text-xs">
+                        Atual {rotuloDe(aluno.turmaId, "outra turma")}
                       </p>
                     )}
                   </div>

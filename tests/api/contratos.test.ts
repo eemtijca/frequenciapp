@@ -562,6 +562,45 @@ describe("gestão de alunos (admin)", () => {
     });
     expect(resposta.status).toBe(404);
   });
+
+  it("coordenação não define origem em massa", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [alunoQA?.id], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(resposta.status).toBe(403);
+  });
+
+  it("define a turma de origem em massa sem mover a turma atual", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [alunoQA?.id], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(resposta.status).toBe(200);
+    const resultado = (await resposta.json()) as { atualizados: number };
+    expect(resultado.atualizados).toBe(1);
+    const listagem = await autenticado(cookieAdmin, "/api/alunos", { method: "GET" });
+    const alunos = (await listagem.json()) as { alunos: AlunoApi[] };
+    const aluno = alunos.alunos.find((item) => item.id === alunoQA?.id);
+    expect(aluno?.turmaOriginalId).toBe(turmaQB?.id);
+    expect(aluno?.turmaId).toBe(turmaQA?.id);
+  });
+
+  it("recusa origem em massa sem seleção ou com aluno inexistente", async () => {
+    const vazio = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(vazio.status).toBe(400);
+    const sumido = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({
+        ids: ["00000000-0000-0000-0000-000000000000"],
+        turmaOriginalId: turmaQB?.id,
+      }),
+    });
+    expect(sumido.status).toBe(404);
+  });
 });
 
 describe("frequências (uma por turma e dia)", () => {

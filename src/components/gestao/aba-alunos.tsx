@@ -4,7 +4,7 @@
 // excluir, agrupados por turma com busca por nome.
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
+import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
@@ -56,6 +56,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [origemEmMassa, setOrigemEmMassa] = useState("");
+  const [aplicando, setAplicando] = useState(false);
 
   const opcoesTurma = useMemo(
     () => turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
@@ -96,6 +100,57 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   }, [alunos, turmas, busca]);
 
   const ativos = alunos.filter((aluno) => aluno.ativo).length;
+  const visiveis = useMemo(() => grupos.flatMap(([, , lista]) => lista), [grupos]);
+
+  function alternarSelecao(id: string) {
+    setSelecionados((atuais) => {
+      const proximos = new Set(atuais);
+      if (proximos.has(id)) proximos.delete(id);
+      else proximos.add(id);
+      return proximos;
+    });
+  }
+
+  function alternarTodos() {
+    setSelecionados((atuais) => {
+      const todos = visiveis.length > 0 && visiveis.every((aluno) => atuais.has(aluno.id));
+      if (todos) return new Set();
+      return new Set(visiveis.map((aluno) => aluno.id));
+    });
+  }
+
+  function cancelarSelecao() {
+    setModoSelecao(false);
+    setSelecionados(new Set());
+    setOrigemEmMassa("");
+  }
+
+  async function aplicarOrigem() {
+    if (aplicando || selecionados.size === 0 || origemEmMassa === "") return;
+    setAplicando(true);
+    try {
+      const dados = await pedir<{ atualizados: number }>(
+        "/api/alunos",
+        corpoAlteracao("PATCH", {
+          ids: [...selecionados],
+          turmaOriginalId: origemEmMassa,
+        }),
+      );
+      toast.success(
+        dados.atualizados === 1
+          ? "Origem de 1 aluno atualizada."
+          : `Origem de ${dados.atualizados} alunos atualizada.`,
+      );
+      cancelarSelecao();
+      await onMudanca();
+    } catch (excecao) {
+      const mensagem =
+        excecao instanceof ErroApi ? excecao.message : "Não foi possível atualizar a origem.";
+      toast.error(mensagem);
+    } finally {
+      setAplicando(false);
+    }
+  }
 
   function abrirNovo() {
     setEmEdicao(null);
@@ -173,20 +228,81 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          {alunos.length} no total · {ativos} ativos
+          {modoSelecao
+            ? `${selecionados.size} ${
+                selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"
+              }`
+            : `${alunos.length} no total · ${ativos} ativos`}
         </p>
-        <Button
-          size="lg"
-          className="h-11 rounded-lg"
-          onClick={abrirNovo}
-          disabled={turmas.length === 0}
-        >
-          <Plus size={16} />
-          Novo aluno
-        </Button>
+        {modoSelecao ? (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="h-11 rounded-lg" onClick={alternarTodos}>
+              <Check size={16} />
+              Selecionar todos
+            </Button>
+            <Button variant="ghost" className="h-11 rounded-lg" onClick={cancelarSelecao}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-11 rounded-lg"
+              onClick={() => setModoSelecao(true)}
+              disabled={turmas.length === 0 || alunos.length === 0}
+            >
+              <Check size={16} />
+              Definir origem
+            </Button>
+            <Button
+              size="lg"
+              className="h-11 rounded-lg"
+              onClick={abrirNovo}
+              disabled={turmas.length === 0}
+            >
+              <Plus size={16} />
+              Novo aluno
+            </Button>
+          </div>
+        )}
       </div>
+
+      {modoSelecao && (
+        <div className="bg-card flex flex-col gap-3 rounded-lg border p-3">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Mudar a turma de origem não move o aluno. A Grade e a planilha passam a agrupar o
+            histórico pela origem escolhida.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="origem-em-massa">Turma de origem</Label>
+              <Selecionar
+                id="origem-em-massa"
+                value={origemEmMassa}
+                buscavel
+                onValueChange={setOrigemEmMassa}
+                placeholder="Escolha a turma"
+                opcoes={opcoesTurma}
+              />
+            </div>
+            <Button
+              className="h-11 rounded-lg sm:w-auto"
+              onClick={() => void aplicarOrigem()}
+              disabled={aplicando || selecionados.size === 0 || origemEmMassa === ""}
+            >
+              {aplicando ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Check size={16} />
+              )}
+              Aplicar origem
+            </Button>
+          </div>
+        </div>
+      )}
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
         Guardamos apenas o nome do aluno e as turmas. Nenhum outro dado pessoal é necessário para a
@@ -239,6 +355,25 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                       transition={{ duration: 0.18 }}
                       className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
                     >
+                      {modoSelecao && (
+                        <button
+                          type="button"
+                          aria-pressed={selecionados.has(aluno.id)}
+                          aria-label={`Selecionar ${aluno.nome}`}
+                          onClick={() => alternarSelecao(aluno.id)}
+                          className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
+                        >
+                          <span
+                            className={`flex size-5 items-center justify-center rounded border ${
+                              selecionados.has(aluno.id)
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-input"
+                            }`}
+                          >
+                            {selecionados.has(aluno.id) && <Check size={13} aria-hidden="true" />}
+                          </span>
+                        </button>
+                      )}
                       <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
                         {String(aluno.ordem).padStart(2, "0")}
                       </span>
@@ -253,58 +388,60 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                           <p className="text-muted-foreground text-xs">desativado</p>
                         )}
                       </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-11"
-                          aria-label={`Editar ${aluno.nome}`}
-                          onClick={() => abrirEdicao(aluno)}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-11"
-                          aria-label={
-                            aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`
-                          }
-                          onClick={() => alternarAtivo(aluno)}
-                        >
-                          <Power size={16} />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-falta-texto size-11"
-                              aria-label={`Excluir ${aluno.nome}`}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                A exclusão é definitiva e apaga também o histórico de faltas do
-                                aluno. Para preservar o histórico, desative em vez de excluir.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-falta text-falta-foreground hover:bg-falta/90"
-                                onClick={() => excluir(aluno)}
+                      {!modoSelecao && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-11"
+                            aria-label={`Editar ${aluno.nome}`}
+                            onClick={() => abrirEdicao(aluno)}
+                          >
+                            <Pencil size={16} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-11"
+                            aria-label={
+                              aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`
+                            }
+                            onClick={() => alternarAtivo(aluno)}
+                          >
+                            <Power size={16} />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-falta-texto size-11"
+                                aria-label={`Excluir ${aluno.nome}`}
                               >
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                                <Trash2 size={16} />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  A exclusão é definitiva e apaga também o histórico de faltas do
+                                  aluno. Para preservar o histórico, desative em vez de excluir.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-falta text-falta-foreground hover:bg-falta/90"
+                                  onClick={() => excluir(aluno)}
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
                     </motion.li>
                   ))}
                 </ul>

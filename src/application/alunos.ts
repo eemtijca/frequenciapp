@@ -144,3 +144,40 @@ export async function removerAluno(admin: { id: string }, id: string): Promise<v
     await auditar(tx, admin.id, "aluno.excluir", `aluno:${id}`);
   });
 }
+
+export const esquemaOrigemEmMassa = z.object({
+  ids: z
+    .array(z.string().uuid("Aluno inválido."))
+    .min(1, "Selecione ao menos um aluno.")
+    .max(500, "Selecione no máximo 500 alunos."),
+  turmaOriginalId: idTurma,
+});
+
+/**
+ * Define a turma de origem de vários alunos de uma vez. A turma atual não
+ * muda; a Grade e a planilha passam a agrupar o histórico pela nova origem.
+ */
+export async function definirOrigemEmMassa(
+  admin: { id: string },
+  entrada: unknown,
+): Promise<{ atualizados: number }> {
+  const dados = esquemaOrigemEmMassa.safeParse(entrada);
+  if (!dados.success) {
+    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  }
+  const origem = await banco().turma.findUnique({ where: { id: dados.data.turmaOriginalId } });
+  if (!origem) throw new ErroHttp("Turma de origem não encontrada.", 404);
+  const atualizados = await comTransacao(async (tx) => {
+    const existentes = await tx.aluno.count({ where: { id: { in: dados.data.ids } } });
+    if (existentes !== dados.data.ids.length) {
+      throw new ErroHttp("Algum aluno selecionado não foi encontrado.", 404);
+    }
+    const resultado = await tx.aluno.updateMany({
+      where: { id: { in: dados.data.ids } },
+      data: { turmaOriginalId: dados.data.turmaOriginalId },
+    });
+    await auditar(tx, admin.id, "aluno.origem_em_massa", `turma:${dados.data.turmaOriginalId}`);
+    return resultado.count;
+  });
+  return { atualizados };
+}
