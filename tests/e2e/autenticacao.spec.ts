@@ -37,7 +37,7 @@ test.describe("autenticação", () => {
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
     await page.getByLabel("Senha", { exact: true }).fill(ADMIN_E2E.senha);
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     await sairDaConta(page);
   });
 
@@ -49,7 +49,7 @@ test.describe("autenticação", () => {
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
     await page.getByLabel("Senha", { exact: true }).fill(ADMIN_E2E.senha);
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 
     const salvo = await page.evaluate(() => window.localStorage.getItem("frequenciapp:email"));
     expect(salvo).toBe(ADMIN_E2E.email);
@@ -72,7 +72,7 @@ test.describe("autenticação", () => {
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
     await page.getByLabel("Senha", { exact: true }).fill(ADMIN_E2E.senha);
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByRole("heading", { name: "Frequência diária" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 
     const salvo = await page.evaluate(() => window.localStorage.getItem("frequenciapp:email"));
     expect(salvo).toBeNull();

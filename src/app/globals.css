@@ -206,3 +206,10 @@ input[type="month"] {
 .pagina-sem-barra::-webkit-scrollbar {
   display: none;
 }
+
+/* Painéis distantes do paginador saem do layout e da pintura até chegarem
+   perto. A rolagem de cada painel é guardada e devolvida pelo shell. */
+.pagina-painel[data-distante="true"] {
+  content-visibility: auto;
+  contain: layout paint style;
+}

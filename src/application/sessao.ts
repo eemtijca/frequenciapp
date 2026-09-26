@@ -41,7 +41,7 @@ function hashDeComparacao(): Promise<string> {
 export async function entrar(
   entrada: unknown,
   segredo: string,
-  ehProducao: boolean,
+  cookiesSeguros: boolean,
   origem: string,
 ): Promise<{ ok: true; usuario: Identidade } | { ok: false; erro: string; status: number }> {
   const dados = esquemaEntrada.safeParse(entrada);
@@ -74,7 +74,7 @@ export async function entrar(
   }
   limparTentativas(chaveOrigem);
   limparTentativas(chaveEmail);
-  await criarSessao(usuario.id, segredo, ehProducao, dados.data.lembrar);
+  await criarSessao(usuario.id, segredo, cookiesSeguros, dados.data.lembrar);
   return {
     ok: true,
     usuario: {
@@ -87,8 +87,8 @@ export async function entrar(
   };
 }
 
-export async function sair(segredo: string, ehProducao: boolean): Promise<void> {
-  await encerrarSessao(segredo, ehProducao);
+export async function sair(segredo: string, cookiesSeguros: boolean): Promise<void> {
+  await encerrarSessao(segredo, cookiesSeguros);
 }
 
 /** Identidade corrente ou null. */

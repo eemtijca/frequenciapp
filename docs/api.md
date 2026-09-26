@@ -2,7 +2,7 @@
 
 Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009).
 
-Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção). Guardas de papel: rotas de cadastro e de contas exigem `ADMIN`; frequência, histórico, grade e consultas aceitam qualquer sessão ativa.
+Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas de papel: rotas de cadastro, de contas, de configurações de recursos, do catálogo de justificativas e de cópia de segurança exigem `ADMIN`; chamada, relatórios, saídas e consultas aceitam qualquer sessão ativa.
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
@@ -192,14 +192,31 @@ Parâmetros opcionais `turmaId` e `registradoPor`.
 - 200 `{"frequencias": Frequencia[]}` do mês, em ordem de dia e turma.
 - 400 quando mês, turma ou autoria são inválidos.
 
+### GET /api/frequencias?dia=YYYY-MM-DD
+
+Sem `turmaId`, devolve o dia inteiro para o Painel.
+
+- 200 `{"frequencias": Frequencia[]}` com todas as turmas do dia.
+- 400 quando o dia é inválido.
+
+### GET /api/frequencias?de=YYYY-MM-DD&ate=YYYY-MM-DD
+
+Período inclusivo, com `turmaId` opcional.
+
+- 200 `{"frequencias": Frequencia[]}` do período, em ordem de dia e turma.
+- 400 quando as datas são inválidas, a final é anterior à inicial ou o período passa de 366 dias.
+
 ### POST /api/frequencias
 
 Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number }`.
 
-Duas formas de faltas:
+Três formas de faltas:
 
 - lista simples de identificadores de aluno: falta em todas as aulas do dia;
-- lista de `{ "alunoId": string, "horarios": string[] }`: falta apenas nas aulas informadas.
+- lista de `{ "alunoId": string, "horarios": string[] }`: falta apenas nas aulas informadas;
+- lista de `{ "alunoId": string, "justificativa"?: string, "observacao"?: string, "horarios"?: string[] }`: falta com justificativa do catálogo. Sem `horarios`, cobre todas as aulas do dia. A observação é aceita para qualquer código e faz sentido no código `O` (Outros).
+
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas }`, com `faltas` no formato `[{ alunoId, horarios, justificativa?, observacao? }]`; os dois últimos campos só aparecem quando há justificativa.
 
 Permissão: qualquer sessão ativa.
 
@@ -214,8 +231,99 @@ Respostas:
 
 - 200 `{"frequencia": Frequencia}` com a revisão incrementada.
 - 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
-- 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, ou a validação falha.
+- 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, quando a justificativa não pertence ao catálogo, ou quando outra validação falha.
 - 403 sem sessão; 404 turma inexistente.
+
+### GET /api/frequencias/resumo?ate=YYYY-MM-DD
+
+Acumulado desde a primeira chamada salva até a data informada.
+
+- 200 `{"resumo": {"primeiroDia": string | null, "diasLetivos": number, "porAluno": [{"alunoId", "faltas", "faltasJustificadas", "diasComRegistro"}]}}`.
+- 400 quando a data é inválida.
+
+Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta simples ou parcial conta em `faltas`.
+
+## Saídas antecipadas
+
+### GET /api/saidas
+
+Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma atual do aluno). É preciso informar ao menos um.
+
+- 200 `{"saidas": Saida[]}` em ordem de dia e registro.
+- 400 quando algum parâmetro é inválido ou o período está invertido.
+
+Saida: `{ id, alunoId, dia, momento, justificativa, observacao, liberadoPorId, liberadoPorNome, criadoEm }`.
+
+### POST /api/saidas
+
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa": string, "observacao"?: string, "liberadoPorId"?: string }`.
+
+- 201 `{"saida": Saida}`. Sem `liberadoPorId`, o responsável é quem registrou.
+- 400 para momento ou justificativa fora do catálogo, aluno inválido, dia inválido, data futura ou responsável inválido.
+- 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
+
+### DELETE /api/saidas/{id}
+
+Remove a saída para correção.
+
+- 200 `{"ok": true}`; 404 inexistente.
+
+## Configurações
+
+### GET /api/configuracoes
+
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean}}`. Qualquer sessão.
+
+### PATCH /api/configuracoes
+
+Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada? }`. Apenas administração, com auditoria.
+
+- 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 403 sem papel de administração.
+
+## Justificativas
+
+### GET /api/justificativas
+
+- 200 `{"justificativas": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Qualquer sessão.
+
+### POST /api/justificativas
+
+Corpo: `{ "codigo": string, "rotulo": string }`. Apenas administração, com auditoria.
+
+- 201 `{"justificativa": Justificativa}`.
+- 400 código fora do formato (letras e números, começando por letra, até 10) ou rótulo fora de 2 a 60 caracteres.
+- 403 sem papel de administração; 409 código repetido sem diferenciar caixa.
+
+### PATCH /api/justificativas/{codigo}
+
+Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico guarda o código.
+
+- 200 `{"justificativa": Justificativa}`; 404 inexistente; 400 corpo inválido.
+
+### DELETE /api/justificativas/{codigo}
+
+- 200 `{"ok": true}`.
+- 409 quando há faltas ou saídas usando o código, com a orientação de desativar.
+- 404 inexistente.
+
+## Responsáveis
+
+### GET /api/responsaveis
+
+- 200 `{"responsaveis": [{"id", "nome", "papel"}]}` com a equipe ativa que pode liberar saídas. Qualquer sessão.
+
+## Cópia de segurança
+
+### GET /api/backup
+
+- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "justificativas", "configuracoes" }`. Apenas administração, com auditoria.
+
+### POST /api/backup
+
+Corpo: o documento exportado pela própria aplicação, com até 25 MB.
+
+- 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
+- 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.
 
 ## Saúde
 

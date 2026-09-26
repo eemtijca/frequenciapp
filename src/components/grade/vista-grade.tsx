@@ -1,39 +1,75 @@
 "use client";
 
-// Grade do mês: turma de origem com alunos nas linhas, dias nas
-// colunas e células P, F ou vazias.
-import { useMemo, useState } from "react";
+// Grade de frequência por turma de origem: modos dia, semana de aula,
+// período personalizado e mês; células P, F e FJ, saída no dia e coluna
+// acumulada (F + FJ) de todo o histórico.
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
-import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
-import { mesSeguinte, montarGrade, normalizar, rotuloMes } from "@/domain/frequencia";
+import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
+import {
+  diasDoMes,
+  diasDoPeriodo,
+  mesSeguinte,
+  montarGrade,
+  normalizar,
+  rotuloDiaSemana,
+  rotuloMes,
+} from "@/domain/frequencia";
+import { ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
   alunos: Aluno[];
   frequencias: Frequencia[];
+  resumo: ResumoAcumulado | null;
   mes: string;
   mesCorrente: string;
   hoje: string;
-  onMes: (mes: string) => void;
-  onRecarregar: (mes: string) => Promise<void>;
+  aberto: boolean;
+  versao: number;
   origens: Turma[];
+  onMes: (mes: string) => void;
+  onRecarregar: () => Promise<void>;
+}
+
+const MODOS: { valor: ModoPeriodo; rotulo: string }[] = [
+  { valor: "mes", rotulo: "Mês" },
+  { valor: "dia", rotulo: "Um dia" },
+  { valor: "semana", rotulo: "Uma semana de aula" },
+  { valor: "periodo", rotulo: "Período personalizado" },
+];
+
+function dataCurta(dia: string): string {
+  const [, mes, numero] = dia.split("-");
+  return `${numero}/${mes}`;
 }
 
 export default function VistaGrade({
   alunos,
   frequencias,
+  resumo,
   mes,
   mesCorrente,
   hoje,
+  aberto,
+  versao,
+  origens,
   onMes,
   onRecarregar,
-  origens,
 }: Props) {
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
+  const [busca, setBusca] = useState("");
+  const [modo, setModo] = useState<ModoPeriodo>("mes");
+  const [diaBase, setDiaBase] = useState(hoje);
+  const [diaFim, setDiaFim] = useState(hoje);
+  const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
+  const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
+  const [recarga, setRecarga] = useState(0);
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
@@ -41,18 +77,58 @@ export default function VistaGrade({
   }, [origens]);
 
   const turmasOriginais = useMemo(() => {
-    const distintas = new Set(alunos.filter((a) => a.ativo).map((a) => a.turmaOriginalId));
+    const distintas = new Set(
+      alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaOriginalId),
+    );
     return origens
       .filter((turma) => distintas.has(turma.id))
       .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
   }, [alunos, origens]);
 
   const [turmaId, setTurmaId] = useState(() => turmasOriginais[0]?.id ?? "");
-  const [busca, setBusca] = useState("");
-
-  const turmaEfetiva = turmasOriginais.some((t) => t.id === turmaId)
+  const turmaEfetiva = turmasOriginais.some((turma) => turma.id === turmaId)
     ? turmaId
     : (turmasOriginais[0]?.id ?? "");
+
+  const dias = useMemo(() => {
+    if (modo === "mes") return diasDoMes(mes);
+    return diasDoPeriodo(modo, diaBase, diaFim);
+  }, [modo, mes, diaBase, diaFim]);
+
+  // No modo mês usamos o estado compartilhado do app; nos demais, o período
+  // é buscado na API para não depender do mês carregado.
+  useEffect(() => {
+    if (modo === "mes" || !aberto) {
+      setDoPeriodo(null);
+      return;
+    }
+    const primeiro = dias[0] ?? diaBase;
+    const ultimo = dias[dias.length - 1] ?? diaBase;
+    let viva = true;
+    setCarregandoPeriodo(true);
+    setErro("");
+    pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?de=${primeiro}&ate=${ultimo}`)
+      .then((dados) => {
+        if (viva) setDoPeriodo(dados.frequencias);
+      })
+      .catch((excecao: unknown) => {
+        if (!viva) return;
+        setErro(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
+        );
+      })
+      .finally(() => {
+        if (viva) setCarregandoPeriodo(false);
+      });
+    return () => {
+      viva = false;
+    };
+  }, [aberto, modo, dias, diaBase, versao, recarga]);
+
+  const frequenciasDoPeriodo = useMemo(() => {
+    if (modo === "mes") return frequencias.filter((frequencia) => frequencia.dia.startsWith(mes));
+    return doPeriodo ?? [];
+  }, [modo, frequencias, mes, doPeriodo]);
 
   const grade = useMemo(() => {
     const alunosDaTurma = alunos.filter(
@@ -60,44 +136,63 @@ export default function VistaGrade({
     );
     return montarGrade(
       alunosDaTurma,
-      frequencias,
-      mes,
+      frequenciasDoPeriodo,
+      dias,
       origens.flatMap((turma) => turma.horarios),
     );
-  }, [alunos, turmaEfetiva, frequencias, mes, origens]);
+  }, [alunos, turmaEfetiva, frequenciasDoPeriodo, dias, origens]);
 
   const termo = normalizar(busca);
   const linhas = grade.linhas.filter(
     (linha) => termo === "" || normalizar(linha.aluno.nome).includes(termo),
   );
 
+  const acumuladoDe = useMemo(() => {
+    const mapa = new Map(
+      (resumo?.porAluno ?? []).map((item) => [item.alunoId, item.faltas + item.faltasJustificadas]),
+    );
+    return (alunoId: string) => mapa.get(alunoId) ?? 0;
+  }, [resumo]);
+
   async function atualizar() {
     setAtualizando(true);
     setErro("");
     try {
-      await onRecarregar(mes);
-    } catch {
-      setErro("Não foi possível buscar os registros.");
+      if (modo === "mes") {
+        await onRecarregar();
+      } else {
+        setDoPeriodo(null);
+        setRecarga((valor) => valor + 1);
+      }
     } finally {
       setAtualizando(false);
     }
   }
 
   const totalFaltas = grade.linhas.reduce((soma, linha) => soma + linha.faltas, 0);
+  const totalJustificadas = grade.linhas.reduce((soma, linha) => soma + linha.justificadas, 0);
   const turmaAtualDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
     return (id: string) => mapa.get(id) ?? "";
   }, [origens]);
 
   return (
-    <section aria-label="Grade do mês" className="flex flex-col gap-4 pb-6">
+    <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Grade do mês</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Grade</h1>
           <p className="text-muted-foreground text-sm">
-            {frequencias.length === 0
+            {frequenciasDoPeriodo.length === 0
               ? "Consulta pelas turmas de origem"
-              : `${frequencias.length} ${frequencias.length === 1 ? "frequência no mês" : "frequências no mês"}${totalFaltas > 0 ? ` · ${totalFaltas} ${totalFaltas === 1 ? "falta" : "faltas"}` : ""}`}
+              : `${frequenciasDoPeriodo.length} ${
+                  frequenciasDoPeriodo.length === 1 ? "frequência" : "frequências"
+                } no período${
+                  totalFaltas + totalJustificadas > 0
+                    ? ` · ${totalFaltas + totalJustificadas} ${
+                        totalFaltas + totalJustificadas === 1 ? "falta" : "faltas"
+                      } (F + FJ)`
+                    : ""
+                }`}
           </p>
         </div>
         <Button
@@ -105,10 +200,10 @@ export default function VistaGrade({
           size="icon"
           className="size-10"
           aria-label="Atualizar consulta"
-          onClick={atualizar}
-          disabled={atualizando}
+          onClick={() => void atualizar()}
+          disabled={atualizando || carregandoPeriodo}
         >
-          {atualizando ? (
+          {atualizando || carregandoPeriodo ? (
             <LoaderCircle size={18} className="animate-spin" />
           ) : (
             <RefreshCw size={18} />
@@ -119,7 +214,9 @@ export default function VistaGrade({
       <div className="flex flex-wrap items-center gap-2">
         {turmasOriginais.map((turma) => {
           const ativo = turma.id === turmaEfetiva;
-          const quantidade = alunos.filter((a) => a.ativo && a.turmaOriginalId === turma.id).length;
+          const quantidade = alunos.filter(
+            (aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id,
+          ).length;
           return (
             <button
               key={turma.id}
@@ -135,47 +232,101 @@ export default function VistaGrade({
         })}
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0 rounded-lg"
-          aria-label="Mês anterior"
-          onClick={() => onMes(mesSeguinte(mes, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <SeletorPeriodo
-            id="mes-grade"
-            modo="mes"
-            valor={mes}
-            max={mesCorrente}
-            rotuloAcessivel="Mês da consulta"
-            rotulo={rotuloMes(mes)}
-            onValor={onMes}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <Selecionar
+            id="grade-modo"
+            value={modo}
+            onValueChange={(valor) => {
+              setModo(valor as ModoPeriodo);
+              setDoPeriodo(null);
+            }}
+            ariaLabel="Período da consulta"
+            opcoes={MODOS.map((item) => ({ valor: item.valor, rotulo: item.rotulo }))}
           />
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0 rounded-lg"
-          aria-label="Mês seguinte"
-          disabled={mes >= mesCorrente}
-          onClick={() => onMes(mesSeguinte(mes, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
+
+        {modo === "mes" ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Mês anterior"
+              onClick={() => onMes(mesSeguinte(mes, -1))}
+            >
+              <ChevronLeft size={18} />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <SeletorPeriodo
+                id="mes-grade"
+                modo="mes"
+                valor={mes}
+                max={mesCorrente}
+                rotuloAcessivel="Mês da consulta"
+                rotulo={rotuloMes(mes)}
+                onValor={onMes}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Mês seguinte"
+              disabled={mes >= mesCorrente}
+              onClick={() => onMes(mesSeguinte(mes, 1))}
+            >
+              <ChevronRight size={18} />
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span className="text-muted-foreground text-xs font-medium">
+                {modo === "periodo" ? "De" : modo === "semana" ? "Data da semana" : "Data"}
+              </span>
+              <SeletorPeriodo
+                id="grade-dia"
+                modo="dia"
+                valor={diaBase}
+                max={hoje}
+                rotuloAcessivel="Data inicial da consulta"
+                rotulo={dataCurta(diaBase)}
+                detalhe={rotuloDiaSemana(diaBase)}
+                onValor={setDiaBase}
+              />
+            </div>
+            {modo === "periodo" && (
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span className="text-muted-foreground text-xs font-medium">Até</span>
+                <SeletorPeriodo
+                  id="grade-dia-fim"
+                  modo="dia"
+                  valor={diaFim}
+                  max={hoje}
+                  rotuloAcessivel="Data final da consulta"
+                  rotulo={dataCurta(diaFim)}
+                  detalhe={rotuloDiaSemana(diaFim)}
+                  onValor={setDiaFim}
+                />
+              </div>
+            )}
+            {modo === "semana" && (
+              <p className="text-muted-foreground text-xs">Segunda a sexta da semana escolhida.</p>
+            )}
+          </div>
+        )}
+
+        {modo === "mes" && mes !== mesCorrente && (
+          <button
+            type="button"
+            onClick={() => onMes(mesCorrente)}
+            className="text-primary self-start text-sm font-medium hover:underline"
+          >
+            Voltar para este mês
+          </button>
+        )}
       </div>
-      {mes !== mesCorrente && (
-        <button
-          type="button"
-          onClick={() => onMes(mesCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline"
-        >
-          Voltar para este mês
-        </button>
-      )}
 
       {erro && (
         <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
@@ -193,7 +344,7 @@ export default function VistaGrade({
         </div>
       ) : (
         <motion.div
-          key={turmaEfetiva}
+          key={turmaEfetiva + modo}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
@@ -206,7 +357,12 @@ export default function VistaGrade({
             placeholder="Buscar aluno"
             className="rounded-none border-0 border-b px-3 py-1.5"
           />
-          {linhas.length === 0 ? (
+          {carregandoPeriodo ? (
+            <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
+              <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+              Buscando o período...
+            </div>
+          ) : linhas.length === 0 ? (
             <div className="text-muted-foreground flex min-h-40 items-center justify-center px-6 text-center text-sm">
               Nenhum aluno encontrado para esta busca.
             </div>
@@ -232,22 +388,15 @@ export default function VistaGrade({
                           dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
                         }`}
                       >
-                        {dia.slice(8)}
+                        {mesmoMes(dia, grade.dias) ? dia.slice(8) : dataCurta(dia)}
                       </th>
                     ))}
                     <th
                       scope="col"
-                      title="Dias com falta"
+                      title="Faltas totais (F + FJ) de todo o histórico"
                       className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
                     >
-                      F
-                    </th>
-                    <th
-                      scope="col"
-                      title="Dias com presença parcial"
-                      className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
-                    >
-                      S
+                      Total
                     </th>
                   </tr>
                 </thead>
@@ -268,15 +417,23 @@ export default function VistaGrade({
                         return (
                           <td
                             key={dia}
-                            className={`border-l px-1 py-1.5 text-center ${dia === hoje ? "bg-primary/5" : ""}`}
+                            className={`border-l px-1 py-1.5 text-center ${
+                              dia === hoje ? "bg-primary/5" : ""
+                            }`}
                           >
-                            {marca === "F" ? (
+                            {marca === "F" || marca === "FJ" ? (
                               <span
-                                className="bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
+                                className={
+                                  marca === "FJ"
+                                    ? "border-primary text-primary inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
+                                    : "bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
+                                }
                                 role="img"
-                                aria-label={`${linha.aluno.nome} com falta em ${dia}`}
+                                aria-label={`${linha.aluno.nome} com ${
+                                  marca === "FJ" ? "falta justificada" : "falta"
+                                } em ${dia}`}
                               >
-                                F
+                                {marca}
                               </span>
                             ) : marca === "S" ? (
                               <span
@@ -303,10 +460,7 @@ export default function VistaGrade({
                         );
                       })}
                       <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
-                        {linha.faltas > 0 ? linha.faltas : ""}
-                      </td>
-                      <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
-                        {linha.parciais > 0 ? linha.parciais : ""}
+                        {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
                       </td>
                     </tr>
                   ))}
@@ -333,6 +487,15 @@ export default function VistaGrade({
             </span>
             <span className="flex items-center gap-1.5">
               <span
+                className="border-primary text-primary inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
+                aria-hidden="true"
+              >
+                FJ
+              </span>
+              falta justificada
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
                 className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
                 aria-hidden="true"
               >
@@ -340,10 +503,19 @@ export default function VistaGrade({
               </span>
               presente em parte das aulas
             </span>
+            <span>Total: faltas (F + FJ) de todo o histórico</span>
             <span>célula vazia: turma sem frequência no dia</span>
           </div>
         </motion.div>
       )}
     </section>
   );
+}
+
+/** Verdadeiro quando o dia pertence a um período dentro de um único mês. */
+function mesmoMes(dia: string, dias: string[]): boolean {
+  const primeiro = dias[0];
+  const ultimo = dias[dias.length - 1];
+  if (!primeiro || !ultimo) return true;
+  return primeiro.slice(0, 7) === ultimo.slice(0, 7) && primeiro.slice(0, 7) === dia.slice(0, 7);
 }

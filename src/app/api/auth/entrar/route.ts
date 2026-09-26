@@ -11,7 +11,7 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const corpo = await corpoJson(requisicao);
     const origem = ipDoPedido(requisicao);
-    const resultado = await entrar(corpo, ambiente.authSecret, ambiente.ehProducao, origem);
+    const resultado = await entrar(corpo, ambiente.authSecret, ambiente.cookiesSeguros, origem);
     if (!resultado.ok) return erroApi(resultado.erro, resultado.status);
     return json({ usuario: resultado.usuario });
   });

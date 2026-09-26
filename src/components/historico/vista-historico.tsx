@@ -11,7 +11,7 @@ import {
   LoaderCircle,
   RefreshCw,
 } from "lucide-react";
-import type { Frequencia, Turma } from "@/domain/frequencia";
+import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
   horaNoFuso,
   horariosDoDia,
@@ -27,6 +27,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 interface Props {
   frequencias: Frequencia[];
   turmas: Turma[];
+  series: Serie[];
   mes: string;
   mesCorrente: string;
   fuso: string;
@@ -49,6 +50,7 @@ function rotuloDia(dia: string): { numero: string; mesAno: string; semana: strin
 export default function VistaHistorico({
   frequencias,
   turmas,
+  series,
   mes,
   mesCorrente,
   fuso,
@@ -61,6 +63,7 @@ export default function VistaHistorico({
   const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
+  const [serieFiltro, setSerieFiltro] = useState("");
 
   async function atualizar() {
     setAtualizando(true);
@@ -80,7 +83,9 @@ export default function VistaHistorico({
       rotuloTurma(b.turmaId).localeCompare(rotuloTurma(a.turmaId), "pt-BR"),
   );
   const termo = normalizar(busca);
+  const serieDaTurma = new Map(turmas.map((turma) => [turma.id, turma.serieId]));
   const filtradas = ordenadas.filter((frequencia) => {
+    if (serieFiltro && serieDaTurma.get(frequencia.turmaId) !== serieFiltro) return false;
     if (termo === "") return true;
     const alvo = normalizar(
       `${rotuloTurma(frequencia.turmaId)} ${frequencia.dia} ${frequencia.atualizadoPorNome ?? ""}`,
@@ -157,6 +162,30 @@ export default function VistaHistorico({
         </button>
       )}
 
+      {series.length > 0 && (
+        <div role="group" aria-label="Filtrar por série" className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            aria-pressed={serieFiltro === ""}
+            onClick={() => setSerieFiltro("")}
+            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+          >
+            Todas
+          </button>
+          {series.map((serie) => (
+            <button
+              key={serie.id}
+              type="button"
+              aria-pressed={serieFiltro === serie.id}
+              onClick={() => setSerieFiltro(serie.id)}
+              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+            >
+              {serie.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
       {bloqueado && (
         <p className="bg-secondary text-secondary-foreground rounded-lg px-4 py-3 text-sm">
           Há alterações na frequência em aberto. Salve antes de abrir outra.
@@ -200,11 +229,20 @@ export default function VistaHistorico({
                 const parciais = frequencia.faltas.filter(
                   (falta) => aulasDoDia.length > 0 && falta.horarios.length < aulasDoDia.length,
                 ).length;
+                const justificadas = frequencia.faltas.filter(
+                  (falta) => falta.justificativa,
+                ).length;
                 const resumo =
                   frequencia.faltas.length === 0
                     ? "Todos presentes"
                     : `${frequencia.faltas.length} ${
                         frequencia.faltas.length === 1 ? "falta" : "faltas"
+                      }${
+                        justificadas > 0
+                          ? ` · ${justificadas} ${
+                              justificadas === 1 ? "justificada" : "justificadas"
+                            }`
+                          : ""
                       }${
                         parciais > 0
                           ? ` · ${parciais} ${parciais === 1 ? "saída parcial" : "saídas parciais"}`

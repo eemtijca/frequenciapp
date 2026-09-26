@@ -3,36 +3,49 @@
 // Shell da aplicação: cabeçalho, troca de visões por deslize e navegação
 // inferior no celular, barra lateral no desktop. A administração ganha a
 // visão Gestão no lugar de Alunos.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MotionConfig, motion, useReducedMotion } from "motion/react";
 import {
+  ChartPie,
   ClipboardCheck,
-  History,
+  DoorOpen,
   KeyRound,
   LogOut,
   Settings2,
+  Table2,
   UserRound,
   Users,
-  UsersRound,
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Aluno, Frequencia, Serie, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  Configuracoes,
+  Frequencia,
+  JustificativaConfigurada,
+  ResumoAcumulado,
+  Responsavel,
+  SaidaAntecipada,
+  Serie,
+  Turma,
+} from "@/domain/frequencia";
+import { diasDoMes } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
-import VistaHistorico from "@/components/historico/vista-historico";
-import VistaGrade from "@/components/grade/vista-grade";
+import VistaPainel from "@/components/painel/vista-painel";
+import VistaSaidas from "@/components/saidas/vista-saidas";
+import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
-export type Visao = "frequencia" | "historico" | "grade" | "alunos" | "gestao";
+export type Visao = "painel" | "chamada" | "saidas" | "relatorios" | "alunos" | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -43,12 +56,26 @@ interface Props {
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
   frequenciasIniciais: Frequencia[];
+  saidasIniciais: SaidaAntecipada[];
+  justificativasIniciais: JustificativaConfigurada[];
+  responsaveisIniciais: Responsavel[];
+  configuracoesIniciais: Configuracoes;
+  resumoInicial: ResumoAcumulado | null;
 }
 
-const VISOES: Visao[] = ["frequencia", "historico", "grade", "alunos", "gestao"];
+const VISOES: Visao[] = ["painel", "chamada", "saidas", "relatorios", "alunos", "gestao"];
 
 function visaoValida(valor: string | undefined): Visao | null {
+  // Valores antigos do manifest e de links continuam abrindo a área certa.
+  if (valor === "frequencia") return "chamada";
+  if (valor === "historico" || valor === "grade") return "relatorios";
   return VISOES.find((visao) => visao === valor) ?? null;
+}
+
+function abaRelatoriosDe(valor: string | undefined): AbaRelatorio | undefined {
+  if (valor === "historico") return "historico";
+  if (valor === "grade") return "grade";
+  return undefined;
 }
 
 interface ItemNav {
@@ -57,11 +84,13 @@ interface ItemNav {
   icone: typeof ClipboardCheck;
 }
 
-const ITENS_BASE: ItemNav[] = [
-  { visao: "frequencia", rotulo: "Frequência", icone: ClipboardCheck },
-  { visao: "historico", rotulo: "Histórico", icone: History },
-  { visao: "grade", rotulo: "Grade", icone: UsersRound },
+const ITENS_INICIAIS: ItemNav[] = [
+  { visao: "painel", rotulo: "Painel", icone: ChartPie },
+  { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
 ];
+
+const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas", icone: DoorOpen };
+const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
 
 const ITENS_FIM: ItemNav[] = [
   { visao: "alunos", rotulo: "Alunos", icone: Users },
@@ -69,9 +98,10 @@ const ITENS_FIM: ItemNav[] = [
 ];
 
 const LARGURAS: Record<Visao, string> = {
-  frequencia: "max-w-2xl lg:max-w-none",
-  historico: "max-w-3xl lg:max-w-none",
-  grade: "max-w-5xl lg:max-w-none",
+  painel: "max-w-5xl lg:max-w-none",
+  chamada: "max-w-2xl lg:max-w-none",
+  saidas: "max-w-3xl lg:max-w-none",
+  relatorios: "max-w-5xl lg:max-w-none",
   alunos: "max-w-3xl lg:max-w-none",
   gestao: "max-w-5xl lg:max-w-none",
 };
@@ -103,7 +133,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       <motion.span
         animate={ativo ? { scale: 1.08 } : { scale: 1 }}
         transition={{ type: "spring", stiffness: 500, damping: 26 }}
-        className="lg:hidden"
+        className="flex h-5 items-center lg:hidden"
       >
         <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
       </motion.span>
@@ -113,7 +143,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
         aria-hidden="true"
         className="hidden lg:block"
       />
-      <span>{item.rotulo}</span>
+      <span className="whitespace-nowrap">{item.rotulo}</span>
       {pendente && (
         <span
           aria-label="Alterações não salvas"
@@ -133,34 +163,64 @@ export default function Aplicacao({
   turmasIniciais,
   alunosIniciais,
   frequenciasIniciais,
+  saidasIniciais,
+  justificativasIniciais,
+  responsaveisIniciais,
+  configuracoesIniciais,
+  resumoInicial,
 }: Props) {
   const router = useRouter();
   const ehAdmin = usuario.papel === "ADMIN";
   const pedida = visaoValida(visaoInicial);
-  const inicial = pedida && (pedida !== "gestao" || ehAdmin) ? pedida : "frequencia";
+  const inicial =
+    pedida &&
+    (pedida !== "gestao" || ehAdmin) &&
+    (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
+      ? pedida
+      : "painel";
   const [visao, setVisao] = useState<Visao>(inicial);
   const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set([inicial]));
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
   const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
+  const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
+  const [justificativas, setJustificativas] =
+    useState<JustificativaConfigurada[]>(justificativasIniciais);
+  const [responsaveis] = useState<Responsavel[]>(responsaveisIniciais);
+  const [configuracoes, setConfiguracoes] = useState<Configuracoes>(configuracoesIniciais);
+  const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
+  const [versaoFrequencias, setVersaoFrequencias] = useState(0);
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
+    abaRelatoriosDe(visaoInicial),
+  );
   const pagerRef = useRef<HTMLDivElement | null>(null);
-  const timerVisao = useRef<number | null>(null);
+  // Índice da visão visível, modo programático e controles de quadro.
+  const indiceVisao = useRef(0);
+  const rolagemProgramatica = useRef(false);
+  const quadroRolagem = useRef<number | null>(null);
+  const timerRolagem = useRef<number | null>(null);
   const reduzirMovimento = useReducedMotion() ?? false;
 
   const itemFinal = useMemo(
     () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
     [ehAdmin],
   );
-  const itens = useMemo<ItemNav[]>(
-    () => (itemFinal ? [...ITENS_BASE, itemFinal] : [...ITENS_BASE]),
-    [itemFinal],
-  );
+  const itens = useMemo<ItemNav[]>(() => {
+    const lista = [...ITENS_INICIAIS];
+    if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
+    lista.push(ITEM_RELATORIOS);
+    if (itemFinal) lista.push(itemFinal);
+    return lista;
+  }, [configuracoes.saidaAntecipada, itemFinal]);
+  const indiceAtivo = itens.findIndex((item) => item.visao === visao);
+  // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
+  const posicoes = useRef(new Map<Visao, number>());
 
   const rotuloTurma = useCallback(
     (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? "",
@@ -177,17 +237,54 @@ export default function Aplicacao({
     setTurmas(dados.turmas);
   }, []);
 
-  const recarregarFrequencias = useCallback(async (novoMes: string) => {
-    setMes(novoMes);
-    const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
-    setFrequencias(dados.frequencias);
+  const recarregarFrequencias = useCallback(
+    async (novoMes: string) => {
+      setMes(novoMes);
+      const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+      setFrequencias(dados.frequencias);
+      setVersaoFrequencias((valor) => valor + 1);
+      try {
+        const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
+          `/api/frequencias/resumo?ate=${diaCorrente}`,
+        );
+        setResumo(resumoDados.resumo);
+      } catch {
+        // O acumulado é complementar: a chamada segue sem ele.
+      }
+    },
+    [diaCorrente],
+  );
+
+  const recarregarSaidas = useCallback(async (novoMes: string) => {
+    const dias = diasDoMes(novoMes);
+    const primeiro = dias[0] ?? `${novoMes}-01`;
+    const ultimo = dias[dias.length - 1] ?? `${novoMes}-28`;
+    const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+      `/api/saidas?de=${primeiro}&ate=${ultimo}`,
+    );
+    setSaidas(dados.saidas);
+  }, []);
+
+  // Troca de mês nos relatórios recarrega frequências e saídas juntas.
+  const recarregarMes = useCallback(
+    async (novoMes: string) => {
+      await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+    },
+    [recarregarFrequencias, recarregarSaidas],
+  );
+
+  const recarregarJustificativas = useCallback(async () => {
+    const dados = await pedir<{ justificativas: JustificativaConfigurada[] }>(
+      "/api/justificativas",
+    );
+    setJustificativas(dados.justificativas);
   }, []);
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
-      if (timerVisao.current !== null) {
-        window.clearTimeout(timerVisao.current);
-        timerVisao.current = null;
+      if (timerRolagem.current !== null) {
+        window.clearTimeout(timerRolagem.current);
+        timerRolagem.current = null;
       }
       setVisao(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
@@ -195,6 +292,9 @@ export default function Aplicacao({
       if (!pager) return;
       const indice = itens.findIndex((item) => item.visao === proxima);
       if (indice < 0) return;
+      indiceVisao.current = indice;
+      // A rolagem por toque não deve mudar a visão ao passar pelas do meio.
+      rolagemProgramatica.current = true;
       // No desktop a troca é instantânea: o deslize é gesto de celular.
       const ehDesktop =
         typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
@@ -202,13 +302,51 @@ export default function Aplicacao({
         left: indice * pager.clientWidth,
         behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
       });
+      // Rede de segurança para navegadores sem scrollend.
+      timerRolagem.current = window.setTimeout(() => {
+        timerRolagem.current = null;
+        rolagemProgramatica.current = false;
+      }, 700);
     },
     [itens, reduzirMovimento],
   );
 
-  // O deslize monta o painel e o vizinho na hora, mas a visão ativa só muda
-  // quando a rolagem para: assim a pílula não passeia pelas visões do meio.
+  // O indicador acompanha o gesto: a cada quadro, o índice visível vira a
+  // visão ativa. Na rolagem programática (toque na navegação), o estado não
+  // muda, então a pílula vai direto ao destino sem passear pelas do meio.
   const aoRolarPager = useCallback(() => {
+    if (quadroRolagem.current !== null) return;
+    quadroRolagem.current = window.requestAnimationFrame(() => {
+      quadroRolagem.current = null;
+      const pager = pagerRef.current;
+      if (!pager) return;
+      const largura = pager.clientWidth;
+      if (largura === 0) return;
+      const indice = Math.max(
+        0,
+        Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)),
+      );
+      const atual = itens[indice];
+      if (!atual) return;
+      setVisitadas((atuais) =>
+        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
+      );
+      if (rolagemProgramatica.current || indiceVisao.current === indice) return;
+      indiceVisao.current = indice;
+      startTransition(() => {
+        setVisao(atual.visao);
+      });
+    });
+  }, [itens]);
+
+  // Fecha a rolagem no evento nativo quando existir, com o temporizador como
+  // rede de segurança para navegadores sem scrollend.
+  const fecharRolagem = useCallback(() => {
+    if (timerRolagem.current !== null) {
+      window.clearTimeout(timerRolagem.current);
+      timerRolagem.current = null;
+    }
+    rolagemProgramatica.current = false;
     const pager = pagerRef.current;
     if (!pager) return;
     const largura = pager.clientWidth;
@@ -216,26 +354,72 @@ export default function Aplicacao({
     const indice = Math.max(0, Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)));
     const atual = itens[indice];
     if (!atual) return;
-    setVisitadas((atuais) => {
-      const proximas = new Set(atuais);
-      proximas.add(atual.visao);
-      const vizinho = itens[indice + 1] ?? itens[indice - 1];
-      if (vizinho) proximas.add(vizinho.visao);
-      return proximas.size === atuais.size ? atuais : proximas;
-    });
-    if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
-    timerVisao.current = window.setTimeout(() => {
-      timerVisao.current = null;
+    indiceVisao.current = indice;
+    startTransition(() => {
       setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
-    }, 120);
+      setVisitadas((atuais) =>
+        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
+      );
+    });
   }, [itens]);
 
-  // Limpa o temporizador da visão ao desmontar.
+  // Limpa quadro e temporizador ao desmontar.
   useEffect(() => {
     return () => {
-      if (timerVisao.current !== null) window.clearTimeout(timerVisao.current);
+      if (quadroRolagem.current !== null) window.cancelAnimationFrame(quadroRolagem.current);
+      if (timerRolagem.current !== null) window.clearTimeout(timerRolagem.current);
     };
   }, []);
+
+  // O evento nativo de fim de rolagem não existe em todos os navegadores.
+  useEffect(() => {
+    const pager = pagerRef.current;
+    if (!pager) return;
+    pager.addEventListener("scrollend", fecharRolagem);
+    return () => pager.removeEventListener("scrollend", fecharRolagem);
+  }, [fecharRolagem]);
+
+  // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
+  // saem da pintura não perderem a posição ao voltar.
+  const guardarRolagem = useCallback((alvo: Visao, evento: React.UIEvent<HTMLElement>) => {
+    posicoes.current.set(alvo, evento.currentTarget.scrollTop);
+  }, []);
+
+  useEffect(() => {
+    const indice = itens.findIndex((item) => item.visao === visao);
+    if (indice < 0) return;
+    const salvo = posicoes.current.get(visao);
+    if (salvo === undefined) return;
+    const quadro = window.requestAnimationFrame(() => {
+      const painel = pagerRef.current?.children[indice];
+      if (painel instanceof HTMLElement && painel.scrollTop !== salvo) painel.scrollTop = salvo;
+    });
+    return () => window.cancelAnimationFrame(quadro);
+  }, [itens, visao]);
+
+  // Monta as áreas depois da primeira pintura: nenhuma tela pesada deve
+  // montar durante o primeiro gesto de deslize.
+  useEffect(() => {
+    const aquecer = () => {
+      startTransition(() => {
+        setVisitadas((atuais) => {
+          const proximas = new Set(atuais);
+          for (const item of itens) proximas.add(item.visao);
+          return proximas.size === atuais.size ? atuais : proximas;
+        });
+      });
+    };
+    const janela = window as Window & {
+      requestIdleCallback?: (retorno: () => void, opcoes?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (janela.requestIdleCallback && janela.cancelIdleCallback) {
+      const id = janela.requestIdleCallback(aquecer, { timeout: 3000 });
+      return () => janela.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(aquecer, 1500);
+    return () => window.clearTimeout(id);
+  }, [itens]);
 
   // Atalho do manifest: abre direto na visão pedida, sem animação.
   const visaoInicialRef = useRef(inicial);
@@ -243,7 +427,10 @@ export default function Aplicacao({
     const pager = pagerRef.current;
     if (!pager) return;
     const indice = itens.findIndex((item) => item.visao === visaoInicialRef.current);
-    if (indice > 0) pager.scrollTo({ left: indice * pager.clientWidth });
+    if (indice > 0) {
+      indiceVisao.current = indice;
+      pager.scrollTo({ left: indice * pager.clientWidth });
+    }
   }, [itens]);
 
   // Ao redimensionar a janela, reencaixa o paginador na visão ativa.
@@ -252,7 +439,10 @@ export default function Aplicacao({
       const pager = pagerRef.current;
       if (!pager) return;
       const indice = itens.findIndex((item) => item.visao === visao);
-      if (indice >= 0) pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
+      if (indice >= 0) {
+        indiceVisao.current = indice;
+        pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
+      }
     }
     window.addEventListener("resize", reencaixar);
     return () => window.removeEventListener("resize", reencaixar);
@@ -260,10 +450,10 @@ export default function Aplicacao({
 
   function abrirFrequencia(dia: string, turmaId: string) {
     setAlvo({ dia, turmaId });
-    trocarVisao("frequencia");
+    trocarVisao("chamada");
     requestAnimationFrame(() => {
       const pager = pagerRef.current;
-      const indice = itens.findIndex((item) => item.visao === "frequencia");
+      const indice = itens.findIndex((item) => item.visao === "chamada");
       const painel = pager?.children[indice];
       if (painel instanceof HTMLElement) painel.scrollTo({ top: 0 });
     });
@@ -305,7 +495,7 @@ export default function Aplicacao({
 
   async function sair() {
     if (pendencias.length > 0) {
-      const confirmar = window.confirm("Há alterações não salvas na frequência. Sair mesmo assim?");
+      const confirmar = window.confirm("Há alterações não salvas na chamada. Sair mesmo assim?");
       if (!confirmar) return;
     }
     try {
@@ -320,7 +510,19 @@ export default function Aplicacao({
   function renderizarVisao(alvoVisao: Visao) {
     return (
       <div className={`mx-auto w-full ${LARGURAS[alvoVisao]}`}>
-        {alvoVisao === "frequencia" && (
+        {alvoVisao === "painel" && (
+          <VistaPainel
+            diaCorrente={diaCorrente}
+            mes={mes}
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            frequencias={frequencias}
+            saidas={saidas}
+            onRecarregar={recarregarMes}
+          />
+        )}
+        {alvoVisao === "chamada" && (
           <VistaFrequencia
             usuario={usuario}
             turmas={turmas}
@@ -328,35 +530,47 @@ export default function Aplicacao({
             diaCorrente={diaCorrente}
             fuso={fuso}
             alvo={alvo}
+            configuracoes={configuracoes}
+            catalogoJustificativas={justificativas}
+            resumo={resumo}
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={setPendencias}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
           />
         )}
-        {alvoVisao === "historico" && (
-          <VistaHistorico
-            frequencias={frequencias}
-            turmas={turmas}
-            mes={mes}
-            mesCorrente={diaCorrente.slice(0, 7)}
+        {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
+          <VistaSaidas
+            usuarioId={usuario.id}
+            diaCorrente={diaCorrente}
             fuso={fuso}
-            onMes={setMes}
-            onAbrir={abrirFrequencia}
-            onRecarregar={recarregarFrequencias}
-            bloqueado={pendencias.includes("frequencia")}
-            rotuloTurma={rotuloTurma}
+            mes={mes}
+            turmas={turmas}
+            alunos={alunos}
+            responsaveis={responsaveis}
+            catalogoJustificativas={justificativas}
+            saidas={saidas}
+            onSaidasMudaram={recarregarSaidas}
           />
         )}
-        {alvoVisao === "grade" && (
-          <VistaGrade
-            alunos={alunos}
-            frequencias={frequencias}
+        {alvoVisao === "relatorios" && (
+          <VistaRelatorios
+            abaInicial={abaRelatoriosInicial}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
-            hoje={diaCorrente}
-            onMes={setMes}
+            diaCorrente={diaCorrente}
+            fuso={fuso}
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            frequencias={frequencias}
+            saidas={saidas}
+            resumo={resumo}
+            versao={versaoFrequencias}
+            bloqueado={pendencias.includes("chamada")}
+            rotuloTurma={rotuloTurma}
+            onMes={recarregarMes}
+            onAbrir={abrirFrequencia}
             onRecarregar={recarregarFrequencias}
-            origens={turmas}
           />
         )}
         {alvoVisao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
@@ -366,6 +580,9 @@ export default function Aplicacao({
             series={series}
             turmas={turmas}
             alunos={alunos}
+            configuracoes={configuracoes}
+            diaCorrente={diaCorrente}
+            justificativas={justificativas}
             onSeriesMudaram={async () => {
               const dados = await pedir<{ series: Serie[] }>("/api/series");
               setSeries(dados.series);
@@ -376,6 +593,8 @@ export default function Aplicacao({
               setSeries(dados.series);
             }}
             onAlunosMudaram={recarregarAlunos}
+            onConfiguracoesMudaram={setConfiguracoes}
+            onJustificativasMudaram={recarregarJustificativas}
           />
         )}
       </div>
@@ -410,7 +629,7 @@ export default function Aplicacao({
                 key={item.visao}
                 item={item}
                 ativo={visao === item.visao}
-                pendente={item.visao === "frequencia" && pendencias.includes("frequencia")}
+                pendente={item.visao === "chamada" && pendencias.includes("chamada")}
                 indicador="indicador-lateral"
                 onTrocar={trocarVisao}
               />
@@ -526,11 +745,13 @@ export default function Aplicacao({
           >
             <div
               ref={pagerRef}
+              data-pager="principal"
               onScroll={aoRolarPager}
               className="pagina-sem-barra flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
             >
-              {itens.map((item) => {
+              {itens.map((item, indice) => {
                 const ativo = item.visao === visao;
+                const distante = Math.abs(indice - indiceAtivo) > 1;
                 return (
                   <section
                     key={item.visao}
@@ -538,7 +759,15 @@ export default function Aplicacao({
                     aria-label={item.rotulo}
                     aria-hidden={!ativo}
                     inert={!ativo}
-                    className="h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 pt-4 pb-0 sm:px-6 lg:px-8"
+                    data-distante={distante ? "true" : undefined}
+                    onScroll={(evento) => guardarRolagem(item.visao, evento)}
+                    onPointerDown={() => {
+                      rolagemProgramatica.current = false;
+                    }}
+                    onWheel={() => {
+                      rolagemProgramatica.current = false;
+                    }}
+                    className="pagina-painel h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                   >
                     {visitadas.has(item.visao) ? renderizarVisao(item.visao) : null}
                   </section>
@@ -552,13 +781,16 @@ export default function Aplicacao({
             className="bg-background/95 supports-[backdrop-filter]:bg-background/85 shrink-0 border-t backdrop-blur lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
-            <div className="grid grid-cols-4">
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
+            >
               {itens.map((item) => (
                 <ItemNavegacao
                   key={item.visao}
                   item={item}
                   ativo={visao === item.visao}
-                  pendente={item.visao === "frequencia" && pendencias.includes("frequencia")}
+                  pendente={item.visao === "chamada" && pendencias.includes("chamada")}
                   indicador="indicador-inferior"
                   onTrocar={trocarVisao}
                 />

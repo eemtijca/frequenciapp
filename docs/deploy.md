@@ -127,6 +127,16 @@ Os workflows ficam em `.github/workflows/`:
 
 O Dependabot atualiza npm, GitHub Actions e Docker semanalmente, agrupando versões minor e patch.
 
+## VPS sem TLS (rede interna)
+
+Quando não há proxy reverso com TLS, defina no `.env`:
+
+```text
+PERMITIR_HTTP=true
+```
+
+O cookie de sessão deixa de usar `Secure`, o HSTS não é enviado e o CSP não força upgrade. O aplicativo avisa no log. Sem TLS o tráfego fica em texto puro e o PWA não instala fora de localhost; use apenas em rede confiável e volte a `false` quando houver TLS. Detalhes em [ambiente.md](ambiente.md) e [seguranca.md](seguranca.md).
+
 ## Máquina própria com systemd
 
 Build e execução diretos:

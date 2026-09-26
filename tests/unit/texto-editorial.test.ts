@@ -34,6 +34,10 @@ const ARQUIVOS_RAIZ = new Set([
   "Dockerfile",
 ]);
 
+// Referência funcional do aplicativo original, mantida fora do Git e fora da
+// varredura editorial (não faz parte do entregável).
+const ARQUIVOS_IGNORADOS = new Set(["apporiginal.html"]);
+
 const EXTENSOES = new Set([
   ".ts",
   ".html",
@@ -77,7 +81,7 @@ async function listarArquivos(diretorio: string): Promise<string[]> {
   const entradas = await readdir(diretorio, { withFileTypes: true });
   const saida: string[] = [];
   for (const entrada of entradas) {
-    if (FORA_DO_ESCOPO.has(entrada.name)) continue;
+    if (FORA_DO_ESCOPO.has(entrada.name) || ARQUIVOS_IGNORADOS.has(entrada.name)) continue;
     const completo = path.join(diretorio, entrada.name);
     if (entrada.isDirectory()) {
       saida.push(...(await listarArquivos(completo)));
@@ -92,7 +96,7 @@ async function arquivosDoRepositorio(): Promise<string[]> {
   const raiz = await readdir(RAIZ, { withFileTypes: true });
   const alvos: string[] = [];
   for (const entrada of raiz) {
-    if (FORA_DO_ESCOPO.has(entrada.name)) continue;
+    if (FORA_DO_ESCOPO.has(entrada.name) || ARQUIVOS_IGNORADOS.has(entrada.name)) continue;
     const completo = path.join(RAIZ, entrada.name);
     if (entrada.isDirectory()) {
       if (["src", "docs", "scripts", "docker", "prisma", "tests"].includes(entrada.name)) {

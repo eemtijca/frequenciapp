@@ -11,13 +11,24 @@ import {
   ehMesValido,
   horariosDoDia,
   type Frequencia,
+  type ResumoAcumulado,
   type ResultadoSalvamento,
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 
 const faltaEntrada = z.object({
   alunoId: z.string().uuid("Aluno inválido."),
-  horarios: z.array(z.string().uuid("Aula inválida.")).max(20, "Lista de aulas grande demais."),
+  // Sem a lista de aulas, a falta cobre todas as aulas do dia.
+  horarios: z
+    .array(z.string().uuid("Aula inválida."))
+    .max(20, "Lista de aulas grande demais.")
+    .optional(),
+  justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
+  observacao: z
+    .string()
+    .trim()
+    .max(200, "A observação deve ter no máximo 200 caracteres.")
+    .nullish(),
 });
 
 export const esquemaSalvarFrequencia = z.object({
@@ -38,15 +49,42 @@ interface LinhaFrequencia {
   atualizadoEm: Date;
   criadoPor: { nome: string } | null;
   atualizadoPor: { nome: string } | null;
-  faltas: { alunoId: string; horarioId: string }[];
+  faltas: {
+    alunoId: string;
+    horarioId: string;
+    justificativa: string | null;
+    observacao: string | null;
+  }[];
 }
 
+/**
+ * Agrupa as faltas por aluno. A justificativa só vale quando todas as faltas
+ * do aluno no dia têm o mesmo código; qualquer falta sem justificativa deixa
+ * o aluno como falta simples.
+ */
 function paraFrequencia(linha: LinhaFrequencia): Frequencia {
-  const porAluno = new Map<string, string[]>();
+  interface Grupo {
+    horarios: string[];
+    justificativas: Set<string>;
+    semJustificativa: boolean;
+    observacao: string | null;
+  }
+  const porAluno = new Map<string, Grupo>();
   for (const falta of linha.faltas) {
-    const aulas = porAluno.get(falta.alunoId) ?? [];
-    aulas.push(falta.horarioId);
-    porAluno.set(falta.alunoId, aulas);
+    const grupo = porAluno.get(falta.alunoId) ?? {
+      horarios: [],
+      justificativas: new Set<string>(),
+      semJustificativa: false,
+      observacao: null,
+    };
+    grupo.horarios.push(falta.horarioId);
+    if (falta.justificativa) {
+      grupo.justificativas.add(falta.justificativa);
+      grupo.observacao ??= falta.observacao ?? null;
+    } else {
+      grupo.semJustificativa = true;
+    }
+    porAluno.set(falta.alunoId, grupo);
   }
   return {
     dia: linha.dia.toISOString().slice(0, 10),
@@ -54,13 +92,25 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     revisao: linha.revisao,
     atualizadoEm: linha.atualizadoEm.toISOString(),
     atualizadoPorNome: linha.atualizadoPor?.nome ?? linha.criadoPor?.nome ?? null,
-    faltas: [...porAluno.entries()].map(([alunoId, horarios]) => ({ alunoId, horarios })),
+    faltas: [...porAluno.entries()].map(([alunoId, grupo]) => {
+      const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
+      const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
+      if (!justificativa) return { alunoId, horarios: grupo.horarios };
+      return {
+        alunoId,
+        horarios: grupo.horarios,
+        justificativa,
+        observacao: grupo.observacao,
+      };
+    }),
   };
 }
 
 const COMPLEMENTO = {
   include: {
-    faltas: { select: { alunoId: true, horarioId: true } },
+    faltas: {
+      select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
+    },
     criadoPor: { select: { nome: true } },
     atualizadoPor: { select: { nome: true } },
   },
@@ -102,6 +152,74 @@ export async function listarFrequenciasDoMes(
   return linhas.map(paraFrequencia);
 }
 
+/** Todas as frequências de um período inclusivo, com filtro opcional de turma. */
+export async function listarFrequenciasDoPeriodo(
+  de: string,
+  ate: string,
+  filtros: { turmaId?: string } = {},
+): Promise<Frequencia[]> {
+  const linhas = await banco().frequencia.findMany({
+    where: {
+      dia: { gte: new Date(`${de}T12:00:00Z`), lte: new Date(`${ate}T12:00:00Z`) },
+      ...(filtros.turmaId ? { turmaId: filtros.turmaId } : {}),
+    },
+    orderBy: [{ dia: "asc" }, { turma: { nome: "asc" } }],
+    ...COMPLEMENTO,
+  });
+  return linhas.map(paraFrequencia);
+}
+
+/**
+ * Acumulado por aluno desde a primeira chamada salva até o dia informado:
+ * dias distintos com falta simples, com falta justificada e com registro.
+ * Um dia parcial no modo por aula conta como falta simples.
+ */
+export async function resumoAcumulado(ate: string): Promise<ResumoAcumulado> {
+  const linhas = await banco().frequencia.findMany({
+    where: { dia: { lte: new Date(`${ate}T12:00:00Z`) } },
+    select: {
+      dia: true,
+      faltas: { select: { alunoId: true, justificativa: true } },
+    },
+    orderBy: { dia: "asc" },
+  });
+  const porAluno = new Map<string, { dias: Set<string>; faltas: number; justificadas: number }>();
+  const diasLetivos = new Set<string>();
+  for (const linha of linhas) {
+    const dia = linha.dia.toISOString().slice(0, 10);
+    diasLetivos.add(dia);
+    const porDia = new Map<string, { total: number; justificadas: number }>();
+    for (const falta of linha.faltas) {
+      const registro = porDia.get(falta.alunoId) ?? { total: 0, justificadas: 0 };
+      registro.total += 1;
+      if (falta.justificativa) registro.justificadas += 1;
+      porDia.set(falta.alunoId, registro);
+    }
+    for (const [alunoId, registro] of porDia) {
+      const acumulado = porAluno.get(alunoId) ?? {
+        dias: new Set<string>(),
+        faltas: 0,
+        justificadas: 0,
+      };
+      acumulado.dias.add(dia);
+      if (registro.justificadas === registro.total) acumulado.justificadas += 1;
+      else acumulado.faltas += 1;
+      porAluno.set(alunoId, acumulado);
+    }
+  }
+  const dias = [...diasLetivos].sort();
+  return {
+    primeiroDia: dias[0] ?? null,
+    diasLetivos: dias.length,
+    porAluno: [...porAluno.entries()].map(([alunoId, valor]) => ({
+      alunoId,
+      faltas: valor.faltas,
+      faltasJustificadas: valor.justificadas,
+      diasComRegistro: valor.dias.size,
+    })),
+  };
+}
+
 /**
  * Salva a frequência de um dia e turma, compartilhada pela coordenação.
  * revisao 0 cria a primeira versão; duplicata devolve conflito.
@@ -141,24 +259,74 @@ export async function salvarFrequencia(
   const idsDeAulaAtiva = aulasDoDia.map((aula) => aula.id);
 
   const faltasBrutas = dados.data.faltas;
-  const porAluno = new Map<string, Set<string>>();
+  interface Ausencia {
+    horarios: Set<string>;
+    justificativa: string | null;
+    observacao: string | null;
+  }
+  const porAluno = new Map<string, Ausencia>();
   if (typeof faltasBrutas[0] === "string") {
     for (const alunoId of faltasBrutas as string[]) {
-      porAluno.set(alunoId, new Set(idsDeAulaAtiva));
+      porAluno.set(alunoId, {
+        horarios: new Set(idsDeAulaAtiva),
+        justificativa: null,
+        observacao: null,
+      });
     }
   } else {
-    for (const falta of faltasBrutas as { alunoId: string; horarios: string[] }[]) {
-      const aulas = porAluno.get(falta.alunoId) ?? new Set<string>();
-      for (const horarioId of falta.horarios) {
-        aulas.add(horarioId);
+    for (const falta of faltasBrutas as {
+      alunoId: string;
+      horarios?: string[];
+      justificativa?: string | null;
+      observacao?: string | null;
+    }[]) {
+      const ausencia = porAluno.get(falta.alunoId) ?? {
+        horarios: new Set<string>(),
+        justificativa: null,
+        observacao: null,
+      };
+      if (falta.horarios && falta.horarios.length > 0) {
+        for (const horarioId of falta.horarios) ausencia.horarios.add(horarioId);
+      } else {
+        for (const horarioId of idsDeAulaAtiva) ausencia.horarios.add(horarioId);
       }
-      porAluno.set(falta.alunoId, aulas);
+      ausencia.justificativa = falta.justificativa ?? null;
+      ausencia.observacao = falta.justificativa ? (falta.observacao ?? null) : null;
+      porAluno.set(falta.alunoId, ausencia);
     }
   }
   // Aluno sem nenhuma aula marcada não gera falta.
   const ausencias = [...porAluno.entries()]
-    .filter(([, aulas]) => aulas.size > 0)
-    .map(([alunoId, aulas]) => ({ alunoId, horarios: [...aulas] }));
+    .filter(([, ausencia]) => ausencia.horarios.size > 0)
+    .map(([alunoId, ausencia]) => ({
+      alunoId,
+      horarios: [...ausencia.horarios],
+      justificativa: ausencia.justificativa,
+      observacao: ausencia.observacao,
+    }));
+
+  // O catálogo de justificativas vem do banco e pode ser editado na Gestão.
+  const codigosDeJustificativa = [
+    ...new Set(
+      ausencias
+        .map((ausencia) => ausencia.justificativa)
+        .filter((codigo): codigo is string => Boolean(codigo)),
+    ),
+  ];
+  if (codigosDeJustificativa.length > 0) {
+    const existentes = await banco().justificativa.findMany({
+      where: { codigo: { in: codigosDeJustificativa } },
+      select: { codigo: true },
+    });
+    const conhecidos = new Set(existentes.map((item) => item.codigo));
+    const desconhecido = codigosDeJustificativa.find((codigo) => !conhecidos.has(codigo));
+    if (desconhecido) {
+      throw new ErroHttp(
+        `A justificativa ${desconhecido} não está no catálogo. Atualize a página e confira.`,
+        400,
+      );
+    }
+  }
 
   const diaUtc = new Date(`${dia}T12:00:00Z`);
   const filtroFrequencia = { turmaId, dia: diaUtc } as const;
@@ -221,7 +389,12 @@ export async function salvarFrequencia(
             atualizadoPorId: identidade.id,
             faltas: {
               create: ausencias.flatMap((ausencia) =>
-                ausencia.horarios.map((horarioId) => ({ alunoId: ausencia.alunoId, horarioId })),
+                ausencia.horarios.map((horarioId) => ({
+                  alunoId: ausencia.alunoId,
+                  horarioId,
+                  justificativa: ausencia.justificativa,
+                  observacao: ausencia.observacao,
+                })),
               ),
             },
           },
@@ -255,13 +428,27 @@ export async function salvarFrequencia(
               frequenciaId: linha.id,
               alunoId: ausencia.alunoId,
               horarioId,
+              justificativa: ausencia.justificativa,
+              observacao: ausencia.observacao,
             })),
           ),
         });
       }
       return {
         situacao: "salvo" as const,
-        frequencia: { ...paraFrequencia(linha), faltas: ausencias },
+        frequencia: {
+          ...paraFrequencia(linha),
+          faltas: ausencias.map((ausencia) => {
+            if (!ausencia.justificativa)
+              return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };
+            return {
+              alunoId: ausencia.alunoId,
+              horarios: ausencia.horarios,
+              justificativa: ausencia.justificativa,
+              observacao: ausencia.observacao,
+            };
+          }),
+        },
       };
     });
   } catch (erro) {

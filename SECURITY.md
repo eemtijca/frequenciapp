@@ -33,4 +33,4 @@ O relato é respondido em até 7 dias. Correções de segurança entram como lan
 
 - O limitador de tentativas é em memória por instância; implantações com múltiplas instâncias devem adotar armazenamento compartilhado (ver [docs/seguranca.md](docs/seguranca.md)).
 - Não há segundo fator de autenticação; para contas compartilhadas, prefira credenciais individuais por pessoa da equipe.
-- O aplicativo pressupõe HTTPS terminado à frente (proxy reverso ou plataforma); o cookie só marca Secure em produção.
+- O aplicativo pressupõe HTTPS terminado à frente (proxy reverso ou plataforma). Em produção o cookie marca Secure; a variável PERMITIR_HTTP libera a operação sem TLS em rede confiável, com as limitações documentadas em [docs/ambiente.md](docs/ambiente.md).

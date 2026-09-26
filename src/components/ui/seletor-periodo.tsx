@@ -1,9 +1,9 @@
 "use client";
 
 // Seletor de período próprio: gatilho com rótulo amigável e painel com a
-// grade do mês (dia) ou a grade de meses, sem campo nativo. No desktop abre
-// em popover ancorado; no celular, em folha inferior.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+// grade do mês (dia) ou a grade de meses, sem campo nativo. Abre em popover
+// ancorado em qualquer largura.
+import { useEffect, useRef, useState } from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -16,7 +16,6 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -33,23 +32,6 @@ interface Props {
 
 const SEMANAS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MESES = Array.from({ length: 12 }, (_, indice) => indice + 1);
-
-const CONSULTA_COMPACTO = "(max-width: 639px)";
-
-function assinarCompacto(notificar: () => void) {
-  const media = window.matchMedia(CONSULTA_COMPACTO);
-  media.addEventListener("change", notificar);
-  return () => media.removeEventListener("change", notificar);
-}
-
-/** Abaixo de 640 px o painel vira folha inferior, como os diálogos do app. */
-function useEhCompacto(): boolean {
-  return useSyncExternalStore(
-    assinarCompacto,
-    () => window.matchMedia(CONSULTA_COMPACTO).matches,
-    () => false,
-  );
-}
 
 /** Mesmo dia em outro mês, limitado ao último dia do mês de destino. */
 function mesmoDiaNoMes(dia: string, deslocamento: number): string {
@@ -71,7 +53,6 @@ export function SeletorPeriodo({
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
-  const compacto = useEhCompacto();
   const [mesVisivel, setMesVisivel] = useState(() => valor.slice(0, 7));
   const [anoVisivel, setAnoVisivel] = useState(() => valor.slice(0, 4));
   const [foco, setFoco] = useState(valor);
@@ -327,25 +308,6 @@ export function SeletorPeriodo({
     </button>
   );
 
-  if (compacto) {
-    return (
-      <>
-        {gatilho}
-        <Dialog open={aberto} onOpenChange={aoAbrir}>
-          <DialogContent
-            folha
-            className="sm:max-w-sm"
-            showCloseButton={false}
-            onOpenAutoFocus={(evento) => evento.preventDefault()}
-          >
-            <DialogTitle className="sr-only">{rotuloAcessivel}</DialogTitle>
-            {painel}
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
-
   return (
     <Popover open={aberto} onOpenChange={aoAbrir}>
       <PopoverPrimitive.Anchor asChild>{gatilho}</PopoverPrimitive.Anchor>
@@ -353,7 +315,8 @@ export function SeletorPeriodo({
         role="dialog"
         aria-label={rotuloAcessivel}
         align="center"
-        className="w-96 p-3"
+        collisionPadding={8}
+        className="w-[min(24rem,calc(100vw-1.5rem))] p-3"
         onOpenAutoFocus={(evento) => evento.preventDefault()}
       >
         {painel}

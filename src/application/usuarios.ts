@@ -67,6 +67,21 @@ export async function listarUsuarios(): Promise<UsuarioDTO[]> {
   return linhas.map(paraUsuario);
 }
 
+/**
+ * Equipe ativa que pode liberar saídas: direção e coordenação, com os
+ * dados mínimos para o campo de responsável.
+ */
+export async function listarResponsaveis(): Promise<
+  { id: string; nome: string; papel: "ADMIN" | "COORDENACAO" }[]
+> {
+  const linhas = await banco().usuario.findMany({
+    where: { ativo: true, papel: { in: ["ADMIN", "COORDENACAO"] } },
+    orderBy: [{ papel: "asc" }, { nome: "asc" }],
+    select: { id: true, nome: true, papel: true },
+  });
+  return linhas;
+}
+
 /** Conta administradores ativos dentro do cliente informado (transação ou base). */
 async function totalDeAdminsAtivos(
   cliente: Prisma.TransactionClient | ReturnType<typeof banco> = banco(),

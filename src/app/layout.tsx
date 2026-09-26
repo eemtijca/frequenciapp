@@ -21,7 +21,8 @@ export const metadata: Metadata = {
     default: "FrequenciApp",
     template: "%s | FrequenciApp",
   },
-  description: "Registro de frequência escolar para professores: marque apenas as faltas e salve.",
+  description:
+    "Chamada diária, saídas antecipadas e indicadores da escola para a direção e a coordenação.",
   applicationName: "FrequenciApp",
   manifest: "/manifest.webmanifest",
   icons: {

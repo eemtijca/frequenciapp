@@ -1,12 +1,14 @@
-// Frequências: consulta por dia e turma, lista do mês com filtros e
-// salvamento compartilhado com proteção de duplicata e conflito de revisão.
+// Frequências: consulta por dia, turma, período ou mês, e salvamento
+// compartilhado com revisão, justificativa e proteção de duplicata.
 import {
   carregarFrequencia,
   diaValidoOuParametro,
   listarFrequenciasDoMes,
+  listarFrequenciasDoPeriodo,
   mesValidoOuParametro,
   salvarFrequencia,
 } from "@/application/frequencias";
+import { LIMITE_DIAS_PERIODO } from "@/domain/frequencia";
 import {
   corpoJson,
   ehUuid,
@@ -40,11 +42,37 @@ export async function GET(requisicao: Request): Promise<Response> {
       });
     }
 
+    const deBruto = parametros.get("de");
+    const ateBruto = parametros.get("ate");
+    if (deBruto !== null || ateBruto !== null) {
+      const de = diaValidoOuParametro(deBruto);
+      const ate = diaValidoOuParametro(ateBruto);
+      if (!de || !ate) {
+        return erroApi("Período inválido. Use de=YYYY-MM-DD e ate=YYYY-MM-DD.", 400);
+      }
+      if (ate < de) return erroApi("A data final deve ser igual ou posterior à inicial.", 400);
+      const totalDias =
+        Math.round((Date.parse(`${ate}T12:00:00Z`) - Date.parse(`${de}T12:00:00Z`)) / 86_400_000) +
+        1;
+      if (totalDias > LIMITE_DIAS_PERIODO) {
+        return erroApi("O período é grande demais. Escolha até 366 dias.", 400);
+      }
+      return json({
+        frequencias: await listarFrequenciasDoPeriodo(de, ate, turmaId ? { turmaId } : {}),
+      });
+    }
+
     const dia = diaValidoOuParametro(parametros.get("dia"));
     if (dia === null) {
-      return erroApi("Informe um mês (mes=YYYY-MM) ou um dia (dia=YYYY-MM-DD).", 400);
+      return erroApi(
+        "Informe um mês (mes=YYYY-MM), um dia (dia=YYYY-MM-DD) ou um período (de e ate).",
+        400,
+      );
     }
-    if (!turmaId) return erroApi("Informe a turma (turmaId).", 400);
+    // Sem turma, a consulta devolve o dia inteiro, para o Painel.
+    if (!turmaId) {
+      return json({ frequencias: await listarFrequenciasDoPeriodo(dia, dia) });
+    }
     return json({ frequencia: await carregarFrequencia(turmaId, dia) });
   });
 }

@@ -123,7 +123,7 @@ interface FrequenciaApi {
   turmaId: string;
   revisao: number;
   atualizadoPorNome: string | null;
-  faltas: { alunoId: string; horarios: string[] }[];
+  faltas: { alunoId: string; horarios: string[]; justificativa?: string | null }[];
 }
 
 let serieQA: Serie | null = null;
@@ -132,6 +132,7 @@ let turmaQB: TurmaApi | null = null;
 let aulaQA: HorarioApi | null = null;
 let coordQA: UsuarioApi | null = null;
 let alunoQA: AlunoApi | null = null;
+let saidaQA: { id: string; alunoId: string; momento: string } | null = null;
 
 beforeAll(async () => {
   await limparMassa();
@@ -866,6 +867,390 @@ describe("remoções com histórico", () => {
       method: "DELETE",
     });
     expect(resposta.status).toBe(200);
+  });
+});
+
+describe("chamada com justificativa, período e acumulado", () => {
+  beforeAll(async () => {
+    // A conta de coordenação de QA foi excluída na bateria anterior;
+    // aqui voltamos à conta fixa de demonstração.
+    const reentrada = await entrar(EMAIL_COORD, SENHA_COORD);
+    cookieCoord = reentrada.cookie;
+  });
+
+  it("salva falta justificada com o código do catálogo", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_4,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, justificativa: "D", observacao: null }],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as { frequencia: FrequenciaApi };
+    expect(dados.frequencia.faltas[0]?.justificativa).toBe("D");
+  });
+
+  it("recusa justificativa fora do catálogo", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_5,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, justificativa: "X" }],
+        revisao: 0,
+      }),
+    });
+    expect(resposta.status).toBe(400);
+  });
+
+  it("consulta o dia inteiro sem turma", async () => {
+    const resposta = await autenticado(cookieCoord, `/api/frequencias?dia=${DIA_TESTE_4}`);
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as { frequencias: FrequenciaApi[] };
+    expect(Array.isArray(dados.frequencias)).toBe(true);
+    expect(dados.frequencias.some((frequencia) => frequencia.turmaId === turmaQA?.id)).toBe(true);
+  });
+
+  it("consulta por período e recusa período invertido", async () => {
+    const resposta = await autenticado(
+      cookieCoord,
+      `/api/frequencias?de=${DIA_TESTE_4}&ate=${DIA_TESTE_5}`,
+    );
+    expect(resposta.status).toBe(200);
+    const invertido = await autenticado(
+      cookieCoord,
+      `/api/frequencias?de=${DIA_TESTE_5}&ate=${DIA_TESTE_4}`,
+    );
+    expect(invertido.status).toBe(400);
+  });
+
+  it("devolve o acumulado por aluno", async () => {
+    const resposta = await autenticado(cookieCoord, `/api/frequencias/resumo?ate=${DIA_TESTE_4}`);
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as {
+      resumo: {
+        diasLetivos: number;
+        porAluno: { alunoId: string; faltas: number; faltasJustificadas: number }[];
+      };
+    };
+    expect(dados.resumo.diasLetivos).toBeGreaterThan(0);
+    const acumulado = dados.resumo.porAluno.find((item) => item.alunoId === alunoQA?.id);
+    expect(acumulado?.faltasJustificadas).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("saídas antecipadas", () => {
+  it("coordenação registra a saída com responsável padrão", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_4,
+        momento: "aula_2",
+        justificativa: "CM",
+        observacao: null,
+      }),
+    });
+    expect(resposta.status).toBe(201);
+    const dados = (await resposta.json()) as {
+      saida: { id: string; alunoId: string; momento: string; liberadoPorNome: string | null };
+    };
+    expect(dados.saida.momento).toBe("aula_2");
+    expect(dados.saida.liberadoPorNome).toBe("Demo");
+    saidaQA = { id: dados.saida.id, alunoId: dados.saida.alunoId, momento: dados.saida.momento };
+  });
+
+  it("recusa saída repetida no mesmo dia", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_4,
+        momento: "aula_3",
+        justificativa: "D",
+      }),
+    });
+    expect(resposta.status).toBe(409);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("já tem uma saída");
+  });
+
+  it("recusa momento, justificativa e dia futuro inválidos", async () => {
+    const momento = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "madrugada",
+        justificativa: "D",
+      }),
+    });
+    expect(momento.status).toBe(400);
+    const justificativa = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "X",
+      }),
+    });
+    expect(justificativa.status).toBe(400);
+    const futuro = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: "2099-06-15",
+        momento: "aula_1",
+        justificativa: "D",
+      }),
+    });
+    expect(futuro.status).toBe(400);
+  });
+
+  it("lista saídas por dia e por período", async () => {
+    const porDia = await autenticado(cookieCoord, `/api/saidas?dia=${DIA_TESTE_4}`);
+    expect(porDia.status).toBe(200);
+    const dadosDia = (await porDia.json()) as { saidas: { id: string }[] };
+    expect(dadosDia.saidas.some((saida) => saida.id === saidaQA?.id)).toBe(true);
+
+    const porPeriodo = await autenticado(
+      cookieCoord,
+      `/api/saidas?de=${DIA_TESTE_4}&ate=${DIA_TESTE_5}`,
+    );
+    expect(porPeriodo.status).toBe(200);
+    const dadosPeriodo = (await porPeriodo.json()) as { saidas: unknown[] };
+    expect(dadosPeriodo.saidas.length).toBeGreaterThan(0);
+  });
+
+  it("remove a saída para correção", async () => {
+    const resposta = await autenticado(cookieCoord, `/api/saidas/${saidaQA?.id}`, {
+      method: "DELETE",
+    });
+    expect(resposta.status).toBe(200);
+    const conferencia = await autenticado(cookieCoord, `/api/saidas?dia=${DIA_TESTE_4}`);
+    const dados = (await conferencia.json()) as { saidas: { id: string }[] };
+    expect(dados.saidas.some((saida) => saida.id === saidaQA?.id)).toBe(false);
+  });
+});
+
+describe("configurações e responsáveis", () => {
+  it("coordenação lê mas não altera as configurações", async () => {
+    const leitura = await autenticado(cookieCoord, "/api/configuracoes");
+    expect(leitura.status).toBe(200);
+    const alteracao = await autenticado(cookieCoord, "/api/configuracoes", {
+      method: "PATCH",
+      body: JSON.stringify({ frequenciaPorAula: true }),
+    });
+    expect(alteracao.status).toBe(403);
+  });
+
+  it("administração alterna os recursos e volta ao padrão", async () => {
+    const ligar = await autenticado(cookieAdmin, "/api/configuracoes", {
+      method: "PATCH",
+      body: JSON.stringify({ frequenciaPorAula: true }),
+    });
+    expect(ligar.status).toBe(200);
+    const dadosLigar = (await ligar.json()) as { configuracoes: { frequenciaPorAula: boolean } };
+    expect(dadosLigar.configuracoes.frequenciaPorAula).toBe(true);
+
+    const desligar = await autenticado(cookieAdmin, "/api/configuracoes", {
+      method: "PATCH",
+      body: JSON.stringify({ frequenciaPorAula: false }),
+    });
+    expect(desligar.status).toBe(200);
+    const dadosDesligar = (await desligar.json()) as {
+      configuracoes: { frequenciaPorAula: boolean };
+    };
+    expect(dadosDesligar.configuracoes.frequenciaPorAula).toBe(false);
+  });
+
+  it("lista a equipe ativa como responsável", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/responsaveis");
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as { responsaveis: { nome: string }[] };
+    expect(dados.responsaveis.length).toBeGreaterThan(0);
+  });
+});
+
+describe("cópia de segurança", () => {
+  it("coordenação não exporta a cópia", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/backup");
+    expect(resposta.status).toBe(403);
+  });
+
+  it("administração exporta e importa a própria cópia sem conflitos", async () => {
+    const exportacao = await autenticado(cookieAdmin, "/api/backup");
+    expect(exportacao.status).toBe(200);
+    const copia = (await exportacao.json()) as {
+      formato: string;
+      versao: number;
+      series: unknown[];
+    };
+    expect(copia.formato).toBe("frequenciapp");
+    expect(copia.versao).toBe(1);
+    expect(copia.series.length).toBeGreaterThan(0);
+
+    const importacao = await autenticado(cookieAdmin, "/api/backup", {
+      method: "POST",
+      body: JSON.stringify(copia),
+    });
+    expect(importacao.status).toBe(200);
+    const resultado = (await importacao.json()) as {
+      adicionadas: number;
+      identicas: number;
+      conflitos: number;
+    };
+    expect(resultado.adicionadas).toBe(0);
+    expect(resultado.conflitos).toBe(0);
+    expect(resultado.identicas).toBeGreaterThan(0);
+  });
+
+  it("recusa arquivo em outro formato", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/backup", {
+      method: "POST",
+      body: JSON.stringify({ formato: "outro" }),
+    });
+    expect(resposta.status).toBe(400);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("formato do FrequenciApp");
+  });
+});
+
+describe("catálogo de justificativas", () => {
+  it("coordenação lê o catálogo em ordem alfabética", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/justificativas");
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as {
+      justificativas: { codigo: string; rotulo: string; ativo: boolean }[];
+    };
+    expect(dados.justificativas.length).toBeGreaterThanOrEqual(12);
+    const rotulos = dados.justificativas.map((item) => item.rotulo);
+    const ordenados = [...rotulos].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+    expect(rotulos).toEqual(ordenados);
+    expect(dados.justificativas.some((item) => item.codigo === "D")).toBe(true);
+  });
+
+  it("coordenação não cria, edita nem exclui", async () => {
+    const criar = await autenticado(cookieCoord, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QA", rotulo: "QA Justificativa" }),
+    });
+    expect(criar.status).toBe(403);
+    const editar = await autenticado(cookieCoord, "/api/justificativas/D", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "Outro" }),
+    });
+    expect(editar.status).toBe(403);
+    const excluir = await autenticado(cookieCoord, "/api/justificativas/QA", {
+      method: "DELETE",
+    });
+    expect(excluir.status).toBe(403);
+  });
+
+  it("administração cria e recusa duplicata e dados inválidos", async () => {
+    const criar = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QA", rotulo: "QA Justificativa" }),
+    });
+    expect(criar.status).toBe(201);
+    const dados = (await criar.json()) as { justificativa: { codigo: string; ativo: boolean } };
+    expect(dados.justificativa.codigo).toBe("QA");
+    expect(dados.justificativa.ativo).toBe(true);
+
+    const duplicada = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "qa", rotulo: "Outra" }),
+    });
+    expect(duplicada.status).toBe(409);
+
+    const codigoInvalido = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "1x", rotulo: "Inválida" }),
+    });
+    expect(codigoInvalido.status).toBe(400);
+
+    const rotuloCurto = await autenticado(cookieAdmin, "/api/justificativas", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QQ", rotulo: "a" }),
+    });
+    expect(rotuloCurto.status).toBe(400);
+  });
+
+  it("administração edita o rótulo e alterna a situação", async () => {
+    const editar = await autenticado(cookieAdmin, "/api/justificativas/QA", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "QA Justificativa Editada" }),
+    });
+    expect(editar.status).toBe(200);
+    const dadosEditar = (await editar.json()) as {
+      justificativa: { rotulo: string; ativo: boolean };
+    };
+    expect(dadosEditar.justificativa.rotulo).toBe("QA Justificativa Editada");
+
+    const desativar = await autenticado(cookieAdmin, "/api/justificativas/QA", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: false }),
+    });
+    expect(desativar.status).toBe(200);
+    expect(
+      ((await desativar.json()) as { justificativa: { ativo: boolean } }).justificativa.ativo,
+    ).toBe(false);
+
+    const inexistente = await autenticado(cookieAdmin, "/api/justificativas/ZZ", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+    expect(inexistente.status).toBe(404);
+  });
+
+  it("recusa justificativa fora do catálogo na chamada e na saída", async () => {
+    const chamada = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_5,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, justificativa: "ZZZ" }],
+        revisao: 0,
+      }),
+    });
+    expect(chamada.status).toBe(400);
+    const dadosChamada = (await chamada.json()) as { error: string };
+    expect(dadosChamada.error).toContain("não está no catálogo");
+
+    const saida = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "ZZZ",
+      }),
+    });
+    expect(saida.status).toBe(400);
+  });
+
+  it("exclusão bloqueada em uso e permitida sem histórico", async () => {
+    const emUso = await autenticado(cookieAdmin, "/api/justificativas/D", { method: "DELETE" });
+    expect(emUso.status).toBe(409);
+    const dadosEmUso = (await emUso.json()) as { error: string };
+    expect(dadosEmUso.error).toContain("em uso");
+
+    const semUso = await autenticado(cookieAdmin, "/api/justificativas/QA", { method: "DELETE" });
+    expect(semUso.status).toBe(200);
+  });
+
+  it("a cópia de segurança inclui o catálogo", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/backup");
+    expect(resposta.status).toBe(200);
+    const copia = (await resposta.json()) as { justificativas?: unknown[] };
+    expect(Array.isArray(copia.justificativas)).toBe(true);
+    expect(copia.justificativas?.length ?? 0).toBeGreaterThanOrEqual(12);
   });
 });
 

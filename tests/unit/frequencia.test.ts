@@ -6,9 +6,13 @@ import {
   diaLocal,
   diaSeguinte,
   diasDoMes,
+  diasDoPeriodo,
+  diasEntre,
   ehDiaValido,
   ehHoraValida,
+  ehJustificativaValida,
   ehMesValido,
+  ehMomentoValido,
   horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
@@ -21,7 +25,9 @@ import {
   rotuloDataCurta,
   rotuloDeTurma,
   rotuloDiaSemana,
+  rotuloJustificativa,
   rotuloMes,
+  rotuloMomento,
   type Aluno,
   type Frequencia,
   type Horario,
@@ -341,7 +347,7 @@ describe("montarGrade", () => {
         ],
       }),
     ];
-    const grade = montarGrade(alunos, frequencias, "2026-09");
+    const grade = montarGrade(alunos, frequencias, diasDoMes("2026-09"));
     expect(grade.dias.length).toBe(30);
     const primeiro = grade.linhas[0];
     expect(primeiro?.aluno.id).toBe("aluno-1");
@@ -357,7 +363,7 @@ describe("montarGrade", () => {
       aluno({ id: "b", nome: "Ana", ordem: 2 }),
       aluno({ id: "c", nome: "Bia", ordem: 1 }),
     ];
-    const grade = montarGrade(alunos, [], "2026-09");
+    const grade = montarGrade(alunos, [], diasDoMes("2026-09"));
     expect(grade.linhas.map((linha) => linha.aluno.id)).toEqual(["c", "b", "a"]);
   });
   it("conta dias parciais quando a falta cobre parte das aulas", () => {
@@ -368,7 +374,7 @@ describe("montarGrade", () => {
         faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
       }),
     ];
-    const grade = montarGrade([aluno()], frequencias, "2026-09", [
+    const grade = montarGrade([aluno()], frequencias, diasDoMes("2026-09"), [
       horario({ id: "aula-1", ordem: 1 }),
       horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
     ]);
@@ -383,5 +389,94 @@ describe("normalizar", () => {
     expect(normalizar("3º Ano")).toBe("3o ano");
     expect(normalizar("ÇÃ")).toBe("ca");
     expect(normalizar("Ana Pa´ula")).toContain("ana");
+  });
+});
+
+describe("justificativas", () => {
+  it("reconhece os códigos do catálogo", () => {
+    expect(ehJustificativaValida("D")).toBe(true);
+    expect(ehJustificativaValida("Dat")).toBe(true);
+    expect(ehJustificativaValida("LM")).toBe(true);
+    expect(ehJustificativaValida("X")).toBe(false);
+    expect(ehJustificativaValida("")).toBe(false);
+  });
+  it("resolve os rótulos", () => {
+    expect(rotuloJustificativa("CM")).toBe("Consulta Médica");
+    expect(rotuloJustificativa("Lt")).toBe("Luto");
+    expect(rotuloJustificativa("Z")).toBe("");
+    expect(rotuloJustificativa(null)).toBe("");
+  });
+});
+
+describe("momentos de saída", () => {
+  it("reconhece aulas, intervalos e almoço", () => {
+    expect(ehMomentoValido("aula_1")).toBe(true);
+    expect(ehMomentoValido("aula_9")).toBe(true);
+    expect(ehMomentoValido("intervalo_1")).toBe(true);
+    expect(ehMomentoValido("almoco")).toBe(true);
+    expect(ehMomentoValido("madrugada")).toBe(false);
+  });
+  it("resolve os rótulos", () => {
+    expect(rotuloMomento("aula_3")).toBe("3ª aula");
+    expect(rotuloMomento("intervalo_2")).toBe("2º intervalo");
+    expect(rotuloMomento("almoco")).toBe("Almoço");
+    expect(rotuloMomento("outro")).toBe("outro");
+  });
+});
+
+describe("diasDoPeriodo", () => {
+  it("resolve dia, semana de aula, mês e intervalo", () => {
+    expect(diasDoPeriodo("dia", "2026-09-25")).toEqual(["2026-09-25"]);
+    expect(diasDoPeriodo("semana", "2026-09-25")).toEqual([
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+    ]);
+    expect(diasDoPeriodo("mes", "2026-09-10").length).toBe(30);
+    expect(diasDoPeriodo("periodo", "2026-09-25", "2026-09-27")).toEqual([
+      "2026-09-25",
+      "2026-09-26",
+      "2026-09-27",
+    ]);
+    expect(diasDoPeriodo("periodo", "2026-09-25", "2026-09-24")).toEqual(["2026-09-25"]);
+  });
+  it("limita intervalos longos ao teto de segurança", () => {
+    expect(diasEntre("2020-01-01", "2030-12-31")).toHaveLength(366);
+  });
+});
+
+describe("marcaDoAluno com justificativa", () => {
+  it("marca FJ quando todas as faltas do dia têm justificativa", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"], justificativa: "D" }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("FJ");
+  });
+  it("marca F quando alguma falta do dia não tem justificativa", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [
+          { alunoId: "aluno-1", horarios: ["aula-1"], justificativa: "D" },
+          { alunoId: "aluno-1", horarios: ["aula-2"] },
+        ],
+      }),
+    ];
+    const grade = [horario({ id: "aula-1" }), horario({ id: "aula-2", ordem: 2 })];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, grade)).toBe("F");
+  });
+  it("mantém FJ mesmo sem frequência da turma atual", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-b",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-9"], justificativa: "T" }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("FJ");
   });
 });

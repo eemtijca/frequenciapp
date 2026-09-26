@@ -4,14 +4,15 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 
 ## Dados tratados
 
-| Dado                                      | Finalidade                                      | Retenção                                                                            |
-| ----------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Nome do aluno                             | Identificar o aluno na frequência e na grade.   | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
-| Turma atual e de origem                   | Organizar frequências e a consulta agrupada.    | Idem.                                                                               |
-| Registro de faltas por dia e aula         | Registrar a frequência, finalidade do sistema.  | Idem, junto com as frequências.                                                     |
-| E-mail e hash de senha da equipe          | Autenticar o acesso pessoal.                    | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
-| Nome da administração e da coordenação    | Tratamento e saudação; identificação da equipe. | Conta ativa.                                                                        |
-| Trilha de auditoria (quem, o quê, quando) | Prestar contas de ações administrativas.        | Conforme política da escola; sem dados de alunos.                                   |
+| Dado                                                   | Finalidade                                         | Retenção                                                                            |
+| ------------------------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nome do aluno                                          | Identificar o aluno na chamada e nos relatórios.   | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
+| Turma atual e de origem                                | Organizar chamadas e a consulta agrupada.          | Idem.                                                                               |
+| Registro de faltas por dia (e por aula, quando ligado) | Registrar a chamada, finalidade do sistema.        | Idem, junto com as chamadas.                                                        |
+| Saída antecipada: momento, justificativa e observação  | Registrar quem saiu antes do fim do dia e por quê. | Idem, junto com as saídas; a responsável pela liberação fica na equipe.             |
+| E-mail e hash de senha da equipe                       | Autenticar o acesso pessoal.                       | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
+| Nome da administração e da coordenação                 | Tratamento e saudação; identificação da equipe.    | Conta ativa.                                                                        |
+| Trilha de auditoria (quem, o quê, quando)              | Prestar contas de ações administrativas.           | Conforme política da escola; sem dados de alunos.                                   |
 
 Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
 
@@ -27,9 +28,9 @@ Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados
 
 A escola é a controladora dos dados dos alunos que cadastra. O aplicativo oferece os meios:
 
-- **Acesso e portabilidade**: a grade por turma de origem exibe o histórico completo por aluno; a exportação por `pg_dump` entrega os dados em formato aberto.
-- **Correção**: edição do nome e das turmas na área de Gestão.
-- **Eliminação**: a exclusão do aluno apaga o cadastro e as faltas; a desativação retira o aluno das frequências futuras preservando o histórico, escolha da escola conforme a necessidade.
+- **Acesso e portabilidade**: a grade por turma de origem e o relatório por aluno exibem o histórico completo; a cópia de segurança em JSON, na Gestão, entrega os dados escolares em formato aberto, e o `pg_dump` cobre o banco inteiro.
+- **Correção**: edição do nome e das turmas na área de Gestão; correção da chamada e remoção da saída antecipada pela própria coordenação.
+- **Eliminação**: a exclusão do aluno apaga o cadastro, as faltas e as saídas antecipadas; a desativação retira o aluno das chamadas futuras preservando o histórico, escolha da escola conforme a necessidade.
 - **Eliminação da conta**: excluir uma conta remove o acesso e as sessões; as frequências da escola permanecem, com a autoria anulada. Para eliminar dados de aluno, use a exclusão do aluno.
 
 ```sql

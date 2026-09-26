@@ -2,9 +2,13 @@ import { identidadeAtual } from "@/application/sessao";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSeries } from "@/application/series";
-import { listarFrequenciasDoMes } from "@/application/frequencias";
+import { listarFrequenciasDoMes, resumoAcumulado } from "@/application/frequencias";
+import { listarSaidas } from "@/application/saidas";
+import { listarJustificativas } from "@/application/justificativas";
+import { listarResponsaveis } from "@/application/usuarios";
+import { lerConfiguracoes } from "@/application/configuracoes";
 import { ambiente } from "@/infra/ambiente";
-import { diaLocal } from "@/domain/frequencia";
+import { diaLocal, diasDoMes } from "@/domain/frequencia";
 import TelaLogin from "@/components/auth/tela-login";
 import Aplicacao from "@/components/aplicacao";
 
@@ -22,11 +26,27 @@ export default async function Pagina({
   const parametros = await searchParams;
   const dia = diaLocal(new Date(), ambiente.fuso);
   const mes = dia.slice(0, 7);
-  const [turmas, series, alunos, frequencias] = await Promise.all([
+  const dias = diasDoMes(mes);
+  const [
+    turmas,
+    series,
+    alunos,
+    frequencias,
+    saidas,
+    justificativas,
+    responsaveis,
+    configuracoes,
+    resumo,
+  ] = await Promise.all([
     listarTodasTurmas(),
     listarSeries(),
     listarTodosAlunos(),
     listarFrequenciasDoMes(mes),
+    listarSaidas({ de: dias[0] ?? `${mes}-01`, ate: dias[dias.length - 1] ?? `${mes}-28` }),
+    listarJustificativas(),
+    listarResponsaveis(),
+    lerConfiguracoes(),
+    resumoAcumulado(dia),
   ]);
   return (
     <Aplicacao
@@ -38,6 +58,11 @@ export default async function Pagina({
       turmasIniciais={turmas}
       alunosIniciais={alunos}
       frequenciasIniciais={frequencias}
+      saidasIniciais={saidas}
+      justificativasIniciais={justificativas}
+      responsaveisIniciais={responsaveis}
+      configuracoesIniciais={configuracoes}
+      resumoInicial={resumo}
     />
   );
 }

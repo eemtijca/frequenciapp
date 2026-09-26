@@ -4,29 +4,35 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 
 ## Esquema
 
-| Tabela        | Papel                                                                                   |
-| ------------- | --------------------------------------------------------------------------------------- |
-| `usuarios`    | Contas: e-mail único, hash da senha, nome, papel (`ADMIN` ou `COORDENACAO`) e situação. |
-| `sessoes`     | Sessões opacas: hash SHA-256 do token, dono e expiração.                                |
-| `series`      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                            |
-| `turmas`      | Turmas por série, com rótulo composto e unicidade dentro da série.                      |
-| `alunos`      | Nome do aluno, turma atual, turma de origem, ordem e situação.                          |
-| `horarios`    | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                       |
-| `frequencias` | Uma frequência por turma e dia: revisão, autoria e atualização.                         |
-| `faltas`      | Ausências por frequência, aluno e aula; a presença é implícita.                         |
-| `auditoria`   | Trilha de ações administrativas: quem, o quê e quando.                                  |
+| Tabela               | Papel                                                                                   |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `usuarios`           | Contas: e-mail único, hash da senha, nome, papel (`ADMIN` ou `COORDENACAO`) e situação. |
+| `sessoes`            | Sessões opacas: hash SHA-256 do token, dono e expiração.                                |
+| `series`             | Séries escolares, por exemplo 1º ano, com ordem de exibição.                            |
+| `turmas`             | Turmas por série, com rótulo composto e unicidade dentro da série.                      |
+| `alunos`             | Nome do aluno, turma atual, turma de origem, ordem e situação.                          |
+| `horarios`           | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                       |
+| `frequencias`        | Uma frequência por turma e dia: revisão, autoria e atualização.                         |
+| `faltas`             | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.       |
+| `saidas_antecipadas` | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
+| `configuracoes`      | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
+| `justificativas`     | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
+| `auditoria`          | Trilha de ações administrativas: quem, o quê e quando.                                  |
 
 Restrições de integridade relevantes:
 
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
+- `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`.
+- `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
+- `justificativas` tem unicidade funcional em `lower(codigo)` e é o catálogo usado na validação da chamada e da saída.
 - `horarios` tem unicidade de (`turma_id`, `ordem`), exclusão em cascata com a turma e checks de formato de hora, intervalo e dias da semana.
 - `series`, `turmas` e `alunos` se protegem por `ON DELETE RESTRICT`.
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.
 - Unicidade de e-mail, nome de série e nome de turma por série é feita por índices funcionais em `lower()`, mantidos no SQL das migrations.
 - Checks de positividade em `frequencias.revisao`, `alunos.ordem`, `series.ordem` e `horarios.ordem` independem da aplicação.
 
-A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
+A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md); a chamada diária com justificativas, saídas e recursos opcionais está na [ADR-012](adr/012-chamada-diaria-com-saidas.md); a grade por período e a cópia JSON estão na [ADR-013](adr/013-grade-por-periodo-e-copia-json.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
 
 ## Migração inicial reescrita
 
