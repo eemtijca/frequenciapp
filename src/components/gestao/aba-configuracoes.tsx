@@ -5,7 +5,7 @@
 import { useRef, useState } from "react";
 import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type { Configuracoes, JustificativaConfigurada } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ export default function AbaConfiguracoes({
       setErro(
         excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
       );
+      avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
     } finally {
       setSalvando(null);
     }
@@ -114,6 +115,7 @@ export default function AbaConfiguracoes({
           ? excecao.message
           : "Não foi possível adicionar a justificativa.",
       );
+      avisarErro(excecao, { contexto: "Não foi possível adicionar a justificativa." });
     } finally {
       setEnviandoJustificativa(false);
     }
@@ -138,6 +140,7 @@ export default function AbaConfiguracoes({
           ? excecao.message
           : "Não foi possível atualizar a justificativa.",
       );
+      avisarErro(excecao, { contexto: "Não foi possível atualizar a justificativa." });
     } finally {
       setEnviandoJustificativa(false);
     }
@@ -161,6 +164,7 @@ export default function AbaConfiguracoes({
       setErroJustificativa(
         excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
       );
+      avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
     }
   }
 
@@ -176,6 +180,7 @@ export default function AbaConfiguracoes({
       setErroJustificativa(
         excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a justificativa.",
       );
+      avisarErro(excecao, { contexto: "Não foi possível excluir a justificativa." });
     } finally {
       setExcluirAlvo(null);
     }
@@ -205,6 +210,7 @@ export default function AbaConfiguracoes({
       );
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
+      avisarErro(excecao, { contexto: "Não foi possível gerar a cópia.", id: aviso });
     } finally {
       setBaixando(false);
     }
@@ -230,7 +236,13 @@ export default function AbaConfiguracoes({
       setResultado(dados);
       avisarSucesso("Importação concluída.", "Confira o resumo na tela antes de continuar.", aviso);
     } catch (excecao) {
-      setErro(excecao instanceof ErroApi ? excecao.message : (excecao as Error).message);
+      const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
+      setErro(mensagem);
+      toast.error(mensagem, {
+        id: aviso,
+        description: "Confira o arquivo e tente de novo.",
+        duration: 8000,
+      });
     } finally {
       setImportando(false);
       if (arquivoRef.current) arquivoRef.current.value = "";

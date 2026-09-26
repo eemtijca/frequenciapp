@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -161,6 +162,10 @@ export default function DialogoEnvio({
       aoConcluir();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível enviar.");
+      avisarErro(excecao, {
+        contexto: "Não foi possível enviar.",
+        descricao: "Nada foi alterado na planilha. Tente de novo em instantes.",
+      });
     } finally {
       setEnviando(false);
     }

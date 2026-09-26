@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a aula.");
+      avisarErro(excecao, { contexto: "Não foi possível salvar a aula." });
     } finally {
       setEnviando(false);
     }

@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -197,6 +197,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar o aluno.");
+      avisarErro(excecao, { contexto: "Não foi possível salvar o aluno." });
     } finally {
       setEnviando(false);
     }

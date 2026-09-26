@@ -21,6 +21,7 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
+import { avisarErro } from "@/lib/avisos";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -71,8 +72,9 @@ export default function VistaHistorico({
     setErro("");
     try {
       await onRecarregar(mes);
-    } catch {
+    } catch (excecao) {
       setErro("Não foi possível buscar as frequências.");
+      avisarErro(excecao, { contexto: "Não foi possível buscar as frequências." });
     } finally {
       setAtualizando(false);
     }

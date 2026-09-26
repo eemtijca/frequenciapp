@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type { Serie, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -123,6 +123,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a turma.");
+      avisarErro(excecao, { contexto: "Não foi possível salvar a turma." });
     } finally {
       setEnviando(false);
     }

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -92,6 +92,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a série.");
+      avisarErro(excecao, { contexto: "Não foi possível salvar a série." });
     } finally {
       setEnviando(false);
     }

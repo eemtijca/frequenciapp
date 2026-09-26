@@ -27,7 +27,7 @@ import {
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -178,6 +178,8 @@ export default function VistaGrade({
         setDoPeriodo(null);
         setRecarga((valor) => valor + 1);
       }
+    } catch (excecao) {
+      avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
     } finally {
       setAtualizando(false);
     }

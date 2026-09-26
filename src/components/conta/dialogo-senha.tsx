@@ -6,6 +6,7 @@ import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Label } from "@/components/ui/label";
@@ -54,6 +55,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
       fechar(false);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível trocar a senha.");
+      avisarErro(excecao, { contexto: "Não foi possível trocar a senha." });
     } finally {
       setEnviando(false);
     }

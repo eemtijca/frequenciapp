@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -133,6 +133,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a conta.");
+      avisarErro(excecao, { contexto: "Não foi possível salvar a conta." });
     } finally {
       setEnviando(false);
     }

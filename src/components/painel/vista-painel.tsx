@@ -15,6 +15,7 @@ import type { Aluno, Frequencia, SaidaAntecipada, Serie, Turma } from "@/domain/
 import { diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
 import { coberturaDoDia, distribuicaoDoDia, marcasDoDia, resumoDoDia } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
@@ -131,8 +132,9 @@ export default function VistaPainel({
     try {
       if (compartilhado) await onRecarregar(mes);
       else setRecarregar((valor) => valor + 1);
-    } catch {
+    } catch (excecao) {
       setErro("Não foi possível atualizar os indicadores.");
+      avisarErro(excecao, { contexto: "Não foi possível atualizar os indicadores." });
     } finally {
       setAtualizando(false);
     }

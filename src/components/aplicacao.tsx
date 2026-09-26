@@ -19,7 +19,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import type {
   Aluno,
   Configuracoes,
@@ -247,16 +247,23 @@ export default function Aplicacao({
   const recarregarFrequencias = useCallback(
     async (novoMes: string) => {
       setMes(novoMes);
-      const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
-      setFrequencias(dados.frequencias);
-      setVersaoFrequencias((valor) => valor + 1);
       try {
-        const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
-          `/api/frequencias/resumo?ate=${diaCorrente}`,
-        );
-        setResumo(resumoDados.resumo);
-      } catch {
-        // O acumulado é complementar: a chamada segue sem ele.
+        const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+        setFrequencias(dados.frequencias);
+        setVersaoFrequencias((valor) => valor + 1);
+        try {
+          const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
+            `/api/frequencias/resumo?ate=${diaCorrente}`,
+          );
+          setResumo(resumoDados.resumo);
+        } catch {
+          // O acumulado é complementar: a chamada segue sem ele.
+        }
+      } catch (excecao) {
+        avisarErro(excecao, {
+          contexto: "Não foi possível atualizar as frequências.",
+          descricao: "As informações na tela podem estar desatualizadas.",
+        });
       }
     },
     [diaCorrente],
@@ -266,16 +273,27 @@ export default function Aplicacao({
     const dias = diasDoMes(novoMes);
     const primeiro = dias[0] ?? `${novoMes}-01`;
     const ultimo = dias[dias.length - 1] ?? `${novoMes}-28`;
-    const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-      `/api/saidas?de=${primeiro}&ate=${ultimo}`,
-    );
-    setSaidas(dados.saidas);
+    try {
+      const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+        `/api/saidas?de=${primeiro}&ate=${ultimo}`,
+      );
+      setSaidas(dados.saidas);
+    } catch (excecao) {
+      avisarErro(excecao, {
+        contexto: "Não foi possível atualizar as saídas.",
+        descricao: "As informações na tela podem estar desatualizadas.",
+      });
+    }
   }, []);
 
   // Troca de mês nos relatórios recarrega frequências e saídas juntas.
   const recarregarMes = useCallback(
     async (novoMes: string) => {
-      await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+      try {
+        await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+      } catch (excecao) {
+        avisarErro(excecao, { contexto: "Não foi possível carregar o mês." });
+      }
     },
     [recarregarFrequencias, recarregarSaidas],
   );
