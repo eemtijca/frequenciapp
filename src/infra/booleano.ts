@@ -13,3 +13,8 @@ export function booleanoDeAmbiente(valor: string | undefined, padrao: boolean): 
 export function cookiesSegurosDe(ehProducao: boolean, permitirHttp: boolean): boolean {
   return ehProducao && !permitirHttp;
 }
+
+/** Endpoint local da planilha: liberado fora de produção ou por escolha explícita. */
+export function permitirEndpointLocalDe(ehProducao: boolean, permitirLocal: boolean): boolean {
+  return !ehProducao || permitirLocal;
+}

@@ -5,5 +5,14 @@ services:
     # Imagem construída pelo passo de build do workflow (com cache).
     # O `up -d` sem `--build` a reaproveita; sem ela, o Compose compila.
     image: frequenciapp:ci
+    # O Apps Script falso das suítes sobe no loopback do runner; a rede do host
+    # deixa o aplicativo alcançar esse endereço e o PostgreSQL publicado.
+    network_mode: host
+    ports: !reset []
     environment:
       AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+      # Na rede do host o banco é alcançado pela porta publicada.
+      DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+      DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+      # Endpoint local liberado apenas no CI, para o script falso.
+      PERMITIR_ENDPOINT_LOCAL: "true"

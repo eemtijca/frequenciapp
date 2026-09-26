@@ -287,7 +287,7 @@ export async function salvarIntegracao(admin: { id: string }, entrada: unknown) 
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   if (dados.data.endpoint !== undefined) {
-    const problema = validarEndpoint(dados.data.endpoint, !ambiente.ehProducao);
+    const problema = validarEndpoint(dados.data.endpoint, ambiente.permitirEndpointLocal);
     if (problema) throw new ErroHttp(problema, 400);
   }
   await comTransacao(async (tx) => {
@@ -362,7 +362,7 @@ export async function testarConexao(admin: { id: string }, entrada: unknown) {
   const linha = await lerLinha();
   const endpoint = dados.data.endpoint?.trim() || linha.endpoint;
   if (!endpoint) throw new ErroHttp("Informe o endereço do aplicativo da Web.", 400);
-  const problema = validarEndpoint(endpoint, !ambiente.ehProducao);
+  const problema = validarEndpoint(endpoint, ambiente.permitirEndpointLocal);
   if (problema) throw new ErroHttp(problema, 400);
   if (!linha.token) throw new ErroHttp("Gere o token antes de testar.", 400);
   const ping = await chamarGas<{

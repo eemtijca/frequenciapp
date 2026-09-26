@@ -65,7 +65,7 @@ Ações administrativas (criar, atualizar e excluir entidades escolares, gerenci
 ## Integração com Google Planilhas
 
 - Desligada por padrão. O navegador nunca fala com o Google: as chamadas saem do servidor, com o token no corpo e sem registro de segredo nos logs.
-- O endereço é validado contra `script.google.com/macros/s/.../exec`; loopback só é aceito fora de produção, para os testes.
+- O endereço é validado contra `script.google.com/macros/s/.../exec`; loopback só é aceito fora de produção ou com `PERMITIR_ENDPOINT_LOCAL=true`, para os testes.
 - Revelar o token, destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
 - O modo completo expira sozinho, cria cópia oculta da aba antes de operação destrutiva e só remove linha, coluna ou aba com marcador de Developer Metadata da integração.
 - Fórmula nunca é sobrescrita, nem no modo completo; célula ocupada é pulada e relatada.

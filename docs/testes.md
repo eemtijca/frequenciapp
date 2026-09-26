@@ -50,7 +50,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - saída encerrando a sessão e verificação de saúde (200 com o banco acessível e 503 sem ele);
 - integração com Google Planilhas contra um Apps Script falso que responde 302: token e conexão, estrutura e mapa, simulação e aplicação conservadora (célula ocupada e fórmula preservadas), substituição no modo completo com cópia, remoção de linha e coluna com marcador, criação e remoção de aba, recusa por token errado, por hash divergente e por modo completo inativo.
 
-A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e dias de teste isolados) antes e depois, de modo que execuções repetidas não acumulam estado. Rodar com a connection string correta exportada (ver [tests/README.md](../tests/README.md)).
+A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e dias de teste isolados) antes e depois, de modo que execuções repetidas não acumulam estado. Rodar com a connection string correta exportada (ver [tests/README.md](../tests/README.md)). No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner e o banco publicado continuar acessível.
 
 ## Ponta a ponta
 
