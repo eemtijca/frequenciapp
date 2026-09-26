@@ -121,24 +121,39 @@ interface LinhaIntegracao {
 }
 
 async function lerLinha(): Promise<LinhaIntegracao> {
-  const linha = await banco().integracaoPlanilha.upsert({
+  const campos = {
+    ativa: true,
+    endpoint: true,
+    token: true,
+    versaoScript: true,
+    esquema: true,
+    assinaturaEsquema: true,
+    esquemaEm: true,
+    modo: true,
+    modoCompletoAte: true,
+    atualizadoEm: true,
+  } as const;
+  const existente = await banco().integracaoPlanilha.findUnique({
     where: { id: ID },
-    update: {},
-    create: { id: ID },
-    select: {
-      ativa: true,
-      endpoint: true,
-      token: true,
-      versaoScript: true,
-      esquema: true,
-      assinaturaEsquema: true,
-      esquemaEm: true,
-      modo: true,
-      modoCompletoAte: true,
-      atualizadoEm: true,
-    },
+    select: campos,
   });
-  return linha as LinhaIntegracao;
+  if (existente) return existente as LinhaIntegracao;
+  try {
+    const criada = await banco().integracaoPlanilha.create({
+      data: { id: ID },
+      select: campos,
+    });
+    return criada as LinhaIntegracao;
+  } catch {
+    // Duas requisições podem criar a linha ao mesmo tempo; a segunda lê a
+    // versão vencedora em vez de falhar.
+    const linha = await banco().integracaoPlanilha.findUnique({
+      where: { id: ID },
+      select: campos,
+    });
+    if (linha) return linha as LinhaIntegracao;
+    throw new ErroHttp("Não foi possível preparar a integração com a planilha.", 500);
+  }
 }
 
 function modoCompletoAtivo(linha: LinhaIntegracao): boolean {
@@ -345,6 +360,7 @@ export async function lerEstrutura() {
     abas: {
       nome: string;
       oculta: boolean;
+      criada: boolean;
       linhas: number;
       colunas: number;
       congeladasLinhas: number;
@@ -376,6 +392,7 @@ export async function lerEstrutura() {
         linhas: item.linhas,
         colunas: item.colunas,
         oculta: item.oculta,
+        criada: item.criada,
         congeladasLinhas: item.congeladasLinhas,
         congeladasColunas: item.congeladasColunas,
         mesclagens: item.mesclagens,
@@ -574,9 +591,11 @@ export async function simularEnvio(entrada: unknown) {
       avisos: plano.avisos.slice(0, 10),
       novasColunas: plano.novasColunas,
       novosAlunos: plano.novosAlunos,
+      substituir: plano.substituir.slice(0, 20),
       removerLinhas: plano.removerLinhas,
       removerColunas: plano.removerColunas,
       candidatosRemocaoLinhas: plano.candidatosRemocaoLinhas,
+      candidatosRemocaoColunas: plano.candidatosRemocaoColunas,
       amostra: amostraDeCelulas(plano),
       assinatura: plano.assinatura,
     })),
@@ -866,6 +885,64 @@ export async function restaurarCopia(admin: { id: string }, entrada: unknown) {
       data: { esquema: Prisma.DbNull, assinaturaEsquema: null, esquemaEm: null },
     });
     await auditar(tx, admin.id, "planilha.restaurar", `aba:${dados.data.aba}`);
+  });
+  return resultado;
+}
+
+/** Cria uma aba nova com o cabeçalho mínimo, para uma turma sem aba. */
+export async function criarAba(admin: { id: string }, entrada: unknown) {
+  const dados = z
+    .object({
+      nome: z.string().trim().min(1, "Informe o nome da aba.").max(200),
+      cabecalho: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+    })
+    .safeParse(entrada);
+  if (!dados.success) {
+    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  }
+  const linha = await lerLinha();
+  const { endpoint, token } = exigirConexao(linha);
+  const resultado = await chamarGas<{ aba: string }>(
+    endpoint,
+    token,
+    { acao: "criarAba", nome: dados.data.nome, cabecalho: dados.data.cabecalho },
+    { retentavel: false },
+  );
+  await comTransacao(async (tx) => {
+    await auditar(tx, admin.id, "planilha.criarAba", `aba:${dados.data.nome}`);
+  });
+  return resultado;
+}
+
+/** Remove uma aba criada pela integração, no modo completo, com senha e frase. */
+export async function removerAba(admin: { id: string }, entrada: unknown) {
+  const dados = z
+    .object({
+      aba: z.string().min(1).max(200),
+      frase: z.string().trim().min(1, "Digite a frase de confirmação."),
+      senha: z.string().min(1, "Informe a senha do administrador."),
+    })
+    .safeParse(entrada);
+  if (!dados.success) {
+    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  }
+  if (dados.data.frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO) {
+    throw new ErroHttp("A frase de confirmação não confere.", 400);
+  }
+  const linha = await lerLinha();
+  if (!modoCompletoAtivo(linha)) {
+    throw new ErroHttp("O modo completo não está ativo.", 400);
+  }
+  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:remover");
+  const { endpoint, token } = exigirConexao(linha);
+  const resultado = await chamarGas<{ aba: string }>(
+    endpoint,
+    token,
+    { acao: "removerAba", aba: dados.data.aba },
+    { retentavel: false },
+  );
+  await comTransacao(async (tx) => {
+    await auditar(tx, admin.id, "planilha.removerAba", `aba:${dados.data.aba}`);
   });
   return resultado;
 }

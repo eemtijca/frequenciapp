@@ -205,6 +205,11 @@ describe("detectarEsquema", () => {
     expect(esquema.mesclagens).toEqual(["C1:D1"]);
   });
 
+  it("marca a aba criada pela integração", () => {
+    const esquema = detectarEsquema({ ...ABA, criada: true }, 2026);
+    expect(esquema.criada).toBe(true);
+  });
+
   it("produz hash estável", () => {
     expect(hashTexto("abc")).toBe(hashTexto("abc"));
     expect(hashTexto("abc")).not.toBe(hashTexto("abd"));
@@ -417,6 +422,13 @@ describe("planejarSincronizacao", () => {
     const plano = planejarSincronizacao(esquema, turma, conteudoMarcado, opcoes());
     expect(plano.candidatosRemocaoLinhas).toEqual([{ linha: 4, nome: "Carla" }]);
     expect(plano.removerLinhas).toHaveLength(0);
+  });
+
+  it("lista colunas criadas pela integração como candidatas", () => {
+    const conteudoMarcado: LeituraAba = { ...conteudo, colunasCriadas: [3, 4] };
+    const plano = planejarSincronizacao(esquema, turma, conteudoMarcado, opcoes());
+    expect(plano.candidatosRemocaoColunas.map((item) => item.coluna)).toEqual([3, 4]);
+    expect(plano.removerColunas).toHaveLength(0);
   });
 
   it("é idempotente: aplicar o plano zera a próxima simulação", () => {

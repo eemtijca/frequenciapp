@@ -36,6 +36,7 @@ interface PlanoResumo {
   novosAlunos: { nome: string }[];
   substituir: { celula: string; valor: string; anterior: string }[];
   candidatosRemocaoLinhas: { linha: number; nome: string }[];
+  candidatosRemocaoColunas: { coluna: number; letra: string; rotulo: string }[];
 }
 
 interface Simulacao {
@@ -73,6 +74,7 @@ export default function DialogoEnvio({
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
   const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
+  const [removerColunasMarcadas, setRemoverColunasMarcadas] = useState<number[]>([]);
 
   const entradas = useCallback(
     () => ({
@@ -83,6 +85,7 @@ export default function DialogoEnvio({
       permitirNovosAlunos: novosAlunos,
       substituirDivergencias: modoCompleto && substituir,
       removerLinhas: modoCompleto ? removerMarcadas : undefined,
+      removerColunas: modoCompleto ? removerColunasMarcadas : undefined,
     }),
     [
       turmaOriginalId,
@@ -93,6 +96,7 @@ export default function DialogoEnvio({
       modoCompleto,
       substituir,
       removerMarcadas,
+      removerColunasMarcadas,
     ],
   );
 
@@ -200,6 +204,24 @@ export default function DialogoEnvio({
                     className="size-4 accent-[var(--primary)]"
                   />
                   Remover {item.nome} (linha {item.linha})
+                </label>
+              ))}
+            {modoCompleto &&
+              plano?.candidatosRemocaoColunas.map((item) => (
+                <label key={`coluna-${item.coluna}`} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={removerColunasMarcadas.includes(item.coluna)}
+                    onChange={(evento) =>
+                      setRemoverColunasMarcadas((atuais) =>
+                        evento.target.checked
+                          ? [...atuais, item.coluna]
+                          : atuais.filter((coluna) => coluna !== item.coluna),
+                      )
+                    }
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Remover coluna {item.rotulo} ({item.letra})
                 </label>
               ))}
           </div>

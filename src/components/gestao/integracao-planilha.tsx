@@ -102,6 +102,7 @@ export default function IntegracaoPlanilha({
     { aba: string; itens: { nome: string; criadaEm: string }[] }[]
   >([]);
   const [restaurar, setRestaurar] = useState<{ aba: string; copia: string } | null>(null);
+  const [abaRemover, setAbaRemover] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -138,6 +139,7 @@ export default function IntegracaoPlanilha({
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
+  const turmasSemAba = turmas.filter((turma) => !Object.values(mapa).includes(turma.id));
 
   async function alternarAtiva(valor: boolean) {
     setSalvando(true);
@@ -199,10 +201,13 @@ export default function IntegracaoPlanilha({
       setAbas(dados.abas);
       setSugestoes(dados.sugestoes);
       setPlanilha(dados.planilha);
+      const idsValidos = new Set(turmas.map((turma) => turma.id));
       setMapa((atual) => {
         const proximo = { ...atual };
         for (const sugestao of dados.sugestoes) {
-          if (!proximo[sugestao.aba] && sugestao.turmaOriginalId) {
+          const atualDaAba = proximo[sugestao.aba];
+          const invalido = atualDaAba !== undefined && !idsValidos.has(atualDaAba);
+          if ((atualDaAba === undefined || invalido) && sugestao.turmaOriginalId) {
             proximo[sugestao.aba] = sugestao.turmaOriginalId;
           }
         }
@@ -252,6 +257,7 @@ export default function IntegracaoPlanilha({
       );
       setTokenVisivel(dados.token);
       setSenha("");
+      setSenhaAberta(null);
       if (senhaAberta === "gerar") toast.success("Token gerado. Atualize o Script Property.");
       await carregar();
     } catch (excecao) {
@@ -290,6 +296,15 @@ export default function IntegracaoPlanilha({
     }
   }
 
+  async function criarAba(nome: string) {
+    try {
+      await pedir("/api/planilha/criar-aba", corpoJson({ nome }));
+      toast.success("Aba criada. Use Conferir estrutura para mapear.");
+    } catch (excecao) {
+      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar a aba.");
+    }
+  }
+
   async function carregarCopias() {
     if (!integracao?.esquema) return;
     try {
@@ -320,6 +335,20 @@ export default function IntegracaoPlanilha({
       await carregar();
     } catch (excecao) {
       toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
+    }
+  }
+
+  async function confirmarRemocaoAba() {
+    if (!abaRemover) return;
+    try {
+      await pedir("/api/planilha/remover-aba", corpoJson({ aba: abaRemover, frase, senha }));
+      setAbaRemover(null);
+      setFrase("");
+      setSenha("");
+      toast.success("Aba removida. A versão atual foi guardada em cópia.");
+      await carregar();
+    } catch (excecao) {
+      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.");
     }
   }
 
@@ -524,6 +553,24 @@ export default function IntegracaoPlanilha({
             </Button>
           </div>
         )}
+        {planilha && turmasSemAba.length > 0 && (
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
+            {turmasSemAba.map((turma) => (
+              <div key={turma.id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate">{turma.rotulo}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8"
+                  onClick={() => void criarAba(turma.rotulo)}
+                >
+                  Criar aba
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
         {sugestoes.length > 0 && (
           <p className="text-muted-foreground text-xs">
             Sugestões preenchidas pelo nome das abas. Ajuste antes de salvar.
@@ -579,6 +626,26 @@ export default function IntegracaoPlanilha({
             )}
           </div>
         ))}
+        {integracao?.esquema?.abas.some((aba) => aba.criada) && (
+          <div className="flex flex-col gap-1 text-xs">
+            <span className="font-medium">Abas criadas pela integração</span>
+            {integracao.esquema.abas
+              .filter((aba) => aba.criada)
+              .map((aba) => (
+                <div key={aba.nome} className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground truncate">{aba.nome}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8"
+                    onClick={() => setAbaRemover(aba.nome)}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              ))}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 rounded-lg border p-3">
@@ -777,6 +844,52 @@ export default function IntegracaoPlanilha({
               disabled={frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""}
             >
               Restaurar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={abaRemover !== null} onOpenChange={(aberto) => !aberto && setAbaRemover(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remover aba</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
+              A aba {abaRemover} foi criada pela integração e será removida, com uma cópia de
+              segurança guardada antes.
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="frase-remover-aba">Digite {FRASE_MODO_COMPLETO}</Label>
+              <Input
+                id="frase-remover-aba"
+                value={frase}
+                onChange={(evento) => setFrase(evento.target.value)}
+                autoComplete="off"
+                className="h-11"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="senha-remover-aba">Senha do administrador</Label>
+              <CampoSenha
+                id="senha-remover-aba"
+                value={senha}
+                onChange={(evento) => setSenha(evento.target.value)}
+                className="h-11"
+                autoComplete="current-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setAbaRemover(null)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void confirmarRemocaoAba()}
+              disabled={frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""}
+            >
+              Remover aba
             </Button>
           </DialogFooter>
         </DialogContent>

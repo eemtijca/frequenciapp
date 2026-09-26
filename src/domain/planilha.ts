@@ -187,6 +187,8 @@ export interface ColunaEsquema {
 export interface AbaEsquema {
   nome: string;
   oculta: boolean;
+  /** Verdadeiro quando a aba foi criada pela integração (marcador). */
+  criada?: boolean;
   totalLinhas: number;
   totalColunas: number;
   congeladas: { linhas: number; colunas: number };
@@ -214,6 +216,7 @@ export interface AbaBruta {
   linhas?: number;
   colunas?: number;
   oculta?: boolean;
+  criada?: boolean;
   congeladasLinhas?: number;
   congeladasColunas?: number;
   mesclagens?: string[];
@@ -353,6 +356,7 @@ export function detectarEsquema(aba: AbaBruta, anoReferencia: number): AbaEsquem
   return {
     nome: aba.nome,
     oculta: Boolean(aba.oculta),
+    criada: Boolean(aba.criada),
     totalLinhas: aba.linhas ?? valores.length,
     totalColunas: aba.colunas ?? Math.max(cabecalho.length, ultimaColunaDados),
     congeladas: {
@@ -507,6 +511,13 @@ export interface RemocaoPlano {
   nome: string;
 }
 
+export interface ColunaCriada {
+  coluna: number;
+  letra: string;
+  rotulo: string;
+  data?: string;
+}
+
 export interface ResumoPlano {
   preencher: number;
   substituir: number;
@@ -532,8 +543,9 @@ export interface PlanoSincronizacao {
   novasColunas: ColunaNovaPlano[];
   novosAlunos: AlunoNovoPlano[];
   removerLinhas: RemocaoPlano[];
-  removerColunas: { coluna: number; letra: string; rotulo: string }[];
+  removerColunas: ColunaCriada[];
   candidatosRemocaoLinhas: RemocaoPlano[];
+  candidatosRemocaoColunas: ColunaCriada[];
   resumo: ResumoPlano;
   avisos: string[];
 }
@@ -741,6 +753,15 @@ export function planejarSincronizacao(
           .filter((item) => item.nome !== "")
       : [];
   const colunasCriadas = new Set(conteudo.colunasCriadas ?? []);
+  const candidatosRemocaoColunas: ColunaCriada[] = (conteudo.colunasCriadas ?? []).map((coluna) => {
+    const encontrada = esquema.colunas.find((item) => item.indice === coluna);
+    return {
+      coluna,
+      letra: letraColuna(coluna),
+      rotulo: encontrada?.rotulo ?? letraColuna(coluna),
+      ...(encontrada?.data ? { data: encontrada.data } : {}),
+    };
+  });
   const removerColunas =
     modoCompleto && opcoes.removerColunas
       ? opcoes.removerColunas
@@ -751,6 +772,7 @@ export function planejarSincronizacao(
               coluna,
               letra: letraColuna(coluna),
               rotulo: encontrada?.rotulo ?? letraColuna(coluna),
+              ...(encontrada?.data ? { data: encontrada.data } : {}),
             };
           })
       : [];
@@ -794,6 +816,7 @@ export function planejarSincronizacao(
     removerLinhas,
     removerColunas,
     candidatosRemocaoLinhas,
+    candidatosRemocaoColunas,
     resumo,
     avisos,
   };

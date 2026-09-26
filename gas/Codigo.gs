@@ -111,11 +111,13 @@ function acaoEstrutura() {
         id: planilha.getId(),
         url: planilha.getUrl(),
         fuso: planilha.getSpreadsheetTimeZone(),
+        versao: VERSAO,
       },
       abas: planilha.getSheets().map(function (aba) {
         return {
           nome: aba.getName(),
           oculta: aba.isSheetHidden(),
+          criada: temMarcador(aba, MARCADOR_ABA),
           linhas: aba.getLastRow(),
           colunas: aba.getLastColumn(),
           congeladasLinhas: aba.getFrozenRows(),
