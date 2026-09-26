@@ -3,20 +3,15 @@
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e resumo de faltas, justificadas e saídas.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChartPie,
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Aluno, Frequencia, SaidaAntecipada, Serie, Turma } from "@/domain/frequencia";
 import { diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
 import { coberturaDoDia, distribuicaoDoDia, marcasDoDia, resumoDoDia } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
@@ -55,6 +50,7 @@ export default function VistaPainel({
   } | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [recarregar, setRecarregar] = useState(0);
 
   const compartilhado = dia.startsWith(mes);
@@ -80,6 +76,7 @@ export default function VistaPainel({
           setErro(
             excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o dia.",
           );
+          setErroVariante(estadoDeErro(excecao));
         }
       } finally {
         if (viva) setCarregando(false);
@@ -134,6 +131,7 @@ export default function VistaPainel({
       else setRecarregar((valor) => valor + 1);
     } catch (excecao) {
       setErro("Não foi possível atualizar os indicadores.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível atualizar os indicadores." });
     }
   });
@@ -207,15 +205,7 @@ export default function VistaPainel({
         </button>
       )}
 
-      {erro && (
-        <p
-          role="alert"
-          className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-        >
-          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       <div
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"

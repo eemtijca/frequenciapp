@@ -15,11 +15,12 @@ import {
   Save,
   School,
   Settings2,
-  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -142,6 +143,7 @@ export default function VistaFrequencia({
   const [salvando, setSalvando] = useState(false);
   const [sujo, setSujo] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -230,6 +232,7 @@ export default function VistaFrequencia({
         setErro(
           excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a frequência.",
         );
+        setErroVariante(estadoDeErro(excecao));
       })
       .finally(() => {
         if (viva) setCarregando(false);
@@ -482,12 +485,15 @@ export default function VistaFrequencia({
         setConflito(true);
       }
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
-      toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
-        description: falha?.conflito
-          ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
-          : undefined,
-        duration: falha?.conflito ? 8000 : undefined,
-      });
+      setErroVariante(falha?.conflito ? "conflito" : estadoDeErro(excecao));
+      if (falha?.status !== 401) {
+        toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
+          description: falha?.conflito
+            ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
+            : undefined,
+          duration: falha?.conflito ? 8000 : undefined,
+        });
+      }
     } finally {
       setSalvando(false);
     }
@@ -737,32 +743,29 @@ export default function VistaFrequencia({
             {resumoAberto ? "Ocultar resumo de faltas" : "Ver resumo de faltas"}
           </button>
 
-          {(erro || conflito) && (
-            <div
-              role="alert"
-              className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-            >
-              <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <div className="flex-1">
-                <p>{erro}</p>
-                {conflito && (
-                  <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
-                    Recarregar versão salva
-                  </Button>
-                )}
-                {!conflito && !sujo && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => setRecarregar((valor) => valor + 1)}
-                  >
-                    Tentar novamente
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
+          {(erro || conflito) &&
+            (conflito ? (
+              <AvisoCompacto
+                variante="conflito"
+                descricao={erro || undefined}
+                tamanho="linha"
+                acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
+              />
+            ) : (
+              <AvisoCompacto
+                variante={erroVariante}
+                descricao={erro}
+                tamanho="linha"
+                acao={
+                  !sujo
+                    ? {
+                        rotulo: "Tentar novamente",
+                        onClick: () => setRecarregar((valor) => valor + 1),
+                      }
+                    : undefined
+                }
+              />
+            ))}
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 xl:order-1">

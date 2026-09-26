@@ -18,6 +18,8 @@ export function avisarErro(
   excecao: unknown,
   opcoes: { contexto: string; descricao?: string; tentarDeNovo?: () => void; id?: string },
 ): void {
+  // A sessão expirada tem fluxo próprio: o shell volta para a entrada com aviso.
+  if (excecao instanceof ErroApi && excecao.status === 401) return;
   toast.error(mensagemAmigavel(excecao, opcoes.contexto), {
     description: opcoes.descricao ?? "Confira a internet e tente de novo em instantes.",
     duration: 8000,

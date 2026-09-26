@@ -6,7 +6,9 @@ import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -53,6 +55,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
   const { chaveAtiva, executar } = useAcoesPorChave();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [busca, setBusca] = useState("");
   const termo = normalizar(busca);
   const filtradas = series.filter(
@@ -94,6 +97,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a série.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível salvar a série." });
     } finally {
       setEnviando(false);
@@ -259,14 +263,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 Menor número aparece primeiro na listagem.
               </p>
             </div>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
                 Cancelar

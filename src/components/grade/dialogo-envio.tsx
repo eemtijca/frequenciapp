@@ -8,7 +8,9 @@ import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -91,6 +93,7 @@ export default function DialogoEnvio({
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
@@ -129,6 +132,7 @@ export default function DialogoEnvio({
       setSimulacao(dados);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.");
+      setErroVariante(estadoDeErro(excecao));
     }
   });
 
@@ -157,6 +161,7 @@ export default function DialogoEnvio({
       aoConcluir();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível enviar.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, {
         contexto: "Não foi possível enviar.",
         descricao: "Nada foi alterado na planilha. Tente de novo em instantes.",
@@ -266,13 +271,14 @@ export default function DialogoEnvio({
           )}
 
           {bloqueado && (
-            <p
-              role="alert"
-              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs"
-            >
-              {simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
-                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."}
-            </p>
+            <AvisoCompacto
+              variante="dados_invalidos"
+              descricao={
+                simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
+                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
+              }
+              tamanho="linha"
+            />
           )}
 
           {simulacao && !carregando && !bloqueado && todas && (
@@ -334,14 +340,7 @@ export default function DialogoEnvio({
             </div>
           )}
 
-          {erro && (
-            <p
-              role="alert"
-              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-            >
-              {erro}
-            </p>
-          )}
+          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         </div>
 
         <DialogFooter>

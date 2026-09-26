@@ -28,7 +28,9 @@ import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -75,6 +77,7 @@ export default function VistaGrade({
 }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<ModoPeriodo>("mes");
   const [diaBase, setDiaBase] = useState(hoje);
@@ -129,6 +132,7 @@ export default function VistaGrade({
           setErro(
             excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
           );
+          setErroVariante(estadoDeErro(excecao));
         }
       } finally {
         if (viva) setCarregandoPeriodo(false);
@@ -179,6 +183,7 @@ export default function VistaGrade({
         setRecarga((valor) => valor + 1);
       }
     } catch (excecao) {
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
     }
   });
@@ -402,11 +407,7 @@ export default function VistaGrade({
         )}
       </div>
 
-      {erro && (
-        <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {turmasOriginais.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">

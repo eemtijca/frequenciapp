@@ -6,7 +6,9 @@ import { useRef, useState } from "react";
 import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Configuracoes, JustificativaConfigurada } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ export default function AbaConfiguracoes({
 }: Props) {
   const [salvando, setSalvando] = useState<"frequenciaPorAula" | "saidaAntecipada" | null>(null);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [baixando, setBaixando] = useState(false);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
@@ -63,6 +66,8 @@ export default function AbaConfiguracoes({
   const [editando, setEditando] = useState<string | null>(null);
   const [rotuloEdicao, setRotuloEdicao] = useState("");
   const [erroJustificativa, setErroJustificativa] = useState("");
+  const [erroJustificativaVariante, setErroJustificativaVariante] =
+    useState<VarianteEstado>("dados_invalidos");
   const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
   const [excluirAlvo, setExcluirAlvo] = useState<JustificativaConfigurada | null>(null);
   const { executar: executarPorChave } = useAcoesPorChave();
@@ -90,6 +95,7 @@ export default function AbaConfiguracoes({
         setErro(
           excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
         );
+        setErroVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
       } finally {
         setSalvando(null);
@@ -120,6 +126,7 @@ export default function AbaConfiguracoes({
             ? excecao.message
             : "Não foi possível adicionar a justificativa.",
         );
+        setErroJustificativaVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível adicionar a justificativa." });
       } finally {
         setEnviandoJustificativa(false);
@@ -147,6 +154,7 @@ export default function AbaConfiguracoes({
             ? excecao.message
             : "Não foi possível atualizar a justificativa.",
         );
+        setErroJustificativaVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível atualizar a justificativa." });
       } finally {
         setEnviandoJustificativa(false);
@@ -173,6 +181,7 @@ export default function AbaConfiguracoes({
         setErroJustificativa(
           excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
         );
+        setErroJustificativaVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
       }
     });
@@ -193,6 +202,7 @@ export default function AbaConfiguracoes({
             ? excecao.message
             : "Não foi possível excluir a justificativa.",
         );
+        setErroJustificativaVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível excluir a justificativa." });
       } finally {
         setExcluirAlvo(null);
@@ -225,6 +235,7 @@ export default function AbaConfiguracoes({
         );
       } catch (excecao) {
         setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
+        setErroVariante(estadoDeErro(excecao));
         avisarErro(excecao, { contexto: "Não foi possível gerar a cópia.", id: aviso });
       } finally {
         setBaixando(false);
@@ -259,6 +270,7 @@ export default function AbaConfiguracoes({
       } catch (excecao) {
         const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
         setErro(mensagem);
+        setErroVariante("dados_invalidos");
         toast.error(mensagem, {
           id: aviso,
           description: "Confira o arquivo e tente de novo.",
@@ -313,11 +325,7 @@ export default function AbaConfiguracoes({
           />
         </div>
 
-        {erro && (
-          <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-            {erro}
-          </p>
-        )}
+        {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
       </div>
 
       <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
@@ -373,9 +381,11 @@ export default function AbaConfiguracoes({
         </div>
 
         {erroJustificativa && (
-          <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-            {erroJustificativa}
-          </p>
+          <AvisoCompacto
+            variante={erroJustificativaVariante}
+            descricao={erroJustificativa}
+            tamanho="linha"
+          />
         )}
 
         <ul className="divide-y overflow-hidden rounded-lg border">

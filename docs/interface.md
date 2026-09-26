@@ -40,6 +40,9 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 - Confirmação explícita para descartar marcações, sair com a chamada em aberto e remover saídas.
 - Toasts em todas as ações, no topo da tela: sucesso em verde e erro em vermelho, com título curto e descrição em linguagem simples. Toda mensagem diz o que aconteceu, o que mudou e o que fazer agora; falhas repetíveis oferecem "Tentar de novo".
 - Operações longas da planilha e da cópia de segurança mostram um aviso de andamento com o mesmo identificador até virarem sucesso ou erro, com contagens no resultado.
+- Telas de estado padronizadas em um único componente, com variantes para cada situação: página não encontrada, erro interno, serviço indisponível, dados inválidos, sessão expirada, acesso restrito, conta desativada, muitas tentativas, conflito de chamada e sem conexão. Cada variante tem ícone, tom (neutro, aviso ou perigo) e ações próprias, com o código HTTP discreto e, no erro interno, uma referência para o suporte localizar o log.
+- Nas rotas de página: o 404 oferece a volta ao início, a fronteira de erro de runtime oferece tentar novamente e ir para o início, e o fallback do layout raiz usa estilos próprios para aparecer mesmo sem o CSS. Os códigos 401 e 403 não usam arquivos especiais: a sessão expirada aparece como aviso na tela de entrada e a conta desativada ou o limite de tentativas aparecem no próprio formulário; os demais estados viram aviso compacto na tela em que aconteceram.
+- A página offline do PWA segue as mesmas cores, o mesmo tom e as mesmas ações do aplicativo, sem depender de fontes ou scripts externos.
 
 ## Acessibilidade
 

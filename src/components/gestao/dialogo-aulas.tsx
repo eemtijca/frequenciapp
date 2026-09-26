@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -61,6 +63,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
   const [enviando, setEnviando] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   useEffect(() => {
     setFormulario(null);
@@ -132,6 +135,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a aula.");
+      setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível salvar a aula." });
     } finally {
       setEnviando(false);
@@ -354,14 +358,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                 })}
               </div>
             </fieldset>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setFormulario(null)}>
                 Cancelar

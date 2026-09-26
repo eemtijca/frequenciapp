@@ -35,6 +35,6 @@ test.describe("PWA", () => {
     await page.reload();
     await context.setOffline(true);
     await page.goto("/sem-conexao").catch(() => undefined);
-    await expect(page.getByText("Você está sem conexão")).toBeVisible();
+    await expect(page.getByText("Sem conexão", { exact: true })).toBeVisible();
   });
 });

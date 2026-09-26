@@ -75,6 +75,7 @@ interface Props {
   resumoInicial: ResumoAcumulado | null;
 }
 
+const CHAVE_AVISO_ENTRADA = "frequenciapp:aviso-entrada";
 const VISOES: Visao[] = ["painel", "chamada", "saidas", "relatorios", "alunos", "gestao"];
 
 function visaoValida(valor: string | undefined): Visao | null {
@@ -408,7 +409,11 @@ export default function Aplicacao({
       setOffline(false);
     }
     function aoExpirarSessao() {
-      toast.error("Sua sessão expirou. Entre novamente.");
+      try {
+        window.sessionStorage.setItem(CHAVE_AVISO_ENTRADA, "sessao_expirada");
+      } catch {
+        // Sem armazenamento: a tela de entrada abre sem o aviso.
+      }
       router.refresh();
     }
     window.addEventListener("beforeunload", avisarSaida);
