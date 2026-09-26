@@ -70,7 +70,8 @@ test.describe("Google Planilhas", () => {
 
     // Estrutura e mapa sugeridos.
     await page.getByRole("button", { name: "Conferir estrutura" }).click();
-    await expect(page.getByText("E2E Ano A").first()).toBeVisible();
+    const painelConfig = page.locator("#painel-configuracoes");
+    await expect(painelConfig.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
     await page.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
