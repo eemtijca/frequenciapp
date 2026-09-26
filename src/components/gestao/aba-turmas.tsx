@@ -3,7 +3,7 @@
 // Aba de turmas: criar, renomear, mover de série e excluir, sempre
 // agrupadas por série para leitura rápida.
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Serie, Turma } from "@/domain/frequencia";
@@ -47,6 +47,7 @@ interface Formulario {
 
 export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
+  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Turma | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
   const [enviando, setEnviando] = useState(false);
@@ -194,9 +195,11 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
             gruposFiltrados.map(([serieId, grupo]) => (
               <motion.div
                 key={serieId}
-                initial={{ opacity: 0 }}
+                initial={semMovimento ? false : { opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                transition={
+                  semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                }
                 className="bg-card overflow-hidden rounded-lg border"
               >
                 <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">

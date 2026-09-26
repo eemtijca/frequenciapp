@@ -16,7 +16,7 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador da barra inferior preso à rolagem quadro a quadro, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
-- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e o interruptor por dispositivo, e interface pensada para uma mão.
+- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
 - **Google Planilhas opcional**: a frequência das turmas atuais é reorganizada por turma de origem e gravada na planilha da escola, com esquema conferido, prévia obrigatória e escrita conservadora: só célula vazia, nunca fórmula, nunca substituição. O modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou, sempre com cópia de segurança.
 
 ## Começando

@@ -198,7 +198,7 @@ input[type="month"] {
   scrollbar-color: color-mix(in oklab, var(--foreground) 25%, transparent) transparent;
 }
 
-/* Paginador de abas: rolagem horizontal sem barra visível. */
+/* Painéis sem barra de rolagem visível. */
 .pagina-sem-barra {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -207,24 +207,9 @@ input[type="month"] {
   display: none;
 }
 
-/* Painéis distantes do paginador saem do layout e da pintura até chegarem
-   perto. A rolagem de cada painel é guardada e devolvida pelo shell. */
+/* Painéis distantes saem da pintura até chegarem perto. A rolagem vertical
+   de cada painel é guardada e devolvida pelo shell. */
 .pagina-painel[data-distante="true"] {
   content-visibility: auto;
   contain: layout paint style;
-}
-
-/* Preferência de animações desligada: transições e animações param na hora,
-   exceto os indicadores de carregamento, que continuam comunicando espera. */
-html[data-animacoes="desligadas"] {
-  scroll-behavior: auto !important;
-}
-html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse),
-html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse)::before,
-html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse)::after {
-  animation-duration: 0.01ms !important;
-  animation-delay: 0ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  transition-delay: 0ms !important;
 }

@@ -3,7 +3,7 @@
 // Aba de equipe: contas da coordenação e da administração, com papel,
 // senha e situação. Sem atribuições de turma.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
@@ -50,6 +50,7 @@ const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO"
 
 export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
+  const semMovimento = useReducedMotion() ?? false;
   const [carregando, setCarregando] = useState(true);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
@@ -222,9 +223,9 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                 return (
                   <motion.li
                     key={usuario.id}
-                    initial={{ opacity: 0 }}
+                    initial={semMovimento ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
+                    transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
                     className={`bg-card overflow-hidden rounded-lg border ${usuario.ativo ? "" : "opacity-60"}`}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">

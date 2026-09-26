@@ -1,7 +1,6 @@
 "use client";
 
-// Relatórios em sub-abas: Histórico, Grade e Por aluno, com o paginador
-// compartilhado.
+// Relatórios em sub-abas: Histórico, Grade e Por aluno.
 import { History, Table2, UserRound } from "lucide-react";
 import type {
   Aluno,

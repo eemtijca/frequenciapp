@@ -1,11 +1,11 @@
 "use client";
 
-// Shell da aplicação: cabeçalho, troca de visões por deslize e navegação
+// Shell da aplicação: cabeçalho, troca de visões por botões e navegação
 // inferior no celular, barra lateral no desktop. A administração ganha a
 // visão Gestão no lugar de Alunos.
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   ChartPie,
   ClipboardCheck,
@@ -36,7 +36,6 @@ import { pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
-import { ControleAnimacoes } from "@/components/ui/controle-animacoes";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaSaidas from "@/components/saidas/vista-saidas";
@@ -118,6 +117,7 @@ interface ItemNavegacaoProps {
 
 function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNavegacaoProps) {
   const Icone = item.icone;
+  const semMovimento = useReducedMotion() ?? false;
   return (
     <button
       type="button"
@@ -125,20 +125,30 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       onClick={() => onTrocar(item.visao)}
       className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors active:scale-[0.98] lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
     >
-      {ativo && indicador && (
+      {ativo &&
+        indicador &&
+        (semMovimento ? (
+          <span className="bg-primary/15 absolute inset-x-4 top-0 h-0.5 rounded-full lg:inset-x-0 lg:inset-y-1 lg:h-auto lg:w-1" />
+        ) : (
+          <motion.span
+            layoutId={indicador}
+            className="bg-primary/15 absolute inset-x-4 top-0 h-0.5 rounded-full lg:inset-x-0 lg:inset-y-1 lg:h-auto lg:w-1"
+            transition={{ type: "spring", stiffness: 500, damping: 40 }}
+          />
+        ))}
+      {semMovimento ? (
+        <span className="flex h-5 items-center lg:hidden">
+          <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
+        </span>
+      ) : (
         <motion.span
-          layoutId={indicador}
-          className="bg-primary/15 absolute inset-x-4 top-0 h-0.5 rounded-full lg:inset-x-0 lg:inset-y-1 lg:h-auto lg:w-1"
-          transition={{ type: "spring", stiffness: 500, damping: 40 }}
-        />
+          animate={ativo ? { scale: 1.08 } : { scale: 1 }}
+          transition={{ type: "spring", stiffness: 500, damping: 26 }}
+          className="flex h-5 items-center lg:hidden"
+        >
+          <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
+        </motion.span>
       )}
-      <motion.span
-        animate={ativo ? { scale: 1.08 } : { scale: 1 }}
-        transition={{ type: "spring", stiffness: 500, damping: 26 }}
-        className="flex h-5 items-center lg:hidden"
-      >
-        <Icone size={20} strokeWidth={ativo ? 2 : 1.7} />
-      </motion.span>
       <Icone
         size={18}
         strokeWidth={ativo ? 2 : 1.7}
@@ -202,16 +212,6 @@ export default function Aplicacao({
     abaRelatoriosDe(visaoInicial),
   );
   const pagerRef = useRef<HTMLDivElement | null>(null);
-  // Índice da visão visível, modo programático e controles de quadro.
-  const indiceVisao = useRef(0);
-  const rolagemProgramatica = useRef(false);
-  const quadroRolagem = useRef<number | null>(null);
-  const quadroProgresso = useRef<number | null>(null);
-  const timerRolagem = useRef<number | null>(null);
-  const reduzirMovimento = useReducedMotion() ?? false;
-  // Progresso contínuo do paginador, base do indicador da barra inferior.
-  const progresso = useMotionValue(0);
-  const indicadorX = useTransform(progresso, (valor) => `${valor * 100}%`);
 
   const itemFinal = useMemo(
     () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
@@ -227,29 +227,6 @@ export default function Aplicacao({
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
   const posicoes = useRef(new Map<Visao, number>());
-
-  // O indicador inferior segue a rolagem de perto, sem mola: a posição vem
-  // do próprio paginador a cada quadro.
-  const atualizarProgresso = useCallback(() => {
-    const pager = pagerRef.current;
-    if (!pager || pager.clientWidth === 0) return;
-    const indice = pager.scrollLeft / pager.clientWidth;
-    progresso.set(Math.max(0, Math.min(itens.length - 1, indice)));
-  }, [itens.length, progresso]);
-
-  // Durante a rolagem programática (toque na navegação) os eventos de rolagem
-  // podem chegar espaçados; o laço garante o acompanhamento quadro a quadro.
-  const acompanharRolagem = useCallback(() => {
-    if (quadroProgresso.current !== null) return;
-    const passo = () => {
-      quadroProgresso.current = null;
-      atualizarProgresso();
-      if (rolagemProgramatica.current) {
-        quadroProgresso.current = window.requestAnimationFrame(passo);
-      }
-    };
-    quadroProgresso.current = window.requestAnimationFrame(passo);
-  }, [atualizarProgresso]);
 
   const rotuloTurma = useCallback(
     (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? "",
@@ -311,107 +288,12 @@ export default function Aplicacao({
 
   const trocarVisao = useCallback(
     (proxima: Visao) => {
-      if (timerRolagem.current !== null) {
-        window.clearTimeout(timerRolagem.current);
-        timerRolagem.current = null;
-      }
+      if (!itens.some((item) => item.visao === proxima)) return;
       setVisao(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
-      const pager = pagerRef.current;
-      if (!pager) return;
-      const indice = itens.findIndex((item) => item.visao === proxima);
-      if (indice < 0) return;
-      indiceVisao.current = indice;
-      // A rolagem por toque não deve mudar a visão ao passar pelas do meio.
-      rolagemProgramatica.current = true;
-      // No desktop a troca é instantânea: o deslize é gesto de celular.
-      const ehDesktop =
-        typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches;
-      pager.scrollTo({
-        left: indice * pager.clientWidth,
-        behavior: ehDesktop || reduzirMovimento ? "auto" : "smooth",
-      });
-      acompanharRolagem();
-      // Rede de segurança para navegadores sem scrollend.
-      timerRolagem.current = window.setTimeout(() => {
-        timerRolagem.current = null;
-        rolagemProgramatica.current = false;
-      }, 700);
     },
-    [itens, reduzirMovimento, acompanharRolagem],
+    [itens],
   );
-
-  // O indicador acompanha o gesto: a cada quadro, o índice visível vira a
-  // visão ativa. Na rolagem programática (toque na navegação), o estado não
-  // muda, então a pílula vai direto ao destino sem passear pelas do meio.
-  const aoRolarPager = useCallback(() => {
-    if (quadroRolagem.current !== null) return;
-    quadroRolagem.current = window.requestAnimationFrame(() => {
-      quadroRolagem.current = null;
-      atualizarProgresso();
-      const pager = pagerRef.current;
-      if (!pager) return;
-      const largura = pager.clientWidth;
-      if (largura === 0) return;
-      const indice = Math.max(
-        0,
-        Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)),
-      );
-      const atual = itens[indice];
-      if (!atual) return;
-      setVisitadas((atuais) =>
-        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
-      );
-      if (rolagemProgramatica.current || indiceVisao.current === indice) return;
-      indiceVisao.current = indice;
-      startTransition(() => {
-        setVisao(atual.visao);
-      });
-    });
-  }, [itens, atualizarProgresso]);
-
-  // Fecha a rolagem no evento nativo quando existir, com o temporizador como
-  // rede de segurança para navegadores sem scrollend.
-  const fecharRolagem = useCallback(() => {
-    if (timerRolagem.current !== null) {
-      window.clearTimeout(timerRolagem.current);
-      timerRolagem.current = null;
-    }
-    rolagemProgramatica.current = false;
-    const pager = pagerRef.current;
-    if (!pager) return;
-    atualizarProgresso();
-    const largura = pager.clientWidth;
-    if (largura === 0) return;
-    const indice = Math.max(0, Math.min(itens.length - 1, Math.round(pager.scrollLeft / largura)));
-    const atual = itens[indice];
-    if (!atual) return;
-    indiceVisao.current = indice;
-    startTransition(() => {
-      setVisao((anterior) => (anterior === atual.visao ? anterior : atual.visao));
-      setVisitadas((atuais) =>
-        atuais.has(atual.visao) ? atuais : new Set(atuais).add(atual.visao),
-      );
-    });
-  }, [itens, atualizarProgresso]);
-
-  // Limpa quadro e temporizador ao desmontar.
-  useEffect(() => {
-    return () => {
-      if (quadroRolagem.current !== null) window.cancelAnimationFrame(quadroRolagem.current);
-      if (quadroProgresso.current !== null) window.cancelAnimationFrame(quadroProgresso.current);
-      if (timerRolagem.current !== null) window.clearTimeout(timerRolagem.current);
-    };
-  }, []);
-
-  // O evento nativo de fim de rolagem não existe em todos os navegadores.
-  useEffect(() => {
-    const pager = pagerRef.current;
-    if (!pager) return;
-    pager.addEventListener("scrollend", fecharRolagem);
-    return () => pager.removeEventListener("scrollend", fecharRolagem);
-  }, [fecharRolagem]);
-
   // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
   // saem da pintura não perderem a posição ao voltar.
   const guardarRolagem = useCallback((alvo: Visao, evento: React.UIEvent<HTMLElement>) => {
@@ -423,15 +305,17 @@ export default function Aplicacao({
     if (indice < 0) return;
     const salvo = posicoes.current.get(visao);
     if (salvo === undefined) return;
+    const rotulo = itens[indice]?.rotulo;
+    if (!rotulo) return;
     const quadro = window.requestAnimationFrame(() => {
-      const painel = pagerRef.current?.children[indice];
+      const painel = pagerRef.current?.querySelector(`[aria-label="${rotulo}"]`);
       if (painel instanceof HTMLElement && painel.scrollTop !== salvo) painel.scrollTop = salvo;
     });
     return () => window.cancelAnimationFrame(quadro);
   }, [itens, visao]);
 
   // Monta as áreas depois da primeira pintura: nenhuma tela pesada deve
-  // montar durante o primeiro gesto de deslize.
+  // montar junto da primeira visão.
   useEffect(() => {
     const aquecer = () => {
       startTransition(() => {
@@ -454,60 +338,22 @@ export default function Aplicacao({
     return () => window.clearTimeout(id);
   }, [itens]);
 
-  // Atalho do manifest: abre direto na visão pedida, sem animação.
-  const visaoInicialRef = useRef(inicial);
-  useEffect(() => {
-    const pager = pagerRef.current;
-    if (!pager) return;
-    const indice = itens.findIndex((item) => item.visao === visaoInicialRef.current);
-    if (indice > 0) {
-      indiceVisao.current = indice;
-      pager.scrollTo({ left: indice * pager.clientWidth });
-      atualizarProgresso();
-    }
-  }, [itens, atualizarProgresso]);
-
-  // Ao redimensionar a janela, reencaixa o paginador na visão ativa.
-  useEffect(() => {
-    function reencaixar() {
-      const pager = pagerRef.current;
-      if (!pager) return;
-      const indice = itens.findIndex((item) => item.visao === visao);
-      if (indice >= 0) {
-        indiceVisao.current = indice;
-        pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
-        atualizarProgresso();
-      }
-    }
-    window.addEventListener("resize", reencaixar);
-    return () => window.removeEventListener("resize", reencaixar);
-  }, [itens, visao, atualizarProgresso]);
-
   // A lista de itens muda quando a área de saídas é ligada ou desligada. A
-  // visão ativa e o indicador são reencaixados sem perder o estado da chamada.
+  // visão ativa volta para um item válido sem perder o estado da chamada.
   useEffect(() => {
     if (itens.length === 0) return;
-    const indice = itens.findIndex((item) => item.visao === visao);
-    if (indice < 0) {
-      const alvo = itens[Math.min(indiceVisao.current, itens.length - 1)];
-      if (alvo) trocarVisao(alvo.visao);
-      return;
-    }
-    const pager = pagerRef.current;
-    if (pager && indice !== indiceVisao.current) {
-      indiceVisao.current = indice;
-      pager.scrollTo({ left: indice * pager.clientWidth, behavior: "auto" });
-    }
-    atualizarProgresso();
-  }, [itens, visao, trocarVisao, atualizarProgresso]);
+    if (itens.some((item) => item.visao === visao)) return;
+    const alvo = itens[Math.min(Math.max(indiceAtivo, 0), itens.length - 1)];
+    if (!alvo || alvo.visao === visao) return;
+    const quadro = window.requestAnimationFrame(() => trocarVisao(alvo.visao));
+    return () => window.cancelAnimationFrame(quadro);
+  }, [itens, visao, trocarVisao, indiceAtivo]);
 
   function abrirFrequencia(dia: string, turmaId: string) {
     setAlvo({ dia, turmaId });
     trocarVisao("chamada");
     requestAnimationFrame(() => {
-      const pager = pagerRef.current;
-      const indice = itens.findIndex((item) => item.visao === "chamada");
-      const painel = pager?.children[indice];
+      const painel = pagerRef.current?.querySelector('[aria-label="Chamada"]');
       if (painel instanceof HTMLElement) painel.scrollTo({ top: 0 });
     });
   }
@@ -701,9 +547,6 @@ export default function Aplicacao({
               </span>
               <SeletorTema />
             </div>
-            <div className="border-border mt-3 border-t pt-3">
-              <ControleAnimacoes id="animacoes-sidebar" className="px-1" />
-            </div>
             <div className="mt-1 flex flex-col gap-0.5">
               <Button
                 variant="ghost"
@@ -760,10 +603,7 @@ export default function Aplicacao({
                         {rotuloDePapel(usuario.papel)}
                       </p>
                     </div>
-                    <div className="border-t px-2.5 py-2">
-                      <ControleAnimacoes id="animacoes-menu" />
-                    </div>
-                    <div className="flex flex-col gap-0.5 border-t pt-1">
+                    <div className="flex flex-col gap-0.5 pt-1">
                       <button
                         type="button"
                         onClick={() => setSenhaAberta(true)}
@@ -802,15 +642,11 @@ export default function Aplicacao({
             data-visao={visao}
             className="relative min-h-0 flex-1 overflow-hidden"
           >
-            <div
-              ref={pagerRef}
-              data-pager="principal"
-              onScroll={aoRolarPager}
-              className="pagina-sem-barra flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden"
-            >
+            <div ref={pagerRef} data-pager="principal" className="h-full overflow-hidden">
               {itens.map((item, indice) => {
                 const ativo = item.visao === visao;
                 const distante = Math.abs(indice - indiceAtivo) > 1;
+                if (!ativo && !visitadas.has(item.visao)) return null;
                 return (
                   <section
                     key={item.visao}
@@ -819,16 +655,11 @@ export default function Aplicacao({
                     aria-hidden={!ativo}
                     inert={!ativo}
                     data-distante={distante ? "true" : undefined}
+                    hidden={!ativo}
                     onScroll={(evento) => guardarRolagem(item.visao, evento)}
-                    onPointerDown={() => {
-                      rolagemProgramatica.current = false;
-                    }}
-                    onWheel={() => {
-                      rolagemProgramatica.current = false;
-                    }}
-                    className="pagina-painel h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 pt-4 pb-0 sm:px-6 lg:px-8"
+                    className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                   >
-                    {visitadas.has(item.visao) ? renderizarVisao(item.visao) : null}
+                    {renderizarVisao(item.visao)}
                   </section>
                 );
               })}
@@ -841,14 +672,17 @@ export default function Aplicacao({
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             <div className="relative">
-              <motion.span
+              <span
                 aria-hidden="true"
                 data-indicador="inferior"
-                style={{ width: `${100 / itens.length}%`, x: indicadorX }}
+                style={{
+                  width: `${100 / itens.length}%`,
+                  left: `${(Math.max(indiceAtivo, 0) * 100) / itens.length}%`,
+                }}
                 className="pointer-events-none absolute top-0 left-0 h-0.5"
               >
                 <span className="bg-primary/15 mx-4 block h-full rounded-full" />
-              </motion.span>
+              </span>
               <div
                 className="grid"
                 style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
