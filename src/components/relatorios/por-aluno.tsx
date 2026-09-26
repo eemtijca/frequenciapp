@@ -273,7 +273,10 @@ export default function PorAluno({
             const acumulado = acumuladoDe(aluno.id);
             const aberto = expandido === aluno.id;
             return (
-              <li key={aluno.id}>
+              <li
+                key={aluno.id}
+                className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+              >
                 <button
                   type="button"
                   aria-expanded={aberto}

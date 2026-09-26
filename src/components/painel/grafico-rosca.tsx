@@ -74,7 +74,10 @@ export default function GraficoRosca({
                 fontSize: "0.75rem",
                 opacity: 1,
               }}
-              wrapperStyle={{ opacity: 1 }}
+              wrapperStyle={{ opacity: 1, zIndex: 30, pointerEvents: "none" }}
+              allowEscapeViewBox={{ x: true, y: true }}
+              offset={12}
+              isAnimationActive={false}
             />
           </PieChart>
         </ResponsiveContainer>

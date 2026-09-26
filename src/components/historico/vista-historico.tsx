@@ -260,6 +260,7 @@ export default function VistaHistorico({
                     transition={
                       semMovimento ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
                     }
+                    className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
                   >
                     <button
                       type="button"

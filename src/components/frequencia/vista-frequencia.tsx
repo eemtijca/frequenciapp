@@ -775,7 +775,10 @@ export default function VistaFrequencia({
                       const acumulado = acumuladoDe(aluno.id);
                       const codigo = justificativas.get(aluno.id);
                       return (
-                        <li key={aluno.id} className="flex items-start gap-3 px-4 py-2.5">
+                        <li
+                          key={aluno.id}
+                          className="flex items-start gap-3 px-4 py-2.5 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                        >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
                               {aluno.nome}
@@ -896,7 +899,10 @@ export default function VistaFrequencia({
                   const codigo = justificativas.get(aluno.id) ?? "";
                   const acumulado = acumuladoDe(aluno.id);
                   return (
-                    <li key={aluno.id}>
+                    <li
+                      key={aluno.id}
+                      className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                    >
                       <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
                         <button
                           type="button"
@@ -1069,7 +1075,7 @@ export default function VistaFrequencia({
 
           <div
             aria-label="Barra de salvamento"
-            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 xl:mx-0"
+            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-3 z-20 rounded-xl border px-4 py-3 shadow-lg backdrop-blur"
           >
             <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
               <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">

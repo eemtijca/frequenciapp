@@ -151,7 +151,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
               initial={semMovimento ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
-              className="flex items-center gap-3 px-4 py-3"
+              className="flex items-center gap-3 px-4 py-3 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
             >
               <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">
                 {String(serie.ordem).padStart(2, "0")}

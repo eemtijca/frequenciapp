@@ -331,7 +331,7 @@ export default function AbaConfiguracoes({
           {justificativas.map((item) => (
             <li
               key={item.codigo}
-              className={`flex min-h-14 items-center gap-3 px-3 py-2 ${
+              className={`flex min-h-14 items-center gap-3 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
                 item.ativo ? "" : "opacity-60"
               }`}
             >

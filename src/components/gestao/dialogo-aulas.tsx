@@ -181,7 +181,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
             {aulas.map((aula) => (
               <li
                 key={aula.id}
-                className={`flex items-center gap-2 px-3 py-2 ${aula.ativo ? "" : "opacity-60"}`}
+                className={`flex items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${aula.ativo ? "" : "opacity-60"}`}
               >
                 <span className="numerais-tabulares text-muted-foreground w-6 shrink-0 text-sm">
                   {String(aula.ordem).padStart(2, "0")}
