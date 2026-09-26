@@ -39,7 +39,7 @@ const ABAS: AbaItem<Aba>[] = [
   { valor: "turmas", rotulo: "Turmas", icone: School },
   { valor: "alunos", rotulo: "Alunos", icone: ListChecks },
   { valor: "equipe", rotulo: "Equipe", icone: Users },
-  { valor: "configuracoes", rotulo: "Configurações", icone: Settings2 },
+  { valor: "configuracoes", rotulo: "Configurações", rotuloCurto: "Config.", icone: Settings2 },
 ];
 
 export default function VistaGestao({
