@@ -486,12 +486,14 @@ export default function VistaFrequencia({
       }
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
       setErroVariante(falha?.conflito ? "conflito" : estadoDeErro(excecao));
-      toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
-        description: falha?.conflito
-          ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
-          : undefined,
-        duration: falha?.conflito ? 8000 : undefined,
-      });
+      if (falha?.status !== 401) {
+        toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
+          description: falha?.conflito
+            ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
+            : undefined,
+          duration: falha?.conflito ? 8000 : undefined,
+        });
+      }
     } finally {
       setSalvando(false);
     }

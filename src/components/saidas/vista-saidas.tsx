@@ -252,7 +252,7 @@ export default function VistaSaidas({
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
       setErro(mensagem);
       setErroVariante(estadoDeErro(excecao));
-      toast.error(mensagem);
+      if (!(excecao instanceof ErroApi && excecao.status === 401)) toast.error(mensagem);
     } finally {
       setEnviando(false);
     }
@@ -277,9 +277,11 @@ export default function VistaSaidas({
         }
         if (relatorioAberto) void carregarRelatorio();
       } catch (excecao) {
-        toast.error(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
-        );
+        if (!(excecao instanceof ErroApi && excecao.status === 401)) {
+          toast.error(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
+          );
+        }
       }
     });
   }
