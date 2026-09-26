@@ -148,7 +148,7 @@ export function SeletorPeriodo({
 
   function classeCelula(selecionado: boolean, futuro: boolean, corrente: boolean) {
     return cn(
-      "flex items-center justify-center rounded-md text-sm transition-colors",
+      "pressionavel flex items-center justify-center rounded-md text-sm transition-colors",
       futuro && "text-muted-foreground/40 cursor-not-allowed",
       selecionado && "bg-primary text-primary-foreground font-semibold",
       !selecionado && !futuro && corrente && "border-primary/40 text-primary border font-semibold",
@@ -163,7 +163,7 @@ export function SeletorPeriodo({
           type="button"
           aria-label={modo === "dia" ? "Mês anterior" : "Ano anterior"}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
-          className="hover:bg-secondary focus-visible:ring-ring flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="hover:bg-secondary focus-visible:ring-ring pressionavel flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronLeft size={18} />
         </button>
@@ -175,7 +175,7 @@ export function SeletorPeriodo({
           aria-label={modo === "dia" ? "Mês seguinte" : "Ano seguinte"}
           disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
-          className="hover:bg-secondary focus-visible:ring-ring flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          className="hover:bg-secondary focus-visible:ring-ring pressionavel flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight size={18} />
         </button>
@@ -268,14 +268,14 @@ export function SeletorPeriodo({
           type="button"
           disabled={valor === max}
           onClick={() => escolher(max)}
-          className="text-primary disabled:text-muted-foreground text-sm font-medium hover:underline disabled:no-underline"
+          className="text-primary disabled:text-muted-foreground pressionavel text-sm font-medium hover:underline disabled:no-underline"
         >
           {modo === "dia" ? "Hoje" : "Este mês"}
         </button>
         <button
           type="button"
           onClick={() => setAberto(false)}
-          className="text-muted-foreground hover:text-foreground text-sm font-medium"
+          className="text-muted-foreground hover:text-foreground pressionavel text-sm font-medium"
         >
           Fechar
         </button>
@@ -292,7 +292,7 @@ export function SeletorPeriodo({
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${rotulo}${selo ? `, ${selo}` : ""}`}
       onClick={() => aoAbrir(!aberto)}
-      className="border-input bg-background focus-visible:ring-ring flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="border-input bg-background focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <CalendarDays size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <span className="numerais-tabulares truncate font-semibold">{rotulo}</span>

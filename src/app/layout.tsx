@@ -1,18 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import CorDoTema from "@/components/pwa/cor-do-tema";
 import "./globals.css";
 
-const fonteInterface = Geist({
-  variable: "--font-geist-sans",
+const fonteInterface = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
 });
 
-const fonteNumeros = Geist_Mono({
-  variable: "--font-geist-mono",
+const fonteNumeros = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 

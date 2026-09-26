@@ -5,6 +5,10 @@ import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -48,8 +52,10 @@ export default function AbaSeries({ series, onMudanca }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
+  const { chaveAtiva, executar } = useAcoesPorChave();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [busca, setBusca] = useState("");
   const termo = normalizar(busca);
   const filtradas = series.filter(
@@ -82,30 +88,34 @@ export default function AbaSeries({ series, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ serie: Serie }>(`/api/series/${emEdicao.id}`, corpoAlteracao("PATCH", dados));
-        toast.success("Série atualizada.");
+        avisarSucesso("Série atualizada.", "O nome novo já aparece na Chamada e nos Relatórios.");
       } else {
         await pedir<{ serie: Serie }>("/api/series", corpoJson(dados));
-        toast.success("Série criada.");
+        avisarSucesso("Série criada.", "Agora é possível cadastrar turmas nesta série.");
       }
       setDialogoAberto(false);
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a série.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível salvar a série." });
     } finally {
       setEnviando(false);
     }
   }
 
-  async function excluir(serie: Serie) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/series/${serie.id}`, corpoAlteracao("DELETE"));
-      toast.success(`Série ${serie.nome} excluída.`);
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a série.";
-      toast.error(mensagem);
-    }
+  function excluir(serie: Serie) {
+    void executar(serie.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/series/${serie.id}`, corpoAlteracao("DELETE"));
+        toast.success(`Série ${serie.nome} excluída.`);
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a série.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -151,7 +161,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
               initial={semMovimento ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
-              className="flex items-center gap-3 px-4 py-3"
+              className="flex items-center gap-3 px-4 py-3 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
             >
               <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">
                 {String(serie.ordem).padStart(2, "0")}
@@ -193,6 +203,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                       <AlertDialogAction
                         className="bg-falta text-falta-foreground hover:bg-falta/90"
                         onClick={() => excluir(serie)}
+                        disabled={chaveAtiva === serie.id}
                       >
                         Excluir
                       </AlertDialogAction>
@@ -252,14 +263,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 Menor número aparece primeiro na listagem.
               </p>
             </div>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
                 Cancelar

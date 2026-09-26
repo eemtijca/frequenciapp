@@ -25,6 +25,8 @@ import {
 import { indexarPorDia, resumoPorAluno } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { avisarErro } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -116,7 +118,6 @@ export default function PorAluno({
   const [serieFiltro, setSerieFiltro] = useState("");
   const [turmaFiltro, setTurmaFiltro] = useState("");
   const [expandido, setExpandido] = useState<string | null>(null);
-  const [atualizando, setAtualizando] = useState(false);
 
   const rotuloTurma = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
@@ -155,14 +156,13 @@ export default function PorAluno({
       );
   }, [alunos, busca, serieFiltro, turmaFiltro, turmaSerie, dias, porDia, saidas, horarios]);
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     try {
       await onRecarregar(mes);
-    } finally {
-      setAtualizando(false);
+    } catch (excecao) {
+      avisarErro(excecao, { contexto: "Não foi possível atualizar o relatório." });
     }
-  }
+  });
 
   return (
     <section aria-label="Relatório por aluno" className="flex flex-col gap-4 pb-6">
@@ -273,12 +273,15 @@ export default function PorAluno({
             const acumulado = acumuladoDe(aluno.id);
             const aberto = expandido === aluno.id;
             return (
-              <li key={aluno.id}>
+              <li
+                key={aluno.id}
+                className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+              >
                 <button
                   type="button"
                   aria-expanded={aberto}
                   onClick={() => setExpandido((atual) => (atual === aluno.id ? null : aluno.id))}
-                  className="hover:bg-secondary/60 flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+                  className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{aluno.nome}</span>

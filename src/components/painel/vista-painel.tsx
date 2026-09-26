@@ -3,18 +3,15 @@
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e resumo de faltas, justificadas e saídas.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChartPie,
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Aluno, Frequencia, SaidaAntecipada, Serie, Turma } from "@/domain/frequencia";
 import { diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
 import { coberturaDoDia, distribuicaoDoDia, marcasDoDia, resumoDoDia } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
@@ -52,38 +49,40 @@ export default function VistaPainel({
     saidas: SaidaAntecipada[];
   } | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [recarregar, setRecarregar] = useState(0);
 
   const compartilhado = dia.startsWith(mes);
 
   useEffect(() => {
-    if (compartilhado) {
-      setDoDia(null);
-      return;
-    }
+    if (compartilhado) return;
     let viva = true;
-    setCarregando(true);
-    setErro("");
-    Promise.all([
-      pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`),
-      pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
-    ])
-      .then(([respostaFrequencias, respostaSaidas]) => {
+    async function buscar() {
+      setCarregando(true);
+      setErro("");
+      try {
+        const [respostaFrequencias, respostaSaidas] = await Promise.all([
+          pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`),
+          pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
+        ]);
         if (!viva) return;
         setDoDia({
           frequencias: respostaFrequencias.frequencias,
           saidas: respostaSaidas.saidas,
         });
-      })
-      .catch((excecao: unknown) => {
-        if (!viva) return;
-        setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o dia.");
-      })
-      .finally(() => {
+      } catch (excecao) {
+        if (viva) {
+          setErro(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o dia.",
+          );
+          setErroVariante(estadoDeErro(excecao));
+        }
+      } finally {
         if (viva) setCarregando(false);
-      });
+      }
+    }
+    void buscar();
     return () => {
       viva = false;
     };
@@ -125,18 +124,17 @@ export default function VistaPainel({
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const carregandoPainel = carregando && !compartilhado;
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       if (compartilhado) await onRecarregar(mes);
       else setRecarregar((valor) => valor + 1);
-    } catch {
+    } catch (excecao) {
       setErro("Não foi possível atualizar os indicadores.");
-    } finally {
-      setAtualizando(false);
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível atualizar os indicadores." });
     }
-  }
+  });
 
   return (
     <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">
@@ -201,21 +199,13 @@ export default function VistaPainel({
         <button
           type="button"
           onClick={() => setDia(diaCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline"
+          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para hoje
         </button>
       )}
 
-      {erro && (
-        <p
-          role="alert"
-          className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-        >
-          <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       <div
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
@@ -264,7 +254,7 @@ export default function VistaPainel({
           type="button"
           aria-pressed={filtro === "escola"}
           onClick={() => setFiltro("escola")}
-          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
         >
           Escola
         </button>
@@ -274,7 +264,7 @@ export default function VistaPainel({
             type="button"
             aria-pressed={filtro === serie.id}
             onClick={() => setFiltro(serie.id)}
-            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
           >
             {serie.nome}
           </button>

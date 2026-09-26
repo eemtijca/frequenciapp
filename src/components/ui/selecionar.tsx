@@ -50,7 +50,7 @@ export function Selecionar({
         id={id}
         aria-label={ariaLabel}
         className={cn(
-          "border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 flex h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 text-sm font-medium shadow-none transition-colors focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+          "border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 text-sm font-medium shadow-none transition-colors focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
           className,
         )}
       >
@@ -91,7 +91,7 @@ export function Selecionar({
                 <SelectPrimitive.Item
                   key={opcao.valor}
                   value={opcao.valor}
-                  className="focus:bg-accent focus:text-accent-foreground relative flex min-h-10 w-full cursor-pointer items-center rounded-md py-1.5 pr-8 pl-8 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                  className="focus:bg-accent focus:text-accent-foreground active:bg-accent pressionavel relative flex min-h-10 w-full cursor-pointer items-center rounded-md py-1.5 pr-8 pl-8 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                 >
                   <span className="absolute left-2 flex size-4 items-center justify-center">
                     <SelectPrimitive.ItemIndicator>

@@ -4,6 +4,10 @@
 import { useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -57,7 +61,9 @@ interface Props {
 export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   useEffect(() => {
     setFormulario(null);
@@ -117,48 +123,59 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
           `/api/horarios/${formulario.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        toast.success("Aula atualizada.");
+        avisarSucesso("Aula atualizada.", "A grade da turma já mostra os horários novos.");
       } else {
         await pedir<{ horario: Horario }>(
           "/api/horarios",
           corpoJson({ turmaId: turma.id, ...corpo }),
         );
-        toast.success("Aula criada.");
+        avisarSucesso("Aula criada.", "Ela entra na grade da turma nos dias marcados.");
       }
       setFormulario(null);
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a aula.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível salvar a aula." });
     } finally {
       setEnviando(false);
     }
   }
 
-  async function alternarAtiva(aula: Horario) {
-    try {
-      await pedir<{ horario: Horario }>(
-        `/api/horarios/${aula.id}`,
-        corpoAlteracao("PATCH", { ativo: !aula.ativo }),
-      );
-      toast.success(aula.ativo ? "Aula desativada." : "Aula reativada.");
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
-      toast.error(mensagem);
-    }
+  function alternarAtiva(aula: Horario) {
+    void executarPorChave(aula.id, async () => {
+      try {
+        await pedir<{ horario: Horario }>(
+          `/api/horarios/${aula.id}`,
+          corpoAlteracao("PATCH", { ativo: !aula.ativo }),
+        );
+        avisarSucesso(
+          aula.ativo ? "Aula desativada." : "Aula reativada.",
+          aula.ativo
+            ? "As faltas já registradas continuam guardadas."
+            : "Ela volta a aparecer na grade da turma.",
+        );
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
+        toast.error(mensagem);
+      }
+    });
   }
 
-  async function excluir(aula: Horario) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
-      toast.success("Aula excluída.");
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
-      toast.error(mensagem);
-    }
+  function excluir(aula: Horario) {
+    void executarPorChave(aula.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
+        toast.success("Aula excluída.");
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -181,7 +198,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
             {aulas.map((aula) => (
               <li
                 key={aula.id}
-                className={`flex items-center gap-2 px-3 py-2 ${aula.ativo ? "" : "opacity-60"}`}
+                className={`flex items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${aula.ativo ? "" : "opacity-60"}`}
               >
                 <span className="numerais-tabulares text-muted-foreground w-6 shrink-0 text-sm">
                   {String(aula.ordem).padStart(2, "0")}
@@ -214,6 +231,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                     aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
                   }
                   onClick={() => alternarAtiva(aula)}
+                  disabled={chaveAtiva === aula.id}
                 >
                   <Power size={16} />
                 </Button>
@@ -243,6 +261,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                       <AlertDialogAction
                         className="bg-falta text-falta-foreground hover:bg-falta/90"
                         onClick={() => excluir(aula)}
+                        disabled={chaveAtiva === aula.id}
                       >
                         Excluir
                       </AlertDialogAction>
@@ -327,7 +346,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                       type="button"
                       aria-pressed={marcado}
                       onClick={() => alternarDia(dia.valor)}
-                      className={`h-9 rounded-lg border px-3 text-xs font-medium transition-colors active:scale-[0.98] ${
+                      className={`pressionavel h-9 rounded-lg border px-3 text-xs font-medium transition-colors ${
                         marcado
                           ? "border-primary bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:border-foreground/30"
@@ -339,14 +358,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                 })}
               </div>
             </fieldset>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setFormulario(null)}>
                 Cancelar

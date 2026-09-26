@@ -19,6 +19,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import type {
   Aluno,
   Configuracoes,
@@ -33,6 +35,16 @@ import type {
 import { diasDoMes } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
@@ -63,6 +75,7 @@ interface Props {
   resumoInicial: ResumoAcumulado | null;
 }
 
+const CHAVE_AVISO_ENTRADA = "frequenciapp:aviso-entrada";
 const VISOES: Visao[] = ["painel", "chamada", "saidas", "relatorios", "alunos", "gestao"];
 
 function visaoValida(valor: string | undefined): Visao | null {
@@ -123,7 +136,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       type="button"
       aria-current={ativo ? "page" : undefined}
       onClick={() => onTrocar(item.visao)}
-      className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors active:scale-[0.98] lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
+      className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary pressionavel relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
     >
       {ativo &&
         indicador &&
@@ -206,6 +219,7 @@ export default function Aplicacao({
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
+  const [saidaComPendencia, setSaidaComPendencia] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [offline, setOffline] = useState(false);
   const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
@@ -246,16 +260,23 @@ export default function Aplicacao({
   const recarregarFrequencias = useCallback(
     async (novoMes: string) => {
       setMes(novoMes);
-      const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
-      setFrequencias(dados.frequencias);
-      setVersaoFrequencias((valor) => valor + 1);
       try {
-        const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
-          `/api/frequencias/resumo?ate=${diaCorrente}`,
-        );
-        setResumo(resumoDados.resumo);
-      } catch {
-        // O acumulado é complementar: a chamada segue sem ele.
+        const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+        setFrequencias(dados.frequencias);
+        setVersaoFrequencias((valor) => valor + 1);
+        try {
+          const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
+            `/api/frequencias/resumo?ate=${diaCorrente}`,
+          );
+          setResumo(resumoDados.resumo);
+        } catch {
+          // O acumulado é complementar: a chamada segue sem ele.
+        }
+      } catch (excecao) {
+        avisarErro(excecao, {
+          contexto: "Não foi possível atualizar as frequências.",
+          descricao: "As informações na tela podem estar desatualizadas.",
+        });
       }
     },
     [diaCorrente],
@@ -265,16 +286,27 @@ export default function Aplicacao({
     const dias = diasDoMes(novoMes);
     const primeiro = dias[0] ?? `${novoMes}-01`;
     const ultimo = dias[dias.length - 1] ?? `${novoMes}-28`;
-    const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-      `/api/saidas?de=${primeiro}&ate=${ultimo}`,
-    );
-    setSaidas(dados.saidas);
+    try {
+      const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+        `/api/saidas?de=${primeiro}&ate=${ultimo}`,
+      );
+      setSaidas(dados.saidas);
+    } catch (excecao) {
+      avisarErro(excecao, {
+        contexto: "Não foi possível atualizar as saídas.",
+        descricao: "As informações na tela podem estar desatualizadas.",
+      });
+    }
   }, []);
 
   // Troca de mês nos relatórios recarrega frequências e saídas juntas.
   const recarregarMes = useCallback(
     async (novoMes: string) => {
-      await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+      try {
+        await Promise.all([recarregarFrequencias(novoMes), recarregarSaidas(novoMes)]);
+      } catch (excecao) {
+        avisarErro(excecao, { contexto: "Não foi possível carregar o mês." });
+      }
     },
     [recarregarFrequencias, recarregarSaidas],
   );
@@ -377,7 +409,11 @@ export default function Aplicacao({
       setOffline(false);
     }
     function aoExpirarSessao() {
-      toast.error("Sua sessão expirou. Entre novamente.");
+      try {
+        window.sessionStorage.setItem(CHAVE_AVISO_ENTRADA, "sessao_expirada");
+      } catch {
+        // Sem armazenamento: a tela de entrada abre sem o aviso.
+      }
       router.refresh();
     }
     window.addEventListener("beforeunload", avisarSaida);
@@ -392,18 +428,28 @@ export default function Aplicacao({
     };
   }, [pendencias, router]);
 
-  async function sair() {
-    if (pendencias.length > 0) {
-      const confirmar = window.confirm("Há alterações não salvas na chamada. Sair mesmo assim?");
-      if (!confirmar) return;
-    }
+  const { executando: saindo, executar: executarSaida } = useAcaoUnica(async () => {
     try {
       await pedir<{ ok: boolean }>("/api/auth/sair", { method: "POST" });
     } catch {
       toast.error("Não foi possível sair. Tente novamente.");
       return;
     }
+    avisarSucesso("Sessão encerrada.");
     router.refresh();
+  });
+
+  function sair() {
+    if (pendencias.length > 0) {
+      setSaidaComPendencia(true);
+      return;
+    }
+    void executarSaida();
+  }
+
+  function confirmarSaida() {
+    setSaidaComPendencia(false);
+    void executarSaida();
   }
 
   function renderizarVisao(alvoVisao: Visao) {
@@ -561,7 +607,8 @@ export default function Aplicacao({
                 variant="ghost"
                 size="sm"
                 className="h-11 w-full justify-start gap-2"
-                onClick={sair}
+                onClick={() => void sair()}
+                disabled={saindo}
               >
                 <LogOut size={16} />
                 Sair da conta
@@ -607,7 +654,7 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => setSenhaAberta(true)}
-                        className="hover:bg-accent flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        className="hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
                       >
                         <KeyRound size={16} aria-hidden="true" />
                         Trocar minha senha
@@ -615,7 +662,8 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => void sair()}
-                        className="text-falta-texto hover:bg-accent flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        disabled={saindo}
+                        className="text-falta-texto hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                       >
                         <LogOut size={16} aria-hidden="true" />
                         Sair da conta
@@ -701,6 +749,23 @@ export default function Aplicacao({
           </nav>
         </div>
       </div>
+
+      <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Há alterações não salvas na chamada</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se sair agora, as marcações não salvas serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarSaida} disabled={saindo}>
+              Sair mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <DialogoSenha aberto={senhaAberta} onAbrir={setSenhaAberta} />
       <RegistroPwa />

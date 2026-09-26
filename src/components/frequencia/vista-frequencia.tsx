@@ -15,9 +15,12 @@ import {
   Save,
   School,
   Settings2,
-  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -140,6 +143,7 @@ export default function VistaFrequencia({
   const [salvando, setSalvando] = useState(false);
   const [sujo, setSujo] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -228,6 +232,7 @@ export default function VistaFrequencia({
         setErro(
           excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a frequência.",
         );
+        setErroVariante(estadoDeErro(excecao));
       })
       .finally(() => {
         if (viva) setCarregando(false);
@@ -421,7 +426,7 @@ export default function VistaFrequencia({
     setErro("");
   }
 
-  async function salvar() {
+  const { executar: salvar } = useAcaoUnica(async () => {
     if (!podeSalvar || !dia || !turmaId) return;
     setSalvando(true);
     setErro("");
@@ -458,7 +463,7 @@ export default function VistaFrequencia({
       }
       const total = dados.frequencia.faltas.length;
       const justificadas = dados.frequencia.faltas.filter((falta) => falta.justificativa).length;
-      toast.success(
+      avisarSucesso(
         total === 0
           ? "Chamada salva. Todos presentes."
           : `Chamada salva com ${total} ${total === 1 ? "falta" : "faltas"}${
@@ -466,6 +471,7 @@ export default function VistaFrequencia({
                 ? ` (${justificadas} ${justificadas === 1 ? "justificada" : "justificadas"})`
                 : ""
             }.`,
+        "Pode conferir no Histórico ou seguir para outra turma.",
       );
       await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
@@ -479,11 +485,19 @@ export default function VistaFrequencia({
         setConflito(true);
       }
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
-      toast.error(falha?.message ?? "Não foi possível salvar a chamada.");
+      setErroVariante(falha?.conflito ? "conflito" : estadoDeErro(excecao));
+      if (falha?.status !== 401) {
+        toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
+          description: falha?.conflito
+            ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
+            : undefined,
+          duration: falha?.conflito ? 8000 : undefined,
+        });
+      }
     } finally {
       setSalvando(false);
     }
-  }
+  });
 
   function descartar() {
     try {
@@ -492,6 +506,9 @@ export default function VistaFrequencia({
       // rascunho já removido
     }
     setRecarregar((valor) => valor + 1);
+    toast("Rascunho descartado.", {
+      description: "As marcações voltaram para a última versão salva.",
+    });
   }
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
@@ -593,7 +610,7 @@ export default function VistaFrequencia({
                     aria-pressed={ativo}
                     disabled={travado}
                     onClick={() => setTurmaId(opcao.id)}
-                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98] disabled:opacity-50"
+                    className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     <span>{opcao.rotulo}</span>
                     <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -643,7 +660,7 @@ export default function VistaFrequencia({
               type="button"
               disabled={travado}
               onClick={() => setDia(diaCorrente)}
-              className="text-primary self-start text-sm font-medium hover:underline disabled:opacity-50"
+              className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
             >
               Voltar para hoje
             </button>
@@ -659,7 +676,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "faltas"}
               onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
-              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                 {carregando ? "" : contagemFaltas}
@@ -672,7 +689,7 @@ export default function VistaFrequencia({
               onClick={() =>
                 setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
               }
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemJustificadas}
@@ -683,7 +700,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "presentes"}
               onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors active:scale-[0.98]"
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemPresencas}
@@ -721,37 +738,34 @@ export default function VistaFrequencia({
             type="button"
             aria-expanded={resumoAberto}
             onClick={() => setResumoAberto((atual) => !atual)}
-            className="text-primary self-start text-sm font-medium hover:underline"
+            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
           >
             {resumoAberto ? "Ocultar resumo de faltas" : "Ver resumo de faltas"}
           </button>
 
-          {(erro || conflito) && (
-            <div
-              role="alert"
-              className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-            >
-              <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-              <div className="flex-1">
-                <p>{erro}</p>
-                {conflito && (
-                  <Button variant="outline" size="sm" className="mt-2" onClick={descartar}>
-                    Recarregar versão salva
-                  </Button>
-                )}
-                {!conflito && !sujo && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => setRecarregar((valor) => valor + 1)}
-                  >
-                    Tentar novamente
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
+          {(erro || conflito) &&
+            (conflito ? (
+              <AvisoCompacto
+                variante="conflito"
+                descricao={erro || undefined}
+                tamanho="linha"
+                acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
+              />
+            ) : (
+              <AvisoCompacto
+                variante={erroVariante}
+                descricao={erro}
+                tamanho="linha"
+                acao={
+                  !sujo
+                    ? {
+                        rotulo: "Tentar novamente",
+                        onClick: () => setRecarregar((valor) => valor + 1),
+                      }
+                    : undefined
+                }
+              />
+            ))}
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 xl:order-1">
@@ -775,7 +789,10 @@ export default function VistaFrequencia({
                       const acumulado = acumuladoDe(aluno.id);
                       const codigo = justificativas.get(aluno.id);
                       return (
-                        <li key={aluno.id} className="flex items-start gap-3 px-4 py-2.5">
+                        <li
+                          key={aluno.id}
+                          className="flex items-start gap-3 px-4 py-2.5 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                        >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
                               {aluno.nome}
@@ -844,7 +861,7 @@ export default function VistaFrequencia({
               {(filtro !== "todos" || busca !== "") && (
                 <button
                   type="button"
-                  className="text-primary font-medium hover:underline"
+                  className="text-primary pressionavel font-medium hover:underline"
                   onClick={() => {
                     setFiltro("todos");
                     setBusca("");
@@ -878,7 +895,7 @@ export default function VistaFrequencia({
                 </p>
                 <button
                   type="button"
-                  className="text-primary text-sm font-medium hover:underline"
+                  className="text-primary pressionavel text-sm font-medium hover:underline"
                   onClick={() => {
                     setFiltro("todos");
                     setBusca("");
@@ -896,7 +913,10 @@ export default function VistaFrequencia({
                   const codigo = justificativas.get(aluno.id) ?? "";
                   const acumulado = acumuladoDe(aluno.id);
                   return (
-                    <li key={aluno.id}>
+                    <li
+                      key={aluno.id}
+                      className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                    >
                       <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
                         <button
                           type="button"
@@ -908,7 +928,7 @@ export default function VistaFrequencia({
                               : `${aluno.nome}: presente. Toque para marcar falta.`
                           }
                           onClick={() => alternarFalta(aluno.id)}
-                          className={`faixa-toque flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors active:scale-[0.99] disabled:opacity-60 ${
+                          className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
                             faltando ? "" : "hover:bg-secondary/60"
                           }`}
                         >
@@ -966,7 +986,7 @@ export default function VistaFrequencia({
                             onClick={() =>
                               setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
                             }
-                            className="text-muted-foreground hover:bg-secondary border-border my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            className="text-muted-foreground hover:bg-secondary border-border pressionavel my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
                           >
                             Aulas
                           </button>
@@ -1020,7 +1040,7 @@ export default function VistaFrequencia({
                                         aria-pressed={marcada}
                                         disabled={bloqueado}
                                         onClick={() => alternarAula(aluno.id, aula.id)}
-                                        className={`numerais-tabulares h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] disabled:opacity-50 ${
+                                        className={`numerais-tabulares pressionavel h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                                           marcada
                                             ? "border-falta bg-falta text-falta-foreground"
                                             : "text-muted-foreground hover:border-foreground/30"
@@ -1034,7 +1054,7 @@ export default function VistaFrequencia({
                                 <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
                                   <button
                                     type="button"
-                                    className="text-primary font-medium hover:underline"
+                                    className="text-primary pressionavel font-medium hover:underline"
                                     onClick={() =>
                                       definirAulas(
                                         aluno.id,
@@ -1046,7 +1066,7 @@ export default function VistaFrequencia({
                                   </button>
                                   <button
                                     type="button"
-                                    className="text-primary font-medium hover:underline"
+                                    className="text-primary pressionavel font-medium hover:underline"
                                     onClick={() => definirAulas(aluno.id, [])}
                                   >
                                     Nenhuma
@@ -1069,7 +1089,7 @@ export default function VistaFrequencia({
 
           <div
             aria-label="Barra de salvamento"
-            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-0 z-20 -mx-4 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 xl:mx-0"
+            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-3 z-20 rounded-xl border px-4 py-3 shadow-lg backdrop-blur"
           >
             <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
               <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">

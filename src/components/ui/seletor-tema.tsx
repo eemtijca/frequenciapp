@@ -52,7 +52,7 @@ export function SeletorTema({ className }: { className?: string }) {
                 role="radio"
                 aria-checked={ativo}
                 onClick={() => setTheme(valor)}
-                className="hover:bg-accent flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                className="hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
               >
                 <Icone size={16} aria-hidden="true" />
                 {rotulo}

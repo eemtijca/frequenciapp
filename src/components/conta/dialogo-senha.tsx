@@ -6,6 +6,9 @@ import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Label } from "@/components/ui/label";
@@ -28,6 +31,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
   const [confirmacao, setConfirmacao] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   function fechar(abertoNovo: boolean) {
     if (enviando) return;
@@ -54,6 +58,8 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
       fechar(false);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível trocar a senha.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível trocar a senha." });
     } finally {
       setEnviando(false);
     }
@@ -111,14 +117,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
               className="h-11 rounded-lg"
             />
           </div>
-          {erro && (
-            <p
-              role="alert"
-              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-            >
-              {erro}
-            </p>
-          )}
+          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => fechar(false)}>
               Cancelar

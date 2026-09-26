@@ -2,10 +2,14 @@
 
 // Aba de equipe: contas da coordenação e da administração, com papel,
 // senha e situação. Sem atribuições de turma.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -51,15 +55,14 @@ const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO"
 export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const semMovimento = useReducedMotion() ?? false;
-  const [carregando, setCarregando] = useState(true);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
-  const recarregar = useCallback(async () => {
-    setCarregando(true);
+  const { executando: carregando, executar: recarregar } = useAcaoUnica(async () => {
     try {
       const dados = await pedir<{ usuarios: UsuarioDTO[] }>("/api/usuarios");
       setUsuarios(dados.usuarios);
@@ -68,10 +71,10 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
         excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a equipe.";
       toast.error(mensagem);
       setUsuarios([]);
-    } finally {
-      setCarregando(false);
     }
-  }, []);
+  });
+
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
   useEffect(() => {
     void recarregar();
@@ -122,46 +125,60 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
           `/api/usuarios/${emEdicao.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        toast.success("Conta atualizada.");
+        avisarSucesso("Conta atualizada.", "Os dados novos valem no próximo acesso.");
       } else {
         await pedir<{ usuario: UsuarioDTO }>("/api/usuarios", corpoJson(formulario));
-        toast.success("Conta criada.");
+        avisarSucesso("Conta criada.", "A pessoa entra com o e-mail e a senha cadastrados.");
       }
       setDialogoAberto(false);
       await recarregar();
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a conta.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível salvar a conta." });
     } finally {
       setEnviando(false);
     }
   }
 
-  async function alternarAtivo(usuario: UsuarioDTO) {
-    try {
-      await pedir<{ usuario: UsuarioDTO }>(
-        `/api/usuarios/${usuario.id}`,
-        corpoAlteracao("PATCH", { ativo: !usuario.ativo }),
-      );
-      toast.success(usuario.ativo ? "Conta desativada." : "Conta reativada.");
-      await recarregar();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a conta.";
-      toast.error(mensagem);
-    }
+  function alternarAtivo(usuario: UsuarioDTO) {
+    void executarPorChave(usuario.id, async () => {
+      try {
+        await pedir<{ usuario: UsuarioDTO }>(
+          `/api/usuarios/${usuario.id}`,
+          corpoAlteracao("PATCH", { ativo: !usuario.ativo }),
+        );
+        avisarSucesso(
+          usuario.ativo ? "Conta desativada." : "Conta reativada.",
+          usuario.ativo
+            ? "A pessoa perde o acesso, mas o histórico é preservado."
+            : "A pessoa volta a entrar com a senha de sempre.",
+        );
+        await recarregar();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a conta.";
+        toast.error(mensagem);
+      }
+    });
   }
 
-  async function excluir(usuario: UsuarioDTO) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/usuarios/${usuario.id}`, corpoAlteracao("DELETE"));
-      toast.success("Conta excluída.");
-      await recarregar();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a conta.";
-      toast.error(mensagem);
-    }
+  function excluir(usuario: UsuarioDTO) {
+    void executarPorChave(usuario.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/usuarios/${usuario.id}`, corpoAlteracao("DELETE"));
+        avisarSucesso(
+          "Conta excluída.",
+          "O histórico fica sem autoria e as faltas continuam salvas.",
+        );
+        await recarregar();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a conta.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -266,7 +283,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                                 ? `Desativar conta de ${usuario.nome}`
                                 : `Reativar conta de ${usuario.nome}`
                             }
-                            disabled={ultimoAdmin}
+                            disabled={ultimoAdmin || chaveAtiva === usuario.id}
                             title={
                               ultimoAdmin
                                 ? "A escola precisa de ao menos um administrador ativo."
@@ -304,6 +321,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                                 <AlertDialogAction
                                   className="bg-falta text-falta-foreground hover:bg-falta/90"
                                   onClick={() => excluir(usuario)}
+                                  disabled={chaveAtiva === usuario.id}
                                 >
                                   Excluir
                                 </AlertDialogAction>
@@ -415,14 +433,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                 </p>
               )}
             </div>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
                 Cancelar

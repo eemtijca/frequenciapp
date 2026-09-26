@@ -7,6 +7,10 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -88,9 +92,8 @@ export default function DialogoEnvio({
 }: Props) {
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
@@ -122,26 +125,23 @@ export default function DialogoEnvio({
     ],
   );
 
-  const simular = useCallback(async () => {
-    setCarregando(true);
+  const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
     try {
       const dados = await pedir<Simulacao>("/api/planilha/simular", corpoJson(entradas()));
       setSimulacao(dados);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.");
-    } finally {
-      setCarregando(false);
+      setErroVariante(estadoDeErro(excecao));
     }
-  }, [entradas]);
+  });
 
   useEffect(() => {
     if (aberto) void simular();
   }, [aberto, simular]);
 
-  async function enviar() {
+  const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
     if (!simulacao) return;
-    setEnviando(true);
     setErro("");
     try {
       const dados = await pedir<{
@@ -161,10 +161,13 @@ export default function DialogoEnvio({
       aoConcluir();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível enviar.");
-    } finally {
-      setEnviando(false);
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, {
+        contexto: "Não foi possível enviar.",
+        descricao: "Nada foi alterado na planilha. Tente de novo em instantes.",
+      });
     }
-  }
+  });
 
   const bloqueado = simulacao?.planos.some((item) => item.bloqueado) ?? false;
   const plano = simulacao?.planos[0];
@@ -268,13 +271,14 @@ export default function DialogoEnvio({
           )}
 
           {bloqueado && (
-            <p
-              role="alert"
-              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs"
-            >
-              {simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
-                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."}
-            </p>
+            <AvisoCompacto
+              variante="dados_invalidos"
+              descricao={
+                simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
+                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
+              }
+              tamanho="linha"
+            />
           )}
 
           {simulacao && !carregando && !bloqueado && todas && (
@@ -336,14 +340,7 @@ export default function DialogoEnvio({
             </div>
           )}
 
-          {erro && (
-            <p
-              role="alert"
-              className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-            >
-              {erro}
-            </p>
-          )}
+          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         </div>
 
         <DialogFooter>

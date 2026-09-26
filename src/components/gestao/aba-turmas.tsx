@@ -6,6 +6,10 @@ import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Serie, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -50,8 +54,10 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Turma | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
+  const { chaveAtiva, executar } = useAcoesPorChave();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [turmaDasAulas, setTurmaDasAulas] = useState<Turma | null>(null);
   const [aulasAberto, setAulasAberto] = useState(false);
   const turmaDasAulasAtual = turmas.find((item) => item.id === turmaDasAulas?.id) ?? turmaDasAulas;
@@ -113,30 +119,34 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ turma: Turma }>(`/api/turmas/${emEdicao.id}`, corpoAlteracao("PATCH", dados));
-        toast.success("Turma atualizada.");
+        avisarSucesso("Turma atualizada.", "A mudança vale para a Chamada e os Relatórios.");
       } else {
         await pedir<{ turma: Turma }>("/api/turmas", corpoJson(dados));
-        toast.success("Turma criada.");
+        avisarSucesso("Turma criada.", "Ela já aparece na Chamada, nos Relatórios e na Gestão.");
       }
       setDialogoAberto(false);
       await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a turma.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível salvar a turma." });
     } finally {
       setEnviando(false);
     }
   }
 
-  async function excluir(turma: Turma) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/turmas/${turma.id}`, corpoAlteracao("DELETE"));
-      toast.success(`Turma ${turma.rotulo} excluída.`);
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a turma.";
-      toast.error(mensagem);
-    }
+  function excluir(turma: Turma) {
+    void executar(turma.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/turmas/${turma.id}`, corpoAlteracao("DELETE"));
+        toast.success(`Turma ${turma.rotulo} excluída.`);
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a turma.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -267,6 +277,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                               <AlertDialogAction
                                 className="bg-falta text-falta-foreground hover:bg-falta/90"
                                 onClick={() => excluir(turma)}
+                                disabled={chaveAtiva === turma.id}
                               >
                                 Excluir
                               </AlertDialogAction>
@@ -323,14 +334,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                 O rótulo completo aparece como série + turma, por exemplo 1º ano A.
               </p>
             </div>
-            {erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
                 Cancelar

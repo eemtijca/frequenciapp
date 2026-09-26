@@ -66,7 +66,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="hover:bg-secondary focus-visible:ring-ring absolute top-2 right-2 flex size-11 items-center justify-center rounded-lg opacity-70 transition-colors hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            className="hover:bg-secondary focus-visible:ring-ring pressionavel absolute top-2 right-2 flex size-11 items-center justify-center rounded-lg opacity-70 transition-colors hover:opacity-100 focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon />
             <span className="sr-only">Fechar</span>

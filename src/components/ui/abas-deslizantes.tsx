@@ -9,6 +9,8 @@ import type { LucideIcon } from "lucide-react";
 export interface AbaItem<T extends string> {
   valor: T;
   rotulo: string;
+  /** Rótulo curto no celular, quando o nome cheio não cabe na aba. */
+  rotuloCurto?: string;
   icone: LucideIcon;
 }
 
@@ -96,11 +98,12 @@ export default function AbasDeslizantes<T extends string>({
               id={`aba-${item.valor}`}
               type="button"
               role="tab"
+              aria-label={item.rotuloCurto ? item.rotulo : undefined}
               aria-selected={ativo}
               aria-controls={`painel-${item.valor}`}
               tabIndex={ativo ? 0 : -1}
               onClick={() => trocarAba(item.valor)}
-              className="relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
+              className="pressionavel relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
             >
               {ativo &&
                 (semMovimento ? (
@@ -120,7 +123,14 @@ export default function AbasDeslizantes<T extends string>({
               <span
                 className={`relative z-10 ${ativo ? "text-foreground" : "text-muted-foreground"}`}
               >
-                {item.rotulo}
+                {item.rotuloCurto ? (
+                  <>
+                    <span className="sm:hidden">{item.rotuloCurto}</span>
+                    <span className="hidden sm:inline">{item.rotulo}</span>
+                  </>
+                ) : (
+                  item.rotulo
+                )}
               </span>
             </button>
           );

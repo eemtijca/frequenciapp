@@ -3,7 +3,7 @@
 // Grade de frequência por turma de origem: modos dia, semana de aula,
 // período personalizado e mês; células P, F e FJ, saída no dia e coluna
 // acumulada (F + FJ) de todo o histórico.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
@@ -27,6 +27,10 @@ import {
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -71,9 +75,9 @@ export default function VistaGrade({
   onMes,
   onRecarregar,
 }: Props) {
-  const [atualizando, setAtualizando] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<ModoPeriodo>("mes");
   const [diaBase, setDiaBase] = useState(hoje);
@@ -111,28 +115,30 @@ export default function VistaGrade({
   // No modo mês usamos o estado compartilhado do app; nos demais, o período
   // é buscado na API para não depender do mês carregado.
   useEffect(() => {
-    if (modo === "mes" || !aberto) {
-      setDoPeriodo(null);
-      return;
-    }
+    if (modo === "mes" || !aberto) return;
     const primeiro = dias[0] ?? diaBase;
     const ultimo = dias[dias.length - 1] ?? diaBase;
     let viva = true;
-    setCarregandoPeriodo(true);
-    setErro("");
-    pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?de=${primeiro}&ate=${ultimo}`)
-      .then((dados) => {
-        if (viva) setDoPeriodo(dados.frequencias);
-      })
-      .catch((excecao: unknown) => {
-        if (!viva) return;
-        setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
+    async function buscar() {
+      setCarregandoPeriodo(true);
+      setErro("");
+      try {
+        const dados = await pedir<{ frequencias: Frequencia[] }>(
+          `/api/frequencias?de=${primeiro}&ate=${ultimo}`,
         );
-      })
-      .finally(() => {
+        if (viva) setDoPeriodo(dados.frequencias);
+      } catch (excecao) {
+        if (viva) {
+          setErro(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
+          );
+          setErroVariante(estadoDeErro(excecao));
+        }
+      } finally {
         if (viva) setCarregandoPeriodo(false);
-      });
+      }
+    }
+    void buscar();
     return () => {
       viva = false;
     };
@@ -167,8 +173,7 @@ export default function VistaGrade({
     return (alunoId: string) => mapa.get(alunoId) ?? 0;
   }, [resumo]);
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       if (modo === "mes") {
@@ -177,10 +182,11 @@ export default function VistaGrade({
         setDoPeriodo(null);
         setRecarga((valor) => valor + 1);
       }
-    } finally {
-      setAtualizando(false);
+    } catch (excecao) {
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
     }
-  }
+  });
 
   const totalFaltas = grade.linhas.reduce((soma, linha) => soma + linha.faltas, 0);
   const totalJustificadas = grade.linhas.reduce((soma, linha) => soma + linha.justificadas, 0);
@@ -189,10 +195,22 @@ export default function VistaGrade({
     return (id: string) => mapa.get(id) ?? "";
   }, [origens]);
 
+  // Geração de arquivo: uma janela curta evita dois downloads no toque duplo.
+  const ultimoDownload = useRef(0);
+
   // Exporta o dataframe da turma de origem no período exibido. A busca da
   // tela não interfere: a planilha leva todos os alunos ativos da turma.
   function baixarPlanilha() {
-    if (grade.linhas.length === 0) return;
+    const agora = Date.now();
+    if (agora - ultimoDownload.current < 800) return;
+    ultimoDownload.current = agora;
+    if (grade.linhas.length === 0) {
+      avisarInfo(
+        "Nada para exportar neste período.",
+        "Escolha outro período ou confira a turma de origem.",
+      );
+      return;
+    }
     const turma = turmaPlanilhaDaGrade(
       turmaEfetiva,
       rotuloDe(turmaEfetiva),
@@ -209,6 +227,7 @@ export default function VistaGrade({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+    avisarSucesso("Planilha baixada.", "O arquivo leva todos os alunos ativos da turma de origem.");
   }
 
   return (
@@ -283,7 +302,7 @@ export default function VistaGrade({
               type="button"
               aria-pressed={ativo}
               onClick={() => setTurmaId(turma.id)}
-              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors"
             >
               <span>{turma.rotulo}</span>
               <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -381,18 +400,14 @@ export default function VistaGrade({
           <button
             type="button"
             onClick={() => onMes(mesCorrente)}
-            className="text-primary self-start text-sm font-medium hover:underline"
+            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
           >
             Voltar para este mês
           </button>
         )}
       </div>
 
-      {erro && (
-        <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {turmasOriginais.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">

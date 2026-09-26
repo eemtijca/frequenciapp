@@ -9,9 +9,12 @@ import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorTema } from "@/components/ui/seletor-tema";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { avisarSucesso } from "@/lib/avisos";
 
 const CHAVE_EMAIL = "frequenciapp:email";
+const CHAVE_AVISO = "frequenciapp:aviso-entrada";
 
 const DESTAQUES = [
   { Icone: CalendarCheck, texto: "Chamada do dia com saída por aula" },
@@ -26,6 +29,8 @@ export default function TelaLogin() {
   const [lembrar, setLembrar] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado | null>(null);
+  const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(null);
 
   // Preenche o e-mail lembrado neste dispositivo, se houver.
   useEffect(() => {
@@ -37,11 +42,24 @@ export default function TelaLogin() {
     }
   }, []);
 
+  // Aviso deixado pelo shell quando a sessão expira, mostrado uma única vez.
+  useEffect(() => {
+    try {
+      if (window.sessionStorage.getItem(CHAVE_AVISO) === "sessao_expirada") {
+        setAvisoEntrada("sessao_expirada");
+        window.sessionStorage.removeItem(CHAVE_AVISO);
+      }
+    } catch {
+      // Sem armazenamento local: segue sem o aviso.
+    }
+  }, []);
+
   async function submeter(evento: React.FormEvent) {
     evento.preventDefault();
     if (enviando) return;
     setEnviando(true);
     setErro("");
+    setErroVariante(null);
     try {
       await pedir<{ usuario: { nome: string } }>(
         "/api/auth/entrar",
@@ -53,11 +71,14 @@ export default function TelaLogin() {
       } catch {
         // Sem armazenamento local: o login continua.
       }
+      avisarSucesso("Entrada confirmada.");
       router.refresh();
     } catch (excecao) {
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível entrar. Tente novamente.";
       setErro(mensagem);
+      const status = excecao instanceof ErroApi ? excecao.status : 0;
+      setErroVariante(status === 403 ? "conta_desativada" : status === 429 ? "limite" : null);
     } finally {
       setEnviando(false);
     }
@@ -121,6 +142,8 @@ export default function TelaLogin() {
             </div>
           </div>
 
+          {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}
+
           <form onSubmit={submeter} className="flex flex-col gap-5" noValidate>
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">E-mail</Label>
@@ -163,7 +186,7 @@ export default function TelaLogin() {
               />
             </div>
 
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+            <label className="pressionavel flex min-h-11 cursor-pointer items-center gap-3 text-sm">
               <input
                 type="checkbox"
                 name="lembrar"
@@ -174,15 +197,18 @@ export default function TelaLogin() {
               Manter conectado neste dispositivo
             </label>
 
-            {erro && (
-              <p
-                id="erro-entrada"
-                role="alert"
-                className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm"
-              >
-                {erro}
-              </p>
-            )}
+            {erro &&
+              (erroVariante ? (
+                <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+              ) : (
+                <p
+                  id="erro-entrada"
+                  role="alert"
+                  className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm"
+                >
+                  {erro}
+                </p>
+              ))}
 
             <Button type="submit" size="lg" className="h-12 text-base" disabled={enviando}>
               {enviando ? <LoaderCircle className="animate-spin" size={18} /> : null}

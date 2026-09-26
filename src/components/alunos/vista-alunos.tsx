@@ -99,7 +99,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
               type="button"
               aria-pressed={ativo}
               onClick={() => setAgrupamento(opcao.valor)}
-              className="aria-[pressed=true]:bg-background aria-[pressed=true]:text-foreground text-muted-foreground relative flex min-h-10 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors aria-[pressed=true]:shadow-sm"
+              className="aria-[pressed=true]:bg-background aria-[pressed=true]:text-foreground text-muted-foreground pressionavel relative flex min-h-10 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors aria-[pressed=true]:shadow-sm"
             >
               {opcao.rotulo}
             </button>

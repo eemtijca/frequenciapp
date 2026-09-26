@@ -3,15 +3,12 @@
 // Saiu mais cedo: registro da saída antecipada, saídas do dia por turma e
 // relatório semanal por aluno. Separado da chamada.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  DoorOpen,
-  LoaderCircle,
-  RefreshCw,
-  TriangleAlert,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, DoorOpen, LoaderCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   Aluno,
   JustificativaConfigurada,
@@ -35,6 +32,16 @@ import {
 import { relatorioSaidas } from "@/domain/relatorios";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -76,10 +83,12 @@ export default function VistaSaidas({
   const [responsavelId, setResponsavelId] = useState(usuarioId);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [doDia, setDoDia] = useState<SaidaAntecipada[] | null>(null);
   const [carregandoDia, setCarregandoDia] = useState(false);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [turmaAberta, setTurmaAberta] = useState<string | null>(null);
+  const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
 
   const [relatorioAberto, setRelatorioAberto] = useState(false);
   const [diaRelatorio, setDiaRelatorio] = useState(diaCorrente);
@@ -87,7 +96,24 @@ export default function VistaSaidas({
   const [buscaRelatorio, setBuscaRelatorio] = useState("");
   const [filtroRelatorio, setFiltroRelatorio] = useState<"todas" | "repetidas">("todas");
   const [saidasSemana, setSaidasSemana] = useState<SaidaAntecipada[] | null>(null);
-  const [carregandoRelatorio, setCarregandoRelatorio] = useState(false);
+
+  const { executando: carregandoRelatorio, executar: carregarRelatorio } = useAcaoUnica(
+    async () => {
+      try {
+        const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+          `/api/saidas?de=${segundaRelatorio}&ate=${domingoRelatorio}`,
+        );
+        setSaidasSemana(dados.saidas);
+      } catch (excecao) {
+        toast.error(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o relatório.",
+        );
+        setSaidasSemana([]);
+      }
+    },
+  );
+
+  const { chaveAtiva: removendoId, executar: executarRemocao } = useAcoesPorChave();
 
   const rotuloTurma = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
@@ -123,6 +149,7 @@ export default function VistaSaidas({
           setErro(
             excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar as saídas.",
           );
+          setErroVariante(estadoDeErro(excecao));
         }
       })
       .finally(() => {
@@ -170,23 +197,6 @@ export default function VistaSaidas({
   const segundaRelatorio = diaSeguinte(diaRelatorio, -(diaDaSemanaIso(diaRelatorio) - 1));
   const domingoRelatorio = diaSeguinte(segundaRelatorio, 6);
 
-  async function carregarRelatorio() {
-    setCarregandoRelatorio(true);
-    try {
-      const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-        `/api/saidas?de=${segundaRelatorio}&ate=${domingoRelatorio}`,
-      );
-      setSaidasSemana(dados.saidas);
-    } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o relatório.",
-      );
-      setSaidasSemana([]);
-    } finally {
-      setCarregandoRelatorio(false);
-    }
-  }
-
   const relatorio = useMemo(() => {
     if (saidasSemana === null) return [];
     const termo = normalizar(buscaRelatorio);
@@ -222,7 +232,10 @@ export default function VistaSaidas({
           liberadoPorId: responsavelId,
         }),
       );
-      toast.success("Saída registrada.");
+      avisarSucesso(
+        "Saída registrada.",
+        "O registro aparece em Saídas, no dia de hoje, e nos relatórios.",
+      );
       setAlunoId("");
       setMomento("");
       setJustificativa("");
@@ -238,32 +251,39 @@ export default function VistaSaidas({
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
       setErro(mensagem);
-      toast.error(mensagem);
+      setErroVariante(estadoDeErro(excecao));
+      if (!(excecao instanceof ErroApi && excecao.status === 401)) toast.error(mensagem);
     } finally {
       setEnviando(false);
     }
   }
 
-  async function remover(saida: SaidaAntecipada) {
-    const aluno = alunosPorId.get(saida.alunoId);
-    const confirmar = window.confirm(
-      `Remover a saída de ${aluno?.nome ?? "aluno"} em ${saida.dia.split("-").reverse().join("/")}?`,
-    );
-    if (!confirmar) return;
-    try {
-      await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
-      toast.success("Saída removida.");
-      if (compartilhado) {
-        await onSaidasMudaram(dia.slice(0, 7));
-      } else {
-        setRecarregarDia((valor) => valor + 1);
+  function remover(saida: SaidaAntecipada) {
+    setSaidaRemover(saida);
+  }
+
+  function confirmarRemocao() {
+    if (!saidaRemover) return;
+    const saida = saidaRemover;
+    setSaidaRemover(null);
+    void executarRemocao(saida.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
+        toast.success("Saída removida.");
+        if (compartilhado) {
+          await onSaidasMudaram(dia.slice(0, 7));
+        } else {
+          setRecarregarDia((valor) => valor + 1);
+        }
+        if (relatorioAberto) void carregarRelatorio();
+      } catch (excecao) {
+        if (!(excecao instanceof ErroApi && excecao.status === 401)) {
+          toast.error(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
+          );
+        }
       }
-      if (relatorioAberto) void carregarRelatorio();
-    } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
-      );
-    }
+    });
   }
 
   const rotuloDia = dia.split("-").reverse().join("/");
@@ -422,15 +442,7 @@ export default function VistaSaidas({
             }))}
           />
         </div>
-        {erro && (
-          <p
-            role="alert"
-            className="border-falta/40 bg-falta-fraca text-falta-texto flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
-          >
-            <TriangleAlert size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-            {erro}
-          </p>
-        )}
+        {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         <Button
           type="submit"
           size="lg"
@@ -466,7 +478,7 @@ export default function VistaSaidas({
                     type="button"
                     aria-expanded={aberto}
                     onClick={() => setTurmaAberta((atual) => (atual === chave ? null : chave))}
-                    className="hover:bg-secondary/60 flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm transition-colors"
+                    className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm transition-colors"
                   >
                     <span className="min-w-0 flex-1 truncate font-medium">{grupo.rotulo}</span>
                     <span className="numerais-tabulares text-muted-foreground text-xs">
@@ -502,6 +514,7 @@ export default function VistaSaidas({
                               size="sm"
                               className="text-falta-texto h-9 shrink-0 rounded-lg px-2"
                               onClick={() => void remover(saida)}
+                              disabled={removendoId === saida.id}
                             >
                               Remover
                             </Button>
@@ -526,7 +539,7 @@ export default function VistaSaidas({
             setRelatorioAberto(abrir);
             if (abrir && saidasSemana === null) void carregarRelatorio();
           }}
-          className="flex min-h-11 items-center justify-between gap-2 text-left font-medium"
+          className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-11 items-center justify-between gap-2 rounded-md text-left font-medium transition-colors"
         >
           <span>Relatório por aluno</span>
           <span className="text-muted-foreground text-xs">
@@ -659,6 +672,31 @@ export default function VistaSaidas({
           </>
         )}
       </div>
+      <AlertDialog
+        open={saidaRemover !== null}
+        onOpenChange={(aberto) => !aberto && setSaidaRemover(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover esta saída?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A saída de {alunosPorId.get(saidaRemover?.alunoId ?? "")?.nome ?? "aluno"} em{" "}
+              {saidaRemover?.dia.split("-").reverse().join("/") ?? ""} sai da lista do dia e dos
+              relatórios.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-falta text-falta-foreground hover:bg-falta/90"
+              onClick={confirmarRemocao}
+              disabled={saidaRemover !== null && removendoId === saidaRemover.id}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

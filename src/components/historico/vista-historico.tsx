@@ -21,6 +21,10 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
+import { avisarErro } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -60,23 +64,22 @@ export default function VistaHistorico({
   bloqueado,
   rotuloTurma,
 }: Props) {
-  const [atualizando, setAtualizando] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       await onRecarregar(mes);
-    } catch {
+    } catch (excecao) {
       setErro("Não foi possível buscar as frequências.");
-    } finally {
-      setAtualizando(false);
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível buscar as frequências." });
     }
-  }
+  });
 
   const ordenadas = [...frequencias].sort(
     (a, b) =>
@@ -157,7 +160,7 @@ export default function VistaHistorico({
         <button
           type="button"
           onClick={() => onMes(mesCorrente)}
-          className="text-primary self-start text-sm font-medium hover:underline"
+          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para este mês
         </button>
@@ -169,7 +172,7 @@ export default function VistaHistorico({
             type="button"
             aria-pressed={serieFiltro === ""}
             onClick={() => setSerieFiltro("")}
-            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
           >
             Todas
           </button>
@@ -179,7 +182,7 @@ export default function VistaHistorico({
               type="button"
               aria-pressed={serieFiltro === serie.id}
               onClick={() => setSerieFiltro(serie.id)}
-              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors active:scale-[0.98]"
+              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
             >
               {serie.nome}
             </button>
@@ -193,11 +196,7 @@ export default function VistaHistorico({
         </p>
       )}
 
-      {erro && (
-        <p role="alert" className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm">
-          {erro}
-        </p>
-      )}
+      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {frequencias.length === 0 ? (
         <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
@@ -260,12 +259,13 @@ export default function VistaHistorico({
                     transition={
                       semMovimento ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
                     }
+                    className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
                   >
                     <button
                       type="button"
                       disabled={bloqueado}
                       onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
-                      className="hover:bg-secondary/60 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:scale-[0.99] disabled:opacity-50"
+                      className="hover:bg-secondary/60 pressionavel flex w-full items-center gap-3 px-4 py-3 text-left transition-colors disabled:opacity-50"
                     >
                       <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
                         <span className="numerais-tabulares text-lg font-semibold">
