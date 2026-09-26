@@ -50,7 +50,7 @@ O destrave é feito em Gestão, Configurações, Google Planilhas, por um admini
 - atualização de células divergentes, inclusive nome e turma atual;
 - limpeza de células indicadas;
 - remoção de linhas criadas pela integração para alunos que saíram da turma;
-- remoção de colunas e abas criadas pela integração, pela API.
+- remoção de colunas de dia e de abas criadas pela integração, com confirmação.
 
 Fórmula nunca é sobrescrita, nem no modo completo. A remoção só acontece em linha, coluna ou aba com o marcador da integração. Qualquer sessão pode voltar ao conservador, e a janela expira sozinha.
 

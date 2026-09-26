@@ -47,13 +47,14 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - cópia de segurança: exportação barrada para a coordenação, formato e versão conferidos, importação da própria cópia sem conflitos e arquivo em outro formato recusado;
 - conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros dispositivos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas e a ausência de nomes de alunos;
-- saída encerrando a sessão e verificação de saúde (200 com o banco acessível e 503 sem ele).
+- saída encerrando a sessão e verificação de saúde (200 com o banco acessível e 503 sem ele);
+- integração com Google Planilhas contra um Apps Script falso que responde 302: token e conexão, estrutura e mapa, simulação e aplicação conservadora (célula ocupada e fórmula preservadas), substituição no modo completo com cópia, remoção de linha e coluna com marcador, criação e remoção de aba, recusa por token errado, por hash divergente e por modo completo inativo.
 
 A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e dias de teste isolados) antes e depois, de modo que execuções repetidas não acumulam estado. Rodar com a connection string correta exportada (ver [tests/README.md](../tests/README.md)).
 
 ## Ponta a ponta
 
-Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), campos de senha com exibir e ocultar, lembrar o acesso no dispositivo com sessão persistente e e-mail preenchido, banco vazio sem carregamento infinito, troca de visão pela navegação (instantânea no desktop) e por deslize com o indicador acompanhando o gesto, tema de três opções, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover com teclado e atalhos, abas da Gestão com toque, deslize e teclado, responsividade, login simétrico, campos do login com margem no celular, histórico, grade com divisórias, períodos e coluna acumulada, saídas antecipadas, cópia de segurança e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
+Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), campos de senha com exibir e ocultar, lembrar o acesso no dispositivo com sessão persistente e e-mail preenchido, banco vazio sem carregamento infinito, troca de visão pela navegação (instantânea no desktop) e por deslize com o indicador da barra inferior preso à rolagem quadro a quadro, preferência de animações por dispositivo com persistência e efeito, integração com Google Planilhas contra um Apps Script falso que responde 302 (token, conexão, estrutura, mapa, prévia na Grade e desconexão), tema de três opções, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover com teclado e atalhos, abas da Gestão com toque, deslize e teclado, responsividade, login simétrico, campos do login com margem no celular, histórico, grade com divisórias, períodos e coluna acumulada, saídas antecipadas, cópia de segurança e PWA. A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
 
 ## Convenções
 

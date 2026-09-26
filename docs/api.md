@@ -392,6 +392,18 @@ Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardand
 
 - 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
 
+### POST /api/planilha/criar-aba
+
+Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria uma aba nova com cabeçalho mínimo e marcador da integração. Apenas administração.
+
+- 200 `{"aba": string}`; 400 nome inválido ou repetido; 502 falha na planilha.
+
+### POST /api/planilha/remover-aba
+
+Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, criando cópia antes. Apenas administração.
+
+- 200 `{"aba": string}`; 400 frase, senha ou modo inválidos; 502 quando a aba não foi criada pela integração.
+
 ### POST /api/planilha/desconectar
 
 Apaga token e esquema e desliga a integração. Apenas administração. A planilha não é alterada.
