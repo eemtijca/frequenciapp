@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Configuracoes, JustificativaConfigurada } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -64,189 +65,210 @@ export default function AbaConfiguracoes({
   const [erroJustificativa, setErroJustificativa] = useState("");
   const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
   const [excluirAlvo, setExcluirAlvo] = useState<JustificativaConfigurada | null>(null);
+  const { executar: executarPorChave } = useAcoesPorChave();
 
   async function alternar(chave: "frequenciaPorAula" | "saidaAntecipada", valor: boolean) {
-    setSalvando(chave);
-    setErro("");
-    try {
-      const dados = await pedir<{ configuracoes: Configuracoes }>(
-        "/api/configuracoes",
-        corpoAlteracao("PATCH", { [chave]: valor }),
-      );
-      onMudanca(dados.configuracoes);
-      toast.success(
-        chave === "frequenciaPorAula"
-          ? valor
-            ? "Chamada por aula ativada."
-            : "Chamada por aula desativada."
-          : valor
-            ? "Saída antecipada ativada."
-            : "Saída antecipada desativada.",
-      );
-    } catch (excecao) {
-      setErro(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
-    } finally {
-      setSalvando(null);
-    }
+    await executarPorChave(`recurso-${chave}`, async () => {
+      setSalvando(chave);
+      setErro("");
+      try {
+        const dados = await pedir<{ configuracoes: Configuracoes }>(
+          "/api/configuracoes",
+          corpoAlteracao("PATCH", { [chave]: valor }),
+        );
+        onMudanca(dados.configuracoes);
+        toast.success(
+          chave === "frequenciaPorAula"
+            ? valor
+              ? "Chamada por aula ativada."
+              : "Chamada por aula desativada."
+            : valor
+              ? "Saída antecipada ativada."
+              : "Saída antecipada desativada.",
+        );
+      } catch (excecao) {
+        setErro(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
+        );
+        avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
+      } finally {
+        setSalvando(null);
+      }
+    });
   }
 
   async function criarJustificativa() {
-    if (enviandoJustificativa) return;
-    setEnviandoJustificativa(true);
-    setErroJustificativa("");
-    try {
-      await pedir<{ justificativa: JustificativaConfigurada }>(
-        "/api/justificativas",
-        corpoJson({ codigo: novaCodigo, rotulo: novaRotulo }),
-      );
-      setNovaCodigo("");
-      setNovaRotulo("");
-      await onJustificativasMudaram();
-      avisarSucesso(
-        "Justificativa adicionada.",
-        "Ela já aparece no seletor da Chamada e das Saídas.",
-      );
-    } catch (excecao) {
-      setErroJustificativa(
-        excecao instanceof ErroApi
-          ? excecao.message
-          : "Não foi possível adicionar a justificativa.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível adicionar a justificativa." });
-    } finally {
-      setEnviandoJustificativa(false);
-    }
+    await executarPorChave("justificativa-nova", async () => {
+      if (enviandoJustificativa) return;
+      setEnviandoJustificativa(true);
+      setErroJustificativa("");
+      try {
+        await pedir<{ justificativa: JustificativaConfigurada }>(
+          "/api/justificativas",
+          corpoJson({ codigo: novaCodigo, rotulo: novaRotulo }),
+        );
+        setNovaCodigo("");
+        setNovaRotulo("");
+        await onJustificativasMudaram();
+        avisarSucesso(
+          "Justificativa adicionada.",
+          "Ela já aparece no seletor da Chamada e das Saídas.",
+        );
+      } catch (excecao) {
+        setErroJustificativa(
+          excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível adicionar a justificativa.",
+        );
+        avisarErro(excecao, { contexto: "Não foi possível adicionar a justificativa." });
+      } finally {
+        setEnviandoJustificativa(false);
+      }
+    });
   }
 
   async function salvarRotulo(codigo: string) {
-    if (enviandoJustificativa) return;
-    setEnviandoJustificativa(true);
-    setErroJustificativa("");
-    try {
-      await pedir<{ justificativa: JustificativaConfigurada }>(
-        `/api/justificativas/${encodeURIComponent(codigo)}`,
-        corpoAlteracao("PATCH", { rotulo: rotuloEdicao }),
-      );
-      setEditando(null);
-      setRotuloEdicao("");
-      await onJustificativasMudaram();
-      avisarSucesso("Justificativa atualizada.", "O seletor da Chamada já mostra o rótulo novo.");
-    } catch (excecao) {
-      setErroJustificativa(
-        excecao instanceof ErroApi
-          ? excecao.message
-          : "Não foi possível atualizar a justificativa.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível atualizar a justificativa." });
-    } finally {
-      setEnviandoJustificativa(false);
-    }
+    await executarPorChave(`justificativa-rotulo-${codigo}`, async () => {
+      if (enviandoJustificativa) return;
+      setEnviandoJustificativa(true);
+      setErroJustificativa("");
+      try {
+        await pedir<{ justificativa: JustificativaConfigurada }>(
+          `/api/justificativas/${encodeURIComponent(codigo)}`,
+          corpoAlteracao("PATCH", { rotulo: rotuloEdicao }),
+        );
+        setEditando(null);
+        setRotuloEdicao("");
+        await onJustificativasMudaram();
+        avisarSucesso("Justificativa atualizada.", "O seletor da Chamada já mostra o rótulo novo.");
+      } catch (excecao) {
+        setErroJustificativa(
+          excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível atualizar a justificativa.",
+        );
+        avisarErro(excecao, { contexto: "Não foi possível atualizar a justificativa." });
+      } finally {
+        setEnviandoJustificativa(false);
+      }
+    });
   }
 
   async function alternarAtivo(item: JustificativaConfigurada) {
-    setErroJustificativa("");
-    try {
-      await pedir<{ justificativa: JustificativaConfigurada }>(
-        `/api/justificativas/${encodeURIComponent(item.codigo)}`,
-        corpoAlteracao("PATCH", { ativo: !item.ativo }),
-      );
-      await onJustificativasMudaram();
-      avisarSucesso(
-        item.ativo ? "Justificativa desativada." : "Justificativa reativada.",
-        item.ativo
-          ? "O histórico que usa o código continua intacto."
-          : "Ela volta a aparecer no seletor da Chamada.",
-      );
-    } catch (excecao) {
-      setErroJustificativa(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
-    }
+    await executarPorChave(`justificativa-${item.codigo}`, async () => {
+      setErroJustificativa("");
+      try {
+        await pedir<{ justificativa: JustificativaConfigurada }>(
+          `/api/justificativas/${encodeURIComponent(item.codigo)}`,
+          corpoAlteracao("PATCH", { ativo: !item.ativo }),
+        );
+        await onJustificativasMudaram();
+        avisarSucesso(
+          item.ativo ? "Justificativa desativada." : "Justificativa reativada.",
+          item.ativo
+            ? "O histórico que usa o código continua intacto."
+            : "Ela volta a aparecer no seletor da Chamada.",
+        );
+      } catch (excecao) {
+        setErroJustificativa(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
+        );
+        avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
+      }
+    });
   }
 
   async function removerJustificativa(item: JustificativaConfigurada) {
-    setErroJustificativa("");
-    try {
-      await pedir<{ ok: boolean }>(`/api/justificativas/${encodeURIComponent(item.codigo)}`, {
-        method: "DELETE",
-      });
-      await onJustificativasMudaram();
-      toast.success("Justificativa excluída.");
-    } catch (excecao) {
-      setErroJustificativa(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a justificativa.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível excluir a justificativa." });
-    } finally {
-      setExcluirAlvo(null);
-    }
+    await executarPorChave(`justificativa-excluir-${item.codigo}`, async () => {
+      setErroJustificativa("");
+      try {
+        await pedir<{ ok: boolean }>(`/api/justificativas/${encodeURIComponent(item.codigo)}`, {
+          method: "DELETE",
+        });
+        await onJustificativasMudaram();
+        toast.success("Justificativa excluída.");
+      } catch (excecao) {
+        setErroJustificativa(
+          excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível excluir a justificativa.",
+        );
+        avisarErro(excecao, { contexto: "Não foi possível excluir a justificativa." });
+      } finally {
+        setExcluirAlvo(null);
+      }
+    });
   }
 
   async function baixarCopia() {
     const aviso = "backup-baixar";
-    setBaixando(true);
-    setErro("");
-    toast.loading("Baixando a cópia de segurança...", { id: aviso });
-    try {
-      const dados = await pedir<unknown>("/api/backup");
-      const conteudo = JSON.stringify(dados, null, 2);
-      const blob = new Blob([conteudo], { type: "application/json;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `frequenciapp-copia-${diaCorrente}.json`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      avisarSucesso(
-        "Cópia preparada. Confira o download no navegador.",
-        "Guarde o arquivo em lugar seguro: é com ele que os dados voltam, se precisar.",
-        aviso,
-      );
-    } catch (excecao) {
-      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
-      avisarErro(excecao, { contexto: "Não foi possível gerar a cópia.", id: aviso });
-    } finally {
-      setBaixando(false);
-    }
+    await executarPorChave(aviso, async () => {
+      setBaixando(true);
+      setErro("");
+      toast.loading("Baixando a cópia de segurança...", { id: aviso });
+      try {
+        const dados = await pedir<unknown>("/api/backup");
+        const conteudo = JSON.stringify(dados, null, 2);
+        const blob = new Blob([conteudo], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `frequenciapp-copia-${diaCorrente}.json`;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        avisarSucesso(
+          "Cópia preparada. Confira o download no navegador.",
+          "Guarde o arquivo em lugar seguro: é com ele que os dados voltam, se precisar.",
+          aviso,
+        );
+      } catch (excecao) {
+        setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
+        avisarErro(excecao, { contexto: "Não foi possível gerar a cópia.", id: aviso });
+      } finally {
+        setBaixando(false);
+      }
+    });
   }
 
   async function importar(arquivo: File) {
     const aviso = "backup-importar";
-    setImportando(true);
-    setErro("");
-    setResultado(null);
-    toast.loading("Importando a cópia de segurança...", { id: aviso });
-    try {
-      if (arquivo.size > LIMITE_ARQUIVO) {
-        throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
-      }
-      let corpo: unknown;
+    await executarPorChave(aviso, async () => {
+      setImportando(true);
+      setErro("");
+      setResultado(null);
+      toast.loading("Importando a cópia de segurança...", { id: aviso });
       try {
-        corpo = JSON.parse(await arquivo.text());
-      } catch {
-        throw new Error("Não foi possível ler a cópia. Selecione o arquivo JSON correto.");
+        if (arquivo.size > LIMITE_ARQUIVO) {
+          throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
+        }
+        let corpo: unknown;
+        try {
+          corpo = JSON.parse(await arquivo.text());
+        } catch {
+          throw new Error("Não foi possível ler a cópia. Selecione o arquivo JSON correto.");
+        }
+        const dados = await pedir<ResultadoImportacao>("/api/backup", corpoJson(corpo));
+        setResultado(dados);
+        avisarSucesso(
+          "Importação concluída.",
+          "Confira o resumo na tela antes de continuar.",
+          aviso,
+        );
+      } catch (excecao) {
+        const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
+        setErro(mensagem);
+        toast.error(mensagem, {
+          id: aviso,
+          description: "Confira o arquivo e tente de novo.",
+          duration: 8000,
+        });
+      } finally {
+        setImportando(false);
+        if (arquivoRef.current) arquivoRef.current.value = "";
       }
-      const dados = await pedir<ResultadoImportacao>("/api/backup", corpoJson(corpo));
-      setResultado(dados);
-      avisarSucesso("Importação concluída.", "Confira o resumo na tela antes de continuar.", aviso);
-    } catch (excecao) {
-      const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
-      setErro(mensagem);
-      toast.error(mensagem, {
-        id: aviso,
-        description: "Confira o arquivo e tente de novo.",
-        duration: 8000,
-      });
-    } finally {
-      setImportando(false);
-      if (arquivoRef.current) arquivoRef.current.value = "";
-    }
+    });
   }
 
   return (

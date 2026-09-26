@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,7 @@ interface Props {
 export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [erro, setErro] = useState("");
 
   useEffect(() => {
@@ -136,36 +138,40 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
     }
   }
 
-  async function alternarAtiva(aula: Horario) {
-    try {
-      await pedir<{ horario: Horario }>(
-        `/api/horarios/${aula.id}`,
-        corpoAlteracao("PATCH", { ativo: !aula.ativo }),
-      );
-      avisarSucesso(
-        aula.ativo ? "Aula desativada." : "Aula reativada.",
-        aula.ativo
-          ? "As faltas já registradas continuam guardadas."
-          : "Ela volta a aparecer na grade da turma.",
-      );
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
-      toast.error(mensagem);
-    }
+  function alternarAtiva(aula: Horario) {
+    void executarPorChave(aula.id, async () => {
+      try {
+        await pedir<{ horario: Horario }>(
+          `/api/horarios/${aula.id}`,
+          corpoAlteracao("PATCH", { ativo: !aula.ativo }),
+        );
+        avisarSucesso(
+          aula.ativo ? "Aula desativada." : "Aula reativada.",
+          aula.ativo
+            ? "As faltas já registradas continuam guardadas."
+            : "Ela volta a aparecer na grade da turma.",
+        );
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
+        toast.error(mensagem);
+      }
+    });
   }
 
-  async function excluir(aula: Horario) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
-      toast.success("Aula excluída.");
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
-      toast.error(mensagem);
-    }
+  function excluir(aula: Horario) {
+    void executarPorChave(aula.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
+        toast.success("Aula excluída.");
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -221,6 +227,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                     aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
                   }
                   onClick={() => alternarAtiva(aula)}
+                  disabled={chaveAtiva === aula.id}
                 >
                   <Power size={16} />
                 </Button>
@@ -250,6 +257,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                       <AlertDialogAction
                         className="bg-falta text-falta-foreground hover:bg-falta/90"
                         onClick={() => excluir(aula)}
+                        disabled={chaveAtiva === aula.id}
                       >
                         Excluir
                       </AlertDialogAction>

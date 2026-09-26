@@ -7,6 +7,7 @@ import { Check, ClipboardCopy, FileSpreadsheet, LoaderCircle, RotateCcw } from "
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
@@ -116,6 +117,7 @@ export default function IntegracaoPlanilha({
   >([]);
   const [restaurar, setRestaurar] = useState<{ aba: string; copia: string } | null>(null);
   const [abaRemover, setAbaRemover] = useState<string | null>(null);
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const [envioAberto, setEnvioAberto] = useState(false);
 
@@ -165,103 +167,111 @@ export default function IntegracaoPlanilha({
   const diasEnvio = diasDoMes(mesEnvio);
 
   async function alternarAtiva(valor: boolean) {
-    setSalvando(true);
-    try {
-      const dados = await pedir<{ integracao: IntegracaoAdmin }>(
-        "/api/planilha",
-        corpoAlteracao("PATCH", { ativa: valor }),
-      );
-      setIntegracao(dados.integracao);
-      toast.success(valor ? "Integração ativada." : "Integração desativada.");
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-    } finally {
-      setSalvando(false);
-    }
+    await executarPorChave("alternar-ativa", async () => {
+      setSalvando(true);
+      try {
+        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
+          "/api/planilha",
+          corpoAlteracao("PATCH", { ativa: valor }),
+        );
+        setIntegracao(dados.integracao);
+        toast.success(valor ? "Integração ativada." : "Integração desativada.");
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
+      } finally {
+        setSalvando(false);
+      }
+    });
   }
 
   async function salvarEndpoint() {
-    setSalvando(true);
-    try {
-      const dados = await pedir<{ integracao: IntegracaoAdmin }>(
-        "/api/planilha",
-        corpoAlteracao("PATCH", { endpoint }),
-      );
-      setIntegracao(dados.integracao);
-      toast.success("Endereço salvo.");
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Endereço inválido.");
-    } finally {
-      setSalvando(false);
-    }
+    await executarPorChave("salvar-endpoint", async () => {
+      setSalvando(true);
+      try {
+        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
+          "/api/planilha",
+          corpoAlteracao("PATCH", { endpoint }),
+        );
+        setIntegracao(dados.integracao);
+        toast.success("Endereço salvo.");
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Endereço inválido.");
+      } finally {
+        setSalvando(false);
+      }
+    });
   }
 
   async function testar() {
     const aviso = "planilha-testar";
-    setTestando(true);
-    setTeste(null);
-    toast.loading("Testando a conexão com a planilha...", { id: aviso });
-    try {
-      const dados = await pedir<{
-        ping: { planilha: { nome: string }; abas: unknown[]; avisos?: string[] };
-      }>("/api/planilha/testar", corpoJson({ endpoint }));
-      setTeste({
-        nome: dados.ping.planilha.nome,
-        abas: dados.ping.abas.length,
-        avisos: dados.ping.avisos ?? [],
-      });
-      avisarSucesso("Conexão confirmada.", undefined, aviso);
-    } catch (excecao) {
-      avisarErro(excecao, {
-        contexto: "Não foi possível conectar.",
-        descricao: "Confira o endereço e a internet, e tente de novo em instantes.",
-        id: aviso,
-      });
-    } finally {
-      setTestando(false);
-    }
+    await executarPorChave(aviso, async () => {
+      setTestando(true);
+      setTeste(null);
+      toast.loading("Testando a conexão com a planilha...", { id: aviso });
+      try {
+        const dados = await pedir<{
+          ping: { planilha: { nome: string }; abas: unknown[]; avisos?: string[] };
+        }>("/api/planilha/testar", corpoJson({ endpoint }));
+        setTeste({
+          nome: dados.ping.planilha.nome,
+          abas: dados.ping.abas.length,
+          avisos: dados.ping.avisos ?? [],
+        });
+        avisarSucesso("Conexão confirmada.", undefined, aviso);
+      } catch (excecao) {
+        avisarErro(excecao, {
+          contexto: "Não foi possível conectar.",
+          descricao: "Confira o endereço e a internet, e tente de novo em instantes.",
+          id: aviso,
+        });
+      } finally {
+        setTestando(false);
+      }
+    });
   }
 
   async function lerEstrutura() {
     const aviso = "planilha-estrutura";
-    setLendo(true);
-    toast.loading("Lendo as abas da planilha...", { id: aviso });
-    try {
-      const dados = await pedir<{
-        planilha: { nome: string; url: string; fuso: string; versao: number };
-        abas: AbaEsquema[];
-        sugestoes: Sugestao[];
-      }>("/api/planilha/estrutura", corpoJson({}));
-      setAbas(dados.abas);
-      setSugestoes(dados.sugestoes);
-      setPlanilha(dados.planilha);
-      const idsValidos = new Set(turmas.map((turma) => turma.id));
-      setMapa((atual) => {
-        const proximo = { ...atual };
-        for (const sugestao of dados.sugestoes) {
-          const atualDaAba = proximo[sugestao.aba];
-          const invalido = atualDaAba !== undefined && !idsValidos.has(atualDaAba);
-          if ((atualDaAba === undefined || invalido) && sugestao.turmaOriginalId) {
-            proximo[sugestao.aba] = sugestao.turmaOriginalId;
+    await executarPorChave(aviso, async () => {
+      setLendo(true);
+      toast.loading("Lendo as abas da planilha...", { id: aviso });
+      try {
+        const dados = await pedir<{
+          planilha: { nome: string; url: string; fuso: string; versao: number };
+          abas: AbaEsquema[];
+          sugestoes: Sugestao[];
+        }>("/api/planilha/estrutura", corpoJson({}));
+        setAbas(dados.abas);
+        setSugestoes(dados.sugestoes);
+        setPlanilha(dados.planilha);
+        const idsValidos = new Set(turmas.map((turma) => turma.id));
+        setMapa((atual) => {
+          const proximo = { ...atual };
+          for (const sugestao of dados.sugestoes) {
+            const atualDaAba = proximo[sugestao.aba];
+            const invalido = atualDaAba !== undefined && !idsValidos.has(atualDaAba);
+            if ((atualDaAba === undefined || invalido) && sugestao.turmaOriginalId) {
+              proximo[sugestao.aba] = sugestao.turmaOriginalId;
+            }
           }
-        }
-        return proximo;
-      });
-      avisarSucesso(
-        `${dados.abas.length} ${dados.abas.length === 1 ? "aba lida" : "abas lidas"}.`,
-        "Confira o mapa de turmas antes de salvar.",
-        aviso,
-      );
-    } catch (excecao) {
-      avisarErro(excecao, {
-        contexto: "Não foi possível ler a planilha.",
-        descricao: "Confira a conexão e o token, e tente de novo em instantes.",
-        tentarDeNovo: () => void lerEstrutura(),
-        id: aviso,
-      });
-    } finally {
-      setLendo(false);
-    }
+          return proximo;
+        });
+        avisarSucesso(
+          `${dados.abas.length} ${dados.abas.length === 1 ? "aba lida" : "abas lidas"}.`,
+          "Confira o mapa de turmas antes de salvar.",
+          aviso,
+        );
+      } catch (excecao) {
+        avisarErro(excecao, {
+          contexto: "Não foi possível ler a planilha.",
+          descricao: "Confira a conexão e o token, e tente de novo em instantes.",
+          tentarDeNovo: () => void lerEstrutura(),
+          id: aviso,
+        });
+      } finally {
+        setLendo(false);
+      }
+    });
   }
 
   async function salvarMapa() {
@@ -276,117 +286,129 @@ export default function IntegracaoPlanilha({
     setSalvando(true);
     const aviso = "planilha-mapa";
     toast.loading("Salvando a estrutura...", { id: aviso });
-    try {
-      const dados = await pedir<{ integracao: IntegracaoAdmin }>(
-        "/api/planilha/mapa",
-        corpoJson({ planilha, abas, mapa: itens }),
-      );
-      setIntegracao(dados.integracao);
-      avisarSucesso(
-        "Estrutura salva.",
-        "Agora a Grade pode enviar as faltas para esta planilha.",
-        aviso,
-      );
-    } catch (excecao) {
-      avisarErro(excecao, {
-        contexto: "Não foi possível salvar o mapa.",
-        descricao: "Confira o mapa de turmas e tente de novo em instantes.",
-        id: aviso,
-      });
-    } finally {
-      setSalvando(false);
-    }
+    await executarPorChave(aviso, async () => {
+      try {
+        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
+          "/api/planilha/mapa",
+          corpoJson({ planilha, abas, mapa: itens }),
+        );
+        setIntegracao(dados.integracao);
+        avisarSucesso(
+          "Estrutura salva.",
+          "Agora a Grade pode enviar as faltas para esta planilha.",
+          aviso,
+        );
+      } catch (excecao) {
+        avisarErro(excecao, {
+          contexto: "Não foi possível salvar o mapa.",
+          descricao: "Confira o mapa de turmas e tente de novo em instantes.",
+          id: aviso,
+        });
+      } finally {
+        setSalvando(false);
+      }
+    });
   }
 
   async function enviarSenha() {
     if (!senhaAberta) return;
-    setEnviandoSenha(true);
-    try {
-      const dados = await pedir<{ token: string }>(
-        "/api/planilha/token",
-        corpoJson({ acao: senhaAberta, senha }),
-      );
-      setTokenVisivel(dados.token);
-      setSenha("");
-      setSenhaAberta(null);
-      if (senhaAberta === "gerar") {
-        avisarSucesso(
-          "Token gerado. Atualize o Script Property.",
-          "Copie o código e cole nas configurações do Apps Script da planilha.",
+    await executarPorChave("enviar-senha", async () => {
+      setEnviandoSenha(true);
+      try {
+        const dados = await pedir<{ token: string }>(
+          "/api/planilha/token",
+          corpoJson({ acao: senhaAberta, senha }),
         );
-      } else {
-        avisarSucesso(
-          "Token revelado.",
-          "Copie e cole no Apps Script da planilha para a integração funcionar.",
-        );
+        setTokenVisivel(dados.token);
+        setSenha("");
+        setSenhaAberta(null);
+        if (senhaAberta === "gerar") {
+          avisarSucesso(
+            "Token gerado. Atualize o Script Property.",
+            "Copie o código e cole nas configurações do Apps Script da planilha.",
+          );
+        } else {
+          avisarSucesso(
+            "Token revelado.",
+            "Copie e cole no Apps Script da planilha para a integração funcionar.",
+          );
+        }
+        await carregar();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Senha incorreta.");
+      } finally {
+        setEnviandoSenha(false);
       }
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Senha incorreta.");
-    } finally {
-      setEnviandoSenha(false);
-    }
+    });
   }
 
   async function copiarToken() {
     if (!tokenVisivel) return;
-    try {
-      await navigator.clipboard.writeText(tokenVisivel);
-      avisarSucesso("Token copiado.", "Cole nas configurações do Apps Script da planilha.");
-    } catch {
-      avisarErro(null, {
-        contexto: "Não foi possível copiar o token.",
-        descricao: "Selecione o código e copie manualmente.",
-        tentarDeNovo: () => void copiarToken(),
-      });
-    }
+    await executarPorChave("copiar-token", async () => {
+      try {
+        await navigator.clipboard.writeText(tokenVisivel);
+        avisarSucesso("Token copiado.", "Cole nas configurações do Apps Script da planilha.");
+      } catch {
+        avisarErro(null, {
+          contexto: "Não foi possível copiar o token.",
+          descricao: "Selecione o código e copie manualmente.",
+          tentarDeNovo: () => void copiarToken(),
+        });
+      }
+    });
   }
 
   async function destravar() {
-    setDestravando(true);
-    try {
-      await pedir(
-        "/api/planilha/modo-completo",
-        corpoJson({ frase, senha, duracaoMinutos: duracao }),
-      );
-      setFrase("");
-      setSenha("");
-      setDestrave(false);
-      avisarSucesso(
-        "Modo completo ativo.",
-        "As ações destrutivas ficam liberadas pelo prazo escolhido e toda remoção guarda cópia antes.",
-      );
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível destravar.");
-    } finally {
-      setDestravando(false);
-    }
+    await executarPorChave("destravar", async () => {
+      setDestravando(true);
+      try {
+        await pedir(
+          "/api/planilha/modo-completo",
+          corpoJson({ frase, senha, duracaoMinutos: duracao }),
+        );
+        setFrase("");
+        setSenha("");
+        setDestrave(false);
+        avisarSucesso(
+          "Modo completo ativo.",
+          "As ações destrutivas ficam liberadas pelo prazo escolhido e toda remoção guarda cópia antes.",
+        );
+        await carregar();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível destravar.");
+      } finally {
+        setDestravando(false);
+      }
+    });
   }
 
   async function voltarConservador() {
-    try {
-      await pedir("/api/planilha/modo-conservador", corpoJson({}));
-      avisarSucesso(
-        "Modo conservador restaurado.",
-        "As ações destrutivas voltaram a ficar bloqueadas.",
-      );
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível encerrar.");
-    }
+    await executarPorChave("voltar-conservador", async () => {
+      try {
+        await pedir("/api/planilha/modo-conservador", corpoJson({}));
+        avisarSucesso(
+          "Modo conservador restaurado.",
+          "As ações destrutivas voltaram a ficar bloqueadas.",
+        );
+        await carregar();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível encerrar.");
+      }
+    });
   }
 
   async function criarAba(nome: string) {
-    try {
-      await pedir("/api/planilha/criar-aba", corpoJson({ nome }));
-      avisarSucesso(
-        "Aba criada. Use Conferir estrutura para mapear.",
-        "A nova aba recebe a estrutura no próximo envio.",
-      );
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar a aba.");
-    }
+    await executarPorChave(`criar-aba-${nome}`, async () => {
+      try {
+        await pedir("/api/planilha/criar-aba", corpoJson({ nome }));
+        avisarSucesso(
+          "Aba criada. Use Conferir estrutura para mapear.",
+          "A nova aba recebe a estrutura no próximo envio.",
+        );
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar a aba.");
+      }
+    });
   }
 
   async function carregarCopias() {
@@ -407,53 +429,61 @@ export default function IntegracaoPlanilha({
 
   async function confirmarRestaurar() {
     if (!restaurar) return;
-    try {
-      await pedir(
-        "/api/planilha/restaurar",
-        corpoJson({ aba: restaurar.aba, copia: restaurar.copia, frase, senha }),
-      );
-      setRestaurar(null);
-      setFrase("");
-      setSenha("");
-      avisarSucesso(
-        "Cópia restaurada. Confira a estrutura de novo.",
-        "A versão anterior foi substituída pela cópia escolhida.",
-      );
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
-    }
+    await executarPorChave("restaurar", async () => {
+      try {
+        await pedir(
+          "/api/planilha/restaurar",
+          corpoJson({ aba: restaurar.aba, copia: restaurar.copia, frase, senha }),
+        );
+        setRestaurar(null);
+        setFrase("");
+        setSenha("");
+        avisarSucesso(
+          "Cópia restaurada. Confira a estrutura de novo.",
+          "A versão anterior foi substituída pela cópia escolhida.",
+        );
+        await carregar();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
+      }
+    });
   }
 
   async function confirmarRemocaoAba() {
     if (!abaRemover) return;
-    try {
-      await pedir("/api/planilha/remover-aba", corpoJson({ aba: abaRemover, frase, senha }));
-      setAbaRemover(null);
-      setFrase("");
-      setSenha("");
-      toast.success("Aba removida. A versão atual foi guardada em cópia.");
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.");
-    }
+    await executarPorChave(`remover-aba-${abaRemover}`, async () => {
+      try {
+        await pedir("/api/planilha/remover-aba", corpoJson({ aba: abaRemover, frase, senha }));
+        setAbaRemover(null);
+        setFrase("");
+        setSenha("");
+        toast.success("Aba removida. A versão atual foi guardada em cópia.");
+        await carregar();
+      } catch (excecao) {
+        toast.error(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.",
+        );
+      }
+    });
   }
 
   async function desconectar() {
-    try {
-      await pedir("/api/planilha/desconectar", corpoJson({}));
-      setAbas([]);
-      setMapa({});
-      setPlanilha(null);
-      setTokenVisivel(null);
-      avisarSucesso(
-        "Integração desconectada. A planilha não foi alterada.",
-        "Nada foi apagado no Google Planilhas.",
-      );
-      await carregar();
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
-    }
+    await executarPorChave("desconectar", async () => {
+      try {
+        await pedir("/api/planilha/desconectar", corpoJson({}));
+        setAbas([]);
+        setMapa({});
+        setPlanilha(null);
+        setTokenVisivel(null);
+        avisarSucesso(
+          "Integração desconectada. A planilha não foi alterada.",
+          "Nada foi apagado no Google Planilhas.",
+        );
+        await carregar();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
+      }
+    });
   }
 
   if (carregando) {
@@ -578,7 +608,7 @@ export default function IntegracaoPlanilha({
             onClick={() => void salvarEndpoint()}
             disabled={salvando}
           >
-            Salvar
+            {chaveAtiva === "salvar-endpoint" ? "Salvando..." : "Salvar"}
           </Button>
           <Button
             type="button"
@@ -668,8 +698,9 @@ export default function IntegracaoPlanilha({
                   variant="ghost"
                   className="h-8"
                   onClick={() => void criarAba(turma.rotulo)}
+                  disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
                 >
-                  Criar aba
+                  {chaveAtiva === `criar-aba-${turma.rotulo}` ? "Criando..." : "Criar aba"}
                 </Button>
               </div>
             ))}
@@ -832,8 +863,9 @@ export default function IntegracaoPlanilha({
             <AlertDialogAction
               className="bg-falta text-falta-foreground hover:bg-falta/90"
               onClick={() => void desconectar()}
+              disabled={chaveAtiva === "desconectar"}
             >
-              Desconectar
+              {chaveAtiva === "desconectar" ? "Desconectando..." : "Desconectar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -991,9 +1023,13 @@ export default function IntegracaoPlanilha({
             <Button
               type="button"
               onClick={() => void confirmarRestaurar()}
-              disabled={frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""}
+              disabled={
+                frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO ||
+                senha === "" ||
+                chaveAtiva === "restaurar"
+              }
             >
-              Restaurar
+              {chaveAtiva === "restaurar" ? "Restaurando..." : "Restaurar"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1037,9 +1073,13 @@ export default function IntegracaoPlanilha({
             <Button
               type="button"
               onClick={() => void confirmarRemocaoAba()}
-              disabled={frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""}
+              disabled={
+                frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO ||
+                senha === "" ||
+                chaveAtiva === `remover-aba-${abaRemover}`
+              }
             >
-              Remover aba
+              {chaveAtiva === `remover-aba-${abaRemover}` ? "Removendo..." : "Remover aba"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,6 +16,7 @@ import { diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
 import { coberturaDoDia, distribuicaoDoDia, marcasDoDia, resumoDoDia } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
@@ -53,38 +54,38 @@ export default function VistaPainel({
     saidas: SaidaAntecipada[];
   } | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const [atualizando, setAtualizando] = useState(false);
   const [erro, setErro] = useState("");
   const [recarregar, setRecarregar] = useState(0);
 
   const compartilhado = dia.startsWith(mes);
 
   useEffect(() => {
-    if (compartilhado) {
-      setDoDia(null);
-      return;
-    }
+    if (compartilhado) return;
     let viva = true;
-    setCarregando(true);
-    setErro("");
-    Promise.all([
-      pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`),
-      pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
-    ])
-      .then(([respostaFrequencias, respostaSaidas]) => {
+    async function buscar() {
+      setCarregando(true);
+      setErro("");
+      try {
+        const [respostaFrequencias, respostaSaidas] = await Promise.all([
+          pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`),
+          pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
+        ]);
         if (!viva) return;
         setDoDia({
           frequencias: respostaFrequencias.frequencias,
           saidas: respostaSaidas.saidas,
         });
-      })
-      .catch((excecao: unknown) => {
-        if (!viva) return;
-        setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o dia.");
-      })
-      .finally(() => {
+      } catch (excecao) {
+        if (viva) {
+          setErro(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o dia.",
+          );
+        }
+      } finally {
         if (viva) setCarregando(false);
-      });
+      }
+    }
+    void buscar();
     return () => {
       viva = false;
     };
@@ -126,8 +127,7 @@ export default function VistaPainel({
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const carregandoPainel = carregando && !compartilhado;
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       if (compartilhado) await onRecarregar(mes);
@@ -135,10 +135,8 @@ export default function VistaPainel({
     } catch (excecao) {
       setErro("Não foi possível atualizar os indicadores.");
       avisarErro(excecao, { contexto: "Não foi possível atualizar os indicadores." });
-    } finally {
-      setAtualizando(false);
     }
-  }
+  });
 
   return (
     <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">

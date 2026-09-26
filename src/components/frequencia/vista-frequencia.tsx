@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -422,7 +423,7 @@ export default function VistaFrequencia({
     setErro("");
   }
 
-  async function salvar() {
+  const { executar: salvar } = useAcaoUnica(async () => {
     if (!podeSalvar || !dia || !turmaId) return;
     setSalvando(true);
     setErro("");
@@ -481,11 +482,16 @@ export default function VistaFrequencia({
         setConflito(true);
       }
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
-      toast.error(falha?.message ?? "Não foi possível salvar a chamada.");
+      toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
+        description: falha?.conflito
+          ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
+          : undefined,
+        duration: falha?.conflito ? 8000 : undefined,
+      });
     } finally {
       setSalvando(false);
     }
-  }
+  });
 
   function descartar() {
     try {

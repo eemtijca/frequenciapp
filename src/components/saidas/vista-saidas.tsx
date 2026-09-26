@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import type {
   Aluno,
   JustificativaConfigurada,
@@ -88,7 +89,24 @@ export default function VistaSaidas({
   const [buscaRelatorio, setBuscaRelatorio] = useState("");
   const [filtroRelatorio, setFiltroRelatorio] = useState<"todas" | "repetidas">("todas");
   const [saidasSemana, setSaidasSemana] = useState<SaidaAntecipada[] | null>(null);
-  const [carregandoRelatorio, setCarregandoRelatorio] = useState(false);
+
+  const { executando: carregandoRelatorio, executar: carregarRelatorio } = useAcaoUnica(
+    async () => {
+      try {
+        const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
+          `/api/saidas?de=${segundaRelatorio}&ate=${domingoRelatorio}`,
+        );
+        setSaidasSemana(dados.saidas);
+      } catch (excecao) {
+        toast.error(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o relatório.",
+        );
+        setSaidasSemana([]);
+      }
+    },
+  );
+
+  const { chaveAtiva: removendoId, executar: executarRemocao } = useAcoesPorChave();
 
   const rotuloTurma = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
@@ -171,23 +189,6 @@ export default function VistaSaidas({
   const segundaRelatorio = diaSeguinte(diaRelatorio, -(diaDaSemanaIso(diaRelatorio) - 1));
   const domingoRelatorio = diaSeguinte(segundaRelatorio, 6);
 
-  async function carregarRelatorio() {
-    setCarregandoRelatorio(true);
-    try {
-      const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-        `/api/saidas?de=${segundaRelatorio}&ate=${domingoRelatorio}`,
-      );
-      setSaidasSemana(dados.saidas);
-    } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o relatório.",
-      );
-      setSaidasSemana([]);
-    } finally {
-      setCarregandoRelatorio(false);
-    }
-  }
-
   const relatorio = useMemo(() => {
     if (saidasSemana === null) return [];
     const termo = normalizar(buscaRelatorio);
@@ -248,26 +249,28 @@ export default function VistaSaidas({
     }
   }
 
-  async function remover(saida: SaidaAntecipada) {
-    const aluno = alunosPorId.get(saida.alunoId);
-    const confirmar = window.confirm(
-      `Remover a saída de ${aluno?.nome ?? "aluno"} em ${saida.dia.split("-").reverse().join("/")}?`,
-    );
-    if (!confirmar) return;
-    try {
-      await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
-      toast.success("Saída removida.");
-      if (compartilhado) {
-        await onSaidasMudaram(dia.slice(0, 7));
-      } else {
-        setRecarregarDia((valor) => valor + 1);
-      }
-      if (relatorioAberto) void carregarRelatorio();
-    } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
+  function remover(saida: SaidaAntecipada) {
+    void executarRemocao(saida.id, async () => {
+      const aluno = alunosPorId.get(saida.alunoId);
+      const confirmar = window.confirm(
+        `Remover a saída de ${aluno?.nome ?? "aluno"} em ${saida.dia.split("-").reverse().join("/")}?`,
       );
-    }
+      if (!confirmar) return;
+      try {
+        await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
+        toast.success("Saída removida.");
+        if (compartilhado) {
+          await onSaidasMudaram(dia.slice(0, 7));
+        } else {
+          setRecarregarDia((valor) => valor + 1);
+        }
+        if (relatorioAberto) void carregarRelatorio();
+      } catch (excecao) {
+        toast.error(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
+        );
+      }
+    });
   }
 
   const rotuloDia = dia.split("-").reverse().join("/");
@@ -506,6 +509,7 @@ export default function VistaSaidas({
                               size="sm"
                               className="text-falta-texto h-9 shrink-0 rounded-lg px-2"
                               onClick={() => void remover(saida)}
+                              disabled={removendoId === saida.id}
                             >
                               Remover
                             </Button>

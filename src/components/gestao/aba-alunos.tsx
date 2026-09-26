@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -61,7 +62,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [origemEmMassa, setOrigemEmMassa] = useState("");
-  const [aplicando, setAplicando] = useState(false);
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
   const opcoesTurma = useMemo(
     () => turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
@@ -127,9 +128,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     setOrigemEmMassa("");
   }
 
-  async function aplicarOrigem() {
-    if (aplicando || selecionados.size === 0 || origemEmMassa === "") return;
-    setAplicando(true);
+  const { executando: aplicando, executar: aplicarOrigem } = useAcaoUnica(async () => {
+    if (selecionados.size === 0 || origemEmMassa === "") return;
     try {
       const dados = await pedir<{ atualizados: number }>(
         "/api/alunos",
@@ -150,10 +150,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível atualizar a origem.";
       toast.error(mensagem);
-    } finally {
-      setAplicando(false);
     }
-  }
+  });
 
   function abrirNovo() {
     setEmEdicao(null);
@@ -203,31 +201,35 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     }
   }
 
-  async function alternarAtivo(aluno: Aluno) {
-    try {
-      await pedir<{ aluno: Aluno }>(
-        `/api/alunos/${aluno.id}`,
-        corpoAlteracao("PATCH", { ativo: !aluno.ativo }),
-      );
-      toast.success(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
-      toast.error(mensagem);
-    }
+  function alternarAtivo(aluno: Aluno) {
+    void executarPorChave(aluno.id, async () => {
+      try {
+        await pedir<{ aluno: Aluno }>(
+          `/api/alunos/${aluno.id}`,
+          corpoAlteracao("PATCH", { ativo: !aluno.ativo }),
+        );
+        toast.success(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
+        toast.error(mensagem);
+      }
+    });
   }
 
-  async function excluir(aluno: Aluno) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/alunos/${aluno.id}`, corpoAlteracao("DELETE"));
-      toast.success("Aluno excluído.");
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o aluno.";
-      toast.error(mensagem);
-    }
+  function excluir(aluno: Aluno) {
+    void executarPorChave(aluno.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/alunos/${aluno.id}`, corpoAlteracao("DELETE"));
+        toast.success("Aluno excluído.");
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o aluno.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -411,6 +413,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                               aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`
                             }
                             onClick={() => alternarAtivo(aluno)}
+                            disabled={chaveAtiva === aluno.id}
                           >
                             <Power size={16} />
                           </Button>
@@ -438,6 +441,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                                 <AlertDialogAction
                                   className="bg-falta text-falta-foreground hover:bg-falta/90"
                                   onClick={() => excluir(aluno)}
+                                  disabled={chaveAtiva === aluno.id}
                                 >
                                   Excluir
                                 </AlertDialogAction>

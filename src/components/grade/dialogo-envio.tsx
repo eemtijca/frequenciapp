@@ -8,6 +8,7 @@ import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,8 +90,6 @@ export default function DialogoEnvio({
 }: Props) {
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
@@ -123,26 +122,22 @@ export default function DialogoEnvio({
     ],
   );
 
-  const simular = useCallback(async () => {
-    setCarregando(true);
+  const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
     try {
       const dados = await pedir<Simulacao>("/api/planilha/simular", corpoJson(entradas()));
       setSimulacao(dados);
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.");
-    } finally {
-      setCarregando(false);
     }
-  }, [entradas]);
+  });
 
   useEffect(() => {
     if (aberto) void simular();
   }, [aberto, simular]);
 
-  async function enviar() {
+  const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
     if (!simulacao) return;
-    setEnviando(true);
     setErro("");
     try {
       const dados = await pedir<{
@@ -166,10 +161,8 @@ export default function DialogoEnvio({
         contexto: "Não foi possível enviar.",
         descricao: "Nada foi alterado na planilha. Tente de novo em instantes.",
       });
-    } finally {
-      setEnviando(false);
     }
-  }
+  });
 
   const bloqueado = simulacao?.planos.some((item) => item.bloqueado) ?? false;
   const plano = simulacao?.planos[0];

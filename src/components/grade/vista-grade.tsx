@@ -3,7 +3,7 @@
 // Grade de frequência por turma de origem: modos dia, semana de aula,
 // período personalizado e mês; células P, F e FJ, saída no dia e coluna
 // acumulada (F + FJ) de todo o histórico.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
@@ -28,6 +28,7 @@ import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -72,7 +73,6 @@ export default function VistaGrade({
   onMes,
   onRecarregar,
 }: Props) {
-  const [atualizando, setAtualizando] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
@@ -112,28 +112,29 @@ export default function VistaGrade({
   // No modo mês usamos o estado compartilhado do app; nos demais, o período
   // é buscado na API para não depender do mês carregado.
   useEffect(() => {
-    if (modo === "mes" || !aberto) {
-      setDoPeriodo(null);
-      return;
-    }
+    if (modo === "mes" || !aberto) return;
     const primeiro = dias[0] ?? diaBase;
     const ultimo = dias[dias.length - 1] ?? diaBase;
     let viva = true;
-    setCarregandoPeriodo(true);
-    setErro("");
-    pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?de=${primeiro}&ate=${ultimo}`)
-      .then((dados) => {
-        if (viva) setDoPeriodo(dados.frequencias);
-      })
-      .catch((excecao: unknown) => {
-        if (!viva) return;
-        setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
+    async function buscar() {
+      setCarregandoPeriodo(true);
+      setErro("");
+      try {
+        const dados = await pedir<{ frequencias: Frequencia[] }>(
+          `/api/frequencias?de=${primeiro}&ate=${ultimo}`,
         );
-      })
-      .finally(() => {
+        if (viva) setDoPeriodo(dados.frequencias);
+      } catch (excecao) {
+        if (viva) {
+          setErro(
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível buscar o período.",
+          );
+        }
+      } finally {
         if (viva) setCarregandoPeriodo(false);
-      });
+      }
+    }
+    void buscar();
     return () => {
       viva = false;
     };
@@ -168,8 +169,7 @@ export default function VistaGrade({
     return (alunoId: string) => mapa.get(alunoId) ?? 0;
   }, [resumo]);
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       if (modo === "mes") {
@@ -180,10 +180,8 @@ export default function VistaGrade({
       }
     } catch (excecao) {
       avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
-    } finally {
-      setAtualizando(false);
     }
-  }
+  });
 
   const totalFaltas = grade.linhas.reduce((soma, linha) => soma + linha.faltas, 0);
   const totalJustificadas = grade.linhas.reduce((soma, linha) => soma + linha.justificadas, 0);
@@ -192,9 +190,15 @@ export default function VistaGrade({
     return (id: string) => mapa.get(id) ?? "";
   }, [origens]);
 
+  // Geração de arquivo: uma janela curta evita dois downloads no toque duplo.
+  const ultimoDownload = useRef(0);
+
   // Exporta o dataframe da turma de origem no período exibido. A busca da
   // tela não interfere: a planilha leva todos os alunos ativos da turma.
   function baixarPlanilha() {
+    const agora = Date.now();
+    if (agora - ultimoDownload.current < 800) return;
+    ultimoDownload.current = agora;
     if (grade.linhas.length === 0) {
       avisarInfo(
         "Nada para exportar neste período.",

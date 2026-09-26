@@ -7,6 +7,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Serie, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -51,6 +52,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Turma | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
+  const { chaveAtiva, executar } = useAcoesPorChave();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [turmaDasAulas, setTurmaDasAulas] = useState<Turma | null>(null);
@@ -129,16 +131,18 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
     }
   }
 
-  async function excluir(turma: Turma) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/turmas/${turma.id}`, corpoAlteracao("DELETE"));
-      toast.success(`Turma ${turma.rotulo} excluída.`);
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a turma.";
-      toast.error(mensagem);
-    }
+  function excluir(turma: Turma) {
+    void executar(turma.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/turmas/${turma.id}`, corpoAlteracao("DELETE"));
+        toast.success(`Turma ${turma.rotulo} excluída.`);
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a turma.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -269,6 +273,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                               <AlertDialogAction
                                 className="bg-falta text-falta-foreground hover:bg-falta/90"
                                 onClick={() => excluir(turma)}
+                                disabled={chaveAtiva === turma.id}
                               >
                                 Excluir
                               </AlertDialogAction>

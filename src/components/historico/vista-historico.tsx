@@ -22,6 +22,7 @@ import {
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { avisarErro } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -61,24 +62,20 @@ export default function VistaHistorico({
   bloqueado,
   rotuloTurma,
 }: Props) {
-  const [atualizando, setAtualizando] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
 
-  async function atualizar() {
-    setAtualizando(true);
+  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     setErro("");
     try {
       await onRecarregar(mes);
     } catch (excecao) {
       setErro("Não foi possível buscar as frequências.");
       avisarErro(excecao, { contexto: "Não foi possível buscar as frequências." });
-    } finally {
-      setAtualizando(false);
     }
-  }
+  });
 
   const ordenadas = [...frequencias].sort(
     (a, b) =>

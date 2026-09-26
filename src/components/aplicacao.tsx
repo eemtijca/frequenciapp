@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
 import type {
   Aluno,
   Configuracoes,
@@ -411,7 +412,7 @@ export default function Aplicacao({
     };
   }, [pendencias, router]);
 
-  async function sair() {
+  const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     if (pendencias.length > 0) {
       const confirmar = window.confirm("Há alterações não salvas na chamada. Sair mesmo assim?");
       if (!confirmar) return;
@@ -424,7 +425,7 @@ export default function Aplicacao({
     }
     avisarSucesso("Sessão encerrada.");
     router.refresh();
-  }
+  });
 
   function renderizarVisao(alvoVisao: Visao) {
     return (
@@ -581,7 +582,8 @@ export default function Aplicacao({
                 variant="ghost"
                 size="sm"
                 className="h-11 w-full justify-start gap-2"
-                onClick={sair}
+                onClick={() => void sair()}
+                disabled={saindo}
               >
                 <LogOut size={16} />
                 Sair da conta
@@ -635,7 +637,8 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => void sair()}
-                        className="text-falta-texto hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        disabled={saindo}
+                        className="text-falta-texto hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                       >
                         <LogOut size={16} aria-hidden="true" />
                         Sair da conta

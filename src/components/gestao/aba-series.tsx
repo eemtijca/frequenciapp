@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -49,6 +50,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
+  const { chaveAtiva, executar } = useAcoesPorChave();
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
@@ -98,16 +100,18 @@ export default function AbaSeries({ series, onMudanca }: Props) {
     }
   }
 
-  async function excluir(serie: Serie) {
-    try {
-      await pedir<{ ok: boolean }>(`/api/series/${serie.id}`, corpoAlteracao("DELETE"));
-      toast.success(`Série ${serie.nome} excluída.`);
-      await onMudanca();
-    } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a série.";
-      toast.error(mensagem);
-    }
+  function excluir(serie: Serie) {
+    void executar(serie.id, async () => {
+      try {
+        await pedir<{ ok: boolean }>(`/api/series/${serie.id}`, corpoAlteracao("DELETE"));
+        toast.success(`Série ${serie.nome} excluída.`);
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a série.";
+        toast.error(mensagem);
+      }
+    });
   }
 
   return (
@@ -195,6 +199,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                       <AlertDialogAction
                         className="bg-falta text-falta-foreground hover:bg-falta/90"
                         onClick={() => excluir(serie)}
+                        disabled={chaveAtiva === serie.id}
                       >
                         Excluir
                       </AlertDialogAction>
