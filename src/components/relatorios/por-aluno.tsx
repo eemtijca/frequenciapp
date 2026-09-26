@@ -90,7 +90,7 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
               </span>
               {": "}
               {rotuloMomento(saida.momento)} · {rotuloJustificativa(saida.justificativa)}
-              {saida.observacao ? ` · ${saida.observacao}` : ""}
+              {saida.texto ? ` · ${saida.texto}` : saida.observacao ? ` · ${saida.observacao}` : ""}
               {saida.liberadoPorNome ? ` · liberado por ${saida.liberadoPorNome}` : ""}
             </li>
           ))}

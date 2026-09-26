@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +27,7 @@ import {
 interface Props {
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
+  turmas: { id: string; rotulo: string }[];
   diaCorrente: string;
   onMudanca: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
@@ -42,6 +44,7 @@ const LIMITE_ARQUIVO = 25 * 1024 * 1024;
 export default function AbaConfiguracoes({
   configuracoes,
   justificativas,
+  turmas,
   diaCorrente,
   onMudanca,
   onJustificativasMudaram,
@@ -265,6 +268,8 @@ export default function AbaConfiguracoes({
           </p>
         )}
       </div>
+
+      <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
 
       <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
         <div>

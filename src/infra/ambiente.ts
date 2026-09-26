@@ -1,7 +1,7 @@
 // Validação das variáveis de ambiente. Falha antecipada: a aplicação
 // não sobe com configuração incompleta ou inválida.
 import { z } from "zod";
-import { booleanoDeAmbiente, cookiesSegurosDe } from "@/infra/booleano";
+import { booleanoDeAmbiente, cookiesSegurosDe, permitirEndpointLocalDe } from "@/infra/booleano";
 
 const esquema = z.object({
   DATABASE_URL: z
@@ -31,6 +31,12 @@ const esquema = z.object({
     .string()
     .optional()
     .transform((valor) => booleanoDeAmbiente(valor, false)),
+  // Quando verdadeiro, aceita endpoint local da integração com Google
+  // Planilhas mesmo em produção. Apenas para testes e ambientes controlados.
+  PERMITIR_ENDPOINT_LOCAL: z
+    .string()
+    .optional()
+    .transform((valor) => booleanoDeAmbiente(valor, false)),
 });
 
 const resultado = esquema.safeParse(process.env);
@@ -46,12 +52,24 @@ if (!resultado.success) {
 const ehProducao = resultado.data.NODE_ENV === "production";
 const permitirHttp = resultado.data.PERMITIR_HTTP;
 const cookiesSeguros = cookiesSegurosDe(ehProducao, permitirHttp);
+const permitirEndpointLocal = permitirEndpointLocalDe(
+  ehProducao,
+  resultado.data.PERMITIR_ENDPOINT_LOCAL,
+);
 
 // Aviso único na partida: sem TLS o tráfego fica em texto puro e o PWA não
 // instala fora de localhost. O modo existe para redes internas confiáveis.
 if (ehProducao && permitirHttp) {
   console.warn(
     "PERMITIR_HTTP ativo: o aplicativo aceita HTTP sem TLS. O cookie de sessão não usa Secure, o HSTS não é enviado e o tráfego fica em texto puro. Use apenas em rede confiável.",
+  );
+}
+
+// Aviso único na partida: a integração passa a aceitar loopback, o que só
+// faz sentido em testes ou ambiente controlado.
+if (ehProducao && resultado.data.PERMITIR_ENDPOINT_LOCAL) {
+  console.warn(
+    "PERMITIR_ENDPOINT_LOCAL ativo: a integração com Google Planilhas aceita endereço local. Use apenas em teste ou ambiente controlado.",
   );
 }
 
@@ -62,4 +80,5 @@ export const ambiente = {
   ehProducao,
   permitirHttp,
   cookiesSeguros,
+  permitirEndpointLocal,
 };

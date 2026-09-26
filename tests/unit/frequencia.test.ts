@@ -12,6 +12,7 @@ import {
   ehHoraValida,
   ehJustificativaValida,
   ehMesValido,
+  ehMomentoDeAula,
   ehMomentoValido,
   horaNoFuso,
   horariosDoDia,
@@ -421,6 +422,13 @@ describe("momentos de saída", () => {
     expect(rotuloMomento("intervalo_2")).toBe("2º intervalo");
     expect(rotuloMomento("almoco")).toBe("Almoço");
     expect(rotuloMomento("outro")).toBe("outro");
+  });
+  it("distingue a saída durante a aula", () => {
+    expect(ehMomentoDeAula("aula_1")).toBe(true);
+    expect(ehMomentoDeAula("aula_9")).toBe(true);
+    expect(ehMomentoDeAula("intervalo_1")).toBe(false);
+    expect(ehMomentoDeAula("almoco")).toBe(false);
+    expect(ehMomentoDeAula("madrugada")).toBe(false);
   });
 });
 

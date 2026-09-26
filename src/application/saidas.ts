@@ -9,8 +9,10 @@ import { ehDuplicidade, ErroHttp } from "@/infra/erros";
 import {
   diaLocal,
   ehDiaValido,
+  ehMomentoDeAula,
   ehMomentoValido,
   JUSTIFICATIVA_OUTROS,
+  LIMITE_TEXTO_SAIDA,
   type SaidaAntecipada,
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
@@ -21,22 +23,39 @@ const justificativaSaida = z
   .min(1, "Informe a justificativa.")
   .max(10, "Justificativa inválida.");
 
-export const esquemaCriarSaida = z.object({
-  alunoId: z.string().uuid("Aluno inválido."),
-  dia: z.string().refine(ehDiaValido, "Data inválida."),
-  momento: z
-    .string()
-    .trim()
-    .max(20, "Momento da saída inválido.")
-    .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-  justificativa: justificativaSaida,
-  observacao: z
-    .string()
-    .trim()
-    .max(200, "A observação deve ter no máximo 200 caracteres.")
-    .nullish(),
-  liberadoPorId: z.string().uuid("Responsável pela liberação inválido.").nullish(),
-});
+export const esquemaCriarSaida = z
+  .object({
+    alunoId: z.string().uuid("Aluno inválido."),
+    dia: z.string().refine(ehDiaValido, "Data inválida."),
+    momento: z
+      .string()
+      .trim()
+      .max(20, "Momento da saída inválido.")
+      .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+    justificativa: justificativaSaida,
+    texto: z
+      .string()
+      .trim()
+      .max(
+        LIMITE_TEXTO_SAIDA,
+        `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
+      )
+      .nullish(),
+    observacao: z
+      .string()
+      .trim()
+      .max(200, "A observação deve ter no máximo 200 caracteres.")
+      .nullish(),
+    liberadoPorId: z.string().uuid("Responsável pela liberação inválido.").nullish(),
+  })
+  .refine((dados) => !dados.texto || ehMomentoDeAula(dados.momento), {
+    message: "O texto da justificativa vale apenas para saída durante a aula.",
+    path: ["texto"],
+  })
+  .refine((dados) => !dados.observacao || !ehMomentoDeAula(dados.momento), {
+    message: "A observação vale para intervalos e almoço; na aula, use o texto.",
+    path: ["observacao"],
+  });
 
 export interface FiltrosSaidas {
   dia?: string;
@@ -53,6 +72,7 @@ interface LinhaSaida {
   momento: string;
   justificativa: string;
   observacao: string | null;
+  texto: string | null;
   liberadoPorId: string | null;
   criadoEm: Date;
   liberadoPor: { nome: string } | null;
@@ -66,6 +86,7 @@ function paraSaida(linha: LinhaSaida): SaidaAntecipada {
     momento: linha.momento,
     justificativa: linha.justificativa,
     observacao: linha.observacao,
+    texto: linha.texto,
     liberadoPorId: linha.liberadoPorId,
     liberadoPorNome: linha.liberadoPor?.nome ?? null,
     criadoEm: linha.criadoEm.toISOString(),
@@ -104,6 +125,7 @@ export async function criarSaida(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   const { alunoId, dia, momento, justificativa } = dados.data;
+  const duranteAula = ehMomentoDeAula(momento);
   if (dia > diaLocal(new Date(), ambiente.fuso)) {
     throw new ErroHttp("Não é possível registrar saída em dia futuro.", 400);
   }
@@ -149,7 +171,10 @@ export async function criarSaida(
           momento,
           justificativa,
           observacao:
-            justificativa === JUSTIFICATIVA_OUTROS ? (dados.data.observacao ?? null) : null,
+            !duranteAula && justificativa === JUSTIFICATIVA_OUTROS
+              ? (dados.data.observacao ?? null)
+              : null,
+          texto: duranteAula && dados.data.texto ? dados.data.texto : null,
           liberadoPorId,
           criadoPorId: identidade.id,
         },

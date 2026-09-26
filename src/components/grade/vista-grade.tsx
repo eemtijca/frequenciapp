@@ -5,7 +5,15 @@
 // acumulada (F + FJ) de todo o histórico.
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, Table2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  LoaderCircle,
+  RefreshCw,
+  Send,
+  Table2,
+} from "lucide-react";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -16,6 +24,8 @@ import {
   rotuloDiaSemana,
   rotuloMes,
 } from "@/domain/frequencia";
+import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
+import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -70,6 +80,8 @@ export default function VistaGrade({
   const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
   const [recarga, setRecarga] = useState(0);
+  const [envioAberto, setEnvioAberto] = useState(false);
+  const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
@@ -176,6 +188,28 @@ export default function VistaGrade({
     return (id: string) => mapa.get(id) ?? "";
   }, [origens]);
 
+  // Exporta o dataframe da turma de origem no período exibido. A busca da
+  // tela não interfere: a planilha leva todos os alunos ativos da turma.
+  function baixarPlanilha() {
+    if (grade.linhas.length === 0) return;
+    const turma = turmaPlanilhaDaGrade(
+      turmaEfetiva,
+      rotuloDe(turmaEfetiva),
+      grade.dias,
+      grade.linhas,
+      turmaAtualDe,
+    );
+    const blob = new Blob([paraCsv(turma)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivoCsv(turma);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
@@ -195,20 +229,45 @@ export default function VistaGrade({
                 }`}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Atualizar consulta"
-          onClick={() => void atualizar()}
-          disabled={atualizando || carregandoPeriodo}
-        >
-          {atualizando || carregandoPeriodo ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
+        <div className="flex items-center gap-1">
+          {estadoPlanilha?.podeEnviar && (
+            <Button
+              variant="outline"
+              className="h-10"
+              aria-label="Enviar para a planilha"
+              onClick={() => setEnvioAberto(true)}
+              disabled={grade.linhas.length === 0 || carregandoPeriodo}
+            >
+              <Send size={16} />
+              <span className="hidden sm:inline">Enviar para a planilha</span>
+            </Button>
           )}
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10"
+            aria-label="Baixar planilha (CSV)"
+            title="Baixar planilha (CSV) da turma de origem"
+            onClick={baixarPlanilha}
+            disabled={grade.linhas.length === 0 || carregandoPeriodo}
+          >
+            <Download size={18} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10"
+            aria-label="Atualizar consulta"
+            onClick={() => void atualizar()}
+            disabled={atualizando || carregandoPeriodo}
+          >
+            {atualizando || carregandoPeriodo ? (
+              <LoaderCircle size={18} className="animate-spin" />
+            ) : (
+              <RefreshCw size={18} />
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -505,8 +564,22 @@ export default function VistaGrade({
             </span>
             <span>Total: faltas (F + FJ) de todo o histórico</span>
             <span>célula vazia: turma sem frequência no dia</span>
+            <span>Baixar planilha: todos os alunos ativos da turma de origem</span>
           </div>
         </motion.div>
+      )}
+
+      {estadoPlanilha?.podeEnviar && grade.dias.length > 0 && (
+        <DialogoEnvio
+          aberto={envioAberto}
+          onAbrir={setEnvioAberto}
+          turmaOriginalId={turmaEfetiva}
+          rotulo={rotuloDe(turmaEfetiva)}
+          de={grade.dias[0] ?? hoje}
+          ate={grade.dias[grade.dias.length - 1] ?? hoje}
+          modoCompleto={estadoPlanilha.modo === "completo"}
+          aoConcluir={() => void recarregarPlanilha()}
+        />
       )}
     </section>
   );

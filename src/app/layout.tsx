@@ -3,7 +3,9 @@ import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import ProvedorAnimacoes from "@/components/ui/provedor-animacoes";
 import CorDoTema from "@/components/pwa/cor-do-tema";
+import { SCRIPT_ANIMACOES } from "@/lib/animacoes";
 import "./globals.css";
 
 const fonteInterface = Geist({
@@ -66,6 +68,7 @@ export default async function LayoutRaiz({
       <body
         className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground antialiased`}
       >
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: SCRIPT_ANIMACOES }} />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -73,7 +76,7 @@ export default async function LayoutRaiz({
           disableTransitionOnChange
           nonce={nonce}
         >
-          {children}
+          <ProvedorAnimacoes>{children}</ProvedorAnimacoes>
           <CorDoTema />
           <Toaster position="top-center" richColors closeButton={false} />
         </ThemeProvider>

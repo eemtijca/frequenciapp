@@ -76,6 +76,7 @@ src/
       saidas/               registro, consulta e remoção de saídas antecipadas
       configuracoes/        leitura e atualização dos recursos da escola
       justificativas/       catálogo de justificativas: leitura e gestão
+      planilha/             integração com Google Planilhas: estado, token, estrutura, envio, modo e cópias
       backup/               exportação e importação da cópia JSON
       saude/                verificação de saúde
     page.tsx                página única: sessão, pré-busca e shell
@@ -100,12 +101,14 @@ src/
   domain/
     frequencia.ts           regras puras de frequência, justificativas e saídas
     relatorios.ts           indicadores e relatórios derivados
+    planilha.ts             dataframe, esquema da planilha, CSV e planejamento conservador
     usuarios.ts             política de senha, papéis e rótulos
   application/
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas
     configuracoes.ts        ler e atualizar os recursos da escola
     justificativas.ts       ler e gerenciar o catálogo de justificativas
+    planilha.ts             integração com Google Planilhas: esquema, envio, modo completo e cópias
     backup.ts               exportar e importar a cópia JSON
     alunos.ts               listar e gerenciar alunos
     series.ts               listar e gerenciar séries
@@ -120,6 +123,7 @@ src/
     erros.ts                tradução de exceções para português
     transacoes.ts           transações ACID com repetição
     auditoria.ts            trilha de ações administrativas
+    planilha.ts             cliente HTTP do Apps Script, com redirecionamento e retentativa segura
     auth/
       hash.ts               scrypt de senhas
       sessao.ts             sessões opacas em cookie HttpOnly
@@ -128,6 +132,7 @@ src/
 prisma/                     schema e migrações
 prisma.config.ts            configuração do CLI do Prisma 7
 generated/                  cliente Prisma gerado (fora do git)
+gas/                        Apps Script da integração com Google Planilhas
 public/                     manifest, service worker, offline e ícones
 docker/                     entrypoint e migrador do contêiner
 scripts/                    criar-admin, criar-coordenacao e seed
@@ -151,3 +156,7 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-012: chamada diária com faltas justificadas, saídas antecipadas e recursos opcionais](adr/012-chamada-diaria-com-saidas.md)
 - [ADR-013: grade por período e cópia de segurança em JSON](adr/013-grade-por-periodo-e-copia-json.md)
 - [ADR-014: catálogo de justificativas configurável](adr/014-justificativas-configuraveis.md)
+- [ADR-015: exportação CSV da grade por turma de origem](adr/015-exportacao-csv-da-grade.md)
+- [ADR-016: integração opcional com Google Planilhas](adr/016-integracao-opcional-com-google-planilhas.md)
+- [ADR-017: modo completo com destrave, prazo e cópias](adr/017-modo-completo-com-copias.md)
+- [ADR-018: texto opcional na saída durante a aula](adr/018-texto-na-saida-durante-a-aula.md)

@@ -19,24 +19,53 @@ enum Papel {
   @@map("papel")
 }
 
+// Modo de escrita na planilha: conservador preenche apenas célula vazia;
+// completo permite substituir, limpar e remover o que a integração criou.
+enum ModoPlanilha {
+  CONSERVADOR
+  COMPLETO
+
+  @@map("modo_planilha")
+}
+
+// Modalidade registrada em cada sincronização concluída.
+enum ModalidadeSincronizacao {
+  CONSERVADOR
+  COMPLETO
+
+  @@map("modalidade_sincronizacao")
+}
+
+// Resultado de uma sincronização: total, parcial ou falha.
+enum ResultadoSincronizacao {
+  SUCESSO
+  PARCIAL
+  FALHA
+
+  @@map("resultado_sincronizacao")
+}
+
 // Usuário da aplicação. Sem dados além do necessário: nome de
 // tratamento, e-mail para acesso, hash da senha e papel.
 model Usuario {
-  id                     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                  String
-  senhaHash              String       @map("senha_hash")
-  nome                   String
-  papel                  Papel        @default(COORDENACAO)
-  ativo                  Boolean      @default(true)
-  criadoEm               DateTime     @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm           DateTime     @updatedAt @map("atualizado_em") @db.Timestamptz
-  sessoes                Sessao[]
-  frequenciasCriadas     Frequencia[] @relation("FrequenciaCriadaPor")
-  frequenciasAtualizadas Frequencia[] @relation("FrequenciaAtualizadaPor")
-  saidasLiberadas        SaidaAntecipada[] @relation("SaidaLiberadaPor")
-  saidasCriadas          SaidaAntecipada[] @relation("SaidaCriadaPor")
-  configuracoesAtualizadas Configuracao[] @relation("ConfiguracaoAtualizadaPor")
-  auditorias             Auditoria[]
+  id                       String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                    String
+  senhaHash                String                  @map("senha_hash")
+  nome                     String
+  papel                    Papel                   @default(COORDENACAO)
+  ativo                    Boolean                 @default(true)
+  criadoEm                 DateTime                @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm             DateTime                @updatedAt @map("atualizado_em") @db.Timestamptz
+  sessoes                  Sessao[]
+  frequenciasCriadas       Frequencia[]            @relation("FrequenciaCriadaPor")
+  frequenciasAtualizadas   Frequencia[]            @relation("FrequenciaAtualizadaPor")
+  saidasLiberadas          SaidaAntecipada[]       @relation("SaidaLiberadaPor")
+  saidasCriadas            SaidaAntecipada[]       @relation("SaidaCriadaPor")
+  configuracoesAtualizadas Configuracao[]          @relation("ConfiguracaoAtualizadaPor")
+  integracoesModo          IntegracaoPlanilha[]    @relation("IntegracaoModoPor")
+  integracoesAtualizadas   IntegracaoPlanilha[]    @relation("IntegracaoAtualizadaPor")
+  sincronizacoesPlanilha   SincronizacaoPlanilha[] @relation("SincronizacaoCriadaPor")
+  auditorias               Auditoria[]
 
   @@index([papel])
   @@map("usuarios")
@@ -71,15 +100,16 @@ model Serie {
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
 // enquanto houver alunos ou frequências vinculadas.
 model Turma {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  serieId     String       @map("serie_id") @db.Uuid
-  nome        String
-  criadoEm    DateTime     @default(now()) @map("criado_em") @db.Timestamptz
-  serie       Serie        @relation(fields: [serieId], references: [id], onDelete: Restrict)
-  alunos      Aluno[]      @relation("AlunoTurma")
-  origemDe    Aluno[]      @relation("AlunoTurmaOriginal")
-  frequencias Frequencia[]
-  horarios    Horario[]
+  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serieId        String                  @map("serie_id") @db.Uuid
+  nome           String
+  criadoEm       DateTime                @default(now()) @map("criado_em") @db.Timestamptz
+  serie          Serie                   @relation(fields: [serieId], references: [id], onDelete: Restrict)
+  alunos         Aluno[]                 @relation("AlunoTurma")
+  origemDe       Aluno[]                 @relation("AlunoTurmaOriginal")
+  frequencias    Frequencia[]
+  horarios       Horario[]
+  sincronizacoes SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
 
   @@unique([serieId, nome])
   @@map("turmas")
@@ -89,15 +119,15 @@ model Turma {
 // frequência diária) e turma original (referência de origem para a
 // consulta agrupada). Nenhum outro dado pessoal é armazenado.
 model Aluno {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId         String   @map("turma_id") @db.Uuid
-  turmaOriginalId String   @map("turma_original_id") @db.Uuid
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId         String            @map("turma_id") @db.Uuid
+  turmaOriginalId String            @map("turma_original_id") @db.Uuid
   nome            String
   ordem           Int
-  ativo           Boolean  @default(true)
-  criadoEm        DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  turma           Turma    @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
-  turmaOriginal   Turma    @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
+  ativo           Boolean           @default(true)
+  criadoEm        DateTime          @default(now()) @map("criado_em") @db.Timestamptz
+  turma           Turma             @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
+  turmaOriginal   Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
   faltas          Falta[]
   saidas          SaidaAntecipada[]
 
@@ -165,7 +195,8 @@ model Falta {
 }
 
 // Saída antecipada registrada pela direção ou coordenação. É separada da
-// chamada: a presença ou falta do dia permanece como foi marcada.
+// chamada: a presença ou falta do dia permanece como foi marcada. O texto
+// livre vale apenas para saídas durante a aula.
 model SaidaAntecipada {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   alunoId       String   @map("aluno_id") @db.Uuid
@@ -173,6 +204,7 @@ model SaidaAntecipada {
   momento       String   @db.VarChar(20)
   justificativa String   @db.VarChar(10)
   observacao    String?  @db.VarChar(200)
+  texto         String?  @db.VarChar(100)
   liberadoPorId String?  @map("liberado_por_id") @db.Uuid
   criadoPorId   String?  @map("criado_por_id") @db.Uuid
   criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz
@@ -225,4 +257,56 @@ model Auditoria {
   @@index([criadoEm])
   @@index([usuarioId])
   @@map("auditoria")
+}
+
+// Integração opcional com Google Planilhas via Apps Script. Linha única: o
+// endpoint e o token nunca saem para o cliente e ficam fora da cópia JSON.
+model IntegracaoPlanilha {
+  id                String       @id @default("principal")
+  ativa             Boolean      @default(false)
+  endpoint          String?      @db.VarChar(500)
+  token             String?      @db.VarChar(120)
+  versaoScript      String?      @map("versao_script") @db.VarChar(20)
+  esquema           Json?
+  assinaturaEsquema String?      @map("assinatura_esquema") @db.VarChar(64)
+  esquemaEm         DateTime?    @map("esquema_em") @db.Timestamptz
+  modo              ModoPlanilha @default(CONSERVADOR)
+  modoCompletoAte   DateTime?    @map("modo_completo_ate") @db.Timestamptz
+  modoCompletoPorId String?      @map("modo_completo_por_id") @db.Uuid
+  atualizadoEm      DateTime     @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?      @map("atualizado_por_id") @db.Uuid
+  modoCompletoPor   Usuario?     @relation("IntegracaoModoPor", fields: [modoCompletoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor     Usuario?     @relation("IntegracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("integracoes_planilha")
+}
+
+// Histórico de sincronizações, uma linha por turma de origem enviada.
+// Serve ao cálculo de dias pendentes e à prestação de contas, sem nomes.
+model SincronizacaoPlanilha {
+  id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaOriginalId  String?                 @map("turma_original_id") @db.Uuid
+  de               DateTime                @db.Date
+  ate              DateTime                @db.Date
+  modalidade       ModalidadeSincronizacao
+  preenchidas      Int                     @default(0)
+  substituidas     Int                     @default(0)
+  limpas           Int                     @default(0)
+  removidasLinhas  Int                     @default(0) @map("removidas_linhas")
+  removidasColunas Int                     @default(0) @map("removidas_colunas")
+  alunosCriados    Int                     @default(0) @map("alunos_criados")
+  colunasCriadas   Int                     @default(0) @map("colunas_criadas")
+  puladasOcupadas  Int                     @default(0) @map("puladas_ocupadas")
+  puladasFormula   Int                     @default(0) @map("puladas_formula")
+  planoHash        String                  @map("plano_hash") @db.VarChar(64)
+  resultado        ResultadoSincronizacao
+  erro             String?                 @db.VarChar(300)
+  autorId          String?                 @map("autor_id") @db.Uuid
+  criadoEm         DateTime                @default(now()) @map("criado_em") @db.Timestamptz
+  turmaOriginal    Turma?                  @relation("SincronizacaoTurma", fields: [turmaOriginalId], references: [id], onDelete: SetNull)
+  autor            Usuario?                @relation("SincronizacaoCriadaPor", fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@index([turmaOriginalId, criadoEm])
+  @@index([criadoEm])
+  @@map("sincronizacoes_planilha")
 }

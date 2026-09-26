@@ -76,4 +76,37 @@ test.describe("navegação", () => {
       )
       .toContain(inicioEscuro ? "light" : "dark");
   });
+
+  test("o indicador inferior acompanha a rolagem", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name === "chromium", "a barra inferior é do celular");
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const indicador = page.locator('[data-indicador="inferior"]');
+    await expect(indicador).toBeVisible();
+    const botoes = page
+      .getByRole("navigation", { name: "Seções do aplicativo" })
+      .getByRole("button");
+    const caixaA = await botoes.nth(0).boundingBox();
+    const caixaB = await botoes.nth(1).boundingBox();
+    const pager = page.locator("[data-pager=principal]");
+    // Sem o encaixe, a rolagem pode parar entre dois painéis e medir o meio.
+    await pager.evaluate((elemento) => {
+      elemento.style.scrollSnapType = "none";
+      elemento.scrollTo({ left: elemento.clientWidth / 2 });
+      elemento.dispatchEvent(new Event("scroll"));
+    });
+    const centroA = (caixaA?.x ?? 0) + (caixaA?.width ?? 0) / 2;
+    const centroB = (caixaB?.x ?? 0) + (caixaB?.width ?? 0) / 2;
+    const alvo = (centroA + centroB) / 2;
+    await expect
+      .poll(
+        async () => {
+          const caixa = await indicador.boundingBox();
+          if (!caixa) return 999;
+          return Math.abs(caixa.x + caixa.width / 2 - alvo);
+        },
+        { timeout: 10_000 },
+      )
+      .toBeLessThan(10);
+  });
 });

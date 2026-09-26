@@ -275,6 +275,11 @@ export default function VistaFrequencia({
     return (alunoId: string): AcumuladoAluno | null => mapa.get(alunoId) ?? null;
   }, [resumo]);
 
+  const rotuloOrigemDe = useMemo(() => {
+    const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
+    return (id: string) => mapa.get(id) ?? "";
+  }, [turmas]);
+
   const opcoesJustificativa = useMemo(
     () => [
       { valor: "", rotulo: "Sem justificativa" },
@@ -297,7 +302,11 @@ export default function VistaFrequencia({
   const visiveis = useMemo(() => {
     const termo = normalizar(busca);
     return ativosDaTurma.filter((aluno) => {
-      const combinaBusca = termo === "" || normalizar(aluno.nome).includes(termo);
+      const origem = rotuloOrigemDe(aluno.turmaOriginalId);
+      const combinaBusca =
+        termo === "" ||
+        normalizar(aluno.nome).includes(termo) ||
+        (origem !== "" && normalizar(origem).includes(termo));
       const combinaFiltro =
         filtro === "todos" ||
         (filtro === "faltas" && ausencias.has(aluno.id)) ||
@@ -305,7 +314,7 @@ export default function VistaFrequencia({
         (filtro === "presentes" && !ausencias.has(aluno.id));
       return combinaBusca && combinaFiltro;
     });
-  }, [ativosDaTurma, busca, filtro, ausencias, justificativas]);
+  }, [ativosDaTurma, busca, filtro, ausencias, justificativas, rotuloOrigemDe]);
 
   const bloqueado = carregando || salvando || conflito;
   const travado = bloqueado || sujo;
@@ -813,7 +822,7 @@ export default function VistaFrequencia({
               id="busca-aluno"
               valor={busca}
               onValor={setBusca}
-              placeholder="Buscar aluno"
+              placeholder="Buscar aluno ou turma de origem"
               className="rounded-none border-0 border-b px-3 py-1.5"
             />
 
@@ -921,6 +930,11 @@ export default function VistaFrequencia({
                                 Acumulado: {acumulado.faltas} F · {acumulado.faltasJustificadas} FJ
                               </span>
                             ) : null}
+                            {aluno.turmaOriginalId !== aluno.turmaId && (
+                              <span className="text-muted-foreground block truncate text-xs">
+                                Origem {rotuloOrigemDe(aluno.turmaOriginalId)}
+                              </span>
+                            )}
                           </span>
                           <motion.span
                             key={faltando ? codigo || "F" : "P"}

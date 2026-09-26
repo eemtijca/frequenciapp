@@ -4,15 +4,16 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 
 ## Dados tratados
 
-| Dado                                                   | Finalidade                                         | Retenção                                                                            |
-| ------------------------------------------------------ | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Nome do aluno                                          | Identificar o aluno na chamada e nos relatórios.   | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
-| Turma atual e de origem                                | Organizar chamadas e a consulta agrupada.          | Idem.                                                                               |
-| Registro de faltas por dia (e por aula, quando ligado) | Registrar a chamada, finalidade do sistema.        | Idem, junto com as chamadas.                                                        |
-| Saída antecipada: momento, justificativa e observação  | Registrar quem saiu antes do fim do dia e por quê. | Idem, junto com as saídas; a responsável pela liberação fica na equipe.             |
-| E-mail e hash de senha da equipe                       | Autenticar o acesso pessoal.                       | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
-| Nome da administração e da coordenação                 | Tratamento e saudação; identificação da equipe.    | Conta ativa.                                                                        |
-| Trilha de auditoria (quem, o quê, quando)              | Prestar contas de ações administrativas.           | Conforme política da escola; sem dados de alunos.                                   |
+| Dado                                                   | Finalidade                                                        | Retenção                                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nome do aluno                                          | Identificar o aluno na chamada e nos relatórios.                  | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
+| Turma atual e de origem                                | Organizar chamadas e a consulta agrupada.                         | Idem.                                                                               |
+| Registro de faltas por dia (e por aula, quando ligado) | Registrar a chamada, finalidade do sistema.                       | Idem, junto com as chamadas.                                                        |
+| Saída antecipada: momento, justificativa e observação  | Registrar quem saiu antes do fim do dia e por quê.                | Idem, junto com as saídas; a responsável pela liberação fica na equipe.             |
+| E-mail e hash de senha da equipe                       | Autenticar o acesso pessoal.                                      | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
+| Nome da administração e da coordenação                 | Tratamento e saudação; identificação da equipe.                   | Conta ativa.                                                                        |
+| Trilha de auditoria (quem, o quê, quando)              | Prestar contas de ações administrativas.                          | Conforme política da escola; sem dados de alunos.                                   |
+| Frequência enviada à planilha da escola                | Reorganizar por turma de origem, quando a integração está ligada. | Na planilha da própria escola, sob controle dela.                                   |
 
 Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
 
@@ -40,7 +41,7 @@ delete from usuarios where id = '<id da conta>';
 
 ## Repartição de papéis
 
-O desenvolvedor do aplicativo não tem acesso a dados de produção: o software roda na infraestrutura escolhida pela escola, sem telemetria e sem dependência de terceiros. A escola, ao usar o sistema, responde pelos dados que insere, mantendo a caderneta digital dentro da mesma finalidade da caderneta de papel.
+O desenvolvedor do aplicativo não tem acesso a dados de produção: o software roda na infraestrutura escolhida pela escola, sem telemetria e sem dependência de terceiros contratados. A integração opcional com o Google Planilhas é configurada pela própria escola, na conta Google dela, e só envia o que a finalidade de frequência exige. A escola, ao usar o sistema, responde pelos dados que insere, mantendo a caderneta digital dentro da mesma finalidade da caderneta de papel.
 
 ## Repositório limpo
 

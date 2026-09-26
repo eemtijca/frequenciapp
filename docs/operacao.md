@@ -61,6 +61,16 @@ select count(*) as frequencias,
   from frequencias;
 ```
 
+## Sincronização com a planilha
+
+Quando a integração com o Google Planilhas está ativa, a rotina é:
+
+1. conferir a estrutura em Gestão, Configurações, Google Planilhas, se o cabeçalho ou as abas mudaram;
+2. enviar pela Grade, com a turma de origem e o período selecionados, ou pelo card da Gestão para o mês de todas as turmas;
+3. revisar a prévia e confirmar; o aplicativo relata células preenchidas, puladas e divergências.
+
+Rotacionar o token invalida a conexão até atualizar o Script Property no Apps Script. O modo completo expira sozinho; para correções, destravar com frase, senha e duração. Cópias ocultas das abas são criadas antes de operações destrutivas e podem ser restauradas pelo card. Desconectar apaga token e esquema do banco, sem alterar a planilha.
+
 ## Higiene
 
 Sessões vencidas:

@@ -86,6 +86,7 @@ export default function VistaGestao({
               <AbaConfiguracoes
                 configuracoes={configuracoes}
                 justificativas={justificativas}
+                turmas={turmas}
                 diaCorrente={diaCorrente}
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}

@@ -213,3 +213,18 @@ input[type="month"] {
   content-visibility: auto;
   contain: layout paint style;
 }
+
+/* Preferência de animações desligada: transições e animações param na hora,
+   exceto os indicadores de carregamento, que continuam comunicando espera. */
+html[data-animacoes="desligadas"] {
+  scroll-behavior: auto !important;
+}
+html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse),
+html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse)::before,
+html[data-animacoes="desligadas"] *:not(.animate-spin):not(.animate-pulse)::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}

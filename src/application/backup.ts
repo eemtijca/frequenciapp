@@ -92,6 +92,7 @@ const esquemaCopia = z.object({
           .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
         justificativa,
         observacao: z.string().trim().max(200).nullish(),
+        texto: z.string().trim().max(100).nullish(),
         liberadoPorId: uuid.nullish(),
       }),
     )
@@ -200,6 +201,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
           momento: true,
           justificativa: true,
           observacao: true,
+          texto: true,
           liberadoPorId: true,
         },
       }),
@@ -511,6 +513,7 @@ export async function importarCopia(
           momento: saida.momento,
           justificativa: saida.justificativa,
           observacao: saida.observacao ?? null,
+          texto: saida.texto ?? null,
           liberadoPorId:
             saida.liberadoPorId && idsUsuarios.has(saida.liberadoPorId)
               ? saida.liberadoPorId

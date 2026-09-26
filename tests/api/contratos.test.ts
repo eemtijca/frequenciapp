@@ -1,5 +1,6 @@
 // Contratos da API contra o aplicativo no ar (APP_URL), com banco migrado e
 // contas de teste. A suíte cria e limpa a própria massa em dias isolados.
+import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 
@@ -67,17 +68,15 @@ async function entrar(email: string, senha: string): Promise<{ status: number; c
   return { status: resposta.status, cookie: bruto.split(";")[0] ?? "" };
 }
 
-/** Validade da sessão mais recente de um e-mail, em milissegundos. */
-async function validadeDaSessaoMaisNova(email: string): Promise<number> {
+/** Validade da sessão criada por uma resposta de login, em milissegundos. */
+async function validadeDaSessaoDoCookie(bruto: string): Promise<number> {
   if (!banco) return 0;
+  const valor = bruto.split(";")[0]?.split("=")[1] ?? "";
+  const token = valor.split(".")[0] ?? "";
+  const hash = createHash("sha256").update(token).digest("hex");
   const { rows } = await banco.query<{ expira_em: Date }>(
-    `select s.expira_em
-       from sessoes s
-       join usuarios u on u.id = s.usuario_id
-      where u.email = $1
-      order by s.criado_em desc
-      limit 1`,
-    [email],
+    "select expira_em from sessoes where token_hash = $1",
+    [hash],
   );
   const expiraEm = rows[0]?.expira_em;
   return expiraEm ? expiraEm.getTime() - Date.now() : 0;
@@ -185,7 +184,7 @@ describe("autenticação", () => {
     expect(resposta.status).toBe(200);
     const bruto = resposta.headers.get("set-cookie") ?? "";
     expect(bruto).toMatch(/Expires=/i);
-    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    const validade = await validadeDaSessaoDoCookie(bruto);
     expect(validade).toBeGreaterThan(29 * 24 * 60 * 60 * 1000);
   });
 
@@ -198,7 +197,7 @@ describe("autenticação", () => {
     const bruto = resposta.headers.get("set-cookie") ?? "";
     expect(bruto).not.toMatch(/Expires=/i);
     expect(bruto).not.toMatch(/Max-Age=/i);
-    const validade = await validadeDaSessaoMaisNova(EMAIL_COORD);
+    const validade = await validadeDaSessaoDoCookie(bruto);
     expect(validade).toBeGreaterThan(11 * 60 * 60 * 1000);
     expect(validade).toBeLessThan(13 * 60 * 60 * 1000);
   });
@@ -561,6 +560,45 @@ describe("gestão de alunos (admin)", () => {
       }),
     });
     expect(resposta.status).toBe(404);
+  });
+
+  it("coordenação não define origem em massa", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [alunoQA?.id], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(resposta.status).toBe(403);
+  });
+
+  it("define a turma de origem em massa sem mover a turma atual", async () => {
+    const resposta = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [alunoQA?.id], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(resposta.status).toBe(200);
+    const resultado = (await resposta.json()) as { atualizados: number };
+    expect(resultado.atualizados).toBe(1);
+    const listagem = await autenticado(cookieAdmin, "/api/alunos", { method: "GET" });
+    const alunos = (await listagem.json()) as { alunos: AlunoApi[] };
+    const aluno = alunos.alunos.find((item) => item.id === alunoQA?.id);
+    expect(aluno?.turmaOriginalId).toBe(turmaQB?.id);
+    expect(aluno?.turmaId).toBe(turmaQA?.id);
+  });
+
+  it("recusa origem em massa sem seleção ou com aluno inexistente", async () => {
+    const vazio = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({ ids: [], turmaOriginalId: turmaQB?.id }),
+    });
+    expect(vazio.status).toBe(400);
+    const sumido = await autenticado(cookieAdmin, "/api/alunos", {
+      method: "PATCH",
+      body: JSON.stringify({
+        ids: ["00000000-0000-0000-0000-000000000000"],
+        turmaOriginalId: turmaQB?.id,
+      }),
+    });
+    expect(sumido.status).toBe(404);
   });
 });
 
@@ -1034,6 +1072,97 @@ describe("saídas antecipadas", () => {
     const conferencia = await autenticado(cookieCoord, `/api/saidas?dia=${DIA_TESTE_4}`);
     const dados = (await conferencia.json()) as { saidas: { id: string }[] };
     expect(dados.saidas.some((saida) => saida.id === saidaQA?.id)).toBe(false);
+  });
+
+  it("recusa texto fora de aula, acima de 100 e observação em aula", async () => {
+    const foraDeAula = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "intervalo_1",
+        justificativa: "D",
+        texto: "Saiu para beber água",
+      }),
+    });
+    expect(foraDeAula.status).toBe(400);
+
+    const longo = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "D",
+        texto: "a".repeat(101),
+      }),
+    });
+    expect(longo.status).toBe(400);
+    expect(((await longo.json()) as { error: string }).error).toContain("100 caracteres");
+
+    const observacao = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "O",
+        observacao: "Na aula use o texto",
+      }),
+    });
+    expect(observacao.status).toBe(400);
+  });
+
+  it("registra saída durante a aula com o texto opcional", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_5,
+        momento: "aula_1",
+        justificativa: "D",
+        texto: "Saiu para a coordenação",
+      }),
+    });
+    expect(resposta.status).toBe(201);
+    const criada = (await resposta.json()) as {
+      saida: { id: string; texto: string | null; observacao: string | null };
+    };
+    expect(criada.saida.texto).toBe("Saiu para a coordenação");
+    expect(criada.saida.observacao).toBeNull();
+
+    const lista = await autenticado(cookieCoord, `/api/saidas?dia=${DIA_TESTE_5}`);
+    const dados = (await lista.json()) as { saidas: { id: string; texto: string | null }[] };
+    expect(dados.saidas.find((item) => item.id === criada.saida.id)?.texto).toBe(
+      "Saiu para a coordenação",
+    );
+
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+  });
+
+  it("mantém Outros sem texto na aula e preserva o texto na cópia JSON", async () => {
+    const semTexto = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_4,
+        momento: "aula_3",
+        justificativa: "O",
+      }),
+    });
+    expect(semTexto.status).toBe(201);
+    const criada = (await semTexto.json()) as { saida: { id: string; texto: string | null } };
+    expect(criada.saida.texto).toBeNull();
+
+    const copia = await autenticado(cookieAdmin, "/api/backup");
+    expect(copia.status).toBe(200);
+    const documento = (await copia.json()) as {
+      saidas: { id: string; texto?: string | null }[];
+    };
+    const naCopia = documento.saidas.find((item) => item.id === criada.saida.id);
+    expect(naCopia?.texto ?? null).toBeNull();
+
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
   });
 });
 

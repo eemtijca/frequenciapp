@@ -4,20 +4,22 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 
 ## Esquema
 
-| Tabela               | Papel                                                                                   |
-| -------------------- | --------------------------------------------------------------------------------------- |
-| `usuarios`           | Contas: e-mail único, hash da senha, nome, papel (`ADMIN` ou `COORDENACAO`) e situação. |
-| `sessoes`            | Sessões opacas: hash SHA-256 do token, dono e expiração.                                |
-| `series`             | Séries escolares, por exemplo 1º ano, com ordem de exibição.                            |
-| `turmas`             | Turmas por série, com rótulo composto e unicidade dentro da série.                      |
-| `alunos`             | Nome do aluno, turma atual, turma de origem, ordem e situação.                          |
-| `horarios`           | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                       |
-| `frequencias`        | Uma frequência por turma e dia: revisão, autoria e atualização.                         |
-| `faltas`             | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.       |
-| `saidas_antecipadas` | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
-| `configuracoes`      | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
-| `justificativas`     | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
-| `auditoria`          | Trilha de ações administrativas: quem, o quê e quando.                                  |
+| Tabela                    | Papel                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `usuarios`                | Contas: e-mail único, hash da senha, nome, papel (`ADMIN` ou `COORDENACAO`) e situação. |
+| `sessoes`                 | Sessões opacas: hash SHA-256 do token, dono e expiração.                                |
+| `series`                  | Séries escolares, por exemplo 1º ano, com ordem de exibição.                            |
+| `turmas`                  | Turmas por série, com rótulo composto e unicidade dentro da série.                      |
+| `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem e situação.                          |
+| `horarios`                | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                       |
+| `frequencias`             | Uma frequência por turma e dia: revisão, autoria e atualização.                         |
+| `faltas`                  | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.       |
+| `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
+| `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
+| `justificativas`          | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
+| `integracoes_planilha`    | Linha única da integração opcional com o Google Planilhas: token, esquema e modo.       |
+| `sincronizacoes_planilha` | Histórico de envios por turma de origem, com contagens e resultado.                     |
+| `auditoria`               | Trilha de ações administrativas: quem, o quê e quando.                                  |
 
 Restrições de integridade relevantes:
 

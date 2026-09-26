@@ -1,16 +1,17 @@
 # Ambiente
 
-Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, `AUTH_SECRET`, `TZ_APP`, `NODE_ENV` e `PERMITIR_HTTP` na partida por zod em `src/infra/ambiente.ts`. Configuração ausente ou inválida derruba o processo com mensagem clara, sem estado intermediário.
+Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, `AUTH_SECRET`, `TZ_APP`, `NODE_ENV`, `PERMITIR_HTTP` e `PERMITIR_ENDPOINT_LOCAL` na partida por zod em `src/infra/ambiente.ts`. Configuração ausente ou inválida derruba o processo com mensagem clara, sem estado intermediário.
 
 ## Variáveis da aplicação
 
-| Variável      | Obrigatória | Padrão              | Descrição                                                                                                                    |
-| ------------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| DATABASE_URL  | sim         |                     | Connection string do runtime da API e do Prisma Client.                                                                      |
-| AUTH_SECRET   | sim         |                     | Segredo de 32 caracteres ou mais que assina o cookie de sessão. Gere com `openssl rand -base64 32`.                          |
-| TZ_APP        | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente, os rótulos e os limites de data. Precisa ser um fuso IANA válido.                   |
-| NODE_ENV      | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure, salvo quando o HTTP está liberado.                            |
-| PERMITIR_HTTP | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
+| Variável                | Obrigatória | Padrão              | Descrição                                                                                                                    |
+| ----------------------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| DATABASE_URL            | sim         |                     | Connection string do runtime da API e do Prisma Client.                                                                      |
+| AUTH_SECRET             | sim         |                     | Segredo de 32 caracteres ou mais que assina o cookie de sessão. Gere com `openssl rand -base64 32`.                          |
+| TZ_APP                  | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente, os rótulos e os limites de data. Precisa ser um fuso IANA válido.                   |
+| NODE_ENV                | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure, salvo quando o HTTP está liberado.                            |
+| PERMITIR_HTTP           | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
+| PERMITIR_ENDPOINT_LOCAL | não         | `false`             | Aceita endpoint local na integração com Google Planilhas mesmo em produção. Apenas para testes e ambientes controlados.      |
 
 ## HTTP sem TLS
 
@@ -21,6 +22,10 @@ O padrão é HTTPS terminado à frente (proxy reverso ou plataforma). Para insta
 - o CSP não força `upgrade-insecure-requests` quando a requisição chega por HTTP.
 
 A aplicação avisa no log na partida. Sem TLS, o tráfego fica em texto puro (senhas e dados de alunos), o PWA não instala nem funciona offline fora de localhost, e qualquer pessoa na mesma rede pode observar o tráfego. Use apenas em rede controlada e volte a `false` assim que houver TLS.
+
+## Endpoint local da planilha
+
+A integração com Google Planilhas aceita `https://script.google.com/macros/s/.../exec`. Fora de produção, `http://127.0.0.1:porta/exec` e `http://localhost:porta/exec` também valem, para os testes com o Apps Script falso. Em produção, liberar o loopback exige `PERMITIR_ENDPOINT_LOCAL=true`, pensado para testes e ambientes controlados; o padrão restringe o endereço ao Google, e a aplicação avisa no log quando a variável está ativa.
 
 ## Conexões do Prisma e do Supabase
 

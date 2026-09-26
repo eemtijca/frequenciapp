@@ -1,0 +1,57 @@
+{
+  "ping": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "ping"
+  },
+  "estrutura": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "estrutura"
+  },
+  "ler": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "ler",
+    "aba": "3º ano A",
+    "linhaInicial": 1,
+    "colunaInicial": 1,
+    "linhas": 80,
+    "colunas": 40
+  },
+  "escrever": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "escrever",
+    "aba": "3º ano A",
+    "cabecalhoLinha": 1,
+    "assinatura": "0000000000000000",
+    "intervalos": [{ "linha": 3, "coluna": 4, "valores": [["F"]] }]
+  },
+  "aplicar": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "aplicar",
+    "aba": "3º ano A",
+    "cabecalhoLinha": 1,
+    "assinatura": "0000000000000000",
+    "modoCompleto": true,
+    "operacoes": [
+      { "tipo": "substituir", "linha": 3, "coluna": 4, "valor": "F", "anterior": "P" },
+      { "tipo": "inserirColunas", "antesDe": 30, "cabecalhoLinha": 1, "rotulos": ["23/09"] },
+      { "tipo": "removerLinhas", "linhas": [42] }
+    ]
+  },
+  "criarAba": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "criarAba",
+    "nome": "3º ano C",
+    "cabecalho": ["Aluno", "Turma atual"]
+  },
+  "listarCopias": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "listarCopias",
+    "aba": "3º ano A"
+  },
+  "restaurarCopia": {
+    "token": "TOKEN_DO_APLICATIVO",
+    "acao": "restaurarCopia",
+    "aba": "3º ano A",
+    "copia": "_frequenciapp_backup_3º ano A_20260923-083000"
+  }
+}
