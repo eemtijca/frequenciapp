@@ -3,7 +3,7 @@
 // Aba de alunos: criar, editar, mover de turma, ativar, desativar e
 // excluir, agrupados por turma com busca por nome.
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import type { Aluno, Turma } from "@/domain/frequencia";
@@ -47,6 +47,7 @@ interface Formulario {
 
 export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
+  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Aluno | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({
     nome: "",
@@ -350,9 +351,9 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                   {lista.map((aluno) => (
                     <motion.li
                       key={aluno.id}
-                      initial={{ opacity: 0 }}
+                      initial={semMovimento ? false : { opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ duration: 0.18 }}
+                      transition={semMovimento ? { duration: 0 } : { duration: 0.18 }}
                       className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
                     >
                       {modoSelecao && (

@@ -15,17 +15,6 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
 }
 
 /**
- * Move o paginador para um painel. Dispara o evento de rolagem de propósito:
- * a primeira rolagem pode acontecer antes de o React registrar o ouvinte.
- */
-export async function rolarPager(page: Page, indice: number): Promise<void> {
-  await page.locator("[data-pager=principal]").evaluate((elemento, alvo) => {
-    elemento.scrollTo({ left: elemento.clientWidth * alvo });
-    elemento.dispatchEvent(new Event("scroll"));
-  }, indice);
-}
-
-/**
  * Troca de visão pela navegação. Em desenvolvimento o Fast Refresh pode trocar
  * os nós durante a hidratação, então o clique é repetido até o painel mudar.
  */

@@ -4,7 +4,7 @@
 // falta e de novo para voltar. A falta pode receber uma justificativa do
 // catálogo (FJ). Rascunho local e proteção de conflito.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   CalendarDays,
   ChevronLeft,
@@ -145,6 +145,7 @@ export default function VistaFrequencia({
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
+  const semMovimento = useReducedMotion() ?? false;
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
   useEffect(() => {
@@ -938,9 +939,13 @@ export default function VistaFrequencia({
                           </span>
                           <motion.span
                             key={faltando ? codigo || "F" : "P"}
-                            initial={MARCAS.escondido}
+                            initial={semMovimento ? false : MARCAS.escondido}
                             animate={MARCAS.visivel}
-                            transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                            transition={
+                              semMovimento
+                                ? { duration: 0 }
+                                : { type: "spring", stiffness: 500, damping: 28 }
+                            }
                             className={
                               faltando
                                 ? codigo

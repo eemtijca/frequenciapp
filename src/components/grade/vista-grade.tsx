@@ -4,7 +4,7 @@
 // período personalizado e mês; células P, F e FJ, saída no dia e coluna
 // acumulada (F + FJ) de todo o histórico.
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -72,6 +72,7 @@ export default function VistaGrade({
   onRecarregar,
 }: Props) {
   const [atualizando, setAtualizando] = useState(false);
+  const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [modo, setModo] = useState<ModoPeriodo>("mes");
@@ -404,9 +405,9 @@ export default function VistaGrade({
       ) : (
         <motion.div
           key={turmaEfetiva + modo}
-          initial={{ opacity: 0 }}
+          initial={semMovimento ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          transition={semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           className="bg-card overflow-hidden rounded-lg border"
         >
           <BarraBusca

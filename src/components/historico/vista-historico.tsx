@@ -2,7 +2,7 @@
 
 // Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   ArrowUpRight,
   ChevronLeft,
@@ -61,6 +61,7 @@ export default function VistaHistorico({
   rotuloTurma,
 }: Props) {
   const [atualizando, setAtualizando] = useState(false);
+  const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
@@ -254,9 +255,11 @@ export default function VistaHistorico({
                 return (
                   <motion.li
                     key={`${frequencia.dia}|${frequencia.turmaId}`}
-                    initial={{ opacity: 0 }}
+                    initial={semMovimento ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    transition={
+                      semMovimento ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+                    }
                   >
                     <button
                       type="button"

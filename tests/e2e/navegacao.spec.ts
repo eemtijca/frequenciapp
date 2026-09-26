@@ -1,6 +1,6 @@
-// Fumaça do shell: troca de visão pela navegação, deslize e tema.
+// Fumaça do shell: troca de visão pela navegação e tema.
 import { expect, test } from "@playwright/test";
-import { aguardarHidratacao, rolarPager, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("navegação", () => {
   test("troca de visão pela navegação", async ({ page }) => {
@@ -17,40 +17,23 @@ test.describe("navegação", () => {
     await expect(page.getByRole("heading", { name: "Gestão" })).toBeVisible();
   });
 
-  test("desliza o paginador e acompanha a visão ativa", async ({ page }) => {
+  test("troca de visão só pelos botões, sem gesto horizontal", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect
-      .poll(
-        async () => {
-          await rolarPager(page, 1);
-          return page.locator("main").getAttribute("data-visao");
-        },
-        { timeout: 20_000 },
-      )
-      .toBe("chamada");
-    await expect
-      .poll(
-        async () => {
-          await rolarPager(page, 0);
-          return page.locator("main").getAttribute("data-visao");
-        },
-        { timeout: 20_000 },
-      )
-      .toBe("painel");
+    await trocarVisao(page, "Chamada", "chamada");
+    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await trocarVisao(page, "Painel", "painel");
+    await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
   });
 
-  test("no desktop a troca de visão é instantânea", async ({ page }) => {
+  test("a troca de visão é instantânea", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    const pager = page.locator("[data-pager=principal]");
     await page.getByRole("button", { name: "Chamada" }).click();
-    const medida = await pager.evaluate((elemento) => ({
-      scrollLeft: elemento.scrollLeft,
-      largura: elemento.clientWidth,
-    }));
-    expect(medida.scrollLeft).toBe(medida.largura);
+    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
   });
 
   test("alterna o tema pelo menu de três opções", async ({ page }) => {
@@ -77,7 +60,7 @@ test.describe("navegação", () => {
       .toContain(inicioEscuro ? "light" : "dark");
   });
 
-  test("o indicador inferior acompanha a rolagem", async ({ page }, testInfo) => {
+  test("o indicador inferior marca a visão ativa", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name === "chromium", "a barra inferior é do celular");
     await page.goto("/");
     await aguardarHidratacao(page);
@@ -86,27 +69,13 @@ test.describe("navegação", () => {
     const botoes = page
       .getByRole("navigation", { name: "Seções do aplicativo" })
       .getByRole("button");
-    const caixaA = await botoes.nth(0).boundingBox();
-    const caixaB = await botoes.nth(1).boundingBox();
-    const pager = page.locator("[data-pager=principal]");
-    // Sem o encaixe, a rolagem pode parar entre dois painéis e medir o meio.
-    await pager.evaluate((elemento) => {
-      elemento.style.scrollSnapType = "none";
-      elemento.scrollTo({ left: elemento.clientWidth / 2 });
-      elemento.dispatchEvent(new Event("scroll"));
-    });
-    const centroA = (caixaA?.x ?? 0) + (caixaA?.width ?? 0) / 2;
-    const centroB = (caixaB?.x ?? 0) + (caixaB?.width ?? 0) / 2;
-    const alvo = (centroA + centroB) / 2;
-    await expect
-      .poll(
-        async () => {
-          const caixa = await indicador.boundingBox();
-          if (!caixa) return 999;
-          return Math.abs(caixa.x + caixa.width / 2 - alvo);
-        },
-        { timeout: 10_000 },
-      )
-      .toBeLessThan(10);
+    await trocarVisao(page, "Chamada", "chamada");
+    const caixaBotao = await botoes.nth(1).boundingBox();
+    const caixaIndicador = await indicador.boundingBox();
+    expect(caixaBotao).not.toBeNull();
+    expect(caixaIndicador).not.toBeNull();
+    const centroBotao = (caixaBotao?.x ?? 0) + (caixaBotao?.width ?? 0) / 2;
+    const centroIndicador = (caixaIndicador?.x ?? 0) + (caixaIndicador?.width ?? 0) / 2;
+    expect(Math.abs(centroIndicador - centroBotao)).toBeLessThan(12);
   });
 });

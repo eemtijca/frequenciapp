@@ -2,7 +2,7 @@
 
 // Aba de séries: criar, renomear, reordenar e excluir.
 import { useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Serie } from "@/domain/frequencia";
@@ -45,6 +45,7 @@ const VAZIO: Formulario = { nome: "", ordem: "1" };
 
 export default function AbaSeries({ series, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
+  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const [enviando, setEnviando] = useState(false);
@@ -147,9 +148,9 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           {filtradas.map((serie) => (
             <motion.li
               key={serie.id}
-              initial={{ opacity: 0 }}
+              initial={semMovimento ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
+              transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
               className="flex items-center gap-3 px-4 py-3"
             >
               <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">

@@ -61,14 +61,20 @@ export default function GraficoRosca({
               ))}
             </Pie>
             <Tooltip
-              formatter={(valor: unknown) => [`${String(valor)} ${rotuloTotal}`, ""]}
+              formatter={(valor: unknown, nome: unknown) => {
+                const total = Number(valor) || 0;
+                return [`${total} ${total === 1 ? "falta" : "faltas"}`, String(nome ?? "")];
+              }}
               contentStyle={{
                 background: "var(--popover)",
+                backgroundColor: "var(--popover)",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius)",
                 color: "var(--popover-foreground)",
                 fontSize: "0.75rem",
+                opacity: 1,
               }}
+              wrapperStyle={{ opacity: 1 }}
             />
           </PieChart>
         </ResponsiveContainer>

@@ -1,9 +1,9 @@
-// Abas da Gestão: seleção por toque, deslize do paginador e teclado.
+// Abas da Gestão: seleção por toque e teclado.
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("abas da Gestão", () => {
-  test("sincroniza toque, deslize e teclado", async ({ page }) => {
+  test("sincroniza toque e teclado", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
@@ -18,19 +18,11 @@ test.describe("abas da Gestão", () => {
       "true",
     );
 
-    const pager = page.locator("[data-pager=gestao]");
-    await expect
-      .poll(
-        async () => {
-          await pager.evaluate((elemento) => {
-            elemento.scrollTo({ left: elemento.clientWidth * 2 });
-            elemento.dispatchEvent(new Event("scroll"));
-          });
-          return page.getByRole("tab", { name: "Alunos" }).getAttribute("aria-selected");
-        },
-        { timeout: 15_000 },
-      )
-      .toBe("true");
+    await page.getByRole("tab", { name: "Alunos" }).click();
+    await expect(page.getByRole("tab", { name: "Alunos" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     await page.getByRole("tab", { name: "Alunos" }).press("ArrowRight");
     await expect(page.getByRole("tab", { name: "Equipe" })).toHaveAttribute(
@@ -39,24 +31,18 @@ test.describe("abas da Gestão", () => {
     );
   });
 
-  test("no desktop a troca é instantânea com deslize curto", async ({ page }) => {
+  test("no desktop a troca é instantânea", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
 
-    const pager = page.locator("[data-pager=gestao]");
     await page.getByRole("tab", { name: "Alunos" }).click();
-    const medida = await pager.evaluate((elemento) => ({
-      scrollLeft: elemento.scrollLeft,
-      largura: elemento.clientWidth,
-    }));
-    // Sem rolagem longa: o paginador já está no painel de destino.
-    expect(medida.scrollLeft).toBe(medida.largura * 2);
     await expect(page.getByRole("tab", { name: "Alunos" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
+    await expect(page.getByRole("tabpanel", { name: "Alunos" })).toBeVisible();
   });
 
   test("campo de senha da equipe mostra e oculta", async ({ page }) => {
@@ -75,7 +61,7 @@ test.describe("abas da Gestão", () => {
     await expect(campo).toHaveAttribute("type", "password");
   });
 
-  test("a pílula não passeia pelas abas intermediárias", async ({ page }) => {
+  test("a seleção vai direto à aba tocada", async ({ page }) => {
     await page.setViewportSize({ width: 412, height: 915 });
     await page.goto("/");
     await aguardarHidratacao(page);
@@ -86,7 +72,6 @@ test.describe("abas da Gestão", () => {
       "aria-selected",
       "true",
     );
-    // Durante a rolagem suave, a aba ativa fica na clicada, sem saltar pelas do meio.
     const abasGestao = page.getByRole("tablist", { name: "Áreas de gestão" });
     for (let i = 0; i < 8; i += 1) {
       const ativa = await abasGestao.getByRole("tab", { selected: true }).textContent();

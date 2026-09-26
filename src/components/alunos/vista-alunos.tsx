@@ -3,7 +3,7 @@
 // Alunos: lista de consulta do professor, agrupada por turma atual ou por
 // turma de origem. O cadastro e a edição acontecem na área de Gestão.
 import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
@@ -23,6 +23,7 @@ const AGRUPAMENTOS: { valor: Agrupamento; rotulo: string }[] = [
 
 export default function VistaAlunos({ alunos, turmas }: Props) {
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
+  const semMovimento = useReducedMotion() ?? false;
   const [busca, setBusca] = useState("");
 
   const rotuloDe = useMemo(() => {
@@ -133,9 +134,11 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
         gruposFiltrados.map(([id, turma, lista]) => (
           <motion.div
             key={id}
-            initial={{ opacity: 0 }}
+            initial={semMovimento ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            transition={
+              semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
+            }
             className="bg-card overflow-hidden rounded-lg border"
           >
             <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">

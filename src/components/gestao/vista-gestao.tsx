@@ -1,7 +1,7 @@
 "use client";
 
 // Gestão: área do administrador. Séries, turmas, alunos, equipe e
-// configurações em abas curtas com o paginador compartilhado.
+// configurações em abas curtas.
 import { GraduationCap, ListChecks, School, Settings2, Users } from "lucide-react";
 import type {
   Aluno,
