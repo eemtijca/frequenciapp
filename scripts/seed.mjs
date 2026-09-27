@@ -265,6 +265,7 @@ try {
   // Saídas antecipadas espalhadas pela semana, para o relatório ter conteúdo.
   let saidasCriadas = 0;
   const turmasParaSaida = Object.values(idsDeTurmas);
+  const liberadores = (await cliente.query("select codigo from liberadores order by codigo")).rows;
   for (let indice = 0; indice < turmasParaSaida.length && indice < dias.length; indice += 1) {
     const turmaId = turmasParaSaida[indice];
     const alunosDaTurma = await cliente.query(
@@ -275,18 +276,28 @@ try {
     const dia = dias[indice];
     const momento = MOMENTOS[indice % MOMENTOS.length];
     const [codigoJustificativa] = JUSTIFICATIVAS[indice % JUSTIFICATIVAS.length];
+    const liberadoPorCodigo = liberadores[indice % liberadores.length]?.codigo ?? null;
     const criada = await cliente.query(
-      `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_id, criado_por_id)
-       values ($1, $2, $3, $4, null, $5, $5)
+      `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_codigo, criado_por_id)
+       values ($1, $2, $3, $4, null, $5, $6)
        on conflict (aluno_id, dia) do nothing
        returning id`,
-      [alunosDaTurma.rows[0].id, dia, momento, codigoJustificativa, coordenacaoId],
+      [
+        alunosDaTurma.rows[0].id,
+        dia,
+        momento,
+        codigoJustificativa,
+        liberadoPorCodigo,
+        coordenacaoId,
+      ],
     );
     saidasCriadas += criada.rowCount;
   }
 
+  const avisoLiberadores =
+    liberadores.length === 0 ? " Nenhum nome no catálogo de quem libera; cadastre na Gestão." : "";
   console.log(
-    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos, ${justificativasNovas} justificativas novas, ${chamadasCriadas} chamadas, ${faltasCriadas} faltas e ${saidasCriadas} saídas antecipadas.`,
+    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos, ${justificativasNovas} justificativas novas, ${chamadasCriadas} chamadas, ${faltasCriadas} faltas e ${saidasCriadas} saídas antecipadas.${avisoLiberadores}`,
   );
 } catch (erro) {
   console.error("Falha ao semear:", erro.message);

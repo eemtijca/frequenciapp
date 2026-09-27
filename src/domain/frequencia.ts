@@ -15,6 +15,17 @@ export interface JustificativaConfigurada extends Justificativa {
   ativo: boolean;
 }
 
+/** Pessoa do catálogo de quem libera a saída, com código estável e rótulo. */
+export interface Liberador {
+  codigo: string;
+  rotulo: string;
+}
+
+/** Liberador com a situação, como o catálogo é lido da Gestão. */
+export interface LiberadorConfigurado extends Liberador {
+  ativo: boolean;
+}
+
 /**
  * Catálogo inicial de justificativas. É o mesmo que a migração e a semente
  * gravam; o catálogo em uso vem do banco e pode ser editado na Gestão.
@@ -37,8 +48,10 @@ export const JUSTIFICATIVAS_PADRAO: readonly Justificativa[] = [
 /** Código que aceita observação escrita. */
 export const JUSTIFICATIVA_OUTROS = "O";
 
-/** Ordena o catálogo pelo rótulo, em português e sem diferenciar caixa. */
-export function ordenarJustificativas<T extends Justificativa>(catalogo: readonly T[]): T[] {
+/** Ordena um catálogo pelo rótulo, em português e sem diferenciar caixa. */
+export function ordenarPorRotulo<T extends { codigo: string; rotulo: string }>(
+  catalogo: readonly T[],
+): T[] {
   return catalogo
     .slice()
     .sort(
@@ -65,7 +78,7 @@ export const MOMENTOS_SAIDA: readonly MomentoSaida[] = [
   { codigo: "almoco", rotulo: "Almoço" },
 ];
 
-/** Limite do texto livre da saída durante a aula. */
+/** Limite do texto livre da justificativa de saída, em poucas palavras. */
 export const LIMITE_TEXTO_SAIDA = 100;
 
 /** Rótulo de uma justificativa no catálogo, ou texto vazio quando não existe. */
@@ -74,6 +87,95 @@ export function rotuloJustificativa(
   catalogo: readonly Justificativa[] = JUSTIFICATIVAS_PADRAO,
 ): string {
   return catalogo.find((item) => item.codigo === codigo)?.rotulo ?? "";
+}
+
+/** Motivo visível da saída e o complemento, quando o tipo e o texto coexistem. */
+export function partesJustificativaSaida(
+  saida: { justificativa: string | null; texto: string | null; observacao: string | null },
+  catalogo: readonly Justificativa[] = JUSTIFICATIVAS_PADRAO,
+): { motivo: string; complemento: string | null } {
+  if (saida.justificativa) {
+    const rotulo = rotuloJustificativa(saida.justificativa, catalogo);
+    return {
+      motivo: rotulo !== "" ? rotulo : saida.justificativa,
+      complemento: saida.texto ?? saida.observacao,
+    };
+  }
+  return { motivo: saida.texto ?? "", complemento: null };
+}
+
+/** Verdadeiro quando o código existe no catálogo de quem libera. */
+export function ehLiberadorValido(codigo: string, catalogo: readonly Liberador[]): boolean {
+  return catalogo.some((item) => item.codigo === codigo);
+}
+
+export interface CamposJustificativaSaida {
+  justificativa: string | null;
+  texto: string | null;
+  observacao: string | null;
+}
+
+/**
+ * Resolve a justificativa da saída: ou um código do catálogo, com texto
+ * opcional na aula e observação de Outros fora dela, ou um texto livre
+ * em qualquer momento.
+ */
+export function camposJustificativaSaida(
+  momento: string,
+  entrada: {
+    justificativa?: string | null;
+    texto?: string | null;
+    observacao?: string | null;
+  },
+): { ok: true; campos: CamposJustificativaSaida } | { ok: false; mensagem: string } {
+  const justificativa = entrada.justificativa?.trim() || null;
+  const texto = entrada.texto?.trim() || null;
+  const observacao = entrada.observacao?.trim() || null;
+  const duranteAula = ehMomentoDeAula(momento);
+
+  if (justificativa && justificativa.length > 10) {
+    return { ok: false, mensagem: "Justificativa inválida." };
+  }
+  if (texto && texto.length > LIMITE_TEXTO_SAIDA) {
+    return {
+      ok: false,
+      mensagem: `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
+    };
+  }
+  if (observacao && observacao.length > 200) {
+    return { ok: false, mensagem: "A observação deve ter no máximo 200 caracteres." };
+  }
+  if (!justificativa && !texto) {
+    return {
+      ok: false,
+      mensagem: "Escolha um tipo ou escreva a justificativa em poucas palavras.",
+    };
+  }
+  if (!justificativa && observacao) {
+    return { ok: false, mensagem: "A observação acompanha um tipo de justificativa." };
+  }
+  if (justificativa && texto && !duranteAula) {
+    return {
+      ok: false,
+      mensagem: "O texto da justificativa vale apenas para saída durante a aula.",
+    };
+  }
+  if (justificativa && observacao && duranteAula) {
+    return {
+      ok: false,
+      mensagem: "A observação vale para intervalos e almoço; na aula, use o texto.",
+    };
+  }
+
+  return {
+    ok: true,
+    campos: {
+      justificativa,
+      texto: justificativa ? (duranteAula ? texto : null) : texto,
+      observacao:
+        justificativa && !duranteAula && justificativa === JUSTIFICATIVA_OUTROS ? observacao : null,
+    },
+  };
 }
 
 /** Valida um código no catálogo informado. */
@@ -151,11 +253,18 @@ export interface SaidaAntecipada {
   alunoId: string;
   dia: string;
   momento: string;
-  justificativa: string;
+  /** Código do catálogo. Nulo quando a justificativa foi escrita em poucas palavras. */
+  justificativa: string | null;
   observacao: string | null;
-  /** Texto livre da saída durante a aula, opcional. */
+  /**
+   * Texto livre. Sem código do catálogo, é a própria justificativa.
+   * Com código, é o complemento opcional da saída durante a aula.
+   */
   texto: string | null;
+  /** Conta da equipe em registros antigos. */
   liberadoPorId: string | null;
+  /** Código fixo de quem liberou. Nulo em registros antigos. */
+  liberadoPorCodigo: string | null;
   liberadoPorNome: string | null;
   criadoEm: string;
 }

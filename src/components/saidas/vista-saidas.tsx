@@ -19,7 +19,7 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import type {
   Aluno,
   JustificativaConfigurada,
-  Responsavel,
+  LiberadorConfigurado,
   SaidaAntecipada,
   Turma,
 } from "@/domain/frequencia";
@@ -32,8 +32,8 @@ import {
   LIMITE_TEXTO_SAIDA,
   MOMENTOS_SAIDA,
   normalizar,
+  partesJustificativaSaida,
   rotuloDiaSemana,
-  rotuloJustificativa,
   rotuloMomento,
 } from "@/domain/frequencia";
 import { relatorioSaidas } from "@/domain/relatorios";
@@ -59,29 +59,29 @@ import DialogoEnvioSaidas, {
 } from "@/components/saidas/dialogo-envio-saidas";
 
 interface Props {
-  usuarioId: string;
   diaCorrente: string;
   fuso: string;
   mes: string;
   turmas: Turma[];
   alunos: Aluno[];
-  responsaveis: Responsavel[];
   catalogoJustificativas: JustificativaConfigurada[];
+  liberadores: LiberadorConfigurado[];
   saidas: SaidaAntecipada[];
   onSaidasMudaram: (mes: string) => Promise<void>;
   /** A vista é aquecida em segundo plano; só busca o estado quando visível. */
   ativo: boolean;
 }
 
+type FormaJustificativa = "texto" | "catalogo";
+
 export default function VistaSaidas({
-  usuarioId,
   diaCorrente,
   fuso,
   mes,
   turmas,
   alunos,
-  responsaveis,
   catalogoJustificativas,
+  liberadores,
   saidas,
   onSaidasMudaram,
   ativo,
@@ -90,10 +90,11 @@ export default function VistaSaidas({
   const [turmaFiltro, setTurmaFiltro] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
+  const [formaJustificativa, setFormaJustificativa] = useState<FormaJustificativa>("catalogo");
   const [justificativa, setJustificativa] = useState("");
   const [texto, setTexto] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [responsavelId, setResponsavelId] = useState(usuarioId);
+  const [responsavelCodigo, setResponsavelCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
@@ -148,6 +149,14 @@ export default function VistaSaidas({
         .filter((item) => item.ativo)
         .map((item) => ({ valor: item.codigo, rotulo: `${item.codigo} · ${item.rotulo}` })),
     [catalogoJustificativas],
+  );
+
+  const opcoesLiberador = useMemo(
+    () =>
+      liberadores
+        .filter((item) => item.ativo)
+        .map((item) => ({ valor: item.codigo, rotulo: item.rotulo })),
+    [liberadores],
   );
 
   const alunosPorId = useMemo(() => new Map(alunos.map((aluno) => [aluno.id, aluno])), [alunos]);
@@ -232,10 +241,25 @@ export default function VistaSaidas({
     });
   }, [saidasSemana, filtroRelatorio, buscaRelatorio, turmaRelatorio, alunosPorId]);
 
+  function textoDaSaida(saida: SaidaAntecipada): string {
+    const partes = partesJustificativaSaida(saida, catalogoJustificativas);
+    return `${rotuloMomento(saida.momento)} · ${partes.motivo}${
+      partes.complemento ? ` · ${partes.complemento}` : ""
+    }`;
+  }
+
   async function registrar() {
     if (enviando) return;
-    if (!alunoId || !momento || !justificativa) {
-      setErro("Escolha o aluno, o momento da saída e a justificativa.");
+    if (!alunoId || !momento || !responsavelCodigo) {
+      setErro("Escolha o aluno, o momento da saída e quem liberou.");
+      return;
+    }
+    if (formaJustificativa === "catalogo" && !justificativa) {
+      setErro("Escolha o tipo de justificativa.");
+      return;
+    }
+    if (formaJustificativa === "texto" && texto.trim() === "") {
+      setErro("Escreva a justificativa em poucas palavras.");
       return;
     }
     setEnviando(true);
@@ -247,11 +271,21 @@ export default function VistaSaidas({
           alunoId,
           dia,
           momento,
-          justificativa,
-          texto: duranteAula && texto.trim() !== "" ? texto : undefined,
+          justificativa: formaJustificativa === "catalogo" ? justificativa : undefined,
+          texto:
+            formaJustificativa === "texto"
+              ? texto.trim()
+              : duranteAula && texto.trim() !== ""
+                ? texto.trim()
+                : undefined,
           observacao:
-            !duranteAula && justificativa === JUSTIFICATIVA_OUTROS ? observacao : undefined,
-          liberadoPorId: responsavelId,
+            formaJustificativa === "catalogo" &&
+            !duranteAula &&
+            justificativa === JUSTIFICATIVA_OUTROS &&
+            observacao.trim() !== ""
+              ? observacao
+              : undefined,
+          liberadoPorCodigo: responsavelCodigo,
         }),
       );
       avisarSucesso(
@@ -260,9 +294,11 @@ export default function VistaSaidas({
       );
       setAlunoId("");
       setMomento("");
+      setFormaJustificativa("catalogo");
       setJustificativa("");
       setTexto("");
       setObservacao("");
+      setResponsavelCodigo("");
       if (compartilhado) {
         await onSaidasMudaram(dia.slice(0, 7));
       } else {
@@ -409,82 +445,141 @@ export default function VistaSaidas({
             }))}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-momento">Momento da saída</Label>
-            <Selecionar
-              id="saida-momento"
-              value={momento}
-              onValueChange={setMomento}
-              placeholder="Selecione a aula ou pausa"
-              opcoes={MOMENTOS_SAIDA.map((item) => ({
-                valor: item.codigo,
-                rotulo: item.rotulo,
-              }))}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-justificativa">Justificativa</Label>
-            <Selecionar
-              id="saida-justificativa"
-              value={justificativa}
-              onValueChange={setJustificativa}
-              placeholder="Selecione a justificativa"
-              opcoes={opcoesJustificativa}
-            />
-          </div>
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <Label htmlFor="saida-momento">Momento da saída</Label>
+          <Selecionar
+            id="saida-momento"
+            value={momento}
+            onValueChange={setMomento}
+            placeholder="Selecione a aula ou pausa"
+            opcoes={MOMENTOS_SAIDA.map((item) => ({
+              valor: item.codigo,
+              rotulo: item.rotulo,
+            }))}
+          />
         </div>
-        {duranteAula ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="saida-texto">Texto da justificativa</Label>
-              <span className="text-muted-foreground numerais-tabulares text-xs">
-                {texto.length}/{LIMITE_TEXTO_SAIDA}
-              </span>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-sm font-medium">Justificativa</legend>
+          <div
+            role="radiogroup"
+            aria-label="Forma da justificativa"
+            className="flex flex-wrap gap-2"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={formaJustificativa === "texto"}
+              onClick={() => {
+                setFormaJustificativa("texto");
+                setJustificativa("");
+                setObservacao("");
+              }}
+              className="aria-[checked=true]:border-primary aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+            >
+              Escrever em poucas palavras
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={formaJustificativa === "catalogo"}
+              onClick={() => {
+                setFormaJustificativa("catalogo");
+                setTexto("");
+              }}
+              className="aria-[checked=true]:border-primary aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+            >
+              Tipos de justificativa
+            </button>
+          </div>
+          {formaJustificativa === "texto" ? (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="saida-texto">Texto da justificativa</Label>
+                <span className="text-muted-foreground numerais-tabulares text-xs">
+                  {texto.length}/{LIMITE_TEXTO_SAIDA}
+                </span>
+              </div>
+              <Input
+                id="saida-texto"
+                value={texto}
+                maxLength={LIMITE_TEXTO_SAIDA}
+                onChange={(evento) => setTexto(evento.target.value)}
+                placeholder="Escreva a justificativa em poucas palavras"
+                className="h-11"
+              />
+              <p className="text-muted-foreground text-xs">
+                Até {LIMITE_TEXTO_SAIDA} caracteres. Este texto é a justificativa da saída.
+              </p>
             </div>
-            <Input
-              id="saida-texto"
-              value={texto}
-              maxLength={LIMITE_TEXTO_SAIDA}
-              onChange={(evento) => setTexto(evento.target.value)}
-              placeholder="Opcional: descreva a saída durante a aula"
-              className="h-11"
-            />
-            <p className="text-muted-foreground text-xs">
-              Opcional, até {LIMITE_TEXTO_SAIDA} caracteres. Aparece nos relatórios.
-            </p>
-          </div>
-        ) : justificativa === JUSTIFICATIVA_OUTROS ? (
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-observacao">Observação</Label>
-            <Input
-              id="saida-observacao"
-              value={observacao}
-              maxLength={200}
-              onChange={(evento) => setObservacao(evento.target.value)}
-              placeholder="Descreva brevemente o motivo"
-              className="h-11"
-            />
-          </div>
-        ) : null}
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="saida-justificativa">Tipo</Label>
+                <Selecionar
+                  id="saida-justificativa"
+                  value={justificativa}
+                  onValueChange={setJustificativa}
+                  placeholder="Selecione a justificativa"
+                  opcoes={opcoesJustificativa}
+                />
+              </div>
+              {duranteAula ? (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="saida-texto">Texto da justificativa</Label>
+                    <span className="text-muted-foreground numerais-tabulares text-xs">
+                      {texto.length}/{LIMITE_TEXTO_SAIDA}
+                    </span>
+                  </div>
+                  <Input
+                    id="saida-texto"
+                    value={texto}
+                    maxLength={LIMITE_TEXTO_SAIDA}
+                    onChange={(evento) => setTexto(evento.target.value)}
+                    placeholder="Opcional: descreva a saída durante a aula"
+                    className="h-11"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Opcional, até {LIMITE_TEXTO_SAIDA} caracteres. Aparece nos relatórios.
+                  </p>
+                </div>
+              ) : justificativa === JUSTIFICATIVA_OUTROS ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="saida-observacao">Observação</Label>
+                  <Input
+                    id="saida-observacao"
+                    value={observacao}
+                    maxLength={200}
+                    onChange={(evento) => setObservacao(evento.target.value)}
+                    placeholder="Descreva brevemente o motivo"
+                    className="h-11"
+                  />
+                </div>
+              ) : null}
+            </>
+          )}
+        </fieldset>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
           <Selecionar
             id="saida-responsavel"
-            value={responsavelId}
-            onValueChange={setResponsavelId}
-            opcoes={responsaveis.map((responsavel) => ({
-              valor: responsavel.id,
-              rotulo: `${responsavel.nome} · ${responsavel.papel === "ADMIN" ? "Direção" : "Coordenação"}`,
-            }))}
+            value={responsavelCodigo}
+            onValueChange={setResponsavelCodigo}
+            placeholder="Selecione quem liberou"
+            opcoes={opcoesLiberador}
           />
+          {opcoesLiberador.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              Nenhum nome cadastrado. A administração cadastra em Gestão, Configurações.
+            </p>
+          )}
         </div>
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         <Button
           type="submit"
           size="lg"
           className="h-11 w-full rounded-lg px-6 sm:w-auto"
-          disabled={enviando}
+          disabled={enviando || opcoesLiberador.length === 0}
         >
           {enviando && <LoaderCircle size={16} className="animate-spin" />}
           Registrar saída
@@ -533,13 +628,7 @@ export default function VistaSaidas({
                                 {aluno?.nome ?? "Aluno"}
                               </p>
                               <p className="text-muted-foreground truncate text-xs">
-                                {rotuloMomento(saida.momento)} ·{" "}
-                                {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
-                                {saida.texto
-                                  ? ` · ${saida.texto}`
-                                  : saida.observacao
-                                    ? ` · ${saida.observacao}`
-                                    : ""}
+                                {textoDaSaida(saida)}
                               </p>
                               <p className="text-muted-foreground truncate text-xs">
                                 Liberado por {saida.liberadoPorNome ?? "registro anterior"}
@@ -686,15 +775,7 @@ export default function VistaSaidas({
                             <p className="numerais-tabulares text-sm font-medium">
                               {saida.dia.split("-").reverse().join("/")}
                             </p>
-                            <p className="text-muted-foreground text-xs">
-                              {rotuloMomento(saida.momento)} ·{" "}
-                              {rotuloJustificativa(saida.justificativa, catalogoJustificativas)}
-                              {saida.texto
-                                ? ` · ${saida.texto}`
-                                : saida.observacao
-                                  ? ` · ${saida.observacao}`
-                                  : ""}
-                            </p>
+                            <p className="text-muted-foreground text-xs">{textoDaSaida(saida)}</p>
                             <p className="text-muted-foreground text-xs">
                               Liberado por {saida.liberadoPorNome ?? "registro anterior"}
                             </p>

@@ -66,6 +66,23 @@ async function limparMassa() {
     "delete from turmas where serie_id in (select id from series where nome = 'QS Ano')",
   );
   await banco.query("delete from series where nome = 'QS Ano'");
+  await banco.query("delete from liberadores where codigo like 'QPS%'");
+}
+
+// A migração não semeia quem libera; a suíte cria e limpa a própria massa.
+const LIBERADORES_QA = [
+  { codigo: "QPS1", rotulo: "QA Planilha Um" },
+  { codigo: "QPS2", rotulo: "QA Planilha Dois" },
+];
+
+async function prepararLiberadores() {
+  if (!banco) return;
+  for (const item of LIBERADORES_QA) {
+    await banco.query(
+      "insert into liberadores (codigo, rotulo) values ($1, $2) on conflict do nothing",
+      [item.codigo, item.rotulo],
+    );
+  }
 }
 
 async function requisicao(caminho: string, opcoes: RequestInit = {}): Promise<Response> {
@@ -90,6 +107,7 @@ async function json<T>(resposta: Response): Promise<T> {
 beforeAll(async () => {
   banco = await conectarBanco();
   await limparMassa();
+  await prepararLiberadores();
   gas = await criarGasFalso();
 
   const entrada = await requisicao("/api/auth/entrar", {
@@ -134,6 +152,7 @@ beforeAll(async () => {
         dia: DIA,
         momento: "aula_1",
         justificativa: "C",
+        liberadoPorCodigo: "QPS1",
       }),
     }),
   );
@@ -292,7 +311,7 @@ describe("planilha de saídas", () => {
     });
     expect(destrave.status).toBe(200);
 
-    // Troca a justificativa da saída: a linha criada pela integração diverge.
+    // Troca a justificativa e quem liberou: duas células da linha criada divergem.
     await autenticado(`/api/saidas/${saidaAnaId}`, { method: "DELETE" });
     const nova = await json<{ saida: { id: string } }>(
       await autenticado("/api/saidas", {
@@ -303,6 +322,7 @@ describe("planilha de saídas", () => {
           momento: "aula_1",
           justificativa: "O",
           texto: "Liberada mais cedo",
+          liberadoPorCodigo: "QPS2",
         }),
       }),
     );
@@ -318,7 +338,7 @@ describe("planilha de saídas", () => {
         body: JSON.stringify({ de: DE, ate: ATE }),
       }),
     );
-    expect(simulado.resumo.substituir).toBe(1);
+    expect(simulado.resumo.substituir).toBe(2);
     expect(simulado.candidatosRemocao).toHaveLength(0);
 
     const aplicado = await json<{ resultado: string }>(
@@ -329,6 +349,8 @@ describe("planilha de saídas", () => {
     );
     expect(aplicado.resultado).toBe("sucesso");
     expect(gas?.valor(ABA, 3, 5)).toBe("Outros");
+    expect(gas?.valor(ABA, 3, 6)).toBe("Liberada mais cedo");
+    expect(gas?.valor(ABA, 3, 7)).toBe("QA Planilha Dois");
 
     // Sem a saída, a linha criada pela integração é candidata e pode sair.
     await autenticado(`/api/saidas/${saidaAnaId}`, { method: "DELETE" });

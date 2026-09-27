@@ -5,7 +5,7 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { ehDiaValido, ehMomentoValido, ordenarJustificativas } from "@/domain/frequencia";
+import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequencia";
 import { lerConfiguracoes } from "@/application/configuracoes";
 
 export const FORMATO_COPIA = "frequenciapp";
@@ -90,10 +90,11 @@ const esquemaCopia = z.object({
           .trim()
           .max(20)
           .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-        justificativa,
+        justificativa: z.string().trim().min(1).max(10).nullish(),
         observacao: z.string().trim().max(200).nullish(),
         texto: z.string().trim().max(100).nullish(),
         liberadoPorId: uuid.nullish(),
+        liberadoPorCodigo: z.string().trim().max(20).nullish(),
       }),
     )
     .max(50000),
@@ -106,6 +107,16 @@ const esquemaCopia = z.object({
       }),
     )
     .max(1000),
+  liberadores: z
+    .array(
+      z.object({
+        codigo: z.string().trim().min(1).max(20),
+        rotulo: z.string().trim().min(2).max(60),
+        ativo: z.boolean(),
+      }),
+    )
+    .max(1000)
+    .optional(),
   configuracoes: z
     .object({ frequenciaPorAula: z.boolean(), saidaAntecipada: z.boolean() })
     .optional(),
@@ -148,68 +159,81 @@ function faltasIguais(
 
 /** Monta a cópia completa do cadastro, das frequências e das saídas. */
 export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequenciapp> {
-  const [series, turmas, horarios, alunos, frequencias, saidas, justificativas, configuracoes] =
-    await Promise.all([
-      banco().serie.findMany({
-        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
-        select: { id: true, nome: true, ordem: true },
-      }),
-      banco().turma.findMany({
-        orderBy: { nome: "asc" },
-        select: { id: true, serieId: true, nome: true },
-      }),
-      banco().horario.findMany({
-        orderBy: [{ turmaId: "asc" }, { ordem: "asc" }],
-        select: {
-          id: true,
-          turmaId: true,
-          ordem: true,
-          inicio: true,
-          fim: true,
-          diasSemana: true,
-          ativo: true,
+  const [
+    series,
+    turmas,
+    horarios,
+    alunos,
+    frequencias,
+    saidas,
+    justificativas,
+    liberadores,
+    configuracoes,
+  ] = await Promise.all([
+    banco().serie.findMany({
+      orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+      select: { id: true, nome: true, ordem: true },
+    }),
+    banco().turma.findMany({
+      orderBy: { nome: "asc" },
+      select: { id: true, serieId: true, nome: true },
+    }),
+    banco().horario.findMany({
+      orderBy: [{ turmaId: "asc" }, { ordem: "asc" }],
+      select: {
+        id: true,
+        turmaId: true,
+        ordem: true,
+        inicio: true,
+        fim: true,
+        diasSemana: true,
+        ativo: true,
+      },
+    }),
+    banco().aluno.findMany({
+      orderBy: [{ turmaId: "asc" }, { ordem: "asc" }],
+      select: {
+        id: true,
+        turmaId: true,
+        turmaOriginalId: true,
+        nome: true,
+        ordem: true,
+        ativo: true,
+      },
+    }),
+    banco().frequencia.findMany({
+      orderBy: [{ dia: "asc" }, { turmaId: "asc" }],
+      select: {
+        dia: true,
+        turmaId: true,
+        revisao: true,
+        faltas: {
+          select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
         },
-      }),
-      banco().aluno.findMany({
-        orderBy: [{ turmaId: "asc" }, { ordem: "asc" }],
-        select: {
-          id: true,
-          turmaId: true,
-          turmaOriginalId: true,
-          nome: true,
-          ordem: true,
-          ativo: true,
-        },
-      }),
-      banco().frequencia.findMany({
-        orderBy: [{ dia: "asc" }, { turmaId: "asc" }],
-        select: {
-          dia: true,
-          turmaId: true,
-          revisao: true,
-          faltas: {
-            select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
-          },
-        },
-      }),
-      banco().saidaAntecipada.findMany({
-        orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
-        select: {
-          id: true,
-          alunoId: true,
-          dia: true,
-          momento: true,
-          justificativa: true,
-          observacao: true,
-          texto: true,
-          liberadoPorId: true,
-        },
-      }),
-      banco().justificativa.findMany({
-        select: { codigo: true, rotulo: true, ativo: true },
-      }),
-      lerConfiguracoes(),
-    ]);
+      },
+    }),
+    banco().saidaAntecipada.findMany({
+      orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
+      select: {
+        id: true,
+        alunoId: true,
+        dia: true,
+        momento: true,
+        justificativa: true,
+        observacao: true,
+        texto: true,
+        liberadoPorId: true,
+        liberadoPorCodigo: true,
+      },
+    }),
+    banco().justificativa.findMany({
+      select: { codigo: true, rotulo: true, ativo: true },
+    }),
+    banco().liberador.findMany({
+      select: { codigo: true, rotulo: true, ativo: true },
+    }),
+    lerConfiguracoes(),
+  ]);
 
   await auditar(banco(), admin.id, "backup.exportar", "copia");
 
@@ -231,7 +255,8 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       ...saida,
       dia: saida.dia.toISOString().slice(0, 10),
     })),
-    justificativas: ordenarJustificativas(justificativas),
+    justificativas: ordenarPorRotulo(justificativas),
+    liberadores: ordenarPorRotulo(liberadores),
     configuracoes,
   };
 }
@@ -276,6 +301,29 @@ export async function importarCopia(
     }
     const codigosDeJustificativa = new Set(
       (await tx.justificativa.findMany({ select: { codigo: true } })).map((item) => item.codigo),
+    );
+
+    // Liberadores do catálogo; cópias antigas não trazem o campo.
+    const liberadoresAtuais = new Map(
+      (
+        await tx.liberador.findMany({
+          select: { id: true, codigo: true, rotulo: true, ativo: true },
+        })
+      ).map((item) => [item.codigo.toLowerCase(), item]),
+    );
+    for (const item of copia.liberadores ?? []) {
+      const atual = liberadoresAtuais.get(item.codigo.toLowerCase());
+      if (!atual) {
+        await tx.liberador.create({ data: item });
+        resultado.adicionadas += 1;
+      } else if (atual.rotulo === item.rotulo && atual.ativo === item.ativo) {
+        resultado.identicas += 1;
+      } else {
+        resultado.conflitos += 1;
+      }
+    }
+    const codigosDeLiberacao = new Set(
+      (await tx.liberador.findMany({ select: { codigo: true } })).map((item) => item.codigo),
     );
 
     // Séries
@@ -488,20 +536,39 @@ export async function importarCopia(
 
     // Saídas
     for (const saida of copia.saidas) {
-      if (!idsAlunos.has(saida.alunoId) || !codigosDeJustificativa.has(saida.justificativa)) {
+      const codigo = saida.justificativa ?? null;
+      const texto = saida.texto?.trim() ? saida.texto.trim() : null;
+      const codigoLiberacao = saida.liberadoPorCodigo ?? null;
+      const codigoLiberacaoInvalido =
+        codigoLiberacao !== null && !codigosDeLiberacao.has(codigoLiberacao);
+      if (
+        !idsAlunos.has(saida.alunoId) ||
+        codigoLiberacaoInvalido ||
+        (codigo !== null && !codigosDeJustificativa.has(codigo)) ||
+        (codigo === null && !texto)
+      ) {
         resultado.conflitos += 1;
         continue;
       }
       const diaRepositorio = new Date(`${saida.dia}T12:00:00Z`);
       const atual = await tx.saidaAntecipada.findUnique({
         where: { alunoId_dia: { alunoId: saida.alunoId, dia: diaRepositorio } },
-        select: { id: true, momento: true, justificativa: true, observacao: true },
+        select: {
+          id: true,
+          momento: true,
+          justificativa: true,
+          observacao: true,
+          texto: true,
+          liberadoPorCodigo: true,
+        },
       });
       if (atual) {
         const igual =
           atual.momento === saida.momento &&
-          atual.justificativa === saida.justificativa &&
-          (atual.observacao ?? null) === (saida.observacao ?? null);
+          atual.justificativa === codigo &&
+          (atual.observacao ?? null) === (saida.observacao ?? null) &&
+          (atual.texto ?? null) === texto &&
+          (atual.liberadoPorCodigo ?? null) === codigoLiberacao;
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
         continue;
@@ -511,13 +578,14 @@ export async function importarCopia(
           alunoId: saida.alunoId,
           dia: diaRepositorio,
           momento: saida.momento,
-          justificativa: saida.justificativa,
+          justificativa: codigo,
           observacao: saida.observacao ?? null,
-          texto: saida.texto ?? null,
+          texto,
           liberadoPorId:
             saida.liberadoPorId && idsUsuarios.has(saida.liberadoPorId)
               ? saida.liberadoPorId
               : null,
+          liberadoPorCodigo: codigoLiberacao,
           criadoPorId: admin.id,
         },
       });

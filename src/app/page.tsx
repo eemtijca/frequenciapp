@@ -5,7 +5,7 @@ import { listarSeries } from "@/application/series";
 import { listarFrequenciasDoMes, resumoAcumulado } from "@/application/frequencias";
 import { listarSaidas } from "@/application/saidas";
 import { listarJustificativas } from "@/application/justificativas";
-import { listarResponsaveis } from "@/application/usuarios";
+import { listarLiberadores } from "@/application/liberadores";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { ambiente } from "@/infra/ambiente";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
@@ -34,7 +34,7 @@ export default async function Pagina({
     frequencias,
     saidas,
     justificativas,
-    responsaveis,
+    liberadores,
     configuracoes,
     resumo,
   ] = await Promise.all([
@@ -44,7 +44,7 @@ export default async function Pagina({
     listarFrequenciasDoMes(mes),
     listarSaidas({ de: dias[0] ?? `${mes}-01`, ate: dias[dias.length - 1] ?? `${mes}-28` }),
     listarJustificativas(),
-    listarResponsaveis(),
+    listarLiberadores(),
     lerConfiguracoes(),
     resumoAcumulado(dia),
   ]);
@@ -60,7 +60,7 @@ export default async function Pagina({
       frequenciasIniciais={frequencias}
       saidasIniciais={saidas}
       justificativasIniciais={justificativas}
-      responsaveisIniciais={responsaveis}
+      liberadoresIniciais={liberadores}
       configuracoesIniciais={configuracoes}
       resumoInicial={resumo}
     />

@@ -107,6 +107,7 @@ export async function criarMassaE2E(): Promise<void> {
       "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query("delete from liberadores where codigo like 'E2E%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );
@@ -138,6 +139,18 @@ export async function criarMassaE2E(): Promise<void> {
   });
 }
 
+/** Cria os liberadores da suíte. A migração não semeia nomes; cada spec usa os seus. */
+export async function criarLiberadoresE2E(): Promise<void> {
+  await comBanco(async (cliente) => {
+    await cliente.query("delete from liberadores where codigo like 'E2E%'");
+    await cliente.query(
+      `insert into liberadores (codigo, rotulo) values
+         ('E2EDIRETOR', 'Diretor E2E'),
+         ('E2ECOORD', 'Coordenadora E2E')`,
+    );
+  });
+}
+
 /** Remove a massa da suíte de frequência, incluindo as frequências criadas. */
 export async function limparMassaE2E(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -145,6 +158,7 @@ export async function limparMassaE2E(): Promise<void> {
       "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query("delete from liberadores where codigo like 'E2E%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );

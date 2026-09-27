@@ -65,6 +65,7 @@ function saida(parcial: Partial<SaidaAntecipada> = {}): SaidaAntecipada {
     observacao: parcial.observacao ?? null,
     texto: parcial.texto ?? null,
     liberadoPorId: parcial.liberadoPorId ?? null,
+    liberadoPorCodigo: parcial.liberadoPorCodigo ?? null,
     liberadoPorNome: parcial.liberadoPorNome ?? null,
     criadoEm: parcial.criadoEm ?? "2026-09-10T14:00:00Z",
   };

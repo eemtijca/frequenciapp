@@ -18,10 +18,11 @@ import {
   marcaDoAluno,
   mesSeguinte,
   normalizar,
-  rotuloJustificativa,
+  partesJustificativaSaida,
   rotuloMes,
   rotuloMomento,
 } from "@/domain/frequencia";
+import { CirculosAcumulado } from "@/components/ui/circulo-contagem";
 import { indexarPorDia, resumoPorAluno } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -85,17 +86,20 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
       )}
       {saidasDoAluno.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs">
-          {saidasDoAluno.map((saida) => (
-            <li key={saida.id} className="text-muted-foreground">
-              <span className="numerais-tabulares text-foreground font-medium">
-                {saida.dia.split("-").reverse().join("/")}
-              </span>
-              {": "}
-              {rotuloMomento(saida.momento)} · {rotuloJustificativa(saida.justificativa)}
-              {saida.texto ? ` · ${saida.texto}` : saida.observacao ? ` · ${saida.observacao}` : ""}
-              {saida.liberadoPorNome ? ` · liberado por ${saida.liberadoPorNome}` : ""}
-            </li>
-          ))}
+          {saidasDoAluno.map((saida) => {
+            const partes = partesJustificativaSaida(saida);
+            return (
+              <li key={saida.id} className="text-muted-foreground">
+                <span className="numerais-tabulares text-foreground font-medium">
+                  {saida.dia.split("-").reverse().join("/")}
+                </span>
+                {": "}
+                {rotuloMomento(saida.momento)} · {partes.motivo}
+                {partes.complemento ? ` · ${partes.complemento}` : ""}
+                {saida.liberadoPorNome ? ` · liberado por ${saida.liberadoPorNome}` : ""}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -292,36 +296,29 @@ export default function PorAluno({
                         : ""}
                     </span>
                   </span>
-                  <span className="flex shrink-0 items-center gap-2 text-xs">
-                    <span className="text-falta-texto numerais-tabulares" title="Faltas no mês">
-                      {doAluno.faltas} F
-                    </span>
-                    <span className="text-primary numerais-tabulares" title="Justificadas no mês">
-                      {doAluno.justificadas} FJ
-                    </span>
-                    <span
-                      className="text-muted-foreground numerais-tabulares"
-                      title="Saídas no mês"
-                    >
-                      {doAluno.saidas} S
-                    </span>
-                  </span>
+                  <CirculosAcumulado
+                    faltas={doAluno.faltas}
+                    justificadas={doAluno.justificadas}
+                    saidas={doAluno.saidas}
+                  />
                 </button>
                 {aberto && (
                   <div className="bg-secondary/30 border-t px-4 py-3">
-                    <p className="text-muted-foreground text-xs">
-                      Acumulado desde{" "}
-                      {resumo?.primeiroDia
-                        ? resumo.primeiroDia.split("-").reverse().join("/")
-                        : "a primeira chamada"}
-                      : <strong className="text-falta-texto">{acumulado?.faltas ?? 0} F</strong>
-                      {" · "}
-                      <strong className="text-primary">
-                        {acumulado?.faltasJustificadas ?? 0} FJ
-                      </strong>
-                      {" em "}
-                      {resumo?.diasLetivos ?? 0}{" "}
-                      {resumo?.diasLetivos === 1 ? "dia letivo" : "dias letivos"}
+                    <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                      <span>
+                        Acumulado desde{" "}
+                        {resumo?.primeiroDia
+                          ? resumo.primeiroDia.split("-").reverse().join("/")
+                          : "a primeira chamada"}
+                      </span>
+                      <CirculosAcumulado
+                        faltas={acumulado?.faltas ?? 0}
+                        justificadas={acumulado?.faltasJustificadas ?? 0}
+                      />
+                      <span>
+                        em {resumo?.diasLetivos ?? 0}{" "}
+                        {resumo?.diasLetivos === 1 ? "dia letivo" : "dias letivos"}
+                      </span>
                     </p>
                     <div className="mt-2">
                       <DetalheAluno

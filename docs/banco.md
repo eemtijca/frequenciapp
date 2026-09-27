@@ -17,6 +17,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
 | `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
 | `justificativas`          | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
+| `liberadores`             | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão. |
 | `integracoes_planilha`    | Uma linha por finalidade (`FREQUENCIA` e `SAIDAS`) com token, esquema e modo.           |
 | `sincronizacoes_planilha` | Histórico de envios por finalidade e turma de origem, com contagens e resultado.        |
 | `auditoria`               | Trilha de ações administrativas: quem, o quê e quando.                                  |
@@ -25,9 +26,10 @@ Restrições de integridade relevantes:
 
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
-- `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`.
+- `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`. A linha exige código de justificativa ou texto livre, e `liberado_por_codigo`, quando preenchido, aponta para o catálogo `liberadores`, validado na aplicação.
 - `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
 - `justificativas` tem unicidade funcional em `lower(codigo)` e é o catálogo usado na validação da chamada e da saída.
+- `liberadores` tem unicidade funcional em `lower(codigo)` e é o catálogo de quem libera a saída, cadastrado pela administração e sem nomes de pessoas na migração.
 - `horarios` tem unicidade de (`turma_id`, `ordem`), exclusão em cascata com a turma e checks de formato de hora, intervalo e dias da semana.
 - `series`, `turmas` e `alunos` se protegem por `ON DELETE RESTRICT`.
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.

@@ -26,8 +26,8 @@ import type {
   Configuracoes,
   Frequencia,
   JustificativaConfigurada,
+  LiberadorConfigurado,
   ResumoAcumulado,
-  Responsavel,
   SaidaAntecipada,
   Serie,
   Turma,
@@ -70,7 +70,7 @@ interface Props {
   frequenciasIniciais: Frequencia[];
   saidasIniciais: SaidaAntecipada[];
   justificativasIniciais: JustificativaConfigurada[];
-  responsaveisIniciais: Responsavel[];
+  liberadoresIniciais: LiberadorConfigurado[];
   configuracoesIniciais: Configuracoes;
   resumoInicial: ResumoAcumulado | null;
 }
@@ -190,7 +190,7 @@ export default function Aplicacao({
   frequenciasIniciais,
   saidasIniciais,
   justificativasIniciais,
-  responsaveisIniciais,
+  liberadoresIniciais,
   configuracoesIniciais,
   resumoInicial,
 }: Props) {
@@ -212,7 +212,7 @@ export default function Aplicacao({
   const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
   const [justificativas, setJustificativas] =
     useState<JustificativaConfigurada[]>(justificativasIniciais);
-  const [responsaveis] = useState<Responsavel[]>(responsaveisIniciais);
+  const [liberadores, setLiberadores] = useState<LiberadorConfigurado[]>(liberadoresIniciais);
   const [configuracoes, setConfiguracoes] = useState<Configuracoes>(configuracoesIniciais);
   const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
   const [versaoFrequencias, setVersaoFrequencias] = useState(0);
@@ -316,6 +316,11 @@ export default function Aplicacao({
       "/api/justificativas",
     );
     setJustificativas(dados.justificativas);
+  }, []);
+
+  const recarregarLiberadores = useCallback(async () => {
+    const dados = await pedir<{ liberadores: LiberadorConfigurado[] }>("/api/liberadores");
+    setLiberadores(dados.liberadores);
   }, []);
 
   const trocarVisao = useCallback(
@@ -485,14 +490,13 @@ export default function Aplicacao({
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaSaidas
-            usuarioId={usuario.id}
             diaCorrente={diaCorrente}
             fuso={fuso}
             mes={mes}
             turmas={turmas}
             alunos={alunos}
-            responsaveis={responsaveis}
             catalogoJustificativas={justificativas}
+            liberadores={liberadores}
             saidas={saidas}
             onSaidasMudaram={recarregarSaidas}
             ativo={ativo}
@@ -529,6 +533,7 @@ export default function Aplicacao({
             configuracoes={configuracoes}
             diaCorrente={diaCorrente}
             justificativas={justificativas}
+            liberadores={liberadores}
             onSeriesMudaram={async () => {
               const dados = await pedir<{ series: Serie[] }>("/api/series");
               setSeries(dados.series);
@@ -541,6 +546,7 @@ export default function Aplicacao({
             onAlunosMudaram={recarregarAlunos}
             onConfiguracoesMudaram={setConfiguracoes}
             onJustificativasMudaram={recarregarJustificativas}
+            onLiberadoresMudaram={recarregarLiberadores}
             onAbrirSaidas={() => trocarVisao("saidas")}
           />
         )}

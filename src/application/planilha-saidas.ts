@@ -40,7 +40,12 @@ import {
   type SaidaPlanilha,
 } from "@/domain/planilha-saidas";
 import { erroVigente, resultadoDeFalha, type AbaBruta, type LeituraAba } from "@/domain/planilha";
-import { diasEntre, ehDiaValido, rotuloJustificativa, rotuloMomento } from "@/domain/frequencia";
+import {
+  diasEntre,
+  ehDiaValido,
+  partesJustificativaSaida,
+  rotuloMomento,
+} from "@/domain/frequencia";
 
 const FINALIDADE = "SAIDAS" as const;
 const LIMITE_DIAS_ENVIO = 92;
@@ -362,6 +367,7 @@ async function montarSimulacaoSaidas(
   for (const saida of saidas) {
     const aluno = alunosPorId.get(saida.alunoId);
     if (!aluno) continue;
+    const partes = partesJustificativaSaida(saida, justificativas);
     linhas.push({
       id: saida.id,
       alunoId: aluno.id,
@@ -369,8 +375,8 @@ async function montarSimulacaoSaidas(
       turma: turmasPorId.get(aluno.turmaId) ?? "",
       dia: saida.dia,
       momento: rotuloMomento(saida.momento),
-      justificativa: rotuloJustificativa(saida.justificativa, justificativas),
-      observacao: saida.texto ?? saida.observacao ?? "",
+      justificativa: partes.motivo,
+      observacao: partes.complemento ?? "",
       liberadoPor: saida.liberadoPorNome ?? "",
     });
   }

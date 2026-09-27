@@ -10,7 +10,9 @@ import {
   diasEntre,
   ehDiaValido,
   ehHoraValida,
+  camposJustificativaSaida,
   ehJustificativaValida,
+  ehLiberadorValido,
   ehMesValido,
   ehMomentoDeAula,
   ehMomentoValido,
@@ -21,6 +23,7 @@ import {
   montarGrade,
   nomeDoMes,
   normalizar,
+  partesJustificativaSaida,
   partesNoFuso,
   rotuloAula,
   rotuloDataCurta,
@@ -429,6 +432,65 @@ describe("momentos de saída", () => {
     expect(ehMomentoDeAula("intervalo_1")).toBe(false);
     expect(ehMomentoDeAula("almoco")).toBe(false);
     expect(ehMomentoDeAula("madrugada")).toBe(false);
+  });
+});
+
+describe("justificativa e liberação da saída", () => {
+  it("aceita texto livre em qualquer momento e tipo com complemento só na aula", () => {
+    const livre = camposJustificativaSaida("intervalo_1", { texto: "  Foi buscar o irmão  " });
+    expect(livre.ok).toBe(true);
+    if (livre.ok) {
+      expect(livre.campos).toEqual({
+        justificativa: null,
+        texto: "Foi buscar o irmão",
+        observacao: null,
+      });
+    }
+
+    const tipo = camposJustificativaSaida("aula_2", {
+      justificativa: "D",
+      texto: "Saiu no meio da aula",
+    });
+    expect(tipo.ok).toBe(true);
+    if (tipo.ok) expect(tipo.campos.texto).toBe("Saiu no meio da aula");
+
+    const fora = camposJustificativaSaida("almoco", {
+      justificativa: "D",
+      texto: "Não cabe aqui",
+    });
+    expect(fora.ok).toBe(false);
+
+    const vazio = camposJustificativaSaida("aula_1", {});
+    expect(vazio.ok).toBe(false);
+  });
+
+  it("mostra o texto livre como motivo e o tipo com o complemento", () => {
+    expect(
+      partesJustificativaSaida({
+        justificativa: null,
+        texto: "Foi buscar o irmão",
+        observacao: null,
+      }).motivo,
+    ).toBe("Foi buscar o irmão");
+    const partes = partesJustificativaSaida({
+      justificativa: "CM",
+      texto: "Retorno marcado",
+      observacao: null,
+    });
+    expect(partes.motivo).toBe("Consulta Médica");
+    expect(partes.complemento).toBe("Retorno marcado");
+  });
+
+  it("valida o código no catálogo de quem libera", () => {
+    const catalogo = [
+      { codigo: "P1", rotulo: "Pessoa Um" },
+      { codigo: "P2", rotulo: "Pessoa Dois" },
+      { codigo: "P3", rotulo: "Pessoa Três" },
+    ];
+    expect(ehLiberadorValido("P1", catalogo)).toBe(true);
+    expect(ehLiberadorValido("P3", catalogo)).toBe(true);
+    expect(ehLiberadorValido("X", catalogo)).toBe(false);
+    expect(ehLiberadorValido("P1", [])).toBe(false);
   });
 });
 

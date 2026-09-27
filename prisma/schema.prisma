@@ -204,19 +204,22 @@ model Falta {
 }
 
 // Saída antecipada registrada pela direção ou coordenação. É separada da
-// chamada: a presença ou falta do dia permanece como foi marcada. O texto
-// livre vale apenas para saídas durante a aula.
+// chamada: a presença ou falta do dia permanece como foi marcada. A
+// justificativa é um código do catálogo ou, quando nula, o texto livre.
+// Quem libera é um código do catálogo de liberadores; a conta antiga fica em
+// liberadoPor.
 model SaidaAntecipada {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  alunoId       String   @map("aluno_id") @db.Uuid
-  dia           DateTime @db.Date
-  momento       String   @db.VarChar(20)
-  justificativa String   @db.VarChar(10)
-  observacao    String?  @db.VarChar(200)
-  texto         String?  @db.VarChar(100)
-  liberadoPorId String?  @map("liberado_por_id") @db.Uuid
-  criadoPorId   String?  @map("criado_por_id") @db.Uuid
-  criadoEm      DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alunoId           String   @map("aluno_id") @db.Uuid
+  dia               DateTime @db.Date
+  momento           String   @db.VarChar(20)
+  justificativa     String?  @db.VarChar(10)
+  observacao        String?  @db.VarChar(200)
+  texto             String?  @db.VarChar(100)
+  liberadoPorId     String?  @map("liberado_por_id") @db.Uuid
+  liberadoPorCodigo String?  @map("liberado_por_codigo") @db.VarChar(20)
+  criadoPorId       String?  @map("criado_por_id") @db.Uuid
+  criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
   aluno         Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   liberadoPor   Usuario? @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
   criadoPor     Usuario? @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
@@ -251,6 +254,18 @@ model Justificativa {
   criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
 
   @@map("justificativas")
+}
+
+// Catálogo de quem pode liberar a saída antecipada. O código é estável, porque
+// a saída guarda o código; rótulo e situação são editáveis na Gestão.
+model Liberador {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo   String   @db.VarChar(20)
+  rotulo   String   @db.VarChar(60)
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
+
+  @@map("liberadores")
 }
 
 // Trilha de auditoria de ações administrativas. Apenas identificadores

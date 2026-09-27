@@ -7,6 +7,7 @@ import type {
   Aluno,
   Configuracoes,
   JustificativaConfigurada,
+  LiberadorConfigurado,
   Serie,
   Turma,
 } from "@/domain/frequencia";
@@ -26,12 +27,14 @@ interface Props {
   alunos: Aluno[];
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
+  liberadores: LiberadorConfigurado[];
   diaCorrente: string;
   onSeriesMudaram: () => Promise<void>;
   onTurmasMudaram: () => Promise<void>;
   onAlunosMudaram: () => Promise<void>;
   onConfiguracoesMudaram: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
+  onLiberadoresMudaram: () => Promise<void>;
   onAbrirSaidas?: () => void;
 }
 
@@ -50,12 +53,14 @@ export default function VistaGestao({
   alunos,
   configuracoes,
   justificativas,
+  liberadores,
   diaCorrente,
   onSeriesMudaram,
   onTurmasMudaram,
   onAlunosMudaram,
   onConfiguracoesMudaram,
   onJustificativasMudaram,
+  onLiberadoresMudaram,
   onAbrirSaidas,
 }: Props) {
   return (
@@ -88,10 +93,12 @@ export default function VistaGestao({
               <AbaConfiguracoes
                 configuracoes={configuracoes}
                 justificativas={justificativas}
+                liberadores={liberadores}
                 turmas={turmas}
                 diaCorrente={diaCorrente}
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}
+                onLiberadoresMudaram={onLiberadoresMudaram}
                 onAbrirSaidas={onAbrirSaidas}
               />
             )}

@@ -260,16 +260,16 @@ Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma 
 - 200 `{"saidas": Saida[]}` em ordem de dia e registro.
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
-Saida: `{ id, alunoId, dia, momento, justificativa, observacao, texto, liberadoPorId, liberadoPorNome, criadoEm }`.
+Saida: `{ id, alunoId, dia, momento, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
 
 ### POST /api/saidas
 
-Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa": string, "texto"?: string, "observacao"?: string, "liberadoPorId"?: string }`.
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
 
-A justificativa do catálogo é sempre obrigatória. O `texto` é opcional, de até 100 caracteres, e só vale quando o momento é uma aula; a `observacao` vale para intervalos e almoço. Os dois são recusados fora do seu momento, e o texto aparece nos relatórios no lugar da observação.
+A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
-- 201 `{"saida": Saida}`. Sem `liberadoPorId`, o responsável é quem registrou.
-- 400 para momento ou justificativa fora do catálogo, aluno inválido, dia inválido, data futura ou responsável inválido.
+- 201 `{"saida": Saida}`.
+- 400 para momento inválido, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
 - 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
 
 ### DELETE /api/saidas/{id}
@@ -314,6 +314,32 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 - 200 `{"ok": true}`.
 - 409 quando há faltas ou saídas usando o código, com a orientação de desativar.
+- 404 inexistente.
+
+## Quem libera
+
+### GET /api/liberadores
+
+- 200 `{"liberadores": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Qualquer sessão.
+
+### POST /api/liberadores
+
+Corpo: `{ "codigo": string, "rotulo": string }`. Apenas administração, com auditoria.
+
+- 201 `{"liberador": Liberador}`.
+- 400 código fora do formato (letras e números, começando por letra, até 20) ou rótulo fora de 2 a 60 caracteres.
+- 403 sem papel de administração; 409 código repetido sem diferenciar caixa.
+
+### PATCH /api/liberadores/{codigo}
+
+Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico guarda o código.
+
+- 200 `{"liberador": Liberador}`; 404 inexistente; 400 corpo inválido.
+
+### DELETE /api/liberadores/{codigo}
+
+- 200 `{"ok": true}`.
+- 409 quando há saídas usando o código, com a orientação de desativar.
 - 404 inexistente.
 
 ## Responsáveis
@@ -506,7 +532,7 @@ Apaga token e esquema e desliga a integração de saídas. Apenas administraçã
 
 ### GET /api/backup
 
-- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "justificativas", "configuracoes" }`. Apenas administração, com auditoria.
+- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "justificativas", "liberadores", "configuracoes" }`. Apenas administração, com auditoria.
 
 ### POST /api/backup
 
