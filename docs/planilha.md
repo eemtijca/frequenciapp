@@ -14,7 +14,7 @@ Integração opcional da administração com a planilha da escola, por Google Ap
 
 1. Abra a planilha da escola e entre em Extensões, Apps Script.
 2. Apague o conteúdo padrão e cole o `gas/Codigo.gs` do repositório.
-3. Em Configurações do projeto, Propriedades do script, crie `FREQUENCIAPP_TOKEN` com o token copiado em Gestão, Configurações, Google Planilhas. Para script autônomo, crie também `PLANILHA_ID` com o identificador da planilha.
+3. Em Configurações do projeto, Propriedades do script, crie `FREQUENCIAPP_TOKEN` com o token copiado em Gestão, Configurações, Planilha de frequência. Para script autônomo, crie também `PLANILHA_ID` com o identificador da planilha.
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como a própria conta e permita acesso a qualquer pessoa. Autorize.
 5. Copie o endereço terminado em `/exec`, cole no aplicativo e use Testar conexão.
 
@@ -28,7 +28,7 @@ A leitura devolve o esquema de cada aba: linha de cabeçalho, coluna de aluno, c
 - lista divergências: nomes repetidos, alunos da planilha que não estão no app, alunos do app sem linha e datas ambíguas;
 - guarda o mapa e uma assinatura do esquema.
 
-Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome da aba ou as mesclagens mudarem, o envio para e pede nova conferência.
+Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome da aba ou as mesclagens mudarem, o envio para e pede nova conferência. O cartão guia conexão, estrutura e envio em etapas: conferir a estrutura só libera com a integração ligada e conectada, e salvar só libera depois da leitura.
 
 ## Enviar
 
@@ -45,7 +45,7 @@ Depois de revisar, o envio recalcula tudo e exige o mesmo hash de plano. Se algu
 
 ## Modo completo
 
-O destrave é feito em Gestão, Configurações, Google Planilhas, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
+O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 
 - atualização de células divergentes, inclusive nome e turma atual quando o aluno é encontrado pelo nome normalizado (renomeações completas sem correspondência pedem ajuste manual, porque não há identificador na planilha);
 - limpeza de células indicadas;
@@ -62,7 +62,7 @@ Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_
 
 ## Planilha de saídas
 
-A segunda finalidade registra as saídas antecipadas em outra planilha, em aba única, uma linha por saída. A configuração fica em Gestão, Configurações, Google Planilhas de saídas, com token, endereço e conferência de estrutura próprios. O mesmo `gas/Codigo.gs` é publicado na planilha de saídas, com implantação e token próprios; o aplicativo avisa quando o script publicado está atrasado.
+A segunda finalidade registra as saídas antecipadas em outra planilha, em aba única, uma linha por saída. A configuração fica em Gestão, Configurações, Planilha de saídas, com token, endereço e conferência de estrutura próprios. O mesmo `gas/Codigo.gs` é publicado na planilha de saídas, com implantação e token próprios; o aplicativo avisa quando o script publicado está atrasado.
 
 Colunas reconhecidas no cabeçalho, por rótulo: Data, Aluno, Turma, Momento, Justificativa, Observação e Liberado por. Aluno e Data são obrigatórios. Colunas desconhecidas são preservadas e não recebem escrita.
 
