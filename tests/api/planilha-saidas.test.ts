@@ -293,7 +293,7 @@ describe("planilha de saídas", () => {
     });
     expect(destrave.status).toBe(200);
 
-    // Troca a justificativa da saída: a linha criada pela integração diverge.
+    // Troca a justificativa e quem liberou: duas células da linha criada divergem.
     await autenticado(`/api/saidas/${saidaAnaId}`, { method: "DELETE" });
     const nova = await json<{ saida: { id: string } }>(
       await autenticado("/api/saidas", {
@@ -320,7 +320,7 @@ describe("planilha de saídas", () => {
         body: JSON.stringify({ de: DE, ate: ATE }),
       }),
     );
-    expect(simulado.resumo.substituir).toBe(1);
+    expect(simulado.resumo.substituir).toBe(2);
     expect(simulado.candidatosRemocao).toHaveLength(0);
 
     const aplicado = await json<{ resultado: string }>(
@@ -331,6 +331,8 @@ describe("planilha de saídas", () => {
     );
     expect(aplicado.resultado).toBe("sucesso");
     expect(gas?.valor(ABA, 3, 5)).toBe("Outros");
+    expect(gas?.valor(ABA, 3, 6)).toBe("Liberada mais cedo");
+    expect(gas?.valor(ABA, 3, 7)).toBe("Coordenadora Helena");
 
     // Sem a saída, a linha criada pela integração é candidata e pode sair.
     await autenticado(`/api/saidas/${saidaAnaId}`, { method: "DELETE" });
