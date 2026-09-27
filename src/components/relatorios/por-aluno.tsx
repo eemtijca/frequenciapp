@@ -72,7 +72,7 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
                 marca === "F"
                   ? "border-falta/40 bg-falta-fraca text-falta-texto"
                   : marca === "FJ"
-                    ? "border-primary/40 bg-accent text-accent-foreground"
+                    ? "border-justificada/40 bg-justificada-fraca text-justificada-texto"
                     : marca === "S"
                       ? "border-falta/40 text-falta-texto"
                       : "text-muted-foreground"
