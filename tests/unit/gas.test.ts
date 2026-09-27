@@ -1,23 +1,24 @@
 // Apps Script: roteamento, token, escrita conservadora, marcadores, cópias e
-// restauração. O Codigo.gs roda em vm com dublês das APIs do Google.
+// restauração. O Codigo.gs roda em vm com dublês fiéis às recusas do Google.
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { VERSAO_SCRIPT } from "@/domain/planilha";
 
+type TipoLocal = "SPREADSHEET" | "SHEET" | "ROW" | "COLUMN";
+
 interface Celula {
-  valor: string;
+  valor: string | Date;
   formula: string;
 }
 
 interface Metadado {
   chave: string;
-  valor?: string;
-  linha?: number;
-  coluna?: number;
-  linhas?: number;
-  colunas?: number;
+  valor: string;
+  tipo: TipoLocal;
+  indice?: number;
 }
 
 interface Intervalo {
@@ -27,12 +28,27 @@ interface Intervalo {
   colunaFinal: number;
 }
 
+/** Mensagem literal do Google para metadado fora de linha ou coluna inteira. */
+const ERRO_METADADO_ARBITRARIO =
+  "Adding developer metadata to arbitrary ranges is not currently supported. Developer metadata may only be added to the top-level spreadsheet, an individual sheet, or an entire row or column.";
+
 function colunaDeLetras(letras: string): number {
   let valor = 0;
   for (const letra of letras) {
     valor = valor * 26 + (letra.toUpperCase().charCodeAt(0) - 64);
   }
   return valor;
+}
+
+function letrasDaColuna(coluna: number): string {
+  let resto = coluna;
+  let letras = "";
+  while (resto > 0) {
+    const indice = (resto - 1) % 26;
+    letras = String.fromCharCode(65 + indice) + letras;
+    resto = Math.floor((resto - 1) / 26);
+  }
+  return letras;
 }
 
 function intervaloA1(texto: string): Intervalo | null {
@@ -48,21 +64,25 @@ function intervaloA1(texto: string): Intervalo | null {
   return { linhaInicial, linhaFinal, colunaInicial, colunaFinal };
 }
 
-/** Localização como a API real: intervalo da linha ou da coluna, ou nulo. */
-function localizacaoDoMetadado(item: Metadado) {
-  const faixa = {
-    getRow: () => item.linha ?? 0,
-    getColumn: () => item.coluna ?? 0,
+/** Exibição como o Sheets mostra por padrão em pt-BR: data em dd/MM/yyyy. */
+function exibir(valor: string | Date): string {
+  if (valor instanceof Date) {
+    const dia = String(valor.getUTCDate()).padStart(2, "0");
+    const mes = String(valor.getUTCMonth() + 1).padStart(2, "0");
+    return `${dia}/${mes}/${valor.getUTCFullYear()}`;
+  }
+  return valor;
+}
+
+function copiarCelula(celula: Celula): Celula {
+  return {
+    valor: celula.valor instanceof Date ? new Date(celula.valor.getTime()) : celula.valor,
+    formula: celula.formula,
   };
-  const linhas = item.linhas ?? 1;
-  const colunas = item.colunas ?? 1;
-  if (linhas === 1 && colunas > 1) {
-    return { getRow: () => faixa, getColumn: () => null };
-  }
-  if (colunas === 1 && linhas > 1) {
-    return { getRow: () => null, getColumn: () => faixa };
-  }
-  return { getRow: () => null, getColumn: () => null };
+}
+
+function vazia(): Celula {
+  return { valor: "", formula: "" };
 }
 
 class AbaFalsa {
@@ -75,6 +95,12 @@ class AbaFalsa {
   metadados: Metadado[] = [];
   maxLinhas = 500;
   maxColunas = 60;
+  /** Células gravadas, em A1, para provar o que nunca foi regravado. */
+  gravacoes: string[] = [];
+  /** Método que lança erro de serviço na próxima chamada, para testes. */
+  falharEm: string | null = null;
+  /** Como a API real: aba apagada não aceita mais chamada. */
+  excluida = false;
   dono: PlanilhaFalsa;
 
   constructor(nome: string, dono: PlanilhaFalsa) {
@@ -82,21 +108,32 @@ class AbaFalsa {
     this.dono = dono;
   }
 
+  private viva() {
+    if (this.excluida) throw new Error("Exception: The sheet has been deleted.");
+  }
+
+  private conferirFalha(metodo: string) {
+    if (this.falharEm === metodo) {
+      this.falharEm = null;
+      throw new Error(
+        "Exception: Service Spreadsheets failed while accessing document with token segredo.",
+      );
+    }
+  }
+
   private garantir(linha: number, coluna: number) {
     while (this.celulas.length < linha) {
-      this.celulas.push(
-        Array.from({ length: this.maxColunas }, () => ({ valor: "", formula: "" })),
-      );
+      this.celulas.push(Array.from({ length: this.maxColunas }, vazia));
     }
     const fileira = this.celulas[linha - 1];
     if (fileira && fileira.length < coluna) {
-      while (fileira.length < coluna) fileira.push({ valor: "", formula: "" });
+      while (fileira.length < coluna) fileira.push(vazia());
     }
   }
 
   getCelula(linha: number, coluna: number): Celula {
     this.garantir(linha, coluna);
-    return this.celulas[linha - 1]?.[coluna - 1] ?? { valor: "", formula: "" };
+    return this.celulas[linha - 1]?.[coluna - 1] ?? vazia();
   }
 
   getName() {
@@ -109,11 +146,18 @@ class AbaFalsa {
     this.nome = nome;
     return this;
   }
+  getSheetId() {
+    return this.dono.abas.indexOf(this);
+  }
   isSheetHidden() {
     return this.oculta;
   }
   hideSheet() {
     this.oculta = true;
+    return this;
+  }
+  showSheet() {
+    this.oculta = false;
     return this;
   }
   getFrozenRows() {
@@ -126,6 +170,11 @@ class AbaFalsa {
     this.congeladasLinhas = valor;
     return this;
   }
+  setFrozenColumns(valor: number) {
+    this.congeladasColunas = valor;
+    return this;
+  }
+  /** Como a API real: linha vazia no fim não conta. */
   getLastRow() {
     let ultima = 0;
     for (let linha = 0; linha < this.celulas.length; linha += 1) {
@@ -135,6 +184,7 @@ class AbaFalsa {
     }
     return ultima;
   }
+  /** Como a API real: coluna vazia, mesmo recém-inserida, não conta. */
   getLastColumn() {
     let ultima = 0;
     for (const fileira of this.celulas) {
@@ -148,56 +198,121 @@ class AbaFalsa {
     return ultima;
   }
   getMaxRows() {
+    this.viva();
     return this.maxLinhas;
   }
   getMaxColumns() {
+    this.viva();
     return this.maxColunas;
   }
 
-  getRange(linha: number, coluna: number, linhas = 1, colunas = 1): FaixaFalsa {
-    return new FaixaFalsa(this, linha, coluna, linhas, colunas);
-  }
-
-  insertColumnsBefore(coluna: number, quantidade: number) {
-    for (const fileira of this.celulas) {
-      fileira.splice(
-        coluna - 1,
-        0,
-        ...Array.from({ length: quantidade }, () => ({ valor: "", formula: "" })),
+  getRange(a: number | string, coluna = 1, linhas = 1, colunas = 1): FaixaFalsa {
+    this.viva();
+    if (typeof a === "string") {
+      const linhasInteiras = /^(\d+):(\d+)$/.exec(a);
+      if (linhasInteiras) {
+        const inicio = Number(linhasInteiras[1]);
+        const fim = Number(linhasInteiras[2]);
+        return new FaixaFalsa(this, inicio, 1, fim - inicio + 1, this.maxColunas);
+      }
+      const colunasInteiras = /^([A-Z]+):([A-Z]+)$/.exec(a);
+      if (colunasInteiras) {
+        const inicio = colunaDeLetras(colunasInteiras[1] ?? "");
+        const fim = colunaDeLetras(colunasInteiras[2] ?? "");
+        return new FaixaFalsa(this, 1, inicio, this.maxLinhas, fim - inicio + 1);
+      }
+      const faixa = intervaloA1(a);
+      if (!faixa) throw new Error("Range not found");
+      return new FaixaFalsa(
+        this,
+        faixa.linhaInicial,
+        faixa.colunaInicial,
+        faixa.linhaFinal - faixa.linhaInicial + 1,
+        faixa.colunaFinal - faixa.colunaInicial + 1,
       );
     }
+    return new FaixaFalsa(this, a, coluna, linhas, colunas);
+  }
+
+  /** Metadado de linha e coluna acompanha inserções, como no Google. */
+  private deslocar(tipo: TipoLocal, aPartirDe: number, delta: number) {
+    for (const item of this.metadados) {
+      if (item.tipo === tipo && item.indice !== undefined && item.indice >= aPartirDe) {
+        item.indice += delta;
+      }
+    }
+  }
+
+  insertRowsBefore(linha: number, quantidade: number) {
+    if (linha - 1 <= this.celulas.length) {
+      this.celulas.splice(
+        linha - 1,
+        0,
+        ...Array.from({ length: quantidade }, () => Array.from({ length: this.maxColunas }, vazia)),
+      );
+    }
+    this.maxLinhas += quantidade;
+    this.deslocar("ROW", linha, quantidade);
+    return this;
+  }
+  insertRowsAfter(linha: number, quantidade: number) {
+    return this.insertRowsBefore(linha + 1, quantidade);
+  }
+  insertColumnsBefore(coluna: number, quantidade: number) {
+    this.conferirFalha("insertColumnsBefore");
+    for (const fileira of this.celulas) {
+      while (fileira.length < coluna - 1) fileira.push(vazia());
+      fileira.splice(coluna - 1, 0, ...Array.from({ length: quantidade }, vazia));
+    }
     this.maxColunas += quantidade;
+    this.deslocar("COLUMN", coluna, quantidade);
     return this;
   }
   insertColumnsAfter(coluna: number, quantidade: number) {
+    if (coluna < 1) throw new Error("Those columns are out of bounds.");
     return this.insertColumnsBefore(coluna + 1, quantidade);
   }
   deleteColumn(coluna: number) {
     for (const fileira of this.celulas) fileira.splice(coluna - 1, 1);
     this.maxColunas -= 1;
     this.metadados = this.metadados.filter(
-      (item) => item.coluna === undefined || item.coluna !== coluna,
+      (item) => !(item.tipo === "COLUMN" && item.indice === coluna),
     );
+    this.deslocar("COLUMN", coluna + 1, -1);
     return this;
   }
   deleteRow(linha: number) {
     this.celulas.splice(linha - 1, 1);
     this.maxLinhas -= 1;
     this.metadados = this.metadados.filter(
-      (item) => item.linha === undefined || item.linha !== linha,
+      (item) => !(item.tipo === "ROW" && item.indice === linha),
     );
+    this.deslocar("ROW", linha + 1, -1);
+    return this;
+  }
+  clear() {
+    for (const fileira of this.celulas) {
+      for (let coluna = 0; coluna < fileira.length; coluna += 1) fileira[coluna] = vazia();
+    }
     return this;
   }
   copyTo(planilha: PlanilhaFalsa) {
-    const copia = new AbaFalsa("Cópia", planilha);
-    copia.celulas = this.celulas.map((fileira) => fileira.map((celula) => ({ ...celula })));
+    this.viva();
+    const copia = new AbaFalsa(`Cópia de ${this.nome}`, planilha);
+    copia.celulas = this.celulas.map((fileira) => fileira.map(copiarCelula));
     copia.mesclagens = this.mesclagens.slice();
-    copia.metadados = [];
+    copia.maxLinhas = this.maxLinhas;
+    copia.maxColunas = this.maxColunas;
+    copia.congeladasLinhas = this.congeladasLinhas;
+    copia.congeladasColunas = this.congeladasColunas;
+    copia.metadados = planilha.copiaLevaMetadados
+      ? this.metadados.map((item) => ({ ...item }))
+      : [];
     planilha.abas.push(copia);
     return copia;
   }
-  addDeveloperMetadata(chave: string, valor = "1") {
-    this.metadados.push({ chave, valor });
+  addDeveloperMetadata(chave: string, valor = "") {
+    this.metadados.push({ chave, valor, tipo: "SHEET" });
     return this;
   }
   createDeveloperMetadataFinder() {
@@ -209,13 +324,35 @@ class AbaFalsa {
       },
       find: () =>
         this.metadados
-          .filter((item) => item.chave === chave)
-          .map((item) => ({
-            getValue: () => item.valor ?? "",
-            getLocation: () => localizacaoDoMetadado(item),
-          })),
+          .filter((item) => chave === null || item.chave === chave)
+          .map((item) => this.embrulhar(item)),
     };
     return finder;
+  }
+  private embrulhar(item: Metadado) {
+    return {
+      getKey: () => item.chave,
+      getValue: () => item.valor,
+      getLocation: () => ({
+        getLocationType: () => item.tipo,
+        getRow: () => (item.tipo === "ROW" ? this.getRange(`${item.indice}:${item.indice}`) : null),
+        getColumn: () => {
+          if (item.tipo !== "COLUMN") return null;
+          const letras = letrasDaColuna(item.indice ?? 0);
+          return this.getRange(`${letras}:${letras}`);
+        },
+        getSheet: () => (item.tipo === "SPREADSHEET" ? null : this),
+      }),
+      remove: () => {
+        this.metadados = this.metadados.filter((outro) => outro !== item);
+      },
+    };
+  }
+  marcadoresDe(chave: string, tipo: TipoLocal) {
+    return this.metadados
+      .filter((item) => item.chave === chave && item.tipo === tipo)
+      .map((item) => item.indice ?? 0)
+      .sort((a, b) => a - b);
   }
 }
 
@@ -228,16 +365,40 @@ class FaixaFalsa {
     private readonly colunas: number,
   ) {}
 
+  getRow() {
+    return this.linha;
+  }
+  getColumn() {
+    return this.coluna;
+  }
+  getNumRows() {
+    return this.linhas;
+  }
+  getNumColumns() {
+    return this.colunas;
+  }
+  getA1Notation() {
+    const inicio = `${letrasDaColuna(this.coluna)}${this.linha}`;
+    if (this.linhas === 1 && this.colunas === 1) return inicio;
+    return `${inicio}:${letrasDaColuna(this.coluna + this.colunas - 1)}${this.linha + this.linhas - 1}`;
+  }
   getValue() {
     return this.aba.getCelula(this.linha, this.coluna).valor;
+  }
+  getDisplayValue() {
+    return exibir(this.getValue());
   }
   getFormula() {
     return this.aba.getCelula(this.linha, this.coluna).formula;
   }
-  setValue(valor: unknown) {
-    const celula = this.aba.getCelula(this.linha, this.coluna);
-    celula.valor = String(valor);
+  private gravar(linha: number, coluna: number, valor: unknown) {
+    const celula = this.aba.getCelula(linha, coluna);
+    celula.valor = valor instanceof Date ? valor : String(valor ?? "");
     celula.formula = "";
+    this.aba.gravacoes.push(`${letrasDaColuna(coluna)}${linha}`);
+  }
+  setValue(valor: unknown) {
+    this.gravar(this.linha, this.coluna, valor);
     return this;
   }
   clearContent() {
@@ -246,52 +407,61 @@ class FaixaFalsa {
     celula.formula = "";
     return this;
   }
-  getValues() {
-    const saida: string[][] = [];
+  private matriz<T>(ler: (celula: Celula) => T): T[][] {
+    const saida: T[][] = [];
     for (let l = 0; l < this.linhas; l += 1) {
-      const fileira: string[] = [];
+      const fileira: T[] = [];
       for (let c = 0; c < this.colunas; c += 1) {
-        fileira.push(String(this.aba.getCelula(this.linha + l, this.coluna + c).valor));
+        fileira.push(ler(this.aba.getCelula(this.linha + l, this.coluna + c)));
       }
       saida.push(fileira);
     }
     return saida;
+  }
+  getValues() {
+    return this.matriz((celula) => celula.valor);
   }
   getDisplayValues() {
-    return this.getValues();
+    return this.matriz((celula) => exibir(celula.valor));
   }
   getFormulas() {
-    const saida: string[][] = [];
-    for (let l = 0; l < this.linhas; l += 1) {
-      const fileira: string[] = [];
-      for (let c = 0; c < this.colunas; c += 1) {
-        fileira.push(this.aba.getCelula(this.linha + l, this.coluna + c).formula);
-      }
-      saida.push(fileira);
-    }
-    return saida;
+    return this.matriz((celula) => celula.formula);
   }
+  /** Como a API real: gravar sobre fórmula apaga a fórmula. */
   setValues(valores: unknown[][]) {
+    if (valores.length !== this.linhas || (valores[0]?.length ?? 0) !== this.colunas) {
+      throw new Error("The number of rows or columns in the data does not match the range.");
+    }
     for (let l = 0; l < valores.length; l += 1) {
       const fileira = valores[l] ?? [];
       for (let c = 0; c < fileira.length; c += 1) {
-        const celula = this.aba.getCelula(this.linha + l, this.coluna + c);
-        celula.valor = String(fileira[c] ?? "");
-        celula.formula = "";
+        this.gravar(this.linha + l, this.coluna + c, fileira[c]);
       }
     }
     return this;
   }
-  addDeveloperMetadata(chave: string, valor = "1") {
-    this.aba.metadados.push({
-      chave,
-      valor,
-      linha: this.linha,
-      coluna: this.coluna,
-      linhas: this.linhas,
-      colunas: this.colunas,
-    });
+  /** Como a API real: só linha ou coluna inteira aceita metadado. */
+  addDeveloperMetadata(chave: string, valor = "") {
+    const linhaInteira =
+      this.linhas === 1 && this.coluna === 1 && this.colunas === this.aba.getMaxColumns();
+    const colunaInteira =
+      this.colunas === 1 && this.linha === 1 && this.linhas === this.aba.getMaxRows();
+    if (linhaInteira) {
+      this.aba.metadados.push({ chave, valor, tipo: "ROW", indice: this.linha });
+    } else if (colunaInteira) {
+      this.aba.metadados.push({ chave, valor, tipo: "COLUMN", indice: this.coluna });
+    } else {
+      throw new Error(ERRO_METADADO_ARBITRARIO);
+    }
     return this;
+  }
+  private cruza(coordenadas: Intervalo) {
+    return !(
+      coordenadas.linhaFinal < this.linha ||
+      coordenadas.linhaInicial > this.linha + this.linhas - 1 ||
+      coordenadas.colunaFinal < this.coluna ||
+      coordenadas.colunaInicial > this.coluna + this.colunas - 1
+    );
   }
   getMergedRanges() {
     return this.aba.mesclagens
@@ -299,24 +469,40 @@ class FaixaFalsa {
       .filter(
         (item): item is { intervalo: string; coordenadas: Intervalo } => item.coordenadas !== null,
       )
-      .filter(
-        ({ coordenadas }) =>
-          !(
-            coordenadas.linhaFinal < this.linha ||
-            coordenadas.linhaInicial > this.linha + this.linhas - 1 ||
-            coordenadas.colunaFinal < this.coluna ||
-            coordenadas.colunaInicial > this.coluna + this.colunas - 1
-          ),
-      )
+      .filter(({ coordenadas }) => this.cruza(coordenadas))
       .map((item) => ({ getA1Notation: () => item.intervalo }));
+  }
+  breakApart() {
+    this.aba.mesclagens = this.aba.mesclagens.filter((intervalo) => {
+      const coordenadas = intervaloA1(intervalo);
+      return coordenadas === null || !this.cruza(coordenadas);
+    });
+    return this;
+  }
+  /** Cópia de conteúdo e mesclagens na mesma posição; metadado não vai junto. */
+  copyTo(destino: FaixaFalsa) {
+    for (let l = 0; l < this.linhas; l += 1) {
+      for (let c = 0; c < this.colunas; c += 1) {
+        const origem = this.aba.getCelula(this.linha + l, this.coluna + c);
+        const alvo = destino.aba.getCelula(destino.linha + l, destino.coluna + c);
+        const copia = copiarCelula(origem);
+        alvo.valor = copia.valor;
+        alvo.formula = copia.formula;
+      }
+    }
+    for (const intervalo of this.aba.mesclagens) {
+      if (!destino.aba.mesclagens.includes(intervalo)) destino.aba.mesclagens.push(intervalo);
+    }
   }
 }
 
 class PlanilhaFalsa {
   nome: string;
   abas: AbaFalsa[] = [];
-  constructor(nome: string) {
+  copiaLevaMetadados: boolean;
+  constructor(nome: string, copiaLevaMetadados: boolean) {
     this.nome = nome;
+    this.copiaLevaMetadados = copiaLevaMetadados;
   }
   getName() {
     return this.nome;
@@ -342,20 +528,28 @@ class PlanilhaFalsa {
     return aba;
   }
   deleteSheet(aba: AbaFalsa) {
+    aba.excluida = true;
     this.abas = this.abas.filter((item) => item !== aba);
   }
+}
+
+interface OpcoesContexto {
+  /** Simula `Sheet.copyTo` levando os metadados da aba (não confirmado). */
+  copiaLevaMetadados?: boolean;
+  /** Carimbo fixo, para simular duas cópias no mesmo segundo. */
+  carimboFixo?: boolean;
 }
 
 interface Contexto {
   doPost(evento: { postData: { contents: string } }): { getContent(): string };
   aba: AbaFalsa;
   planilha: PlanilhaFalsa;
+  errosRegistrados: unknown[][];
   definirToken(valor: string | null): void;
-  proximoCarimbo(): string;
 }
 
-function montarContexto(): Contexto {
-  const planilha = new PlanilhaFalsa("Frequência 2026");
+function montarContexto(opcoes: OpcoesContexto = {}): Contexto {
+  const planilha = new PlanilhaFalsa("Frequência 2026", opcoes.copiaLevaMetadados ?? false);
   const aba = planilha.insertSheet("3º ano A");
   const cabecalho = ["Aluno", "Turma atual", "10/09", "11/09", "Total"];
   aba.getRange(1, 1, 1, cabecalho.length).setValues([cabecalho]);
@@ -364,8 +558,10 @@ function montarContexto(): Contexto {
     ["Bruno", "3º ano A", "", "", ""],
   ]);
   aba.getCelula(2, 5).formula = '=CONT.SE(C2:D3;"F")';
+  aba.gravacoes = [];
   const propriedades = new Map<string, string>();
   propriedades.set("FREQUENCIAPP_TOKEN", "segredo");
+  const errosRegistrados: unknown[][] = [];
   let carimbo = 0;
   const sandbox = {
     PropertiesService: {
@@ -377,6 +573,12 @@ function montarContexto(): Contexto {
       getActiveSpreadsheet: () => planilha,
       openById: () => planilha,
       flush: () => undefined,
+      DeveloperMetadataLocationType: {
+        SPREADSHEET: "SPREADSHEET",
+        SHEET: "SHEET",
+        ROW: "ROW",
+        COLUMN: "COLUMN",
+      },
     },
     LockService: {
       getScriptLock: () => ({ waitLock: () => undefined, releaseLock: () => undefined }),
@@ -389,12 +591,19 @@ function montarContexto(): Contexto {
       }),
     },
     Utilities: {
-      formatDate: () => {
-        carimbo += 1;
-        return `20260926-0300${String(carimbo).padStart(2, "0")}`;
+      formatDate: (_data: Date, _fuso: string, formato: string) => {
+        if (!opcoes.carimboFixo) carimbo += 1;
+        const base = `20260926-0300${String(carimbo).padStart(2, "0")}`;
+        return formato.includes("SSS") ? `${base}-000` : base;
       },
     },
-    console,
+    console: {
+      log: () => undefined,
+      warn: () => undefined,
+      error: (...args: unknown[]) => {
+        errosRegistrados.push(args);
+      },
+    },
   };
   const codigo = readFileSync(path.resolve("gas/Codigo.gs"), "utf8");
   vm.runInNewContext(codigo, sandbox);
@@ -409,26 +618,27 @@ function montarContexto(): Contexto {
     },
     aba,
     planilha,
+    errosRegistrados,
     definirToken: (valor) => {
       if (valor === null) propriedades.delete("FREQUENCIAPP_TOKEN");
       else propriedades.set("FREQUENCIAPP_TOKEN", valor);
     },
-    proximoCarimbo: () => {
-      carimbo += 1;
-      return `20260926-0300${String(carimbo).padStart(2, "0")}`;
-    },
   };
 }
 
-function chamar(contexto: Contexto, corpo: Record<string, unknown>) {
+interface Resposta {
+  ok: boolean;
+  erro?: string;
+  detalhe?: string;
+  parcial?: boolean;
+  dados?: Record<string, unknown>;
+}
+
+function chamar(contexto: Contexto, corpo: Record<string, unknown>): Resposta {
   const resposta = contexto.doPost({
     postData: { contents: JSON.stringify({ token: "segredo", versao: 1, ...corpo }) },
   });
-  return JSON.parse(resposta.getContent()) as {
-    ok: boolean;
-    erro?: string;
-    dados?: Record<string, unknown>;
-  };
+  return JSON.parse(resposta.getContent()) as Resposta;
 }
 
 function assinaturaDaAba(aba: AbaFalsa): string {
@@ -449,6 +659,64 @@ function assinaturaDaAba(aba: AbaFalsa): string {
     b = (Math.imul(b ^ codigo, 0x85ebca6b) + indice) >>> 0;
   }
   return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
+}
+
+/** Aplica operações na aba com a assinatura vigente. */
+function aplicar(
+  contexto: Contexto,
+  operacoes: Record<string, unknown>[],
+  opcoes: { aba?: AbaFalsa; modoCompleto?: boolean } = {},
+): Resposta {
+  const aba = opcoes.aba ?? contexto.aba;
+  return chamar(contexto, {
+    acao: "aplicar",
+    aba: aba.getName(),
+    cabecalhoLinha: 1,
+    assinatura: assinaturaDaAba(aba),
+    modoCompleto: opcoes.modoCompleto ?? false,
+    operacoes,
+  });
+}
+
+function ler(contexto: Contexto, aba: AbaFalsa = contexto.aba) {
+  const resposta = chamar(contexto, {
+    acao: "ler",
+    aba: aba.getName(),
+    linhaInicial: 1,
+    colunaInicial: 1,
+    linhas: 12,
+    colunas: 10,
+  });
+  expect(resposta.ok).toBe(true);
+  return resposta.dados as {
+    valores: string[][];
+    linhasCriadas: number[];
+    colunasCriadas: number[];
+  };
+}
+
+function criarCarla(contexto: Contexto, linha = 4): Resposta {
+  return aplicar(contexto, [
+    {
+      tipo: "criarLinhas",
+      itens: [
+        {
+          linha,
+          celulas: [
+            { coluna: 1, valor: "Carla" },
+            { coluna: 2, valor: "3º ano A" },
+          ],
+        },
+      ],
+    },
+  ]);
+}
+
+function nomesDeCopias(contexto: Contexto): string[] {
+  return contexto.planilha
+    .getSheets()
+    .map((item) => item.nome)
+    .filter((nome) => nome.startsWith("_frequenciapp_backup_"));
 }
 
 let contexto: Contexto;
@@ -543,60 +811,39 @@ describe("Apps Script", () => {
   });
 
   it("recusa operação destrutiva sem o modo completo", () => {
-    const resposta = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
-      operacoes: [{ tipo: "limpar", linha: 2, coluna: 3, anterior: "P" }],
-    });
+    const resposta = aplicar(contexto, [{ tipo: "limpar", linha: 2, coluna: 3, anterior: "P" }]);
     expect(resposta.ok).toBe(false);
     expect(contexto.aba.getCelula(2, 3).valor).toBe("P");
   });
 
   it("substitui no modo completo e cria cópia antes de operação destrutiva", () => {
-    const resposta = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
-      modoCompleto: true,
-      operacoes: [
+    const resposta = aplicar(
+      contexto,
+      [
         { tipo: "limpar", linha: 2, coluna: 3, anterior: "P" },
         { tipo: "substituir", linha: 2, coluna: 4, valor: "F", anterior: "P" },
       ],
-    });
+      { modoCompleto: true },
+    );
     expect(resposta.ok).toBe(true);
     expect(resposta.dados).toMatchObject({ limpas: 1, substituidas: 1 });
     expect(contexto.aba.getCelula(2, 3).valor).toBe("");
     expect(contexto.aba.getCelula(2, 4).valor).toBe("F");
-    const copias = contexto.planilha
-      .getSheets()
-      .filter((item) => item.nome.startsWith("_frequenciapp_backup_"));
-    expect(copias.length).toBeGreaterThanOrEqual(1);
+    expect(nomesDeCopias(contexto).length).toBeGreaterThanOrEqual(1);
   });
 
   it("recusa remoção de linha sem marcador da integração", () => {
-    const resposta = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
+    const resposta = aplicar(contexto, [{ tipo: "removerLinhas", linhas: [3] }], {
       modoCompleto: true,
-      operacoes: [{ tipo: "removerLinhas", linhas: [3] }],
     });
     expect(resposta.ok).toBe(false);
     expect(contexto.planilha.getSheetByName("3º ano A")?.getCelula(3, 1).valor).toBe("Bruno");
   });
 
   it("remove linha marcada e insere coluna com marcador", () => {
-    const criar = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
-      modoCompleto: true,
-      operacoes: [
+    const criar = aplicar(
+      contexto,
+      [
         {
           tipo: "criarLinhas",
           itens: [
@@ -609,77 +856,28 @@ describe("Apps Script", () => {
             },
           ],
         },
-        {
-          tipo: "inserirColunas",
-          antesDe: 5,
-          cabecalhoLinha: 1,
-          rotulos: ["12/09"],
-        },
+        { tipo: "inserirColunas", antesDe: 5, cabecalhoLinha: 1, rotulos: ["12/09"] },
       ],
-    });
+      { modoCompleto: true },
+    );
     expect(criar.ok).toBe(true);
     expect(contexto.aba.getCelula(4, 1).valor).toBe("Carla");
     expect(contexto.aba.getCelula(1, 5).valor).toBe("12/09");
     // A leitura precisa reconhecer o que a integração criou para o modo
     // completo poder remover depois.
-    const leitura = chamar(contexto, {
-      acao: "ler",
-      aba: "3º ano A",
-      linhaInicial: 1,
-      colunaInicial: 1,
-      linhas: 6,
-      colunas: 6,
-    });
-    expect(leitura.ok).toBe(true);
-    const marcadoresLidos = leitura.dados as {
-      linhasCriadas: number[];
-      colunasCriadas: number[];
-    };
-    expect(marcadoresLidos.linhasCriadas).toContain(4);
-    expect(marcadoresLidos.colunasCriadas).toContain(5);
-    const remover = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
+    const lidos = ler(contexto);
+    expect(lidos.linhasCriadas).toContain(4);
+    expect(lidos.colunasCriadas).toContain(5);
+    const remover = aplicar(contexto, [{ tipo: "removerLinhas", linhas: [4] }], {
       modoCompleto: true,
-      operacoes: [{ tipo: "removerLinhas", linhas: [4] }],
     });
     expect(remover.ok).toBe(true);
     expect(remover.dados).toMatchObject({ removidasLinhas: 1 });
-    const removerColuna = chamar(contexto, {
-      acao: "aplicar",
-      aba: "3º ano A",
-      cabecalhoLinha: 1,
-      assinatura: assinaturaDaAba(contexto.aba),
+    const removerColuna = aplicar(contexto, [{ tipo: "removerColunas", colunas: [5] }], {
       modoCompleto: true,
-      operacoes: [{ tipo: "removerColunas", colunas: [5] }],
     });
     expect(removerColuna.ok).toBe(true);
     expect(removerColuna.dados).toMatchObject({ removidasColunas: 1 });
-  });
-
-  it("ignora marcador de versão antiga sem o número no valor", () => {
-    contexto.aba.metadados.push({
-      chave: "frequenciapp.linha",
-      valor: "1",
-      linha: 9,
-      coluna: 1,
-    });
-    try {
-      const leitura = chamar(contexto, {
-        acao: "ler",
-        aba: "3º ano A",
-        linhaInicial: 1,
-        colunaInicial: 1,
-        linhas: 10,
-        colunas: 6,
-      });
-      const dadosLidos = leitura.dados as { linhasCriadas: number[] };
-      expect(dadosLidos.linhasCriadas).not.toContain(9);
-    } finally {
-      contexto.aba.metadados = contexto.aba.metadados.filter((item) => item.linha !== 9);
-    }
   });
 
   it("cria, lista e remove aba com marcador", () => {
@@ -698,8 +896,9 @@ describe("Apps Script", () => {
   it("lista cópias e restaura a mais recente", () => {
     const copias = chamar(contexto, { acao: "listarCopias", aba: "3º ano A" });
     expect(copias.ok).toBe(true);
-    const lista = (copias.dados as { copias: { nome: string }[] }).copias;
+    const lista = (copias.dados as { copias: { nome: string; criadaEm: string }[] }).copias;
     expect(lista.length).toBeGreaterThanOrEqual(1);
+    expect(lista[0]?.criadaEm).toMatch(/^2026-09-26 03:00$/);
     const resposta = chamar(contexto, {
       acao: "restaurarCopia",
       aba: "3º ano A",
@@ -708,10 +907,419 @@ describe("Apps Script", () => {
     expect(resposta.ok).toBe(true);
     expect(contexto.planilha.getSheetByName("3º ano A")).not.toBeNull();
   });
+});
+
+describe("Apps Script: marcadores de linha e coluna", () => {
+  it("cria duas linhas numa aba de saídas vazia, cada uma com marcador", () => {
+    const local = montarContexto();
+    const saidas = local.planilha.insertSheet("Saídas");
+    saidas.getRange(1, 1, 1, 4).setValues([["Data", "Aluno", "Turma", "Momento"]]);
+    const resposta = aplicar(
+      local,
+      [
+        {
+          tipo: "criarLinhas",
+          itens: [
+            {
+              linha: 2,
+              celulas: [
+                { coluna: 1, valor: "25/09/2026" },
+                { coluna: 2, valor: "Alice" },
+              ],
+            },
+            {
+              linha: 3,
+              celulas: [
+                { coluna: 1, valor: "26/09/2026" },
+                { coluna: 2, valor: "Bruno" },
+              ],
+            },
+          ],
+        },
+      ],
+      { aba: saidas },
+    );
+    expect(resposta.ok).toBe(true);
+    expect(resposta.dados).toMatchObject({ linhasCriadas: 2 });
+    expect(saidas.marcadoresDe("frequenciapp.linha", "ROW")).toEqual([2, 3]);
+    expect(ler(local, saidas).linhasCriadas).toEqual([2, 3]);
+  });
+
+  it("não marca nem grava linha que já tem dado em outra coluna", () => {
+    const local = montarContexto();
+    local.aba.getCelula(4, 3).valor = "anotação manual";
+    const resposta = criarCarla(local);
+    expect(resposta.ok).toBe(true);
+    expect(resposta.dados).toMatchObject({ linhasCriadas: 0, puladasOcupadas: 1 });
+    expect(local.aba.getCelula(4, 1).valor).toBe("");
+    expect(local.aba.marcadoresDe("frequenciapp.linha", "ROW")).toEqual([]);
+  });
+
+  it("segue a linha criada quando uma linha manual entra acima dela", () => {
+    const local = montarContexto();
+    expect(criarCarla(local).ok).toBe(true);
+    // Linha manual inserida acima: Bruno desce para 4 e Carla para 5.
+    local.aba.insertRowsBefore(2, 1);
+    local.aba.getCelula(2, 1).valor = "Manual";
+    expect(local.aba.getCelula(4, 1).valor).toBe("Bruno");
+    expect(ler(local).linhasCriadas).toEqual([5]);
+    const antiga = aplicar(local, [{ tipo: "removerLinhas", linhas: [4] }], {
+      modoCompleto: true,
+    });
+    expect(antiga.ok).toBe(false);
+    expect(local.aba.getCelula(4, 1).valor).toBe("Bruno");
+    const atual = aplicar(local, [{ tipo: "removerLinhas", linhas: [5] }], { modoCompleto: true });
+    expect(atual.ok).toBe(true);
+    expect(local.aba.getCelula(4, 1).valor).toBe("Bruno");
+    expect(local.aba.getCelula(5, 1).valor).toBe("");
+  });
+
+  it("segue a coluna criada quando outra coluna entra antes dela", () => {
+    const local = montarContexto();
+    const primeira = aplicar(local, [
+      { tipo: "inserirColunas", antesDe: 5, cabecalhoLinha: 1, rotulos: ["12/09"] },
+    ]);
+    expect(primeira.ok).toBe(true);
+    const segunda = aplicar(local, [
+      { tipo: "inserirColunas", antesDe: 5, cabecalhoLinha: 1, rotulos: ["13/09"] },
+    ]);
+    expect(segunda.ok).toBe(true);
+    expect(ler(local).colunasCriadas).toEqual([5, 6]);
+    expect(local.aba.getCelula(1, 6).valor).toBe("12/09");
+  });
+
+  it("reconhece o marcador de linha antigo pela localização e ignora marcador de aba", () => {
+    const local = montarContexto();
+    local.aba.metadados.push({
+      chave: "frequenciapp.linha",
+      valor: "linha:2",
+      tipo: "ROW",
+      indice: 3,
+    });
+    local.aba.metadados.push({ chave: "frequenciapp.linha", valor: "linha:9", tipo: "SHEET" });
+    expect(ler(local).linhasCriadas).toEqual([3]);
+  });
+
+  it("insere colunas sem posição depois da última coluna do cabeçalho", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [
+      { tipo: "inserirColunas", cabecalhoLinha: 1, rotulos: ["12/09", "13/09"] },
+    ]);
+    expect(resposta.ok).toBe(true);
+    const cabecalho = local.aba.getRange(1, 1, 1, 7).getDisplayValues()[0];
+    expect(cabecalho).toEqual([
+      "Aluno",
+      "Turma atual",
+      "10/09",
+      "11/09",
+      "Total",
+      "12/09",
+      "13/09",
+    ]);
+    expect(local.aba.getCelula(2, 5).formula).not.toBe("");
+    expect(ler(local).colunasCriadas).toEqual([6, 7]);
+  });
+
+  it("insere colunas numa aba sem colunas sobrando", () => {
+    const local = montarContexto();
+    const justa = local.planilha.insertSheet("Justa");
+    justa.maxColunas = 2;
+    justa.getRange(1, 1, 1, 2).setValues([["Aluno", "Turma atual"]]);
+    const resposta = aplicar(
+      local,
+      [{ tipo: "inserirColunas", cabecalhoLinha: 1, rotulos: ["12/09"] }],
+      { aba: justa },
+    );
+    expect(resposta.ok).toBe(true);
+    expect(justa.getCelula(1, 3).valor).toBe("12/09");
+    expect(justa.marcadoresDe("frequenciapp.coluna", "COLUMN")).toEqual([3]);
+  });
+});
+
+describe("Apps Script: escrita e comparação", () => {
+  it("nunca regrava célula com fórmula ou ocupada num intervalo misto", () => {
+    const local = montarContexto();
+    const resposta = chamar(local, {
+      acao: "escrever",
+      aba: "3º ano A",
+      cabecalhoLinha: 1,
+      assinatura: assinaturaDaAba(local.aba),
+      intervalos: [{ linha: 2, coluna: 3, valores: [["F", "F", "9"]] }],
+    });
+    expect(resposta.ok).toBe(true);
+    expect(resposta.dados).toMatchObject({ aplicadas: 1, puladasOcupadas: 1, puladasFormula: 1 });
+    expect(local.aba.getCelula(2, 5).formula).toBe('=CONT.SE(C2:D3;"F")');
+    expect(local.aba.getCelula(2, 4).valor).toBe("F");
+    expect(local.aba.gravacoes).toEqual(["D2"]);
+  });
+
+  it("agrupa células vazias contíguas numa gravação por trecho", () => {
+    const local = montarContexto();
+    const resposta = chamar(local, {
+      acao: "escrever",
+      aba: "3º ano A",
+      cabecalhoLinha: 1,
+      assinatura: assinaturaDaAba(local.aba),
+      intervalos: [
+        {
+          linha: 3,
+          coluna: 3,
+          valores: [
+            ["F", "P", "0"],
+            ["F", "F", "0"],
+          ],
+        },
+      ],
+    });
+    expect(resposta.ok).toBe(true);
+    expect(resposta.dados).toMatchObject({ aplicadas: 6, puladasOcupadas: 0, puladasFormula: 0 });
+    expect(local.aba.gravacoes.sort()).toEqual(["C3", "C4", "D3", "D4", "E3", "E4"]);
+  });
+
+  it("completa com vazio a linha de valores mais curta que o intervalo", () => {
+    const local = montarContexto();
+    const resposta = chamar(local, {
+      acao: "escrever",
+      aba: "3º ano A",
+      cabecalhoLinha: 1,
+      assinatura: assinaturaDaAba(local.aba),
+      intervalos: [{ linha: 3, coluna: 3, valores: [["F", "P"], ["F"]] }],
+    });
+    expect(resposta.ok).toBe(true);
+    expect(local.aba.getCelula(3, 4).valor).toBe("P");
+    expect(local.aba.getCelula(4, 3).valor).toBe("F");
+    expect(local.aba.getCelula(4, 4).valor).toBe("");
+  });
+
+  it("substitui e limpa célula de data comparando o texto exibido", () => {
+    const local = montarContexto();
+    local.aba.getCelula(3, 3).valor = new Date(Date.UTC(2026, 8, 25, 12));
+    local.aba.getCelula(3, 4).valor = new Date(Date.UTC(2026, 8, 26, 12));
+    const resposta = aplicar(
+      local,
+      [
+        { tipo: "substituir", linha: 3, coluna: 3, valor: "F", anterior: "25/09/2026" },
+        { tipo: "limpar", linha: 3, coluna: 4, anterior: "26/09/2026" },
+      ],
+      { modoCompleto: true },
+    );
+    expect(resposta.ok).toBe(true);
+    expect(resposta.dados).toMatchObject({ substituidas: 1, limpas: 1, puladasOcupadas: 0 });
+    expect(local.aba.getCelula(3, 3).valor).toBe("F");
+    expect(local.aba.getCelula(3, 4).valor).toBe("");
+  });
+
+  it("não substitui data quando o texto exibido mudou", () => {
+    const local = montarContexto();
+    local.aba.getCelula(3, 3).valor = new Date(Date.UTC(2026, 8, 25, 12));
+    const resposta = aplicar(
+      local,
+      [{ tipo: "substituir", linha: 3, coluna: 3, valor: "F", anterior: "24/09/2026" }],
+      { modoCompleto: true },
+    );
+    expect(resposta.dados).toMatchObject({ substituidas: 0, puladasOcupadas: 1 });
+  });
+});
+
+describe("Apps Script: erros", () => {
+  it("devolve frase, detalhe sem o token e parcial quando o plano quebra no meio", () => {
+    const local = montarContexto();
+    local.aba.falharEm = "insertColumnsBefore";
+    const resposta = aplicar(local, [
+      { tipo: "preencher", linha: 3, coluna: 3, valor: "F" },
+      { tipo: "inserirColunas", antesDe: 5, cabecalhoLinha: 1, rotulos: ["12/09"] },
+    ]);
+    expect(resposta.ok).toBe(false);
+    expect(resposta.erro).toBe("Não foi possível concluir a operação na planilha.");
+    expect(resposta.parcial).toBe(true);
+    expect(resposta.detalhe).toContain("Service Spreadsheets failed");
+    expect(resposta.detalhe).not.toContain("segredo");
+    expect(local.errosRegistrados.length).toBeGreaterThan(0);
+    expect(String(local.errosRegistrados[0]?.[0])).toContain("Service Spreadsheets failed");
+  });
+
+  it("recusa corpo inválido sem ecoar o conteúdo", () => {
+    const local = montarContexto();
+    const resposta = local.doPost({ postData: { contents: '{"token":"segredo", acao' } });
+    const texto = resposta.getContent();
+    expect(texto).not.toContain("segredo");
+    expect(JSON.parse(texto)).toMatchObject({ ok: false, erro: "Corpo inválido." });
+  });
+
+  it("não marca como parcial a recusa prevista", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [{ tipo: "removerLinhas", linhas: [3] }], {
+      modoCompleto: true,
+    });
+    expect(resposta.ok).toBe(false);
+    expect(resposta.parcial).toBeUndefined();
+  });
+});
+
+describe("Apps Script: cópias e restauração", () => {
+  for (const copiaLevaMetadados of [false, true]) {
+    const caso = copiaLevaMetadados ? "cópia com metadados" : "cópia sem metadados";
+
+    it(`restaura na própria aba, preservando identidade e marcadores (${caso})`, () => {
+      const local = montarContexto({ copiaLevaMetadados });
+      const original = local.aba;
+      expect(criarCarla(local).ok).toBe(true);
+      const remover = aplicar(local, [{ tipo: "removerLinhas", linhas: [4] }], {
+        modoCompleto: true,
+      });
+      expect(remover.ok).toBe(true);
+      expect(original.getCelula(4, 1).valor).toBe("");
+      const lista = chamar(local, { acao: "listarCopias", aba: "3º ano A" });
+      const copias = (lista.dados as { copias: { nome: string }[] }).copias;
+      expect(copias).toHaveLength(1);
+      const resposta = chamar(local, {
+        acao: "restaurarCopia",
+        aba: "3º ano A",
+        copia: copias[0]?.nome,
+      });
+      expect(resposta.ok).toBe(true);
+      expect(local.planilha.getSheetByName("3º ano A")).toBe(original);
+      expect(local.planilha.getSheets()[0]).toBe(original);
+      expect(original.isSheetHidden()).toBe(false);
+      expect(original.getCelula(4, 1).valor).toBe("Carla");
+      expect(original.getCelula(2, 5).formula).toBe('=CONT.SE(C2:D3;"F")');
+      expect(original.marcadoresDe("frequenciapp.copia", "SHEET")).toEqual([]);
+      expect(ler(local).linhasCriadas).toEqual(copiaLevaMetadados ? [4] : []);
+    });
+
+    it(`não deixa a cópia herdar o marcador de aba criada (${caso})`, () => {
+      const local = montarContexto({ copiaLevaMetadados });
+      expect(chamar(local, { acao: "criarAba", nome: "3º ano C" }).ok).toBe(true);
+      const criada = local.planilha.getSheetByName("3º ano C");
+      if (!criada) throw new Error("aba ausente");
+      criada.getRange(2, 1, 1, 2).setValues([["Dora", "3º ano C"]]);
+      const limpar = aplicar(
+        local,
+        [{ tipo: "limpar", linha: 2, coluna: 2, anterior: "3º ano C" }],
+        {
+          aba: criada,
+          modoCompleto: true,
+        },
+      );
+      expect(limpar.ok).toBe(true);
+      const nome = nomesDeCopias(local).find((item) => item.includes("3º ano C"));
+      const copia = local.planilha.getSheetByName(nome ?? "");
+      expect(copia?.marcadoresDe("frequenciapp.aba", "SHEET")).toEqual([]);
+      expect(copia?.marcadoresDe("frequenciapp.copia", "SHEET")).toHaveLength(1);
+      expect(chamar(local, { acao: "removerAba", aba: nome }).ok).toBe(false);
+      const restaurar = chamar(local, { acao: "restaurarCopia", aba: "3º ano C", copia: nome });
+      expect(restaurar.ok).toBe(true);
+      expect(criada.marcadoresDe("frequenciapp.aba", "SHEET")).toHaveLength(1);
+      expect(criada.marcadoresDe("frequenciapp.copia", "SHEET")).toEqual([]);
+      expect(criada.getCelula(2, 2).valor).toBe("3º ano C");
+    });
+  }
+
+  it("restaura a cópia mais antiga mesmo com o limite de cópias cheio", () => {
+    const local = montarContexto();
+    const valores = ["P", "F", "A"];
+    for (const [indice, valor] of valores.entries()) {
+      const anterior = indice === 0 ? "" : (valores[indice - 1] ?? "");
+      const resposta = aplicar(
+        local,
+        [{ tipo: "substituir", linha: 3, coluna: 3, valor, anterior }],
+        { modoCompleto: true },
+      );
+      expect(resposta.ok).toBe(true);
+    }
+    const lista = chamar(local, { acao: "listarCopias", aba: "3º ano A" });
+    const copias = (lista.dados as { copias: { nome: string }[] }).copias;
+    expect(copias).toHaveLength(3);
+    const maisAntiga = copias[2]?.nome;
+    const resposta = chamar(local, { acao: "restaurarCopia", aba: "3º ano A", copia: maisAntiga });
+    expect(resposta.ok).toBe(true);
+    expect(local.aba.getCelula(3, 3).valor).toBe("");
+    expect(nomesDeCopias(local)).toHaveLength(3);
+  });
+
+  it("não colide o nome de duas cópias no mesmo instante", () => {
+    const local = montarContexto({ carimboFixo: true });
+    const primeira = aplicar(local, [{ tipo: "limpar", linha: 2, coluna: 3, anterior: "P" }], {
+      modoCompleto: true,
+    });
+    expect(primeira.ok).toBe(true);
+    const segunda = aplicar(
+      local,
+      [{ tipo: "substituir", linha: 2, coluna: 1, valor: "Alícia", anterior: "Alice" }],
+      { modoCompleto: true },
+    );
+    expect(segunda.ok).toBe(true);
+    const nomes = nomesDeCopias(local);
+    expect(new Set(nomes).size).toBe(2);
+    const lista = chamar(local, { acao: "listarCopias", aba: "3º ano A" });
+    const copias = (lista.dados as { copias: { criadaEm: string }[] }).copias;
+    expect(copias.map((item) => item.criadaEm)).toEqual(["2026-09-26 03:00", "2026-09-26 03:00"]);
+  });
+
+  it("poda as cópias de uma aba sem tocar as de outra com prefixo parecido", () => {
+    const local = montarContexto();
+    const a = local.planilha.insertSheet("A");
+    a.getRange(1, 1, 1, 2).setValues([["Aluno", "Turma atual"]]);
+    a.getRange(2, 1, 1, 2).setValues([["Eva", "A"]]);
+    const deOutra = [1, 2, 3, 4].map(
+      (indice) => `_frequenciapp_backup_A_B_20260101-00000${indice}`,
+    );
+    for (const nome of deOutra) local.planilha.insertSheet(nome).hideSheet();
+    const resposta = aplicar(local, [{ tipo: "limpar", linha: 2, coluna: 2, anterior: "A" }], {
+      aba: a,
+      modoCompleto: true,
+    });
+    expect(resposta.ok).toBe(true);
+    for (const nome of deOutra) expect(local.planilha.getSheetByName(nome)).not.toBeNull();
+    const lista = chamar(local, { acao: "listarCopias", aba: "A" });
+    expect((lista.dados as { copias: unknown[] }).copias).toHaveLength(1);
+  });
+});
+
+describe("Apps Script: token", () => {
+  it("aceita só o token idêntico", () => {
+    const local = montarContexto();
+    for (const token of ["segred", "segredO", "segredo ", "", "segredos"]) {
+      const resposta = local.doPost({
+        postData: { contents: JSON.stringify({ token, acao: "ping" }) },
+      });
+      expect(JSON.parse(resposta.getContent()).erro).toBe("Não autorizado.");
+    }
+    expect(chamar(local, { acao: "ping" }).ok).toBe(true);
+    local.definirToken(null);
+    expect(chamar(local, { acao: "ping" }).erro).toBe("Não autorizado.");
+  });
+});
+
+/**
+ * Histórico do script publicado. Qualquer mudança no gas/Codigo.gs muda o
+ * hash e exige nova entrada com versão maior, o que obriga a subir a VERSAO
+ * e, com ela, o aviso de script atrasado no aplicativo.
+ */
+const VERSOES_DO_SCRIPT = [
+  { versao: 1, sha256: "1fe567b6391975de778c75b285a8a4e6d2b879e340d3079c3b0bc45ece75550b" },
+  { versao: 2, sha256: "3b4a451026e87f8eb9634b7ed0b6d520dbf2d08602c8374f261c03df4b9c9faa" },
+];
+
+describe("Apps Script: versão", () => {
+  const codigo = readFileSync(path.resolve("gas/Codigo.gs"), "utf8");
+  const versao = Number(codigo.match(/var VERSAO = (\d+)/)?.[1] ?? 0);
 
   it("mantém a versão do script igual à esperada pelo aplicativo", () => {
-    const codigo = readFileSync(path.resolve("gas/Codigo.gs"), "utf8");
-    const encontrada = Number(codigo.match(/var VERSAO = (\d+)/)?.[1] ?? 0);
-    expect(encontrada).toBe(VERSAO_SCRIPT);
+    expect(versao).toBe(VERSAO_SCRIPT);
+  });
+
+  it("exige versão nova a cada mudança no script", () => {
+    const hash = createHash("sha256").update(codigo).digest("hex");
+    const ultima = VERSOES_DO_SCRIPT[VERSOES_DO_SCRIPT.length - 1];
+    expect(
+      ultima,
+      "Acrescente { versao, sha256 } em VERSOES_DO_SCRIPT ao mudar o gas/Codigo.gs.",
+    ).toEqual({ versao, sha256: hash });
+    for (let indice = 1; indice < VERSOES_DO_SCRIPT.length; indice += 1) {
+      expect(VERSOES_DO_SCRIPT[indice]?.versao).toBeGreaterThan(
+        VERSOES_DO_SCRIPT[indice - 1]?.versao ?? 0,
+      );
+    }
   });
 });

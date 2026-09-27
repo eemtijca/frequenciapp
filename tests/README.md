@@ -18,7 +18,8 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `relatorios.test.ts`: indicadores do dia e relatórios por aluno e por saída.
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
 - `planilha.test.ts`: dataframe, esquema da planilha, CSV e planejamento conservador.
-- `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês das APIs do Google.
+- `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
+- `planilha-cliente.test.ts`: cliente do Apps Script com recusa, falha parcial e detalhe técnico.
 - `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.

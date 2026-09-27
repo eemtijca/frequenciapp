@@ -8,6 +8,10 @@ const TENTATIVAS = 3;
 interface Envelope<T> {
   ok: boolean;
   erro?: string;
+  /** Mensagem original da exceção no script, sem segredos; nunca vai à tela. */
+  detalhe?: string;
+  /** Exceção no meio de uma ação que altera a planilha: parte pode ter sido aplicada. */
+  parcial?: boolean;
   versao?: number;
   dados?: T;
 }
@@ -25,12 +29,22 @@ export interface OpcoesGas {
 /** Falha de script (recusa) contra falha de rede (pode ter aplicado parte). */
 export class ErroGas extends ErroHttp {
   recusado: boolean;
+  /** Diagnóstico técnico do script, para registro e log; nunca vai à tela. */
+  detalhe: string | null;
 
-  constructor(mensagem: string, recusado: boolean) {
+  constructor(mensagem: string, recusado: boolean, detalhe: string | null = null) {
     super(mensagem, 502);
     this.name = "ErroGas";
     this.recusado = recusado;
+    this.detalhe = detalhe;
   }
+}
+
+/** Texto para o registro de sincronização: frase e detalhe, no limite da coluna. */
+export function mensagemParaRegistro(erro: unknown, padrao: string): string {
+  if (!(erro instanceof ErroHttp)) return padrao;
+  const detalhe = erro instanceof ErroGas && erro.detalhe ? ` Detalhe: ${erro.detalhe}` : "";
+  return `${erro.message}${detalhe}`.slice(0, 300);
 }
 
 /**
@@ -66,7 +80,13 @@ export async function chamarGas<T>(
         throw new ErroGas("O script da planilha respondeu em formato inesperado.", true);
       }
       if (!envelope.ok || envelope.dados === undefined) {
-        throw new ErroGas(envelope.erro || "O script recusou a operação.", true);
+        const detalhe = typeof envelope.detalhe === "string" ? envelope.detalhe : null;
+        if (detalhe) console.error(`Apps Script (${String(corpo.acao)}): ${detalhe}`);
+        throw new ErroGas(
+          envelope.erro || "O script recusou a operação.",
+          envelope.parcial !== true,
+          detalhe,
+        );
       }
       return envelope.dados;
     } catch (erro) {
