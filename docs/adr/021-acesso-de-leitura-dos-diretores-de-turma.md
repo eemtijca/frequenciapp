@@ -20,6 +20,7 @@ Até aqui havia dois papéis e duas guardas: `exigirAdmin` para a gestão e `exi
 - **Escopo no servidor.** Toda consulta do diretor filtra pelas turmas do vínculo vigente, lidas do banco na própria requisição. Um identificador de turma vindo do navegador nunca amplia o escopo.
 - **Parâmetros na Configuração, editáveis pela administração,** com valores iniciais conservadores: categorias visíveis (inicialmente só faltas), validade da palavra-chave (90 dias), duração da sessão do diretor, tentativas de entrada e janela de bloqueio, e limite de risco de frequência.
 - **Emissão e revogação da palavra-chave só pela administração.**
+- **Entrada por identificador.** O diretor entra com um identificador curto, sem arroba (por exemplo `3a-maria`), e a palavra-chave. O identificador fica na coluna `email`, que passa a ser o login de todas as contas: a equipe continua entrando por e-mail, e a ausência de arroba impede colisão entre os dois. A palavra-chave é a senha da conta, com o mesmo hash scrypt; o ciclo de vida fica em `credenciais_diretor`.
 
 ## Ciclo de vida da palavra-chave
 
