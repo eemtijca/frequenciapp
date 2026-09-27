@@ -737,6 +737,12 @@ export default function AbaConfiguracoes({
           />
         )}
 
+        {liberadores.length === 0 && (
+          <p className="text-muted-foreground text-sm">
+            Nenhum nome cadastrado ainda. Use o formulário para adicionar quem pode liberar a saída.
+          </p>
+        )}
+
         <ul className="divide-y overflow-hidden rounded-lg border">
           {liberadores.map((item) => (
             <li

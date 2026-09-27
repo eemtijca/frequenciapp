@@ -568,13 +568,18 @@ export default function VistaSaidas({
             placeholder="Selecione quem liberou"
             opcoes={opcoesLiberador}
           />
+          {opcoesLiberador.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              Nenhum nome cadastrado. A administração cadastra em Gestão, Configurações.
+            </p>
+          )}
         </div>
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         <Button
           type="submit"
           size="lg"
           className="h-11 w-full rounded-lg px-6 sm:w-auto"
-          disabled={enviando}
+          disabled={enviando || opcoesLiberador.length === 0}
         >
           {enviando && <LoaderCircle size={16} className="animate-spin" />}
           Registrar saída
