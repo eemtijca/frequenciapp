@@ -61,9 +61,6 @@ const JUSTIFICATIVAS = [
   ["S", "Suspensão"],
 ];
 
-// Mesmo catálogo inicial da migração para quem libera a saída.
-const LIBERADORES = ["adriano", "adriana", "helena"];
-
 const MOMENTOS = ["aula_2", "aula_3", "intervalo_1", "aula_5", "almoco"];
 
 function formatarDia(data) {
@@ -268,6 +265,7 @@ try {
   // Saídas antecipadas espalhadas pela semana, para o relatório ter conteúdo.
   let saidasCriadas = 0;
   const turmasParaSaida = Object.values(idsDeTurmas);
+  const liberadores = (await cliente.query("select codigo from liberadores order by codigo")).rows;
   for (let indice = 0; indice < turmasParaSaida.length && indice < dias.length; indice += 1) {
     const turmaId = turmasParaSaida[indice];
     const alunosDaTurma = await cliente.query(
@@ -278,7 +276,7 @@ try {
     const dia = dias[indice];
     const momento = MOMENTOS[indice % MOMENTOS.length];
     const [codigoJustificativa] = JUSTIFICATIVAS[indice % JUSTIFICATIVAS.length];
-    const liberadoPorCodigo = LIBERADORES[indice % LIBERADORES.length];
+    const liberadoPorCodigo = liberadores[indice % liberadores.length]?.codigo ?? null;
     const criada = await cliente.query(
       `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_codigo, criado_por_id)
        values ($1, $2, $3, $4, null, $5, $6)
