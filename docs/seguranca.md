@@ -17,7 +17,7 @@ Detalhamento das decisões de segurança. O resumo para reportar falhas está em
 - Cookie HttpOnly, SameSite=Lax, path `/`, Secure em produção, exceto quando `PERMITIR_HTTP=true` libera a implantação sem TLS ([ambiente.md](ambiente.md)). Com a opção "Manter conectado neste dispositivo", a validade é de 30 dias com expiração registrada; sem ela, o cookie é de sessão (some ao fechar o navegador) e a validade no servidor é de 12 horas.
 - Sessões vencidas são apagadas no primeiro uso detectado e podem ser purgadas em rotina (ver [operacao.md](operacao.md)).
 - Trocar a senha encerra as sessões dos outros dispositivos; o dispositivo corrente continua válido.
-- A identidade de sessão carrega o papel; guardas de papel (`exigirAdmin`) fecham as rotas de gestão.
+- A identidade de sessão carrega o papel, e as rotas exigem capacidades, não papéis (`exigirCapacidade`, com `exigirSessao` para a operação escolar e `exigirAdmin` para a gestão). A matriz de papel para capacidades fica em `src/domain/usuarios.ts` e recusa por padrão; ver [ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md).
 
 ## CSRF
 
@@ -40,6 +40,7 @@ Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que 
 ## Papéis e isolamento
 
 - Dois papéis: `ADMIN` gerencia séries, turmas, aulas, alunos e contas; `COORDENACAO` registra a frequência e consulta o histórico e a grade do mês. As duas funções veem os dados escolares, que são o objeto do serviço.
+- Capacidades: `operar` (chamada, saídas, relatórios e envio à planilha), `administrar` (gestão, contas, catálogos, integrações e cópia de segurança) e `alterarPropriaSenha`. `ADMIN` tem as três; `COORDENACAO`, `operar` e `alterarPropriaSenha`. Papel sem a capacidade recebe 403 mesmo com sessão válida, e a página inicial só abre o aplicativo completo com `operar`. Todo manipulador da API passa por uma guarda, conferido em teste; as exceções públicas (entrada, saída, estado da sessão e saúde) ficam listadas no próprio teste.
 - Guardas intransponíveis: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta. A frequência é dado da escola: excluir uma conta preserva o histórico e anula a autoria.
 - A guarda do último administrador roda dentro da transação serializável, junto da escrita, para duas alterações simultâneas não deixarem a escola sem acesso de configuração.
 - A frequência é única por turma e dia, com revisão; a checagem de duplicata e de revisão acontece no banco, e o salvamento revalida alunos e aulas dentro da transação. A saída antecipada é única por aluno e dia, e o registro separado não altera a chamada. Os contratos de API testam os casos diretamente.

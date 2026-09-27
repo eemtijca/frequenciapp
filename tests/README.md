@@ -21,10 +21,11 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
 - `planilha-envios.test.ts`: erro vigente por turma ou por histórico único, data do último envio e datas sem horário em qualquer fuso.
 - `planilha-cliente.test.ts`: cliente do Apps Script com recusa, falha parcial e detalhe técnico.
-- `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
+- `usuarios.test.ts`: política de senha, primeiro nome, rótulo de papel e capacidades por papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.
 - `decisao-admin.test.ts`: bootstrap do administrador no modo `--somente-criar`.
+- `guardas-rotas.test.ts`: todo manipulador em `src/app/api` passa por uma guarda de capacidade, salvo as rotas públicas listadas com o motivo, e nenhuma rota decide acesso comparando o papel.
 - `texto-editorial.test.ts`: guarda da convenção editorial do repositório (sem travessões e demais padrões proibidos).
 
 ## Contratos de API
