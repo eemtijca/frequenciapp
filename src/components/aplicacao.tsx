@@ -27,7 +27,6 @@ import type {
   Frequencia,
   JustificativaConfigurada,
   ResumoAcumulado,
-  Responsavel,
   SaidaAntecipada,
   Serie,
   Turma,
@@ -70,7 +69,6 @@ interface Props {
   frequenciasIniciais: Frequencia[];
   saidasIniciais: SaidaAntecipada[];
   justificativasIniciais: JustificativaConfigurada[];
-  responsaveisIniciais: Responsavel[];
   configuracoesIniciais: Configuracoes;
   resumoInicial: ResumoAcumulado | null;
 }
@@ -190,7 +188,6 @@ export default function Aplicacao({
   frequenciasIniciais,
   saidasIniciais,
   justificativasIniciais,
-  responsaveisIniciais,
   configuracoesIniciais,
   resumoInicial,
 }: Props) {
@@ -212,7 +209,6 @@ export default function Aplicacao({
   const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
   const [justificativas, setJustificativas] =
     useState<JustificativaConfigurada[]>(justificativasIniciais);
-  const [responsaveis] = useState<Responsavel[]>(responsaveisIniciais);
   const [configuracoes, setConfiguracoes] = useState<Configuracoes>(configuracoesIniciais);
   const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
   const [versaoFrequencias, setVersaoFrequencias] = useState(0);
@@ -485,13 +481,11 @@ export default function Aplicacao({
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaSaidas
-            usuarioId={usuario.id}
             diaCorrente={diaCorrente}
             fuso={fuso}
             mes={mes}
             turmas={turmas}
             alunos={alunos}
-            responsaveis={responsaveis}
             catalogoJustificativas={justificativas}
             saidas={saidas}
             onSaidasMudaram={recarregarSaidas}

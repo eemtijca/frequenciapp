@@ -134,6 +134,7 @@ beforeAll(async () => {
         dia: DIA,
         momento: "aula_1",
         justificativa: "C",
+        liberadoPorCodigo: "adriana",
       }),
     }),
   );
@@ -303,6 +304,7 @@ describe("planilha de saídas", () => {
           momento: "aula_1",
           justificativa: "O",
           texto: "Liberada mais cedo",
+          liberadoPorCodigo: "helena",
         }),
       }),
     );

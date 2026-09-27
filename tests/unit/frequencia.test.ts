@@ -10,10 +10,12 @@ import {
   diasEntre,
   ehDiaValido,
   ehHoraValida,
+  camposJustificativaSaida,
   ehJustificativaValida,
   ehMesValido,
   ehMomentoDeAula,
   ehMomentoValido,
+  ehResponsavelLiberacao,
   horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
@@ -21,12 +23,14 @@ import {
   montarGrade,
   nomeDoMes,
   normalizar,
+  partesJustificativaSaida,
   partesNoFuso,
   rotuloAula,
   rotuloDataCurta,
   rotuloDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
+  rotuloResponsavelLiberacao,
   rotuloMes,
   rotuloMomento,
   type Aluno,
@@ -429,6 +433,63 @@ describe("momentos de saída", () => {
     expect(ehMomentoDeAula("intervalo_1")).toBe(false);
     expect(ehMomentoDeAula("almoco")).toBe(false);
     expect(ehMomentoDeAula("madrugada")).toBe(false);
+  });
+});
+
+describe("justificativa e liberação da saída", () => {
+  it("aceita texto livre em qualquer momento e tipo com complemento só na aula", () => {
+    const livre = camposJustificativaSaida("intervalo_1", { texto: "  Foi buscar o irmão  " });
+    expect(livre.ok).toBe(true);
+    if (livre.ok) {
+      expect(livre.campos).toEqual({
+        justificativa: null,
+        texto: "Foi buscar o irmão",
+        observacao: null,
+      });
+    }
+
+    const tipo = camposJustificativaSaida("aula_2", {
+      justificativa: "D",
+      texto: "Saiu no meio da aula",
+    });
+    expect(tipo.ok).toBe(true);
+    if (tipo.ok) expect(tipo.campos.texto).toBe("Saiu no meio da aula");
+
+    const fora = camposJustificativaSaida("almoco", {
+      justificativa: "D",
+      texto: "Não cabe aqui",
+    });
+    expect(fora.ok).toBe(false);
+
+    const vazio = camposJustificativaSaida("aula_1", {});
+    expect(vazio.ok).toBe(false);
+  });
+
+  it("mostra o texto livre como motivo e o tipo com o complemento", () => {
+    expect(
+      partesJustificativaSaida({
+        justificativa: null,
+        texto: "Foi buscar o irmão",
+        observacao: null,
+      }).motivo,
+    ).toBe("Foi buscar o irmão");
+    const partes = partesJustificativaSaida({
+      justificativa: "CM",
+      texto: "Retorno marcado",
+      observacao: null,
+    });
+    expect(partes.motivo).toBe("Consulta Médica");
+    expect(partes.complemento).toBe("Retorno marcado");
+  });
+
+  it("reconhece os três responsáveis pela liberação", () => {
+    expect(ehResponsavelLiberacao("adriano")).toBe(true);
+    expect(ehResponsavelLiberacao("adriana")).toBe(true);
+    expect(ehResponsavelLiberacao("helena")).toBe(true);
+    expect(ehResponsavelLiberacao("demo")).toBe(false);
+    expect(rotuloResponsavelLiberacao("adriana")).toBe("Coordenadora Adriana");
+    expect(rotuloResponsavelLiberacao("helena")).toBe("Coordenadora Helena");
+    expect(rotuloResponsavelLiberacao(null)).toBe("");
   });
 });
 

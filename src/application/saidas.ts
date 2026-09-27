@@ -1,5 +1,5 @@
 // Saídas antecipadas: registro separado da chamada, com momento,
-// justificativa e responsável pela liberação (direção ou coordenação).
+// justificativa (tipo ou texto) e um dos responsáveis fixos pela liberação.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -7,55 +7,47 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
 import {
+  camposJustificativaSaida,
   diaLocal,
   ehDiaValido,
-  ehMomentoDeAula,
   ehMomentoValido,
-  JUSTIFICATIVA_OUTROS,
+  ehResponsavelLiberacao,
   LIMITE_TEXTO_SAIDA,
+  rotuloResponsavelLiberacao,
   type SaidaAntecipada,
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 
-const justificativaSaida = z
-  .string()
-  .trim()
-  .min(1, "Informe a justificativa.")
-  .max(10, "Justificativa inválida.");
-
-export const esquemaCriarSaida = z
-  .object({
-    alunoId: z.string().uuid("Aluno inválido."),
-    dia: z.string().refine(ehDiaValido, "Data inválida."),
-    momento: z
+export const esquemaCriarSaida = z.object({
+  alunoId: z.string().uuid("Aluno inválido."),
+  dia: z.string().refine(ehDiaValido, "Data inválida."),
+  momento: z
+    .string()
+    .trim()
+    .max(20, "Momento da saída inválido.")
+    .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+  justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
+  texto: z
+    .string()
+    .trim()
+    .max(
+      LIMITE_TEXTO_SAIDA,
+      `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
+    )
+    .nullish(),
+  observacao: z
+    .string()
+    .trim()
+    .max(200, "A observação deve ter no máximo 200 caracteres.")
+    .nullish(),
+  liberadoPorCodigo: z.preprocess(
+    (valor) => (typeof valor === "string" ? valor : ""),
+    z
       .string()
       .trim()
-      .max(20, "Momento da saída inválido.")
-      .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-    justificativa: justificativaSaida,
-    texto: z
-      .string()
-      .trim()
-      .max(
-        LIMITE_TEXTO_SAIDA,
-        `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
-      )
-      .nullish(),
-    observacao: z
-      .string()
-      .trim()
-      .max(200, "A observação deve ter no máximo 200 caracteres.")
-      .nullish(),
-    liberadoPorId: z.string().uuid("Responsável pela liberação inválido.").nullish(),
-  })
-  .refine((dados) => !dados.texto || ehMomentoDeAula(dados.momento), {
-    message: "O texto da justificativa vale apenas para saída durante a aula.",
-    path: ["texto"],
-  })
-  .refine((dados) => !dados.observacao || !ehMomentoDeAula(dados.momento), {
-    message: "A observação vale para intervalos e almoço; na aula, use o texto.",
-    path: ["observacao"],
-  });
+      .refine((codigo) => ehResponsavelLiberacao(codigo), "Escolha quem liberou o estudante."),
+  ),
+});
 
 export interface FiltrosSaidas {
   dia?: string;
@@ -70,10 +62,11 @@ interface LinhaSaida {
   alunoId: string;
   dia: Date;
   momento: string;
-  justificativa: string;
+  justificativa: string | null;
   observacao: string | null;
   texto: string | null;
   liberadoPorId: string | null;
+  liberadoPorCodigo: string | null;
   criadoEm: Date;
   liberadoPor: { nome: string } | null;
 }
@@ -88,7 +81,9 @@ function paraSaida(linha: LinhaSaida): SaidaAntecipada {
     observacao: linha.observacao,
     texto: linha.texto,
     liberadoPorId: linha.liberadoPorId,
-    liberadoPorNome: linha.liberadoPor?.nome ?? null,
+    liberadoPorCodigo: linha.liberadoPorCodigo,
+    liberadoPorNome:
+      rotuloResponsavelLiberacao(linha.liberadoPorCodigo) || linha.liberadoPor?.nome || null,
     criadoEm: linha.criadoEm.toISOString(),
   };
 }
@@ -112,9 +107,9 @@ export async function listarSaidas(filtros: FiltrosSaidas = {}): Promise<SaidaAn
 }
 
 /**
- * Registra a saída de um aluno. O responsável padrão é quem está usando o
- * aplicativo; outra pessoa da equipe ativa pode ser escolhida. Uma saída
- * por aluno e dia, com remoção para correção.
+ * Registra a saída de um aluno. A justificativa é um tipo do catálogo ou
+ * um texto curto, e quem libera é um dos três nomes fixos da escola. Uma
+ * saída por aluno e dia, com remoção para correção.
  */
 export async function criarSaida(
   identidade: Identidade,
@@ -124,21 +119,24 @@ export async function criarSaida(
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  const { alunoId, dia, momento, justificativa } = dados.data;
-  const duranteAula = ehMomentoDeAula(momento);
+  const { alunoId, dia, momento } = dados.data;
+  const campos = camposJustificativaSaida(momento, dados.data);
+  if (!campos.ok) throw new ErroHttp(campos.mensagem, 400);
   if (dia > diaLocal(new Date(), ambiente.fuso)) {
     throw new ErroHttp("Não é possível registrar saída em dia futuro.", 400);
   }
   // O catálogo de justificativas vem do banco e pode ser editado na Gestão.
-  const justificativaNoCatalogo = await banco().justificativa.findFirst({
-    where: { codigo: justificativa },
-    select: { id: true },
-  });
-  if (!justificativaNoCatalogo) {
-    throw new ErroHttp(
-      `A justificativa ${justificativa} não está no catálogo. Atualize a página e confira.`,
-      400,
-    );
+  if (campos.campos.justificativa) {
+    const justificativaNoCatalogo = await banco().justificativa.findFirst({
+      where: { codigo: campos.campos.justificativa },
+      select: { id: true },
+    });
+    if (!justificativaNoCatalogo) {
+      throw new ErroHttp(
+        `A justificativa ${campos.campos.justificativa} não está no catálogo. Atualize a página e confira.`,
+        400,
+      );
+    }
   }
   const aluno = await banco().aluno.findUnique({ where: { id: alunoId } });
   if (!aluno) throw new ErroHttp("Aluno não encontrado.", 404);
@@ -149,19 +147,6 @@ export async function criarSaida(
     );
   }
 
-  const liberadoPorId = dados.data.liberadoPorId ?? identidade.id;
-  const responsavel = await banco().usuario.findFirst({
-    where: {
-      id: liberadoPorId,
-      ativo: true,
-      papel: { in: ["ADMIN", "COORDENACAO"] },
-    },
-    select: { id: true },
-  });
-  if (!responsavel) {
-    throw new ErroHttp("Escolha um responsável pela liberação da equipe.", 400);
-  }
-
   try {
     return await comTransacao(async (tx) => {
       const criada = await tx.saidaAntecipada.create({
@@ -169,13 +154,10 @@ export async function criarSaida(
           alunoId,
           dia: new Date(`${dia}T12:00:00Z`),
           momento,
-          justificativa,
-          observacao:
-            !duranteAula && justificativa === JUSTIFICATIVA_OUTROS
-              ? (dados.data.observacao ?? null)
-              : null,
-          texto: duranteAula && dados.data.texto ? dados.data.texto : null,
-          liberadoPorId,
+          justificativa: campos.campos.justificativa,
+          observacao: campos.campos.observacao,
+          texto: campos.campos.texto,
+          liberadoPorCodigo: dados.data.liberadoPorCodigo,
           criadoPorId: identidade.id,
         },
         ...COMPLEMENTO,

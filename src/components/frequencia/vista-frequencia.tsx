@@ -45,6 +45,7 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Input } from "@/components/ui/input";
+import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import {
@@ -810,20 +811,17 @@ export default function VistaFrequencia({
                                 : ""}
                             </span>
                           </span>
-                          <span className="text-muted-foreground shrink-0 text-right text-xs">
+                          <span className="flex shrink-0 flex-col items-end gap-1">
                             {acumulado ? (
                               <>
-                                <span className="text-falta-texto numerais-tabulares">
-                                  {acumulado.faltas} F
-                                </span>
-                                {" · "}
-                                <span className="text-primary numerais-tabulares">
-                                  {acumulado.faltasJustificadas} FJ
-                                </span>
-                                <span className="block">acumulado</span>
+                                <CirculosAcumulado
+                                  faltas={acumulado.faltas}
+                                  justificadas={acumulado.faltasJustificadas}
+                                />
+                                <span className="text-muted-foreground text-xs">acumulado</span>
                               </>
                             ) : (
-                              "sem acumulado"
+                              <span className="text-muted-foreground text-xs">sem acumulado</span>
                             )}
                           </span>
                         </li>
@@ -912,6 +910,9 @@ export default function VistaFrequencia({
                   const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
                   const codigo = justificativas.get(aluno.id) ?? "";
                   const acumulado = acumuladoDe(aluno.id);
+                  const temAcumulado = Boolean(
+                    acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
+                  );
                   return (
                     <li
                       key={aluno.id}
@@ -922,11 +923,15 @@ export default function VistaFrequencia({
                           type="button"
                           aria-pressed={faltando}
                           disabled={bloqueado}
-                          aria-label={
+                          aria-label={`${aluno.nome}: ${
                             faltando
-                              ? `${aluno.nome}: falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
-                              : `${aluno.nome}: presente. Toque para marcar falta.`
-                          }
+                              ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                              : "presente. Toque para marcar falta."
+                          }${
+                            temAcumulado && acumulado
+                              ? ` ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
+                              : ""
+                          }`}
                           onClick={() => alternarFalta(aluno.id)}
                           className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
                             faltando ? "" : "hover:bg-secondary/60"
@@ -945,10 +950,13 @@ export default function VistaFrequencia({
                               <span className="text-falta-texto block truncate text-xs">
                                 saiu em parte das aulas
                               </span>
-                            ) : acumulado &&
-                              (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0) ? (
-                              <span className="text-muted-foreground block truncate text-xs">
-                                Acumulado: {acumulado.faltas} F · {acumulado.faltasJustificadas} FJ
+                            ) : temAcumulado && acumulado ? (
+                              <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                <span className="text-muted-foreground text-xs">Acumulado</span>
+                                <CirculosAcumulado
+                                  faltas={acumulado.faltas}
+                                  justificadas={acumulado.faltasJustificadas}
+                                />
                               </span>
                             ) : null}
                             {aluno.turmaOriginalId !== aluno.turmaId && (

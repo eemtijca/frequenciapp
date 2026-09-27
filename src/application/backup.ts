@@ -5,7 +5,12 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { ehDiaValido, ehMomentoValido, ordenarJustificativas } from "@/domain/frequencia";
+import {
+  ehDiaValido,
+  ehMomentoValido,
+  ehResponsavelLiberacao,
+  ordenarJustificativas,
+} from "@/domain/frequencia";
 import { lerConfiguracoes } from "@/application/configuracoes";
 
 export const FORMATO_COPIA = "frequenciapp";
@@ -90,10 +95,11 @@ const esquemaCopia = z.object({
           .trim()
           .max(20)
           .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-        justificativa,
+        justificativa: z.string().trim().min(1).max(10).nullish(),
         observacao: z.string().trim().max(200).nullish(),
         texto: z.string().trim().max(100).nullish(),
         liberadoPorId: uuid.nullish(),
+        liberadoPorCodigo: z.string().trim().max(20).nullish(),
       }),
     )
     .max(50000),
@@ -203,6 +209,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
           observacao: true,
           texto: true,
           liberadoPorId: true,
+          liberadoPorCodigo: true,
         },
       }),
       banco().justificativa.findMany({
@@ -488,20 +495,41 @@ export async function importarCopia(
 
     // Saídas
     for (const saida of copia.saidas) {
-      if (!idsAlunos.has(saida.alunoId) || !codigosDeJustificativa.has(saida.justificativa)) {
+      const codigo = saida.justificativa ?? null;
+      const texto = saida.texto?.trim() ? saida.texto.trim() : null;
+      const codigoLiberacao =
+        saida.liberadoPorCodigo && ehResponsavelLiberacao(saida.liberadoPorCodigo)
+          ? saida.liberadoPorCodigo
+          : null;
+      const codigoLiberacaoInvalido = Boolean(saida.liberadoPorCodigo) && codigoLiberacao === null;
+      if (
+        !idsAlunos.has(saida.alunoId) ||
+        codigoLiberacaoInvalido ||
+        (codigo !== null && !codigosDeJustificativa.has(codigo)) ||
+        (codigo === null && !texto)
+      ) {
         resultado.conflitos += 1;
         continue;
       }
       const diaRepositorio = new Date(`${saida.dia}T12:00:00Z`);
       const atual = await tx.saidaAntecipada.findUnique({
         where: { alunoId_dia: { alunoId: saida.alunoId, dia: diaRepositorio } },
-        select: { id: true, momento: true, justificativa: true, observacao: true },
+        select: {
+          id: true,
+          momento: true,
+          justificativa: true,
+          observacao: true,
+          texto: true,
+          liberadoPorCodigo: true,
+        },
       });
       if (atual) {
         const igual =
           atual.momento === saida.momento &&
-          atual.justificativa === saida.justificativa &&
-          (atual.observacao ?? null) === (saida.observacao ?? null);
+          atual.justificativa === codigo &&
+          (atual.observacao ?? null) === (saida.observacao ?? null) &&
+          (atual.texto ?? null) === texto &&
+          (atual.liberadoPorCodigo ?? null) === codigoLiberacao;
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
         continue;
@@ -511,13 +539,14 @@ export async function importarCopia(
           alunoId: saida.alunoId,
           dia: diaRepositorio,
           momento: saida.momento,
-          justificativa: saida.justificativa,
+          justificativa: codigo,
           observacao: saida.observacao ?? null,
-          texto: saida.texto ?? null,
+          texto,
           liberadoPorId:
             saida.liberadoPorId && idsUsuarios.has(saida.liberadoPorId)
               ? saida.liberadoPorId
               : null,
+          liberadoPorCodigo: codigoLiberacao,
           criadoPorId: admin.id,
         },
       });

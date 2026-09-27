@@ -94,22 +94,23 @@ A unicidade de (turma, dia) faz o banco rejeitar duplicatas: existe **uma frequ�
 | justificativa | texto | Código do catálogo; nulo quando a falta é simples.            |
 | observacao    | texto | Observação opcional, usada principalmente no código "Outros". |
 
-A presença não gera linha: quem não tem falta na frequência do dia esteve presente na aula. Uma frequência salva sem faltas significa todos presentes, que é o caso comum. A falta com justificativa vira **FJ**; sem justificativa permanece **F**. No modo por aula, o aluno que sai no meio do dia fica com falta apenas nas aulas que perdeu, e a marca vira **S** quando a falta cobre parte das aulas. O catálogo de justificativas vem da tabela `justificativas`, é editável na Gestão e vale para a falta e para a saída; o código é estável e o rótulo pode mudar.
+A presença não gera linha: quem não tem falta na frequência do dia esteve presente na aula. Uma frequência salva sem faltas significa todos presentes, que é o caso comum. A falta com justificativa vira **FJ**; sem justificativa permanece **F**. No modo por aula, o aluno que sai no meio do dia fica com falta apenas nas aulas que perdeu, e a marca vira **S** quando a falta cobre parte das aulas. O catálogo de justificativas vem da tabela `justificativas`, é editável na Gestão e vale para a falta e para a saída; o código é estável e o rótulo pode mudar. A saída também pode guardar a justificativa em texto livre, sem código.
 
 ## Saída antecipada (saida_antecipada)
 
-| Campo         | Tipo  | Observação                                                    |
-| ------------- | ----- | ------------------------------------------------------------- |
-| id            | uuid  | Gerado pelo banco.                                            |
-| alunoId       | uuid  | Aluno que saiu; cascata na exclusão do aluno.                 |
-| dia           | date  | Dia civil da saída.                                           |
-| momento       | texto | Código do momento: aulas, intervalos e almoço.                |
-| justificativa | texto | Código do catálogo, obrigatório.                              |
-| observacao    | texto | Observação opcional de intervalos e almoço.                   |
-| texto         | texto | Texto opcional de até 100 caracteres da saída durante a aula. |
-| liberadoPorId | uuid  | Quem liberou; anulável quando a conta é excluída.             |
-| criadoPorId   | uuid  | Quem registrou; anulável.                                     |
-| criadoEm      | data  | Momento do registro.                                          |
+| Campo             | Tipo  | Observação                                                                            |
+| ----------------- | ----- | ------------------------------------------------------------------------------------- |
+| id                | uuid  | Gerado pelo banco.                                                                    |
+| alunoId           | uuid  | Aluno que saiu; cascata na exclusão do aluno.                                         |
+| dia               | date  | Dia civil da saída.                                                                   |
+| momento           | texto | Código do momento: aulas, intervalos e almoço.                                        |
+| justificativa     | texto | Código do catálogo; nulo quando a justificativa foi escrita.                          |
+| observacao        | texto | Observação opcional de intervalos e almoço, no tipo Outros.                           |
+| texto             | texto | Até 100 caracteres. Sem código, é a justificativa. Na aula, pode complementar o tipo. |
+| liberadoPorCodigo | texto | Quem liberou: `adriano`, `adriana` ou `helena`. Nulo no histórico antigo.             |
+| liberadoPorId     | uuid  | Conta da equipe nos registros antigos; anulável.                                      |
+| criadoPorId       | uuid  | Quem registrou; anulável.                                                             |
+| criadoEm          | data  | Momento do registro.                                                                  |
 
 A unicidade de (aluno, dia) impede dois registros no mesmo dia; a correção é remover o registro com auditoria. A saída não altera a presença nem a falta do dia: é uma informação separada, usada nos relatórios e nos indicadores.
 

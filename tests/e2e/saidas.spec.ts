@@ -26,6 +26,8 @@ test.describe("saída durante a aula", () => {
     await page.getByRole("option", { name: "1ª aula" }).click();
     await page.locator("#saida-justificativa").click();
     await page.getByRole("option", { name: "D · Doente" }).click();
+    await page.locator("#saida-responsavel").click();
+    await page.getByRole("option", { name: "Diretor Adriano" }).click();
 
     const campoTexto = page.locator("#saida-texto");
     await expect(campoTexto).toBeVisible();
@@ -35,5 +37,28 @@ test.describe("saída durante a aula", () => {
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
     await expect(page.getByText("Saiu para a coordenação").first()).toBeVisible();
+    await expect(page.getByText("Liberado por Diretor Adriano").first()).toBeVisible();
+  });
+
+  test("registra a justificativa escrita e a coordenadora que liberou", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Saídas", "saidas");
+
+    await page.locator("#saida-turma").click();
+    await page.getByRole("option", { name: "E2E Ano A" }).click();
+    await page.locator("#saida-aluno").click();
+    await page.getByRole("option", { name: /E2E Aluno Dois/ }).click();
+    await page.locator("#saida-momento").click();
+    await page.getByRole("option", { name: "1º intervalo" }).click();
+    await page.getByRole("radio", { name: "Escrever em poucas palavras" }).click();
+    await page.locator("#saida-texto").fill("Foi buscar o irmão");
+    await page.locator("#saida-responsavel").click();
+    await page.getByRole("option", { name: "Coordenadora Adriana" }).click();
+    await page.getByRole("button", { name: "Registrar saída" }).click();
+    await expect(page.getByText("Saída registrada.")).toBeVisible();
+    await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
+    await expect(page.getByText("Foi buscar o irmão").first()).toBeVisible();
+    await expect(page.getByText("Liberado por Coordenadora Adriana").first()).toBeVisible();
   });
 });

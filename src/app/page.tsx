@@ -5,7 +5,6 @@ import { listarSeries } from "@/application/series";
 import { listarFrequenciasDoMes, resumoAcumulado } from "@/application/frequencias";
 import { listarSaidas } from "@/application/saidas";
 import { listarJustificativas } from "@/application/justificativas";
-import { listarResponsaveis } from "@/application/usuarios";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { ambiente } from "@/infra/ambiente";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
@@ -27,27 +26,17 @@ export default async function Pagina({
   const dia = diaLocal(new Date(), ambiente.fuso);
   const mes = dia.slice(0, 7);
   const dias = diasDoMes(mes);
-  const [
-    turmas,
-    series,
-    alunos,
-    frequencias,
-    saidas,
-    justificativas,
-    responsaveis,
-    configuracoes,
-    resumo,
-  ] = await Promise.all([
-    listarTodasTurmas(),
-    listarSeries(),
-    listarTodosAlunos(),
-    listarFrequenciasDoMes(mes),
-    listarSaidas({ de: dias[0] ?? `${mes}-01`, ate: dias[dias.length - 1] ?? `${mes}-28` }),
-    listarJustificativas(),
-    listarResponsaveis(),
-    lerConfiguracoes(),
-    resumoAcumulado(dia),
-  ]);
+  const [turmas, series, alunos, frequencias, saidas, justificativas, configuracoes, resumo] =
+    await Promise.all([
+      listarTodasTurmas(),
+      listarSeries(),
+      listarTodosAlunos(),
+      listarFrequenciasDoMes(mes),
+      listarSaidas({ de: dias[0] ?? `${mes}-01`, ate: dias[dias.length - 1] ?? `${mes}-28` }),
+      listarJustificativas(),
+      lerConfiguracoes(),
+      resumoAcumulado(dia),
+    ]);
   return (
     <Aplicacao
       usuario={usuario}
@@ -60,7 +49,6 @@ export default async function Pagina({
       frequenciasIniciais={frequencias}
       saidasIniciais={saidas}
       justificativasIniciais={justificativas}
-      responsaveisIniciais={responsaveis}
       configuracoesIniciais={configuracoes}
       resumoInicial={resumo}
     />

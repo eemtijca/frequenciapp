@@ -981,7 +981,7 @@ describe("chamada com justificativa, período e acumulado", () => {
 });
 
 describe("saídas antecipadas", () => {
-  it("coordenação registra a saída com responsável padrão", async () => {
+  it("coordenação registra a saída com quem liberou", async () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
@@ -990,14 +990,22 @@ describe("saídas antecipadas", () => {
         momento: "aula_2",
         justificativa: "CM",
         observacao: null,
+        liberadoPorCodigo: "adriano",
       }),
     });
     expect(resposta.status).toBe(201);
     const dados = (await resposta.json()) as {
-      saida: { id: string; alunoId: string; momento: string; liberadoPorNome: string | null };
+      saida: {
+        id: string;
+        alunoId: string;
+        momento: string;
+        liberadoPorCodigo: string | null;
+        liberadoPorNome: string | null;
+      };
     };
     expect(dados.saida.momento).toBe("aula_2");
-    expect(dados.saida.liberadoPorNome).toBe("Demo");
+    expect(dados.saida.liberadoPorCodigo).toBe("adriano");
+    expect(dados.saida.liberadoPorNome).toBe("Diretor Adriano");
     saidaQA = { id: dados.saida.id, alunoId: dados.saida.alunoId, momento: dados.saida.momento };
   });
 
@@ -1009,6 +1017,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_4,
         momento: "aula_3",
         justificativa: "D",
+        liberadoPorCodigo: "adriana",
       }),
     });
     expect(resposta.status).toBe(409);
@@ -1024,6 +1033,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_5,
         momento: "madrugada",
         justificativa: "D",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(momento.status).toBe(400);
@@ -1034,6 +1044,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_5,
         momento: "aula_1",
         justificativa: "X",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(justificativa.status).toBe(400);
@@ -1044,6 +1055,7 @@ describe("saídas antecipadas", () => {
         dia: "2099-06-15",
         momento: "aula_1",
         justificativa: "D",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(futuro.status).toBe(400);
@@ -1083,6 +1095,7 @@ describe("saídas antecipadas", () => {
         momento: "intervalo_1",
         justificativa: "D",
         texto: "Saiu para beber água",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(foraDeAula.status).toBe(400);
@@ -1095,6 +1108,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "D",
         texto: "a".repeat(101),
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(longo.status).toBe(400);
@@ -1108,6 +1122,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "O",
         observacao: "Na aula use o texto",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(observacao.status).toBe(400);
@@ -1122,6 +1137,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "D",
         texto: "Saiu para a coordenação",
+        liberadoPorCodigo: "adriana",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1148,6 +1164,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_4,
         momento: "aula_3",
         justificativa: "O",
+        liberadoPorCodigo: "adriano",
       }),
     });
     expect(semTexto.status).toBe(201);
@@ -1157,12 +1174,62 @@ describe("saídas antecipadas", () => {
     const copia = await autenticado(cookieAdmin, "/api/backup");
     expect(copia.status).toBe(200);
     const documento = (await copia.json()) as {
-      saidas: { id: string; texto?: string | null }[];
+      saidas: { id: string; texto?: string | null; liberadoPorCodigo?: string | null }[];
     };
     const naCopia = documento.saidas.find((item) => item.id === criada.saida.id);
     expect(naCopia?.texto ?? null).toBeNull();
+    expect(naCopia?.liberadoPorCodigo).toBe("adriano");
 
     await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+  });
+
+  it("registra justificativa escrita e recusa responsável fora da lista", async () => {
+    const escrita = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE,
+        momento: "intervalo_1",
+        texto: "Foi buscar o irmão",
+        liberadoPorCodigo: "helena",
+      }),
+    });
+    expect(escrita.status).toBe(201);
+    const criada = (await escrita.json()) as {
+      saida: {
+        id: string;
+        justificativa: string | null;
+        texto: string | null;
+        liberadoPorNome: string | null;
+      };
+    };
+    expect(criada.saida.justificativa).toBeNull();
+    expect(criada.saida.texto).toBe("Foi buscar o irmão");
+    expect(criada.saida.liberadoPorNome).toBe("Coordenadora Helena");
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+
+    const semMotivo = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE,
+        momento: "aula_1",
+        liberadoPorCodigo: "adriano",
+      }),
+    });
+    expect(semMotivo.status).toBe(400);
+
+    const foraDaLista = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE,
+        momento: "aula_1",
+        texto: "Consulta",
+        liberadoPorCodigo: "demo",
+      }),
+    });
+    expect(foraDaLista.status).toBe(400);
   });
 });
 
@@ -1359,6 +1426,7 @@ describe("catálogo de justificativas", () => {
         dia: DIA_TESTE_5,
         momento: "aula_1",
         justificativa: "ZZZ",
+        liberadoPorCodigo: "helena",
       }),
     });
     expect(saida.status).toBe(400);
