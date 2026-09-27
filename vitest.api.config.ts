@@ -12,6 +12,9 @@ export default defineConfig({
     include: ["tests/api/**/*.test.ts"],
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Um banco compartilhado: arquivos em paralelo disputam transações
+    // serializáveis e a massa de teste. A suíte roda em série.
+    fileParallelism: false,
   },
   resolve: {
     alias: {
