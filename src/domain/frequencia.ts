@@ -15,6 +15,17 @@ export interface JustificativaConfigurada extends Justificativa {
   ativo: boolean;
 }
 
+/** Pessoa do catálogo de quem libera a saída, com código estável e rótulo. */
+export interface Liberador {
+  codigo: string;
+  rotulo: string;
+}
+
+/** Liberador com a situação, como o catálogo é lido da Gestão. */
+export interface LiberadorConfigurado extends Liberador {
+  ativo: boolean;
+}
+
 /**
  * Catálogo inicial de justificativas. É o mesmo que a migração e a semente
  * gravam; o catálogo em uso vem do banco e pode ser editado na Gestão.
@@ -37,8 +48,10 @@ export const JUSTIFICATIVAS_PADRAO: readonly Justificativa[] = [
 /** Código que aceita observação escrita. */
 export const JUSTIFICATIVA_OUTROS = "O";
 
-/** Ordena o catálogo pelo rótulo, em português e sem diferenciar caixa. */
-export function ordenarJustificativas<T extends Justificativa>(catalogo: readonly T[]): T[] {
+/** Ordena um catálogo pelo rótulo, em português e sem diferenciar caixa. */
+export function ordenarPorRotulo<T extends { codigo: string; rotulo: string }>(
+  catalogo: readonly T[],
+): T[] {
   return catalogo
     .slice()
     .sort(
@@ -68,18 +81,6 @@ export const MOMENTOS_SAIDA: readonly MomentoSaida[] = [
 /** Limite do texto livre da justificativa de saída, em poucas palavras. */
 export const LIMITE_TEXTO_SAIDA = 100;
 
-/**
- * Quem pode liberar o estudante. A lista é fixa da escola e não depende
- * das contas do aplicativo.
- */
-export const RESPONSAVEIS_LIBERACAO = [
-  { codigo: "adriano", rotulo: "Diretor Adriano" },
-  { codigo: "adriana", rotulo: "Coordenadora Adriana" },
-  { codigo: "helena", rotulo: "Coordenadora Helena" },
-] as const;
-
-export type CodigoResponsavelLiberacao = (typeof RESPONSAVEIS_LIBERACAO)[number]["codigo"];
-
 /** Rótulo de uma justificativa no catálogo, ou texto vazio quando não existe. */
 export function rotuloJustificativa(
   codigo: string | null | undefined,
@@ -103,14 +104,9 @@ export function partesJustificativaSaida(
   return { motivo: saida.texto ?? "", complemento: null };
 }
 
-/** Verdadeiro quando o código é um dos responsáveis fixos pela liberação. */
-export function ehResponsavelLiberacao(codigo: string): codigo is CodigoResponsavelLiberacao {
-  return RESPONSAVEIS_LIBERACAO.some((item) => item.codigo === codigo);
-}
-
-/** Rótulo de quem liberou, ou texto vazio quando o código não é da lista. */
-export function rotuloResponsavelLiberacao(codigo: string | null | undefined): string {
-  return RESPONSAVEIS_LIBERACAO.find((item) => item.codigo === codigo)?.rotulo ?? "";
+/** Verdadeiro quando o código existe no catálogo de quem libera. */
+export function ehLiberadorValido(codigo: string, catalogo: readonly Liberador[]): boolean {
+  return catalogo.some((item) => item.codigo === codigo);
 }
 
 export interface CamposJustificativaSaida {

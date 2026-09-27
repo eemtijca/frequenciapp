@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ehJustificativaValida,
   JUSTIFICATIVAS_PADRAO,
-  ordenarJustificativas,
+  ordenarPorRotulo,
   rotuloJustificativa,
   type Justificativa,
 } from "@/domain/frequencia";
@@ -15,14 +15,14 @@ const catalogoCustom: Justificativa[] = [
   { codigo: "C", rotulo: "Consulta" },
 ];
 
-describe("ordenarJustificativas", () => {
+describe("ordenarPorRotulo", () => {
   it("ordena pelo rótulo em português, sem diferenciar caixa", () => {
-    const ordenado = ordenarJustificativas(catalogoCustom).map((item) => item.rotulo);
+    const ordenado = ordenarPorRotulo(catalogoCustom).map((item) => item.rotulo);
     expect(ordenado).toEqual(["Água", "Consulta", "Doente", "Zelo"]);
   });
   it("não altera a lista original", () => {
     const copia = [...catalogoCustom];
-    ordenarJustificativas(catalogoCustom);
+    ordenarPorRotulo(catalogoCustom);
     expect(catalogoCustom).toEqual(copia);
   });
 });

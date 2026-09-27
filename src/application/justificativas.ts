@@ -6,7 +6,7 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp, ehDuplicidade } from "@/infra/erros";
-import { ordenarJustificativas, type JustificativaConfigurada } from "@/domain/frequencia";
+import { ordenarPorRotulo, type JustificativaConfigurada } from "@/domain/frequencia";
 
 const codigoJustificativa = z
   .string()
@@ -50,7 +50,7 @@ const CAMPOS = { codigo: true, rotulo: true, ativo: true } as const;
 /** Catálogo completo, em ordem alfabética pelo rótulo. */
 export async function listarJustificativas(): Promise<JustificativaConfigurada[]> {
   const linhas = await banco().justificativa.findMany({ select: CAMPOS });
-  return ordenarJustificativas(linhas);
+  return ordenarPorRotulo(linhas);
 }
 
 /** Busca uma justificativa pelo código, sem diferenciar caixa. */

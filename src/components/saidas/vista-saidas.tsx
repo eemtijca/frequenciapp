@@ -16,7 +16,13 @@ import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import type { Aluno, JustificativaConfigurada, SaidaAntecipada, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  JustificativaConfigurada,
+  LiberadorConfigurado,
+  SaidaAntecipada,
+  Turma,
+} from "@/domain/frequencia";
 import {
   diaDaSemanaIso,
   diaSeguinte,
@@ -27,7 +33,6 @@ import {
   MOMENTOS_SAIDA,
   normalizar,
   partesJustificativaSaida,
-  RESPONSAVEIS_LIBERACAO,
   rotuloDiaSemana,
   rotuloMomento,
 } from "@/domain/frequencia";
@@ -60,6 +65,7 @@ interface Props {
   turmas: Turma[];
   alunos: Aluno[];
   catalogoJustificativas: JustificativaConfigurada[];
+  liberadores: LiberadorConfigurado[];
   saidas: SaidaAntecipada[];
   onSaidasMudaram: (mes: string) => Promise<void>;
   /** A vista é aquecida em segundo plano; só busca o estado quando visível. */
@@ -75,6 +81,7 @@ export default function VistaSaidas({
   turmas,
   alunos,
   catalogoJustificativas,
+  liberadores,
   saidas,
   onSaidasMudaram,
   ativo,
@@ -142,6 +149,14 @@ export default function VistaSaidas({
         .filter((item) => item.ativo)
         .map((item) => ({ valor: item.codigo, rotulo: `${item.codigo} · ${item.rotulo}` })),
     [catalogoJustificativas],
+  );
+
+  const opcoesLiberador = useMemo(
+    () =>
+      liberadores
+        .filter((item) => item.ativo)
+        .map((item) => ({ valor: item.codigo, rotulo: item.rotulo })),
+    [liberadores],
   );
 
   const alunosPorId = useMemo(() => new Map(alunos.map((aluno) => [aluno.id, aluno])), [alunos]);
@@ -551,10 +566,7 @@ export default function VistaSaidas({
             value={responsavelCodigo}
             onValueChange={setResponsavelCodigo}
             placeholder="Selecione quem liberou"
-            opcoes={RESPONSAVEIS_LIBERACAO.map((responsavel) => ({
-              valor: responsavel.codigo,
-              rotulo: responsavel.rotulo,
-            }))}
+            opcoes={opcoesLiberador}
           />
         </div>
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}

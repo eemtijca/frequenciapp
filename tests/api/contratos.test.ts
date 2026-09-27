@@ -1442,12 +1442,138 @@ describe("catálogo de justificativas", () => {
     expect(semUso.status).toBe(200);
   });
 
-  it("a cópia de segurança inclui o catálogo", async () => {
+  it("a cópia de segurança inclui os catálogos", async () => {
     const resposta = await autenticado(cookieAdmin, "/api/backup");
     expect(resposta.status).toBe(200);
-    const copia = (await resposta.json()) as { justificativas?: unknown[] };
+    const copia = (await resposta.json()) as {
+      justificativas?: unknown[];
+      liberadores?: unknown[];
+    };
     expect(Array.isArray(copia.justificativas)).toBe(true);
     expect(copia.justificativas?.length ?? 0).toBeGreaterThanOrEqual(12);
+    expect(copia.liberadores?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("catálogo de quem libera as saídas", () => {
+  it("coordenação lê o catálogo em ordem alfabética", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/liberadores");
+    expect(resposta.status).toBe(200);
+    const dados = (await resposta.json()) as {
+      liberadores: { codigo: string; rotulo: string; ativo: boolean }[];
+    };
+    expect(dados.liberadores.length).toBeGreaterThanOrEqual(3);
+    const rotulos = dados.liberadores.map((item) => item.rotulo);
+    const ordenados = [...rotulos].sort((a, b) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
+    );
+    expect(rotulos).toEqual(ordenados);
+    expect(dados.liberadores.find((item) => item.codigo === "adriano")?.rotulo).toBe(
+      "Diretor Adriano",
+    );
+  });
+
+  it("coordenação não cria, edita nem exclui", async () => {
+    const criar = await autenticado(cookieCoord, "/api/liberadores", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QAL", rotulo: "QA Liberador" }),
+    });
+    expect(criar.status).toBe(403);
+    const editar = await autenticado(cookieCoord, "/api/liberadores/adriano", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "Outro" }),
+    });
+    expect(editar.status).toBe(403);
+    const excluir = await autenticado(cookieCoord, "/api/liberadores/QAL", {
+      method: "DELETE",
+    });
+    expect(excluir.status).toBe(403);
+  });
+
+  it("administração cria e recusa duplicata e dados inválidos", async () => {
+    const criar = await autenticado(cookieAdmin, "/api/liberadores", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QAL", rotulo: "QA Liberador" }),
+    });
+    expect(criar.status).toBe(201);
+    const dados = (await criar.json()) as { liberador: { codigo: string; ativo: boolean } };
+    expect(dados.liberador.codigo).toBe("QAL");
+    expect(dados.liberador.ativo).toBe(true);
+
+    const duplicado = await autenticado(cookieAdmin, "/api/liberadores", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "qal", rotulo: "Outro" }),
+    });
+    expect(duplicado.status).toBe(409);
+
+    const codigoInvalido = await autenticado(cookieAdmin, "/api/liberadores", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "1x", rotulo: "Inválido" }),
+    });
+    expect(codigoInvalido.status).toBe(400);
+
+    const rotuloCurto = await autenticado(cookieAdmin, "/api/liberadores", {
+      method: "POST",
+      body: JSON.stringify({ codigo: "QQ", rotulo: "a" }),
+    });
+    expect(rotuloCurto.status).toBe(400);
+  });
+
+  it("administração edita o rótulo e alterna a situação", async () => {
+    const editar = await autenticado(cookieAdmin, "/api/liberadores/QAL", {
+      method: "PATCH",
+      body: JSON.stringify({ rotulo: "QA Porteiro" }),
+    });
+    expect(editar.status).toBe(200);
+    const dadosEditar = (await editar.json()) as { liberador: { rotulo: string } };
+    expect(dadosEditar.liberador.rotulo).toBe("QA Porteiro");
+
+    const desativar = await autenticado(cookieAdmin, "/api/liberadores/QAL", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: false }),
+    });
+    expect(desativar.status).toBe(200);
+    expect(((await desativar.json()) as { liberador: { ativo: boolean } }).liberador.ativo).toBe(
+      false,
+    );
+
+    const reativar = await autenticado(cookieAdmin, "/api/liberadores/QAL", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+    expect(reativar.status).toBe(200);
+
+    const inexistente = await autenticado(cookieAdmin, "/api/liberadores/ZZ", {
+      method: "PATCH",
+      body: JSON.stringify({ ativo: true }),
+    });
+    expect(inexistente.status).toBe(404);
+  });
+
+  it("exclusão bloqueada em uso e permitida sem histórico", async () => {
+    const saida = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        alunoId: alunoQA?.id,
+        dia: DIA_TESTE_2,
+        momento: "aula_1",
+        justificativa: "D",
+        liberadoPorCodigo: "QAL",
+      }),
+    });
+    expect(saida.status).toBe(201);
+    const criada = (await saida.json()) as {
+      saida: { id: string; liberadoPorNome: string | null };
+    };
+    expect(criada.saida.liberadoPorNome).toBe("QA Porteiro");
+
+    const emUso = await autenticado(cookieAdmin, "/api/liberadores/QAL", { method: "DELETE" });
+    expect(emUso.status).toBe(409);
+    expect(((await emUso.json()) as { error: string }).error).toContain("em uso");
+
+    await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
+    const semUso = await autenticado(cookieAdmin, "/api/liberadores/QAL", { method: "DELETE" });
+    expect(semUso.status).toBe(200);
   });
 });
 

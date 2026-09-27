@@ -107,6 +107,7 @@ export async function criarMassaE2E(): Promise<void> {
       "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query("delete from liberadores where codigo like 'E2E%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );
@@ -145,6 +146,7 @@ export async function limparMassaE2E(): Promise<void> {
       "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
+    await cliente.query("delete from liberadores where codigo like 'E2E%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );

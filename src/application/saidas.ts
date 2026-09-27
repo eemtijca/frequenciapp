@@ -1,5 +1,5 @@
 // Saídas antecipadas: registro separado da chamada, com momento,
-// justificativa (tipo ou texto) e um dos responsáveis fixos pela liberação.
+// justificativa (tipo ou texto) e o liberador do catálogo da Gestão.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -10,10 +10,9 @@ import {
   camposJustificativaSaida,
   diaLocal,
   ehDiaValido,
+  ehLiberadorValido,
   ehMomentoValido,
-  ehResponsavelLiberacao,
   LIMITE_TEXTO_SAIDA,
-  rotuloResponsavelLiberacao,
   type SaidaAntecipada,
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
@@ -45,7 +44,8 @@ export const esquemaCriarSaida = z.object({
     z
       .string()
       .trim()
-      .refine((codigo) => ehResponsavelLiberacao(codigo), "Escolha quem liberou o estudante."),
+      .min(1, "Escolha quem liberou o estudante.")
+      .max(20, "Responsável pela liberação inválido."),
   ),
 });
 
@@ -71,7 +71,10 @@ interface LinhaSaida {
   liberadoPor: { nome: string } | null;
 }
 
-function paraSaida(linha: LinhaSaida): SaidaAntecipada {
+function paraSaida(
+  linha: LinhaSaida,
+  rotulosLiberador: ReadonlyMap<string, string>,
+): SaidaAntecipada {
   return {
     id: linha.id,
     alunoId: linha.alunoId,
@@ -83,7 +86,9 @@ function paraSaida(linha: LinhaSaida): SaidaAntecipada {
     liberadoPorId: linha.liberadoPorId,
     liberadoPorCodigo: linha.liberadoPorCodigo,
     liberadoPorNome:
-      rotuloResponsavelLiberacao(linha.liberadoPorCodigo) || linha.liberadoPor?.nome || null,
+      (linha.liberadoPorCodigo ? rotulosLiberador.get(linha.liberadoPorCodigo) : null) ??
+      linha.liberadoPor?.nome ??
+      null,
     criadoEm: linha.criadoEm.toISOString(),
   };
 }
@@ -92,23 +97,27 @@ const COMPLEMENTO = { include: { liberadoPor: { select: { nome: true } } } } as 
 
 /** Saídas por dia, período, aluno ou turma, em ordem cronológica. */
 export async function listarSaidas(filtros: FiltrosSaidas = {}): Promise<SaidaAntecipada[]> {
-  const linhas = await banco().saidaAntecipada.findMany({
-    where: {
-      ...(filtros.dia ? { dia: new Date(`${filtros.dia}T12:00:00Z`) } : {}),
-      ...(filtros.de ? { dia: { gte: new Date(`${filtros.de}T12:00:00Z`) } } : {}),
-      ...(filtros.ate ? { dia: { lte: new Date(`${filtros.ate}T12:00:00Z`) } } : {}),
-      ...(filtros.alunoId ? { alunoId: filtros.alunoId } : {}),
-      ...(filtros.turmaId ? { aluno: { turmaId: filtros.turmaId } } : {}),
-    },
-    orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
-    ...COMPLEMENTO,
-  });
-  return linhas.map(paraSaida);
+  const [linhas, liberadores] = await Promise.all([
+    banco().saidaAntecipada.findMany({
+      where: {
+        ...(filtros.dia ? { dia: new Date(`${filtros.dia}T12:00:00Z`) } : {}),
+        ...(filtros.de ? { dia: { gte: new Date(`${filtros.de}T12:00:00Z`) } } : {}),
+        ...(filtros.ate ? { dia: { lte: new Date(`${filtros.ate}T12:00:00Z`) } } : {}),
+        ...(filtros.alunoId ? { alunoId: filtros.alunoId } : {}),
+        ...(filtros.turmaId ? { aluno: { turmaId: filtros.turmaId } } : {}),
+      },
+      orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
+      ...COMPLEMENTO,
+    }),
+    banco().liberador.findMany({ select: { codigo: true, rotulo: true } }),
+  ]);
+  const rotulosLiberador = new Map(liberadores.map((item) => [item.codigo, item.rotulo]));
+  return linhas.map((linha) => paraSaida(linha, rotulosLiberador));
 }
 
 /**
  * Registra a saída de um aluno. A justificativa é um tipo do catálogo ou
- * um texto curto, e quem libera é um dos três nomes fixos da escola. Uma
+ * um texto curto, e quem libera é uma pessoa do catálogo da Gestão. Uma
  * saída por aluno e dia, com remoção para correção.
  */
 export async function criarSaida(
@@ -146,6 +155,14 @@ export async function criarSaida(
       409,
     );
   }
+  // O catálogo de quem libera vem do banco e pode ser editado na Gestão.
+  const liberadores = await banco().liberador.findMany({
+    select: { codigo: true, rotulo: true },
+  });
+  if (!ehLiberadorValido(dados.data.liberadoPorCodigo, liberadores)) {
+    throw new ErroHttp("Escolha quem liberou o estudante.", 400);
+  }
+  const rotulosLiberador = new Map(liberadores.map((item) => [item.codigo, item.rotulo]));
 
   try {
     return await comTransacao(async (tx) => {
@@ -163,7 +180,7 @@ export async function criarSaida(
         ...COMPLEMENTO,
       });
       await auditar(tx, identidade.id, "saida.criar", `saida:${criada.id}`);
-      return paraSaida(criada);
+      return paraSaida(criada, rotulosLiberador);
     });
   } catch (erro) {
     if (ehDuplicidade(erro)) {

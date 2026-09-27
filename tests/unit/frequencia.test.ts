@@ -12,10 +12,10 @@ import {
   ehHoraValida,
   camposJustificativaSaida,
   ehJustificativaValida,
+  ehLiberadorValido,
   ehMesValido,
   ehMomentoDeAula,
   ehMomentoValido,
-  ehResponsavelLiberacao,
   horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
@@ -30,7 +30,6 @@ import {
   rotuloDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
-  rotuloResponsavelLiberacao,
   rotuloMes,
   rotuloMomento,
   type Aluno,
@@ -482,14 +481,16 @@ describe("justificativa e liberação da saída", () => {
     expect(partes.complemento).toBe("Retorno marcado");
   });
 
-  it("reconhece os três responsáveis pela liberação", () => {
-    expect(ehResponsavelLiberacao("adriano")).toBe(true);
-    expect(ehResponsavelLiberacao("adriana")).toBe(true);
-    expect(ehResponsavelLiberacao("helena")).toBe(true);
-    expect(ehResponsavelLiberacao("demo")).toBe(false);
-    expect(rotuloResponsavelLiberacao("adriana")).toBe("Coordenadora Adriana");
-    expect(rotuloResponsavelLiberacao("helena")).toBe("Coordenadora Helena");
-    expect(rotuloResponsavelLiberacao(null)).toBe("");
+  it("valida o código no catálogo de quem libera", () => {
+    const catalogo = [
+      { codigo: "adriano", rotulo: "Diretor Adriano" },
+      { codigo: "adriana", rotulo: "Coordenadora Adriana" },
+      { codigo: "helena", rotulo: "Coordenadora Helena" },
+    ];
+    expect(ehLiberadorValido("adriano", catalogo)).toBe(true);
+    expect(ehLiberadorValido("helena", catalogo)).toBe(true);
+    expect(ehLiberadorValido("demo", catalogo)).toBe(false);
+    expect(ehLiberadorValido("adriano", [])).toBe(false);
   });
 });
 
