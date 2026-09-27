@@ -284,7 +284,8 @@ export function dataDoRotulo(rotulo: string, anoReferencia: number): string | nu
   return `${String(ano).padStart(4, "0")}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 }
 
-function letraColuna(indice: number): string {
+/** Letra da coluna a partir do índice 1: 1 vira A, 27 vira AA. */
+export function letraColuna(indice: number): string {
   let valor = indice;
   let letra = "";
   while (valor > 0) {

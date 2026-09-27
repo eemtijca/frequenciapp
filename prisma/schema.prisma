@@ -307,6 +307,7 @@ model SincronizacaoPlanilha {
   removidasLinhas  Int                     @default(0) @map("removidas_linhas")
   removidasColunas Int                     @default(0) @map("removidas_colunas")
   alunosCriados    Int                     @default(0) @map("alunos_criados")
+  linhasCriadas    Int                     @default(0) @map("linhas_criadas")
   colunasCriadas   Int                     @default(0) @map("colunas_criadas")
   puladasOcupadas  Int                     @default(0) @map("puladas_ocupadas")
   puladasFormula   Int                     @default(0) @map("puladas_formula")
