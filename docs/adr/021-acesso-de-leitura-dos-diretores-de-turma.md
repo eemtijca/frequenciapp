@@ -2,7 +2,7 @@
 
 ## Status
 
-Aceita. Fases 1 a 4 implementadas, cada uma em pull request próprio; a fase 5 (roteiro de operação) fecha o ciclo.
+Aceita e implementada nas cinco fases, cada uma em pull request próprio. O roteiro de operação está em [operacao.md](../operacao.md#diretores-de-turma).
 
 ## Contexto
 

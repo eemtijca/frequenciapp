@@ -4,17 +4,19 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 
 ## Dados tratados
 
-| Dado                                                   | Finalidade                                                        | Retenção                                                                            |
-| ------------------------------------------------------ | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Nome do aluno                                          | Identificar o aluno na chamada e nos relatórios.                  | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
-| Turma atual e de origem                                | Organizar chamadas e a consulta agrupada.                         | Idem.                                                                               |
-| Registro de faltas por dia (e por aula, quando ligado) | Registrar a chamada, finalidade do sistema.                       | Idem, junto com as chamadas.                                                        |
-| Saída antecipada: momento, justificativa e observação  | Registrar quem saiu antes do fim do dia e por quê.                | Idem, junto com as saídas; quem liberou sai do catálogo de pessoas da escola.       |
-| E-mail e hash de senha da equipe                       | Autenticar o acesso pessoal.                                      | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
-| Nome da administração e da coordenação                 | Tratamento e saudação; identificação da equipe.                   | Conta ativa.                                                                        |
-| Trilha de auditoria (quem, o quê, quando)              | Prestar contas de ações administrativas.                          | Conforme política da escola; sem dados de alunos.                                   |
-| Frequência enviada à planilha da escola                | Reorganizar por turma de origem, quando a integração está ligada. | Na planilha da própria escola, sob controle dela.                                   |
-| Saídas enviadas à planilha da escola                   | Registrar as saídas antecipadas em outra planilha, quando ligada. | Idem, com justificativa e observação sob controle da escola.                        |
+| Dado                                                      | Finalidade                                                        | Retenção                                                                            |
+| --------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Nome do aluno                                             | Identificar o aluno na chamada e nos relatórios.                  | Enquanto a escola mantiver o cadastro; exclusão a pedido.                           |
+| Turma atual e de origem                                   | Organizar chamadas e a consulta agrupada.                         | Idem.                                                                               |
+| Registro de faltas por dia (e por aula, quando ligado)    | Registrar a chamada, finalidade do sistema.                       | Idem, junto com as chamadas.                                                        |
+| Saída antecipada: momento, justificativa e observação     | Registrar quem saiu antes do fim do dia e por quê.                | Idem, junto com as saídas; quem liberou sai do catálogo de pessoas da escola.       |
+| E-mail e hash de senha da equipe                          | Autenticar o acesso pessoal.                                      | Conta ativa; sessões expiram em 30 dias quando lembradas e em 12 horas sem a opção. |
+| Nome da administração e da coordenação                    | Tratamento e saudação; identificação da equipe.                   | Conta ativa.                                                                        |
+| Identificador e hash da palavra-chave do diretor de turma | Autenticar o acesso individual de leitura das estatísticas.       | Até a revogação ou exclusão da conta; sessão de horas, com cookie de sessão.        |
+| Vínculo do diretor com turmas, com início e fim           | Limitar o que cada diretor vê e registrar quem via o quê.         | O fim é registrado, nunca apagado, junto com a conta.                               |
+| Trilha de auditoria (quem, o quê, quando)                 | Prestar contas de ações administrativas.                          | Conforme política da escola; sem dados de alunos.                                   |
+| Frequência enviada à planilha da escola                   | Reorganizar por turma de origem, quando a integração está ligada. | Na planilha da própria escola, sob controle dela.                                   |
+| Saídas enviadas à planilha da escola                      | Registrar as saídas antecipadas em outra planilha, quando ligada. | Idem, com justificativa e observação sob controle da escola.                        |
 
 Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
 
@@ -22,7 +24,7 @@ Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados
 
 - **Necessidade**: cada campo existe para a finalidade do sistema, que é o registro de frequência (art. 6º, III).
 - **Minimização**: apenas o estritamente necessário, com presença implícita em vez de registro positivo de todos os dias (art. 6º, III).
-- **Finalidade**: dados usados exclusivamente pela equipe da escola, dentro do aplicativo.
+- **Finalidade**: dados usados exclusivamente pela equipe da escola e pelos diretores de turma, dentro do aplicativo, sem exportação para fora dele.
 - **Segurança**: senha com scrypt, sessões opacas com hash no banco, tráfego protegido por HTTPS no deploy, autoria anulável e trilha de auditoria sem dados de alunos.
 - **Transparência**: este documento e a interface avisam o que é armazenado.
 
@@ -54,4 +56,6 @@ A verificação de limpeza foi feita na reconstrução: varredura por nomes, e-m
 
 ## Papéis e minimização
 
-A administração configura séries, turmas, alunos, aulas e contas; a coordenação registra e consulta a frequência da escola. As duas funções veem os dados escolares, que são o objeto do serviço, e o aplicativo não coleta nada além do necessário. A trilha de auditoria registra apenas identificadores e nomes de ação: nenhum dado pessoal de aluno entra no log, e as frequências preservam o histórico mesmo quando uma conta é excluída.
+A administração configura séries, turmas, alunos, aulas e contas; a coordenação registra e consulta a frequência da escola. As duas funções veem os dados escolares, que são o objeto do serviço, e o aplicativo não coleta nada além do necessário. O diretor de turma é um terceiro papel, só de leitura: vê apenas os alunos ativos da turma de origem vinculada a ele, apenas no período do vínculo, e apenas agregados (ausências, dias com chamada, taxa e, quando a administração libera, a separação entre faltas e faltas justificadas e a contagem de saídas). Não vê observação, justificativa escrita, quem liberou uma saída, outras turmas nem ação de escrita. As categorias começam restritas às faltas e só se abrem pelos parâmetros da Gestão; cada consulta fica na auditoria. O roteiro de entrega, vazamento e virada do ano está em [operacao.md](operacao.md#diretores-de-turma).
+
+A trilha de auditoria registra apenas identificadores e nomes de ação: nenhum dado pessoal de aluno entra no log, e as frequências preservam o histórico mesmo quando uma conta é excluída.

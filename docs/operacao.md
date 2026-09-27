@@ -1,6 +1,6 @@
 # Operação
 
-Rotinas do operador do FrequenciApp: contas, backup, restauração e higiene de banco.
+Rotinas do operador do FrequenciApp: contas, diretores de turma, backup, restauração e higiene de banco.
 
 ## Administrador inicial
 
@@ -26,6 +26,62 @@ Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca 
 
 ```sql
 delete from sessoes where usuario_id = (select id from usuarios where email = 'equipe@escola.br');
+```
+
+## Diretores de turma
+
+Contas só de leitura das estatísticas das turmas de origem, com o ciclo de vida da [ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md). Tudo acontece na aba Diretores da Gestão; não há comando de terminal para criar diretor, e nenhuma pessoa ou turma fica no código. Os parâmetros (validade da palavra-chave, horas de sessão, tentativas, janela, o que o diretor vê e limite de risco) ficam em Gestão, Configurações, Acesso dos diretores.
+
+### Cadastro e entrega da palavra-chave
+
+1. Em Gestão, Diretores, cadastre o nome, o identificador (letras minúsculas, números e hífen, sem arroba, por exemplo `3a-maria`) e as turmas de origem.
+2. Toque em Gerar palavra-chave. O diálogo mostra a palavra uma única vez; o servidor guarda só o hash.
+3. Entregue a palavra ao próprio professor, em mãos ou por mensagem direta. Nunca em grupo, lista de e-mail, planilha, mural ou issue. Toque em Já entreguei para fechar o diálogo.
+4. No primeiro acesso, o professor entra com o identificador e a palavra recebida e precisa criar uma palavra própria antes de ver qualquer dado. O selo passa de "Aguardando primeiro acesso" para "Em uso".
+
+Palavra perdida antes do primeiro uso ou esquecida depois: gere outra. A emissão nova revoga a anterior e derruba as sessões abertas. A palavra vence pela validade dos parâmetros; cada troca feita pelo diretor renova o prazo, e a vencida só volta a funcionar com uma emissão nova.
+
+### Resposta a vazamento
+
+Quando a palavra de um diretor pode ter sido vista por outra pessoa:
+
+1. Revogue na aba Diretores, com o motivo. A entrada é recusada e todas as sessões da conta caem na hora.
+2. Confira o que foi consultado desde a emissão. As consultas do diretor ficam na auditoria como `diretor.consultar`, com turma e período:
+
+```sql
+select a.criado_em, a.acao, a.alvo
+  from auditoria a join usuarios u on u.id = a.usuario_id
+ where u.email = '3a-maria'
+ order by a.criado_em desc;
+```
+
+3. Gere uma palavra nova e entregue como no cadastro.
+4. Se houver sinal de tentativa por força bruta, veja as contagens da entrada. As chaves seguem os formatos `entrada:email:<login>` e `entrada:ip:<origem>:<login>`:
+
+```sql
+select chave, contagem, janela_inicio from tentativas_entrada order by janela_inicio desc limit 50;
+```
+
+Registre o incidente conforme o processo da escola; a frequência de estudantes é dado pessoal de menores (ver [lgpd.md](lgpd.md)).
+
+### Saída da função
+
+Revogue a palavra-chave com o motivo e retire as turmas do diretor. Vínculo iniciado no próprio dia é apagado; os demais ganham fim na véspera, para o histórico dizer quem via o quê em cada período. Desative a conta quando a pessoa deixar a escola.
+
+### Virada do ano letivo
+
+1. Primeiro, a estrutura: séries, turmas novas e a turma de origem dos alunos (Alunos, Definir origem, quando a 3ª série reorganiza as turmas).
+2. Depois, em Diretores, revise cada conta: retire as turmas encerradas e vincule as novas. O vínculo novo vale a partir do dia em que foi criado, e o diretor não vê dados anteriores a ele.
+3. Quem não continua na função: revogue a palavra-chave e retire as turmas. A lista marca "Sem turma vinculada" para quem ficou sem vínculo; uma conta assim entra, mas não vê turma alguma.
+4. Confira os parâmetros de acesso, em especial as categorias visíveis e o limite de risco.
+
+### Tentativas de entrada
+
+As tentativas ficam na tabela `tentativas_entrada`, contadas por dispositivo e login e por login, com os limites e a janela dos parâmetros. A entrada bem-sucedida zera as chaves daquela entrada, e chaves paradas há mais de um dia saem sozinhas numa fração das tentativas. Expurgo manual e desbloqueio de um login antes do fim da janela:
+
+```sql
+delete from tentativas_entrada where janela_inicio < now() - interval '1 day';
+delete from tentativas_entrada where chave like '%:3a-maria';
 ```
 
 ## Conexões administrativas
