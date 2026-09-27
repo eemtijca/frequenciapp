@@ -46,6 +46,7 @@ describe("rotuloDePapel", () => {
   it("traduz os papéis", () => {
     expect(rotuloDePapel("ADMIN")).toBe("Administração");
     expect(rotuloDePapel("COORDENACAO")).toBe("Coordenação");
+    expect(rotuloDePapel("DIRETOR_TURMA")).toBe("Diretor de turma");
   });
 });
 
@@ -60,6 +61,14 @@ describe("temCapacidade", () => {
     expect(temCapacidade("COORDENACAO", "operar")).toBe(true);
     expect(temCapacidade("COORDENACAO", "alterarPropriaSenha")).toBe(true);
     expect(temCapacidade("COORDENACAO", "administrar")).toBe(false);
+  });
+
+  it("dá ao diretor de turma só a leitura das estatísticas e a troca de senha", () => {
+    expect(temCapacidade("DIRETOR_TURMA", "verEstatisticasDasTurmas")).toBe(true);
+    expect(temCapacidade("DIRETOR_TURMA", "alterarPropriaSenha")).toBe(true);
+    expect(temCapacidade("DIRETOR_TURMA", "operar")).toBe(false);
+    expect(temCapacidade("DIRETOR_TURMA", "administrar")).toBe(false);
+    expect(temCapacidade("COORDENACAO", "verEstatisticasDasTurmas")).toBe(false);
   });
 
   it("recusa papel desconhecido vindo de dado inesperado", () => {
