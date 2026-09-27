@@ -292,6 +292,31 @@ function chaveSaida(nome: string, dia: string): string {
   return `${normalizar(nome)}|${dia}`;
 }
 
+/**
+ * Reconhece a última linha de dados a partir da leitura atual. O esquema salvo
+ * pode estar defasado depois de um envio, e a linha nova não pode ser criada
+ * duas vezes.
+ */
+export function atualizarLimitesSaida(
+  esquema: AbaSaidaEsquema,
+  conteudo: LeituraAba,
+): AbaSaidaEsquema {
+  const colunas = esquema.colunas
+    .filter((coluna) => coluna.atributo)
+    .map((coluna) => coluna.indice);
+  let ultima = esquema.cabecalho;
+  for (let indice = conteudo.valores.length - 1; indice >= 0; indice -= 1) {
+    const linha = conteudo.linhaInicial + indice;
+    if (linha <= esquema.cabecalho) break;
+    const celulas = conteudo.valores[indice] ?? [];
+    if (colunas.some((coluna) => textoLimpo(celulas[coluna - conteudo.colunaInicial]) !== "")) {
+      ultima = linha;
+      break;
+    }
+  }
+  return { ...esquema, ultimaLinhaDados: ultima };
+}
+
 interface LinhaExistenteSaida {
   linha: number;
   nome: string;

@@ -2,6 +2,7 @@
 // correção e remoção no modo completo.
 import { describe, expect, it } from "vitest";
 import {
+  atualizarLimitesSaida,
   detectarEsquemaSaida,
   detectarLinhaCabecalhoSaida,
   planejarSaidas,
@@ -224,6 +225,25 @@ describe("plano da aba de saídas", () => {
     expect(plano.bloqueado).toBe(true);
     expect(plano.resumo.criar).toBe(0);
     expect(plano.avisos[0]).toContain("Aluno e Data");
+  });
+
+  it("reconhece linha criada depois da estrutura salva", () => {
+    const valores = [
+      CABECALHO,
+      ["01/09/2026", "Ana", "1º ano A", "1ª aula", "Consulta", "", "Direção"],
+      ["02/09/2026", "Bruno", "1º ano A", "1ª aula", "Consulta", "", "Direção"],
+    ];
+    const esquemaAntigo = esquemaComValores([CABECALHO]);
+    const conteudo = leitura(valores);
+    const atualizado = atualizarLimitesSaida(esquemaAntigo, conteudo);
+    expect(atualizado.ultimaLinhaDados).toBe(3);
+    const plano = planejarSaidas(
+      atualizado,
+      [saida({ nome: "Ana", dia: "2026-09-01" })],
+      conteudo,
+      { modo: "conservador", de: "2026-09-01", ate: "2026-09-30", anoReferencia: 2026 },
+    );
+    expect(plano.resumo.criar).toBe(0);
   });
 
   it("mantém o hash estável para o mesmo plano", () => {

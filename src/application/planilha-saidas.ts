@@ -22,6 +22,7 @@ import {
   lerLinha,
   listarCopias as listarCopiasComum,
   modoCompletoAtivo,
+  removerAba as removerAbaComum,
   restaurarCopia as restaurarCopiaComum,
   revelarToken as revelarTokenComum,
   salvarConfiguracao,
@@ -30,6 +31,7 @@ import {
 } from "@/application/planilha-comum";
 import {
   CABECALHO_SAIDAS,
+  atualizarLimitesSaida,
   detectarEsquemaSaida,
   planejarSaidas,
   type AbaSaidaEsquema,
@@ -157,6 +159,11 @@ export async function testarConexaoSaidas(entrada: unknown) {
 /** Desliga a integração e apaga token e esquema. A planilha fica intacta. */
 export async function desconectarSaidas(admin: { id: string }) {
   return desconectar(admin, FINALIDADE);
+}
+
+/** Remove a aba de saídas criada pela integração, no modo completo e com senha. */
+export async function removerAbaSaidas(admin: { id: string }, entrada: unknown) {
+  return removerAbaComum(admin, FINALIDADE, entrada);
 }
 
 /** Destrava o modo completo com frase, senha e duração. */
@@ -375,7 +382,7 @@ async function montarSimulacaoSaidas(
     aba: salvo.aba,
     linhaInicial: 1,
     colunaInicial: 1,
-    linhas: Math.max(esquemaAba.ultimaLinhaDados + 20, 2),
+    linhas: Math.max(esquemaAba.totalLinhas + 20, 2),
     colunas: Math.max(esquemaAba.ultimaColunaDados + 5, 2),
   });
   const conteudo: LeituraAba = {
@@ -387,16 +394,17 @@ async function montarSimulacaoSaidas(
     linhasCriadas: leitura.linhasCriadas,
     colunasCriadas: leitura.colunasCriadas,
   };
+  const esquemaAtual = atualizarLimitesSaida(esquemaAba, conteudo);
   const completo = modoCompletoAtivo(linha);
   const modalidade = completo ? ("completo" as const) : ("conservador" as const);
-  const plano = planejarSaidas(esquemaAba, linhas, conteudo, {
+  const plano = planejarSaidas(esquemaAtual, linhas, conteudo, {
     modo: modalidade,
     de: entrada.de,
     ate: entrada.ate,
     anoReferencia: new Date().getFullYear(),
     removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
   });
-  return { modalidade, plano, esquema: esquemaAba };
+  return { modalidade, plano, esquema: esquemaAtual };
 }
 
 /** Prévia do envio das saídas, sem gravar nada. */
