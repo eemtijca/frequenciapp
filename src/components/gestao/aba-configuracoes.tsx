@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import SecaoAcessoDiretores from "@/components/gestao/secao-acesso-diretores";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
 import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import {
@@ -855,6 +856,8 @@ export default function AbaConfiguracoes({
           </AlertDialogContent>
         </AlertDialog>
       </SecaoRecolhivel>
+
+      <SecaoAcessoDiretores />
 
       <SecaoRecolhivel
         dataSecao="config-copia"
