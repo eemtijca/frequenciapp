@@ -500,7 +500,7 @@ export default function VistaGrade({
                               <span
                                 className={
                                   marca === "FJ"
-                                    ? "border-primary text-primary inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
+                                    ? "border-justificada text-justificada-texto inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
                                     : "bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
                                 }
                                 role="img"
@@ -562,7 +562,7 @@ export default function VistaGrade({
             </span>
             <span className="flex items-center gap-1.5">
               <span
-                className="border-primary text-primary inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
+                className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
                 aria-hidden="true"
               >
                 FJ

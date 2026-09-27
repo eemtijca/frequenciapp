@@ -691,9 +691,9 @@ export default function VistaFrequencia({
               onClick={() =>
                 setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
               }
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+              className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
-              <span className="numerais-tabulares text-primary text-2xl font-semibold">
+              <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
                 {carregando ? "" : contagemJustificadas}
               </span>
               <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
@@ -702,7 +702,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "presentes"}
               onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+              className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemPresencas}
@@ -978,7 +978,7 @@ export default function VistaFrequencia({
                             className={
                               faltando
                                 ? codigo
-                                  ? "bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                                  ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                                   : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
                                 : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
                             }

@@ -25,6 +25,7 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 
 - Papel neutro quente de fundo, tinta grafite e um único acento verde institucional para presença e ações primárias.
 - O vermelho é estritamente semântico: aparece somente onde comunica falta ou erro.
+- A falta justificada (FJ) usa um azul próprio, os tokens `--justificada`, e não o verde institucional. Vermelho e verde na mesma luminosidade se confundem para quem tem daltonismo vermelho-verde; o par falta e falta justificada é conferido em `tests/unit/paleta.test.ts` nos dois temas, com separação sob daltonismo simulado e contraste AA do texto.
 - Tema claro e escuro com preferência do sistema e troca manual persistida; as duas variações mantêm contraste AA.
 - Raio de canto único (14 px) em cartões, botões e campos; uma única família de forma em toda a interface.
 - Tipografia Plus Jakarta Sans para interface e JetBrains Mono com numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
