@@ -40,15 +40,19 @@ function hashDoToken(token: string): string {
  * Cria uma sessão nova e grava o cookie HttpOnly. Com `lembrar`, o cookie é
  * persistente por 30 dias; sem, é cookie de sessão com validade de 12 horas.
  * `cookiesSeguros` decide o atributo Secure (produção sem HTTP liberado).
+ * `expiraAte` fixa a validade no servidor (sessão do diretor, limitada pelos
+ * parâmetros e pela palavra-chave) e força cookie de sessão.
  */
 export async function criarSessao(
   usuarioId: string,
   segredo: string,
   cookiesSeguros: boolean,
   lembrar: boolean,
+  expiraAte?: Date,
 ): Promise<void> {
   const token = randomBytes(32).toString("hex");
-  const expiraEm = new Date(Date.now() + duracaoDaSessao(lembrar));
+  const expiraEm = expiraAte ?? new Date(Date.now() + duracaoDaSessao(lembrar));
+  const persistente = lembrar && !expiraAte;
   await banco().sessao.create({ data: { tokenHash: hashDoToken(token), usuarioId, expiraEm } });
   const armazem = await cookies();
   armazem.set(NOME_COOKIE, valorAssinado(token, segredo), {
@@ -56,7 +60,7 @@ export async function criarSessao(
     sameSite: "lax",
     secure: cookiesSeguros,
     path: "/",
-    ...(lembrar ? { expires: expiraEm } : {}),
+    ...(persistente ? { expires: expiraEm } : {}),
   });
 }
 

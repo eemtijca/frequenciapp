@@ -11,10 +11,12 @@ datasource db {
 }
 
 // Papel do usuário. ADMIN cuida de contas e cadastros; COORDENACAO faz a
-// frequência, consulta o histórico e a grade do mês.
+// frequência, consulta o histórico e a grade do mês; DIRETOR_TURMA só lê as
+// estatísticas das turmas do seu vínculo (ADR-021).
 enum Papel {
   ADMIN
   COORDENACAO
+  DIRETOR_TURMA
 
   @@map("papel")
 }
@@ -75,6 +77,10 @@ model Usuario {
   integracoesAtualizadas   IntegracaoPlanilha[]    @relation("IntegracaoAtualizadaPor")
   sincronizacoesPlanilha   SincronizacaoPlanilha[] @relation("SincronizacaoCriadaPor")
   auditorias               Auditoria[]
+  vinculosDiretor          VinculoDiretor[]        @relation("VinculoDoDiretor")
+  vinculosCriados          VinculoDiretor[]        @relation("VinculoCriadoPor")
+  credencialDiretor        CredencialDiretor?
+  parametrosAtualizados    ParametrosAcesso[]      @relation("ParametrosAtualizadosPor")
 
   @@index([papel])
   @@map("usuarios")
@@ -119,6 +125,8 @@ model Turma {
   frequencias    Frequencia[]
   horarios       Horario[]
   sincronizacoes SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
+
+  vinculosDiretor VinculoDiretor[] @relation("VinculoDaTurma")
 
   @@unique([serieId, nome])
   @@map("turmas")
@@ -220,14 +228,80 @@ model SaidaAntecipada {
   liberadoPorCodigo String?  @map("liberado_por_codigo") @db.VarChar(20)
   criadoPorId       String?  @map("criado_por_id") @db.Uuid
   criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  aluno         Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  liberadoPor   Usuario? @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
-  criadoPor     Usuario? @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  aluno             Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  liberadoPor       Usuario? @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
+  criadoPor         Usuario? @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   @@unique([alunoId, dia])
   @@index([dia])
   @@index([alunoId, dia])
   @@map("saidas_antecipadas")
+}
+
+// Vínculo de um diretor com uma turma de origem, com período. O fim é
+// registrado e nunca apagado, para o histórico dizer quem via o quê.
+model VinculoDiretor {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId   String    @map("usuario_id") @db.Uuid
+  turmaId     String    @map("turma_id") @db.Uuid
+  inicio      DateTime  @db.Date
+  fim         DateTime? @db.Date
+  criadoPorId String?   @map("criado_por_id") @db.Uuid
+  criadoEm    DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  usuario     Usuario   @relation("VinculoDoDiretor", fields: [usuarioId], references: [id], onDelete: Cascade)
+  turma       Turma     @relation("VinculoDaTurma", fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor   Usuario?  @relation("VinculoCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId])
+  @@index([turmaId])
+  @@map("vinculos_diretor")
+}
+
+// Palavra-chave do diretor: o segredo é a senha da conta (scrypt); aqui fica
+// o ciclo de vida, com emissão, validade, primeiro uso e revogação.
+model CredencialDiretor {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId        String    @unique @map("usuario_id") @db.Uuid
+  emitidaEm        DateTime  @map("emitida_em") @db.Timestamptz
+  expiraEm         DateTime  @map("expira_em") @db.Timestamptz
+  primeiroUsoEm    DateTime? @map("primeiro_uso_em") @db.Timestamptz
+  revogadaEm       DateTime? @map("revogada_em") @db.Timestamptz
+  motivoRevogacao  String?   @map("motivo_revogacao") @db.VarChar(200)
+  trocaObrigatoria Boolean   @default(true) @map("troca_obrigatoria")
+  atualizadoEm     DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
+  usuario          Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("credenciais_diretor")
+}
+
+// Tentativas de entrada por chave, em janela deslizante. Fica no banco para
+// valer entre instâncias; a chave é natural e a linha vence com a janela.
+model TentativaEntrada {
+  chave        String   @id @db.VarChar(300)
+  contagem     Int
+  janelaInicio DateTime @map("janela_inicio") @db.Timestamptz
+
+  @@index([janelaInicio])
+  @@map("tentativas_entrada")
+}
+
+// Parâmetros de acesso editáveis pela administração: validade da palavra-chave,
+// sessão do diretor, limites de tentativa, o que o diretor vê e o limite de
+// risco. Linha única; faixas conferidas no banco.
+model ParametrosAcesso {
+  id                    String   @id @default("principal")
+  validadePalavraDias   Int      @default(90) @map("validade_palavra_dias")
+  sessaoDiretorHoras    Int      @default(12) @map("sessao_diretor_horas")
+  tentativasPorOrigem   Int      @default(10) @map("tentativas_por_origem")
+  tentativasPorLogin    Int      @default(30) @map("tentativas_por_login")
+  janelaMinutos         Int      @default(15) @map("janela_minutos")
+  categoriasDiretor     String[] @default(["faltas"]) @map("categorias_diretor")
+  limiteRiscoPercentual Int      @default(25) @map("limite_risco_percentual")
+  atualizadoEm          DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId       String?  @map("atualizado_por_id") @db.Uuid
+  atualizadoPor         Usuario? @relation("ParametrosAtualizadosPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("parametros_acesso")
 }
 
 // Configurações de recursos e catálogo de justificativas. A linha de

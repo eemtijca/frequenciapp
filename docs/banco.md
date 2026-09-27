@@ -4,23 +4,27 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 
 ## Esquema
 
-| Tabela                    | Papel                                                                                   |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `usuarios`                | Contas: e-mail único, hash da senha, nome, papel (`ADMIN` ou `COORDENACAO`) e situação. |
-| `sessoes`                 | Sessões opacas: hash SHA-256 do token, dono e expiração.                                |
-| `series`                  | Séries escolares, por exemplo 1º ano, com ordem de exibição.                            |
-| `turmas`                  | Turmas por série, com rótulo composto e unicidade dentro da série.                      |
-| `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem e situação.                          |
-| `horarios`                | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                       |
-| `frequencias`             | Uma frequência por turma e dia: revisão, autoria e atualização.                         |
-| `faltas`                  | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.       |
-| `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
-| `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
-| `justificativas`          | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
-| `liberadores`             | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão. |
-| `integracoes_planilha`    | Uma linha por finalidade (`FREQUENCIA` e `SAIDAS`) com token, esquema e modo.           |
-| `sincronizacoes_planilha` | Histórico de envios por finalidade e turma de origem, com contagens e resultado.        |
-| `auditoria`               | Trilha de ações administrativas: quem, o quê e quando.                                  |
+| Tabela                    | Papel                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `usuarios`                | Contas: login único (e-mail ou identificador do diretor), hash da senha, nome, papel e situação. |
+| `sessoes`                 | Sessões opacas: hash SHA-256 do token, dono e expiração.                                         |
+| `series`                  | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
+| `turmas`                  | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
+| `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem e situação.                                   |
+| `horarios`                | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
+| `frequencias`             | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
+| `faltas`                  | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
+| `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.                |
+| `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.                        |
+| `justificativas`          | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.               |
+| `liberadores`             | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.          |
+| `integracoes_planilha`    | Uma linha por finalidade (`FREQUENCIA` e `SAIDAS`) com token, esquema e modo.                    |
+| `sincronizacoes_planilha` | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                 |
+| `auditoria`               | Trilha de ações administrativas: quem, o quê e quando.                                           |
+| `vinculos_diretor`        | Turmas de origem de cada diretor, com início e fim; o fim fica no histórico.                     |
+| `credenciais_diretor`     | Ciclo de vida da palavra-chave do diretor: emissão, validade, primeiro uso e revogação.          |
+| `parametros_acesso`       | Linha única com validade, sessão do diretor, limites de entrada, categorias e risco.             |
+| `tentativas_entrada`      | Contador de tentativas por chave, compartilhado entre instâncias.                                |
 
 Restrições de integridade relevantes:
 
@@ -36,6 +40,9 @@ Restrições de integridade relevantes:
 - Unicidade de e-mail, nome de série e nome de turma por série é feita por índices funcionais em `lower()`, mantidos no SQL das migrations.
 - Checks de positividade em `frequencias.revisao`, `alunos.ordem`, `series.ordem` e `horarios.ordem` independem da aplicação.
 - `integracoes_planilha` e `sincronizacoes_planilha` separam a frequência das saídas pela coluna `finalidade`; cada finalidade tem a própria linha de token, esquema e modo completo.
+- `vinculos_diretor` tem índice único parcial em (`usuario_id`, `turma_id`) com `fim` nulo, check de fim maior ou igual ao início, exclusão em cascata com a conta e `ON DELETE RESTRICT` na turma.
+- `credenciais_diretor` tem um registro por conta, com check de validade posterior à emissão.
+- `parametros_acesso` é linha única com checks de faixa e de categorias (subconjunto fechado, sempre com `faltas`), criada na migração.
 
 A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md); a chamada diária com justificativas, saídas e recursos opcionais está na [ADR-012](adr/012-chamada-diaria-com-saidas.md); a grade por período e a cópia JSON estão na [ADR-013](adr/013-grade-por-periodo-e-copia-json.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
 
@@ -93,6 +100,12 @@ Sessões vencidas acumulam poucas linhas por conta:
 
 ```sql
 delete from sessoes where expira_em < now();
+```
+
+O contador de tentativas se expurga sozinho de tempos em tempos; para limpar de uma vez:
+
+```sql
+delete from tentativas_entrada where janela_inicio < now() - interval '1 day';
 ```
 
 A trilha de auditoria cresce com o uso administrativo. Quando não houver obrigação legal de retenção, a purga pode seguir política própria:

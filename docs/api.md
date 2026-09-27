@@ -10,15 +10,15 @@ Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB r
 
 ### POST /api/auth/entrar
 
-Corpo: `{ "email": string, "senha": string }`.
+Corpo: `{ "login": string, "senha": string, "lembrar"?: boolean }`. O `login` é o e-mail da equipe ou o identificador do diretor de turma; o campo antigo `email` continua aceito no lugar de `login`.
 
 Respostas:
 
-- 200 `{"usuario": {"id", "nome", "email", "papel", "ativo"}}` e cookie de sessão.
+- 200 `{"usuario": {"id", "nome", "email", "papel", "ativo"}}` e cookie de sessão. No diretor, `email` traz o identificador, o cookie é de sessão e a validade no servidor é a menor entre a sessão do diretor e a validade da palavra-chave.
 - 400 quando o corpo é inválido.
 - 401 com mensagem genérica quando credenciais não conferem.
-- 403 quando a conta está desativada ou a origem não é confiável.
-- 429 após excesso de tentativas no mesmo IP e e-mail (15 minutos).
+- 403 quando a conta está desativada, quando a palavra-chave do diretor venceu ou foi revogada (só depois de a palavra conferir) ou quando a origem não é confiável.
+- 429 após excesso de tentativas por dispositivo e login ou por login, com limites e janela dos parâmetros de acesso.
 
 ### POST /api/auth/sair
 
@@ -38,6 +38,52 @@ Troca a própria senha. Corpo: `{ "senhaAtual": string, "senhaNova": string }`. 
 
 - 200 `{"ok": true}`.
 - 400 quando a senha atual não confere, a nova está fora da política (mínimo 8 caracteres, uma letra e um número) ou o corpo é inválido.
+
+## Diretores de turma (administração)
+
+Contas só de leitura das estatísticas das turmas de origem do vínculo ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)). Todas exigem `administrar`.
+
+Diretor: `{ id, nome, identificador, ativo, estado, emitidaEm, expiraEm, primeiroUsoEm, revogadaEm, motivoRevogacao, turmas }`, com `estado` entre `sem_palavra`, `emitida`, `em_uso`, `expirada` e `revogada`, e `turmas` com os vínculos vigentes hoje (`{ id, turmaId, turma, inicio, fim }`).
+
+### GET /api/diretores
+
+- 200 `{"diretores": Diretor[]}`, ativos primeiro.
+
+### POST /api/diretores
+
+Corpo: `{ "nome": string, "identificador": string, "turmaIds"?: uuid[] }`. O identificador usa minúsculas, números, ponto e hífen, de 3 a 40 caracteres, sem arroba. A conta nasce sem palavra-chave e não entra até a emissão; os vínculos começam hoje.
+
+- 201 `{"diretor": Diretor}`; 400 validação; 404 turma inexistente; 409 identificador em uso.
+
+### PATCH /api/diretores/{id}
+
+Corpo parcial: `{ nome?, ativo?, turmaIds? }`. Turma retirada deixa de valer na hora: o vínculo termina ontem ou, se começou hoje, sai inteiro. Desativar encerra as sessões.
+
+- 200 `{"diretor": Diretor}`; 404 diretor ou turma inexistente.
+
+### POST /api/diretores/{id}/palavra-chave
+
+Emite uma palavra-chave nova, em blocos de quatro, válida pelos dias dos parâmetros e com troca obrigatória no primeiro acesso. A anterior deixa de valer e as sessões abertas caem. A palavra só aparece nesta resposta.
+
+- 200 `{"palavraChave": string, "diretor": Diretor}`; 404 diretor inexistente; 409 diretor desativado.
+
+### POST /api/diretores/{id}/revogar
+
+Corpo: `{ "motivo": string }`, de 3 a 200 caracteres. A senha vira inutilizável e todas as sessões do diretor caem.
+
+- 200 `{"diretor": Diretor}`; 400 sem motivo; 404 diretor inexistente; 409 sem palavra-chave ativa.
+
+## Parâmetros de acesso (administração)
+
+### GET /api/parametros-acesso
+
+- 200 `{"parametros": { validadePalavraDias, sessaoDiretorHoras, tentativasPorOrigem, tentativasPorLogin, janelaMinutos, categoriasDiretor, limiteRiscoPercentual }}`.
+
+### PATCH /api/parametros-acesso
+
+Corpo parcial com os mesmos campos. Faixas: validade de 1 a 365 dias, sessão de 1 a 72 horas, tentativas por dispositivo de 1 a 100, por login de 1 a 500, janela de 1 a 1440 minutos e limite de risco de 1% a 100%. `categoriasDiretor` é subconjunto de `faltas`, `justificativas` e `saidas`, sempre com `faltas`.
+
+- 200 `{"parametros": ...}`; 400 fora da faixa.
 
 ## Séries
 

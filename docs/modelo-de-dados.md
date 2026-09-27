@@ -10,7 +10,7 @@ Entidades, invariantes e derivações. A coordenação faz uma chamada por turma
 | email        | texto    | Único sem diferenciar caixa, por índice funcional. |
 | senhaHash    | texto    | scrypt com sal e formato versionado.               |
 | nome         | texto    | Nome de tratamento usado na saudação.              |
-| papel        | enum     | `ADMIN` ou `COORDENACAO`.                          |
+| papel        | enum     | `ADMIN`, `COORDENACAO` ou `DIRETOR_TURMA`.         |
 | ativo        | booleano | Desativado perde o acesso na próxima requisição.   |
 | criadoEm     | data     |                                                    |
 | atualizadoEm | data     |                                                    |
@@ -18,6 +18,42 @@ Entidades, invariantes e derivações. A coordenação faz uma chamada por turma
 Não há telefone, CPF, matrícula ou qualquer outro dado pessoal. A administração configura tudo e a coordenação registra a frequência. O administrador inicial é criado pelo comando `criar-admin` com credenciais do ambiente; as contas de coordenação nascem pelo comando `criar-coordenacao` ou pela área de Gestão.
 
 Invariantes de segurança da camada de aplicação: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta e desativar uma conta encerra as sessões dela na hora.
+
+No diretor de turma, a coluna `email` guarda o identificador de entrada, sem arroba, e a senha é a palavra-chave. A conta tem cadastro próprio e não aparece na Equipe.
+
+## Vínculo do diretor (vinculo_diretor)
+
+| Campo       | Tipo | Observação                                                |
+| ----------- | ---- | --------------------------------------------------------- |
+| id          | uuid | Gerado pelo banco.                                        |
+| usuarioId   | uuid | Conta do diretor; o vínculo sai junto com a conta.        |
+| turmaId     | uuid | Turma de origem acompanhada; a turma fica protegida.      |
+| inicio      | data | Dia civil em que o vínculo começa a valer.                |
+| fim         | data | Último dia em que vale, inclusive; nulo enquanto vigente. |
+| criadoPorId | uuid | Quem criou; anulável.                                     |
+| criadoEm    | data |                                                           |
+
+Um vínculo vigente por diretor e turma. O fim é registrado, nunca apagado, salvo o vínculo retirado no mesmo dia em que começou.
+
+## Credencial do diretor (credencial_diretor)
+
+| Campo            | Tipo     | Observação                                           |
+| ---------------- | -------- | ---------------------------------------------------- |
+| usuarioId        | uuid     | Um por diretor.                                      |
+| emitidaEm        | data     | Emissão da palavra-chave vigente.                    |
+| expiraEm         | data     | Validade; renovada quando o diretor troca a palavra. |
+| primeiroUsoEm    | data     | Primeira entrada depois da emissão.                  |
+| revogadaEm       | data     | Revogação, que vence a validade.                     |
+| motivoRevogacao  | texto    | Até 200 caracteres.                                  |
+| trocaObrigatoria | booleano | Verdadeiro da emissão até a primeira troca.          |
+
+## Parâmetros de acesso (parametros_acesso)
+
+Linha única (`principal`) com validade da palavra-chave, horas da sessão do diretor, tentativas de entrada por dispositivo e por login, janela das tentativas, categorias visíveis ao diretor (sempre com faltas) e limite de risco. As faixas são conferidas no banco e na aplicação.
+
+## Tentativa de entrada (tentativa_entrada)
+
+Contagem por chave (dispositivo e login, ou só login) e início da janela. A linha recomeça quando a janela vence e sai no expurgo ocasional.
 
 ## Série (serie)
 

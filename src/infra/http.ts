@@ -40,6 +40,7 @@ const RECUSA_POR_CAPACIDADE: Record<Capacidade, string> = {
   operar: "Seu acesso não permite esta operação.",
   administrar: "Apenas o administrador pode fazer esta operação.",
   alterarPropriaSenha: "Seu acesso não permite trocar a senha por aqui.",
+  verEstatisticasDasTurmas: "Seu acesso não permite ver estas estatísticas.",
 };
 
 /**
