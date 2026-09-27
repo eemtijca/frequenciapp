@@ -1,29 +1,39 @@
-// Google Planilhas: casos de uso da integração opcional. Leitura do esquema,
-// planejamento conservador, envio manual, modo completo e cópias de segurança.
-import { randomBytes } from "node:crypto";
+// Google Planilhas: casos de uso da integração da frequência. Leitura do
+// esquema, planejamento conservador, envio manual e modo completo.
 import { z } from "zod";
-import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { ambiente } from "@/infra/ambiente";
-import { conferirSenha } from "@/infra/auth/hash";
-import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
+import { limiteDeTentativas } from "@/infra/auth/limite";
 import { chamarGas, ErroGas } from "@/infra/planilha";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
 import {
-  DURACOES_MODO_COMPLETO,
-  FRASE_MODO_COMPLETO,
-  VERSAO_SCRIPT,
+  ativarModoCompleto as ativarModoCompletoComum,
+  criarAba as criarAbaComum,
+  desconectar,
+  desativarModoCompleto as desativarModoCompletoComum,
+  exigirConexao,
+  gerarToken as gerarTokenComum,
+  idDaIntegracao,
+  lerLinha,
+  listarCopias as listarCopiasComum,
+  modoCompletoAtivo,
+  removerAba as removerAbaComum,
+  restaurarCopia as restaurarCopiaComum,
+  revelarToken as revelarTokenComum,
+  salvarConfiguracao,
+  testarConexao as testarConexaoComum,
+  type LinhaIntegracao,
+} from "@/application/planilha-comum";
+import {
   detectarEsquema,
   hashTexto,
   montarTurmaPlanilha,
   planejarSincronizacao,
   resultadoDeFalha,
-  validarEndpoint,
   type AbaEsquema,
   type AbaBruta,
   type CelulaPlano,
@@ -32,7 +42,7 @@ import {
 } from "@/domain/planilha";
 import { diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
 
-const ID = "principal";
+const FINALIDADE = "FREQUENCIA" as const;
 const LIMITE_DIAS_ENVIO = 92;
 
 export interface MapaAba {
@@ -54,23 +64,6 @@ export interface EstadoPlanilha {
   podeEnviar: boolean;
   alteradasDepois: number;
 }
-
-const esquemaSalvar = z
-  .object({
-    ativa: z.boolean().optional(),
-    endpoint: z.string().trim().max(500).optional(),
-  })
-  .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
-    message: "Nada a atualizar.",
-  });
-
-const esquemaSenha = z.object({ senha: z.string().min(1, "Informe a senha do administrador.") });
-
-const esquemaModoCompleto = z.object({
-  frase: z.string().trim().min(1, "Digite a frase de confirmação."),
-  senha: z.string().min(1, "Informe a senha do administrador."),
-  duracaoMinutos: z.number().int().optional(),
-});
 
 const esquemaMapa = z.object({
   planilha: z.object({
@@ -100,78 +93,7 @@ const esquemaEnvio = z.object({
   planoHashGeral: z.string().max(64).optional(),
 });
 
-const esquemaRestaurar = z.object({
-  aba: z.string().min(1).max(200),
-  copia: z.string().min(1).max(300),
-  frase: z.string().trim().min(1, "Digite a frase de confirmação."),
-  senha: z.string().min(1, "Informe a senha do administrador."),
-});
-
 type EntradaEnvio = z.infer<typeof esquemaEnvio>;
-
-interface LinhaIntegracao {
-  ativa: boolean;
-  endpoint: string | null;
-  token: string | null;
-  versaoScript: string | null;
-  esquema: unknown;
-  assinaturaEsquema: string | null;
-  esquemaEm: Date | null;
-  modo: "CONSERVADOR" | "COMPLETO";
-  modoCompletoAte: Date | null;
-  atualizadoEm: Date;
-}
-
-async function lerLinha(): Promise<LinhaIntegracao> {
-  const campos = {
-    ativa: true,
-    endpoint: true,
-    token: true,
-    versaoScript: true,
-    esquema: true,
-    assinaturaEsquema: true,
-    esquemaEm: true,
-    modo: true,
-    modoCompletoAte: true,
-    atualizadoEm: true,
-  } as const;
-  const existente = await banco().integracaoPlanilha.findUnique({
-    where: { id: ID },
-    select: campos,
-  });
-  if (existente) return existente as LinhaIntegracao;
-  try {
-    const criada = await banco().integracaoPlanilha.create({
-      data: { id: ID },
-      select: campos,
-    });
-    return criada as LinhaIntegracao;
-  } catch {
-    // Duas requisições podem criar a linha ao mesmo tempo; a segunda lê a
-    // versão vencedora em vez de falhar.
-    const linha = await banco().integracaoPlanilha.findUnique({
-      where: { id: ID },
-      select: campos,
-    });
-    if (linha) return linha as LinhaIntegracao;
-    throw new ErroHttp("Não foi possível preparar a integração com a planilha.", 500);
-  }
-}
-
-function modoCompletoAtivo(linha: LinhaIntegracao): boolean {
-  return (
-    linha.modo === "COMPLETO" &&
-    linha.modoCompletoAte !== null &&
-    linha.modoCompletoAte.getTime() > Date.now()
-  );
-}
-
-function exigirConexao(linha: LinhaIntegracao): { endpoint: string; token: string } {
-  if (!linha.ativa || !linha.endpoint || !linha.token) {
-    throw new ErroHttp("A integração com a planilha não está ativa.", 400);
-  }
-  return { endpoint: linha.endpoint, token: linha.token };
-}
 
 function esquemaSalvo(linha: LinhaIntegracao): EsquemaSalvo | null {
   const bruto = linha.esquema;
@@ -181,10 +103,10 @@ function esquemaSalvo(linha: LinhaIntegracao): EsquemaSalvo | null {
   return candidato;
 }
 
-/** Chamadas alteradas desde o último envio bem-sucedido. */
+/** Chamadas alteradas desde o último envio bem-sucedido da frequência. */
 async function contarAlteradasDepois(): Promise<number> {
   const ultima = await banco().sincronizacaoPlanilha.findFirst({
-    where: { resultado: { not: "FALHA" } },
+    where: { finalidade: FINALIDADE, resultado: { not: "FALHA" } },
     orderBy: { criadoEm: "desc" },
     select: { criadoEm: true },
   });
@@ -194,11 +116,11 @@ async function contarAlteradasDepois(): Promise<number> {
 
 /** Estado público da integração, para o selo e o botão da Grade. */
 export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
-  const linha = await lerLinha();
+  const linha = await lerLinha(FINALIDADE);
   const completo = modoCompletoAtivo(linha);
   if (linha.modo === "COMPLETO" && !completo) {
     await banco().integracaoPlanilha.update({
-      where: { id: ID },
+      where: { id: idDaIntegracao(FINALIDADE) },
       data: { modo: "CONSERVADOR", modoCompletoAte: null },
     });
   }
@@ -213,8 +135,9 @@ export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
 
 /** Configuração completa para a administração. O token nunca volta inteiro. */
 export async function lerIntegracaoAdmin() {
-  const linha = await lerLinha();
+  const linha = await lerLinha(FINALIDADE);
   const sincronizacoes = await banco().sincronizacaoPlanilha.findMany({
+    where: { finalidade: FINALIDADE },
     orderBy: { criadoEm: "desc" },
     take: 10,
     select: {
@@ -238,7 +161,7 @@ export async function lerIntegracaoAdmin() {
     },
   });
   const ultimoErro = await banco().sincronizacaoPlanilha.findFirst({
-    where: { resultado: { in: ["FALHA", "PARCIAL"] } },
+    where: { finalidade: FINALIDADE, resultado: { in: ["FALHA", "PARCIAL"] } },
     orderBy: { criadoEm: "desc" },
     select: {
       erro: true,
@@ -282,115 +205,28 @@ export async function lerIntegracaoAdmin() {
 
 /** Salva integração ativa e endereço do Web App, com validação de host. */
 export async function salvarIntegracao(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaSalvar.safeParse(entrada);
-  if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
-  }
-  if (dados.data.endpoint !== undefined) {
-    const problema = validarEndpoint(dados.data.endpoint, ambiente.permitirEndpointLocal);
-    if (problema) throw new ErroHttp(problema, 400);
-  }
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.upsert({
-      where: { id: ID },
-      update: {
-        ...(dados.data.ativa !== undefined ? { ativa: dados.data.ativa } : {}),
-        ...(dados.data.endpoint !== undefined
-          ? { endpoint: dados.data.endpoint.trim() || null }
-          : {}),
-        atualizadoPorId: admin.id,
-      },
-      create: {
-        id: ID,
-        ativa: dados.data.ativa ?? false,
-        endpoint: dados.data.endpoint?.trim() || null,
-        atualizadoPorId: admin.id,
-      },
-    });
-    await auditar(tx, admin.id, "planilha.salvar", `integracao:${ID}`);
-  });
+  await salvarConfiguracao(admin, FINALIDADE, entrada);
   return lerIntegracaoAdmin();
 }
 
 /** Gera um token novo. Rotacionar invalida a conexão até atualizar o script. */
 export async function gerarToken(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaSenha.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Informe a senha do administrador.", 400);
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:token");
-  const token = randomBytes(32).toString("base64url");
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.upsert({
-      where: { id: ID },
-      update: { token, ativa: false, atualizadoPorId: admin.id },
-      create: { id: ID, token, atualizadoPorId: admin.id },
-    });
-    await auditar(tx, admin.id, "planilha.token.gerar", `integracao:${ID}`);
-  });
-  return { token };
+  return gerarTokenComum(admin, FINALIDADE, entrada);
 }
 
 /** Revela o token com a senha, para reinstalar ou corrigir o script. */
 export async function revelarToken(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaSenha.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Informe a senha do administrador.", 400);
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:token");
-  const linha = await lerLinha();
-  if (!linha.token) throw new ErroHttp("Ainda não há token gerado.", 404);
-  return { token: linha.token };
-}
-
-async function conferirSenhaDoAdmin(
-  usuarioId: string,
-  senha: string,
-  chaveLimite: string,
-): Promise<void> {
-  const chave = `${chaveLimite}:${usuarioId}`;
-  if (!limiteDeTentativas(chave, 5)) {
-    throw new ErroHttp("Muitas tentativas incorretas. Aguarde alguns minutos.", 429);
-  }
-  const usuario = await banco().usuario.findUnique({ where: { id: usuarioId } });
-  if (!usuario || !(await conferirSenha(senha, usuario.senhaHash))) {
-    throw new ErroHttp("A senha do administrador está incorreta.", 400);
-  }
-  limparTentativas(chave);
+  return revelarTokenComum(admin, FINALIDADE, entrada);
 }
 
 /** Testa o Web App publicado: ping sem alterar a planilha. */
-export async function testarConexao(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaSalvar.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Endereço inválido.", 400);
-  const linha = await lerLinha();
-  const endpoint = dados.data.endpoint?.trim() || linha.endpoint;
-  if (!endpoint) throw new ErroHttp("Informe o endereço do aplicativo da Web.", 400);
-  const problema = validarEndpoint(endpoint, ambiente.permitirEndpointLocal);
-  if (problema) throw new ErroHttp(problema, 400);
-  if (!linha.token) throw new ErroHttp("Gere o token antes de testar.", 400);
-  const ping = await chamarGas<{
-    versao: number;
-    planilha: { nome: string; url: string; fuso: string };
-    abas: { nome: string; linhas: number; colunas: number; oculta: boolean }[];
-  }>(endpoint, linha.token, { acao: "ping" });
-  const avisos: string[] = [];
-  if (ping.planilha.fuso !== ambiente.fuso) {
-    avisos.push(
-      `O script usa o fuso ${ping.planilha.fuso}, diferente do fuso da escola (${ambiente.fuso}). As datas podem sair deslocadas.`,
-    );
-  }
-  if (ping.versao !== VERSAO_SCRIPT) {
-    avisos.push(
-      `O script publicado está na versão ${ping.versao}; a esperada é ${VERSAO_SCRIPT}. Publique a versão atual do gas/Codigo.gs.`,
-    );
-  }
-  await banco().integracaoPlanilha.update({
-    where: { id: ID },
-    data: { endpoint, versaoScript: String(ping.versao) },
-  });
-  return { ...ping, avisos };
+export async function testarConexao(entrada: unknown) {
+  return testarConexaoComum(FINALIDADE, entrada);
 }
 
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
 export async function lerEstrutura() {
-  const linha = await lerLinha();
+  const linha = await lerLinha(FINALIDADE);
   const { endpoint, token } = exigirConexao(linha);
   const estrutura = await chamarGas<{
     planilha: { nome: string; url: string; fuso: string };
@@ -496,7 +332,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
   };
   await comTransacao(async (tx) => {
     await tx.integracaoPlanilha.update({
-      where: { id: ID },
+      where: { id: idDaIntegracao(FINALIDADE) },
       data: {
         esquema: salvo as unknown as object,
         assinaturaEsquema: hashTexto(JSON.stringify(abas.map((aba) => aba.assinatura))),
@@ -504,7 +340,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
         atualizadoPorId: admin.id,
       },
     });
-    await auditar(tx, admin.id, "planilha.mapear", `integracao:${ID}`);
+    await auditar(tx, admin.id, "planilha.mapear", `integracao:${idDaIntegracao(FINALIDADE)}`);
   });
   return lerIntegracaoAdmin();
 }
@@ -618,7 +454,7 @@ export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
   if (!limiteDeTentativas(`planilha:simular:${usuario.id}`, 60)) {
     throw new ErroHttp("Muitas prévias em sequência. Aguarde alguns minutos.", 429);
   }
-  const linha = await lerLinha();
+  const linha = await lerLinha(FINALIDADE);
   const simulacao = await montarSimulacao(linha, dados.data);
   return {
     modalidade: simulacao.modalidade,
@@ -668,7 +504,7 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
   if (!limiteDeTentativas(`planilha:envio:${usuario.id}`, 30)) {
     throw new ErroHttp("Muitos envios em sequência. Aguarde alguns minutos.", 429);
   }
-  const linha = await lerLinha();
+  const linha = await lerLinha(FINALIDADE);
   const simulacao = await montarSimulacao(linha, dados.data);
   if (dados.data.planoHashGeral !== simulacao.planoHashGeral) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
@@ -858,158 +694,35 @@ async function registrarSincronizacao(
 
 /** Destrava o modo completo com frase, senha e duração. */
 export async function ativarModoCompleto(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaModoCompleto.safeParse(entrada);
-  if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
-  }
-  if (dados.data.frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO) {
-    throw new ErroHttp("A frase de confirmação não confere.", 400);
-  }
-  const duracao = dados.data.duracaoMinutos ?? 15;
-  if (!(DURACOES_MODO_COMPLETO as readonly number[]).includes(duracao)) {
-    throw new ErroHttp("Duração inválida.", 400);
-  }
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:modo");
-  const ate = new Date(Date.now() + duracao * 60_000);
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.upsert({
-      where: { id: ID },
-      update: { modo: "COMPLETO", modoCompletoAte: ate, modoCompletoPorId: admin.id },
-      create: { id: ID, modo: "COMPLETO", modoCompletoAte: ate, modoCompletoPorId: admin.id },
-    });
-    await auditar(tx, admin.id, "planilha.modoCompleto.ativar", `duracao:${duracao}`);
-  });
-  return { modo: "completo" as const, modoCompletoAte: ate.toISOString() };
+  return ativarModoCompletoComum(admin, FINALIDADE, entrada);
 }
 
 /** Volta ao conservador; qualquer sessão pode encerrar a janela. */
 export async function desativarModoCompleto(usuario: { id: string }) {
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.update({
-      where: { id: ID },
-      data: { modo: "CONSERVADOR", modoCompletoAte: null },
-    });
-    await auditar(tx, usuario.id, "planilha.modoCompleto.encerrar", `integracao:${ID}`);
-  });
-  return { modo: "conservador" as const };
+  return desativarModoCompletoComum(usuario, FINALIDADE);
 }
 
 /** Lista as cópias ocultas de uma aba. */
 export async function listarCopias(entrada: unknown) {
-  const dados = z.object({ aba: z.string().min(1).max(200) }).safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Informe a aba.", 400);
-  const linha = await lerLinha();
-  const { endpoint, token } = exigirConexao(linha);
-  return chamarGas<{ copias: { nome: string; criadaEm: string }[] }>(endpoint, token, {
-    acao: "listarCopias",
-    aba: dados.data.aba,
-  });
+  return listarCopiasComum(FINALIDADE, entrada);
 }
 
 /** Restaura uma cópia, com senha e frase; invalida o esquema salvo. */
 export async function restaurarCopia(admin: { id: string }, entrada: unknown) {
-  const dados = esquemaRestaurar.safeParse(entrada);
-  if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
-  }
-  if (dados.data.frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO) {
-    throw new ErroHttp("A frase de confirmação não confere.", 400);
-  }
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:restaurar");
-  const linha = await lerLinha();
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string; copia: string; anterior: string }>(
-    endpoint,
-    token,
-    { acao: "restaurarCopia", aba: dados.data.aba, copia: dados.data.copia },
-    { retentavel: false },
-  );
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.update({
-      where: { id: ID },
-      data: { esquema: Prisma.DbNull, assinaturaEsquema: null, esquemaEm: null },
-    });
-    await auditar(tx, admin.id, "planilha.restaurar", `aba:${dados.data.aba}`);
-  });
-  return resultado;
+  return restaurarCopiaComum(admin, FINALIDADE, entrada);
 }
 
 /** Cria uma aba nova com o cabeçalho mínimo, para uma turma sem aba. */
 export async function criarAba(admin: { id: string }, entrada: unknown) {
-  const dados = z
-    .object({
-      nome: z.string().trim().min(1, "Informe o nome da aba.").max(200),
-      cabecalho: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
-    })
-    .safeParse(entrada);
-  if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
-  }
-  const linha = await lerLinha();
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string }>(
-    endpoint,
-    token,
-    { acao: "criarAba", nome: dados.data.nome, cabecalho: dados.data.cabecalho },
-    { retentavel: false },
-  );
-  await comTransacao(async (tx) => {
-    await auditar(tx, admin.id, "planilha.criarAba", `aba:${dados.data.nome}`);
-  });
-  return resultado;
+  return criarAbaComum(admin, FINALIDADE, entrada);
 }
 
 /** Remove uma aba criada pela integração, no modo completo, com senha e frase. */
 export async function removerAba(admin: { id: string }, entrada: unknown) {
-  const dados = z
-    .object({
-      aba: z.string().min(1).max(200),
-      frase: z.string().trim().min(1, "Digite a frase de confirmação."),
-      senha: z.string().min(1, "Informe a senha do administrador."),
-    })
-    .safeParse(entrada);
-  if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
-  }
-  if (dados.data.frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO) {
-    throw new ErroHttp("A frase de confirmação não confere.", 400);
-  }
-  const linha = await lerLinha();
-  if (!modoCompletoAtivo(linha)) {
-    throw new ErroHttp("O modo completo não está ativo.", 400);
-  }
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:remover");
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string }>(
-    endpoint,
-    token,
-    { acao: "removerAba", aba: dados.data.aba },
-    { retentavel: false },
-  );
-  await comTransacao(async (tx) => {
-    await auditar(tx, admin.id, "planilha.removerAba", `aba:${dados.data.aba}`);
-  });
-  return resultado;
+  return removerAbaComum(admin, FINALIDADE, entrada);
 }
 
 /** Desliga a integração e apaga token e esquema. A planilha fica intacta. */
 export async function desconectarIntegracao(admin: { id: string }) {
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.update({
-      where: { id: ID },
-      data: {
-        ativa: false,
-        endpoint: null,
-        token: null,
-        esquema: Prisma.DbNull,
-        assinaturaEsquema: null,
-        esquemaEm: null,
-        modo: "CONSERVADOR",
-        modoCompletoAte: null,
-        atualizadoPorId: admin.id,
-      },
-    });
-    await auditar(tx, admin.id, "planilha.desconectar", `integracao:${ID}`);
-  });
-  return { ok: true };
+  return desconectar(admin, FINALIDADE);
 }
