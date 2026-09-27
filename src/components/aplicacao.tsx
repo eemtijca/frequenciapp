@@ -452,7 +452,7 @@ export default function Aplicacao({
     void executarSaida();
   }
 
-  function renderizarVisao(alvoVisao: Visao) {
+  function renderizarVisao(alvoVisao: Visao, ativo: boolean) {
     return (
       <div className={`mx-auto w-full ${LARGURAS[alvoVisao]}`}>
         {alvoVisao === "painel" && (
@@ -495,6 +495,7 @@ export default function Aplicacao({
             catalogoJustificativas={justificativas}
             saidas={saidas}
             onSaidasMudaram={recarregarSaidas}
+            ativo={ativo}
           />
         )}
         {alvoVisao === "relatorios" && (
@@ -707,7 +708,7 @@ export default function Aplicacao({
                     onScroll={(evento) => guardarRolagem(item.visao, evento)}
                     className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                   >
-                    {renderizarVisao(item.visao)}
+                    {renderizarVisao(item.visao, ativo)}
                   </section>
                 );
               })}

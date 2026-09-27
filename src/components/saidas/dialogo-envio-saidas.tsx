@@ -221,8 +221,11 @@ export default function DialogoEnvioSaidas({
             <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
               <span className="font-medium">Aba {simulacao.aba}</span>
               <span>
-                {simulacao.resumo.criar} linhas novas · {simulacao.resumo.preencher} células a
-                preencher · {simulacao.resumo.puladasOcupadas} ocupadas ignoradas ·{" "}
+                {simulacao.resumo.criar}{" "}
+                {simulacao.resumo.criar === 1 ? "linha nova" : "linhas novas"} ·{" "}
+                {simulacao.resumo.preencher}{" "}
+                {simulacao.resumo.preencher === 1 ? "célula a preencher" : "células a preencher"} ·{" "}
+                {simulacao.resumo.puladasOcupadas} ocupadas ignoradas ·{" "}
                 {simulacao.resumo.puladasFormula} fórmulas protegidas
               </span>
               {modoCompleto && (

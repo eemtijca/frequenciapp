@@ -69,6 +69,8 @@ interface Props {
   catalogoJustificativas: JustificativaConfigurada[];
   saidas: SaidaAntecipada[];
   onSaidasMudaram: (mes: string) => Promise<void>;
+  /** A vista é aquecida em segundo plano; só busca o estado quando visível. */
+  ativo: boolean;
 }
 
 export default function VistaSaidas({
@@ -82,6 +84,7 @@ export default function VistaSaidas({
   catalogoJustificativas,
   saidas,
   onSaidasMudaram,
+  ativo,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turmaFiltro, setTurmaFiltro] = useState("");
@@ -102,6 +105,12 @@ export default function VistaSaidas({
   const [envioAberto, setEnvioAberto] = useState(false);
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilhaSaidas();
+
+  // A vista é aquecida em segundo plano e pode montar antes de a planilha ser
+  // configurada; ao ficar visível, o estado da integração é relido.
+  useEffect(() => {
+    if (ativo) void recarregarPlanilha();
+  }, [ativo, recarregarPlanilha]);
 
   const [relatorioAberto, setRelatorioAberto] = useState(false);
   const [diaRelatorio, setDiaRelatorio] = useState(diaCorrente);
