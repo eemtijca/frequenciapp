@@ -27,6 +27,11 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
 A cada mudança no código, publique uma nova versão da implantação. O
 aplicativo avisa quando a versão publicada está atrasada.
 
+Para a planilha de saídas, repita a publicação na outra planilha, com outro
+`FREQUENCIAPP_TOKEN` e, se o projeto for autônomo, outro `PLANILHA_ID`. O
+mesmo código serve às duas finalidades, e o aplicativo guarda um endereço e
+um token por planilha.
+
 ## Desenvolvimento com clasp
 
 ```bash

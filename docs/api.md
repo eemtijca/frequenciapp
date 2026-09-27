@@ -412,6 +412,96 @@ Apaga token e esquema e desliga a integração. Apenas administração. A planil
 
 - 200 `{"ok": true}`.
 
+## Planilha de saídas
+
+Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Mesmas regras de conexão, token e modo completo, com configuração restrita à administração e envio aceito de qualquer sessão ativa.
+
+### GET /api/planilha-saidas/estado
+
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "configurada"}}`. Qualquer sessão.
+
+### GET /api/planilha-saidas e PATCH /api/planilha-saidas
+
+Leitura e edição da configuração: `{ ativa?, endpoint? }`. Apenas administração. O token volta mascarado.
+
+- 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
+
+### POST /api/planilha-saidas/token
+
+Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administração, com a senha conferida e limite de tentativas.
+
+- 200 `{"token": string}`; 400 senha incorreta; 429 tentativas em excesso.
+
+### POST /api/planilha-saidas/testar
+
+Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso ou a versão divergem.
+
+- 200 `{"ping": { ..., "avisos": string[] }}`; 400 endereço ou token ausente; 502 sem resposta.
+
+### POST /api/planilha-saidas/estrutura
+
+Lê as abas e sugere a aba única de registro, com as colunas reconhecidas.
+
+- 200 `{ "planilha", "abas", "sugestao", "problemas" }`. Apenas administração.
+
+### POST /api/planilha-saidas/mapa
+
+Corpo: `{ "planilha": {...}, "abas": AbaSaidaEsquema[], "aba": string }`. Salva a aba escolhida e a assinatura.
+
+- 200 `{"integracao": {...}}`; 400 para aba inválida, bloqueada ou ausente.
+
+### POST /api/planilha-saidas/simular
+
+Corpo: `{ "de", "ate", "removerLinhas"? }`. Período de até 92 dias. Devolve a prévia da aba única, o `planoHash`, as linhas novas, as correções, os candidatos à remoção e os avisos.
+
+- 200 com resumo e listas; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
+
+### POST /api/planilha-saidas/aplicar
+
+Mesmo corpo da simulação mais `planoHash`. Recalcula tudo, exige o mesmo hash e envia a aba. Operações destrutivas exigem o modo completo.
+
+- 200 `{"resultado": "sucesso" | "parcial" | "falha", "contagens"?, "erro"?}`; 400 sem prévia; 409 quando os dados mudaram; 429 envios em excesso.
+
+### POST /api/planilha-saidas/modo-completo
+
+Corpo: `{ "frase": "EDITAR PLANILHA", "senha": string, "duracaoMinutos"?: 5 | 15 | 30 | 60 }`. Apenas administração.
+
+- 200 `{"modo": "completo", "modoCompletoAte"}`; 400 frase, senha ou duração inválidas; 429 tentativas em excesso.
+
+### POST /api/planilha-saidas/modo-conservador
+
+Volta ao modo conservador. Qualquer sessão.
+
+- 200 `{"modo": "conservador"}`.
+
+### GET /api/planilha-saidas/copias?aba=...
+
+Lista as cópias ocultas da aba de saídas. Apenas administração.
+
+### POST /api/planilha-saidas/restaurar
+
+Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardando a versão atual e invalidando o esquema. Apenas administração.
+
+- 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
+
+### POST /api/planilha-saidas/criar-aba
+
+Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria a aba de registro com o cabeçalho padrão das saídas. Apenas administração.
+
+- 200 `{"aba": string}`; 400 nome inválido ou repetido; 502 falha na planilha.
+
+### POST /api/planilha-saidas/remover-aba
+
+Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, criando cópia antes. Apenas administração.
+
+- 200 `{"aba": string}`; 400 frase, senha ou modo inválidos; 502 quando a aba não foi criada pela integração.
+
+### POST /api/planilha-saidas/desconectar
+
+Apaga token e esquema e desliga a integração de saídas. Apenas administração. A planilha não é alterada.
+
+- 200 `{"ok": true}`.
+
 ## Cópia de segurança
 
 ### GET /api/backup
