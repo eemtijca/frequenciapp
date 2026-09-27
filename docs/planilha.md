@@ -58,6 +58,8 @@ Fórmula nunca é sobrescrita, nem no modo completo. A remoção só acontece em
 
 Quando a falha no envio é de rede, ou quando o script quebra no meio de um plano, o registro fica como parcial, porque parte do plano pode ter sido aplicada; recusa explícita do script fica como falha. A tela mostra só a frase em português; o detalhe técnico devolvido pelo script fica no log do servidor e no último erro do card.
 
+O card mostra o último erro só enquanto ele for vigente: vale o envio mais recente e, se ele deu certo, o erro anterior some. Na planilha de frequência o critério é por turma de origem, porque o envio do mês grava uma turma por vez: a falha de uma turma continua visível até ela mesma ser enviada com sucesso, e o sucesso de outra turma não a esconde. Na planilha de saídas há um só histórico. O selo "Último envio em" mostra a data em que o envio aconteceu, no fuso da escola, e o histórico lista o período enviado em DD/MM/AAAA.
+
 ## Cópias de segurança
 
 Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_frequenciapp_backup_<aba>_<data-hora-milissegundos>`, mantendo as três mais recentes. O card lista as cópias por aba e permite restaurar, com senha e frase de novo. A restauração guarda a versão atual como nova cópia, copia o conteúdo, os formatos e as mesclagens da cópia para dentro da própria aba e invalida o esquema salvo, exigindo nova conferência antes do próximo envio. A aba mantém identificador, posição e as fórmulas de outras abas que apontam para ela. Os marcadores de linha e coluna passam a ser os da cópia.
