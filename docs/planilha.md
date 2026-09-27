@@ -18,7 +18,9 @@ Integração opcional da administração com a planilha da escola, por Google Ap
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como a própria conta e permita acesso a qualquer pessoa. Autorize.
 5. Copie o endereço terminado em `/exec`, cole no aplicativo e use Testar conexão.
 
-Cada mudança no código pede uma nova versão da implantação. O aplicativo mostra a versão que o script devolveu no último teste. O script guarda a posição de cada linha e coluna criada no valor do marcador de metadado; marcador sem essa posição vem de versão de teste antiga e é ignorado, o que mantém a remoção restrita ao que a integração criou.
+Cada mudança no código pede uma nova versão da implantação, em Implantar, Gerenciar implantações, Nova versão; o endereço `/exec` não muda. O script está na versão 2, e o Testar conexão avisa quando a versão publicada é outra. Um teste de unidade guarda o hash de cada versão e falha se o `gas/Codigo.gs` mudar sem versão nova.
+
+O script marca cada linha e coluna que cria com Developer Metadata na linha ou coluna inteira, único alvo que o Google aceita além da aba e da planilha. A posição é lida da localização do marcador, que acompanha a linha ou coluna quando outras são inseridas ou removidas antes dela; o valor não carrega posição. Assim a remoção fica restrita ao que a integração criou, mesmo depois de edição manual acima. Marcador antigo com valor `linha:2` na linha inteira continua reconhecido.
 
 ## Conferir a estrutura
 
@@ -54,11 +56,11 @@ O destrave é feito em Gestão, Configurações, Planilha de frequência, por um
 
 Fórmula nunca é sobrescrita, nem no modo completo. A remoção só acontece em linha, coluna ou aba com o marcador da integração. Cabeçalho com mesclagem sobre coluna de dia bloqueia a prévia e pede ajuste manual. Qualquer sessão pode voltar ao conservador, e a janela expira sozinha; perto do fim, o card oferece Estender, sempre com senha de novo.
 
-Quando a falha no envio é de rede, o registro fica como parcial, porque parte do plano pode ter sido aplicada; recusa explícita do script fica como falha.
+Quando a falha no envio é de rede, ou quando o script quebra no meio de um plano, o registro fica como parcial, porque parte do plano pode ter sido aplicada; recusa explícita do script fica como falha. A tela mostra só a frase em português; o detalhe técnico devolvido pelo script fica no log do servidor e no último erro do card.
 
 ## Cópias de segurança
 
-Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_frequenciapp_backup_<aba>_<data-hora>`, mantendo as três mais recentes. O card lista as cópias por aba e permite restaurar, com senha e frase de novo. A restauração guarda a versão atual como nova cópia e invalida o esquema salvo, exigindo nova conferência antes do próximo envio.
+Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_frequenciapp_backup_<aba>_<data-hora-milissegundos>`, mantendo as três mais recentes. O card lista as cópias por aba e permite restaurar, com senha e frase de novo. A restauração guarda a versão atual como nova cópia, copia o conteúdo, os formatos e as mesclagens da cópia para dentro da própria aba e invalida o esquema salvo, exigindo nova conferência antes do próximo envio. A aba mantém identificador, posição e as fórmulas de outras abas que apontam para ela. Os marcadores de linha e coluna passam a ser os da cópia.
 
 ## Planilha de saídas
 
@@ -82,6 +84,7 @@ O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o
 | A aba de saídas precisa de Aluno e Data  | Ajuste o cabeçalho da aba de registro antes de salvar a estrutura.               |
 | Nada a enviar no período                 | As saídas do mês já estão na planilha; a prévia mostra zero linhas novas.        |
 | Não foi possível falar com a planilha    | Rede de saída bloqueada ou implantação despublicada.                             |
+| Não foi possível concluir a operação     | Erro do Google no script; o último erro do card traz o detalhe.                  |
 | O script respondeu em formato inesperado | Código antigo publicado; publique a versão atual.                                |
 
 ## Privacidade
