@@ -6,7 +6,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
-import { chamarGas, ErroGas } from "@/infra/planilha";
+import { chamarGas, ErroGas, mensagemParaRegistro } from "@/infra/planilha";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSaidas } from "@/application/saidas";
@@ -549,6 +549,7 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
     return { resultado: "sucesso" as const, contagens };
   } catch (erro) {
     const mensagem = erro instanceof ErroHttp ? erro.message : "Falha ao enviar para a planilha.";
+    const registro = mensagemParaRegistro(erro, mensagem);
     // Falha de rede pode ter aplicado parte do plano; recusa explícita, não.
     const parcial = erro instanceof ErroGas && !erro.recusado;
     await registrarSincronizacaoSaidas(
@@ -559,7 +560,7 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
       resultadoDeFalha(!parcial),
       dados.data.de,
       dados.data.ate,
-      mensagem,
+      registro,
     );
     return { resultado: parcial ? ("parcial" as const) : ("falha" as const), erro: mensagem };
   }
