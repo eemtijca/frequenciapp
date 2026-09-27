@@ -26,7 +26,8 @@ export function CirculoContagem({ valor, sigla, tom, singular, plural }: Circulo
       className={cn(
         "numerais-tabulares inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] leading-none font-semibold",
         tom === "falta" && "border-falta/40 bg-falta-fraca text-falta-texto",
-        tom === "justificada" && "border-primary/30 bg-primary/10 text-primary",
+        tom === "justificada" &&
+          "border-justificada/40 bg-justificada-fraca text-justificada-texto",
         tom === "saida" && "bg-secondary text-muted-foreground border-border",
       )}
     >

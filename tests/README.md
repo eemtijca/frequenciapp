@@ -25,6 +25,7 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.
 - `decisao-admin.test.ts`: bootstrap do administrador no modo `--somente-criar`.
+- `paleta.test.ts`: separação entre falta e falta justificada sob daltonismo simulado e contraste dos tokens, lidos do `globals.css` nos dois temas.
 - `texto-editorial.test.ts`: guarda da convenção editorial do repositório (sem travessões e demais padrões proibidos).
 
 ## Contratos de API
