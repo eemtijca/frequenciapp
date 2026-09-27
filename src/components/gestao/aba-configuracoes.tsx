@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
+import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -329,6 +330,8 @@ export default function AbaConfiguracoes({
       </div>
 
       <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
+
+      <IntegracaoSaidas />
 
       <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
         <div>
