@@ -345,11 +345,12 @@ describe("integração com a planilha", () => {
     const config = await json<{
       integracao: {
         alteradasDepois: number;
-        ultimoErro: { resultado: string; erro: string | null } | null;
+        ultimoErro: { resultado: string; erro: string | null; turma: string | null } | null;
       };
     }>(await autenticado("/api/planilha"));
     expect(config.integracao.alteradasDepois).toBeGreaterThanOrEqual(0);
     expect(config.integracao.ultimoErro?.resultado).toBe("FALHA");
+    expect(config.integracao.ultimoErro?.turma).toBe("QP Ano A");
     expect(config.integracao.ultimoErro?.erro).toContain("Recusa de teste");
   });
 
@@ -458,6 +459,12 @@ describe("integração com a planilha", () => {
     expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
     expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
     expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(true);
+
+    // O sucesso da mesma turma apaga a falha registrada antes para ela.
+    const config = await json<{
+      integracao: { ultimoErro: { turma: string | null } | null };
+    }>(await autenticado("/api/planilha"));
+    expect(config.integracao.ultimoErro?.turma ?? null).not.toBe("QP Ano A");
   });
 
   it("remove linha criada pela integração no modo completo", async () => {

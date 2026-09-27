@@ -6,6 +6,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
+import { ambiente } from "@/infra/ambiente";
 import { chamarGas, ErroGas, mensagemParaRegistro } from "@/infra/planilha";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -30,6 +31,7 @@ import {
 } from "@/application/planilha-comum";
 import {
   detectarEsquema,
+  erroVigente,
   hashTexto,
   montarTurmaPlanilha,
   planejarSincronizacao,
@@ -160,16 +162,7 @@ export async function lerIntegracaoAdmin() {
       criadoEm: true,
     },
   });
-  const ultimoErro = await banco().sincronizacaoPlanilha.findFirst({
-    where: { finalidade: FINALIDADE, resultado: { in: ["FALHA", "PARCIAL"] } },
-    orderBy: { criadoEm: "desc" },
-    select: {
-      erro: true,
-      resultado: true,
-      criadoEm: true,
-      turmaOriginal: { select: { nome: true, serie: { select: { nome: true } } } },
-    },
-  });
+  const ultimoErro = await lerErroVigente();
   return {
     ativa: linha.ativa,
     endpoint: linha.endpoint,
@@ -183,6 +176,7 @@ export async function lerIntegracaoAdmin() {
       ? (linha.modoCompletoAte?.toISOString() ?? null)
       : null,
     atualizadoEm: linha.atualizadoEm.toISOString(),
+    fuso: ambiente.fuso,
     alteradasDepois: await contarAlteradasDepois(),
     ultimoErro: ultimoErro
       ? {
@@ -201,6 +195,37 @@ export async function lerIntegracaoAdmin() {
       criadoEm: item.criadoEm.toISOString(),
     })),
   };
+}
+
+/**
+ * Erro vigente da frequência, por turma de origem: só o envio mais recente de
+ * cada turma conta, para um sucesso posterior apagar o erro daquela turma sem
+ * esconder a falha de outra. Duas consultas: o último instante por turma e os
+ * registros desses instantes.
+ */
+async function lerErroVigente() {
+  const ultimos = await banco().sincronizacaoPlanilha.groupBy({
+    by: ["turmaOriginalId"],
+    where: { finalidade: FINALIDADE, turmaOriginalId: { not: null } },
+    _max: { criadoEm: true },
+  });
+  const limites = ultimos.flatMap((item) =>
+    item.turmaOriginalId && item._max.criadoEm
+      ? [{ turmaOriginalId: item.turmaOriginalId, criadoEm: item._max.criadoEm }]
+      : [],
+  );
+  if (limites.length === 0) return null;
+  const registros = await banco().sincronizacaoPlanilha.findMany({
+    where: { finalidade: FINALIDADE, OR: limites },
+    select: {
+      turmaOriginalId: true,
+      erro: true,
+      resultado: true,
+      criadoEm: true,
+      turmaOriginal: { select: { nome: true, serie: { select: { nome: true } } } },
+    },
+  });
+  return erroVigente(registros, (registro) => registro.turmaOriginalId);
 }
 
 /** Salva integração ativa e endereço do Web App, com validação de host. */

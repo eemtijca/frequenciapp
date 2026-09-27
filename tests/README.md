@@ -19,6 +19,7 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
 - `planilha.test.ts`: dataframe, esquema da planilha, CSV e planejamento conservador.
 - `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
+- `planilha-envios.test.ts`: erro vigente por turma ou por histórico único, data do último envio e datas sem horário em qualquer fuso.
 - `planilha-cliente.test.ts`: cliente do Apps Script com recusa, falha parcial e detalhe técnico.
 - `usuarios.test.ts`: política de senha, primeiro nome e rótulo de papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
