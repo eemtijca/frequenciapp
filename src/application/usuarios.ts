@@ -1,5 +1,7 @@
-// Gestão de usuários pela administração: criar, editar, redefinir senha,
-// ativar, desativar e excluir. Nunca sem administrador ativo.
+// Gestão da equipe pela administração: criar, editar, redefinir senha,
+// ativar, desativar e excluir. Nunca sem administrador ativo. Contas de
+// diretor de turma têm cadastro próprio (application/diretores) e não
+// aparecem nem são alteradas por aqui.
 import { z } from "zod";
 import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
@@ -7,8 +9,8 @@ import { hashearSenha } from "@/infra/auth/hash";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { problemaDeSenha } from "@/domain/usuarios";
-import type { Identidade, UsuarioDTO } from "@/domain/usuarios";
+import { PAPEIS_DA_EQUIPE, ehPapelDaEquipe, problemaDeSenha } from "@/domain/usuarios";
+import type { Identidade, Papel, PapelDaEquipe, UsuarioDTO } from "@/domain/usuarios";
 
 const nomeUsuario = z
   .string()
@@ -26,7 +28,7 @@ export const esquemaCriarUsuario = z.object({
   nome: nomeUsuario,
   email: emailUsuario,
   senha: senhaForte,
-  papel: z.enum(["ADMIN", "COORDENACAO"]).default("COORDENACAO"),
+  papel: z.enum(PAPEIS_DA_EQUIPE).default("COORDENACAO"),
 });
 
 export const esquemaAtualizarUsuario = z
@@ -34,7 +36,7 @@ export const esquemaAtualizarUsuario = z
     nome: nomeUsuario.optional(),
     email: emailUsuario.optional(),
     senha: senhaForte.optional(),
-    papel: z.enum(["ADMIN", "COORDENACAO"]).optional(),
+    papel: z.enum(PAPEIS_DA_EQUIPE).optional(),
     ativo: z.boolean().optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
@@ -45,7 +47,7 @@ interface LinhaUsuario {
   id: string;
   nome: string;
   email: string;
-  papel: "ADMIN" | "COORDENACAO";
+  papel: Papel;
   ativo: boolean;
 }
 
@@ -62,6 +64,7 @@ function paraUsuario(linha: LinhaUsuario): UsuarioDTO {
 /** Lista todos os usuários da equipe. */
 export async function listarUsuarios(): Promise<UsuarioDTO[]> {
   const linhas = await banco().usuario.findMany({
+    where: { papel: { in: [...PAPEIS_DA_EQUIPE] } },
     orderBy: [{ ativo: "desc" }, { nome: "asc" }],
   });
   return linhas.map(paraUsuario);
@@ -72,14 +75,21 @@ export async function listarUsuarios(): Promise<UsuarioDTO[]> {
  * dados mínimos para o campo de responsável.
  */
 export async function listarResponsaveis(): Promise<
-  { id: string; nome: string; papel: "ADMIN" | "COORDENACAO" }[]
+  { id: string; nome: string; papel: PapelDaEquipe }[]
 > {
   const linhas = await banco().usuario.findMany({
-    where: { ativo: true, papel: { in: ["ADMIN", "COORDENACAO"] } },
+    where: { ativo: true, papel: { in: [...PAPEIS_DA_EQUIPE] } },
     orderBy: [{ papel: "asc" }, { nome: "asc" }],
     select: { id: true, nome: true, papel: true },
   });
-  return linhas;
+  return linhas.flatMap((linha) =>
+    ehPapelDaEquipe(linha.papel) ? [{ ...linha, papel: linha.papel }] : [],
+  );
+}
+
+/** Conta da equipe pelo id; conta de diretor fica de fora, como inexistente. */
+function buscarDaEquipe(id: string) {
+  return banco().usuario.findFirst({ where: { id, papel: { in: [...PAPEIS_DA_EQUIPE] } } });
 }
 
 /** Conta administradores ativos dentro do cliente informado (transação ou base). */
@@ -146,7 +156,7 @@ export async function atualizarUsuario(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
 
-  const alvo = await banco().usuario.findUnique({ where: { id } });
+  const alvo = await buscarDaEquipe(id);
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
 
   if (dados.data.email && dados.data.email !== alvo.email) {
@@ -209,7 +219,7 @@ export async function removerUsuario(admin: Identidade, id: string): Promise<voi
   if (id === admin.id) {
     throw new ErroHttp("Você não pode excluir a sua própria conta. Use outro administrador.", 400);
   }
-  const alvo = await banco().usuario.findUnique({ where: { id } });
+  const alvo = await buscarDaEquipe(id);
   if (!alvo) throw new ErroHttp("Usuário não encontrado.", 404);
   await comTransacao(async (tx) => {
     if (alvo.papel === "ADMIN" && alvo.ativo) {
