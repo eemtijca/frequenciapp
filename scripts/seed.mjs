@@ -61,6 +61,9 @@ const JUSTIFICATIVAS = [
   ["S", "Suspensão"],
 ];
 
+// Mesmo catálogo inicial da migração para quem libera a saída.
+const LIBERADORES = ["adriano", "adriana", "helena"];
+
 const MOMENTOS = ["aula_2", "aula_3", "intervalo_1", "aula_5", "almoco"];
 
 function formatarDia(data) {
@@ -275,12 +278,20 @@ try {
     const dia = dias[indice];
     const momento = MOMENTOS[indice % MOMENTOS.length];
     const [codigoJustificativa] = JUSTIFICATIVAS[indice % JUSTIFICATIVAS.length];
+    const liberadoPorCodigo = LIBERADORES[indice % LIBERADORES.length];
     const criada = await cliente.query(
-      `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_id, criado_por_id)
-       values ($1, $2, $3, $4, null, $5, $5)
+      `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa, observacao, liberado_por_codigo, criado_por_id)
+       values ($1, $2, $3, $4, null, $5, $6)
        on conflict (aluno_id, dia) do nothing
        returning id`,
-      [alunosDaTurma.rows[0].id, dia, momento, codigoJustificativa, coordenacaoId],
+      [
+        alunosDaTurma.rows[0].id,
+        dia,
+        momento,
+        codigoJustificativa,
+        liberadoPorCodigo,
+        coordenacaoId,
+      ],
     );
     saidasCriadas += criada.rowCount;
   }
