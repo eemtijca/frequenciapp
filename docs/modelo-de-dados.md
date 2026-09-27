@@ -94,7 +94,7 @@ A unicidade de (turma, dia) faz o banco rejeitar duplicatas: existe **uma frequ�
 | justificativa | texto | Código do catálogo; nulo quando a falta é simples.            |
 | observacao    | texto | Observação opcional, usada principalmente no código "Outros". |
 
-A presença não gera linha: quem não tem falta na frequência do dia esteve presente na aula. Uma frequência salva sem faltas significa todos presentes, que é o caso comum. A falta com justificativa vira **FJ**; sem justificativa permanece **F**. No modo por aula, o aluno que sai no meio do dia fica com falta apenas nas aulas que perdeu, e a marca vira **S** quando a falta cobre parte das aulas. O catálogo de justificativas vem da tabela `justificativas`, é editável na Gestão e vale para a falta e para a saída; o código é estável e o rótulo pode mudar. A saída também pode guardar a justificativa em texto livre, sem código.
+A presença não gera linha: quem não tem falta na frequência do dia esteve presente na aula. Uma frequência salva sem faltas significa todos presentes, que é o caso comum. A falta com justificativa vira **FJ**; sem justificativa permanece **F**. No modo por aula, o aluno que sai no meio do dia fica com falta apenas nas aulas que perdeu, e a marca vira **S** quando a falta cobre parte das aulas. O catálogo de justificativas vem da tabela `justificativas`, é editável na Gestão e vale para a falta e para a saída; o código é estável e o rótulo pode mudar. A saída também pode guardar a justificativa em texto livre, sem código, e quem libera sai do catálogo `liberadores`, também editável na Gestão.
 
 ## Saída antecipada (saida_antecipada)
 
@@ -107,7 +107,7 @@ A presença não gera linha: quem não tem falta na frequência do dia esteve pr
 | justificativa     | texto | Código do catálogo; nulo quando a justificativa foi escrita.                          |
 | observacao        | texto | Observação opcional de intervalos e almoço, no tipo Outros.                           |
 | texto             | texto | Até 100 caracteres. Sem código, é a justificativa. Na aula, pode complementar o tipo. |
-| liberadoPorCodigo | texto | Quem liberou: `adriano`, `adriana` ou `helena`. Nulo no histórico antigo.             |
+| liberadoPorCodigo | texto | Código do catálogo de quem libera; nulo no histórico antigo.                          |
 | liberadoPorId     | uuid  | Conta da equipe nos registros antigos; anulável.                                      |
 | criadoPorId       | uuid  | Quem registrou; anulável.                                                             |
 | criadoEm          | data  | Momento do registro.                                                                  |
@@ -137,6 +137,18 @@ Os recursos são ligados e desligados na Gestão, com auditoria. Desligar não a
 | criadoEm | data     |                                                                    |
 
 O catálogo nasce com os 12 códigos do aplicativo de referência e é editado em Gestão, Configurações, Justificativas. A exclusão é bloqueada quando há faltas ou saídas usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo.
+
+## Quem libera (liberador)
+
+| Campo    | Tipo     | Observação                                                         |
+| -------- | -------- | ------------------------------------------------------------------ |
+| id       | uuid     | Gerado pelo banco.                                                 |
+| codigo   | texto    | Código estável, único sem diferenciar caixa; até 20 caracteres.    |
+| rotulo   | texto    | Nome exibido, de 2 a 60 caracteres; editável.                      |
+| ativo    | booleano | Desativado sai das opções novas e continua resolvendo o histórico. |
+| criadoEm | data     |                                                                    |
+
+O catálogo nasce com Diretor Adriano, Coordenadora Adriana e Coordenadora Helena e é editado em Gestão, Configurações, Quem libera as saídas. A exclusão é bloqueada quando há saída usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo, e a saída guarda o código, não o nome, para o rótulo poder mudar sem perder o histórico.
 
 ## Integração com a planilha (integracao_planilha)
 

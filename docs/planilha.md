@@ -68,7 +68,7 @@ Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_
 
 A segunda finalidade registra as saídas antecipadas em outra planilha, em aba única, uma linha por saída. A configuração fica em Gestão, Configurações, Planilha de saídas, com token, endereço e conferência de estrutura próprios. O mesmo `gas/Codigo.gs` é publicado na planilha de saídas, com implantação e token próprios; o aplicativo avisa quando o script publicado está atrasado.
 
-Colunas reconhecidas no cabeçalho, por rótulo: Data, Aluno, Turma, Momento, Justificativa, Observação e Liberado por. Aluno e Data são obrigatórios. Colunas desconhecidas são preservadas e não recebem escrita. A coluna Justificativa recebe o rótulo do tipo ou o texto escrito; Liberado por recebe o nome fixo de quem liberou.
+Colunas reconhecidas no cabeçalho, por rótulo: Data, Aluno, Turma, Momento, Justificativa, Observação e Liberado por. Aluno e Data são obrigatórios. Colunas desconhecidas são preservadas e não recebem escrita. A coluna Justificativa recebe o rótulo do tipo ou o texto escrito; Liberado por recebe o rótulo do catálogo de quem libera.
 
 O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o mês escolhido e prévia obrigatória. No modo conservador só nasce linha para saída que ainda não existe e só célula vazia é preenchida; divergência em linha manual é listada e ignorada. No modo completo, com a mesma frase, senha e prazo, o aplicativo corrige células divergentes de linhas criadas pela integração e permite remover linhas marcadas que não têm mais saída no período enviado. Cada operação destrutiva guarda cópia da aba.
 
