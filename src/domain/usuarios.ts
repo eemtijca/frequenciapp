@@ -2,13 +2,23 @@
 // e nomes de exibição: testáveis de forma isolada.
 
 /** Papel do usuário na aplicação. */
-export type Papel = "ADMIN" | "COORDENACAO";
+export type Papel = "ADMIN" | "COORDENACAO" | "DIRETOR_TURMA";
+
+/** Papéis da equipe escolar, criados na aba Equipe; o diretor tem cadastro próprio. */
+export const PAPEIS_DA_EQUIPE = ["ADMIN", "COORDENACAO"] as const;
+export type PapelDaEquipe = (typeof PAPEIS_DA_EQUIPE)[number];
+
+/** Verdadeiro para os papéis da equipe escolar. */
+export function ehPapelDaEquipe(papel: Papel): papel is PapelDaEquipe {
+  return (PAPEIS_DA_EQUIPE as readonly Papel[]).includes(papel);
+}
 
 /**
  * O que um papel permite fazer. As guardas consultam a capacidade, nunca o
  * papel: um papel novo só ganha acesso ao que for listado para ele aqui.
  */
-export type Capacidade = "operar" | "administrar" | "alterarPropriaSenha";
+export type Capacidade =
+  "operar" | "administrar" | "alterarPropriaSenha" | "verEstatisticasDasTurmas";
 
 /**
  * Matriz de acesso. É política de segurança, revisada em pull request, e por
@@ -18,6 +28,7 @@ export type Capacidade = "operar" | "administrar" | "alterarPropriaSenha";
 const CAPACIDADES_POR_PAPEL: Record<Papel, readonly Capacidade[]> = {
   ADMIN: ["operar", "administrar", "alterarPropriaSenha"],
   COORDENACAO: ["operar", "alterarPropriaSenha"],
+  DIRETOR_TURMA: ["verEstatisticasDasTurmas", "alterarPropriaSenha"],
 };
 
 /** Verdadeiro quando o papel concede a capacidade; o restante é recusado. */
@@ -55,6 +66,12 @@ export function primeiroNome(nomeCompleto: string): string {
   return nomeCompleto.trim().split(/\s+/)[0] ?? nomeCompleto;
 }
 
+const ROTULOS_DE_PAPEL: Record<Papel, string> = {
+  ADMIN: "Administração",
+  COORDENACAO: "Coordenação",
+  DIRETOR_TURMA: "Diretor de turma",
+};
+
 export function rotuloDePapel(papel: Papel): string {
-  return papel === "ADMIN" ? "Administração" : "Coordenação";
+  return ROTULOS_DE_PAPEL[papel];
 }
