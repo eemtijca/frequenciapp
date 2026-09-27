@@ -13,7 +13,7 @@ A saída antecipada exigia um código do catálogo em todo registro. O texto liv
 - O formulário oferece duas formas, e só uma vale por registro: escrever a justificativa em até 100 caracteres, ou escolher um tipo do catálogo como antes.
 - No tipo, o texto opcional da aula e a observação de Outros fora da aula continuam como na ADR-018.
 - No texto livre, o código fica nulo e o texto vale em qualquer momento, inclusive intervalo e almoço.
-- Quem libera é um código do catálogo `liberadores`, gerido na Gestão como o catálogo de justificativas: código estável, rótulo e situação editáveis, exclusão barrada quando há saída usando o código. A migração semeia Diretor Adriano, Coordenadora Adriana e Coordenadora Helena.
+- Quem libera é um código do catálogo `liberadores`, gerido na Gestão como o catálogo de justificativas: código estável, rótulo e situação editáveis, exclusão barrada quando há saída usando o código. O catálogo nasce vazio: a administração cadastra quem libera na Gestão, sem nome de pessoa no código nem na migração.
 - O registro novo exige um código do catálogo. Registros antigos continuam com `liberadoPorId` e sem código. A cópia JSON aceita os dois formatos e leva o catálogo junto.
 - O nome exibido sai do rótulo atual do catálogo, e o histórico preserva o código.
 

@@ -148,7 +148,7 @@ O catálogo nasce com os 12 códigos do aplicativo de referência e é editado e
 | ativo    | booleano | Desativado sai das opções novas e continua resolvendo o histórico. |
 | criadoEm | data     |                                                                    |
 
-O catálogo nasce com Diretor Adriano, Coordenadora Adriana e Coordenadora Helena e é editado em Gestão, Configurações, Quem libera as saídas. A exclusão é bloqueada quando há saída usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo, e a saída guarda o código, não o nome, para o rótulo poder mudar sem perder o histórico.
+O catálogo começa vazio e é editado em Gestão, Configurações, Quem libera as saídas. A exclusão é bloqueada quando há saída usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo, e a saída guarda o código, não o nome, para o rótulo poder mudar sem perder o histórico.
 
 ## Integração com a planilha (integracao_planilha)
 
