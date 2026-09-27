@@ -33,7 +33,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import { diasDoMes } from "@/domain/frequencia";
-import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
+import { primeiroNome, rotuloDePapel, temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import {
   AlertDialog,
@@ -195,7 +195,7 @@ export default function Aplicacao({
   resumoInicial,
 }: Props) {
   const router = useRouter();
-  const ehAdmin = usuario.papel === "ADMIN";
+  const ehAdmin = temCapacidade(usuario.papel, "administrar");
   const pedida = visaoValida(visaoInicial);
   const inicial =
     pedida &&

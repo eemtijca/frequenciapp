@@ -9,6 +9,7 @@ import { listarLiberadores } from "@/application/liberadores";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { ambiente } from "@/infra/ambiente";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
+import { temCapacidade } from "@/domain/usuarios";
 import TelaLogin from "@/components/auth/tela-login";
 import Aplicacao from "@/components/aplicacao";
 
@@ -20,7 +21,9 @@ export default async function Pagina({
   searchParams: Promise<{ visao?: string }>;
 }) {
   const usuario = await identidadeAtual(ambiente.authSecret);
-  if (!usuario) {
+  // Recusa por padrão: o aplicativo completo só abre para quem opera a
+  // escola. Nenhum papel atual cai aqui; um papel só de leitura terá tela própria.
+  if (!usuario || !temCapacidade(usuario.papel, "operar")) {
     return <TelaLogin />;
   }
   const parametros = await searchParams;
