@@ -1,6 +1,12 @@
-// Domínio de usuários: política de senha e rótulos de exibição.
+// Domínio de usuários: política de senha, rótulos de exibição e capacidades.
 import { describe, expect, it } from "vitest";
-import { primeiroNome, problemaDeSenha, rotuloDePapel } from "@/domain/usuarios";
+import {
+  primeiroNome,
+  problemaDeSenha,
+  rotuloDePapel,
+  temCapacidade,
+  type Papel,
+} from "@/domain/usuarios";
 
 describe("problemaDeSenha", () => {
   it("aprova senhas dentro da política", () => {
@@ -40,5 +46,25 @@ describe("rotuloDePapel", () => {
   it("traduz os papéis", () => {
     expect(rotuloDePapel("ADMIN")).toBe("Administração");
     expect(rotuloDePapel("COORDENACAO")).toBe("Coordenação");
+  });
+});
+
+describe("temCapacidade", () => {
+  it("dá à administração a operação, a gestão e a troca de senha", () => {
+    expect(temCapacidade("ADMIN", "operar")).toBe(true);
+    expect(temCapacidade("ADMIN", "administrar")).toBe(true);
+    expect(temCapacidade("ADMIN", "alterarPropriaSenha")).toBe(true);
+  });
+
+  it("dá à coordenação a operação e a troca de senha, sem a gestão", () => {
+    expect(temCapacidade("COORDENACAO", "operar")).toBe(true);
+    expect(temCapacidade("COORDENACAO", "alterarPropriaSenha")).toBe(true);
+    expect(temCapacidade("COORDENACAO", "administrar")).toBe(false);
+  });
+
+  it("recusa papel desconhecido vindo de dado inesperado", () => {
+    const desconhecido = "VISITANTE" as unknown as Papel;
+    expect(temCapacidade(desconhecido, "operar")).toBe(false);
+    expect(temCapacidade(desconhecido, "administrar")).toBe(false);
   });
 });

@@ -40,7 +40,7 @@ import {
   rotuloJustificativa,
   type FaltaAluno,
 } from "@/domain/frequencia";
-import type { Identidade } from "@/domain/usuarios";
+import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -131,6 +131,7 @@ export default function VistaFrequencia({
   onPendencia,
   onAbrirGestao,
 }: Props) {
+  const podeAdministrar = temCapacidade(usuario.papel, "administrar");
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
   const [dia, setDia] = useState(() => alvo?.dia ?? diaCorrente);
   const [ausencias, setAusencias] = useState<Map<string, Set<string>>>(new Map());
@@ -564,11 +565,11 @@ export default function VistaFrequencia({
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma turma cadastrada</p>
           <p className="text-muted-foreground text-sm">
-            {usuario.papel === "ADMIN"
+            {podeAdministrar
               ? "Cadastre séries, turmas e alunos na área de Gestão para começar."
               : "Peça à administração para cadastrar as turmas e os alunos da escola."}
           </p>
-          {usuario.papel === "ADMIN" && onAbrirGestao && (
+          {podeAdministrar && onAbrirGestao && (
             <Button variant="outline" className="mt-2" onClick={onAbrirGestao}>
               <Settings2 size={16} />
               Ir para a Gestão
@@ -879,7 +880,7 @@ export default function VistaFrequencia({
               <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
                 <p className="font-medium">Nenhum aluno ativo nesta turma</p>
                 <p className="text-muted-foreground text-sm">
-                  {usuario.papel === "ADMIN"
+                  {podeAdministrar
                     ? "Cadastre alunos na área de Gestão."
                     : "Peça ao administrador para cadastrar os alunos desta turma."}
                 </p>

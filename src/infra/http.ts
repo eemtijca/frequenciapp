@@ -1,9 +1,9 @@
-// Auxiliares das rotas: resposta JSON sem cache, guardas de sessão e papel,
+// Auxiliares das rotas: resposta JSON sem cache, guardas por capacidade,
 // defesa CSRF, leitura limitada do corpo e tradução de qualquer exceção.
 import { ambiente } from "@/infra/ambiente";
 import { identidadeAtual } from "@/application/sessao";
 import { ErroHttp, traduzirErro } from "@/infra/erros";
-import type { Identidade } from "@/domain/usuarios";
+import { temCapacidade, type Capacidade, type Identidade } from "@/domain/usuarios";
 
 const LIMITE_DE_CORPO = 200_000;
 
@@ -33,30 +33,41 @@ export async function executarRota(manipulador: () => Promise<Response>): Promis
   }
 }
 
-/** Exige sessão ativa; devolve a identidade ou resposta de erro. */
-export async function exigirSessao(): Promise<
-  { ok: true; usuario: Identidade } | { ok: false; resposta: Response }
-> {
+type Guarda = { ok: true; usuario: Identidade } | { ok: false; resposta: Response };
+
+/** Recusa por capacidade: a mensagem diz o que falta, sem expor o papel. */
+const RECUSA_POR_CAPACIDADE: Record<Capacidade, string> = {
+  operar: "Seu acesso não permite esta operação.",
+  administrar: "Apenas o administrador pode fazer esta operação.",
+  alterarPropriaSenha: "Seu acesso não permite trocar a senha por aqui.",
+};
+
+/**
+ * Exige sessão ativa com a capacidade pedida. É a única porta das rotas:
+ * papel sem a capacidade recebe 403, mesmo com sessão válida.
+ */
+export async function exigirCapacidade(capacidade: Capacidade): Promise<Guarda> {
   const usuario = await identidadeAtual(ambiente.authSecret);
   if (!usuario) {
     return { ok: false, resposta: erroApi("Sua sessão expirou. Entre novamente.", 401) };
   }
+  if (!temCapacidade(usuario.papel, capacidade)) {
+    return { ok: false, resposta: erroApi(RECUSA_POR_CAPACIDADE[capacidade], 403) };
+  }
   return { ok: true, usuario };
 }
 
+/**
+ * Exige sessão da operação escolar: chamada, saídas, relatórios e envio à
+ * planilha. Um papel novo só passa aqui se receber a capacidade "operar".
+ */
+export async function exigirSessao(): Promise<Guarda> {
+  return exigirCapacidade("operar");
+}
+
 /** Exige sessão ativa de administrador (acesso root de configuração). */
-export async function exigirAdmin(): Promise<
-  { ok: true; usuario: Identidade } | { ok: false; resposta: Response }
-> {
-  const sessao = await exigirSessao();
-  if (!sessao.ok) return sessao;
-  if (sessao.usuario.papel !== "ADMIN") {
-    return {
-      ok: false,
-      resposta: erroApi("Apenas o administrador pode fazer esta operação.", 403),
-    };
-  }
-  return sessao;
+export async function exigirAdmin(): Promise<Guarda> {
+  return exigirCapacidade("administrar");
 }
 
 /**

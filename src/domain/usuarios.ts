@@ -4,6 +4,27 @@
 /** Papel do usuário na aplicação. */
 export type Papel = "ADMIN" | "COORDENACAO";
 
+/**
+ * O que um papel permite fazer. As guardas consultam a capacidade, nunca o
+ * papel: um papel novo só ganha acesso ao que for listado para ele aqui.
+ */
+export type Capacidade = "operar" | "administrar" | "alterarPropriaSenha";
+
+/**
+ * Matriz de acesso. É política de segurança, revisada em pull request, e por
+ * isso fica no código, e não no banco. O Record obriga todo papel a declarar
+ * as capacidades: esquecer um papel novo quebra a compilação.
+ */
+const CAPACIDADES_POR_PAPEL: Record<Papel, readonly Capacidade[]> = {
+  ADMIN: ["operar", "administrar", "alterarPropriaSenha"],
+  COORDENACAO: ["operar", "alterarPropriaSenha"],
+};
+
+/** Verdadeiro quando o papel concede a capacidade; o restante é recusado. */
+export function temCapacidade(papel: Papel, capacidade: Capacidade): boolean {
+  return CAPACIDADES_POR_PAPEL[papel]?.includes(capacidade) ?? false;
+}
+
 /** Usuário visível pela interface. Sem segredos. */
 export interface UsuarioDTO {
   id: string;
