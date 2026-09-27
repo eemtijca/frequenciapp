@@ -28,7 +28,7 @@ test.describe("autenticação", () => {
     await page.getByLabel("E-mail").fill(ADMIN_E2E.email);
     await page.getByLabel("Senha", { exact: true }).fill("senha-errada-123");
     await page.getByRole("button", { name: "Entrar" }).click();
-    await expect(page.getByText("E-mail ou senha incorretos.")).toBeVisible();
+    await expect(page.getByText("E-mail, identificador ou senha incorretos.")).toBeVisible();
   });
 
   test("entra na frequência e sai da conta", async ({ page }) => {

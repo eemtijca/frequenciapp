@@ -2,7 +2,7 @@
 
 ## Status
 
-Aceita. A fase 1 (guardas por capacidade) entra com esta ADR; as fases seguintes vêm em pull requests próprios.
+Aceita. Fases 1 a 4 implementadas, cada uma em pull request próprio; a fase 5 (roteiro de operação) fecha o ciclo.
 
 ## Contexto
 

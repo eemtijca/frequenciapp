@@ -91,10 +91,10 @@ export async function entrar(
   const usuario = await banco().usuario.findFirst({ where: { email: dados.data.login } });
   if (!usuario) {
     await conferirSenha(dados.data.senha, await hashDeComparacao());
-    return { ok: false, erro: "E-mail ou senha incorretos.", status: 401 };
+    return { ok: false, erro: "E-mail, identificador ou senha incorretos.", status: 401 };
   }
   if (!(await conferirSenha(dados.data.senha, usuario.senhaHash))) {
-    return { ok: false, erro: "E-mail ou senha incorretos.", status: 401 };
+    return { ok: false, erro: "E-mail, identificador ou senha incorretos.", status: 401 };
   }
   if (!usuario.ativo) {
     return {

@@ -1,7 +1,8 @@
 "use client";
 
 // Troca da própria senha: exige a atual, orienta a política e avisa
-// que outros dispositivos serão desconectados.
+// que outros dispositivos serão desconectados. Para o diretor de turma, o
+// mesmo formulário troca a palavra-chave, e no primeiro acesso não fecha.
 import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -23,9 +25,22 @@ import {
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
+  /** Troca a palavra-chave do diretor de turma, com os rótulos dela. */
+  palavraChave?: boolean;
+  /** Troca obrigatória: sem cancelar, e o diálogo não fecha sozinho. */
+  obrigatoria?: boolean;
+  onTrocada?: () => void;
 }
 
-export default function DialogoSenha({ aberto, onAbrir }: Props) {
+export default function DialogoSenha({
+  aberto,
+  onAbrir,
+  palavraChave = false,
+  obrigatoria = false,
+  onTrocada,
+}: Props) {
+  const termo = palavraChave ? "palavra-chave" : "senha";
+  const Termo = palavraChave ? "Palavra-chave" : "Senha";
   const [senhaAtual, setSenhaAtual] = useState("");
   const [senhaNova, setSenhaNova] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
@@ -34,7 +49,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   function fechar(abertoNovo: boolean) {
-    if (enviando) return;
+    if (enviando || (obrigatoria && !abertoNovo)) return;
     onAbrir(abertoNovo);
     if (!abertoNovo) {
       setSenhaAtual("");
@@ -47,19 +62,24 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
   async function submeter() {
     if (enviando) return;
     if (senhaNova !== confirmacao) {
-      setErro("A confirmação não confere com a nova senha.");
+      setErro(`A confirmação não confere com a nova ${termo}.`);
       return;
     }
     setEnviando(true);
     setErro("");
     try {
       await pedir<{ ok: boolean }>("/api/conta/senha", corpoJson({ senhaAtual, senhaNova }));
-      toast.success("Senha trocada. Nos outros dispositivos, entre de novo.");
-      fechar(false);
+      toast.success(`${Termo} trocada. Nos outros dispositivos, entre de novo.`);
+      setSenhaAtual("");
+      setSenhaNova("");
+      setConfirmacao("");
+      onTrocada?.();
+      if (!obrigatoria) fechar(false);
     } catch (excecao) {
-      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível trocar a senha.");
+      const contexto = `Não foi possível trocar a ${termo}.`;
+      setErro(excecao instanceof ErroApi ? excecao.message : contexto);
       setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, { contexto: "Não foi possível trocar a senha." });
+      avisarErro(excecao, { contexto });
     } finally {
       setEnviando(false);
     }
@@ -67,9 +87,15 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
 
   return (
     <Dialog open={aberto} onOpenChange={fechar}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-sm" showCloseButton={!obrigatoria}>
         <DialogHeader>
-          <DialogTitle>Trocar minha senha</DialogTitle>
+          <DialogTitle>{obrigatoria ? `Crie sua ${termo}` : `Trocar minha ${termo}`}</DialogTitle>
+          {obrigatoria && (
+            <DialogDescription>
+              A palavra-chave recebida serve só para o primeiro acesso. Escolha uma própria para
+              continuar.
+            </DialogDescription>
+          )}
         </DialogHeader>
         <form
           className="flex flex-col gap-4"
@@ -80,7 +106,9 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           noValidate
         >
           <div className="flex flex-col gap-2">
-            <Label htmlFor="senha-atual">Senha atual</Label>
+            <Label htmlFor="senha-atual">
+              {obrigatoria ? "Palavra-chave recebida" : `${Termo} atual`}
+            </Label>
             <CampoSenha
               id="senha-atual"
               value={senhaAtual}
@@ -91,7 +119,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="senha-nova">Nova senha</Label>
+            <Label htmlFor="senha-nova">Nova {termo}</Label>
             <CampoSenha
               id="senha-nova"
               value={senhaNova}
@@ -106,7 +134,7 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="senha-confirmacao">Confirmar nova senha</Label>
+            <Label htmlFor="senha-confirmacao">Confirmar nova {termo}</Label>
             <CampoSenha
               id="senha-confirmacao"
               value={confirmacao}
@@ -119,12 +147,14 @@ export default function DialogoSenha({ aberto, onAbrir }: Props) {
           </div>
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => fechar(false)}>
-              Cancelar
-            </Button>
+            {!obrigatoria && (
+              <Button type="button" variant="outline" onClick={() => fechar(false)}>
+                Cancelar
+              </Button>
+            )}
             <Button type="submit" disabled={enviando}>
               {enviando && <LoaderCircle size={16} className="animate-spin" />}
-              Trocar senha
+              {obrigatoria ? "Salvar e continuar" : `Trocar ${termo}`}
             </Button>
           </DialogFooter>
         </form>

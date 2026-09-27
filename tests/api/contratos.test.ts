@@ -169,7 +169,7 @@ describe("autenticação", () => {
     });
     expect(resposta.status).toBe(401);
     const dados = (await resposta.json()) as { error: string };
-    expect(dados.error).toBe("E-mail ou senha incorretos.");
+    expect(dados.error).toBe("E-mail, identificador ou senha incorretos.");
   });
 
   it("entra com o admin e devolve o papel", async () => {

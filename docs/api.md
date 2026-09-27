@@ -2,7 +2,7 @@
 
 Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009).
 
-Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas por capacidade ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)): rotas de cadastro, de contas, de configurações de recursos, dos catálogos, das integrações e de cópia de segurança exigem `administrar` (papel `ADMIN`); chamada, relatórios, saídas e consultas exigem `operar` (`ADMIN` e `COORDENACAO`); a troca da própria senha exige `alterarPropriaSenha`. Sem sessão, 401; com sessão sem a capacidade, 403.
+Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas por capacidade ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)): rotas de cadastro, de contas, de configurações de recursos, dos catálogos, das integrações e de cópia de segurança exigem `administrar` (papel `ADMIN`); chamada, relatórios, saídas e consultas exigem `operar` (`ADMIN` e `COORDENACAO`); a troca da própria senha exige `alterarPropriaSenha`; as estatísticas do diretor de turma exigem `verEstatisticasDasTurmas` (papel `DIRETOR_TURMA`). Sem sessão, 401; com sessão sem a capacidade, 403.
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
@@ -16,7 +16,7 @@ Respostas:
 
 - 200 `{"usuario": {"id", "nome", "email", "papel", "ativo"}}` e cookie de sessão. No diretor, `email` traz o identificador, o cookie é de sessão e a validade no servidor é a menor entre a sessão do diretor e a validade da palavra-chave.
 - 400 quando o corpo é inválido.
-- 401 com mensagem genérica quando credenciais não conferem.
+- 401 com mensagem genérica ("E-mail, identificador ou senha incorretos.") quando credenciais não conferem.
 - 403 quando a conta está desativada, quando a palavra-chave do diretor venceu ou foi revogada (só depois de a palavra conferir) ou quando a origem não é confiável.
 - 429 após excesso de tentativas por dispositivo e login ou por login, com limites e janela dos parâmetros de acesso.
 
@@ -84,6 +84,23 @@ Corpo: `{ "motivo": string }`, de 3 a 200 caracteres. A senha vira inutilizável
 Corpo parcial com os mesmos campos. Faixas: validade de 1 a 365 dias, sessão de 1 a 72 horas, tentativas por dispositivo de 1 a 100, por login de 1 a 500, janela de 1 a 1440 minutos e limite de risco de 1% a 100%. `categoriasDiretor` é subconjunto de `faltas`, `justificativas` e `saidas`, sempre com `faltas`.
 
 - 200 `{"parametros": ...}`; 400 fora da faixa.
+
+## Visão do diretor de turma
+
+### GET /api/diretor/estatisticas?turmaId=&de=&ate=
+
+Exige `verEstatisticasDasTurmas`. Estatísticas agregadas dos alunos ativos cuja turma de origem é `turmaId`, com a marca tirada da chamada da turma atual de cada um (o mesmo recorte da Grade). `de` e `ate` são datas `AAAA-MM-DD`, no máximo um ano.
+
+- O escopo sai do banco: a turma precisa ter vínculo vigente hoje com o diretor da sessão. O período é recortado ao vínculo e ao dia corrente; sem interseção, `periodo` e `estatisticas` voltam nulos.
+- Denominador: os dias com chamada registrada na turma atual do aluno. Ausência soma faltas e faltas justificadas; em risco é quem alcança o `limiteRiscoPercentual` dos parâmetros.
+- `faltas` e `justificadas` só vêm preenchidos com a categoria `justificativas` liberada, e `saidas` com a categoria `saidas`; fora delas, `null`.
+- Cada consulta fica na auditoria como `diretor.consultar`.
+
+Respostas:
+
+- 200 `{"turmaId", "turma", "periodo": {de, ate} | null, "vinculo": {inicio, fim}, "estatisticas": { alunos[], semanas[], resumo, limiteRisco, categorias } | null}`. Aluno: `{ alunoId, nome, ausencias, faltas, justificadas, saidas, diasComChamada, taxa, emRisco }`, ordenados pela taxa. Semana: `{ inicio (segunda-feira), ausencias, faltas, justificadas, alunoDias, taxa }`.
+- 400 consulta malformada ou período invertido.
+- 403 sem a capacidade, com a palavra-chave ainda por trocar ("Troque a palavra-chave para ver as estatísticas.") ou com turma fora do vínculo ("Esta turma não está entre as suas.").
 
 ## Séries
 

@@ -63,7 +63,7 @@ export default function TelaLogin() {
     try {
       await pedir<{ usuario: { nome: string } }>(
         "/api/auth/entrar",
-        corpoJson({ email, senha, lembrar }),
+        corpoJson({ login: email, senha, lembrar }),
       );
       try {
         if (lembrar) window.localStorage.setItem(CHAVE_EMAIL, email.trim().toLowerCase());
@@ -146,13 +146,12 @@ export default function TelaLogin() {
 
           <form onSubmit={submeter} className="flex flex-col gap-5" noValidate>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">E-mail ou identificador</Label>
               <Input
                 id="email"
-                type="email"
+                type="text"
                 name="email"
                 autoComplete="username"
-                inputMode="email"
                 autoCapitalize="none"
                 spellCheck={false}
                 required
@@ -163,7 +162,7 @@ export default function TelaLogin() {
                   setEmail(evento.target.value);
                   if (erro) setErro("");
                 }}
-                placeholder="pessoa@escola.br"
+                placeholder="pessoa@escola.br ou 3a-maria"
                 className="h-12"
               />
             </div>
