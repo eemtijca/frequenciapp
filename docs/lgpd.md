@@ -14,6 +14,7 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 | Nome da administração e da coordenação                 | Tratamento e saudação; identificação da equipe.                   | Conta ativa.                                                                        |
 | Trilha de auditoria (quem, o quê, quando)              | Prestar contas de ações administrativas.                          | Conforme política da escola; sem dados de alunos.                                   |
 | Frequência enviada à planilha da escola                | Reorganizar por turma de origem, quando a integração está ligada. | Na planilha da própria escola, sob controle dela.                                   |
+| Saídas enviadas à planilha da escola                   | Registrar as saídas antecipadas em outra planilha, quando ligada. | Idem, com justificativa e observação sob controle da escola.                        |
 
 Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
 
@@ -41,7 +42,7 @@ delete from usuarios where id = '<id da conta>';
 
 ## Repartição de papéis
 
-O desenvolvedor do aplicativo não tem acesso a dados de produção: o software roda na infraestrutura escolhida pela escola, sem telemetria e sem dependência de terceiros contratados. A integração opcional com o Google Planilhas é configurada pela própria escola, na conta Google dela, e só envia o que a finalidade de frequência exige. A escola, ao usar o sistema, responde pelos dados que insere, mantendo a caderneta digital dentro da mesma finalidade da caderneta de papel.
+O desenvolvedor do aplicativo não tem acesso a dados de produção: o software roda na infraestrutura escolhida pela escola, sem telemetria e sem dependência de terceiros contratados. A integração opcional com o Google Planilhas é configurada pela própria escola, na conta Google dela, e só envia o que cada finalidade exige: a frequência por turma de origem e, quando ligada, as saídas antecipadas em outra planilha, com justificativa e observação. A escola, ao usar o sistema, responde pelos dados que insere, mantendo a caderneta digital dentro da mesma finalidade da caderneta de papel.
 
 ## Repositório limpo
 

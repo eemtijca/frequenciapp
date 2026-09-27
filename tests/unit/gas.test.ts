@@ -13,8 +13,56 @@ interface Celula {
 
 interface Metadado {
   chave: string;
+  valor?: string;
   linha?: number;
   coluna?: number;
+  linhas?: number;
+  colunas?: number;
+}
+
+interface Intervalo {
+  linhaInicial: number;
+  linhaFinal: number;
+  colunaInicial: number;
+  colunaFinal: number;
+}
+
+function colunaDeLetras(letras: string): number {
+  let valor = 0;
+  for (const letra of letras) {
+    valor = valor * 26 + (letra.toUpperCase().charCodeAt(0) - 64);
+  }
+  return valor;
+}
+
+function intervaloA1(texto: string): Intervalo | null {
+  const partes = texto.split(":");
+  const inicio = /^([A-Za-z]+)(\d+)$/.exec(partes[0] ?? "");
+  if (!inicio) return null;
+  const fim = partes[1] ? /^([A-Za-z]+)(\d+)$/.exec(partes[1]) : null;
+  const colunaInicial = colunaDeLetras(inicio[1] ?? "");
+  const linhaInicial = Number(inicio[2]);
+  const colunaFinal = fim ? colunaDeLetras(fim[1] ?? "") : colunaInicial;
+  const linhaFinal = fim ? Number(fim[2]) : linhaInicial;
+  if (!colunaInicial || !linhaInicial) return null;
+  return { linhaInicial, linhaFinal, colunaInicial, colunaFinal };
+}
+
+/** Localização como a API real: intervalo da linha ou da coluna, ou nulo. */
+function localizacaoDoMetadado(item: Metadado) {
+  const faixa = {
+    getRow: () => item.linha ?? 0,
+    getColumn: () => item.coluna ?? 0,
+  };
+  const linhas = item.linhas ?? 1;
+  const colunas = item.colunas ?? 1;
+  if (linhas === 1 && colunas > 1) {
+    return { getRow: () => faixa, getColumn: () => null };
+  }
+  if (colunas === 1 && linhas > 1) {
+    return { getRow: () => null, getColumn: () => faixa };
+  }
+  return { getRow: () => null, getColumn: () => null };
 }
 
 class AbaFalsa {
@@ -77,11 +125,6 @@ class AbaFalsa {
   setFrozenRows(valor: number) {
     this.congeladasLinhas = valor;
     return this;
-  }
-  getMergedRanges() {
-    return this.mesclagens.map((intervalo) => ({
-      getA1Notation: () => intervalo,
-    }));
   }
   getLastRow() {
     let ultima = 0;
@@ -153,8 +196,8 @@ class AbaFalsa {
     planilha.abas.push(copia);
     return copia;
   }
-  addDeveloperMetadata(chave: string, _valor: string) {
-    this.metadados.push({ chave });
+  addDeveloperMetadata(chave: string, valor = "1") {
+    this.metadados.push({ chave, valor });
     return this;
   }
   createDeveloperMetadataFinder() {
@@ -168,10 +211,8 @@ class AbaFalsa {
         this.metadados
           .filter((item) => item.chave === chave)
           .map((item) => ({
-            getLocation: () => ({
-              getRow: () => item.linha ?? null,
-              getColumn: () => item.coluna ?? null,
-            }),
+            getValue: () => item.valor ?? "",
+            getLocation: () => localizacaoDoMetadado(item),
           })),
     };
     return finder;
@@ -241,9 +282,33 @@ class FaixaFalsa {
     }
     return this;
   }
-  addDeveloperMetadata(chave: string, _valor: string) {
-    this.aba.metadados.push({ chave, linha: this.linha, coluna: this.coluna });
+  addDeveloperMetadata(chave: string, valor = "1") {
+    this.aba.metadados.push({
+      chave,
+      valor,
+      linha: this.linha,
+      coluna: this.coluna,
+      linhas: this.linhas,
+      colunas: this.colunas,
+    });
     return this;
+  }
+  getMergedRanges() {
+    return this.aba.mesclagens
+      .map((intervalo) => ({ intervalo, coordenadas: intervaloA1(intervalo) }))
+      .filter(
+        (item): item is { intervalo: string; coordenadas: Intervalo } => item.coordenadas !== null,
+      )
+      .filter(
+        ({ coordenadas }) =>
+          !(
+            coordenadas.linhaFinal < this.linha ||
+            coordenadas.linhaInicial > this.linha + this.linhas - 1 ||
+            coordenadas.colunaFinal < this.coluna ||
+            coordenadas.colunaInicial > this.coluna + this.colunas - 1
+          ),
+      )
+      .map((item) => ({ getA1Notation: () => item.intervalo }));
   }
 }
 
@@ -372,7 +437,11 @@ function assinaturaDaAba(aba: AbaFalsa): string {
   // Mesmo cálculo do domínio e do script.
   let a = 0x811c9dc5;
   let b = 0x1000193;
-  const texto = JSON.stringify([aba.getName(), cabecalho.map((v) => String(v).trim()), []]);
+  const texto = JSON.stringify([
+    aba.getName(),
+    cabecalho.map((v) => String(v).trim()),
+    aba.mesclagens.slice().sort(),
+  ]);
   for (let indice = 0; indice < texto.length; indice += 1) {
     const codigo = texto.charCodeAt(indice);
     a ^= codigo;
@@ -419,6 +488,18 @@ describe("Apps Script", () => {
     expect(dados.valores[1]?.[0]).toBe("Alice");
     expect(dados.formula[1]?.[4]).toBe(true);
     expect(dados.formula[0]?.[0]).toBe(false);
+  });
+
+  it("devolve as mesclagens da aba na estrutura", () => {
+    contexto.aba.mesclagens.push("C1:D1");
+    try {
+      const resposta = chamar(contexto, { acao: "estrutura" });
+      expect(resposta.ok).toBe(true);
+      const dados = resposta.dados as { abas: { nome: string; mesclagens: string[] }[] };
+      expect(dados.abas[0]?.mesclagens).toEqual(["C1:D1"]);
+    } finally {
+      contexto.aba.mesclagens.length = 0;
+    }
   });
 
   it("escreve apenas em célula vazia e sem fórmula", () => {
@@ -539,6 +620,23 @@ describe("Apps Script", () => {
     expect(criar.ok).toBe(true);
     expect(contexto.aba.getCelula(4, 1).valor).toBe("Carla");
     expect(contexto.aba.getCelula(1, 5).valor).toBe("12/09");
+    // A leitura precisa reconhecer o que a integração criou para o modo
+    // completo poder remover depois.
+    const leitura = chamar(contexto, {
+      acao: "ler",
+      aba: "3º ano A",
+      linhaInicial: 1,
+      colunaInicial: 1,
+      linhas: 6,
+      colunas: 6,
+    });
+    expect(leitura.ok).toBe(true);
+    const marcadoresLidos = leitura.dados as {
+      linhasCriadas: number[];
+      colunasCriadas: number[];
+    };
+    expect(marcadoresLidos.linhasCriadas).toContain(4);
+    expect(marcadoresLidos.colunasCriadas).toContain(5);
     const remover = chamar(contexto, {
       acao: "aplicar",
       aba: "3º ano A",
@@ -549,6 +647,39 @@ describe("Apps Script", () => {
     });
     expect(remover.ok).toBe(true);
     expect(remover.dados).toMatchObject({ removidasLinhas: 1 });
+    const removerColuna = chamar(contexto, {
+      acao: "aplicar",
+      aba: "3º ano A",
+      cabecalhoLinha: 1,
+      assinatura: assinaturaDaAba(contexto.aba),
+      modoCompleto: true,
+      operacoes: [{ tipo: "removerColunas", colunas: [5] }],
+    });
+    expect(removerColuna.ok).toBe(true);
+    expect(removerColuna.dados).toMatchObject({ removidasColunas: 1 });
+  });
+
+  it("ignora marcador de versão antiga sem o número no valor", () => {
+    contexto.aba.metadados.push({
+      chave: "frequenciapp.linha",
+      valor: "1",
+      linha: 9,
+      coluna: 1,
+    });
+    try {
+      const leitura = chamar(contexto, {
+        acao: "ler",
+        aba: "3º ano A",
+        linhaInicial: 1,
+        colunaInicial: 1,
+        linhas: 10,
+        colunas: 6,
+      });
+      const dadosLidos = leitura.dados as { linhasCriadas: number[] };
+      expect(dadosLidos.linhasCriadas).not.toContain(9);
+    } finally {
+      contexto.aba.metadados = contexto.aba.metadados.filter((item) => item.linha !== 9);
+    }
   });
 
   it("cria, lista e remove aba com marcador", () => {

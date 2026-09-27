@@ -48,13 +48,17 @@ test.describe("Google Planilhas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    const cartao = page.locator('[data-secao="planilha-frequencia"]');
+
+    // Antes de conectar, a leitura da estrutura fica bloqueada.
+    await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
 
     // Token com senha.
-    await page.getByRole("button", { name: "Gerar novo" }).click();
+    await cartao.getByRole("button", { name: "Gerar novo" }).click();
     const dialogoSenha = page.getByRole("dialog");
     await dialogoSenha.getByLabel("Senha do administrador").fill(ADMIN_E2E.senha);
     await dialogoSenha.getByRole("button", { name: "Confirmar" }).click();
-    const campoToken = page.locator("input[readonly]");
+    const campoToken = cartao.locator("input[readonly]");
     await expect
       .poll(async () => (await campoToken.inputValue()).length, { timeout: 15_000 })
       .toBeGreaterThan(20);
@@ -62,17 +66,18 @@ test.describe("Google Planilhas", () => {
     gas.definirToken(token);
 
     // Endereço, ativação e teste de conexão.
-    await page.getByLabel("URL /exec").fill(gas.url);
-    await page.getByRole("button", { name: "Salvar", exact: true }).click();
-    await page.getByRole("switch", { name: "Integração ativa" }).click();
-    await page.getByRole("button", { name: "Testar conexão" }).click();
-    await expect(page.getByText(/Conectado a Planilha de teste/)).toBeVisible();
+    await cartao.getByLabel("URL /exec").fill(gas.url);
+    await cartao.getByRole("button", { name: "Salvar", exact: true }).click();
+    await cartao.getByRole("switch", { name: "Integração ativa" }).click();
+    await cartao.getByRole("button", { name: "Testar conexão" }).click();
+    await expect(cartao.getByText(/Conectado a Planilha de teste/)).toBeVisible();
+    await expect(cartao.getByText("Ligada", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
-    await page.getByRole("button", { name: "Conferir estrutura" }).click();
+    await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
     const painelConfig = page.locator("#painel-configuracoes");
     await expect(painelConfig.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Salvar estrutura" }).click();
+    await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
     // Envio do mês de todas as turmas: a prévia lista a turma mapeada.
@@ -95,10 +100,11 @@ test.describe("Google Planilhas", () => {
     await page.context().setOffline(false);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
 
-    // Desconexão.
+    // Desconexão, na zona de risco.
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    await page.getByRole("button", { name: "Desconectar" }).first().click();
+    await cartao.getByRole("button", { name: "Zona de risco" }).click();
+    await cartao.getByRole("button", { name: "Desconectar" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Desconectar" }).click();
     await expect(
       page.getByText("Integração desconectada. A planilha não foi alterada."),

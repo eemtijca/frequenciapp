@@ -17,8 +17,8 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.       |
 | `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.               |
 | `justificativas`          | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.      |
-| `integracoes_planilha`    | Linha única da integração opcional com o Google Planilhas: token, esquema e modo.       |
-| `sincronizacoes_planilha` | Histórico de envios por turma de origem, com contagens e resultado.                     |
+| `integracoes_planilha`    | Uma linha por finalidade (`FREQUENCIA` e `SAIDAS`) com token, esquema e modo.           |
+| `sincronizacoes_planilha` | Histórico de envios por finalidade e turma de origem, com contagens e resultado.        |
 | `auditoria`               | Trilha de ações administrativas: quem, o quê e quando.                                  |
 
 Restrições de integridade relevantes:
@@ -33,6 +33,7 @@ Restrições de integridade relevantes:
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.
 - Unicidade de e-mail, nome de série e nome de turma por série é feita por índices funcionais em `lower()`, mantidos no SQL das migrations.
 - Checks de positividade em `frequencias.revisao`, `alunos.ordem`, `series.ordem` e `horarios.ordem` independem da aplicação.
+- `integracoes_planilha` e `sincronizacoes_planilha` separam a frequência das saídas pela coluna `finalidade`; cada finalidade tem a própria linha de token, esquema e modo completo.
 
 A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md); a chamada diária com justificativas, saídas e recursos opcionais está na [ADR-012](adr/012-chamada-diaria-com-saidas.md); a grade por período e a cópia JSON estão na [ADR-013](adr/013-grade-por-periodo-e-copia-json.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
 

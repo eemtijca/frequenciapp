@@ -32,6 +32,7 @@ interface Props {
   onAlunosMudaram: () => Promise<void>;
   onConfiguracoesMudaram: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
+  onAbrirSaidas?: () => void;
 }
 
 const ABAS: AbaItem<Aba>[] = [
@@ -55,6 +56,7 @@ export default function VistaGestao({
   onAlunosMudaram,
   onConfiguracoesMudaram,
   onJustificativasMudaram,
+  onAbrirSaidas,
 }: Props) {
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
@@ -90,6 +92,7 @@ export default function VistaGestao({
                 diaCorrente={diaCorrente}
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}
+                onAbrirSaidas={onAbrirSaidas}
               />
             )}
           </>

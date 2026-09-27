@@ -28,6 +28,15 @@ enum ModoPlanilha {
   @@map("modo_planilha")
 }
 
+// Finalidade da integração com a planilha: a frequência das turmas de origem
+// ou o registro das saídas antecipadas em outra planilha.
+enum FinalidadeIntegracao {
+  FREQUENCIA
+  SAIDAS
+
+  @@map("finalidade_integracao")
+}
+
 // Modalidade registrada em cada sincronização concluída.
 enum ModalidadeSincronizacao {
   CONSERVADOR
@@ -259,32 +268,35 @@ model Auditoria {
   @@map("auditoria")
 }
 
-// Integração opcional com Google Planilhas via Apps Script. Linha única: o
-// endpoint e o token nunca saem para o cliente e ficam fora da cópia JSON.
+// Integração opcional com Google Planilhas via Apps Script. Uma linha por
+// finalidade: o endpoint e o token nunca saem para o cliente e ficam fora da
+// cópia JSON.
 model IntegracaoPlanilha {
-  id                String       @id @default("principal")
-  ativa             Boolean      @default(false)
-  endpoint          String?      @db.VarChar(500)
-  token             String?      @db.VarChar(120)
-  versaoScript      String?      @map("versao_script") @db.VarChar(20)
+  id                String               @id @default("principal")
+  finalidade        FinalidadeIntegracao @default(FREQUENCIA)
+  ativa             Boolean              @default(false)
+  endpoint          String?              @db.VarChar(500)
+  token             String?              @db.VarChar(120)
+  versaoScript      String?              @map("versao_script") @db.VarChar(20)
   esquema           Json?
-  assinaturaEsquema String?      @map("assinatura_esquema") @db.VarChar(64)
-  esquemaEm         DateTime?    @map("esquema_em") @db.Timestamptz
-  modo              ModoPlanilha @default(CONSERVADOR)
-  modoCompletoAte   DateTime?    @map("modo_completo_ate") @db.Timestamptz
-  modoCompletoPorId String?      @map("modo_completo_por_id") @db.Uuid
-  atualizadoEm      DateTime     @updatedAt @map("atualizado_em") @db.Timestamptz
-  atualizadoPorId   String?      @map("atualizado_por_id") @db.Uuid
-  modoCompletoPor   Usuario?     @relation("IntegracaoModoPor", fields: [modoCompletoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor     Usuario?     @relation("IntegracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  assinaturaEsquema String?              @map("assinatura_esquema") @db.VarChar(64)
+  esquemaEm         DateTime?            @map("esquema_em") @db.Timestamptz
+  modo              ModoPlanilha         @default(CONSERVADOR)
+  modoCompletoAte   DateTime?            @map("modo_completo_ate") @db.Timestamptz
+  modoCompletoPorId String?              @map("modo_completo_por_id") @db.Uuid
+  atualizadoEm      DateTime             @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?              @map("atualizado_por_id") @db.Uuid
+  modoCompletoPor   Usuario?             @relation("IntegracaoModoPor", fields: [modoCompletoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor     Usuario?             @relation("IntegracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("integracoes_planilha")
 }
 
-// Histórico de sincronizações, uma linha por turma de origem enviada.
-// Serve ao cálculo de dias pendentes e à prestação de contas, sem nomes.
+// Histórico de sincronizações, uma linha por envio registrado. Serve ao
+// cálculo de dias pendentes e à prestação de contas, sem nomes.
 model SincronizacaoPlanilha {
   id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  finalidade       FinalidadeIntegracao    @default(FREQUENCIA)
   turmaOriginalId  String?                 @map("turma_original_id") @db.Uuid
   de               DateTime                @db.Date
   ate              DateTime                @db.Date
@@ -295,6 +307,7 @@ model SincronizacaoPlanilha {
   removidasLinhas  Int                     @default(0) @map("removidas_linhas")
   removidasColunas Int                     @default(0) @map("removidas_colunas")
   alunosCriados    Int                     @default(0) @map("alunos_criados")
+  linhasCriadas    Int                     @default(0) @map("linhas_criadas")
   colunasCriadas   Int                     @default(0) @map("colunas_criadas")
   puladasOcupadas  Int                     @default(0) @map("puladas_ocupadas")
   puladasFormula   Int                     @default(0) @map("puladas_formula")
@@ -308,5 +321,6 @@ model SincronizacaoPlanilha {
 
   @@index([turmaOriginalId, criadoEm])
   @@index([criadoEm])
+  @@index([finalidade, criadoEm])
   @@map("sincronizacoes_planilha")
 }
