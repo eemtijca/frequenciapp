@@ -230,6 +230,22 @@ describe("planilha de saídas", () => {
     expect(simulado.resumo.criar).toBe(1);
     expect(simulado.resumo.puladasOcupadas).toBe(0);
 
+    // Uma recusa vira o último erro do cartão até o próximo envio dar certo.
+    gas?.definirRecusarAplicar(true);
+    const recusado = await json<{ resultado: string }>(
+      await autenticado("/api/planilha-saidas/aplicar", {
+        method: "POST",
+        body: JSON.stringify({ de: DE, ate: ATE, planoHash: simulado.planoHash }),
+      }),
+    );
+    gas?.definirRecusarAplicar(false);
+    expect(recusado.resultado).toBe("falha");
+    const comErro = await json<{
+      integracao: { ultimoErro: { resultado: string; erro: string | null } | null };
+    }>(await autenticado("/api/planilha-saidas"));
+    expect(comErro.integracao.ultimoErro?.resultado).toBe("FALHA");
+    expect(comErro.integracao.ultimoErro?.erro).toContain("Recusa de teste");
+
     const aplicado = await json<{ resultado: string; contagens: Record<string, number> }>(
       await autenticado("/api/planilha-saidas/aplicar", {
         method: "POST",
@@ -240,6 +256,17 @@ describe("planilha de saídas", () => {
     expect(aplicado.contagens.linhasCriadas).toBe(1);
     expect(gas?.valor(ABA, 3, 1)).toBe("10/09/2026");
     expect(gas?.valor(ABA, 3, 2)).toBe("QS Ana");
+
+    const semErro = await json<{
+      integracao: {
+        ultimoErro: unknown;
+        fuso: string;
+        sincronizacoes: { resultado: string; criadoEm: string }[];
+      };
+    }>(await autenticado("/api/planilha-saidas"));
+    expect(semErro.integracao.ultimoErro).toBeNull();
+    expect(semErro.integracao.sincronizacoes[0]?.resultado).toBe("SUCESSO");
+    expect(semErro.integracao.fuso).toBeTruthy();
 
     const repetido = await json<{ resumo: { criar: number } }>(
       await autenticado("/api/planilha-saidas/simular", {

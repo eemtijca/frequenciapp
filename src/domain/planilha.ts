@@ -2,8 +2,10 @@
 // layout, planejamento conservador de sincronização e exportação CSV. Regras
 // puras, compartilhadas pelo servidor, pela interface e pelos testes.
 import {
+  diaLocal,
   montarGrade,
   normalizar,
+  rotuloData,
   type Aluno,
   type Frequencia,
   type Horario,
@@ -20,6 +22,60 @@ export const VERSAO_SCRIPT = 2;
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
   return recusado ? "FALHA" : "PARCIAL";
+}
+
+/** Registro de envio para o cálculo do erro vigente. */
+export interface RegistroDeEnvio {
+  resultado: "SUCESSO" | "FALHA" | "PARCIAL";
+  criadoEm: Date | string;
+}
+
+/**
+ * Erro vigente do histórico de envios: o registro mais recente de cada grupo
+ * decide, e só é erro se for FALHA ou PARCIAL. Um sucesso posterior no mesmo
+ * grupo apaga o erro anterior. Na frequência o grupo é a turma de origem, para
+ * a falha de uma turma não sumir com o sucesso de outra; nas saídas há um
+ * grupo só. Grupo nulo (turma excluída) não conta.
+ */
+export function erroVigente<T extends RegistroDeEnvio>(
+  registros: readonly T[],
+  grupo: (registro: T) => string | null,
+): T | null {
+  const ordenados = [...registros].sort(
+    (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime(),
+  );
+  const vistos = new Set<string>();
+  for (const registro of ordenados) {
+    const chave = grupo(registro);
+    if (chave === null || vistos.has(chave)) continue;
+    vistos.add(chave);
+    if (registro.resultado !== "SUCESSO") return registro;
+  }
+  return null;
+}
+
+/** Data DD/MM/AAAA de um instante, no fuso da escola. */
+export function rotuloInstante(instanteIso: string | null | undefined, fuso: string): string {
+  if (!instanteIso) return "";
+  const data = new Date(instanteIso);
+  if (Number.isNaN(data.getTime())) return "";
+  try {
+    return rotuloData(diaLocal(data, fuso || "UTC"));
+  } catch {
+    return rotuloData(data.toISOString().slice(0, 10));
+  }
+}
+
+/** Selo do cartão: a data em que o envio mais recente aconteceu, não o período. */
+export function rotuloUltimoEnvio(
+  sincronizacoes: readonly { criadoEm: string }[],
+  fuso: string,
+): string {
+  const recente = sincronizacoes.reduce<string | null>(
+    (maior, item) => (maior === null || item.criadoEm > maior ? item.criadoEm : maior),
+    null,
+  );
+  return recente ? `Último envio em ${rotuloInstante(recente, fuso)}` : "Sem envios";
 }
 
 /** Endpoint aceito: Web App do Google. Fora de produção o teste aceita local. */

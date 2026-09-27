@@ -6,6 +6,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
+import { ambiente } from "@/infra/ambiente";
 import { chamarGas, ErroGas, mensagemParaRegistro } from "@/infra/planilha";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -38,7 +39,7 @@ import {
   type PlanoSaidas,
   type SaidaPlanilha,
 } from "@/domain/planilha-saidas";
-import { resultadoDeFalha, type AbaBruta, type LeituraAba } from "@/domain/planilha";
+import { erroVigente, resultadoDeFalha, type AbaBruta, type LeituraAba } from "@/domain/planilha";
 import { diasEntre, ehDiaValido, rotuloJustificativa, rotuloMomento } from "@/domain/frequencia";
 
 const FINALIDADE = "SAIDAS" as const;
@@ -101,11 +102,13 @@ export async function lerIntegracaoSaidasAdmin() {
       criadoEm: true,
     },
   });
-  const ultimoErro = await banco().sincronizacaoPlanilha.findFirst({
-    where: { finalidade: FINALIDADE, resultado: { in: ["FALHA", "PARCIAL"] } },
+  // Só o envio mais recente decide: um sucesso depois apaga o erro anterior.
+  const ultimoEnvio = await banco().sincronizacaoPlanilha.findFirst({
+    where: { finalidade: FINALIDADE },
     orderBy: { criadoEm: "desc" },
     select: { erro: true, resultado: true, criadoEm: true },
   });
+  const ultimoErro = erroVigente(ultimoEnvio ? [ultimoEnvio] : [], () => FINALIDADE);
   return {
     ativa: linha.ativa,
     endpoint: linha.endpoint,
@@ -119,6 +122,7 @@ export async function lerIntegracaoSaidasAdmin() {
       ? (linha.modoCompletoAte?.toISOString() ?? null)
       : null,
     atualizadoEm: linha.atualizadoEm.toISOString(),
+    fuso: ambiente.fuso,
     ultimoErro: ultimoErro
       ? {
           erro: ultimoErro.erro,

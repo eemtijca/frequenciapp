@@ -380,6 +380,15 @@ export function rotuloDataCurta(dia: string): string {
   return `${numero}/${mes}`;
 }
 
+/**
+ * Data completa DD/MM/AAAA de um dia civil. Não passa por Date: "2026-09-01"
+ * lido como instante é meia-noite UTC e sairia 31/08 em fuso negativo.
+ */
+export function rotuloData(dia: string): string {
+  const [ano = "", mes = "", numero = ""] = dia.split("-");
+  return `${numero}/${mes}/${ano}`;
+}
+
 /** Dia civil deslocado em dias, sem depender do fuso do processo. */
 export function diaSeguinte(dia: string, deslocamento: number): string {
   const [anoTexto = "0", mesTexto = "0", numeroTexto = "0"] = dia.split("-");

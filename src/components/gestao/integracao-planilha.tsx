@@ -10,8 +10,8 @@ import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { type AbaEsquema } from "@/domain/planilha";
-import { diasDoMes, rotuloMes } from "@/domain/frequencia";
+import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
+import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -46,6 +46,7 @@ interface IntegracaoAdmin {
   esquemaEm: string | null;
   modo: "conservador" | "completo";
   modoCompletoAte: string | null;
+  fuso: string;
   alteradasDepois: number;
   ultimoErro: {
     erro: string | null;
@@ -67,11 +68,6 @@ interface IntegracaoAdmin {
 interface MapaAba {
   aba: string;
   turmaOriginalId: string;
-}
-
-function formatarData(iso: string | null | undefined): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("pt-BR");
 }
 
 export default function IntegracaoPlanilha({
@@ -338,7 +334,7 @@ export default function IntegracaoPlanilha({
         estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
         resumo={
           estruturaSalva && !estruturaEmEdicao
-            ? `Salva em ${formatarData(integracao?.esquemaEm)}`
+            ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
             : podeEnviar
               ? "Leia as abas e confira o mapa de cada turma."
               : "Conecte a planilha e ligue a integração para liberar."
@@ -499,8 +495,8 @@ export default function IntegracaoPlanilha({
             <ul className="text-muted-foreground flex flex-col gap-0.5">
               {integracao.sincronizacoes.slice(0, 5).map((item) => (
                 <li key={item.id}>
-                  {item.de} a {item.ate} · {item.modalidade.toLowerCase()} · {item.preenchidas}{" "}
-                  células · {item.resultado.toLowerCase()}
+                  {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()} ·{" "}
+                  {item.preenchidas} células · {item.resultado.toLowerCase()}
                 </li>
               ))}
             </ul>

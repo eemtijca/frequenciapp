@@ -11,6 +11,8 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { CABECALHO_SAIDAS, type AbaSaidaEsquema } from "@/domain/planilha-saidas";
+import { rotuloInstante, rotuloUltimoEnvio } from "@/domain/planilha";
+import { rotuloData } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +42,7 @@ interface IntegracaoSaidasAdmin {
   modo: "conservador" | "completo";
   modoCompletoAte: string | null;
   atualizadoEm: string;
+  fuso: string;
   ultimoErro: { erro: string | null; resultado: string; criadoEm: string } | null;
   sincronizacoes: {
     id: string;
@@ -56,11 +59,6 @@ interface IntegracaoSaidasAdmin {
 }
 
 const NOME_ABA_PADRAO = "Saiu mais cedo";
-
-function formatarData(iso: string | null | undefined): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("pt-BR");
-}
 
 export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: () => void }) {
   const [integracao, setIntegracao] = useState<IntegracaoSaidasAdmin | null>(null);
@@ -127,7 +125,6 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
   const abaEscolhida = abas.find((aba) => aba.nome === abaSelecionada) ?? null;
-  const ultimoEnvio = integracao?.sincronizacoes[0] ?? null;
 
   async function alternarAtiva(valor: boolean) {
     await executarPorChave("alternar-ativa", async () => {
@@ -272,7 +269,9 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           </Selo>
           {completoAtivo && <Selo variante="atencao">Modo completo</Selo>}
           <Selo>
-            {ultimoEnvio ? `Último envio em ${formatarData(ultimoEnvio.de)}` : "Sem envios"}
+            {integracao
+              ? rotuloUltimoEnvio(integracao.sincronizacoes, integracao.fuso)
+              : "Sem envios"}
           </Selo>
           {integracao?.ultimoErro && <Selo variante="perigo">Último envio com erro</Selo>}
         </>
@@ -303,7 +302,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
         estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
         resumo={
           estruturaSalva && !estruturaEmEdicao
-            ? `Salva em ${formatarData(integracao?.esquemaEm)}`
+            ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
             : podeEnviar
               ? "Escolha a aba única que recebe as saídas."
               : "Conecte a planilha e ligue a integração para liberar."
@@ -446,9 +445,9 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
             <ul className="text-muted-foreground flex flex-col gap-0.5">
               {integracao.sincronizacoes.slice(0, 5).map((item) => (
                 <li key={item.id}>
-                  {item.de} a {item.ate} · {item.modalidade.toLowerCase()} · {item.linhasCriadas}{" "}
-                  linhas criadas · {item.substituidas} corrigidas · {item.removidasLinhas} removidas
-                  · {item.resultado.toLowerCase()}
+                  {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()} ·{" "}
+                  {item.linhasCriadas} linhas criadas · {item.substituidas} corrigidas ·{" "}
+                  {item.removidasLinhas} removidas · {item.resultado.toLowerCase()}
                 </li>
               ))}
             </ul>

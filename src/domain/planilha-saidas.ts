@@ -10,7 +10,7 @@ import {
   type AbaBruta,
   type LeituraAba,
 } from "@/domain/planilha";
-import { normalizar } from "@/domain/frequencia";
+import { normalizar, rotuloData } from "@/domain/frequencia";
 
 /** Colunas reconhecidas no cabeçalho da aba de saídas. */
 export type AtributoSaida =
@@ -283,11 +283,6 @@ export function detectarEsquemaSaida(aba: AbaBruta): AbaSaidaEsquema {
   };
 }
 
-function dataBr(dia: string): string {
-  const [ano, mes, numero] = dia.split("-");
-  return `${numero}/${mes}/${ano}`;
-}
-
 function chaveSaida(nome: string, dia: string): string {
   return `${normalizar(nome)}|${dia}`;
 }
@@ -350,7 +345,7 @@ function mapearLinhasSaida(
 function formatarValor(atributo: AtributoSaida, saida: SaidaPlanilha): string {
   switch (atributo) {
     case "data":
-      return dataBr(saida.dia);
+      return rotuloData(saida.dia);
     case "aluno":
       return saida.nome;
     case "turma":
@@ -420,7 +415,7 @@ export function planejarSaidas(
     if (existentes.length > 1) {
       ambiguidades += 1;
       avisos.push(
-        `O aluno ${saida.nome} tem mais de uma linha em ${dataBr(saida.dia)}. Ajuste a planilha.`,
+        `O aluno ${saida.nome} tem mais de uma linha em ${rotuloData(saida.dia)}. Ajuste a planilha.`,
       );
       continue;
     }
