@@ -3,7 +3,19 @@
 // Configurações de recursos, catálogo de justificativas e cópia de segurança
 // em JSON. Restrita à administração, com auditoria no servidor.
 import { useRef, useState } from "react";
-import { Check, Download, LoaderCircle, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import {
+  Archive,
+  Check,
+  Download,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  ScrollText,
+  Settings2,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -15,6 +27,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Selo } from "@/components/ui/selo";
+import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
 import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import {
@@ -36,6 +50,7 @@ interface Props {
   diaCorrente: string;
   onMudanca: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
+  onAbrirSaidas?: () => void;
 }
 
 interface ResultadoImportacao {
@@ -53,7 +68,11 @@ export default function AbaConfiguracoes({
   diaCorrente,
   onMudanca,
   onJustificativasMudaram,
+  onAbrirSaidas,
 }: Props) {
+  const [abertoRecursos, setAbertoRecursos] = useState(true);
+  const [abertoJustificativas, setAbertoJustificativas] = useState(false);
+  const [abertoCopia, setAbertoCopia] = useState(false);
   const [salvando, setSalvando] = useState<"frequenciaPorAula" | "saidaAntecipada" | null>(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
@@ -286,14 +305,24 @@ export default function AbaConfiguracoes({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
-        <div>
-          <h2 className="font-medium">Recursos</h2>
-          <p className="text-muted-foreground text-sm">
-            O que estiver desligado continua preservado nos dados e pode ser religado depois.
-          </p>
-        </div>
-
+      <SecaoRecolhivel
+        dataSecao="config-recursos"
+        titulo="Recursos da escola"
+        descricao="O que estiver desligado continua preservado nos dados e pode ser religado depois."
+        icone={Settings2}
+        aberto={abertoRecursos}
+        onAbertoChange={setAbertoRecursos}
+        resumo={
+          <>
+            <Selo variante={configuracoes.frequenciaPorAula ? "sucesso" : "neutro"}>
+              Chamada por aula {configuracoes.frequenciaPorAula ? "ligada" : "desligada"}
+            </Selo>
+            <Selo variante={configuracoes.saidaAntecipada ? "sucesso" : "neutro"}>
+              Saída antecipada {configuracoes.saidaAntecipada ? "ligada" : "desligada"}
+            </Selo>
+          </>
+        }
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <Label htmlFor="config-frequencia-aula">Chamada por aula</Label>
@@ -327,22 +356,26 @@ export default function AbaConfiguracoes({
         </div>
 
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-      </div>
+      </SecaoRecolhivel>
 
       <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
 
-      <IntegracaoSaidas />
+      <IntegracaoSaidas onAbrirSaidas={onAbrirSaidas} />
 
-      <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
-        <div>
-          <h2 className="font-medium">Justificativas</h2>
-          <p className="text-muted-foreground text-sm">
-            Valem para a falta justificada e para a saída antecipada. O código é fixo depois de
-            criado, porque o histórico guarda o código; o rótulo e a situação podem mudar. A lista
-            aparece em ordem alfabética.
-          </p>
-        </div>
-
+      <SecaoRecolhivel
+        dataSecao="config-justificativas"
+        titulo="Justificativas"
+        descricao="Valem para a falta justificada e para a saída antecipada. O código é fixo depois de criado; rótulo e situação podem mudar."
+        icone={ScrollText}
+        aberto={abertoJustificativas}
+        onAbertoChange={setAbertoJustificativas}
+        resumo={
+          <>
+            <Selo>{justificativas.length} no catálogo</Selo>
+            <Selo>{justificativas.filter((item) => item.ativo).length} ativas</Selo>
+          </>
+        }
+      >
         <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label htmlFor="justificativa-codigo">Código</Label>
@@ -504,17 +537,17 @@ export default function AbaConfiguracoes({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </SecaoRecolhivel>
 
-      <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
-        <div>
-          <h2 className="font-medium">Cópia de segurança</h2>
-          <p className="text-muted-foreground text-sm">
-            A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, justificativas e
-            configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve
-            o que já existe.
-          </p>
-        </div>
+      <SecaoRecolhivel
+        dataSecao="config-copia"
+        titulo="Cópia de segurança"
+        descricao="A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, justificativas e configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve o que já existe."
+        icone={Archive}
+        aberto={abertoCopia}
+        onAbertoChange={setAbertoCopia}
+        resumo={<Selo>Arquivo JSON com todos os dados</Selo>}
+      >
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -582,7 +615,7 @@ export default function AbaConfiguracoes({
             {resultado.conflitos === 1 ? "conflito mantido" : "conflitos mantidos"}.
           </p>
         )}
-      </div>
+      </SecaoRecolhivel>
     </div>
   );
 }
