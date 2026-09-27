@@ -1,7 +1,7 @@
 "use client";
 
-// Card da integração com Google Planilhas: conexão, estrutura, envio,
-// modo completo com prazo e cópias de segurança. Restrito à administração.
+// Card da planilha de frequência: etapas de conexão, estrutura e envio, modo
+// completo e zona de risco. Restrito à administração.
 import { useCallback, useEffect, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -16,22 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import DialogoEnvio from "@/components/grade/dialogo-envio";
+import { Selo } from "@/components/ui/selo";
+import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import { EtapaPlanilha } from "@/components/gestao/planilha-etapa";
 import {
   BlocoConexaoPlanilha,
   BlocoModoCompletoPlanilha,
+  BlocoRiscoPlanilha,
 } from "@/components/gestao/planilha-blocos";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import DialogoEnvio from "@/components/grade/dialogo-envio";
 
 interface Sugestao {
   aba: string;
@@ -76,6 +69,11 @@ interface MapaAba {
   turmaOriginalId: string;
 }
 
+function formatarData(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("pt-BR");
+}
+
 export default function IntegracaoPlanilha({
   turmas,
   diaCorrente,
@@ -85,6 +83,7 @@ export default function IntegracaoPlanilha({
 }) {
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [aberto, setAberto] = useState<boolean | null>(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
@@ -99,6 +98,7 @@ export default function IntegracaoPlanilha({
     versao: number;
   } | null>(null);
   const [mapa, setMapa] = useState<Record<string, string>>({});
+  const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const [envioAberto, setEnvioAberto] = useState(false);
@@ -108,6 +108,7 @@ export default function IntegracaoPlanilha({
       const dados = await pedir<{ integracao: IntegracaoAdmin }>("/api/planilha");
       setIntegracao(dados.integracao);
       setEndpoint(dados.integracao.endpoint ?? "");
+      setAberto((atual) => atual ?? !dados.integracao.esquema);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
@@ -121,11 +122,17 @@ export default function IntegracaoPlanilha({
             (dados.integracao.esquema.mapa ?? []).map((item) => [item.aba, item.turmaOriginalId]),
           ),
         );
+      } else {
+        setPlanilha(null);
+        setAbas([]);
+        setMapa({});
+        setEditandoEstrutura(true);
       }
       setErro("");
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível ler a integração.");
       setErroVariante(estadoDeErro(excecao));
+      setAberto((atual) => atual ?? true);
     } finally {
       setCarregando(false);
     }
@@ -139,6 +146,11 @@ export default function IntegracaoPlanilha({
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
+  const conectada = Boolean(integracao?.temToken && integracao.endpoint);
+  const podeEnviar = Boolean(integracao?.ativa && integracao.endpoint && integracao.temToken);
+  const estruturaSalva = Boolean(integracao?.esquema);
+  const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
+  const temMapa = Object.values(mapa).some((turmaId) => turmaId !== "");
   const turmasSemAba = turmas.filter((turma) => !Object.values(mapa).includes(turma.id));
   const diasEnvio = diasDoMes(mesEnvio);
 
@@ -223,6 +235,7 @@ export default function IntegracaoPlanilha({
           corpoJson({ planilha, abas, mapa: itens }),
         );
         setIntegracao(dados.integracao);
+        setEditandoEstrutura(false);
         avisarSucesso(
           "Estrutura salva.",
           "Agora a Grade pode enviar as faltas para esta planilha.",
@@ -254,168 +267,199 @@ export default function IntegracaoPlanilha({
     });
   }
 
-  async function desconectar() {
-    await executarPorChave("desconectar", async () => {
-      try {
-        await pedir("/api/planilha/desconectar", corpoJson({}));
-        setAbas([]);
-        setMapa({});
-        setPlanilha(null);
-        avisarSucesso(
-          "Integração desconectada. A planilha não foi alterada.",
-          "Nada foi apagado no Google Planilhas.",
-        );
-        await carregar();
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
-      }
-    });
-  }
-
-  if (carregando) {
+  if (carregando || aberto === null) {
     return (
       <section
-        aria-label="Google Planilhas"
+        data-secao="planilha-frequencia"
+        aria-label="Planilha de frequência"
         className="bg-card flex flex-col gap-4 rounded-lg border p-4"
       >
-        <h2 className="font-medium">Google Planilhas</h2>
+        <h2 className="font-medium">Planilha de frequência</h2>
         <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
       </section>
     );
   }
 
   return (
-    <section
-      aria-label="Google Planilhas"
-      className="bg-card flex flex-col gap-4 rounded-lg border p-4"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 font-medium">
-            <FileSpreadsheet size={16} aria-hidden="true" />
-            Google Planilhas
-          </h2>
-          <p className="text-muted-foreground text-sm">
-            A frequência por turma de origem é gravada na planilha. No modo conservador apenas
-            células vazias são preenchidas; nada existente é alterado.
-          </p>
-        </div>
+    <SecaoRecolhivel
+      dataSecao="planilha-frequencia"
+      titulo="Planilha de frequência"
+      descricao="Envia a frequência por turma de origem para a planilha da escola."
+      icone={FileSpreadsheet}
+      aberto={aberto}
+      onAbertoChange={setAberto}
+      resumo={
+        <>
+          <Selo variante={integracao?.ativa ? "sucesso" : "neutro"}>
+            {integracao?.ativa ? "Ligada" : "Desligada"}
+          </Selo>
+          <Selo variante={conectada ? "sucesso" : "atencao"}>
+            {conectada
+              ? integracao?.versaoScript
+                ? `Conectada · v${integracao.versaoScript}`
+                : "Conectada"
+              : "Sem conexão"}
+          </Selo>
+          <Selo variante={estruturaSalva ? "sucesso" : "neutro"}>
+            {estruturaSalva
+              ? `Estrutura · ${integracao?.esquema?.mapa.length ?? 0} abas`
+              : "Estrutura pendente"}
+          </Selo>
+          {completoAtivo && <Selo variante="atencao">Modo completo</Selo>}
+          {(integracao?.alteradasDepois ?? 0) > 0 && (
+            <Selo>{integracao?.alteradasDepois} chamadas alteradas</Selo>
+          )}
+          {integracao?.ultimoErro && <Selo variante="perigo">Último envio com erro</Selo>}
+        </>
+      }
+      acoes={
         <Switch
           checked={integracao?.ativa ?? false}
           disabled={salvando || !integracao?.temToken}
           onCheckedChange={(valor) => void alternarAtiva(valor)}
           aria-label="Integração ativa"
         />
-      </div>
+      }
+    >
+      <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
+        <BlocoConexaoPlanilha
+          idPrefixo="planilha"
+          urlBase="/api/planilha"
+          endpoint={endpoint}
+          integracao={integracao}
+          onEndpoint={setEndpoint}
+          onAtualizar={carregar}
+        />
+      </EtapaPlanilha>
 
-      <BlocoConexaoPlanilha
-        idPrefixo="planilha"
-        urlBase="/api/planilha"
-        endpoint={endpoint}
-        integracao={integracao}
-        onEndpoint={setEndpoint}
-        onAtualizar={carregar}
-      />
-
-      <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium">3. Estrutura e mapa por turma de origem</p>
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10"
-            onClick={() => void lerEstrutura()}
-            disabled={lendo}
-          >
-            {lendo ? <LoaderCircle size={16} className="animate-spin" /> : <RotateCcw size={16} />}
-            Conferir estrutura
-          </Button>
-        </div>
-        {planilha && (
-          <p className="text-muted-foreground text-xs">
-            {planilha.nome} · fuso {planilha.fuso} · versão do script {planilha.versao}
-          </p>
-        )}
-        {abas.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {abas.map((aba) => (
-              <div
-                key={aba.nome}
-                className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
-              >
-                <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
-                <span className="text-muted-foreground shrink-0 text-xs">
-                  cabeçalho {aba.cabecalho} ·{" "}
-                  {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
-                </span>
-                <div className="w-full sm:w-56">
-                  <Selecionar
-                    id={`mapa-${aba.nome}`}
-                    value={mapa[aba.nome] ?? ""}
-                    onValueChange={(valor) => setMapa((atual) => ({ ...atual, [aba.nome]: valor }))}
-                    placeholder="Ignorar aba"
-                    ariaLabel={`Turma de origem da aba ${aba.nome}`}
-                    opcoes={turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
-                  />
-                </div>
-              </div>
-            ))}
+      <EtapaPlanilha
+        numero={2}
+        titulo="Estrutura e mapa por turma de origem"
+        estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
+        resumo={
+          estruturaSalva && !estruturaEmEdicao
+            ? `Salva em ${formatarData(integracao?.esquemaEm)}`
+            : podeEnviar
+              ? "Leia as abas e confira o mapa de cada turma."
+              : "Conecte a planilha e ligue a integração para liberar."
+        }
+        acoes={
+          estruturaEmEdicao ? (
             <Button
               type="button"
-              className="h-11 self-start"
-              onClick={() => void salvarMapa()}
-              disabled={salvando}
+              variant="outline"
+              className="h-10"
+              onClick={() => void lerEstrutura()}
+              disabled={lendo || !podeEnviar}
+              title={podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."}
             >
-              Salvar estrutura
+              {lendo ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <RotateCcw size={16} />
+              )}
+              Conferir estrutura
             </Button>
-          </div>
-        )}
-        {planilha && turmasSemAba.length > 0 && (
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
-            {turmasSemAba.map((turma) => (
-              <div key={turma.id} className="flex items-center justify-between gap-2">
-                <span className="min-w-0 truncate">{turma.rotulo}</span>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={() => setEditandoEstrutura(true)}
+            >
+              Revisar estrutura
+            </Button>
+          )
+        }
+      >
+        {estruturaEmEdicao ? (
+          <>
+            {planilha && (
+              <p className="text-muted-foreground text-xs">
+                {planilha.nome} · fuso {planilha.fuso} · versão do script {planilha.versao}
+              </p>
+            )}
+            {abas.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {abas.map((aba) => (
+                  <div
+                    key={aba.nome}
+                    className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
+                    <span className="text-muted-foreground shrink-0 text-xs">
+                      cabeçalho {aba.cabecalho} ·{" "}
+                      {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
+                    </span>
+                    <div className="w-full sm:w-56">
+                      <Selecionar
+                        id={`mapa-${aba.nome}`}
+                        value={mapa[aba.nome] ?? ""}
+                        onValueChange={(valor) =>
+                          setMapa((atual) => ({ ...atual, [aba.nome]: valor }))
+                        }
+                        placeholder="Ignorar aba"
+                        ariaLabel={`Turma de origem da aba ${aba.nome}`}
+                        opcoes={turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
+                      />
+                    </div>
+                  </div>
+                ))}
                 <Button
                   type="button"
-                  variant="ghost"
-                  className="h-8"
-                  onClick={() => void criarAba(turma.rotulo)}
-                  disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
+                  className="h-11 self-start"
+                  onClick={() => void salvarMapa()}
+                  disabled={salvando || !temMapa}
                 >
-                  {chaveAtiva === `criar-aba-${turma.rotulo}` ? "Criando..." : "Criar aba"}
+                  Salvar estrutura
                 </Button>
               </div>
-            ))}
-          </div>
-        )}
-        {sugestoes.length > 0 && (
+            )}
+            {planilha && turmasSemAba.length > 0 && (
+              <div className="flex flex-col gap-1 text-xs">
+                <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
+                {turmasSemAba.map((turma) => (
+                  <div key={turma.id} className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate">{turma.rotulo}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => void criarAba(turma.rotulo)}
+                      disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
+                    >
+                      {chaveAtiva === `criar-aba-${turma.rotulo}` ? "Criando..." : "Criar aba"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sugestoes.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                Sugestões preenchidas pelo nome das abas. Ajuste antes de salvar.
+              </p>
+            )}
+          </>
+        ) : (
           <p className="text-muted-foreground text-xs">
-            Sugestões preenchidas pelo nome das abas. Ajuste antes de salvar.
+            {integracao?.esquema?.mapa.length ?? 0} abas mapeadas. Use Revisar estrutura para reler
+            a planilha.
           </p>
         )}
-      </div>
+      </EtapaPlanilha>
 
-      <BlocoModoCompletoPlanilha
-        idPrefixo="planilha"
-        urlBase="/api/planilha"
-        ativo={completoAtivo}
-        ate={integracao?.modoCompletoAte ?? null}
-        copiasDe={(integracao?.esquema?.mapa ?? []).map((item) => item.aba)}
-        abasCriadas={(integracao?.esquema?.abas ?? [])
-          .filter((aba) => aba.criada)
-          .map((aba) => aba.nome)}
-        onMudou={carregar}
-      />
-
-      <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <p className="text-xs font-medium">5. Envio do mês</p>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Envia o mês escolhido para todas as turmas de origem mapeadas, com a mesma prévia e as
-          mesmas regras do envio pela Grade.
-        </p>
+      <EtapaPlanilha
+        numero={3}
+        titulo="Envio do mês"
+        estado={estruturaSalva ? "atual" : "pendente"}
+        resumo={
+          estruturaSalva
+            ? "Envia o mês escolhido para todas as turmas mapeadas, com prévia obrigatória."
+            : "Salve a estrutura antes de enviar."
+        }
+      >
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="w-full sm:w-56">
+          <div className="w-full sm:w-64">
             <SeletorPeriodo
               id="planilha-mes-envio"
               modo="mes"
@@ -429,72 +473,58 @@ export default function IntegracaoPlanilha({
           <Button
             type="button"
             className="h-11"
-            disabled={!integracao?.ativa || !integracao.esquema || !integracao.temToken}
+            disabled={!estruturaSalva}
+            title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
             onClick={() => setEnvioAberto(true)}
           >
             Enviar o mês de todas as turmas
           </Button>
         </div>
-      </div>
 
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
-        <p className="text-xs font-medium">Situação</p>
-        <p className="text-muted-foreground text-xs">
-          {integracao?.alteradasDepois ?? 0}{" "}
-          {integracao?.alteradasDepois === 1
-            ? "chamada alterada desde o último envio"
-            : "chamadas alteradas desde o último envio"}
-        </p>
-        {integracao?.ultimoErro && (
-          <p className="text-falta-texto text-xs">
-            {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
-            {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
-            {integracao.ultimoErro.erro ?? "sem detalhe"}
+        <div className="flex flex-col gap-1 text-xs">
+          <p className="text-muted-foreground">
+            {integracao?.alteradasDepois ?? 0}{" "}
+            {integracao?.alteradasDepois === 1
+              ? "chamada alterada desde o último envio"
+              : "chamadas alteradas desde o último envio"}
           </p>
-        )}
-      </div>
+          {integracao?.ultimoErro && (
+            <p className="text-falta-texto">
+              {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
+              {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
+              {integracao.ultimoErro.erro ?? "sem detalhe"}
+            </p>
+          )}
+          {integracao && integracao.sincronizacoes.length > 0 && (
+            <ul className="text-muted-foreground flex flex-col gap-0.5">
+              {integracao.sincronizacoes.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  {item.de} a {item.ate} · {item.modalidade.toLowerCase()} · {item.preenchidas}{" "}
+                  células · {item.resultado.toLowerCase()}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </EtapaPlanilha>
 
-      <div className="flex flex-col gap-2 rounded-lg border p-3">
-        <p className="text-xs font-medium">Últimos envios</p>
-        {integracao && integracao.sincronizacoes.length > 0 ? (
-          <ul className="text-muted-foreground flex flex-col gap-1 text-xs">
-            {integracao.sincronizacoes.slice(0, 5).map((item) => (
-              <li key={item.id}>
-                {item.de} a {item.ate} · {item.modalidade.toLowerCase()} · {item.preenchidas}{" "}
-                células · {item.resultado.toLowerCase()}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground text-xs">Nenhum envio registrado.</p>
-        )}
-      </div>
+      <BlocoModoCompletoPlanilha
+        idPrefixo="planilha"
+        urlBase="/api/planilha"
+        ativo={completoAtivo}
+        ate={integracao?.modoCompletoAte ?? null}
+        onMudou={carregar}
+      />
 
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button type="button" variant="ghost" className="text-falta-texto h-11 self-start">
-            Desconectar
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Desconectar a planilha?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O token e a estrutura salva são apagados. Nada é removido da planilha.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-falta text-falta-foreground hover:bg-falta/90"
-              onClick={() => void desconectar()}
-              disabled={chaveAtiva === "desconectar"}
-            >
-              {chaveAtiva === "desconectar" ? "Desconectando..." : "Desconectar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <BlocoRiscoPlanilha
+        idPrefixo="planilha"
+        urlBase="/api/planilha"
+        copiasDe={(integracao?.esquema?.mapa ?? []).map((item) => item.aba)}
+        abasCriadas={(integracao?.esquema?.abas ?? [])
+          .filter((aba) => aba.criada)
+          .map((aba) => aba.nome)}
+        onMudou={carregar}
+      />
 
       <DialogoEnvio
         aberto={envioAberto}
@@ -510,6 +540,6 @@ export default function IntegracaoPlanilha({
       />
 
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-    </section>
+    </SecaoRecolhivel>
   );
 }

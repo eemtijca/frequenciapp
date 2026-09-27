@@ -1,18 +1,31 @@
 "use client";
 
-// Blocos compartilhados dos cards de Google Planilhas: conexão, com token e
-// endereço do Web App, e modo completo, com cópias de segurança da aba.
+// Blocos compartilhados dos cards de Google Planilhas: conexão em etapa
+// recolhível, modo completo com prazo e zona de risco com cópias.
 import { useState } from "react";
-import { Check, ClipboardCopy, LoaderCircle } from "lucide-react";
+import { ClipboardCopy, LoaderCircle, Lock, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
+import { Selo } from "@/components/ui/selo";
+import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/ui/campo-senha";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +37,29 @@ import {
 interface IntegracaoConexao {
   token: string | null;
   temToken: boolean;
+  versaoScript: string | null;
+  endpoint: string | null;
+}
+
+interface ResultadoPing {
+  nome: string;
+  abas: number;
+  avisos: string[];
+}
+
+function ResultadoTeste({ teste }: { teste: ResultadoPing }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-muted-foreground text-xs">
+        Conectado a {teste.nome} · {teste.abas} {teste.abas === 1 ? "aba" : "abas"}
+      </p>
+      {teste.avisos.map((aviso) => (
+        <p key={aviso} className="text-falta-texto text-xs">
+          {aviso}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 /** Token do aplicativo e endereço do Web App, com teste de conexão. */
@@ -44,12 +80,16 @@ export function BlocoConexaoPlanilha({
 }) {
   const [salvando, setSalvando] = useState(false);
   const [testando, setTestando] = useState(false);
-  const [teste, setTeste] = useState<{ nome: string; abas: number; avisos: string[] } | null>(null);
+  const [teste, setTeste] = useState<ResultadoPing | null>(null);
+  const [editando, setEditando] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState<null | "gerar" | "revelar">(null);
   const [senha, setSenha] = useState("");
   const [tokenVisivel, setTokenVisivel] = useState<string | null>(null);
   const [enviandoSenha, setEnviandoSenha] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+
+  const conectada = Boolean(integracao?.temToken && integracao.endpoint);
+  const resumida = conectada && !editando;
 
   async function salvarEndpoint() {
     await executarPorChave("salvar-endpoint", async () => {
@@ -81,6 +121,7 @@ export function BlocoConexaoPlanilha({
           abas: dados.ping.abas.length,
           avisos: dados.ping.avisos ?? [],
         });
+        setEditando(false);
         avisarSucesso("Conexão confirmada.", undefined, aviso);
         await onAtualizar();
       } catch (excecao) {
@@ -143,15 +184,55 @@ export function BlocoConexaoPlanilha({
     });
   }
 
+  if (resumida) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="bg-secondary/40 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2">
+          <span className="min-w-0 text-xs">
+            <span className="block truncate">
+              {integracao?.versaoScript
+                ? `Conectada · script na versão ${integracao.versaoScript}`
+                : "Conexão salva"}
+            </span>
+            <span className="text-muted-foreground block truncate">{endpoint}</span>
+          </span>
+          <span className="flex shrink-0 flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9"
+              onClick={() => void testar()}
+              disabled={testando}
+            >
+              {testando && <LoaderCircle size={14} className="animate-spin" />}
+              Testar conexão
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => setEditando(true)}
+            >
+              Editar conexão
+            </Button>
+          </span>
+        </div>
+        {teste && <ResultadoTeste teste={teste} />}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <p className="text-xs font-medium">1. Token do aplicativo</p>
+        <p className="text-xs font-medium">Token do aplicativo</p>
         <div className="flex flex-wrap items-center gap-2">
           <Input
             readOnly
             value={tokenVisivel ?? integracao?.token ?? "Nenhum token gerado"}
-            className="h-11 flex-1"
+            className="h-11 min-w-0 flex-1"
           />
           {tokenVisivel && (
             <Button
@@ -188,7 +269,7 @@ export function BlocoConexaoPlanilha({
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <p className="text-xs font-medium">2. Endereço do aplicativo da Web</p>
+        <p className="text-xs font-medium">Endereço do aplicativo da Web</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <Label htmlFor={`${idPrefixo}-endpoint`}>URL /exec</Label>
@@ -215,23 +296,23 @@ export function BlocoConexaoPlanilha({
             onClick={() => void testar()}
             disabled={testando || !endpoint}
           >
-            {testando ? <LoaderCircle size={16} className="animate-spin" /> : <Check size={16} />}
+            {testando && <LoaderCircle size={16} className="animate-spin" />}
             Testar conexão
           </Button>
         </div>
-        {teste && (
-          <div className="flex flex-col gap-1">
-            <p className="text-muted-foreground text-xs">
-              Conectado a {teste.nome} · {teste.abas} {teste.abas === 1 ? "aba" : "abas"}
-            </p>
-            {teste.avisos.map((aviso) => (
-              <p key={aviso} className="text-falta-texto text-xs">
-                {aviso}
-              </p>
-            ))}
-          </div>
-        )}
+        {teste && <ResultadoTeste teste={teste} />}
       </div>
+
+      {conectada && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10 self-start"
+          onClick={() => setEditando(false)}
+        >
+          Fechar edição
+        </Button>
+      )}
 
       <Dialog
         open={senhaAberta !== null}
@@ -280,38 +361,33 @@ export function BlocoConexaoPlanilha({
   );
 }
 
-/** Modo completo com prazo, cópias de segurança e remoção de aba criada. */
+/** Modo completo com prazo, sem as cópias nem a remoção de aba. */
 export function BlocoModoCompletoPlanilha({
   idPrefixo,
   urlBase,
   ativo,
   ate,
-  copiasDe,
-  abasCriadas,
   onMudou,
 }: {
   idPrefixo: string;
   urlBase: string;
   ativo: boolean;
   ate: string | null;
-  copiasDe: string[];
-  abasCriadas: string[];
   onMudou: () => Promise<void> | void;
 }) {
+  const [aberto, setAberto] = useState(false);
   const [destrave, setDestrave] = useState(false);
   const [frase, setFrase] = useState("");
   const [duracao, setDuracao] = useState(15);
   const [destravando, setDestravando] = useState(false);
-  const [copias, setCopias] = useState<
-    { aba: string; itens: { nome: string; criadaEm: string }[] }[]
-  >([]);
-  const [restaurar, setRestaurar] = useState<{ aba: string; copia: string } | null>(null);
-  const [abaRemover, setAbaRemover] = useState<string | null>(null);
   const [senha, setSenha] = useState("");
-  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+  const { executar: executarPorChave } = useAcoesPorChave();
 
   const restanteMinutos =
     ativo && ate ? Math.max(0, Math.ceil((new Date(ate).getTime() - Date.now()) / 60_000)) : null;
+  const hora = ate
+    ? new Date(ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : "";
 
   async function destravar() {
     await executarPorChave("destravar", async () => {
@@ -352,99 +428,28 @@ export function BlocoModoCompletoPlanilha({
     });
   }
 
-  async function carregarCopias() {
-    try {
-      const lista: { aba: string; itens: { nome: string; criadaEm: string }[] }[] = [];
-      for (const aba of copiasDe) {
-        const dados = await pedir<{ copias: { nome: string; criadaEm: string }[] }>(
-          `${urlBase}/copias?aba=${encodeURIComponent(aba)}`,
-        );
-        lista.push({ aba, itens: dados.copias });
-      }
-      setCopias(lista);
-    } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível listar cópias.");
-    }
-  }
-
-  async function confirmarRestaurar() {
-    if (!restaurar) return;
-    await executarPorChave("restaurar", async () => {
-      try {
-        await pedir(
-          `${urlBase}/restaurar`,
-          corpoJson({ aba: restaurar.aba, copia: restaurar.copia, frase, senha }),
-        );
-        setRestaurar(null);
-        setFrase("");
-        setSenha("");
-        avisarSucesso(
-          "Cópia restaurada. Confira a estrutura de novo.",
-          "A versão anterior foi substituída pela cópia escolhida.",
-        );
-        await onMudou();
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
-      }
-    });
-  }
-
-  async function confirmarRemocaoAba() {
-    if (!abaRemover) return;
-    await executarPorChave(`remover-aba-${abaRemover}`, async () => {
-      try {
-        await pedir(`${urlBase}/remover-aba`, corpoJson({ aba: abaRemover, frase, senha }));
-        setAbaRemover(null);
-        setFrase("");
-        setSenha("");
-        toast.success("Aba removida. A versão atual foi guardada em cópia.");
-        await onMudou();
-      } catch (excecao) {
-        toast.error(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.",
-        );
-      }
-    });
-  }
-
   return (
     <>
-      {ativo && ate && (
-        <div className="bg-falta-fraca text-falta-texto flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs">
-          <span>
-            Modo completo ativo até{" "}
-            {new Date(ate).toLocaleTimeString("pt-BR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-            {restanteMinutos !== null && restanteMinutos <= 5
-              ? ` · restam ${restanteMinutos} min`
-              : ""}
-          </span>
-          <span className="flex items-center gap-1">
-            {restanteMinutos !== null && restanteMinutos <= 5 && (
-              <Button size="sm" variant="ghost" className="h-8" onClick={() => setDestrave(true)}>
-                Estender
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8"
-              onClick={() => void voltarConservador()}
-            >
-              Voltar ao conservador
-            </Button>
-          </span>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3 rounded-lg border p-3">
-        <p className="text-xs font-medium">4. Modo completo</p>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Permite atualizar divergências, limpar células e remover o que a integração criou. Antes
-          de cada operação destrutiva o script guarda uma cópia oculta da aba.
-        </p>
+      <SecaoRecolhivel
+        nivel="interna"
+        titulo="Modo completo"
+        descricao="Permite corrigir e remover o que a integração criou, com cópia antes de cada operação destrutiva."
+        icone={Lock}
+        aberto={aberto}
+        onAbertoChange={setAberto}
+        resumo={
+          <Selo variante={ativo ? "atencao" : "neutro"}>
+            {ativo ? `Janela aberta até ${hora}` : "Bloqueado"}
+          </Selo>
+        }
+      >
+        {ativo && restanteMinutos !== null && (
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Ações destrutivas liberadas até {hora}
+            {restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}. A janela expira
+            sozinha.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -452,60 +457,20 @@ export function BlocoModoCompletoPlanilha({
             className="h-11"
             onClick={() => setDestrave(true)}
           >
-            Liberar modo completo
+            {ativo ? "Estender" : "Liberar modo completo"}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-11"
-            onClick={() => void carregarCopias()}
-          >
-            Cópias de segurança
-          </Button>
+          {ativo && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11"
+              onClick={() => void voltarConservador()}
+            >
+              Voltar ao conservador
+            </Button>
+          )}
         </div>
-        {copias.map((item) => (
-          <div key={item.aba} className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">{item.aba}</span>
-            {item.itens.length === 0 ? (
-              <span className="text-muted-foreground">Nenhuma cópia.</span>
-            ) : (
-              item.itens.map((copia) => (
-                <div key={copia.nome} className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground truncate">
-                    {copia.criadaEm || copia.nome}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-8"
-                    onClick={() => setRestaurar({ aba: item.aba, copia: copia.nome })}
-                  >
-                    Restaurar
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        ))}
-        {abasCriadas.length > 0 && (
-          <div className="flex flex-col gap-1 text-xs">
-            <span className="font-medium">Abas criadas pela integração</span>
-            {abasCriadas.map((nome) => (
-              <div key={nome} className="flex items-center justify-between gap-2">
-                <span className="text-muted-foreground truncate">{nome}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8"
-                  onClick={() => setAbaRemover(nome)}
-                >
-                  Remover
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      </SecaoRecolhivel>
 
       <Dialog open={destrave} onOpenChange={setDestrave}>
         <DialogContent className="max-w-md">
@@ -576,6 +541,217 @@ export function BlocoModoCompletoPlanilha({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+/** Cópias de segurança, remoção de aba criada e desconexão da integração. */
+export function BlocoRiscoPlanilha({
+  idPrefixo,
+  urlBase,
+  copiasDe,
+  abasCriadas,
+  onMudou,
+}: {
+  idPrefixo: string;
+  urlBase: string;
+  copiasDe: string[];
+  abasCriadas: string[];
+  onMudou: () => Promise<void> | void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [copias, setCopias] = useState<
+    { aba: string; itens: { nome: string; criadaEm: string }[] }[]
+  >([]);
+  const [restaurar, setRestaurar] = useState<{ aba: string; copia: string } | null>(null);
+  const [abaRemover, setAbaRemover] = useState<string | null>(null);
+  const [senha, setSenha] = useState("");
+  const [frase, setFrase] = useState("");
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+
+  async function carregarCopias() {
+    try {
+      const lista: { aba: string; itens: { nome: string; criadaEm: string }[] }[] = [];
+      for (const aba of copiasDe) {
+        const dados = await pedir<{ copias: { nome: string; criadaEm: string }[] }>(
+          `${urlBase}/copias?aba=${encodeURIComponent(aba)}`,
+        );
+        lista.push({ aba, itens: dados.copias });
+      }
+      setCopias(lista);
+    } catch (excecao) {
+      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível listar cópias.");
+    }
+  }
+
+  async function confirmarRestaurar() {
+    if (!restaurar) return;
+    await executarPorChave("restaurar", async () => {
+      try {
+        await pedir(
+          `${urlBase}/restaurar`,
+          corpoJson({ aba: restaurar.aba, copia: restaurar.copia, frase, senha }),
+        );
+        setRestaurar(null);
+        setFrase("");
+        setSenha("");
+        avisarSucesso(
+          "Cópia restaurada. Confira a estrutura de novo.",
+          "A versão anterior foi substituída pela cópia escolhida.",
+        );
+        await onMudou();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
+      }
+    });
+  }
+
+  async function confirmarRemocaoAba() {
+    if (!abaRemover) return;
+    await executarPorChave(`remover-aba-${abaRemover}`, async () => {
+      try {
+        await pedir(`${urlBase}/remover-aba`, corpoJson({ aba: abaRemover, frase, senha }));
+        setAbaRemover(null);
+        setFrase("");
+        setSenha("");
+        toast.success("Aba removida. A versão atual foi guardada em cópia.");
+        await onMudou();
+      } catch (excecao) {
+        toast.error(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.",
+        );
+      }
+    });
+  }
+
+  async function desconectar() {
+    await executarPorChave("desconectar", async () => {
+      try {
+        await pedir(`${urlBase}/desconectar`, corpoJson({}));
+        setCopias([]);
+        avisarSucesso(
+          "Integração desconectada. A planilha não foi alterada.",
+          "Nada foi apagado no Google Planilhas.",
+        );
+        await onMudou();
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
+      }
+    });
+  }
+
+  return (
+    <>
+      <SecaoRecolhivel
+        nivel="interna"
+        variante="perigo"
+        titulo="Zona de risco"
+        descricao="Cópias de segurança, remoção de aba criada pela integração e desconexão."
+        icone={TriangleAlert}
+        aberto={aberto}
+        onAbertoChange={setAberto}
+        resumo={<Selo variante="perigo">Altera a planilha</Selo>}
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Cópias de segurança</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Cada operação destrutiva guarda uma cópia oculta da aba.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={() => void carregarCopias()}
+            >
+              Listar cópias
+            </Button>
+          </div>
+          {copias.map((item) => (
+            <div key={item.aba} className="flex flex-col gap-1 text-xs">
+              <span className="font-medium">{item.aba}</span>
+              {item.itens.length === 0 ? (
+                <span className="text-muted-foreground">Nenhuma cópia.</span>
+              ) : (
+                item.itens.map((copia) => (
+                  <div key={copia.nome} className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground truncate">
+                      {copia.criadaEm || copia.nome}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8"
+                      onClick={() => setRestaurar({ aba: item.aba, copia: copia.nome })}
+                    >
+                      Restaurar
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          ))}
+        </div>
+
+        {abasCriadas.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium">Abas criadas pela integração</p>
+            {abasCriadas.map((nome) => (
+              <div key={nome} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-muted-foreground truncate">{nome}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8"
+                  onClick={() => setAbaRemover(nome)}
+                >
+                  Remover
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Desconectar integração</p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Apaga o token e a estrutura salva. Nada é removido da planilha.
+            </p>
+          </div>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-falta/40 text-falta-texto h-10"
+                disabled={chaveAtiva === "desconectar"}
+              >
+                {chaveAtiva === "desconectar" ? "Desconectando..." : "Desconectar"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Desconectar a planilha?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  O token e a estrutura salva são apagados. Nada é removido da planilha.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-falta text-falta-foreground hover:bg-falta/90"
+                  onClick={() => void desconectar()}
+                >
+                  Desconectar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </SecaoRecolhivel>
 
       <Dialog open={restaurar !== null} onOpenChange={(aberto) => !aberto && setRestaurar(null)}>
         <DialogContent className="max-w-md">

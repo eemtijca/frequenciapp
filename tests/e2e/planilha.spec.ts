@@ -48,7 +48,10 @@ test.describe("Google Planilhas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    const cartao = page.locator('section[aria-label="Google Planilhas"]');
+    const cartao = page.locator('[data-secao="planilha-frequencia"]');
+
+    // Antes de conectar, a leitura da estrutura fica bloqueada.
+    await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
 
     // Token com senha.
     await cartao.getByRole("button", { name: "Gerar novo" }).click();
@@ -68,6 +71,7 @@ test.describe("Google Planilhas", () => {
     await cartao.getByRole("switch", { name: "Integração ativa" }).click();
     await cartao.getByRole("button", { name: "Testar conexão" }).click();
     await expect(cartao.getByText(/Conectado a Planilha de teste/)).toBeVisible();
+    await expect(cartao.getByText("Ligada", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
@@ -96,9 +100,10 @@ test.describe("Google Planilhas", () => {
     await page.context().setOffline(false);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
 
-    // Desconexão.
+    // Desconexão, na zona de risco.
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await cartao.getByRole("button", { name: "Zona de risco" }).click();
     await cartao.getByRole("button", { name: "Desconectar" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Desconectar" }).click();
     await expect(

@@ -541,6 +541,7 @@ export default function Aplicacao({
             onAlunosMudaram={recarregarAlunos}
             onConfiguracoesMudaram={setConfiguracoes}
             onJustificativasMudaram={recarregarJustificativas}
+            onAbrirSaidas={() => trocarVisao("saidas")}
           />
         )}
       </div>

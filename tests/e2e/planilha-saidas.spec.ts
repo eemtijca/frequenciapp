@@ -52,7 +52,7 @@ test.describe("Google Planilhas de saídas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    const cartao = page.locator('section[aria-label="Google Planilhas de saídas"]');
+    const cartao = page.locator('[data-secao="planilha-saidas"]');
 
     // Token com senha.
     await cartao.getByRole("button", { name: "Gerar novo" }).click();
