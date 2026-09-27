@@ -18,7 +18,7 @@ Integração opcional da administração com a planilha da escola, por Google Ap
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como a própria conta e permita acesso a qualquer pessoa. Autorize.
 5. Copie o endereço terminado em `/exec`, cole no aplicativo e use Testar conexão.
 
-Cada mudança no código pede uma nova versão da implantação. O aplicativo mostra a versão que o script devolveu no último teste.
+Cada mudança no código pede uma nova versão da implantação. O aplicativo mostra a versão que o script devolveu no último teste. O script guarda a posição de cada linha e coluna criada no valor do marcador de metadado; marcador sem essa posição vem de versão de teste antiga e é ignorado, o que mantém a remoção restrita ao que a integração criou.
 
 ## Conferir a estrutura
 
@@ -62,17 +62,17 @@ Antes de cada operação destrutiva o script duplica a aba como cópia oculta `_
 
 ## Solução de problemas
 
-| Mensagem                                 | Causa provável                                                   |
-| ---------------------------------------- | ---------------------------------------------------------------- |
-| Não autorizado                           | Token do aplicativo diferente do `FREQUENCIAPP_TOKEN` do script. |
-| A estrutura da planilha mudou            | Cabeçalho, nome de aba ou mesclagem alterados; confira de novo.  |
-| A mesclagem cobre colunas de dia         | Ajuste o cabeçalho na planilha antes de enviar.                  |
-| O script usa outro fuso                  | Divergência com `TZ_APP`; as datas podem sair deslocadas.        |
-| O script está na versão antiga           | Publique a versão atual do `gas/Codigo.gs`.                      |
-| Aba não encontrada                       | A aba mapeada foi renomeada ou removida.                         |
-| A linha não foi criada pela integração   | A remoção é recusada de propósito para dado manual.              |
-| Não foi possível falar com a planilha    | Rede de saída bloqueada ou implantação despublicada.             |
-| O script respondeu em formato inesperado | Código antigo publicado; publique a versão atual.                |
+| Mensagem                                 | Causa provável                                                                   |
+| ---------------------------------------- | -------------------------------------------------------------------------------- |
+| Não autorizado                           | Token do aplicativo diferente do `FREQUENCIAPP_TOKEN` do script.                 |
+| A estrutura da planilha mudou            | Cabeçalho, nome de aba ou mesclagem alterados; confira de novo.                  |
+| A mesclagem cobre colunas de dia         | Ajuste o cabeçalho na planilha antes de enviar.                                  |
+| O script usa outro fuso                  | Divergência com `TZ_APP`; as datas podem sair deslocadas.                        |
+| O script está na versão antiga           | Publique a versão atual do `gas/Codigo.gs`.                                      |
+| Aba não encontrada                       | A aba mapeada foi renomeada ou removida.                                         |
+| A linha não foi criada pela integração   | A remoção é recusada de propósito para dado manual ou marcador de versão antiga. |
+| Não foi possível falar com a planilha    | Rede de saída bloqueada ou implantação despublicada.                             |
+| O script respondeu em formato inesperado | Código antigo publicado; publique a versão atual.                                |
 
 ## Privacidade
 

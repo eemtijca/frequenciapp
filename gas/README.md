@@ -6,7 +6,7 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
 - preenche apenas célula vazia e sem fórmula;
 - nunca sobrescreve fórmula, nem no modo completo;
 - remove somente linha, coluna ou aba criada pela própria integração,
-  identificada por Developer Metadata;
+  identificada por Developer Metadata, com a posição no valor do marcador;
 - cria uma cópia oculta da aba antes de qualquer operação destrutiva,
   mantendo as três mais recentes;
 - recusa qualquer escrita quando o cabeçalho da aba mudou.
@@ -64,3 +64,5 @@ configuração de Aplicativo da Web. `gas/.clasp.json` não entra no Git.
   planilha; em unidade compartilhada, republique com a conta correta.
 - **A linha ou coluna não foi criada pela integração**: a remoção é
   recusada de propósito. Ajuste manualmente na planilha, se necessário.
+  Marcador sem a posição no valor vem de versão antiga do script e também
+  é ignorado; publique a versão atual do `Codigo.gs`.

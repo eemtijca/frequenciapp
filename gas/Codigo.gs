@@ -22,6 +22,8 @@ var MARCADOR_LINHA = "frequenciapp.linha";
 var MARCADOR_COLUNA = "frequenciapp.coluna";
 var MARCADOR_ABA = "frequenciapp.aba";
 var MARCADOR_COPIA = "frequenciapp.copia";
+var PREFIXO_LINHA = "linha:";
+var PREFIXO_COLUNA = "coluna:";
 
 function doPost(e) {
   try {
@@ -122,9 +124,7 @@ function acaoEstrutura() {
           colunas: aba.getLastColumn(),
           congeladasLinhas: aba.getFrozenRows(),
           congeladasColunas: aba.getFrozenColumns(),
-          mesclagens: aba.getMergedRanges().map(function (faixa) {
-            return faixa.getA1Notation();
-          }),
+          mesclagens: mesclagensDaAba(aba),
           amostra: amostraDaAba(aba),
         };
       }),
@@ -136,6 +136,21 @@ function amostraDaAba(aba) {
   var linhas = Math.min(Math.max(aba.getLastRow(), 1), MAX_AMOSTRA_LINHAS);
   var colunas = Math.min(Math.max(aba.getLastColumn(), 1), MAX_AMOSTRA_COLUNAS);
   return aba.getRange(1, 1, linhas, colunas).getDisplayValues();
+}
+
+/**
+ * Mesclagens da aba. O método vive no intervalo, não na aba, e a leitura
+ * precisa cobrir a aba inteira para a assinatura bater com a do aplicativo.
+ */
+function mesclagensDaAba(aba) {
+  var linhas = Math.max(aba.getMaxRows(), 1);
+  var colunas = Math.max(aba.getMaxColumns(), 1);
+  return aba
+    .getRange(1, 1, linhas, colunas)
+    .getMergedRanges()
+    .map(function (faixa) {
+      return faixa.getA1Notation();
+    });
 }
 
 // ------------------------------------------------------------------- leitura
@@ -171,8 +186,8 @@ function acaoLer(corpo) {
           return valor !== "";
         });
       }),
-      linhasCriadas: marcadores(aba, MARCADOR_LINHA),
-      colunasCriadas: marcadores(aba, MARCADOR_COLUNA),
+      linhasCriadas: marcadores(aba, MARCADOR_LINHA, PREFIXO_LINHA),
+      colunasCriadas: marcadores(aba, MARCADOR_COLUNA, PREFIXO_COLUNA),
     },
   };
 }
@@ -395,7 +410,7 @@ function aplicarRemoverColunas(aba, operacao, contagem) {
   var colunas = (operacao.colunas || []).slice().sort(function (a, b) {
     return b - a;
   });
-  var criadas = marcadores(aba, MARCADOR_COLUNA);
+  var criadas = marcadores(aba, MARCADOR_COLUNA, PREFIXO_COLUNA);
   for (var i = 0; i < colunas.length; i += 1) {
     if (criadas.indexOf(colunas[i]) < 0) {
       return { ok: false, erro: "A coluna " + colunas[i] + " não foi criada pela integração." };
@@ -412,7 +427,7 @@ function aplicarRemoverLinhas(aba, operacao, contagem) {
   var linhas = (operacao.linhas || []).slice().sort(function (a, b) {
     return b - a;
   });
-  var criadas = marcadores(aba, MARCADOR_LINHA);
+  var criadas = marcadores(aba, MARCADOR_LINHA, PREFIXO_LINHA);
   for (var i = 0; i < linhas.length; i += 1) {
     if (criadas.indexOf(linhas[i]) < 0) {
       return { ok: false, erro: "A linha " + linhas[i] + " não foi criada pela integração." };
@@ -593,9 +608,7 @@ function conferirAssinatura(aba, corpo) {
   var cabecalhoLinha = numeroPositivo(corpo.cabecalhoLinha, 1);
   var largura = Math.max(aba.getLastColumn(), 1);
   var cabecalho = aba.getRange(cabecalhoLinha, 1, 1, largura).getDisplayValues()[0];
-  var mesclagens = aba.getMergedRanges().map(function (faixa) {
-    return faixa.getA1Notation();
-  });
+  var mesclagens = mesclagensDaAba(aba);
   var atual = hashTexto(
     JSON.stringify([aba.getName(), cabecalho.map(limpar), mesclagens.slice().sort()]),
   );
@@ -637,15 +650,20 @@ function numeroPositivo(valor, padrao) {
   return Math.floor(numero);
 }
 
-function marcadores(aba, chave) {
+/**
+ * Posições marcadas pela integração. O número vai no valor do metadado
+ * porque a localização devolve intervalo, não número, e o tipo de localização
+ * não é confiável em célula isolada. Valor sem o prefixo é de versão antiga e
+ * fica de fora para não autorizar remoção indevida.
+ */
+function marcadores(aba, chave, prefixo) {
   var achados = aba.createDeveloperMetadataFinder().withKey(chave).find();
   var valores = [];
   for (var i = 0; i < achados.length; i += 1) {
-    var local = achados[i].getLocation();
-    var linha = local.getRow();
-    var coluna = local.getColumn();
-    if (linha !== null && linha !== undefined && linha > 0) valores.push(linha);
-    else if (coluna !== null && coluna !== undefined && coluna > 0) valores.push(coluna);
+    var texto = String(achados[i].getValue() || "");
+    if (texto.indexOf(prefixo) !== 0) continue;
+    var numero = Number(texto.slice(prefixo.length));
+    if (isFinite(numero) && numero > 0) valores.push(Math.floor(numero));
   }
   valores.sort(function (a, b) {
     return a - b;
@@ -654,11 +672,11 @@ function marcadores(aba, chave) {
 }
 
 function marcarLinha(aba, linha) {
-  aba.getRange(linha, 1).addDeveloperMetadata(MARCADOR_LINHA, "1");
+  aba.getRange(linha, 1).addDeveloperMetadata(MARCADOR_LINHA, PREFIXO_LINHA + linha);
 }
 
 function marcarColuna(aba, coluna) {
-  aba.getRange(1, coluna).addDeveloperMetadata(MARCADOR_COLUNA, "1");
+  aba.getRange(1, coluna).addDeveloperMetadata(MARCADOR_COLUNA, PREFIXO_COLUNA + coluna);
 }
 
 function temMarcador(aba, chave) {
