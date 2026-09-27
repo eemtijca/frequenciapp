@@ -1,12 +1,13 @@
 // Saída antecipada: registro durante a aula com texto opcional, justificativa
 // escrita no intervalo e o nome de quem liberou vindo do catálogo da Gestão.
 import { expect, test } from "@playwright/test";
-import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { criarLiberadoresE2E, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("saída durante a aula", () => {
   test.beforeAll(async () => {
     await criarMassaE2E();
+    await criarLiberadoresE2E();
   });
 
   test.afterAll(async () => {
@@ -27,7 +28,7 @@ test.describe("saída durante a aula", () => {
     await page.locator("#saida-justificativa").click();
     await page.getByRole("option", { name: "D · Doente" }).click();
     await page.locator("#saida-responsavel").click();
-    await page.getByRole("option", { name: "Diretor Adriano" }).click();
+    await page.getByRole("option", { name: "Diretor E2E" }).click();
 
     const campoTexto = page.locator("#saida-texto");
     await expect(campoTexto).toBeVisible();
@@ -37,7 +38,7 @@ test.describe("saída durante a aula", () => {
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
     await expect(page.getByText("Saiu para a coordenação").first()).toBeVisible();
-    await expect(page.getByText("Liberado por Diretor Adriano").first()).toBeVisible();
+    await expect(page.getByText("Liberado por Diretor E2E").first()).toBeVisible();
   });
 
   test("registra a justificativa escrita e a coordenadora que liberou", async ({ page }) => {
@@ -54,11 +55,11 @@ test.describe("saída durante a aula", () => {
     await page.getByRole("radio", { name: "Escrever em poucas palavras" }).click();
     await page.locator("#saida-texto").fill("Foi buscar o irmão");
     await page.locator("#saida-responsavel").click();
-    await page.getByRole("option", { name: "Coordenadora Adriana" }).click();
+    await page.getByRole("option", { name: "Coordenadora E2E" }).click();
     await page.getByRole("button", { name: "Registrar saída" }).click();
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
     await expect(page.getByText("Foi buscar o irmão").first()).toBeVisible();
-    await expect(page.getByText("Liberado por Coordenadora Adriana").first()).toBeVisible();
+    await expect(page.getByText("Liberado por Coordenadora E2E").first()).toBeVisible();
   });
 });

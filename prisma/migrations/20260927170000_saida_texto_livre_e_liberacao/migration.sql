@@ -16,14 +16,8 @@ CREATE TABLE "liberadores" (
 -- CreateIndex
 CREATE UNIQUE INDEX "liberadores_codigo_unico" ON "liberadores" (lower("codigo"));
 
--- Catálogo inicial de quem libera a saída, definido pela escola. O código é
--- estável no histórico; rótulo e situação são editáveis na Gestão.
-INSERT INTO "liberadores" ("codigo", "rotulo")
-VALUES
-    ('adriano', 'Diretor Adriano'),
-    ('adriana', 'Coordenadora Adriana'),
-    ('helena', 'Coordenadora Helena')
-ON CONFLICT DO NOTHING;
+-- O catálogo de quem libera nasce vazio: a administração cadastra os nomes
+-- na Gestão, sem dado de pessoa no código nem na migração.
 
 -- O motivo da saída vive na linha, com código de justificativa ou texto livre.
 ALTER TABLE "saidas_antecipadas" ADD CONSTRAINT "saidas_antecipadas_motivo_presente" CHECK (

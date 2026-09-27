@@ -483,14 +483,14 @@ describe("justificativa e liberação da saída", () => {
 
   it("valida o código no catálogo de quem libera", () => {
     const catalogo = [
-      { codigo: "adriano", rotulo: "Diretor Adriano" },
-      { codigo: "adriana", rotulo: "Coordenadora Adriana" },
-      { codigo: "helena", rotulo: "Coordenadora Helena" },
+      { codigo: "P1", rotulo: "Pessoa Um" },
+      { codigo: "P2", rotulo: "Pessoa Dois" },
+      { codigo: "P3", rotulo: "Pessoa Três" },
     ];
-    expect(ehLiberadorValido("adriano", catalogo)).toBe(true);
-    expect(ehLiberadorValido("helena", catalogo)).toBe(true);
-    expect(ehLiberadorValido("demo", catalogo)).toBe(false);
-    expect(ehLiberadorValido("adriano", [])).toBe(false);
+    expect(ehLiberadorValido("P1", catalogo)).toBe(true);
+    expect(ehLiberadorValido("P3", catalogo)).toBe(true);
+    expect(ehLiberadorValido("X", catalogo)).toBe(false);
+    expect(ehLiberadorValido("P1", [])).toBe(false);
   });
 });
 

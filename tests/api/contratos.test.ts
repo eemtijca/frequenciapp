@@ -27,6 +27,7 @@ async function limparMassa() {
   await banco.connect();
   await banco.query("delete from frequencias where dia = any($1::date[])", [DIAS_TESTE]);
   await banco.query("delete from alunos where nome like 'QA%'");
+  await banco.query("delete from liberadores where codigo like 'QA%'");
   await banco.query(
     "delete from sessoes where usuario_id in (select id from usuarios where email like 'qa-%')",
   );
@@ -36,6 +37,23 @@ async function limparMassa() {
   );
   await banco.query("delete from series where nome = 'QA Ano'");
   await banco.query("delete from auditoria where alvo like '%qa-%' or alvo like 'QA%'");
+}
+
+// A migração não semeia quem libera; a suíte cria e limpa a própria massa.
+const LIBERADORES_QA = [
+  { codigo: "QADIR", rotulo: "QA Diretor" },
+  { codigo: "QACOR1", rotulo: "QA Coordenadora" },
+  { codigo: "QACOR2", rotulo: "QA Supervisora" },
+];
+
+async function prepararLiberadores() {
+  if (!banco) return;
+  for (const item of LIBERADORES_QA) {
+    await banco.query(
+      "insert into liberadores (codigo, rotulo) values ($1, $2) on conflict do nothing",
+      [item.codigo, item.rotulo],
+    );
+  }
 }
 
 async function requisicao(caminho: string, opcoes: RequestInit = {}): Promise<Response> {
@@ -135,6 +153,7 @@ let saidaQA: { id: string; alunoId: string; momento: string } | null = null;
 
 beforeAll(async () => {
   await limparMassa();
+  await prepararLiberadores();
 });
 
 afterAll(async () => {
@@ -990,7 +1009,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_2",
         justificativa: "CM",
         observacao: null,
-        liberadoPorCodigo: "adriano",
+        liberadoPorCodigo: "QADIR",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1004,8 +1023,8 @@ describe("saídas antecipadas", () => {
       };
     };
     expect(dados.saida.momento).toBe("aula_2");
-    expect(dados.saida.liberadoPorCodigo).toBe("adriano");
-    expect(dados.saida.liberadoPorNome).toBe("Diretor Adriano");
+    expect(dados.saida.liberadoPorCodigo).toBe("QADIR");
+    expect(dados.saida.liberadoPorNome).toBe("QA Diretor");
     saidaQA = { id: dados.saida.id, alunoId: dados.saida.alunoId, momento: dados.saida.momento };
   });
 
@@ -1017,7 +1036,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_4,
         momento: "aula_3",
         justificativa: "D",
-        liberadoPorCodigo: "adriana",
+        liberadoPorCodigo: "QACOR1",
       }),
     });
     expect(resposta.status).toBe(409);
@@ -1033,7 +1052,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_5,
         momento: "madrugada",
         justificativa: "D",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(momento.status).toBe(400);
@@ -1044,7 +1063,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_5,
         momento: "aula_1",
         justificativa: "X",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(justificativa.status).toBe(400);
@@ -1055,7 +1074,7 @@ describe("saídas antecipadas", () => {
         dia: "2099-06-15",
         momento: "aula_1",
         justificativa: "D",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(futuro.status).toBe(400);
@@ -1095,7 +1114,7 @@ describe("saídas antecipadas", () => {
         momento: "intervalo_1",
         justificativa: "D",
         texto: "Saiu para beber água",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(foraDeAula.status).toBe(400);
@@ -1108,7 +1127,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "D",
         texto: "a".repeat(101),
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(longo.status).toBe(400);
@@ -1122,7 +1141,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "O",
         observacao: "Na aula use o texto",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(observacao.status).toBe(400);
@@ -1137,7 +1156,7 @@ describe("saídas antecipadas", () => {
         momento: "aula_1",
         justificativa: "D",
         texto: "Saiu para a coordenação",
-        liberadoPorCodigo: "adriana",
+        liberadoPorCodigo: "QACOR1",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1164,7 +1183,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE_4,
         momento: "aula_3",
         justificativa: "O",
-        liberadoPorCodigo: "adriano",
+        liberadoPorCodigo: "QADIR",
       }),
     });
     expect(semTexto.status).toBe(201);
@@ -1178,7 +1197,7 @@ describe("saídas antecipadas", () => {
     };
     const naCopia = documento.saidas.find((item) => item.id === criada.saida.id);
     expect(naCopia?.texto ?? null).toBeNull();
-    expect(naCopia?.liberadoPorCodigo).toBe("adriano");
+    expect(naCopia?.liberadoPorCodigo).toBe("QADIR");
 
     await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
   });
@@ -1191,7 +1210,7 @@ describe("saídas antecipadas", () => {
         dia: DIA_TESTE,
         momento: "intervalo_1",
         texto: "Foi buscar o irmão",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(escrita.status).toBe(201);
@@ -1205,7 +1224,7 @@ describe("saídas antecipadas", () => {
     };
     expect(criada.saida.justificativa).toBeNull();
     expect(criada.saida.texto).toBe("Foi buscar o irmão");
-    expect(criada.saida.liberadoPorNome).toBe("Coordenadora Helena");
+    expect(criada.saida.liberadoPorNome).toBe("QA Supervisora");
     await autenticado(cookieCoord, `/api/saidas/${criada.saida.id}`, { method: "DELETE" });
 
     const semMotivo = await autenticado(cookieCoord, "/api/saidas", {
@@ -1214,7 +1233,7 @@ describe("saídas antecipadas", () => {
         alunoId: alunoQA?.id,
         dia: DIA_TESTE,
         momento: "aula_1",
-        liberadoPorCodigo: "adriano",
+        liberadoPorCodigo: "QADIR",
       }),
     });
     expect(semMotivo.status).toBe(400);
@@ -1426,7 +1445,7 @@ describe("catálogo de justificativas", () => {
         dia: DIA_TESTE_5,
         momento: "aula_1",
         justificativa: "ZZZ",
-        liberadoPorCodigo: "helena",
+        liberadoPorCodigo: "QACOR2",
       }),
     });
     expect(saida.status).toBe(400);
@@ -1468,9 +1487,7 @@ describe("catálogo de quem libera as saídas", () => {
       a.localeCompare(b, "pt-BR", { sensitivity: "base" }),
     );
     expect(rotulos).toEqual(ordenados);
-    expect(dados.liberadores.find((item) => item.codigo === "adriano")?.rotulo).toBe(
-      "Diretor Adriano",
-    );
+    expect(dados.liberadores.find((item) => item.codigo === "QADIR")?.rotulo).toBe("QA Diretor");
   });
 
   it("coordenação não cria, edita nem exclui", async () => {
@@ -1479,7 +1496,7 @@ describe("catálogo de quem libera as saídas", () => {
       body: JSON.stringify({ codigo: "QAL", rotulo: "QA Liberador" }),
     });
     expect(criar.status).toBe(403);
-    const editar = await autenticado(cookieCoord, "/api/liberadores/adriano", {
+    const editar = await autenticado(cookieCoord, "/api/liberadores/QADIR", {
       method: "PATCH",
       body: JSON.stringify({ rotulo: "Outro" }),
     });

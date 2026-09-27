@@ -294,8 +294,10 @@ try {
     saidasCriadas += criada.rowCount;
   }
 
+  const avisoLiberadores =
+    liberadores.length === 0 ? " Nenhum nome no catálogo de quem libera; cadastre na Gestão." : "";
   console.log(
-    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos, ${justificativasNovas} justificativas novas, ${chamadasCriadas} chamadas, ${faltasCriadas} faltas e ${saidasCriadas} saídas antecipadas.`,
+    `Semente pronta: ${SERIES.length} séries, ${Object.keys(idsDeTurmas).length} turmas, ${AULAS.length} aulas por turma, ${semeados} alunos sintéticos, ${justificativasNovas} justificativas novas, ${chamadasCriadas} chamadas, ${faltasCriadas} faltas e ${saidasCriadas} saídas antecipadas.${avisoLiberadores}`,
   );
 } catch (erro) {
   console.error("Falha ao semear:", erro.message);
