@@ -108,6 +108,8 @@ export async function criarMassaE2E(): Promise<void> {
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
     await cliente.query("delete from liberadores where codigo like 'E2E%'");
+    // Contas de diretor da massa saem antes das turmas, que o vínculo protege.
+    await cliente.query("delete from usuarios where email like 'e2e-%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );
@@ -159,9 +161,23 @@ export async function limparMassaE2E(): Promise<void> {
     );
     await cliente.query("delete from alunos where nome like 'E2E %'");
     await cliente.query("delete from liberadores where codigo like 'E2E%'");
+    // Contas de diretor da massa saem antes das turmas, que o vínculo protege.
+    await cliente.query("delete from usuarios where email like 'e2e-%'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome = 'E2E Ano')",
     );
     await cliente.query("delete from series where nome = 'E2E Ano'");
+  });
+}
+
+/** Volta os parâmetros de acesso aos padrões da migração. */
+export async function restaurarParametrosAcessoE2E(): Promise<void> {
+  await comBanco(async (cliente) => {
+    await cliente.query(
+      `update parametros_acesso set validade_palavra_dias = 90, sessao_diretor_horas = 12,
+         tentativas_por_origem = 10, tentativas_por_login = 30, janela_minutos = 15,
+         categorias_diretor = '{faltas}', limite_risco_percentual = 25
+       where id = 'principal'`,
+    );
   });
 }
