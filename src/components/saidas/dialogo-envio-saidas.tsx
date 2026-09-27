@@ -120,7 +120,12 @@ export default function DialogoEnvioSaidas({
 
   useEffect(() => {
     if (aberto) void simular();
-  }, [aberto, simular]);
+  }, [aberto, mes, simular]);
+
+  function trocarMes(novo: string) {
+    setRemoverMarcadas([]);
+    onMes(novo);
+  }
 
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
     if (!simulacao) return;
@@ -183,7 +188,7 @@ export default function DialogoEnvioSaidas({
               max={mes}
               rotuloAcessivel="Mês do envio das saídas"
               rotulo={rotuloMes(mes)}
-              onValor={onMes}
+              onValor={trocarMes}
             />
           </div>
 
