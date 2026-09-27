@@ -104,14 +104,14 @@ export async function conferirSenhaDoAdmin(
   chaveLimite: string,
 ): Promise<void> {
   const chave = `${chaveLimite}:${usuarioId}`;
-  if (!limiteDeTentativas(chave, 5)) {
+  if (!(await limiteDeTentativas(chave, 5))) {
     throw new ErroHttp("Muitas tentativas incorretas. Aguarde alguns minutos.", 429);
   }
   const usuario = await banco().usuario.findUnique({ where: { id: usuarioId } });
   if (!usuario || !(await conferirSenha(senha, usuario.senhaHash))) {
     throw new ErroHttp("A senha do administrador está incorreta.", 400);
   }
-  limparTentativas(chave);
+  await limparTentativas(chave);
 }
 
 export const esquemaSenha = z.object({

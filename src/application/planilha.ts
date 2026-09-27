@@ -476,7 +476,7 @@ export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  if (!limiteDeTentativas(`planilha:simular:${usuario.id}`, 60)) {
+  if (!(await limiteDeTentativas(`planilha:simular:${usuario.id}`, 60))) {
     throw new ErroHttp("Muitas prévias em sequência. Aguarde alguns minutos.", 429);
   }
   const linha = await lerLinha(FINALIDADE);
@@ -526,7 +526,7 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
   if (!dados.data.planoHashGeral) {
     throw new ErroHttp("Faça a prévia antes de enviar.", 400);
   }
-  if (!limiteDeTentativas(`planilha:envio:${usuario.id}`, 30)) {
+  if (!(await limiteDeTentativas(`planilha:envio:${usuario.id}`, 30))) {
     throw new ErroHttp("Muitos envios em sequência. Aguarde alguns minutos.", 429);
   }
   const linha = await lerLinha(FINALIDADE);
