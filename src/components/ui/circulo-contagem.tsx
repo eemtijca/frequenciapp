@@ -20,6 +20,7 @@ export function CirculoContagem({ valor, sigla, tom, singular, plural }: Circulo
   const legenda = legendaDe(valor, singular, plural);
   return (
     <span
+      role="img"
       title={legenda}
       aria-label={legenda}
       className={cn(
@@ -63,5 +64,9 @@ export function CirculosAcumulado({ faltas, justificadas, saidas }: CirculosAcum
 
 /** Frase do acumulado para o nome acessível da linha do aluno. */
 export function fraseAcumulado(faltas: number, justificadas: number): string {
-  return `Acumulado: ${legendaDe(faltas, "falta", "faltas")} e ${legendaDe(justificadas, "justificada", "justificadas")}.`;
+  return `Acumulado: ${legendaDe(faltas, "falta", "faltas")} e ${legendaDe(
+    justificadas,
+    "falta justificada",
+    "faltas justificadas",
+  )}.`;
 }

@@ -1,5 +1,5 @@
-// Saída antecipada durante a aula: o texto livre de até 100 caracteres é
-// opcional e aparece na lista do dia.
+// Saída antecipada: registro durante a aula com texto opcional, justificativa
+// escrita no intervalo e o nome de quem liberou vindo do catálogo da Gestão.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
