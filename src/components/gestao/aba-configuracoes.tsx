@@ -347,6 +347,7 @@ export default function AbaConfiguracoes({
               id="justificativa-codigo"
               value={novaCodigo}
               maxLength={10}
+              autoComplete="off"
               disabled={enviandoJustificativa}
               onChange={(evento) => setNovaCodigo(evento.target.value)}
               placeholder="Ex.: At"
@@ -359,6 +360,7 @@ export default function AbaConfiguracoes({
               id="justificativa-rotulo"
               value={novaRotulo}
               maxLength={60}
+              autoComplete="off"
               disabled={enviandoJustificativa}
               onChange={(evento) => setNovaRotulo(evento.target.value)}
               placeholder="Ex.: Atestado"
@@ -404,6 +406,7 @@ export default function AbaConfiguracoes({
                   <Input
                     value={rotuloEdicao}
                     maxLength={60}
+                    autoComplete="off"
                     aria-label={`Rótulo de ${item.codigo}`}
                     onChange={(evento) => setRotuloEdicao(evento.target.value)}
                     className="h-10 min-w-0 flex-1"
