@@ -311,6 +311,11 @@ export interface Frequencia {
   atualizadoEm: string;
   atualizadoPorNome: string | null;
   faltas: FaltaAluno[];
+  /**
+   * Quem estava na lista da chamada, presente ou ausente. Fixa o histórico
+   * quando o aluno muda de turma depois. Ausente só em dado de teste antigo.
+   */
+  alunos?: string[];
 }
 
 /** Resultado do salvamento: conflito devolve a versão vigente. */
@@ -320,6 +325,12 @@ export type ResultadoSalvamento =
 /** Rótulo de exibição de uma turma: série + nome, por exemplo "1º ano A". */
 export function rotuloDeTurma(serieNome: string, turmaNome: string): string {
   return `${serieNome.trim()} ${turmaNome.trim()}`.trim();
+}
+
+/** Rótulo curto para os círculos: só o ordinal da série e a turma, "3º A". */
+export function rotuloCurtoDeTurma(serieNome: string, turmaNome: string): string {
+  const [ordinal = ""] = serieNome.trim().split(/\s+/);
+  return `${ordinal} ${turmaNome.trim()}`.trim();
 }
 
 /** Rótulo curto de uma aula: ordem + janela, por exemplo "Aula 1 · 07:00 às 07:50". */
@@ -570,8 +581,8 @@ export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; mi
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
  * aulas. Regra: falta em todas as aulas vira F, ou FJ quando todas as faltas
  * do dia têm justificativa; falta em parte vira S (saiu antes ou chegou
- * depois); sem falta e com frequência vira P; vazio quando a turma não teve
- * frequência. A falta prevalece mesmo em aula que saiu da grade depois do
+ * depois); sem falta e na lista de uma chamada do dia vira P; vazio quando
+ * o aluno não estava em nenhuma chamada do dia. A falta prevalece mesmo em aula que saiu da grade depois do
  * registro.
  */
 export function marcaDoAluno(
@@ -592,9 +603,20 @@ export function marcaDoAluno(
       }
     }
   }
-  const temFrequencia = frequenciasDoDia.some((frequencia) => frequencia.turmaId === aluno.turmaId);
+  // A chamada do aluno no dia é a que o tinha na lista, não a da turma
+  // atual: mover de turma depois não reescreve os dias já salvos.
+  const turmasDaChamada = new Set(
+    frequenciasDoDia
+      .filter((frequencia) =>
+        frequencia.alunos
+          ? frequencia.alunos.includes(aluno.id)
+          : frequencia.turmaId === aluno.turmaId,
+      )
+      .map((frequencia) => frequencia.turmaId),
+  );
+  const temFrequencia = turmasDaChamada.size > 0;
   const aulasDaTurma = horariosDoDia(
-    horarios.filter((horario) => horario.turmaId === aluno.turmaId),
+    horarios.filter((horario) => turmasDaChamada.has(horario.turmaId)),
     dia,
   );
 

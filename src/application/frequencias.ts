@@ -55,6 +55,7 @@ interface LinhaFrequencia {
     justificativa: string | null;
     observacao: string | null;
   }[];
+  alunos: { alunoId: string }[];
 }
 
 /**
@@ -92,6 +93,7 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     revisao: linha.revisao,
     atualizadoEm: linha.atualizadoEm.toISOString(),
     atualizadoPorNome: linha.atualizadoPor?.nome ?? linha.criadoPor?.nome ?? null,
+    alunos: linha.alunos.map((item) => item.alunoId),
     faltas: [...porAluno.entries()].map(([alunoId, grupo]) => {
       const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
       const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
@@ -111,6 +113,7 @@ const COMPLEMENTO = {
     faltas: {
       select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
     },
+    alunos: { select: { alunoId: true } },
     criadoPor: { select: { nome: true } },
     atualizadoPor: { select: { nome: true } },
   },
@@ -239,7 +242,8 @@ export async function salvarFrequencia(
   const { dia, turmaId, revisao } = dados.data;
 
   // O dia corrente vem do fuso da escola, nunca do relógio do cliente.
-  if (dia > diaLocal(new Date(), ambiente.fuso)) {
+  const hoje = diaLocal(new Date(), ambiente.fuso);
+  if (dia > hoje) {
     throw new ErroHttp("Não é possível registrar frequência em dia futuro.", 400);
   }
 
@@ -362,9 +366,11 @@ export async function salvarFrequencia(
         where: { turmaId, ativo: true },
         select: { id: true },
       });
+      const listaGravada = existente?.alunos.map((item) => item.alunoId) ?? [];
       const idsValidos = new Set([
         ...alunosDaTurma.map((aluno) => aluno.id),
         ...comFaltaRegistrada,
+        ...listaGravada,
       ]);
       const invalidos = ausencias
         .map((ausencia) => ausencia.alunoId)
@@ -375,6 +381,20 @@ export async function salvarFrequencia(
           400,
         );
       }
+
+      // Lista da chamada: na primeira vez, os ativos da turma atual. Depois,
+      // a lista gravada continua; só o dia corrente recebe quem entrou na
+      // turma, para um aluno movido não aparecer em chamadas antigas.
+      const ausentes = ausencias.map((ausencia) => ausencia.alunoId);
+      const lista = new Set(
+        existente
+          ? [
+              ...listaGravada,
+              ...ausentes,
+              ...(dia === hoje ? alunosDaTurma.map((aluno) => aluno.id) : []),
+            ]
+          : [...alunosDaTurma.map((aluno) => aluno.id), ...ausentes],
+      );
 
       if (revisao === 0) {
         if (existente) {
@@ -397,6 +417,7 @@ export async function salvarFrequencia(
                 })),
               ),
             },
+            alunos: { create: [...lista].map((alunoId) => ({ alunoId })) },
           },
           ...COMPLEMENTO,
         });
@@ -420,6 +441,10 @@ export async function salvarFrequencia(
         ...COMPLEMENTO,
       });
       if (!linha) throw new ErroHttp("Frequência não encontrada para atualizar.", 404);
+      await tx.alunoDaChamada.createMany({
+        data: [...lista].map((alunoId) => ({ frequenciaId: linha.id, alunoId })),
+        skipDuplicates: true,
+      });
       await tx.falta.deleteMany({ where: { frequenciaId: linha.id } });
       if (ausencias.length > 0) {
         await tx.falta.createMany({
@@ -438,6 +463,7 @@ export async function salvarFrequencia(
         situacao: "salvo" as const,
         frequencia: {
           ...paraFrequencia(linha),
+          alunos: [...new Set([...linha.alunos.map((item) => item.alunoId), ...lista])],
           faltas: ausencias.map((ausencia) => {
             if (!ausencia.justificativa)
               return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };

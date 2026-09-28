@@ -147,6 +147,7 @@ model Aluno {
   turmaOriginal   Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
   faltas          Falta[]
   saidas          SaidaAntecipada[]
+  chamadas        AlunoDaChamada[]
 
   @@index([turmaId, ordem])
   @@index([turmaOriginalId])
@@ -176,21 +177,35 @@ model Horario {
 // primeiro salvamento e crescimento a cada atualização bem-sucedida; a autoria
 // fica anulável para o histórico não depender da conta.
 model Frequencia {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId         String   @map("turma_id") @db.Uuid
-  dia             DateTime @db.Date
-  revisao         Int      @default(1)
-  criadoPorId     String?  @map("criado_por_id") @db.Uuid
-  atualizadoPorId String?  @map("atualizado_por_id") @db.Uuid
-  atualizadoEm    DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
-  turma           Turma    @relation(fields: [turmaId], references: [id], onDelete: Restrict)
-  criadoPor       Usuario? @relation("FrequenciaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor   Usuario? @relation("FrequenciaAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId         String           @map("turma_id") @db.Uuid
+  dia             DateTime         @db.Date
+  revisao         Int              @default(1)
+  criadoPorId     String?          @map("criado_por_id") @db.Uuid
+  atualizadoPorId String?          @map("atualizado_por_id") @db.Uuid
+  atualizadoEm    DateTime         @updatedAt @map("atualizado_em") @db.Timestamptz
+  turma           Turma            @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor       Usuario?         @relation("FrequenciaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor   Usuario?         @relation("FrequenciaAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
   faltas          Falta[]
+  alunos          AlunoDaChamada[]
 
   @@unique([turmaId, dia])
   @@index([dia])
   @@map("frequencias")
+}
+
+// Quem estava na lista da chamada, presente ou ausente. Fixa o histórico:
+// mover o aluno de turma depois não muda a presença dos dias já salvos.
+model AlunoDaChamada {
+  frequenciaId String     @map("frequencia_id") @db.Uuid
+  alunoId      String     @map("aluno_id") @db.Uuid
+  frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
+  aluno        Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@id([frequenciaId, alunoId])
+  @@index([alunoId])
+  @@map("alunos_chamada")
 }
 
 // Falta de um aluno em uma aula da frequência. Presença não gera linha. A

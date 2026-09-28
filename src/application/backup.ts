@@ -76,6 +76,8 @@ const esquemaCopia = z.object({
             }),
           )
           .max(50000),
+        // Lista da chamada. Cópias antigas não trazem; a importação a deduz.
+        alunos: z.array(uuid).max(5000).optional(),
       }),
     )
     .max(50000),
@@ -210,6 +212,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         faltas: {
           select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
         },
+        alunos: { select: { alunoId: true } },
       },
     }),
     banco().saidaAntecipada.findMany({
@@ -250,6 +253,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       turmaId: frequencia.turmaId,
       revisao: frequencia.revisao,
       faltas: frequencia.faltas,
+      alunos: frequencia.alunos.map((item) => item.alunoId),
     })),
     saidas: saidas.map((saida) => ({
       ...saida,
@@ -514,6 +518,16 @@ export async function importarCopia(
         resultado.conflitos += 1;
         continue;
       }
+      // Sem lista na cópia, vale o que ela diz da turma: ativos dela e quem
+      // tem falta na chamada.
+      const lista = new Set(
+        (
+          frequencia.alunos ??
+          copia.alunos
+            .filter((aluno) => aluno.ativo && aluno.turmaId === frequencia.turmaId)
+            .map((aluno) => aluno.id)
+        ).concat(frequencia.faltas.map((falta) => falta.alunoId)),
+      );
       await tx.frequencia.create({
         data: {
           turmaId: frequencia.turmaId,
@@ -528,6 +542,11 @@ export async function importarCopia(
               justificativa: falta.justificativa ?? null,
               observacao: falta.justificativa ? (falta.observacao ?? null) : null,
             })),
+          },
+          alunos: {
+            create: [...lista]
+              .filter((alunoId) => idsAlunos.has(alunoId))
+              .map((alunoId) => ({ alunoId })),
           },
         },
       });
