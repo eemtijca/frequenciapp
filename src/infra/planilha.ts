@@ -24,6 +24,8 @@ function esperar(ms: number): Promise<void> {
 export interface OpcoesGas {
   /** Operações destrutivas não são repetidas automaticamente. */
   retentavel?: boolean;
+  /** Tempo máximo da chamada, abaixo do limite da função do servidor. */
+  tempoLimiteMs?: number;
 }
 
 /** Falha de script (recusa) contra falha de rede (pode ter aplicado parte). */
@@ -67,7 +69,7 @@ export async function chamarGas<T>(
         body: JSON.stringify({ token, versao: 1, ...corpo }),
         redirect: "follow",
         cache: "no-store",
-        signal: AbortSignal.timeout(TEMPO_LIMITE_MS),
+        signal: AbortSignal.timeout(opcoes.tempoLimiteMs ?? TEMPO_LIMITE_MS),
       });
       if (!resposta.ok) {
         throw new ErroGas("A planilha respondeu com erro. Confira a publicação do script.", false);
