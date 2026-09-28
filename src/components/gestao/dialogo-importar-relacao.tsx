@@ -1,14 +1,21 @@
 "use client";
 
-// Importação das relações de turma: cola o texto ou escolhe os arquivos,
-// confere a prévia do que muda e só então aplica.
+// Importação da relação de alunos em CSV: escolhe ou cola o arquivo, confere
+// o schema na hora, vê a prévia do que muda no cadastro e só então aplica.
 import { useMemo, useRef, useState } from "react";
-import { FileUp, LoaderCircle } from "lucide-react";
+import { CircleCheck, FileUp, LoaderCircle, TriangleAlert } from "lucide-react";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import type { Turma } from "@/domain/frequencia";
-import type { ItemDoPlano, PlanoDeImportacao } from "@/domain/importacao-alunos";
+import {
+  AJUDA_COLUNAS_RELACAO,
+  CABECALHO_RELACAO,
+  COLUNAS_RELACAO,
+  lerRelacaoCsv,
+  type ItemDoPlano,
+  type PlanoDeImportacao,
+} from "@/domain/importacao-alunos";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AvisoCompacto } from "@/components/ui/tela-estado";
@@ -33,21 +40,56 @@ interface Resposta {
   aplicado: { criados: number; atualizados: number; desativados: number } | null;
 }
 
+const ERROS_VISIVEIS = 8;
+
 function plural(valor: number, singular: string, varios: string): string {
   return `${valor} ${valor === 1 ? singular : varios}`;
 }
 
+/** Lista de problemas em destaque, com as primeiras linhas e o total restante. */
+function ListaDeProblemas({ titulo, itens }: { titulo: string; itens: string[] }) {
+  const visiveis = itens.slice(0, ERROS_VISIVEIS);
+  return (
+    <div
+      role="alert"
+      className="border-falta/40 bg-falta-fraca text-falta-texto flex gap-2.5 rounded-lg border px-3 py-2 text-sm"
+    >
+      <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="font-medium">{titulo}</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
+          {visiveis.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        {itens.length > visiveis.length && (
+          <p className="mt-1 text-xs">
+            E mais {plural(itens.length - visiveis.length, "problema", "problemas")}.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImportado }: Props) {
   const [texto, setTexto] = useState("");
+  const [arquivo, setArquivo] = useState("");
+  const [erroArquivo, setErroArquivo] = useState("");
   const [plano, setPlano] = useState<PlanoDeImportacao | null>(null);
   const [conferido, setConferido] = useState("");
   const [erro, setErro] = useState("");
-  const arquivos = useRef<HTMLInputElement>(null);
+  const seletor = useRef<HTMLInputElement>(null);
 
   const rotulo = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
     return (id: string) => mapa.get(id) ?? "";
   }, [turmas]);
+
+  // O schema é conferido na hora, antes de ir ao servidor.
+  const leitura = useMemo(() => (texto.trim() ? lerRelacaoCsv(texto) : null), [texto]);
+  const alunosLidos = leitura?.relacoes.reduce((soma, item) => soma + item.alunos.length, 0) ?? 0;
+  const foraDoPadrao = Boolean(erroArquivo) || (leitura !== null && leitura.erros.length > 0);
 
   function trocarTexto(valor: string) {
     setTexto(valor);
@@ -55,19 +97,24 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
     setErro("");
   }
 
-  async function lerArquivos(lista: FileList | null) {
-    if (!lista || lista.length === 0) return;
-    const conteudos = await Promise.all([...lista].map((arquivo) => arquivo.text()));
-    trocarTexto(
-      [texto.trim(), ...conteudos.map((conteudo) => conteudo.trim())].filter(Boolean).join("\n\n"),
-    );
-    if (arquivos.current) arquivos.current.value = "";
+  async function lerArquivo(lista: FileList | null) {
+    const escolhido = lista?.[0];
+    if (seletor.current) seletor.current.value = "";
+    if (!escolhido) return;
+    setArquivo(escolhido.name);
+    if (!/\.csv$/i.test(escolhido.name)) {
+      setErroArquivo(`${escolhido.name} não é um arquivo CSV. Salve a relação como .csv.`);
+      trocarTexto("");
+      return;
+    }
+    setErroArquivo("");
+    trocarTexto(await escolhido.text());
   }
 
   const { executando: conferindo, executar: conferir } = useAcaoUnica(async () => {
     setErro("");
     try {
-      const resposta = await pedir<Resposta>("/api/alunos/importacao", corpoJson({ texto }));
+      const resposta = await pedir<Resposta>("/api/alunos/importacao", corpoJson({ csv: texto }));
       setPlano(resposta.plano);
       setConferido(texto);
     } catch (excecao) {
@@ -81,7 +128,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
     try {
       const resposta = await pedir<Resposta>(
         "/api/alunos/importacao",
-        corpoJson({ texto: conferido, aplicar: true }),
+        corpoJson({ csv: conferido, aplicar: true }),
       );
       const feito = resposta.aplicado;
       avisarSucesso(
@@ -92,6 +139,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
       );
       onAbrir(false);
       setTexto("");
+      setArquivo("");
       setPlano(null);
       await onImportado();
     } catch (excecao) {
@@ -124,45 +172,90 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Importar relação das turmas</DialogTitle>
+          <DialogTitle>Importar relação em CSV</DialogTitle>
           <DialogDescription>
-            Cada relação começa pela linha RELAÇÃO ATUAL com a turma, e cada aluno traz a turma
-            original. A Chamada passa a seguir a relação na ordem dela, e o histórico de cada aluno
-            é mantido.
+            Uma linha por aluno, com o cabeçalho abaixo. A Chamada passa a seguir a relação na ordem
+            do arquivo, e o histórico de cada aluno é mantido. Use Exportar relação para baixar um
+            arquivo já no padrão.
           </DialogDescription>
         </DialogHeader>
 
+        <div className="bg-secondary/50 flex flex-col gap-2 rounded-lg px-3 py-2 text-xs">
+          <code className="font-mono text-[13px] break-all">{CABECALHO_RELACAO}</code>
+          <details>
+            <summary className="text-muted-foreground cursor-pointer">
+              Como montar o arquivo
+            </summary>
+            <ul className="text-muted-foreground mt-1.5 space-y-1">
+              {COLUNAS_RELACAO.map((coluna) => (
+                <li key={coluna}>
+                  <span className="text-foreground font-mono">{coluna}</span>:{" "}
+                  {AJUDA_COLUNAS_RELACAO[coluna]}.
+                </li>
+              ))}
+              <li>
+                Separador ponto e vírgula, codificação UTF-8. Alunos ativos das turmas do arquivo
+                que não estiverem nele são desativados, sem perder o histórico.
+              </li>
+            </ul>
+          </details>
+        </div>
+
         <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="texto-relacao">Relações</Label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label htmlFor="texto-relacao" className="whitespace-nowrap">
+              Conteúdo do CSV
+            </Label>
             <Button
               type="button"
               variant="outline"
               size="sm"
               className="h-9 rounded-lg"
-              onClick={() => arquivos.current?.click()}
+              onClick={() => seletor.current?.click()}
             >
               <FileUp size={16} />
-              Escolher arquivos
+              Escolher .csv
             </Button>
             <input
-              ref={arquivos}
+              ref={seletor}
               type="file"
-              accept=".txt,text/plain"
-              multiple
+              accept=".csv,text/csv"
               hidden
-              onChange={(evento) => void lerArquivos(evento.target.files)}
+              onChange={(evento) => void lerArquivo(evento.target.files)}
             />
           </div>
           <textarea
             id="texto-relacao"
             value={texto}
-            onChange={(evento) => trocarTexto(evento.target.value)}
-            rows={8}
+            onChange={(evento) => {
+              setErroArquivo("");
+              setArquivo("");
+              trocarTexto(evento.target.value);
+            }}
+            rows={7}
             spellCheck={false}
-            className="border-input bg-background focus-visible:ring-ring/50 focus-visible:border-ring min-h-40 w-full rounded-lg border px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
-            placeholder="Cole aqui as relações de uma ou mais turmas."
+            aria-invalid={foraDoPadrao || undefined}
+            aria-describedby="situacao-relacao"
+            className="border-input bg-background focus-visible:ring-ring/50 focus-visible:border-ring aria-[invalid=true]:border-falta min-h-36 w-full rounded-lg border px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
+            placeholder={`${CABECALHO_RELACAO}\n3º ano A;1;Nome do aluno;3º ano B`}
           />
+          <div id="situacao-relacao">
+            {erroArquivo ? (
+              <ListaDeProblemas titulo="Arquivo fora do padrão" itens={[erroArquivo]} />
+            ) : leitura && leitura.erros.length > 0 ? (
+              <ListaDeProblemas
+                titulo={`${arquivo || "O CSV"} está fora do padrão`}
+                itens={leitura.erros}
+              />
+            ) : leitura ? (
+              <p className="text-primary flex items-center gap-1.5 text-xs font-medium">
+                <CircleCheck size={14} aria-hidden="true" />
+                {arquivo ? `${arquivo}: ` : ""}
+                {plural(alunosLidos, "aluno", "alunos")} em{" "}
+                {plural(leitura.relacoes.length, "turma", "turmas")}, no padrão. Toque em Conferir.
+              </p>
+            ) : null}
+          </div>
         </div>
 
         {erro && <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
@@ -170,12 +263,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
         {plano && (
           <div className="flex flex-col gap-3" aria-live="polite">
             {plano.bloqueios.length > 0 && (
-              <AvisoCompacto
-                variante="dados_invalidos"
-                titulo="Corrija antes de aplicar"
-                descricao={plano.bloqueios.join(" ")}
-                tamanho="linha"
-              />
+              <ListaDeProblemas titulo="Corrija antes de aplicar" itens={plano.bloqueios} />
             )}
             {plano.avisos.length > 0 && (
               <AvisoCompacto
@@ -197,7 +285,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
             </ul>
             <div className="divide-y rounded-lg border">
               {grupos.map((grupo) => (
-                <details key={grupo.titulo} className="group px-3 py-2">
+                <details key={grupo.titulo} className="px-3 py-2">
                   <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
                     {grupo.titulo}
                     <span className="numerais-tabulares text-muted-foreground">
@@ -239,7 +327,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
           <Button
             type="button"
             variant={podeAplicar ? "outline" : "default"}
-            disabled={texto.trim() === "" || conferindo || aplicando}
+            disabled={!leitura || foraDoPadrao || conferindo || aplicando}
             onClick={() => void conferir()}
           >
             {conferindo && <LoaderCircle size={16} className="animate-spin" />}

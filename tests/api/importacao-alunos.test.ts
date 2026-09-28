@@ -1,4 +1,4 @@
-// Contratos da importação das relações de turma: prévia sem gravar, aplicação
+// Contratos da importação da relação de alunos em CSV: prévia sem gravar, aplicação
 // que move, reordena, cria e desativa mantendo o histórico, recusa para a
 // coordenação e bloqueio que impede aplicar. Massa com prefixo QI.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -12,7 +12,6 @@ const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
 const EMAIL_COORD = process.env.TESTE_EMAIL ?? "demo@escola.exemplo";
 const SENHA_COORD = process.env.TESTE_SENHA ?? "DemoFrequencia2026";
 const DIA = "2026-06-24";
-const TRAVESSAO = String.fromCharCode(0x2014);
 
 let banco: pg.Client | null = null;
 let cookieAdmin = "";
@@ -58,19 +57,22 @@ async function entrar(email: string, senha: string): Promise<string> {
   return resposta.headers.get("set-cookie")?.split(";")[0] ?? "";
 }
 
-function importar(texto: string, aplicar = false, cookie = cookieAdmin): Promise<Response> {
+function importar(csv: string, aplicar = false, cookie = cookieAdmin): Promise<Response> {
   return chamar(
     "/api/alunos/importacao",
-    { method: "POST", body: JSON.stringify({ texto, aplicar }) },
+    { method: "POST", body: JSON.stringify({ csv, aplicar }) },
     cookie,
   );
 }
 
-// Relações no formato recebido da escola, com a quebra escrita como texto.
+// Relação no schema padrão, com BOM e CRLF como sai do Excel.
 const RELACOES = [
-  `RELAÇÃO ATUAL ${TRAVESSAO} QI A\\nTotal de estudantes: 2\\n\\nQI BRUNO ${TRAVESSAO} Turma original: QI B\\nQI ANA ${TRAVESSAO} Turma original: QI A\\n`,
-  `RELAÇÃO ATUAL ${TRAVESSAO} QI B\\nTotal de estudantes: 2\\n\\nQI CARLA ${TRAVESSAO} Turma original: QI A\\nQI DAVI NOVO ${TRAVESSAO} Turma original: QI B\\n`,
-].join("\n");
+  "\uFEFFturma_atual;ordem;nome;turma_original",
+  "QI A;1;QI BRUNO;QI B",
+  "QI A;2;QI ANA;QI A",
+  "QI B;1;QI CARLA;QI A",
+  "QI B;2;QI DAVI NOVO;QI B",
+].join("\r\n");
 
 beforeAll(async () => {
   const conexao = process.env.DATABASE_URL;
@@ -183,9 +185,12 @@ describe("importação das relações de turma", () => {
 
   it("não aplica com bloqueio", async () => {
     const resposta = await importar(
-      `RELAÇÃO ATUAL ${TRAVESSAO} QI A\\nQI ANA ${TRAVESSAO} Turma original: QI Z`,
+      "turma_atual;ordem;nome;turma_original\nQI A;1;QI ANA;QI Z",
       true,
     );
     expect(resposta.status).toBe(400);
+    const foraDoPadrao = await importar("nome;turma\nQI ANA;QI A");
+    const { plano } = await json<Resposta>(foraDoPadrao);
+    expect(plano.bloqueios[0]).toContain("cabeçalho");
   });
 });
