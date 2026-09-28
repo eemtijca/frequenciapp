@@ -12,6 +12,8 @@ import { diaLocal, diasDoMes } from "@/domain/frequencia";
 import { temCapacidade } from "@/domain/usuarios";
 import TelaLogin from "@/components/auth/tela-login";
 import Aplicacao from "@/components/aplicacao";
+import AplicacaoDiretor from "@/components/diretor/aplicacao-diretor";
+import { contextoDoDiretor } from "@/application/diretor-visao";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +23,13 @@ export default async function Pagina({
   searchParams: Promise<{ visao?: string }>;
 }) {
   const usuario = await identidadeAtual(ambiente.authSecret);
+  if (!usuario) return <TelaLogin />;
   // Recusa por padrão: o aplicativo completo só abre para quem opera a
-  // escola. Nenhum papel atual cai aqui; um papel só de leitura terá tela própria.
-  if (!usuario || !temCapacidade(usuario.papel, "operar")) {
+  // escola; o diretor de turma tem a própria tela, só de leitura.
+  if (!temCapacidade(usuario.papel, "operar")) {
+    if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
+      return <AplicacaoDiretor usuario={usuario} contexto={await contextoDoDiretor(usuario.id)} />;
+    }
     return <TelaLogin />;
   }
   const parametros = await searchParams;

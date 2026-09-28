@@ -1,8 +1,8 @@
 "use client";
 
-// Gestão: área do administrador. Séries, turmas, alunos, equipe e
-// configurações em abas curtas.
-import { GraduationCap, ListChecks, School, Settings2, Users } from "lucide-react";
+// Gestão: área do administrador. Séries, turmas, alunos, equipe, diretores
+// de turma e configurações em abas curtas.
+import { GraduationCap, ListChecks, School, Settings2, UserRoundCheck, Users } from "lucide-react";
 import type {
   Aluno,
   Configuracoes,
@@ -16,9 +16,10 @@ import AbaSeries from "@/components/gestao/aba-series";
 import AbaTurmas from "@/components/gestao/aba-turmas";
 import AbaAlunos from "@/components/gestao/aba-alunos";
 import AbaEquipe from "@/components/gestao/aba-equipe";
+import AbaDiretores from "@/components/gestao/aba-diretores";
 import AbaConfiguracoes from "@/components/gestao/aba-configuracoes";
 
-export type Aba = "series" | "turmas" | "alunos" | "equipe" | "configuracoes";
+export type Aba = "series" | "turmas" | "alunos" | "equipe" | "diretores" | "configuracoes";
 
 interface Props {
   usuarioId: string;
@@ -43,6 +44,7 @@ const ABAS: AbaItem<Aba>[] = [
   { valor: "turmas", rotulo: "Turmas", icone: School },
   { valor: "alunos", rotulo: "Alunos", icone: ListChecks },
   { valor: "equipe", rotulo: "Equipe", icone: Users },
+  { valor: "diretores", rotulo: "Diretores", rotuloCurto: "Diretores", icone: UserRoundCheck },
   { valor: "configuracoes", rotulo: "Configurações", rotuloCurto: "Config.", icone: Settings2 },
 ];
 
@@ -68,7 +70,7 @@ export default function VistaGestao({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Gestão</h1>
         <p className="text-muted-foreground text-sm">
-          Séries, turmas, alunos, equipe e recursos da escola.
+          Séries, turmas, alunos, equipe, diretores de turma e recursos da escola.
         </p>
       </div>
 
@@ -89,6 +91,7 @@ export default function VistaGestao({
               <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
             )}
             {aba === "equipe" && <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} />}
+            {aba === "diretores" && <AbaDiretores turmas={turmas} />}
             {aba === "configuracoes" && (
               <AbaConfiguracoes
                 configuracoes={configuracoes}

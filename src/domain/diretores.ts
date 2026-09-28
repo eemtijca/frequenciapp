@@ -83,6 +83,29 @@ export function mensagemDeCredencialRecusada(estado: EstadoCredencial): string {
   return "Acesso encerrado. Procure a coordenação da escola.";
 }
 
+export interface VinculoDTO {
+  id: string;
+  turmaId: string;
+  turma: string;
+  inicio: string;
+  fim: string | null;
+}
+
+export interface DiretorDTO {
+  id: string;
+  nome: string;
+  identificador: string;
+  ativo: boolean;
+  estado: EstadoCredencial;
+  emitidaEm: string | null;
+  expiraEm: string | null;
+  primeiroUsoEm: string | null;
+  revogadaEm: string | null;
+  motivoRevogacao: string | null;
+  /** Vínculos vigentes hoje, no fuso da escola. */
+  turmas: VinculoDTO[];
+}
+
 export interface PeriodoVinculo {
   inicio: string;
   fim: string | null;

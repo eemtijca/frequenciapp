@@ -16,34 +16,11 @@ import {
   normalizarLogin,
   problemaDeIdentificador,
   vinculoVigente,
-  type EstadoCredencial,
+  type DiretorDTO,
 } from "@/domain/diretores";
 import { lerParametrosAcesso } from "@/application/parametros-acesso";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
-
-export interface VinculoDTO {
-  id: string;
-  turmaId: string;
-  turma: string;
-  inicio: string;
-  fim: string | null;
-}
-
-export interface DiretorDTO {
-  id: string;
-  nome: string;
-  identificador: string;
-  ativo: boolean;
-  estado: EstadoCredencial;
-  emitidaEm: string | null;
-  expiraEm: string | null;
-  primeiroUsoEm: string | null;
-  revogadaEm: string | null;
-  motivoRevogacao: string | null;
-  /** Vínculos vigentes hoje, no fuso da escola. */
-  turmas: VinculoDTO[];
-}
 
 const nomeDiretor = z
   .string()

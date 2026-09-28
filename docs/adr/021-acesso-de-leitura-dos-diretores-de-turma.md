@@ -2,7 +2,7 @@
 
 ## Status
 
-Aceita. A fase 1 (guardas por capacidade) entra com esta ADR; as fases seguintes vêm em pull requests próprios.
+Aceita e implementada nas cinco fases, cada uma em pull request próprio. O roteiro de operação está em [operacao.md](../operacao.md#diretores-de-turma).
 
 ## Contexto
 

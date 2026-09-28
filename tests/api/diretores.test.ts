@@ -1,11 +1,12 @@
 // Contratos dos diretores de turma: cadastro pela administração, emissão,
 // troca e revogação da palavra-chave, entrada pelo identificador, recusa de
-// toda rota da equipe e parâmetros de acesso. Massa com prefixo QD.
+// toda rota da equipe, estatísticas da turma de origem e parâmetros de acesso.
+// Massa com prefixo QD.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { diaLocal, diaSeguinte } from "@/domain/frequencia";
+import { diaDaSemanaIso, diaLocal, diaSeguinte } from "@/domain/frequencia";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -23,6 +24,7 @@ let serieId = "";
 let turmaId = "";
 let diretorId = "";
 let palavraChave = "";
+let alunoRiscoId = "";
 
 interface Diretor {
   id: string;
@@ -50,6 +52,10 @@ async function limparMassa() {
   if (!banco) return;
   await banco.query("delete from usuarios where email like 'qd-%'");
   await banco.query("delete from tentativas_entrada where chave like '%qd-%'");
+  const daSerie =
+    "select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'QD Ano'";
+  await banco.query(`delete from frequencias where turma_id in (${daSerie})`);
+  await banco.query(`delete from alunos where turma_id in (${daSerie})`);
   await banco.query(
     "delete from turmas where serie_id in (select id from series where nome = 'QD Ano')",
   );
@@ -76,6 +82,17 @@ async function json<T>(resposta: Response): Promise<T> {
 
 async function entrar(corpo: Record<string, unknown>): Promise<Response> {
   return chamar("/api/auth/entrar", { method: "POST", body: JSON.stringify(corpo) });
+}
+
+/** Dia letivo mais recente até hoje, no fuso da escola. */
+function diaUtilRecente(): string {
+  let dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  while (diaDaSemanaIso(dia) > 5) dia = diaSeguinte(dia, -1);
+  return dia;
+}
+
+function hojeNaEscola(): string {
+  return diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
 }
 
 function cookieDe(resposta: Response): string {
@@ -226,8 +243,20 @@ describe("palavra-chave e entrada do diretor", () => {
     expect(lista.diretores.find((item) => item.id === diretorId)?.primeiroUsoEm).not.toBeNull();
   });
 
+  it("exige a troca da palavra-chave antes das estatísticas", async () => {
+    const hoje = hojeNaEscola();
+    const resposta = await chamar(
+      `/api/diretor/estatisticas?turmaId=${turmaId}&de=${hoje}&ate=${hoje}`,
+      {},
+      cookieDiretor,
+    );
+    expect(resposta.status).toBe(403);
+    expect((await json<{ error: string }>(resposta)).error).toContain("Troque a palavra-chave");
+  });
+
   it("recusa toda rota da equipe para o diretor", async () => {
     const publicas = new Set([
+      "GET /api/diretor/estatisticas",
       "POST /api/auth/entrar",
       "POST /api/auth/sair",
       "GET /api/auth/sessao",
@@ -272,6 +301,132 @@ describe("palavra-chave e entrada do diretor", () => {
       await chamar("/api/diretores", {}, cookieAdmin),
     );
     expect(lista.diretores.find((item) => item.id === diretorId)?.estado).toBe("em_uso");
+  });
+
+  it("mostra só a turma do vínculo e recusa consulta malformada", async () => {
+    const outra = await json<{ turma: { id: string } }>(
+      await chamar(
+        "/api/turmas",
+        { method: "POST", body: JSON.stringify({ serieId, nome: "B" }) },
+        cookieAdmin,
+      ),
+    );
+    const hoje = hojeNaEscola();
+    const alheia = await chamar(
+      `/api/diretor/estatisticas?turmaId=${outra.turma.id}&de=${hoje}&ate=${hoje}`,
+      {},
+      cookieDiretor,
+    );
+    expect(alheia.status).toBe(403);
+    expect((await json<{ error: string }>(alheia)).error).toContain("não está entre as suas");
+    const invertida = await chamar(
+      `/api/diretor/estatisticas?turmaId=${turmaId}&de=${hoje}&ate=${diaSeguinte(hoje, -1)}`,
+      {},
+      cookieDiretor,
+    );
+    expect(invertida.status).toBe(400);
+    const coordenacao = await chamar(
+      `/api/diretor/estatisticas?turmaId=${turmaId}&de=${hoje}&ate=${hoje}`,
+      {},
+      cookieCoord,
+    );
+    expect(coordenacao.status).toBe(403);
+  });
+
+  it("recorta o período ao vínculo e mostra só as categorias liberadas", async () => {
+    if (!banco) return;
+    const hoje = hojeNaEscola();
+    const inicio = diaSeguinte(hoje, -10);
+    await banco.query(
+      "update vinculos_diretor set inicio = $2::date where usuario_id = $1 and fim is null",
+      [diretorId, inicio],
+    );
+    const alunos: string[] = [];
+    for (const nome of ["QD Aluna Risco", "QD Aluno Presente"]) {
+      const criado = await json<{ aluno: { id: string } }>(
+        await chamar(
+          "/api/alunos",
+          { method: "POST", body: JSON.stringify({ nome, turmaId }) },
+          cookieAdmin,
+        ),
+      );
+      alunos.push(criado.aluno.id);
+    }
+    alunoRiscoId = alunos[0] ?? "";
+    const salvar = await chamar(
+      "/api/frequencias",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          dia: diaUtilRecente(),
+          turmaId,
+          faltas: [alunoRiscoId],
+          revisao: 0,
+        }),
+      },
+      cookieCoord,
+    );
+    expect(salvar.status).toBe(200);
+
+    const consulta = `/api/diretor/estatisticas?turmaId=${turmaId}&de=${diaSeguinte(hoje, -40)}&ate=${hoje}`;
+    interface Resposta {
+      periodo: { de: string; ate: string } | null;
+      estatisticas: {
+        alunos: {
+          alunoId: string;
+          ausencias: number;
+          faltas: number | null;
+          saidas: number | null;
+          diasComChamada: number;
+          emRisco: boolean;
+        }[];
+        resumo: { alunos: number; emRisco: number };
+      } | null;
+    }
+    const resposta = await chamar(consulta, {}, cookieDiretor);
+    expect(resposta.status).toBe(200);
+    const dados = await json<Resposta>(resposta);
+    expect(dados.periodo).toEqual({ de: inicio, ate: hoje });
+    expect(dados.estatisticas?.resumo).toMatchObject({ alunos: 2, emRisco: 1 });
+    const risco = dados.estatisticas?.alunos.find((aluno) => aluno.alunoId === alunoRiscoId);
+    expect(risco).toMatchObject({
+      ausencias: 1,
+      diasComChamada: 1,
+      emRisco: true,
+      faltas: null,
+      saidas: null,
+    });
+
+    await chamar(
+      "/api/parametros-acesso",
+      {
+        method: "PATCH",
+        body: JSON.stringify({ categoriasDiretor: ["faltas", "justificativas", "saidas"] }),
+      },
+      cookieAdmin,
+    );
+    const liberada = await json<Resposta>(await chamar(consulta, {}, cookieDiretor));
+    const detalhado = liberada.estatisticas?.alunos.find((aluno) => aluno.alunoId === alunoRiscoId);
+    expect(detalhado).toMatchObject({ faltas: 1, saidas: 0 });
+    await chamar(
+      "/api/parametros-acesso",
+      { method: "PATCH", body: JSON.stringify({ categoriasDiretor: ["faltas"] }) },
+      cookieAdmin,
+    );
+
+    const antes = await json<Resposta>(
+      await chamar(
+        `/api/diretor/estatisticas?turmaId=${turmaId}&de=${diaSeguinte(inicio, -5)}&ate=${diaSeguinte(inicio, -1)}`,
+        {},
+        cookieDiretor,
+      ),
+    );
+    expect(antes.periodo).toBeNull();
+    expect(antes.estatisticas).toBeNull();
+    await banco.query(
+      "update vinculos_diretor set inicio = $2::date where usuario_id = $1 and fim is null",
+      [diretorId, hoje],
+    );
   });
 
   it("retira a turma na hora, sem apagar o histórico", async () => {

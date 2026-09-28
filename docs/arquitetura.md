@@ -4,7 +4,7 @@ Next.js 16 (App Router) com TypeScript estrito sobre PostgreSQL 17 via Prisma 7 
 
 ## Visão geral
 
-O navegador carrega `src/app/page.tsx`, um componente de servidor que resolve a sessão e pré-busca o escopo do usuário: séries, turmas visíveis, alunos e frequências do mês corrente. Sem sessão, a tela de entrada é renderizada no mesmo endereço. Com sessão, a página entrega ao shell de cliente o que cada papel pode ver; a partir daí o shell troca de visão localmente, sem recarregar, e as ações chamam rotas em `src/app/api/**`, que resolvem a sessão, aplicam as guardas de papel e respondem JSON. O service worker em `public/sw.js` cuida da instalação como PWA e da página de aviso quando a internet cai.
+O navegador carrega `src/app/page.tsx`, um componente de servidor que resolve a sessão e pré-busca o escopo do usuário: séries, turmas visíveis, alunos e frequências do mês corrente. Sem sessão, a tela de entrada é renderizada no mesmo endereço. Com sessão e a capacidade `operar`, a página entrega ao shell de cliente o que cada papel pode ver; o diretor de turma, que só tem `verEstatisticasDasTurmas`, recebe a tela própria de `src/components/diretor/` com o contexto dos vínculos vigentes, e qualquer outra sessão volta à entrada; a partir daí o shell troca de visão localmente, sem recarregar, e as ações chamam rotas em `src/app/api/**`, que resolvem a sessão, aplicam as guardas de papel e respondem JSON. O service worker em `public/sw.js` cuida da instalação como PWA e da página de aviso quando a internet cai.
 
 ```mermaid
 flowchart LR
