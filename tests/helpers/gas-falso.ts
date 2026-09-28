@@ -29,6 +29,9 @@ export interface GasFalso {
   definirToken(valor: string): void;
   definirFuso(valor: string): void;
   definirRecusarAplicar(valor: boolean): void;
+  renomearAba(nome: string, novo: string): void;
+  /** O próximo aplicar grava tudo e derruba a conexão sem responder, como um 504. */
+  derrubarProximoAplicar(): void;
   definirAba(
     nome: string,
     valores: string[][],
@@ -49,7 +52,7 @@ const MARCADOR_LINHA = "frequenciapp.linha";
 const MARCADOR_COLUNA = "frequenciapp.coluna";
 const MARCADOR_ABA = "frequenciapp.aba";
 const MARCADOR_ALUNO = "frequenciapp.aluno";
-const VERSAO = 3;
+const VERSAO = 4;
 const COPIA_PREFIXO = "_frequenciapp_backup_";
 
 function hashTexto(texto: string): string {
@@ -71,6 +74,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
   let token = "segredo-de-teste";
   let fuso = "America/Fortaleza";
   let recusarAplicar = false;
+  let derrubarAplicar = false;
   let contadorCopia = 0;
 
   function aba(nome: string): AbaFalsa | undefined {
@@ -190,29 +194,31 @@ export async function criarGasFalso(): Promise<GasFalso> {
               fuso,
               versao: VERSAO,
             },
-            abas: abas.map((item) => {
-              const linhas = Math.min(Math.max(ultimaLinha(item), 1), 12);
-              const colunas = Math.min(Math.max(ultimaColuna(item), 1), 60);
-              const amostra: string[][] = [];
-              for (let linha = 1; linha <= linhas; linha += 1) {
-                const fileira: string[] = [];
-                for (let coluna = 1; coluna <= colunas; coluna += 1) {
-                  fileira.push(garantir(item, linha, coluna).valor);
+            abas: abas
+              .filter((item) => !corpo.aba || item.nome === nomeAba)
+              .map((item) => {
+                const linhas = Math.min(Math.max(ultimaLinha(item), 1), 12);
+                const colunas = Math.min(Math.max(ultimaColuna(item), 1), 60);
+                const amostra: string[][] = [];
+                for (let linha = 1; linha <= linhas; linha += 1) {
+                  const fileira: string[] = [];
+                  for (let coluna = 1; coluna <= colunas; coluna += 1) {
+                    fileira.push(garantir(item, linha, coluna).valor);
+                  }
+                  amostra.push(fileira);
                 }
-                amostra.push(fileira);
-              }
-              return {
-                nome: item.nome,
-                oculta: item.oculta,
-                criada: item.metadados.some((meta) => meta.chave === MARCADOR_ABA),
-                linhas: ultimaLinha(item),
-                colunas: ultimaColuna(item),
-                congeladasLinhas: item.congeladasLinhas,
-                congeladasColunas: item.congeladasColunas,
-                mesclagens: item.mesclagens,
-                amostra,
-              };
-            }),
+                return {
+                  nome: item.nome,
+                  oculta: item.oculta,
+                  criada: item.metadados.some((meta) => meta.chave === MARCADOR_ABA),
+                  linhas: ultimaLinha(item),
+                  colunas: ultimaColuna(item),
+                  congeladasLinhas: item.congeladasLinhas,
+                  congeladasColunas: item.congeladasColunas,
+                  mesclagens: item.mesclagens,
+                  amostra,
+                };
+              }),
           },
         };
       case "ler": {
@@ -222,19 +228,30 @@ export async function criarGasFalso(): Promise<GasFalso> {
         const colunaInicial = Number(corpo.colunaInicial ?? 1);
         const linhas = Number(corpo.linhas ?? ultimaLinha(item));
         const colunas = Number(corpo.colunas ?? ultimaColuna(item));
-        const valores: string[][] = [];
-        const formula: boolean[][] = [];
-        for (let linha = 0; linha < linhas; linha += 1) {
-          const fileiraValores: string[] = [];
-          const fileiraFormula: boolean[] = [];
-          for (let coluna = 0; coluna < colunas; coluna += 1) {
-            const celula = garantir(item, linhaInicial + linha, colunaInicial + coluna);
-            fileiraValores.push(celula.valor);
-            fileiraFormula.push(celula.formula !== "");
+        const lerFaixa = (inicio: number, largura: number) => {
+          const valores: string[][] = [];
+          const formula: boolean[][] = [];
+          for (let linha = 0; linha < linhas; linha += 1) {
+            const fileiraValores: string[] = [];
+            const fileiraFormula: boolean[] = [];
+            for (let coluna = 0; coluna < largura; coluna += 1) {
+              const celula = garantir(item, linhaInicial + linha, inicio + coluna);
+              fileiraValores.push(celula.valor);
+              fileiraFormula.push(celula.formula !== "");
+            }
+            valores.push(fileiraValores);
+            formula.push(fileiraFormula);
           }
-          valores.push(fileiraValores);
-          formula.push(fileiraFormula);
-        }
+          return { valores, formula };
+        };
+        const pedidos = Array.isArray(corpo.blocos)
+          ? (corpo.blocos as { coluna: number; colunas: number }[])
+          : null;
+        const blocos = pedidos?.map((bloco) => ({
+          ...bloco,
+          ...lerFaixa(bloco.coluna, bloco.colunas),
+        }));
+        const { valores, formula } = blocos?.[0] ?? lerFaixa(colunaInicial, colunas);
         return {
           ok: true,
           versao: VERSAO,
@@ -246,6 +263,12 @@ export async function criarGasFalso(): Promise<GasFalso> {
             colunas,
             valores,
             formula,
+            ...(blocos ? { blocos } : {}),
+            ultimaLinha: ultimaLinha(item),
+            ...(corpo.cabecalhoLinha
+              ? { assinatura: assinatura(item, Number(corpo.cabecalhoLinha)) }
+              : {}),
+            tempos: { ler: 0 },
             linhasCriadas: marcadores(item, MARCADOR_LINHA),
             colunasCriadas: marcadores(item, MARCADOR_COLUNA),
             alunosDasLinhas: item.metadados
@@ -448,7 +471,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
             continue;
           }
         }
-        return { ok: true, versao: VERSAO, dados: contagem };
+        return { ok: true, versao: VERSAO, dados: { ...contagem, tempos: { aplicar: 0 } } };
       }
       case "criarAba": {
         const nome = String(corpo.nome ?? "").trim();
@@ -521,11 +544,21 @@ export async function criarGasFalso(): Promise<GasFalso> {
       req.on("end", () => {
         sequencia += 1;
         const id = String(sequencia);
+        let acao = "";
         try {
-          const dados = executar(JSON.parse(corpo) as Record<string, unknown>);
+          const pedido = JSON.parse(corpo) as Record<string, unknown>;
+          acao = String(pedido.acao ?? "");
+          const dados = executar(pedido);
           resultados.set(id, JSON.stringify(dados));
         } catch {
           resultados.set(id, JSON.stringify({ ok: false, erro: "Corpo inválido." }));
+        }
+        // Como o Apps Script que termina depois do limite do servidor: a
+        // planilha foi gravada, mas a resposta nunca chega.
+        if (acao === "aplicar" && derrubarAplicar) {
+          derrubarAplicar = false;
+          req.socket.destroy();
+          return;
         }
         res.writeHead(302, { Location: `/resultado/${id}` });
         res.end();
@@ -550,6 +583,13 @@ export async function criarGasFalso(): Promise<GasFalso> {
     url: `http://127.0.0.1:${porta}/exec`,
     definirToken: (valor) => {
       token = valor;
+    },
+    renomearAba: (nome, novo) => {
+      const item = aba(nome);
+      if (item) item.nome = novo;
+    },
+    derrubarProximoAplicar: () => {
+      derrubarAplicar = true;
     },
     definirFuso: (valor) => {
       fuso = valor;

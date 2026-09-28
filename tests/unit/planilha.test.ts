@@ -1,7 +1,10 @@
 // Planilha: esquema, dataframe, CSV e planejamento conservador.
 import { describe, expect, it } from "vitest";
 import {
+  blocosDeColunas,
   campoCsv,
+  colunasNecessarias,
+  leituraDosBlocos,
   colunasDoIntervalo,
   dataDoRotulo,
   detectarEsquema,
@@ -567,6 +570,54 @@ describe("planejarSincronizacao: código do aluno na linha", () => {
     };
     const plano = planejarSincronizacao(esquema, turmaDe(alunos), conteudo, opcoes());
     expect(plano.candidatosRemocaoLinhas).toEqual([{ linha: 4, nome: "Carla" }]);
+  });
+});
+
+describe("leitura parcial da aba", () => {
+  const esquema = detectarEsquema(ABA, 2026);
+
+  it("pede só aluno, turma, total e os dias do período que já têm coluna", () => {
+    expect(colunasNecessarias(esquema, ["2026-09-11"])).toEqual([1, 2, 4, 5]);
+    expect(colunasNecessarias(esquema, ["2026-09-28"])).toEqual([1, 2, 5]);
+  });
+
+  it("junta colunas vizinhas em faixas", () => {
+    expect(blocosDeColunas([5, 1, 2, 4, 9, 2])).toEqual([
+      { coluna: 1, colunas: 2 },
+      { coluna: 4, colunas: 2 },
+      { coluna: 9, colunas: 1 },
+    ]);
+  });
+
+  it("monta a leitura com cada faixa na posição real e o resto vazio", () => {
+    const leitura = leituraDosBlocos("3º ano A", 1, [
+      { coluna: 1, colunas: 1, valores: [["Aluno"], ["Alice"]], formula: [[false], [false]] },
+      { coluna: 4, colunas: 1, valores: [["11/09"], ["F"]], formula: [[false], [true]] },
+    ]);
+    expect(leitura.valores).toEqual([
+      ["Aluno", "", "", "11/09"],
+      ["Alice", "", "", "F"],
+    ]);
+    expect(leitura.formula[1]).toEqual([false, false, false, true]);
+  });
+
+  it("cria a linha nova depois da última linha da aba, mesmo fora das colunas lidas", () => {
+    const turma = montarTurmaPlanilha(
+      "origem-a",
+      "3º ano A",
+      [aluno(), aluno({ id: "aluno-9", nome: "Nova", ordem: 9 })],
+      [],
+      [],
+      ["2026-09-11"],
+      () => "3º ano A",
+    );
+    const plano = planejarSincronizacao(
+      esquema,
+      turma,
+      { ...conteudoDaAba(ABA), ultimaLinhaAba: 7 },
+      opcoes(),
+    );
+    expect(plano.novosAlunos[0]?.linha).toBe(8);
   });
 });
 

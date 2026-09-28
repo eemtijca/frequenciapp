@@ -468,15 +468,16 @@ Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOrigin
 
 ### POST /api/planilha/simular
 
-Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. Devolve a prévia, o `planoHashGeral` e, por turma, `bloqueado` quando a estrutura impede a escrita.
+Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias com chamada criada ou alterada desde o último envio `SUCESSO` dela; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
 
 - 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 
 ### POST /api/planilha/aplicar
 
-Mesmo corpo da simulação mais `planoHashGeral`. Recalcula tudo, exige o mesmo hash e envia por turma. Operações destrutivas exigem o modo completo.
+Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao script e vira `SUCESSO` com a resposta; o envio ao script nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
 
-- 200 `{"resultados", "resumo"}`; 400 sem prévia; 409 quando os dados mudaram; 429 envios em excesso; 502 falha na planilha.
+- 200 `{"resultados", "resumo"}`; cada resultado é `sucesso`, `parcial` (sem confirmação: timeout ou queda depois de enviar, com a mensagem para conferir a aba), `falha` (recusa do script) ou `sem_envio`.
+- 400 sem prévia ou com `todas`; 409 quando os dados mudaram; 429 envios em excesso.
 
 ### POST /api/planilha/modo-completo
 

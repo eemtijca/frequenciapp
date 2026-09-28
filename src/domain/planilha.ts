@@ -17,7 +17,7 @@ export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
 /** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
-export const VERSAO_SCRIPT = 3;
+export const VERSAO_SCRIPT = 4;
 
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
@@ -299,6 +299,73 @@ export interface LeituraAba {
   colunasCriadas?: number[];
   /** Código do aluno gravado em cada linha pelo script (versão 3 em diante). */
   alunosDasLinhas?: { linha: number; alunoId: string }[];
+  /** Última linha com conteúdo na aba inteira (versão 4), além das colunas lidas. */
+  ultimaLinhaAba?: number;
+}
+
+/** Faixa contígua de colunas para a leitura parcial da aba. */
+export interface BlocoColunas {
+  coluna: number;
+  colunas: number;
+}
+
+/**
+ * Colunas que o plano precisa ler para os dias pedidos: a do aluno, a da
+ * turma atual, a do total e as dos dias que já existem na aba. O resto da
+ * aba fica de fora da leitura.
+ */
+export function colunasNecessarias(esquema: AbaEsquema, dias: string[]): number[] {
+  const pedidos = new Set(dias);
+  const colunas = new Set<number>();
+  for (const coluna of esquema.colunas) {
+    if (coluna.tipo === "aluno" || coluna.tipo === "turma" || coluna.tipo === "total") {
+      colunas.add(coluna.indice);
+    }
+    if (coluna.tipo === "dia" && coluna.data && pedidos.has(coluna.data))
+      colunas.add(coluna.indice);
+  }
+  if (colunas.size === 0) colunas.add(1);
+  return [...colunas].filter((coluna) => coluna > 0).sort((a, b) => a - b);
+}
+
+/** Junta colunas vizinhas em faixas, para ler cada faixa numa chamada só. */
+export function blocosDeColunas(colunas: number[]): BlocoColunas[] {
+  const blocos: BlocoColunas[] = [];
+  for (const coluna of [...new Set(colunas)].sort((a, b) => a - b)) {
+    const ultimo = blocos[blocos.length - 1];
+    if (ultimo && ultimo.coluna + ultimo.colunas === coluna) ultimo.colunas += 1;
+    else blocos.push({ coluna, colunas: 1 });
+  }
+  return blocos;
+}
+
+/**
+ * Monta a leitura a partir das faixas lidas, na posição real de cada coluna.
+ * Colunas não lidas ficam vazias e sem fórmula; o plano só usa as lidas.
+ */
+export function leituraDosBlocos(
+  nome: string,
+  linhaInicial: number,
+  blocos: (BlocoColunas & { valores: string[][]; formula: boolean[][] })[],
+): Pick<LeituraAba, "nome" | "valores" | "formula" | "linhaInicial" | "colunaInicial"> {
+  const largura = Math.max(0, ...blocos.map((bloco) => bloco.coluna + bloco.colunas - 1));
+  const altura = Math.max(0, ...blocos.map((bloco) => bloco.valores.length));
+  const valores = Array.from({ length: altura }, () => Array.from({ length: largura }, () => ""));
+  const formula = Array.from({ length: altura }, () =>
+    Array.from({ length: largura }, () => false),
+  );
+  for (const bloco of blocos) {
+    bloco.valores.forEach((fileira, linha) => {
+      fileira.forEach((valor, deslocamento) => {
+        const destino = valores[linha];
+        if (destino) destino[bloco.coluna - 1 + deslocamento] = valor;
+        const marca = formula[linha];
+        if (marca)
+          marca[bloco.coluna - 1 + deslocamento] = Boolean(bloco.formula[linha]?.[deslocamento]);
+      });
+    });
+  }
+  return { nome, valores, formula, linhaInicial, colunaInicial: 1 };
 }
 
 const ROTULOS_ALUNO = new Set(["aluno", "aluna", "nome", "estudante", "nome do aluno"]);
@@ -706,6 +773,9 @@ function casarLinhas(
       ultimaLinha = Math.max(ultimaLinha, conteudo.linhaInicial + indice);
     }
   });
+
+  // Com leitura parcial, a última linha da aba inteira vem do script.
+  ultimaLinha = Math.max(ultimaLinha, conteudo.ultimaLinhaAba ?? 0);
 
   const codigoDaLinha = new Map<number, string>();
   const linhaDoCodigo = new Map<string, number>();

@@ -36,6 +36,22 @@ grava o código junto com a linha. Cada linha tem no máximo um código e cada
 código fica em uma linha só. A restauração de cópia recria os códigos da
 cópia.
 
+## Desempenho e tempos
+
+Cada chamada ao serviço de planilhas custa uma ida ao Google. A versão 4
+agrupa o trabalho: a vinculação faz uma busca de metadados por lote (a 3
+buscava e relia todos os metadados a cada linha), e preenchimentos seguidos
+são lidos e gravados por trecho contíguo de cada coluna, sem pular fórmula nem
+célula ocupada. No dublê dos testes, o envio com vinculação de 35 linhas, dia
+novo e 35 marcas caiu de 3.376 para 97 chamadas, e o envio do dia seguinte, de
+156 para 22.
+
+A leitura aceita `blocos` (faixas de colunas), devolve `ultimaLinha` e, com
+`cabecalhoLinha`, a `assinatura` atual. `estrutura` aceita `aba` para devolver
+só aquela aba. `ler` e `aplicar` devolvem `tempos` por etapa em milissegundos
+e registram o mesmo objeto com `console.log`, visível em Execuções no editor
+do Apps Script.
+
 ## Cópias e restauração
 
 A cópia se chama `_frequenciapp_backup_<aba>_<yyyyMMdd-HHmmss-SSS>`, com
@@ -72,7 +88,7 @@ log do servidor e para o último erro do cartão da integração.
 
 A cada mudança no código, publique uma nova versão da implantação em
 Implantar, Gerenciar implantações, editar, Nova versão; o endereço `/exec`
-continua o mesmo. O script declara a `VERSAO` (hoje 3) e o aplicativo avisa
+continua o mesmo. O script declara a `VERSAO` (hoje 4) e o aplicativo avisa
 no Testar conexão quando a versão publicada está atrasada. O teste
 `tests/unit/gas.test.ts` guarda o hash de cada versão e falha quando o
 `Codigo.gs` muda sem uma `VERSAO` nova.

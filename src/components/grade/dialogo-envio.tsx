@@ -1,8 +1,9 @@
 "use client";
 
 // Diálogo de envio: prévia obrigatória, opções aditivas marcadas e
-// divergências só com o modo completo. Nada é gravado sem confirmação.
-// Com "todas", envia o mês de cada turma de origem mapeada.
+// divergências só com o modo completo. Por padrão vai só o que mudou desde o
+// último envio; o período inteiro fica como conferência. Cada turma vai numa
+// requisição, em sequência, com o andamento na tela.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,9 @@ interface PlanoResumo {
   turmaOriginalId: string;
   rotulo: string;
   aba: string;
+  dias: string[];
+  semEnvio: boolean;
+  planoHashTurma: string;
   bloqueado: boolean;
   resumo: {
     preencher: number;
@@ -65,6 +69,25 @@ interface Props {
   aoConcluir: () => void;
 }
 
+type Andamento = "aguardando" | "enviando" | "enviado" | "sem_confirmacao" | "falhou";
+
+const ROTULO_ANDAMENTO: Record<Andamento, string> = {
+  aguardando: "aguardando",
+  enviando: "enviando...",
+  enviado: "enviado",
+  sem_confirmacao: "sem confirmação, confira a aba",
+  falhou: "não enviado",
+};
+
+/** Mensagem de quando a resposta não chegou: a planilha pode ter sido gravada. */
+const SEM_CONFIRMACAO =
+  "Não foi possível confirmar o resultado na planilha. Confira a aba antes de reenviar; o reenvio não sobrescreve o que já foi gravado.";
+
+/** Dia AAAA-MM-DD como dd/mm, para a lista de dias do envio. */
+function diaCurto(dia: string): string {
+  return `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+}
+
 function useOnline(): boolean {
   return useSyncExternalStore(
     (ouvinte) => {
@@ -100,6 +123,9 @@ export default function DialogoEnvio({
   const [substituir, setSubstituir] = useState(false);
   const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
   const [removerColunasMarcadas, setRemoverColunasMarcadas] = useState<number[]>([]);
+  const [somenteAlteradas, setSomenteAlteradas] = useState(true);
+  const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
+  const [detalhes, setDetalhes] = useState<Record<string, string>>({});
 
   const entradas = useCallback(
     () => ({
@@ -111,8 +137,10 @@ export default function DialogoEnvio({
       substituirDivergencias: modoCompleto && substituir,
       removerLinhas: !todas && modoCompleto ? removerMarcadas : undefined,
       removerColunas: !todas && modoCompleto ? removerColunasMarcadas : undefined,
+      somenteAlteradas,
     }),
     [
+      somenteAlteradas,
       todas,
       turmaOriginalId,
       de,
@@ -128,6 +156,8 @@ export default function DialogoEnvio({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
+    setAndamento({});
+    setDetalhes({});
     try {
       const dados = await pedir<Simulacao>("/api/planilha/simular", corpoJson(entradas()));
       setSimulacao(dados);
@@ -139,47 +169,87 @@ export default function DialogoEnvio({
 
   useEffect(() => {
     if (aberto) void simular();
-  }, [aberto, simular]);
+  }, [aberto, simular, somenteAlteradas]);
 
+  // Uma requisição por turma, em sequência: nenhuma chamada carrega o mês de
+  // todas as turmas, e a falha de uma não impede as seguintes.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
     if (!simulacao) return;
     setErro("");
-    try {
-      const dados = await pedir<{
-        resumo: { turmas: number; falhas: number; parciais: number; sucesso: number };
-      }>(
-        "/api/planilha/aplicar",
-        corpoJson({ ...entradas(), planoHashGeral: simulacao.planoHashGeral }),
-      );
-      toast.success(
-        dados.resumo.falhas + dados.resumo.parciais === 0
-          ? `${dados.resumo.sucesso} ${
-              dados.resumo.sucesso === 1 ? "turma enviada" : "turmas enviadas"
-            }.`
-          : `${dados.resumo.sucesso} de ${dados.resumo.turmas} turmas enviadas.`,
-      );
-      onAbrir(false);
-      aoConcluir();
-    } catch (excecao) {
-      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível enviar.");
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, {
-        contexto: "Não foi possível enviar.",
-        descricao: "Nada foi alterado na planilha. Tente de novo em instantes.",
-      });
+    const pendentes = simulacao.planos.filter((item) => !item.semEnvio);
+    setAndamento(Object.fromEntries(pendentes.map((item) => [item.turmaOriginalId, "aguardando"])));
+    setDetalhes({});
+    const finais: Andamento[] = [];
+    for (const item of pendentes) {
+      setAndamento((atual) => ({ ...atual, [item.turmaOriginalId]: "enviando" }));
+      let final: Andamento = "enviado";
+      let detalhe = "";
+      try {
+        const dados = await pedir<{
+          resultados: { resultado: "sucesso" | "parcial" | "falha" | "sem_envio"; erro?: string }[];
+        }>(
+          "/api/planilha/aplicar",
+          corpoJson({
+            ...entradas(),
+            todas: undefined,
+            turmaOriginalId: item.turmaOriginalId,
+            planoHashGeral: item.planoHashTurma,
+          }),
+        );
+        const resultado = dados.resultados[0];
+        if (resultado?.resultado === "parcial") {
+          final = "sem_confirmacao";
+          detalhe = resultado.erro ?? SEM_CONFIRMACAO;
+        } else if (resultado?.resultado === "falha") {
+          final = "falhou";
+          detalhe = resultado.erro ?? "O script recusou o envio.";
+        }
+      } catch (excecao) {
+        // Sem resposta do servidor (504, queda de rede): a planilha pode ter
+        // sido gravada. Resposta com erro do aplicativo: nada foi enviado.
+        const semResposta =
+          !(excecao instanceof ErroApi) || [502, 503, 504].includes(excecao.status);
+        final = semResposta ? "sem_confirmacao" : "falhou";
+        detalhe = semResposta
+          ? SEM_CONFIRMACAO
+          : excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível enviar.";
+      }
+      finais.push(final);
+      setAndamento((atual) => ({ ...atual, [item.turmaOriginalId]: final }));
+      if (detalhe) setDetalhes((atual) => ({ ...atual, [item.turmaOriginalId]: detalhe }));
     }
+    const enviados = finais.filter((item) => item === "enviado").length;
+    const semConfirmacao = finais.filter((item) => item === "sem_confirmacao").length;
+    aoConcluir();
+    if (enviados === finais.length) {
+      toast.success(`${enviados} ${enviados === 1 ? "turma enviada" : "turmas enviadas"}.`);
+      onAbrir(false);
+      return;
+    }
+    avisarErro(new Error("envio incompleto"), {
+      contexto: `${enviados} de ${finais.length} turmas enviadas.`,
+      descricao:
+        semConfirmacao > 0
+          ? "Algumas turmas ficaram sem confirmação. Confira as abas antes de reenviar."
+          : "Veja no diálogo o que não foi enviado e tente de novo.",
+    });
   });
 
   const bloqueado = simulacao?.planos.some((item) => item.bloqueado) ?? false;
   const plano = simulacao?.planos[0];
-  const detalhado = !todas && plano;
+  const detalhado = !todas && plano && !plano.semEnvio;
+  const nadaAEnviar = simulacao !== null && simulacao.planos.every((item) => item.semEnvio);
+  const enviou = Object.keys(andamento).length > 0 && !enviando;
 
   return (
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Enviar {rotulo} · {de === ate ? de : `${de} a ${ate}`}
+            Enviar {rotulo}
+            {somenteAlteradas ? " · o que mudou" : ` · ${de === ate ? de : `${de} a ${ate}`}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -195,6 +265,43 @@ export default function DialogoEnvio({
               Sem conexão. O envio fica indisponível até a internet voltar.
             </p>
           )}
+
+          <fieldset className="flex flex-col gap-1.5 text-sm" disabled={enviando}>
+            <legend className="sr-only">O que enviar</legend>
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="alcance-envio"
+                checked={somenteAlteradas}
+                onChange={() => setSomenteAlteradas(true)}
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+              />
+              <span>
+                Só o que mudou desde o último envio
+                <span className="text-muted-foreground block text-xs">
+                  Dias com chamada criada ou alterada depois do último envio confirmado de cada
+                  turma.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input
+                type="radio"
+                name="alcance-envio"
+                checked={!somenteAlteradas}
+                onChange={() => setSomenteAlteradas(false)}
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+              />
+              <span>
+                O período inteiro (
+                {de === ate ? diaCurto(de) : `${diaCurto(de)} a ${diaCurto(ate)}`})
+                <span className="text-muted-foreground block text-xs">
+                  Para conferência ou recuperação; no modo conservador, só preenche o que está
+                  vazio.
+                </span>
+              </span>
+            </label>
+          </fieldset>
 
           <div className="flex flex-col gap-2 text-sm">
             <label className="flex items-center gap-2">
@@ -282,23 +389,54 @@ export default function DialogoEnvio({
             />
           )}
 
-          {simulacao && !carregando && !bloqueado && todas && (
-            <ul className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
-              {simulacao.planos.map((item) => (
-                <li key={item.turmaOriginalId}>
-                  <span className="font-medium">{item.rotulo}</span> · {item.resumo.preencher} a
-                  preencher · {item.resumo.novasColunas} colunas · {item.resumo.novosAlunos} alunos
-                  {modoCompleto && item.resumo.substituir > 0
-                    ? ` · ${item.resumo.substituir} substituições`
-                    : ""}
-                </li>
-              ))}
+          {simulacao && !carregando && nadaAEnviar && (
+            <p className="bg-secondary/40 rounded-lg px-3 py-2 text-sm">
+              Nada mudou desde o último envio{todas ? " em nenhuma turma" : ""}. Para conferir o
+              período inteiro, escolha a segunda opção.
+            </p>
+          )}
+
+          {simulacao && !carregando && !bloqueado && (todas || enviou) && !nadaAEnviar && (
+            <ul
+              className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs"
+              aria-label="Turmas do envio"
+              aria-live="polite"
+            >
+              {simulacao.planos.map((item) => {
+                const estado = andamento[item.turmaOriginalId];
+                return (
+                  <li key={item.turmaOriginalId} data-turma={item.rotulo}>
+                    <span className="font-medium">{item.rotulo}</span>
+                    {item.semEnvio ? (
+                      ": sem alterações"
+                    ) : (
+                      <>
+                        :{" "}
+                        {estado ? ROTULO_ANDAMENTO[estado] : `${item.resumo.preencher} a preencher`}
+                        {!estado &&
+                          ` · dias ${item.dias.map(diaCurto).join(", ")} · ${item.resumo.novasColunas} colunas`}
+                        {!estado && modoCompleto && item.resumo.substituir > 0
+                          ? ` · ${item.resumo.substituir} substituições`
+                          : ""}
+                      </>
+                    )}
+                    {estado && detalhes[item.turmaOriginalId] && (
+                      <span
+                        className={`block ${estado === "sem_confirmacao" ? "text-falta-texto" : "text-muted-foreground"}`}
+                      >
+                        {detalhes[item.turmaOriginalId]}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
 
           {detalhado && !bloqueado && (
             <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
               <span className="font-medium">Aba {plano.aba}</span>
+              <span>Dias: {plano.dias.map(diaCurto).join(", ")}</span>
               <span>
                 {plano.resumo.preencher} a preencher · {plano.resumo.puladasOcupadas} ocupadas
                 ignoradas · {plano.resumo.puladasFormula} fórmulas protegidas
@@ -348,16 +486,28 @@ export default function DialogoEnvio({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onAbrir(false)}>
-            Cancelar
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onAbrir(false)}
+            disabled={enviando}
+          >
+            {enviou ? "Fechar" : "Cancelar"}
           </Button>
           <Button
             type="button"
-            onClick={() => void enviar()}
-            disabled={enviando || carregando || !simulacao || bloqueado || !online}
+            onClick={() => void (enviou ? simular() : enviar())}
+            disabled={
+              enviando ||
+              carregando ||
+              !simulacao ||
+              bloqueado ||
+              !online ||
+              (nadaAEnviar && !enviou)
+            }
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            Enviar
+            {enviou ? "Nova prévia" : "Enviar"}
           </Button>
         </DialogFooter>
       </DialogContent>
