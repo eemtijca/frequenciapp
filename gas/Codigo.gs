@@ -7,7 +7,7 @@
  * integração não tenha criado, e célula com fórmula nunca é sobrescrita.
  */
 
-var VERSAO = 3;
+var VERSAO = 4;
 var PROP_TOKEN = "FREQUENCIAPP_TOKEN";
 var PROP_PLANILHA = "PLANILHA_ID";
 var MAX_LER_CELULAS = 20000;
@@ -75,7 +75,7 @@ function rotear(corpo) {
     case "ping":
       return acaoPing();
     case "estrutura":
-      return acaoEstrutura();
+      return acaoEstrutura(corpo);
     case "ler":
       return acaoLer(corpo);
     case "escrever":
@@ -122,8 +122,10 @@ function acaoPing() {
   };
 }
 
-function acaoEstrutura() {
+/** Estrutura das abas; com `aba`, só a daquela aba, para reconferir depois de um envio. */
+function acaoEstrutura(corpo) {
   var planilha = abrirPlanilha();
+  var nomeAba = corpo && corpo.aba ? String(corpo.aba) : "";
   return {
     ok: true,
     versao: VERSAO,
@@ -135,7 +137,7 @@ function acaoEstrutura() {
         fuso: planilha.getSpreadsheetTimeZone(),
         versao: VERSAO,
       },
-      abas: planilha.getSheets().map(function (aba) {
+      abas: (nomeAba ? [resolverAba(nomeAba)] : planilha.getSheets()).map(function (aba) {
         return {
           nome: aba.getName(),
           oculta: aba.isSheetHidden(),
@@ -175,42 +177,76 @@ function mesclagensDaAba(aba) {
 
 // ------------------------------------------------------------------- leitura
 
+/**
+ * Lê valores e fórmulas. Com `blocos`, lê só as faixas de colunas pedidas
+ * (aluno, dias do período, total), em vez da aba inteira. Devolve também a
+ * última linha com conteúdo, a assinatura atual do cabeçalho e os códigos de
+ * aluno por linha, para o aplicativo planejar sem reler a estrutura.
+ */
 function acaoLer(corpo) {
+  var inicio = Date.now();
   var aba = resolverAba(corpo.aba);
   var linhaInicial = numeroPositivo(corpo.linhaInicial, 1);
   var colunaInicial = numeroPositivo(corpo.colunaInicial, 1);
-  var linhas = numeroPositivo(corpo.linhas, aba.getLastRow());
+  var ultimaLinha = aba.getLastRow();
+  var linhas = numeroPositivo(corpo.linhas, ultimaLinha);
   var colunas = numeroPositivo(corpo.colunas, aba.getLastColumn());
   if (linhaInicial > aba.getMaxRows() || colunaInicial > aba.getMaxColumns()) {
     return { ok: false, erro: "Intervalo fora da aba." };
   }
   linhas = Math.min(linhas, aba.getMaxRows() - linhaInicial + 1);
-  colunas = Math.min(colunas, aba.getMaxColumns() - colunaInicial + 1);
-  if (linhas * colunas > MAX_LER_CELULAS) {
+  var pedidos = Array.isArray(corpo.blocos) && corpo.blocos.length > 0 ? corpo.blocos : null;
+  var faixas = pedidos
+    ? pedidos.map(function (bloco) {
+        return {
+          coluna: numeroPositivo(bloco.coluna, 1),
+          colunas: numeroPositivo(bloco.colunas, 1),
+        };
+      })
+    : [{ coluna: colunaInicial, colunas: colunas }];
+  var celulas = 0;
+  for (var f = 0; f < faixas.length; f += 1) {
+    if (faixas[f].coluna > aba.getMaxColumns())
+      return { ok: false, erro: "Intervalo fora da aba." };
+    faixas[f].colunas = Math.min(faixas[f].colunas, aba.getMaxColumns() - faixas[f].coluna + 1);
+    celulas += linhas * faixas[f].colunas;
+  }
+  if (celulas > MAX_LER_CELULAS) {
     return { ok: false, erro: "Intervalo grande demais para uma leitura." };
   }
-  var faixa = aba.getRange(linhaInicial, colunaInicial, linhas, colunas);
-  var formulas = faixa.getFormulas();
-  return {
-    ok: true,
-    versao: VERSAO,
-    dados: {
-      aba: aba.getName(),
-      linhaInicial: linhaInicial,
-      colunaInicial: colunaInicial,
-      linhas: linhas,
-      colunas: colunas,
-      valores: faixa.getDisplayValues(),
-      formula: formulas.map(function (linha) {
+  var lidos = faixas.map(function (faixa) {
+    var intervalo = aba.getRange(linhaInicial, faixa.coluna, linhas, faixa.colunas);
+    return {
+      coluna: faixa.coluna,
+      colunas: faixa.colunas,
+      valores: intervalo.getDisplayValues(),
+      formula: intervalo.getFormulas().map(function (linha) {
         return linha.map(function (valor) {
           return valor !== "";
         });
       }),
-      linhasCriadas: marcadores(aba, MARCADOR_LINHA),
-      colunasCriadas: marcadores(aba, MARCADOR_COLUNA),
-      alunosDasLinhas: alunosDasLinhas(aba),
-    },
+    };
+  });
+  var dados = {
+    aba: aba.getName(),
+    linhaInicial: linhaInicial,
+    colunaInicial: lidos[0].coluna,
+    linhas: linhas,
+    colunas: lidos[0].colunas,
+    valores: lidos[0].valores,
+    formula: lidos[0].formula,
+    ultimaLinha: ultimaLinha,
+    linhasCriadas: marcadores(aba, MARCADOR_LINHA),
+    colunasCriadas: marcadores(aba, MARCADOR_COLUNA),
+    alunosDasLinhas: alunosDasLinhas(aba),
   };
+  if (pedidos) dados.blocos = lidos;
+  if (corpo.cabecalhoLinha) {
+    dados.assinatura = assinaturaDaAba(aba, numeroPositivo(corpo.cabecalhoLinha, 1));
+  }
+  dados.tempos = { ler: Date.now() - inicio };
+  console.log(JSON.stringify({ acao: "ler", aba: aba.getName(), tempos: dados.tempos }));
+  return { ok: true, versao: VERSAO, dados: dados };
 }
 
 // ------------------------------------------------------------ escrita segura
@@ -309,14 +345,26 @@ function acaoAplicar(corpo) {
     vinculadas: 0,
     puladasVinculo: 0,
   };
-  var copiaAtual = null;
+  var tempos = {};
+  var marcar = function (etapa, inicio) {
+    tempos[etapa] = (tempos[etapa] || 0) + (Date.now() - inicio);
+  };
   for (var i = 0; i < operacoes.length; i += 1) {
     var operacao = operacoes[i];
     var resultado;
+    var inicio = Date.now();
+    if (operacao.tipo === "preencher") {
+      // Preenchimentos seguidos vão juntos: uma leitura e uma escrita por trecho.
+      var lote = [operacao];
+      while (i + 1 < operacoes.length && operacoes[i + 1].tipo === "preencher") {
+        i += 1;
+        lote.push(operacoes[i]);
+      }
+      aplicarPreencherLote(aba, lote, contagem);
+      marcar("preencher", inicio);
+      continue;
+    }
     switch (operacao.tipo) {
-      case "preencher":
-        resultado = aplicarPreencher(aba, operacao, contagem);
-        break;
       case "substituir":
         resultado = aplicarSubstituir(aba, operacao, contagem);
         break;
@@ -341,10 +389,67 @@ function acaoAplicar(corpo) {
       default:
         return { ok: false, erro: "Operação desconhecida." };
     }
+    marcar(operacao.tipo, inicio);
     if (resultado) return resultado;
   }
+  var inicioFlush = Date.now();
   SpreadsheetApp.flush();
+  marcar("gravar", inicioFlush);
+  contagem.tempos = tempos;
+  console.log(JSON.stringify({ acao: "aplicar", aba: aba.getName(), tempos: tempos }));
   return { ok: true, versao: VERSAO, dados: contagem };
+}
+
+/**
+ * Preenche várias células de uma vez: por coluna, lê valores e fórmulas do
+ * trecho em uma chamada e grava cada sequência de linhas livres com um só
+ * setValues. Célula com fórmula ou já ocupada é pulada, como no preencher.
+ */
+function aplicarPreencherLote(aba, operacoes, contagem) {
+  var porColuna = {};
+  for (var i = 0; i < operacoes.length; i += 1) {
+    var chave = String(operacoes[i].coluna);
+    (porColuna[chave] = porColuna[chave] || []).push(operacoes[i]);
+  }
+  Object.keys(porColuna).forEach(function (chave) {
+    var coluna = Number(chave);
+    var lista = porColuna[chave].slice().sort(function (a, b) {
+      return a.linha - b.linha;
+    });
+    var primeira = lista[0].linha;
+    var altura = lista[lista.length - 1].linha - primeira + 1;
+    var faixa = aba.getRange(primeira, coluna, altura, 1);
+    var valores = faixa.getValues();
+    var formulas = faixa.getFormulas();
+    var trecho = [];
+    var gravarTrecho = function () {
+      if (trecho.length === 0) return;
+      aba.getRange(trecho[0].linha, coluna, trecho.length, 1).setValues(
+        trecho.map(function (item) {
+          return [item.valor];
+        }),
+      );
+      contagem.preenchidas += trecho.length;
+      trecho = [];
+    };
+    for (var j = 0; j < lista.length; j += 1) {
+      var item = lista[j];
+      var indice = item.linha - primeira;
+      var anterior = trecho.length ? trecho[trecho.length - 1].linha : null;
+      if (anterior !== null && item.linha !== anterior + 1) gravarTrecho();
+      if (anterior !== null && item.linha === anterior) continue;
+      if (formulas[indice][0] !== "") {
+        gravarTrecho();
+        contagem.puladasFormula += 1;
+      } else if (String(valores[indice][0]).trim() !== "") {
+        gravarTrecho();
+        contagem.puladasOcupadas += 1;
+      } else {
+        trecho.push(item);
+      }
+    }
+    gravarTrecho();
+  });
 }
 
 function aplicarPreencher(aba, operacao, contagem) {
@@ -451,7 +556,9 @@ function aplicarCriarLinhas(aba, operacao, contagem) {
       continue;
     }
     marcarLinha(aba, item.linha);
-    if (ID_ALUNO.test(String(item.alunoId || ""))) vincularAluno(aba, item.linha, item.alunoId);
+    if (ID_ALUNO.test(String(item.alunoId || ""))) {
+      vincularAlunos(aba, [{ linha: item.linha, alunoId: String(item.alunoId) }]);
+    }
     for (var d = 0; d < celulas.length; d += 1) {
       aba.getRange(item.linha, celulas[d].coluna).setValue(celulas[d].valor);
     }
@@ -463,24 +570,36 @@ function aplicarCriarLinhas(aba, operacao, contagem) {
 /**
  * Grava o código do aluno em linhas que já existem. A célula do nome precisa
  * mostrar o mesmo texto lido na prévia: se a linha mudou de lugar ou de dono
- * no intervalo, o vínculo é pulado em vez de cair no aluno errado.
+ * no intervalo, o vínculo é pulado em vez de cair no aluno errado. Tudo em
+ * lote: uma leitura da coluna de nomes e uma busca de metadados por chamada.
  */
 function aplicarVincularLinhas(aba, operacao, contagem) {
   var itens = operacao.itens || [];
+  if (itens.length === 0) return null;
+  var coluna = 0;
+  var maiorLinha = 0;
   for (var i = 0; i < itens.length; i += 1) {
-    var item = itens[i];
-    var linha = numeroPositivo(item.linha, 0);
-    var coluna = numeroPositivo(item.coluna, 0);
-    if (!linha || !coluna || !ID_ALUNO.test(String(item.alunoId || ""))) {
+    var linha = numeroPositivo(itens[i].linha, 0);
+    var colunaItem = numeroPositivo(itens[i].coluna, 0);
+    if (!linha || !colunaItem || !ID_ALUNO.test(String(itens[i].alunoId || ""))) {
       return { ok: false, erro: "Vínculo de aluno inválido." };
     }
-    if (!conferePrevio(aba.getRange(linha, coluna), { anterior: item.nome })) {
+    if (coluna && colunaItem !== coluna) return { ok: false, erro: "Vínculo de aluno inválido." };
+    coluna = colunaItem;
+    if (linha > maiorLinha) maiorLinha = linha;
+  }
+  var nomes = aba.getRange(1, coluna, maiorLinha, 1).getDisplayValues();
+  var aceitos = [];
+  for (var j = 0; j < itens.length; j += 1) {
+    var exibido = nomes[itens[j].linha - 1] ? nomes[itens[j].linha - 1][0] : "";
+    if (limpar(exibido) !== limpar(itens[j].nome)) {
       contagem.puladasVinculo += 1;
       continue;
     }
-    vincularAluno(aba, linha, item.alunoId);
-    contagem.vinculadas += 1;
+    aceitos.push({ linha: numeroPositivo(itens[j].linha, 0), alunoId: String(itens[j].alunoId) });
   }
+  vincularAlunos(aba, aceitos);
+  contagem.vinculadas += aceitos.length;
   return null;
 }
 
@@ -722,10 +841,7 @@ function recriarMarcadores(origem, destino, chave) {
 function recriarVinculos(origem, destino) {
   var achados = destino.createDeveloperMetadataFinder().withKey(MARCADOR_ALUNO).find();
   for (var i = 0; i < achados.length; i += 1) achados[i].remove();
-  var vinculos = alunosDasLinhas(origem);
-  for (var j = 0; j < vinculos.length; j += 1) {
-    vincularAluno(destino, vinculos[j].linha, vinculos[j].alunoId);
-  }
+  vincularAlunos(destino, alunosDasLinhas(origem));
 }
 
 /** Remove metadados de nível de aba com a chave, sem tocar linha ou coluna. */
@@ -768,14 +884,18 @@ function tokenConfere(valor) {
   return diferenca === 0;
 }
 
-function conferirAssinatura(aba, corpo) {
-  var cabecalhoLinha = numeroPositivo(corpo.cabecalhoLinha, 1);
+/** Assinatura da aba: nome, cabeçalho e mesclagens, como no aplicativo. */
+function assinaturaDaAba(aba, cabecalhoLinha) {
   var largura = Math.max(aba.getLastColumn(), 1);
   var cabecalho = aba.getRange(cabecalhoLinha, 1, 1, largura).getDisplayValues()[0];
   var mesclagens = mesclagensDaAba(aba);
-  var atual = hashTexto(
+  return hashTexto(
     JSON.stringify([aba.getName(), cabecalho.map(limpar), mesclagens.slice().sort()]),
   );
+}
+
+function conferirAssinatura(aba, corpo) {
+  var atual = assinaturaDaAba(aba, numeroPositivo(corpo.cabecalhoLinha, 1));
   if (String(corpo.assinatura || "") !== atual) {
     return { ok: false, erro: "A estrutura da planilha mudou. Confira de novo antes de enviar." };
   }
@@ -877,18 +997,33 @@ function alunosDasLinhas(aba) {
   return vinculos;
 }
 
-/** Um código por linha e uma linha por código: o vínculo novo substitui os antigos. */
-function vincularAluno(aba, linha, alunoId) {
+/**
+ * Um código por linha e uma linha por código: os vínculos novos substituem os
+ * antigos. Uma só busca de metadados para o lote inteiro; cada metadado é
+ * lido uma vez, e só as linhas e os códigos envolvidos são removidos.
+ */
+function vincularAlunos(aba, vinculos) {
+  if (vinculos.length === 0) return;
+  var linhas = {};
+  var codigos = {};
+  for (var i = 0; i < vinculos.length; i += 1) {
+    linhas[vinculos[i].linha] = true;
+    codigos[vinculos[i].alunoId] = true;
+  }
   var tipos = SpreadsheetApp.DeveloperMetadataLocationType;
   var achados = aba.createDeveloperMetadataFinder().withKey(MARCADOR_ALUNO).find();
-  for (var i = 0; i < achados.length; i += 1) {
-    var local = achados[i].getLocation();
+  for (var j = 0; j < achados.length; j += 1) {
+    var local = achados[j].getLocation();
     if (local.getLocationType() !== tipos.ROW) continue;
     var faixa = local.getRow();
-    var mesmaLinha = faixa && faixa.getRow() === linha;
-    if (mesmaLinha || achados[i].getValue() === alunoId) achados[i].remove();
+    var linha = faixa ? faixa.getRow() : 0;
+    if (linhas[linha] || codigos[achados[j].getValue()]) achados[j].remove();
   }
-  aba.getRange(linha + ":" + linha).addDeveloperMetadata(MARCADOR_ALUNO, alunoId);
+  for (var k = 0; k < vinculos.length; k += 1) {
+    aba
+      .getRange(vinculos[k].linha + ":" + vinculos[k].linha)
+      .addDeveloperMetadata(MARCADOR_ALUNO, vinculos[k].alunoId);
+  }
 }
 
 function temMarcador(aba, chave) {
