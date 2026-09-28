@@ -446,11 +446,11 @@ export default function IntegracaoPlanilha({
 
       <EtapaPlanilha
         numero={3}
-        titulo="Envio do mês"
+        titulo="Envio"
         estado={estruturaSalva ? "atual" : "pendente"}
         resumo={
           estruturaSalva
-            ? "Envia o mês escolhido para todas as turmas mapeadas, com prévia obrigatória."
+            ? "Envia o que mudou desde o último envio de cada turma, uma turma por vez, com prévia obrigatória. O mês escolhido vale para a conferência do período inteiro."
             : "Salve a estrutura antes de enviar."
         }
       >
@@ -473,7 +473,7 @@ export default function IntegracaoPlanilha({
             title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
             onClick={() => setEnvioAberto(true)}
           >
-            Enviar o mês de todas as turmas
+            Enviar todas as turmas
           </Button>
         </div>
 
