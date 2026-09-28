@@ -72,6 +72,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 | `npm run test:unit`         | Apenas os testes de unidade.                             |
 | `npm run test:api`          | Contratos de API com o aplicativo no ar.                 |
 | `npm run test:e2e`          | Ponta a ponta com Playwright (headless).                 |
+| `npm run test:e2e:docker`   | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
 | `npm run test:pwa`          | PWA contra o build de produção.                          |
 | `npm run db:migrate`        | Cria e aplica migrações em desenvolvimento.              |
 | `npm run db:deploy`         | Aplica migrações pendentes em produção.                  |

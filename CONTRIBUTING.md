@@ -41,6 +41,10 @@ Comandos úteis na raiz:
 
 ## Fluxo de contribuição e pull requests
 
+### GitHub CLI
+
+Opere issues, pull requests e execuções de workflow pelo GitHub CLI (`gh`), não pela interface web. Antes de operar, confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, autentique com `gh auth login`. Comandos do dia a dia: `gh issue create`, `gh pr create --fill`, `gh pr view`, `gh pr checks --watch` e `gh run watch`. Nunca inclua segredos ou dados de alunos em comandos, títulos ou corpos.
+
 ### Issues e discussão
 
 Descreva o problema ou a proposta antes de codificar quando a mudança for estrutural. Para bugs, inclua passos de reprodução, comportamento observado, comportamento esperado e o commit afetado. Nunca anexe dados reais de pessoas ou alunos.
@@ -86,6 +90,7 @@ npm run lint
 npm run tsc
 npm run test:unit     # domínio, senhas, erros e guarda editorial
 npm run test:api      # com o aplicativo no ar, contas de teste e DATABASE_URL
+npm run test:e2e:docker:chromium   # Playwright na imagem oficial, com o aplicativo no ar
 npm run build         # build de produção
 ```
 

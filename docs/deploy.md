@@ -129,6 +129,8 @@ Os workflows ficam em `.github/workflows/`:
 | `codeql.yml`     | Análise de segurança de JavaScript e TypeScript              |
 | `publicacao.yml` | Publicação da imagem no GHCR                                 |
 
+Para acompanhar e operar workflows e releases pelo terminal, use o GitHub CLI (`gh`): confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Depois use `gh run list`, `gh run watch`, `gh run view --log-failed`, `gh pr checks --watch` e `gh release create`. Nunca inclua segredos em comandos.
+
 O Dependabot atualiza npm, GitHub Actions e Docker semanalmente, agrupando versões minor e patch.
 
 ## VPS sem TLS (rede interna)
