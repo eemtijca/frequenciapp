@@ -120,6 +120,15 @@ Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, todos os dias),
 
 A unicidade de (turma, dia) faz o banco rejeitar duplicatas: existe **uma frequência por turma e dia**, compartilhada por toda a coordenação. A revisão implementa concorrência otimista entre dispositivos dentro de uma transação serializável (ADR-007), e a autoria sobrevive à exclusão da conta.
 
+## Lista da chamada (alunoDaChamada)
+
+| Campo        | Tipo | Observação                                  |
+| ------------ | ---- | ------------------------------------------- |
+| frequenciaId | uuid | Chamada do dia; exclusão em cascata.        |
+| alunoId      | uuid | Aluno que estava na lista, presente ou não. |
+
+Fixa quem fez parte de cada chamada. Na primeira gravação, a lista é a relação atual da turma; depois, a lista gravada continua, e só o dia corrente recebe quem entrou na turma. Mover um aluno de turma não altera as chamadas já salvas ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)).
+
 ## Falta (falta)
 
 | Campo         | Tipo  | Observação                                                    |
@@ -212,13 +221,15 @@ A trilha registra ações administrativas e trocas de senha sempre na mesma tran
 
 ## Derivação da marca
 
-A marca de um aluno em um dia considera a grade de aulas da turma e as faltas registradas:
+A marca de um aluno em um dia considera as chamadas que o tinham na lista, as aulas da turma dessas chamadas e as faltas registradas:
 
 1. **FJ** quando todas as faltas do aluno no dia têm justificativa do catálogo. Conta como ausência no total (F + FJ).
 2. **F** quando o aluno falta em todas as aulas do dia sem justificativa, ou quando a falta está registrada em aula que saiu da grade. A falta prevalece mesmo depois de o aluno mudar de turma; na dúvida de transferência, prevalece a confirmação mais recente por aluno e dia.
-3. **S** (presença parcial) quando o aluno falta em parte das aulas e esteve presente no restante, caso de quem saiu antes do fim ou chegou depois. A marca existe apenas no modo por aula.
-4. **P** quando a turma atual teve frequência naquele dia e não há falta do aluno.
-5. **Vazia** quando a turma não teve frequência; células vazias na grade significam ausência de frequência, não presença.
+3. **S** (presença parcial) quando o aluno falta em parte das aulas da turma da chamada e esteve presente no restante, caso de quem saiu antes do fim ou chegou depois. A marca existe apenas no modo por aula.
+4. **P** quando o aluno estava na lista de uma chamada daquele dia e não há falta dele.
+5. **Vazia** quando o aluno não estava em nenhuma chamada do dia; células vazias na grade significam ausência de frequência, não presença.
+
+Dados sem lista, como cópias antigas, seguem a regra anterior: a chamada do aluno é a da turma atual.
 
 A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pelo servidor e pela interface, para manter a grade, o histórico e o painel coerentes com a chamada.
 

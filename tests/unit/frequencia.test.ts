@@ -27,6 +27,7 @@ import {
   partesNoFuso,
   rotuloAula,
   rotuloDataCurta,
+  rotuloCurtoDeTurma,
   rotuloDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
@@ -56,6 +57,7 @@ function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
     atualizadoEm: parcial.atualizadoEm ?? "2026-09-10T12:00:00Z",
     atualizadoPorNome: parcial.atualizadoPorNome ?? null,
     faltas: parcial.faltas ?? [],
+    ...(parcial.alunos ? { alunos: parcial.alunos } : {}),
   };
 }
 
@@ -109,6 +111,13 @@ describe("ehHoraValida", () => {
     expect(ehHoraValida("7:00")).toBe(false);
     expect(ehHoraValida("07:60")).toBe(false);
     expect(ehHoraValida("")).toBe(false);
+  });
+});
+
+describe("rotuloCurtoDeTurma", () => {
+  it("usa só o ordinal da série e a turma", () => {
+    expect(rotuloCurtoDeTurma("3º ano", "A")).toBe("3º A");
+    expect(rotuloCurtoDeTurma(" 1ª série ", " B ")).toBe("1ª B");
   });
 });
 
@@ -548,5 +557,45 @@ describe("marcaDoAluno com justificativa", () => {
       }),
     ];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("FJ");
+  });
+});
+
+describe("marcaDoAluno pela lista da chamada", () => {
+  // Aluno que estava na turma A e hoje está na turma B, com origem A.
+  const movido = aluno({ turmaId: "turma-b", turmaOriginalId: "turma-a" });
+  const aulasA = [horario({ id: "aula-a1" }), horario({ id: "aula-a2", ordem: 2 })];
+  const aulasB = [horario({ id: "aula-b1", turmaId: "turma-b" })];
+
+  it("mantém a presença do dia antigo na turma em que estava", () => {
+    const doDia = [frequencia({ turmaId: "turma-a", alunos: ["aluno-1"] })];
+    expect(marcaDoAluno(movido, "2026-09-10", doDia, [...aulasA, ...aulasB])).toBe("P");
+  });
+
+  it("mantém a falta parcial calculada pelas aulas da turma da chamada", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        alunos: ["aluno-1"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-a1"] }],
+      }),
+      frequencia({ turmaId: "turma-b", alunos: ["aluno-2"] }),
+    ];
+    expect(marcaDoAluno(movido, "2026-09-10", doDia, [...aulasA, ...aulasB])).toBe("S");
+  });
+
+  it("não dá presença pela chamada da turma nova antes de o aluno entrar nela", () => {
+    const doDia = [frequencia({ turmaId: "turma-b", alunos: ["aluno-2"] })];
+    expect(marcaDoAluno(movido, "2026-09-10", doDia, [...aulasA, ...aulasB])).toBeNull();
+  });
+
+  it("marca pela turma atual quando o aluno está na lista dela", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-b",
+        alunos: ["aluno-1"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-b1"] }],
+      }),
+    ];
+    expect(marcaDoAluno(movido, "2026-09-10", doDia, [...aulasA, ...aulasB])).toBe("F");
   });
 });

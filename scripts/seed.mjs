@@ -243,6 +243,13 @@ try {
         const frequenciaId = criada.rows[0]?.id;
         if (!frequenciaId) continue;
         chamadasCriadas += 1;
+        for (const aluno of alunosDaTurma.rows) {
+          await cliente.query(
+            `insert into alunos_chamada (frequencia_id, aluno_id) values ($1, $2)
+             on conflict do nothing`,
+            [frequenciaId, aluno.id],
+          );
+        }
 
         for (const aluno of alunosDaTurma.rows) {
           const marca = marcar(indiceTurma, aluno.ordem, indiceDia);

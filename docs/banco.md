@@ -13,6 +13,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem e situação.                                   |
 | `horarios`                | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
 | `frequencias`             | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
+| `alunos_chamada`          | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
 | `faltas`                  | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
 | `saidas_antecipadas`      | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.                |
 | `configuracoes`           | Linha única com os recursos ligados: chamada por aula e saída antecipada.                        |
@@ -29,6 +30,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 Restrições de integridade relevantes:
 
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
+- `alunos_chamada` tem chave composta (`frequencia_id`, `aluno_id`) e exclusão em cascata com a frequência e com o aluno. A migração `lista_da_chamada` preenche as chamadas já salvas com quem tem falta nelas e com os alunos ativos que estão na turma da chamada.
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
 - `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`. A linha exige código de justificativa ou texto livre, e `liberado_por_codigo`, quando preenchido, aponta para o catálogo `liberadores`, validado na aplicação.
 - `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
