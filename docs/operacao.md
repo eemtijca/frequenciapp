@@ -84,6 +84,18 @@ delete from tentativas_entrada where janela_inicio < now() - interval '1 day';
 delete from tentativas_entrada where chave like '%:3a-maria';
 ```
 
+## Relações de turma
+
+Quando a escola reorganiza turmas, como nas 3ª séries, a Chamada passa a seguir a relação atual de cada turma, e a Grade e a planilha consolidam pela turma original de cada aluno.
+
+1. Publique a versão do aplicativo com a lista da chamada ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)) antes de mover alunos. A migração fixa quem estava em cada chamada já salva.
+2. Em Gestão, Alunos, toque em Importar relação, cole as relações ou escolha os arquivos `.txt` de todas as turmas da série de uma vez, e toque em Conferir.
+3. Confira a prévia: o total por turma precisa bater com o cabeçalho de cada relação, e a lista de desativados só pode ter quem de fato saiu. Corrija no arquivo qualquer turma desconhecida ou nome repetido.
+4. Toque em Aplicar. A Chamada de cada turma passa a mostrar a relação na ordem do arquivo, com a turma original em círculo ao lado de cada nome.
+5. Repetir a mesma relação não muda nada; uma relação nova pode ser importada da mesma forma.
+
+As relações têm nomes de alunos: não as anexe em issue, pull request ou commit.
+
 ## Conexões administrativas
 
 Use `DIRECT_URL` para operações administrativas, migrations, backup e restauração. No Supabase, essa variável deve apontar para a Session pooler ou para uma conexão direta. A Transaction pooler em `DATABASE_URL` é para o runtime da API.
