@@ -533,7 +533,36 @@ class PlanilhaFalsa {
   }
 }
 
+/** Contagem de chamadas ao serviço de planilhas, por método, para medir custo. */
+interface Contador {
+  total: number;
+  porMetodo: Map<string, number>;
+}
+
+/**
+ * Envolve os dublês para contar cada método chamado. Cada chamada ao serviço
+ * real custa uma ida ao Google; a contagem aproxima o tempo do doPost.
+ */
+function contar<T>(alvo: T, contador: Contador): T {
+  if (Array.isArray(alvo)) return alvo.map((item: unknown) => contar(item, contador)) as T;
+  if (alvo === null || typeof alvo !== "object" || alvo instanceof Date) return alvo;
+  return new Proxy(alvo as object, {
+    get(objeto, chave, receptor) {
+      const valor: unknown = Reflect.get(objeto, chave, receptor);
+      if (typeof valor !== "function") return valor;
+      return (...args: unknown[]) => {
+        const nome = String(chave);
+        contador.total += 1;
+        contador.porMetodo.set(nome, (contador.porMetodo.get(nome) ?? 0) + 1);
+        return contar((valor as (...a: unknown[]) => unknown).apply(objeto, args), contador);
+      };
+    },
+  }) as T;
+}
+
 interface OpcoesContexto {
+  /** Conta as chamadas feitas pelo script ao serviço de planilhas. */
+  contador?: Contador;
   /** Simula `Sheet.copyTo` levando os metadados da aba (não confirmado). */
   copiaLevaMetadados?: boolean;
   /** Carimbo fixo, para simular duas cópias no mesmo segundo. */
@@ -570,8 +599,8 @@ function montarContexto(opcoes: OpcoesContexto = {}): Contexto {
       }),
     },
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => planilha,
-      openById: () => planilha,
+      getActiveSpreadsheet: () => (opcoes.contador ? contar(planilha, opcoes.contador) : planilha),
+      openById: () => (opcoes.contador ? contar(planilha, opcoes.contador) : planilha),
       flush: () => undefined,
       DeveloperMetadataLocationType: {
         SPREADSHEET: "SPREADSHEET",
@@ -1376,6 +1405,124 @@ describe("Apps Script: código do aluno na linha", () => {
   });
 });
 
+/** Aba de uma turma com 35 alunos, sem código nas linhas, como a do 3º C. */
+function montarTurmaGrande(contador: Contador): Contexto {
+  const local = montarContexto({ contador });
+  const nomes = Array.from(
+    { length: 35 },
+    (_, indice) => `Aluno ${String(indice + 1).padStart(2, "0")}`,
+  );
+  local.aba.getRange(2, 1, 35, 5).setValues(nomes.map((nome) => [nome, "3º ano C", "", "", ""]));
+  return local;
+}
+
+/** Envio diário típico: vincular 35 linhas, criar o dia e preencher 35 células. */
+function envioDiario(local: Contexto): Resposta {
+  const ids = Array.from(
+    { length: 35 },
+    (_, indice) => `00000000-0000-4000-8000-${String(indice + 1).padStart(12, "0")}`,
+  );
+  return aplicar(local, [
+    {
+      tipo: "vincularLinhas",
+      itens: ids.map((alunoId, indice) => ({
+        linha: indice + 2,
+        coluna: 1,
+        nome: `Aluno ${String(indice + 1).padStart(2, "0")}`,
+        alunoId,
+      })),
+    },
+    { tipo: "inserirColunas", antesDe: 5, cabecalhoLinha: 1, rotulos: ["28/09"] },
+    ...ids.map((_, indice) => ({
+      tipo: "preencher",
+      linha: indice + 2,
+      coluna: 5,
+      valor: indice % 7 === 0 ? "F" : "P",
+    })),
+  ]);
+}
+
+describe("Apps Script: custo do envio diário", () => {
+  // Com a versão 3, o mesmo envio fazia 3.376 chamadas: a vinculação buscava
+  // os metadados da aba de novo a cada linha e relia todos eles.
+  it("vincula, cria o dia e preenche 35 alunos com poucas chamadas ao serviço", () => {
+    const contador: Contador = { total: 0, porMetodo: new Map() };
+    const local = montarTurmaGrande(contador);
+    contador.total = 0;
+    contador.porMetodo.clear();
+    const resposta = envioDiario(local);
+    expect(resposta.dados).toMatchObject({ vinculadas: 35, colunasCriadas: 1, preenchidas: 35 });
+    expect(contador.total).toBeLessThanOrEqual(120);
+    expect(contador.porMetodo.get("createDeveloperMetadataFinder")).toBe(1);
+    expect(local.aba.marcadoresDe("frequenciapp.aluno", "ROW")).toHaveLength(35);
+    expect(local.aba.getCelula(2, 5).valor).toBe("F");
+    expect(local.aba.getCelula(3, 5).valor).toBe("P");
+    expect(Object.keys((resposta.dados as { tempos: object }).tempos)).toEqual([
+      "vincularLinhas",
+      "inserirColunas",
+      "preencher",
+      "gravar",
+    ]);
+  });
+
+  it("no lote, pula célula com fórmula ou ocupada e grava o resto", () => {
+    const local = montarTurmaGrande({ total: 0, porMetodo: new Map() });
+    local.aba.getCelula(4, 3).formula = "=1";
+    local.aba.getCelula(5, 3).valor = "FJ";
+    const resposta = aplicar(
+      local,
+      [2, 3, 4, 5, 6, 8].map((linha) => ({ tipo: "preencher", linha, coluna: 3, valor: "F" })),
+    );
+    expect(resposta.dados).toMatchObject({ preenchidas: 4, puladasFormula: 1, puladasOcupadas: 1 });
+    expect([2, 3, 4, 5, 6, 7, 8].map((linha) => local.aba.getCelula(linha, 3).valor)).toEqual([
+      "F",
+      "F",
+      "",
+      "FJ",
+      "F",
+      "",
+      "F",
+    ]);
+    expect(local.aba.getCelula(4, 3).formula).toBe("=1");
+  });
+
+  it("lê só os blocos de colunas pedidos, com assinatura e última linha", () => {
+    const local = montarTurmaGrande({ total: 0, porMetodo: new Map() });
+    const resposta = chamar(local, {
+      acao: "ler",
+      aba: "3º ano A",
+      linhaInicial: 1,
+      cabecalhoLinha: 1,
+      blocos: [
+        { coluna: 1, colunas: 1 },
+        { coluna: 4, colunas: 2 },
+      ],
+    });
+    const dados = resposta.dados as {
+      blocos: { coluna: number; valores: string[][] }[];
+      assinatura: string;
+      ultimaLinha: number;
+    };
+    expect(dados.blocos.map((bloco) => [bloco.coluna, bloco.valores[0]])).toEqual([
+      [1, ["Aluno"]],
+      [4, ["11/09", "Total"]],
+    ]);
+    expect(dados.ultimaLinha).toBe(36);
+    expect(dados.assinatura).toBe(assinaturaDaAba(local.aba));
+  });
+
+  it("devolve a estrutura de uma aba só quando pedida", () => {
+    const local = montarContexto();
+    local.planilha.insertSheet("Outra");
+    const toda = chamar(local, { acao: "estrutura" }).dados as { abas: unknown[] };
+    const uma = chamar(local, { acao: "estrutura", aba: "3º ano A" }).dados as {
+      abas: { nome: string }[];
+    };
+    expect(toda.abas).toHaveLength(2);
+    expect(uma.abas.map((aba) => aba.nome)).toEqual(["3º ano A"]);
+  });
+});
+
 /**
  * Histórico do script publicado. Qualquer mudança no gas/Codigo.gs muda o
  * hash e exige nova entrada com versão maior, o que obriga a subir a VERSAO
@@ -1385,6 +1532,7 @@ const VERSOES_DO_SCRIPT = [
   { versao: 1, sha256: "1fe567b6391975de778c75b285a8a4e6d2b879e340d3079c3b0bc45ece75550b" },
   { versao: 2, sha256: "3b4a451026e87f8eb9634b7ed0b6d520dbf2d08602c8374f261c03df4b9c9faa" },
   { versao: 3, sha256: "b10946c2d7497c2f4b2cf02e53bbf17e9fc5ddad7b801f7e8509ff6f52a0b933" },
+  { versao: 4, sha256: "9b2c7ee0a010bb99c925ca96fe935249b211ef71d253a0ed8f6c56c079836404" },
 ];
 
 describe("Apps Script: versão", () => {

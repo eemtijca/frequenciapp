@@ -357,6 +357,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -371,6 +372,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({
         turmaOriginalId: turmaAId,
         de: DIA,
+        somenteAlteradas: false,
         ate: DIA,
         permitirInserirColunas: true,
         permitirNovosAlunos: true,
@@ -401,6 +403,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({
         turmaOriginalId: turmaAId,
         de: DIA,
+        somenteAlteradas: false,
         ate: DIA,
         planoHashGeral: "hash-que-nao-confere",
       }),
@@ -443,6 +446,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           substituirDivergencias: true,
           permitirInserirColunas: true,
@@ -475,6 +479,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           substituirDivergencias: true,
           permitirInserirColunas: true,
@@ -489,6 +494,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({
         turmaOriginalId: turmaAId,
         de: DIA,
+        somenteAlteradas: false,
         ate: DIA,
         substituirDivergencias: true,
         permitirInserirColunas: true,
@@ -518,6 +524,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -548,6 +555,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -565,6 +573,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -579,6 +588,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({
         turmaOriginalId: turmaAId,
         de: DIA,
+        somenteAlteradas: false,
         ate: DIA,
         permitirInserirColunas: true,
         permitirNovosAlunos: true,
@@ -601,6 +611,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -617,6 +628,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           permitirInserirColunas: true,
           permitirNovosAlunos: true,
@@ -629,6 +641,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({
         turmaOriginalId: turmaAId,
         de: DIA,
+        somenteAlteradas: false,
         ate: DIA,
         permitirInserirColunas: true,
         permitirNovosAlunos: true,
@@ -683,6 +696,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({
           turmaOriginalId: turmaAId,
           de: DIA,
+          somenteAlteradas: false,
           ate: DIA,
           substituirDivergencias: true,
           permitirInserirColunas: true,
