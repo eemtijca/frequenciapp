@@ -7,7 +7,8 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
-import { chamarGas, ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { ErroGoogle } from "@/infra/google-planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
@@ -16,7 +17,7 @@ import {
   criarAba as criarAbaComum,
   desconectar,
   desativarModoCompleto as desativarModoCompletoComum,
-  exigirConexao,
+  chamarIntegracao,
   gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
@@ -139,7 +140,12 @@ export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
     ativa: linha.ativa,
     modo: completo ? "completo" : "conservador",
     modoCompletoAte: completo && linha.modoCompletoAte ? linha.modoCompletoAte.toISOString() : null,
-    podeEnviar: Boolean(linha.ativa && linha.endpoint && linha.token),
+    podeEnviar: Boolean(
+      linha.ativa &&
+      (linha.provedor === "GOOGLE"
+        ? linha.googleRefreshToken && linha.googlePlanilhaId
+        : linha.endpoint && linha.token),
+    ),
     alteradasDepois: await contarAlteradasDepois(),
   };
 }
@@ -174,6 +180,11 @@ export async function lerIntegracaoAdmin() {
   const ultimoErro = await lerErroVigente();
   return {
     ativa: linha.ativa,
+    provedor: linha.provedor,
+    googleConectado: Boolean(linha.googleRefreshToken),
+    googlePlanilha: linha.googlePlanilhaId
+      ? { id: linha.googlePlanilhaId, nome: linha.googlePlanilhaNome }
+      : null,
     endpoint: linha.endpoint,
     token: linha.token ? `••••••••${linha.token.slice(-4)}` : null,
     temToken: Boolean(linha.token),
@@ -261,8 +272,7 @@ export async function testarConexao(entrada: unknown) {
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
 export async function lerEstrutura() {
   const linha = await lerLinha(FINALIDADE);
-  const { endpoint, token } = exigirConexao(linha);
-  const estrutura = await chamarGas<{
+  const estrutura = await chamarIntegracao<{
     planilha: { nome: string; url: string; fuso: string };
     abas: {
       nome: string;
@@ -275,16 +285,16 @@ export async function lerEstrutura() {
       mesclagens: string[];
       amostra: string[][];
     }[];
-  }>(endpoint, token, { acao: "estrutura" });
+  }>(linha, { acao: "estrutura" });
   const turmas = await listarTodasTurmas();
   const abas: AbaEsquema[] = [];
   const problemas: { aba: string; erro: string }[] = [];
   for (const item of estrutura.abas) {
     try {
-      const leitura = await chamarGas<{
+      const leitura = await chamarIntegracao<{
         valores: string[][];
         formula: boolean[][];
-      }>(endpoint, token, {
+      }>(linha, {
         acao: "ler",
         aba: item.nome,
         linhaInicial: 1,
@@ -460,13 +470,12 @@ type LeituraGas = {
  * coluna necessária.
  */
 async function lerParaPlano(
-  endpoint: string,
-  token: string,
+  linha: LinhaIntegracao,
   esquema: AbaEsquema,
   dias: string[],
 ): Promise<{ conteudo: LeituraAba; assinatura: string | null }> {
   const colunas = colunasNecessarias(esquema, dias);
-  const leitura = await chamarGas<LeituraGas>(endpoint, token, {
+  const leitura = await chamarIntegracao<LeituraGas>(linha, {
     acao: "ler",
     aba: esquema.nome,
     linhaInicial: 1,
@@ -503,8 +512,8 @@ async function lerParaPlano(
 }
 
 /** Detecta de novo o esquema de uma aba, pela mesma regra da conferência de estrutura. */
-async function detectarAba(endpoint: string, token: string, nome: string): Promise<AbaEsquema> {
-  const estrutura = await chamarGas<{
+async function detectarAba(linha: LinhaIntegracao, nome: string): Promise<AbaEsquema> {
+  const estrutura = await chamarIntegracao<{
     abas: {
       nome: string;
       oculta: boolean;
@@ -515,10 +524,10 @@ async function detectarAba(endpoint: string, token: string, nome: string): Promi
       congeladasColunas: number;
       mesclagens: string[];
     }[];
-  }>(endpoint, token, { acao: "estrutura", aba: nome });
+  }>(linha, { acao: "estrutura", aba: nome });
   const item = estrutura.abas.find((aba) => aba.nome === nome);
   if (!item) throw new ErroHttp(`A aba ${nome} não foi encontrada na planilha.`, 409);
-  const leitura = await chamarGas<{ valores: string[][]; formula: boolean[][] }>(endpoint, token, {
+  const leitura = await chamarIntegracao<{ valores: string[][]; formula: boolean[][] }>(linha, {
     acao: "ler",
     aba: nome,
     linhaInicial: 1,
@@ -564,7 +573,6 @@ async function montarSimulacao(
   linha: LinhaIntegracao,
   entrada: EntradaEnvio,
 ): Promise<SimulacaoInterna> {
-  const { endpoint, token } = exigirConexao(linha);
   const salvo = esquemaSalvo(linha);
   if (!salvo || salvo.mapa.length === 0) {
     throw new ErroHttp("Confira a estrutura da planilha antes de enviar.", 400);
@@ -622,15 +630,15 @@ async function montarSimulacao(
       dias,
       rotuloDaTurma,
     );
-    let leitura = await lerParaPlano(endpoint, token, esquemaAba, dias);
+    let leitura = await lerParaPlano(linha, esquemaAba, dias);
     // A aba mudou desde a última conferência (por exemplo, um envio anterior
     // criou o dia e não chegou a responder): o esquema é detectado de novo e
     // salvo, e a prévia já mostra o plano sobre a estrutura atual.
     let estruturaAtualizada = false;
     if (leitura.assinatura && leitura.assinatura !== esquemaAba.assinatura) {
-      esquemaAba = await detectarAba(endpoint, token, par.aba);
+      esquemaAba = await detectarAba(linha, par.aba);
       await salvarEsquemaDaAba(esquemaAba);
-      leitura = await lerParaPlano(endpoint, token, esquemaAba, dias);
+      leitura = await lerParaPlano(linha, esquemaAba, dias);
       estruturaAtualizada = true;
     }
     const plano = planejarSincronizacao(esquemaAba, turmaPlanilha, leitura.conteudo, {
@@ -775,7 +783,6 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
   if (dados.data.planoHashGeral !== simulacao.planoHashGeral) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
   }
-  const { endpoint, token } = exigirConexao(linha);
   const resultados: ResultadoTurma[] = [];
   for (const item of simulacao.planos) {
     const base = {
@@ -805,9 +812,8 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       continue;
     }
     try {
-      const contagens = await chamarGas<Record<string, unknown>>(
-        endpoint,
-        token,
+      const contagens = await chamarIntegracao<Record<string, unknown>>(
+        linha,
         {
           acao: "aplicar",
           aba: plano.aba,
@@ -825,14 +831,14 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       // para o próximo envio não pedir nova conferência de estrutura.
       if (Number(contagens.colunasCriadas ?? 0) > 0 || Number(contagens.linhasCriadas ?? 0) > 0) {
         try {
-          await salvarEsquemaDaAba(await detectarAba(endpoint, token, plano.aba));
+          await salvarEsquemaDaAba(await detectarAba(linha, plano.aba));
         } catch {
           // A prévia seguinte detecta a mudança pela assinatura e reconfere.
         }
       }
       resultados.push({ ...base, resultado: "sucesso", contagens });
     } catch (erro) {
-      const recusado = erro instanceof ErroGas && erro.recusado;
+      const recusado = (erro instanceof ErroGas || erro instanceof ErroGoogle) && erro.recusado;
       const mensagem = recusado ? erro.message : ERRO_SEM_CONFIRMACAO;
       await concluirRegistro(
         registro,

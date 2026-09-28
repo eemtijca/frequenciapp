@@ -3,6 +3,16 @@ import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("abas da Gestão", () => {
+  test("retorno do OAuth abre diretamente as configurações", async ({ page }) => {
+    await page.goto("/?visao=gestao&google=conectado");
+    await aguardarHidratacao(page);
+    await expect(page.getByRole("tab", { name: "Configurações" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByText("Conta Google conectada. Escolha a planilha.")).toBeVisible();
+  });
+
   test("sincroniza toque e teclado", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);

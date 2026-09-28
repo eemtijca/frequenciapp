@@ -11,6 +11,12 @@ services:
     ports: !reset []
     environment:
       AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+      # O CI usa dublês da Sheets API; não acessa uma conta Google real.
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      GOOGLE_REDIRECT_URI: ""
+      GOOGLE_PICKER_API_KEY: ""
+      GOOGLE_PROJECT_NUMBER: ""
       # Na rede do host o banco é alcançado pela porta publicada.
       DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia

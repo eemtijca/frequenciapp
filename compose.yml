@@ -34,6 +34,11 @@ services:
       DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      GOOGLE_PICKER_API_KEY: ${GOOGLE_PICKER_API_KEY:-}
+      GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER:-}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
       # Implantação sem TLS em rede confiável (ver .env.example).
       PERMITIR_HTTP: ${PERMITIR_HTTP:-false}

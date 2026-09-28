@@ -23,6 +23,8 @@ const cabecalhosSeguranca = [
 ];
 
 const nextConfig: NextConfig = {
+  agentRules: false,
+  devIndicators: false,
   output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,

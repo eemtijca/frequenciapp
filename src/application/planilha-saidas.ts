@@ -7,17 +7,18 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
-import { chamarGas, ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { ErroGoogle } from "@/infra/google-planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSaidas } from "@/application/saidas";
 import { listarJustificativas } from "@/application/justificativas";
 import {
   ativarModoCompleto as ativarModoCompletoComum,
+  chamarIntegracao,
   criarAba as criarAbaComum,
   desconectar,
   desativarModoCompleto as desativarModoCompletoComum,
-  exigirConexao,
   gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
@@ -79,7 +80,12 @@ export async function lerEstadoSaidas() {
     ativa: linha.ativa,
     modo: completo ? ("completo" as const) : ("conservador" as const),
     modoCompletoAte: completo && linha.modoCompletoAte ? linha.modoCompletoAte.toISOString() : null,
-    podeEnviar: Boolean(linha.ativa && linha.endpoint && linha.token),
+    podeEnviar: Boolean(
+      linha.ativa &&
+      (linha.provedor === "GOOGLE"
+        ? linha.googleRefreshToken && linha.googlePlanilhaId
+        : linha.endpoint && linha.token),
+    ),
     configurada: Boolean(esquemaSaidasSalvo(linha)),
   };
 }
@@ -87,6 +93,10 @@ export async function lerEstadoSaidas() {
 /** Configuração completa para a administração. O token nunca volta inteiro. */
 export async function lerIntegracaoSaidasAdmin() {
   const linha = await lerLinha(FINALIDADE);
+  const principal = await banco().integracaoPlanilha.findUnique({
+    where: { id: "principal" },
+    select: { googleRefreshToken: true },
+  });
   const sincronizacoes = await banco().sincronizacaoPlanilha.findMany({
     where: { finalidade: FINALIDADE },
     orderBy: { criadoEm: "desc" },
@@ -116,6 +126,12 @@ export async function lerIntegracaoSaidasAdmin() {
   const ultimoErro = erroVigente(ultimoEnvio ? [ultimoEnvio] : [], () => FINALIDADE);
   return {
     ativa: linha.ativa,
+    provedor: linha.provedor,
+    contaGoogle: Boolean(linha.googleRefreshToken || principal?.googleRefreshToken),
+    googlePlanilha:
+      linha.googlePlanilhaId && linha.provedor === "GOOGLE"
+        ? { id: linha.googlePlanilhaId, nome: linha.googlePlanilhaNome }
+        : null,
     endpoint: linha.endpoint,
     token: linha.token ? `••••••••${linha.token.slice(-4)}` : null,
     temToken: Boolean(linha.token),
@@ -229,8 +245,7 @@ function sugerirAbaSaidas(abas: AbaSaidaEsquema[]): SugestaoAba | null {
 /** Lê a estrutura das abas e sugere a aba única de registro das saídas. */
 export async function lerEstruturaSaidas() {
   const linha = await lerLinha(FINALIDADE);
-  const { endpoint, token } = exigirConexao(linha);
-  const estrutura = await chamarGas<{
+  const estrutura = await chamarIntegracao<{
     planilha: { nome: string; url: string; fuso: string };
     abas: {
       nome: string;
@@ -243,15 +258,15 @@ export async function lerEstruturaSaidas() {
       mesclagens: string[];
       amostra: string[][];
     }[];
-  }>(endpoint, token, { acao: "estrutura" });
+  }>(linha, { acao: "estrutura" });
   const abas: AbaSaidaEsquema[] = [];
   const problemas: { aba: string; erro: string }[] = [];
   for (const item of estrutura.abas) {
     try {
-      const leitura = await chamarGas<{
+      const leitura = await chamarIntegracao<{
         valores: string[][];
         formula: boolean[][];
-      }>(endpoint, token, {
+      }>(linha, {
         acao: "ler",
         aba: item.nome,
         linhaInicial: 1,
@@ -344,7 +359,6 @@ async function montarSimulacaoSaidas(
   linha: LinhaIntegracao,
   entrada: EntradaEnvioSaidas,
 ): Promise<SimulacaoSaidas> {
-  const { endpoint, token } = exigirConexao(linha);
   const salvo = esquemaSaidasSalvo(linha);
   if (!salvo) {
     throw new ErroHttp("Confira a estrutura da planilha de saídas antes de enviar.", 400);
@@ -380,14 +394,14 @@ async function montarSimulacaoSaidas(
       liberadoPor: saida.liberadoPorNome ?? "",
     });
   }
-  const leitura = await chamarGas<{
+  const leitura = await chamarIntegracao<{
     valores: string[][];
     formula: boolean[][];
     linhaInicial: number;
     colunaInicial: number;
     linhasCriadas: number[];
     colunasCriadas: number[];
-  }>(endpoint, token, {
+  }>(linha, {
     acao: "ler",
     aba: salvo.aba,
     linhaInicial: 1,
@@ -527,16 +541,14 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
   if (dados.data.planoHash !== simulacao.plano.planoHash) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
   }
-  const { endpoint, token } = exigirConexao(linha);
   const operacoes = operacoesDoPlanoSaidas(simulacao.plano);
   if (operacoes.length === 0) {
     return { resultado: "sucesso" as const, contagens: {} };
   }
   const destrutiva = temDestrutivaSaidas(simulacao.plano);
   try {
-    const contagens = await chamarGas<Record<string, number>>(
-      endpoint,
-      token,
+    const contagens = await chamarIntegracao<Record<string, number>>(
+      linha,
       {
         acao: "aplicar",
         aba: simulacao.plano.aba,
@@ -561,7 +573,7 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
     const mensagem = erro instanceof ErroHttp ? erro.message : "Falha ao enviar para a planilha.";
     const registro = mensagemParaRegistro(erro, mensagem);
     // Falha de rede pode ter aplicado parte do plano; recusa explícita, não.
-    const parcial = erro instanceof ErroGas && !erro.recusado;
+    const parcial = (erro instanceof ErroGas || erro instanceof ErroGoogle) && !erro.recusado;
     await registrarSincronizacaoSaidas(
       usuario.id,
       simulacao.plano,

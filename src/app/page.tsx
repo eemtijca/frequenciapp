@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function Pagina({
   searchParams,
 }: {
-  searchParams: Promise<{ visao?: string }>;
+  searchParams: Promise<{ visao?: string; google?: string }>;
 }) {
   const usuario = await identidadeAtual(ambiente.authSecret);
   if (!usuario) return <TelaLogin />;
@@ -63,6 +63,7 @@ export default async function Pagina({
       diaCorrente={dia}
       fuso={ambiente.fuso}
       visaoInicial={parametros.visao}
+      abaGestaoInicial={parametros.google ? "configuracoes" : undefined}
       seriesIniciais={series}
       turmasIniciais={turmas}
       alunosIniciais={alunos}

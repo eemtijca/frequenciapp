@@ -10,7 +10,9 @@ import { ErroHttp } from "@/infra/erros";
 import { ambiente } from "@/infra/ambiente";
 import { conferirSenha } from "@/infra/auth/hash";
 import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
-import { chamarGas } from "@/infra/planilha";
+import { chamarGas, type OpcoesGas } from "@/infra/planilha";
+import { renovarAcesso } from "@/infra/google-oauth";
+import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
 import {
   DURACOES_MODO_COMPLETO,
   FRASE_MODO_COMPLETO,
@@ -33,9 +35,13 @@ export function idDaIntegracao(finalidade: FinalidadeIntegracao): string {
 
 export interface LinhaIntegracao {
   ativa: boolean;
+  provedor: string;
   endpoint: string | null;
   token: string | null;
   versaoScript: string | null;
+  googleRefreshToken: string | null;
+  googlePlanilhaId: string | null;
+  googlePlanilhaNome: string | null;
   esquema: unknown;
   assinaturaEsquema: string | null;
   esquemaEm: Date | null;
@@ -46,9 +52,13 @@ export interface LinhaIntegracao {
 
 const CAMPOS = {
   ativa: true,
+  provedor: true,
   endpoint: true,
   token: true,
   versaoScript: true,
+  googleRefreshToken: true,
+  googlePlanilhaId: true,
+  googlePlanilhaNome: true,
   esquema: true,
   assinaturaEsquema: true,
   esquemaEm: true,
@@ -98,6 +108,23 @@ export function exigirConexao(linha: LinhaIntegracao): { endpoint: string; token
   return { endpoint: linha.endpoint, token: linha.token };
 }
 
+/** Escolhe a fonte da finalidade: Sheets API ou protocolo legado. */
+export async function chamarIntegracao<T>(
+  linha: LinhaIntegracao,
+  corpo: Record<string, unknown>,
+  opcoes?: OpcoesGas,
+): Promise<T> {
+  if (linha.provedor === "GOOGLE") {
+    if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId) {
+      throw new ErroHttp("A integração com a planilha não está ativa.", 400);
+    }
+    const acesso = await renovarAcesso(linha.googleRefreshToken);
+    return (await executarAcaoGoogle(linha.googlePlanilhaId, acesso, corpo)) as T;
+  }
+  const { endpoint, token } = exigirConexao(linha);
+  return chamarGas<T>(endpoint, token, corpo, opcoes);
+}
+
 export async function conferirSenhaDoAdmin(
   usuarioId: string,
   senha: string,
@@ -142,13 +169,26 @@ export async function salvarConfiguracao(
     if (problema) throw new ErroHttp(problema, 400);
   }
   const id = idDaIntegracao(finalidade);
+  const trocandoProvedor =
+    dados.data.endpoint !== undefined && (await lerLinha(finalidade)).provedor === "GOOGLE";
   await comTransacao(async (tx) => {
     await tx.integracaoPlanilha.upsert({
       where: { id },
       update: {
         ...(dados.data.ativa !== undefined ? { ativa: dados.data.ativa } : {}),
         ...(dados.data.endpoint !== undefined
-          ? { endpoint: dados.data.endpoint.trim() || null }
+          ? {
+              endpoint: dados.data.endpoint.trim() || null,
+              provedor: "GAS",
+              ...(trocandoProvedor
+                ? {
+                    ativa: false,
+                    esquema: Prisma.DbNull,
+                    assinaturaEsquema: null,
+                    esquemaEm: null,
+                  }
+                : {}),
+            }
           : {}),
         atualizadoPorId: admin.id,
       },
@@ -246,6 +286,10 @@ export async function desconectar(
         ativa: false,
         endpoint: null,
         token: null,
+        googleRefreshToken: null,
+        googlePlanilhaId: null,
+        googlePlanilhaNome: null,
+        provedor: "GAS",
         esquema: Prisma.DbNull,
         assinaturaEsquema: null,
         esquemaEm: null,
@@ -323,8 +367,7 @@ export async function listarCopias(finalidade: FinalidadeIntegracao, entrada: un
   const dados = z.object({ aba: z.string().min(1).max(200) }).safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Informe a aba.", 400);
   const linha = await lerLinha(finalidade);
-  const { endpoint, token } = exigirConexao(linha);
-  return chamarGas<{ copias: { nome: string; criadaEm: string }[] }>(endpoint, token, {
+  return chamarIntegracao<{ copias: { nome: string; criadaEm: string }[] }>(linha, {
     acao: "listarCopias",
     aba: dados.data.aba,
   });
@@ -352,10 +395,8 @@ export async function restaurarCopia(
   }
   await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:restaurar:${finalidade}`);
   const linha = await lerLinha(finalidade);
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string; copia: string; anterior: string }>(
-    endpoint,
-    token,
+  const resultado = await chamarIntegracao<{ aba: string; copia: string; anterior: string }>(
+    linha,
     { acao: "restaurarCopia", aba: dados.data.aba, copia: dados.data.copia },
     { retentavel: false },
   );
@@ -385,10 +426,8 @@ export async function criarAba(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   const linha = await lerLinha(finalidade);
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string }>(
-    endpoint,
-    token,
+  const resultado = await chamarIntegracao<{ aba: string }>(
+    linha,
     { acao: "criarAba", nome: dados.data.nome, cabecalho: dados.data.cabecalho },
     { retentavel: false },
   );
@@ -422,10 +461,8 @@ export async function removerAba(
     throw new ErroHttp("O modo completo não está ativo.", 400);
   }
   await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:remover:${finalidade}`);
-  const { endpoint, token } = exigirConexao(linha);
-  const resultado = await chamarGas<{ aba: string }>(
-    endpoint,
-    token,
+  const resultado = await chamarIntegracao<{ aba: string }>(
+    linha,
     { acao: "removerAba", aba: dados.data.aba },
     { retentavel: false },
   );

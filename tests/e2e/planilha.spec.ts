@@ -51,6 +51,7 @@ test.describe("Google Planilhas", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
+    await cartao.getByText("Conexão por Apps Script").click();
 
     // Antes de conectar, a leitura da estrutura fica bloqueada.
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();

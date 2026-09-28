@@ -430,7 +430,14 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 ## Planilha
 
-Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). O endpoint e o token nunca saem do servidor. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Na conexão legada, o endpoint e o token ficam no servidor. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+
+### Conexão OAuth da frequência e das saídas
+
+- `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração.
+- `GET /api/planilha/google/retorno`: recebe o código OAuth, confere estado e sessão, guarda o token de atualização cifrado e redireciona ao aplicativo.
+- `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar a planilha de saídas.
+- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" }`, confere acesso pela Sheets API, guarda a planilha da finalidade, desliga essa integração e invalida o mapa anterior.
 
 ### GET /api/planilha/estado
 
@@ -450,7 +457,7 @@ Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administraçã
 
 ### POST /api/planilha/testar
 
-Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso do script difere de `TZ_APP` ou quando a versão publicada está atrasada.
+Na conexão legada, corpo `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso do script difere de `TZ_APP` ou quando a versão publicada está atrasada.
 
 - 200 `{"ping": { ..., "avisos": string[] }}`; 400 endereço ou token ausente; 502 sem resposta.
 
@@ -474,7 +481,7 @@ Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"
 
 ### POST /api/planilha/aplicar
 
-Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao script e vira `SUCESSO` com a resposta; o envio ao script nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
+Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao Google e vira `SUCESSO` com a resposta; o envio nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
 
 - 200 `{"resultados", "resumo"}`; cada resultado é `sucesso`, `parcial` (sem confirmação: timeout ou queda depois de enviar, com a mensagem para conferir a aba), `falha` (recusa do script) ou `sem_envio`.
 - 400 sem prévia ou com `todas`; 409 quando os dados mudaram; 429 envios em excesso.
@@ -521,7 +528,7 @@ Apaga token e esquema e desliga a integração. Apenas administração. A planil
 
 ## Planilha de saídas
 
-Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Mesmas regras de conexão, token e modo completo, com configuração restrita à administração e envio aceito de qualquer sessão ativa.
+Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Pode usar o OAuth e a Sheets API descritos acima ou a conexão legada por Apps Script. A seleção da planilha, o modo e o mapa são próprios desta finalidade. A configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
 
 ### GET /api/planilha-saidas/estado
 

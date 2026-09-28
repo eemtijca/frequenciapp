@@ -1,6 +1,6 @@
 # Ambiente
 
-Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, `AUTH_SECRET`, `TZ_APP`, `NODE_ENV`, `PERMITIR_HTTP` e `PERMITIR_ENDPOINT_LOCAL` na partida por zod em `src/infra/ambiente.ts`. Configuração ausente ou inválida derruba o processo com mensagem clara, sem estado intermediário.
+Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, `AUTH_SECRET`, `TZ_APP`, `NODE_ENV`, `PERMITIR_HTTP`, `PERMITIR_ENDPOINT_LOCAL` e a configuração OAuth quando presente na partida por zod em `src/infra/ambiente.ts`. Configuração ausente ou inválida derruba o processo com mensagem clara, sem estado intermediário.
 
 ## Variáveis da aplicação
 
@@ -12,6 +12,18 @@ Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, 
 | NODE_ENV                | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure, salvo quando o HTTP está liberado.                            |
 | PERMITIR_HTTP           | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
 | PERMITIR_ENDPOINT_LOCAL | não         | `false`             | Aceita endpoint local na integração com Google Planilhas mesmo em produção. Apenas para testes e ambientes controlados.      |
+
+Para as planilhas de frequência e de saídas por OAuth, configure as cinco variáveis juntas:
+
+| Variável              | Uso                                                                 |
+| --------------------- | ------------------------------------------------------------------- |
+| GOOGLE_CLIENT_ID      | Cliente OAuth do tipo Aplicativo da Web.                            |
+| GOOGLE_CLIENT_SECRET  | Segredo do cliente, somente no servidor.                            |
+| GOOGLE_REDIRECT_URI   | Endereço público terminado em `/api/planilha/google/retorno`.       |
+| GOOGLE_PICKER_API_KEY | Chave pública restrita à Google Picker API e aos sites autorizados. |
+| GOOGLE_PROJECT_NUMBER | Número do projeto Cloud usado pelo Picker.                          |
+
+O segredo de atualização da conta Google é cifrado com uma chave derivada de `AUTH_SECRET`. Trocar `AUTH_SECRET` exige conectar a conta Google novamente. Consulte [planilha.md](planilha.md) para preparar o projeto Cloud e a planilha.
 
 ## HTTP sem TLS
 
@@ -25,7 +37,7 @@ A aplicação avisa no log na partida. Sem TLS, o tráfego fica em texto puro (s
 
 ## Endpoint local da planilha
 
-A integração com Google Planilhas aceita `https://script.google.com/macros/s/.../exec`. Fora de produção, `http://127.0.0.1:porta/exec` e `http://localhost:porta/exec` também valem, para os testes com o Apps Script falso. Em produção, liberar o loopback exige `PERMITIR_ENDPOINT_LOCAL=true`, pensado para testes e ambientes controlados; o padrão restringe o endereço ao Google, e a aplicação avisa no log quando a variável está ativa.
+A conexão legada por Apps Script aceita `https://script.google.com/macros/s/.../exec`. Fora de produção, `http://127.0.0.1:porta/exec` e `http://localhost:porta/exec` também valem, para os testes com o Apps Script falso. Em produção, liberar o loopback exige `PERMITIR_ENDPOINT_LOCAL=true`, pensado para testes e ambientes controlados; o padrão restringe o endereço ao Google, e a aplicação avisa no log quando a variável está ativa.
 
 ## Conexões do Prisma e do Supabase
 
