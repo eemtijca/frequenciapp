@@ -61,7 +61,16 @@ A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e
 
 ## Ponta a ponta com Playwright
 
-Instalação e configuração já estão no repositório:
+Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. O aplicativo precisa estar no ar antes (`docker compose up -d` ou `npm run dev`):
+
+```bash
+npm run test:e2e:docker            # todos os projetos
+npm run test:e2e:docker:chromium   # só o Chromium
+```
+
+O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test`. Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
+
+Como alternativa, instale os navegadores no host e mantenha a configuração já presente no repositório:
 
 ```bash
 npm i -D @playwright/test
@@ -76,7 +85,7 @@ npx playwright test    # headless, execução serial
 - Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, indicador da barra inferior na visão ativa, abas da Gestão com toque e teclado, integração com Google Planilhas contra o script falso (token, conexão, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
-Com o aplicativo já no ar, use `TEST_BASE_URL` e `PLAYWRIGHT_SKIP_WEBSERVER=1`. O CI sobe o Compose, instala o Chromium e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner.
+O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner.
 
 ## Verificação visual e de ponta a ponta
 
