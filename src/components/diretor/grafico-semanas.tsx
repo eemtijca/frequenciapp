@@ -18,6 +18,7 @@ import {
 import { rotuloDataCurta } from "@/domain/frequencia";
 import type { EstatisticaSemana } from "@/domain/estatisticas-diretor";
 import { ESTILO_TOOLTIP, escalaPercentual } from "@/components/diretor/grafico-alunos";
+import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 interface Props {
   semanas: EstatisticaSemana[];
@@ -135,9 +136,20 @@ export default function GraficoSemanas({ semanas, limiteRisco, separarJustificad
                 _nome: unknown,
                 item: { payload?: EstatisticaSemana },
               ) => [
-                item.payload
-                  ? `${percentual.format(item.payload.taxa)} · ${item.payload.ausencias} ausências`
-                  : "",
+                item.payload ? (
+                  <span key="valores" className="inline-flex items-center gap-1 align-middle">
+                    <CirculoValor
+                      texto={percentual.format(item.payload.taxa)}
+                      rotulo={`${percentual.format(item.payload.taxa)} de ausência`}
+                    />
+                    <CirculoValor
+                      texto={`${item.payload.ausencias} ${item.payload.ausencias === 1 ? "ausência" : "ausências"}`}
+                      rotulo={`${item.payload.ausencias} ${item.payload.ausencias === 1 ? "ausência" : "ausências"}`}
+                    />
+                  </span>
+                ) : (
+                  ""
+                ),
                 "Ausência",
               ]}
             />

@@ -15,6 +15,7 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
+import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 interface Props {
   diaCorrente: string;
@@ -325,9 +326,14 @@ export default function VistaPainel({
               >
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="font-medium">{serie.nome}</h3>
-                  <span className="text-muted-foreground numerais-tabulares text-xs">
+                  <span className="text-muted-foreground numerais-tabulares flex items-center gap-1.5 text-xs">
                     {serie.faltas + serie.justificadas} de {resumo.ausencias || 0}
-                    {resumo.ausencias > 0 ? ` · ${percentual.format(serie.percentual)}` : ""}
+                    {resumo.ausencias > 0 && (
+                      <CirculoValor
+                        texto={percentual.format(serie.percentual)}
+                        rotulo={`${percentual.format(serie.percentual)} das faltas do dia`}
+                      />
+                    )}
                   </span>
                 </div>
                 <GraficoRosca

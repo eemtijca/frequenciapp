@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import type { EstatisticaAluno } from "@/domain/estatisticas-diretor";
+import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 interface Props {
   alunos: EstatisticaAluno[];
@@ -106,8 +107,15 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
               ) => {
                 const aluno = item.payload;
                 if (!aluno) return ["", ""];
+                const dias = `${aluno.ausencias} de ${aluno.diasComChamada} dias`;
                 return [
-                  `${percentual.format(aluno.taxa)} · ${aluno.ausencias} de ${aluno.diasComChamada} dias`,
+                  <span key="valores" className="inline-flex items-center gap-1 align-middle">
+                    <CirculoValor
+                      texto={percentual.format(aluno.taxa)}
+                      rotulo={`${percentual.format(aluno.taxa)} de ausência`}
+                    />
+                    <CirculoValor texto={dias} rotulo={`ausente em ${dias} com chamada`} />
+                  </span>,
                   aluno.emRisco ? "Ausência (em risco)" : "Ausência",
                 ];
               }}

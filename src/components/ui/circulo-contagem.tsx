@@ -1,4 +1,5 @@
-// Círculo de contagem: valor e sigla (F, FJ ou S) do acumulado e dos relatórios.
+// Círculos de contagem: valor e sigla (F, FJ ou S) do acumulado e dos relatórios,
+// e o círculo neutro que separa números nos gráficos, no lugar de pontos.
 import { cn } from "@/lib/utils";
 
 type TomContagem = "falta" | "justificada" | "saida";
@@ -34,6 +35,27 @@ export function CirculoContagem({ valor, sigla, tom, singular, plural }: Circulo
       <span aria-hidden="true">
         {valor} {sigla}
       </span>
+    </span>
+  );
+}
+
+interface CirculoValorProps {
+  /** Texto visível dentro do círculo, por exemplo 27 ou 35,5%. */
+  texto: string;
+  /** Leitura por extenso para leitores de tela, por exemplo "27 faltas". */
+  rotulo: string;
+}
+
+/** Um número isolado em círculo neutro; vários lado a lado se separam sem pontos. */
+export function CirculoValor({ texto, rotulo }: CirculoValorProps) {
+  return (
+    <span
+      role="img"
+      title={rotulo}
+      aria-label={rotulo}
+      className="numerais-tabulares bg-secondary text-foreground border-border inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] leading-none font-semibold"
+    >
+      <span aria-hidden="true">{texto}</span>
     </span>
   );
 }
