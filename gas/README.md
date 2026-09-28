@@ -26,6 +26,16 @@ Marcador antigo com valor `linha:2`, preso à linha inteira, continua
 reconhecido pela localização; metadado de outro tipo com essas chaves é
 ignorado. Uma linha só é criada se estiver inteira vazia e sem fórmula.
 
+Desde a versão 3, cada linha de aluno também guarda o código do aluno no
+aplicativo, na chave `frequenciapp.aluno`, com o id do aluno como valor. A
+leitura devolve os códigos por linha (`alunosDasLinhas`), e o aplicativo acha
+o aluno pelo código, mesmo que o nome mude, se repita ou a linha seja movida
+ou ordenada. A operação `vincularLinhas` grava o código em linha existente
+só se a célula do nome ainda mostrar o texto lido na prévia; `criarLinhas`
+grava o código junto com a linha. Cada linha tem no máximo um código e cada
+código fica em uma linha só. A restauração de cópia recria os códigos da
+cópia.
+
 ## Cópias e restauração
 
 A cópia se chama `_frequenciapp_backup_<aba>_<yyyyMMdd-HHmmss-SSS>`, com
@@ -62,7 +72,7 @@ log do servidor e para o último erro do cartão da integração.
 
 A cada mudança no código, publique uma nova versão da implantação em
 Implantar, Gerenciar implantações, editar, Nova versão; o endereço `/exec`
-continua o mesmo. O script declara a `VERSAO` (hoje 2) e o aplicativo avisa
+continua o mesmo. O script declara a `VERSAO` (hoje 3) e o aplicativo avisa
 no Testar conexão quando a versão publicada está atrasada. O teste
 `tests/unit/gas.test.ts` guarda o hash de cada versão e falha quando o
 `Codigo.gs` muda sem uma `VERSAO` nova.

@@ -1291,6 +1291,91 @@ describe("Apps Script: token", () => {
   });
 });
 
+const ALICE_ID = "11111111-1111-4111-8111-111111111111";
+const BRUNO_ID = "22222222-2222-4222-8222-222222222222";
+const CARLA_ID = "33333333-3333-4333-8333-333333333333";
+
+function vinculos(contexto: Contexto) {
+  return (ler(contexto) as unknown as { alunosDasLinhas: { linha: number; alunoId: string }[] })
+    .alunosDasLinhas;
+}
+
+describe("Apps Script: código do aluno na linha", () => {
+  it("vincula a linha pelo nome conferido e devolve o código na leitura", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [
+      {
+        tipo: "vincularLinhas",
+        itens: [
+          { linha: 2, coluna: 1, nome: "Alice", alunoId: ALICE_ID },
+          { linha: 3, coluna: 1, nome: "Bruno", alunoId: BRUNO_ID },
+        ],
+      },
+    ]);
+    expect(resposta.dados).toMatchObject({ vinculadas: 2, puladasVinculo: 0 });
+    expect(vinculos(local)).toEqual([
+      { linha: 2, alunoId: ALICE_ID },
+      { linha: 3, alunoId: BRUNO_ID },
+    ]);
+  });
+
+  it("pula o vínculo quando o nome da linha mudou desde a prévia", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [
+      {
+        tipo: "vincularLinhas",
+        itens: [{ linha: 2, coluna: 1, nome: "Bruno", alunoId: BRUNO_ID }],
+      },
+    ]);
+    expect(resposta.dados).toMatchObject({ vinculadas: 0, puladasVinculo: 1 });
+    expect(vinculos(local)).toEqual([]);
+  });
+
+  it("recusa código fora do formato", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [
+      { tipo: "vincularLinhas", itens: [{ linha: 2, coluna: 1, nome: "Alice", alunoId: "x" }] },
+    ]);
+    expect(resposta.ok).toBe(false);
+  });
+
+  it("grava o código na linha criada e o mantém quando uma linha entra acima", () => {
+    const local = montarContexto();
+    const resposta = aplicar(local, [
+      {
+        tipo: "criarLinhas",
+        itens: [{ linha: 4, alunoId: CARLA_ID, celulas: [{ coluna: 1, valor: "Carla" }] }],
+      },
+    ]);
+    expect(resposta.ok).toBe(true);
+    local.aba.insertRowsBefore(2, 1);
+    expect(vinculos(local)).toEqual([{ linha: 5, alunoId: CARLA_ID }]);
+  });
+
+  it("mantém uma linha por aluno e um aluno por linha", () => {
+    const local = montarContexto();
+    aplicar(local, [
+      {
+        tipo: "vincularLinhas",
+        itens: [{ linha: 2, coluna: 1, nome: "Alice", alunoId: ALICE_ID }],
+      },
+    ]);
+    aplicar(local, [
+      {
+        tipo: "vincularLinhas",
+        itens: [{ linha: 3, coluna: 1, nome: "Bruno", alunoId: ALICE_ID }],
+      },
+    ]);
+    aplicar(local, [
+      {
+        tipo: "vincularLinhas",
+        itens: [{ linha: 3, coluna: 1, nome: "Bruno", alunoId: BRUNO_ID }],
+      },
+    ]);
+    expect(vinculos(local)).toEqual([{ linha: 3, alunoId: BRUNO_ID }]);
+  });
+});
+
 /**
  * Histórico do script publicado. Qualquer mudança no gas/Codigo.gs muda o
  * hash e exige nova entrada com versão maior, o que obriga a subir a VERSAO
@@ -1299,6 +1384,7 @@ describe("Apps Script: token", () => {
 const VERSOES_DO_SCRIPT = [
   { versao: 1, sha256: "1fe567b6391975de778c75b285a8a4e6d2b879e340d3079c3b0bc45ece75550b" },
   { versao: 2, sha256: "3b4a451026e87f8eb9634b7ed0b6d520dbf2d08602c8374f261c03df4b9c9faa" },
+  { versao: 3, sha256: "b10946c2d7497c2f4b2cf02e53bbf17e9fc5ddad7b801f7e8509ff6f52a0b933" },
 ];
 
 describe("Apps Script: versão", () => {

@@ -18,7 +18,7 @@ Integração opcional da administração com a planilha da escola, por Google Ap
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como a própria conta e permita acesso a qualquer pessoa. Autorize.
 5. Copie o endereço terminado em `/exec`, cole no aplicativo e use Testar conexão.
 
-Cada mudança no código pede uma nova versão da implantação, em Implantar, Gerenciar implantações, Nova versão; o endereço `/exec` não muda. O script está na versão 2, e o Testar conexão avisa quando a versão publicada é outra. Um teste de unidade guarda o hash de cada versão e falha se o `gas/Codigo.gs` mudar sem versão nova.
+Cada mudança no código pede uma nova versão da implantação, em Implantar, Gerenciar implantações, Nova versão; o endereço `/exec` não muda. O script está na versão 3, e o Testar conexão avisa quando a versão publicada é outra. O envio de frequência exige a versão 3: com a anterior, a prévia pede a publicação da versão atual. Um teste de unidade guarda o hash de cada versão e falha se o `gas/Codigo.gs` mudar sem versão nova.
 
 O script marca cada linha e coluna que cria com Developer Metadata na linha ou coluna inteira, único alvo que o Google aceita além da aba e da planilha. A posição é lida da localização do marcador, que acompanha a linha ou coluna quando outras são inseridas ou removidas antes dela; o valor não carrega posição. Assim a remoção fica restrita ao que a integração criou, mesmo depois de edição manual acima. Marcador antigo com valor `linha:2` na linha inteira continua reconhecido.
 
@@ -43,13 +43,15 @@ A prévia mostra:
 - alunos novos que serão acrescentados no fim do bloco;
 - divergências existentes, apenas listadas no modo conservador.
 
+**Identificação do aluno.** Cada linha de aluno guarda, de forma invisível, o código do aluno no aplicativo. O envio acha a linha pelo código; o nome só é usado para vincular uma linha que ainda não tem código, e apenas quando ele é único na turma e na aba. A prévia informa quantas linhas ganham o código. Alunos com o mesmo nome na turma não são vinculados pelo nome: o aviso pede conferência, para as marcas nunca irem para o aluno errado. A leitura vai até a última linha com conteúdo da aba, e a linha de aluno novo entra depois dela. O mapa aceita uma aba por turma original.
+
 Depois de revisar, o envio recalcula tudo e exige o mesmo hash de plano. Se alguém salvou uma chamada ou editou a planilha no meio do caminho, o aplicativo recusa e pede nova prévia. Na gravação, cada célula é conferida outra vez: o que estiver ocupado ou com fórmula é pulado e relatado.
 
 ## Modo completo
 
 O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 
-- atualização de células divergentes, inclusive nome e turma atual quando o aluno é encontrado pelo nome normalizado (renomeações completas sem correspondência pedem ajuste manual, porque não há identificador na planilha);
+- atualização de células divergentes, inclusive nome e turma atual do aluno encontrado pelo código da linha ou, antes do primeiro vínculo, pelo nome único;
 - limpeza de células indicadas;
 - remoção de linhas criadas pela integração para alunos que saíram da turma;
 - remoção de colunas de dia e de abas criadas pela integração, com confirmação.

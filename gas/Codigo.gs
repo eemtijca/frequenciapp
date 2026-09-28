@@ -7,7 +7,7 @@
  * integração não tenha criado, e célula com fórmula nunca é sobrescrita.
  */
 
-var VERSAO = 2;
+var VERSAO = 3;
 var PROP_TOKEN = "FREQUENCIAPP_TOKEN";
 var PROP_PLANILHA = "PLANILHA_ID";
 var MAX_LER_CELULAS = 20000;
@@ -23,6 +23,10 @@ var MARCADOR_LINHA = "frequenciapp.linha";
 var MARCADOR_COLUNA = "frequenciapp.coluna";
 var MARCADOR_ABA = "frequenciapp.aba";
 var MARCADOR_COPIA = "frequenciapp.copia";
+// Código do aluno na linha: o id do aplicativo, para achar o aluno mesmo que
+// o nome mude, se repita ou a linha mude de lugar.
+var MARCADOR_ALUNO = "frequenciapp.aluno";
+var ID_ALUNO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Carimbo da cópia: data, hora, milissegundos opcionais e sufixo de desempate. */
 var CARIMBO_COPIA = /^(\d{8})-(\d{6})(?:-\d{3})?(?:-[a-z0-9]+)?$/;
 var VALOR_MARCADOR = "1";
@@ -204,6 +208,7 @@ function acaoLer(corpo) {
       }),
       linhasCriadas: marcadores(aba, MARCADOR_LINHA),
       colunasCriadas: marcadores(aba, MARCADOR_COLUNA),
+      alunosDasLinhas: alunosDasLinhas(aba),
     },
   };
 }
@@ -301,6 +306,8 @@ function acaoAplicar(corpo) {
     linhasCriadas: 0,
     puladasOcupadas: 0,
     puladasFormula: 0,
+    vinculadas: 0,
+    puladasVinculo: 0,
   };
   var copiaAtual = null;
   for (var i = 0; i < operacoes.length; i += 1) {
@@ -321,6 +328,9 @@ function acaoAplicar(corpo) {
         break;
       case "criarLinhas":
         resultado = aplicarCriarLinhas(aba, operacao, contagem);
+        break;
+      case "vincularLinhas":
+        resultado = aplicarVincularLinhas(aba, operacao, contagem);
         break;
       case "removerColunas":
         resultado = aplicarRemoverColunas(aba, operacao, contagem);
@@ -441,10 +451,35 @@ function aplicarCriarLinhas(aba, operacao, contagem) {
       continue;
     }
     marcarLinha(aba, item.linha);
+    if (ID_ALUNO.test(String(item.alunoId || ""))) vincularAluno(aba, item.linha, item.alunoId);
     for (var d = 0; d < celulas.length; d += 1) {
       aba.getRange(item.linha, celulas[d].coluna).setValue(celulas[d].valor);
     }
     contagem.linhasCriadas += 1;
+  }
+  return null;
+}
+
+/**
+ * Grava o código do aluno em linhas que já existem. A célula do nome precisa
+ * mostrar o mesmo texto lido na prévia: se a linha mudou de lugar ou de dono
+ * no intervalo, o vínculo é pulado em vez de cair no aluno errado.
+ */
+function aplicarVincularLinhas(aba, operacao, contagem) {
+  var itens = operacao.itens || [];
+  for (var i = 0; i < itens.length; i += 1) {
+    var item = itens[i];
+    var linha = numeroPositivo(item.linha, 0);
+    var coluna = numeroPositivo(item.coluna, 0);
+    if (!linha || !coluna || !ID_ALUNO.test(String(item.alunoId || ""))) {
+      return { ok: false, erro: "Vínculo de aluno inválido." };
+    }
+    if (!conferePrevio(aba.getRange(linha, coluna), { anterior: item.nome })) {
+      contagem.puladasVinculo += 1;
+      continue;
+    }
+    vincularAluno(aba, linha, item.alunoId);
+    contagem.vinculadas += 1;
   }
   return null;
 }
@@ -661,6 +696,7 @@ function acaoRestaurarCopia(corpo) {
   removerMarcadoresDeAba(atual, MARCADOR_COPIA);
   recriarMarcadores(copia, atual, MARCADOR_LINHA);
   recriarMarcadores(copia, atual, MARCADOR_COLUNA);
+  recriarVinculos(copia, atual);
   if (atual.isSheetHidden()) atual.showSheet();
   SpreadsheetApp.flush();
   podarCopias(nomeAba);
@@ -679,6 +715,16 @@ function recriarMarcadores(origem, destino, chave) {
   for (var j = 0; j < posicoes.length; j += 1) {
     if (chave === MARCADOR_LINHA) marcarLinha(destino, posicoes[j]);
     else marcarColuna(destino, posicoes[j]);
+  }
+}
+
+/** Troca os códigos de aluno do destino pelos da origem, linha a linha. */
+function recriarVinculos(origem, destino) {
+  var achados = destino.createDeveloperMetadataFinder().withKey(MARCADOR_ALUNO).find();
+  for (var i = 0; i < achados.length; i += 1) achados[i].remove();
+  var vinculos = alunosDasLinhas(origem);
+  for (var j = 0; j < vinculos.length; j += 1) {
+    vincularAluno(destino, vinculos[j].linha, vinculos[j].alunoId);
   }
 }
 
@@ -807,6 +853,42 @@ function marcarLinha(aba, linha) {
 function marcarColuna(aba, coluna) {
   var letra = aba.getRange(1, coluna).getA1Notation().replace(/\d+$/, "");
   aba.getRange(letra + ":" + letra).addDeveloperMetadata(MARCADOR_COLUNA, VALOR_MARCADOR);
+}
+
+/**
+ * Códigos de aluno por linha, lidos da localização do metadado, que acompanha
+ * a linha quando outras entram, saem ou a aba é ordenada.
+ */
+function alunosDasLinhas(aba) {
+  var tipos = SpreadsheetApp.DeveloperMetadataLocationType;
+  var achados = aba.createDeveloperMetadataFinder().withKey(MARCADOR_ALUNO).find();
+  var vinculos = [];
+  for (var i = 0; i < achados.length; i += 1) {
+    var local = achados[i].getLocation();
+    if (local.getLocationType() !== tipos.ROW) continue;
+    var faixa = local.getRow();
+    var linha = faixa ? faixa.getRow() : 0;
+    var alunoId = String(achados[i].getValue() || "");
+    if (linha > 0 && ID_ALUNO.test(alunoId)) vinculos.push({ linha: linha, alunoId: alunoId });
+  }
+  vinculos.sort(function (a, b) {
+    return a.linha - b.linha;
+  });
+  return vinculos;
+}
+
+/** Um código por linha e uma linha por código: o vínculo novo substitui os antigos. */
+function vincularAluno(aba, linha, alunoId) {
+  var tipos = SpreadsheetApp.DeveloperMetadataLocationType;
+  var achados = aba.createDeveloperMetadataFinder().withKey(MARCADOR_ALUNO).find();
+  for (var i = 0; i < achados.length; i += 1) {
+    var local = achados[i].getLocation();
+    if (local.getLocationType() !== tipos.ROW) continue;
+    var faixa = local.getRow();
+    var mesmaLinha = faixa && faixa.getRow() === linha;
+    if (mesmaLinha || achados[i].getValue() === alunoId) achados[i].remove();
+  }
+  aba.getRange(linha + ":" + linha).addDeveloperMetadata(MARCADOR_ALUNO, alunoId);
 }
 
 function temMarcador(aba, chave) {

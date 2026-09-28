@@ -36,6 +36,7 @@ import {
   montarTurmaPlanilha,
   planejarSincronizacao,
   resultadoDeFalha,
+  VERSAO_SCRIPT,
   type AbaEsquema,
   type AbaBruta,
   type CelulaPlano,
@@ -340,6 +341,13 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Estrutura inválida.", 400);
   }
   const turmas = await listarTodasTurmas();
+  // Uma aba por turma original: duas abas gravariam a mesma turma duas vezes.
+  const repetida = turmas.find(
+    (turma) => dados.data.mapa.filter((item) => item.turmaOriginalId === turma.id).length > 1,
+  );
+  if (repetida) {
+    throw new ErroHttp(`A turma ${repetida.rotulo} está em mais de uma aba. Escolha só uma.`, 400);
+  }
   for (const item of dados.data.mapa) {
     if (!turmas.some((turma) => turma.id === item.turmaOriginalId)) {
       throw new ErroHttp("Turma de origem não encontrada.", 404);
@@ -430,14 +438,23 @@ async function montarSimulacao(
       colunaInicial: number;
       linhasCriadas: number[];
       colunasCriadas: number[];
+      alunosDasLinhas?: { linha: number; alunoId: string }[];
     }>(endpoint, token, {
       acao: "ler",
       aba: par.aba,
       linhaInicial: 1,
       colunaInicial: 1,
-      linhas: Math.max(esquemaAba.ultimaLinhaDados + 20, 2),
+      // Sem limite de linhas: o script lê até a última linha com conteúdo, e
+      // a linha de aluno novo nunca cai sobre uma linha que o esquema salvo
+      // ainda não conhecia.
       colunas: Math.max(esquemaAba.ultimaColunaDados + 5, 2),
     });
+    if (!leitura.alunosDasLinhas) {
+      throw new ErroHttp(
+        `O script da planilha está desatualizado. Publique a versão ${VERSAO_SCRIPT} do gas/Codigo.gs antes de enviar.`,
+        409,
+      );
+    }
     const conteudo: LeituraAba = {
       nome: par.aba,
       valores: leitura.valores,
@@ -446,6 +463,7 @@ async function montarSimulacao(
       colunaInicial: leitura.colunaInicial,
       linhasCriadas: leitura.linhasCriadas,
       colunasCriadas: leitura.colunasCriadas,
+      alunosDasLinhas: leitura.alunosDasLinhas,
     };
     const plano = planejarSincronizacao(esquemaAba, turmaPlanilha, conteudo, {
       ...opcoesBase,
@@ -611,6 +629,18 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
   const operacoes: Record<string, unknown>[] = [];
   const colunaAluno = esquema.colunas.find((coluna) => coluna.tipo === "aluno")?.indice ?? 1;
   const colunaTurma = esquema.colunas.find((coluna) => coluna.tipo === "turma")?.indice;
+  // O vínculo vai primeiro, com as coordenadas exatamente como foram lidas.
+  if (plano.vincular.length > 0) {
+    operacoes.push({
+      tipo: "vincularLinhas",
+      itens: plano.vincular.map((item) => ({
+        linha: item.linha,
+        coluna: item.coluna,
+        nome: item.nome,
+        alunoId: item.alunoId,
+      })),
+    });
+  }
   if (plano.novasColunas.length > 0) {
     const total = esquema.colunas.find((coluna) => coluna.tipo === "total");
     operacoes.push({
@@ -626,6 +656,7 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
       itens: [
         {
           linha: aluno.linha,
+          alunoId: aluno.alunoId,
           celulas: [
             { coluna: colunaAluno, valor: aluno.nome },
             ...(colunaTurma ? [{ coluna: colunaTurma, valor: aluno.turmaAtual }] : []),
