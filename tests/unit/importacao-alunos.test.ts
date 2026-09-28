@@ -1,30 +1,24 @@
-// Leitura das relações de turma e plano de importação: formato com quebra de
-// linha escrita como texto, rótulos de turma, casamento sem acento, mudanças,
-// novos, desativados e bloqueios. Nomes fictícios.
+// Relação de alunos em CSV: schema, validação por linha, exportação com ida e
+// volta e plano de importação (casamento sem acento, mudanças, novos,
+// desativados e bloqueios). Nomes fictícios.
 import { describe, expect, it } from "vitest";
 import {
+  CABECALHO_RELACAO,
   chaveDeTurma,
-  lerRelacoes,
+  lerRelacaoCsv,
   planejarImportacao,
+  relacaoParaCsv,
   type AlunoCadastrado,
 } from "@/domain/importacao-alunos";
 
-// Travessão das relações originais, sem o caractere no código-fonte.
-const TRAVESSAO = String.fromCharCode(0x2014);
 const turmas = [
   { id: "t-a", rotulo: "3º ano A" },
   { id: "t-b", rotulo: "3º ano B" },
   { id: "t-1a", rotulo: "1º ano A" },
 ];
 
-function relacao(turma: string, linhas: string[], total = linhas.length): string {
-  return [
-    `RELAÇÃO ATUAL ${TRAVESSAO} ${turma}`,
-    "Aplicativo de chamada | atualizado em 28/09/2026",
-    `Total de estudantes: ${total}`,
-    "",
-    ...linhas,
-  ].join("\n");
+function csv(linhas: string[], cabecalho = CABECALHO_RELACAO): string {
+  return [cabecalho, ...linhas].join("\n");
 }
 
 function cadastrado(parcial: Partial<AlunoCadastrado> & { id: string; nome: string }) {
@@ -37,29 +31,87 @@ function cadastrado(parcial: Partial<AlunoCadastrado> & { id: string; nome: stri
   };
 }
 
-describe("lerRelacoes", () => {
-  it("aceita quebra de linha escrita como texto e separadores variados", () => {
-    const texto = `RELAÇÃO ATUAL ${TRAVESSAO} 3º A\\nTotal de estudantes: 2\\n\\nANA TESTE ${TRAVESSAO} Turma original: 3º A\\nBRUNO EXEMPLO - Turma original: 3º B\\n`;
-    const leitura = lerRelacoes(texto);
+describe("lerRelacaoCsv", () => {
+  it("lê BOM, CRLF, aspas e agrupa por turma na ordem informada", () => {
+    const texto = `﻿${CABECALHO_RELACAO}\r\n3º A;2;"SILVA; ANA";3º B\r\n3º ano A;1;BRUNO TESTE;3º A\r\n3º B;1;CAIO  EXEMPLO;3º A\r\n`;
+    const leitura = lerRelacaoCsv(texto);
     expect(leitura.erros).toEqual([]);
     expect(leitura.relacoes).toEqual([
       {
         turma: "3º A",
-        totalDeclarado: 2,
         alunos: [
-          { nome: "ANA TESTE", origem: "3º A", posicao: 1, linha: 4 },
-          { nome: "BRUNO EXEMPLO", origem: "3º B", posicao: 2, linha: 5 },
+          { nome: "BRUNO TESTE", origem: "3º A", linha: 3, posicao: 1 },
+          { nome: "SILVA; ANA", origem: "3º B", linha: 2, posicao: 2 },
         ],
       },
+      { turma: "3º B", alunos: [{ nome: "CAIO EXEMPLO", origem: "3º A", linha: 4, posicao: 1 }] },
     ]);
   });
 
-  it("aponta a linha fora do formato e o texto sem cabeçalho", () => {
-    expect(lerRelacoes("ANA TESTE").erros[0]).toContain("Nenhuma relação");
-    const leitura = lerRelacoes(
-      relacao("3º A", [`ANA TESTE ${TRAVESSAO} Turma original: 3º A`, "linha solta"]),
+  it("aceita vírgula como separador", () => {
+    const leitura = lerRelacaoCsv("turma_atual,ordem,nome,turma_original\n3º A,1,ANA,3º A");
+    expect(leitura.erros).toEqual([]);
+    expect(leitura.relacoes[0]?.alunos[0]?.nome).toBe("ANA");
+  });
+
+  it("recusa arquivo vazio, sem alunos ou com cabeçalho fora do padrão", () => {
+    expect(lerRelacaoCsv("").erros).toEqual(["O arquivo está vazio."]);
+    expect(lerRelacaoCsv(CABECALHO_RELACAO).erros).toEqual(["O arquivo não tem nenhum aluno."]);
+    expect(lerRelacaoCsv("nome;turma\nANA;3º A").erros[0]).toContain(
+      "o cabeçalho precisa ser exatamente turma_atual;ordem;nome;turma_original",
     );
-    expect(leitura.erros).toEqual(['Linha 6: fora do formato "NOME, Turma original: turma".']);
+  });
+
+  it("aponta cada linha fora do padrão com o número e o problema", () => {
+    const leitura = lerRelacaoCsv(
+      csv([
+        "3º A;1;ANA TESTE;3º A",
+        "3º A;2;BRUNO",
+        ";x;B;",
+        "3º A;1;CARLA TESTE;3º B",
+        "",
+        "3º A;3;DIEGO TESTE;3º A",
+      ]),
+    );
+    expect(leitura.erros).toEqual([
+      "Linha 3: esperadas 4 colunas, encontradas 3.",
+      "Linha 4: turma_atual vazia; ordem precisa ser um número inteiro de 1 a 9999; nome precisa ter de 2 a 100 caracteres; turma_original vazia.",
+      "Linha 5: a ordem 1 já foi usada na turma 3º A.",
+    ]);
+    expect(leitura.relacoes[0]?.alunos.map((aluno) => aluno.nome)).toEqual([
+      "ANA TESTE",
+      "DIEGO TESTE",
+    ]);
+  });
+});
+
+describe("relacaoParaCsv", () => {
+  it("exporta no mesmo schema e volta idêntico na leitura", () => {
+    const texto = relacaoParaCsv([
+      { turmaAtual: "3º ano A", ordem: 4, nome: "ANA; TESTE", turmaOriginal: "3º ano B" },
+      { turmaAtual: "3º ano A", ordem: 9, nome: "=HIPERLINK(1)", turmaOriginal: "3º ano A" },
+      { turmaAtual: "3º ano B", ordem: 2, nome: 'BRUNO "BIBI"', turmaOriginal: "3º ano B" },
+    ]);
+    expect(texto.startsWith(`﻿${CABECALHO_RELACAO}\r\n`)).toBe(true);
+    expect(texto).toContain('3º ano A;1;"ANA; TESTE";3º ano B\r\n');
+    expect(texto).toContain("3º ano A;2;'=HIPERLINK(1);3º ano A\r\n");
+    const leitura = lerRelacaoCsv(texto);
+    expect(leitura.erros).toEqual([]);
+    expect(
+      leitura.relacoes.map((relacao) => [
+        relacao.turma,
+        relacao.alunos.map((aluno) => [aluno.posicao, aluno.nome, aluno.origem]),
+      ]),
+    ).toEqual([
+      [
+        "3º ano A",
+        [
+          [1, "ANA; TESTE", "3º ano B"],
+          [2, "=HIPERLINK(1)", "3º ano A"],
+        ],
+      ],
+      ["3º ano B", [[1, 'BRUNO "BIBI"', "3º ano B"]]],
+    ]);
   });
 });
 
@@ -72,14 +124,12 @@ describe("chaveDeTurma", () => {
 });
 
 describe("planejarImportacao", () => {
-  const texto = [
-    relacao("3º A", [
-      `ÁLVARO TESTE ${TRAVESSAO} Turma original: 3º B`,
-      `BEATRIZ EXEMPLO ${TRAVESSAO} Turma original: 3º A`,
-      `CAIO NOVO ${TRAVESSAO} Turma original: 3º A`,
-    ]),
-    relacao("3º B", [`DANIELA  REATIVADA ${TRAVESSAO} Turma original: 3º B`], 2),
-  ].join("\n\n");
+  const texto = csv([
+    "3º A;1;ÁLVARO TESTE;3º B",
+    "3º A;2;BEATRIZ EXEMPLO;3º A",
+    "3º A;3;CAIO NOVO;3º A",
+    "3º B;1;DANIELA  REATIVADA;3º B",
+  ]);
   const alunos = [
     cadastrado({ id: "a1", nome: "Alvaro Teste", turmaId: "t-b", turmaOriginalId: "t-b" }),
     cadastrado({ id: "a2", nome: "Beatriz Exemplo", ordem: 2 }),
@@ -87,7 +137,7 @@ describe("planejarImportacao", () => {
     cadastrado({ id: "a4", nome: "Eduardo Saiu", ordem: 3 }),
     cadastrado({ id: "a5", nome: "Fora da Serie", turmaId: "t-1a", turmaOriginalId: "t-1a" }),
   ];
-  const plano = planejarImportacao(lerRelacoes(texto), turmas, alunos);
+  const plano = planejarImportacao(lerRelacaoCsv(texto), turmas, alunos);
 
   it("casa sem acento e mantém o id do aluno cadastrado", () => {
     expect(plano.bloqueios).toEqual([]);
@@ -98,8 +148,10 @@ describe("planejarImportacao", () => {
 
   it("classifica ordem, origem, reativação e aluno novo", () => {
     expect(plano.itens.find((item) => item.alunoId === "a2")?.mudancas).toEqual([]);
-    const daniela = plano.itens.find((item) => item.alunoId === "a3");
-    expect(daniela?.mudancas).toEqual(["origem", "reativar"]);
+    expect(plano.itens.find((item) => item.alunoId === "a3")?.mudancas).toEqual([
+      "origem",
+      "reativar",
+    ]);
     expect(plano.itens.find((item) => item.nome === "CAIO NOVO")).toMatchObject({
       alunoId: null,
       turmaId: "t-a",
@@ -107,36 +159,34 @@ describe("planejarImportacao", () => {
     });
   });
 
-  it("desativa quem está nas turmas importadas e não aparece nas relações", () => {
+  it("desativa quem está nas turmas importadas e não aparece na relação", () => {
     expect(plano.desativar).toEqual([{ alunoId: "a4", nome: "Eduardo Saiu", turmaId: "t-a" }]);
-  });
-
-  it("resume as turmas e avisa o total diferente do cabeçalho", () => {
     expect(plano.turmas.map((turma) => [turma.rotulo, turma.alunos])).toEqual([
       ["3º ano A", 3],
       ["3º ano B", 1],
     ]);
-    expect(plano.avisos).toEqual(["3º ano B: o cabeçalho diz 2 e a lista tem 1."]);
   });
 
-  it("bloqueia turma desconhecida, homônimo no cadastro e nome repetido", () => {
+  it("bloqueia erro de schema, turma desconhecida, homônimo e nome repetido", () => {
     const bloqueado = planejarImportacao(
-      lerRelacoes(
-        relacao("3º A", [
-          `ANA DUPLA ${TRAVESSAO} Turma original: 3º Z`,
-          `BIA IGUAL ${TRAVESSAO} Turma original: 3º A`,
-          `CÉLIA REPETIDA ${TRAVESSAO} Turma original: 3º A`,
-          `CELIA REPETIDA ${TRAVESSAO} Turma original: 3º A`,
+      lerRelacaoCsv(
+        csv([
+          "3º A;1;ANA DUPLA;3º Z",
+          "3º A;2;BIA IGUAL;3º A",
+          "3º A;3;CÉLIA REPETIDA;3º A",
+          "3º A;4;CELIA REPETIDA;3º A",
+          "3º A;x;DIEGO;3º A",
         ]),
       ),
       turmas,
       [cadastrado({ id: "b1", nome: "Bia Igual" }), cadastrado({ id: "b2", nome: "BIA IGUAL" })],
     );
     expect(bloqueado.bloqueios).toEqual([
+      "Linha 6: ordem precisa ser um número inteiro de 1 a 9999.",
       'A turma "3º Z" não está cadastrada.',
       "BIA IGUAL corresponde a mais de um aluno cadastrado.",
-      "CÉLIA REPETIDA aparece mais de uma vez nas relações.",
-      "CELIA REPETIDA aparece mais de uma vez nas relações.",
+      "CÉLIA REPETIDA aparece mais de uma vez no arquivo.",
+      "CELIA REPETIDA aparece mais de uma vez no arquivo.",
     ]);
   });
 });

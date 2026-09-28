@@ -1,6 +1,22 @@
-// Leitura das relações de turma em texto ("RELAÇÃO ATUAL" com a turma atual e,
-// por aluno, a turma original) e o casamento com o cadastro. Regras puras.
+// Relação de alunos em CSV: o schema padrão, a leitura com validação por
+// linha, a exportação no mesmo formato e o casamento com o cadastro. Regras puras.
 import { normalizar } from "@/domain/frequencia";
+
+/**
+ * Schema da relação de alunos. Uma linha por aluno, com cabeçalho fixo nesta
+ * ordem. Separador ponto e vírgula (a vírgula também é aceita na leitura),
+ * UTF-8 com ou sem BOM e aspas duplas para campos com separador ou aspas.
+ */
+export const COLUNAS_RELACAO = ["turma_atual", "ordem", "nome", "turma_original"] as const;
+export const CABECALHO_RELACAO = COLUNAS_RELACAO.join(";");
+/** Descrição curta de cada coluna, para a ajuda da interface e a documentação. */
+export const AJUDA_COLUNAS_RELACAO: Record<(typeof COLUNAS_RELACAO)[number], string> = {
+  turma_atual: "turma em que o aluno faz a chamada, como cadastrada (3º ano A ou 3º A)",
+  ordem: "posição do aluno na chamada da turma, de 1 em diante, sem repetir",
+  nome: "nome do aluno, de 2 a 100 caracteres",
+  turma_original: "turma original do aluno, pela qual a frequência é consolidada",
+};
+const MAXIMO_LINHAS = 5000;
 
 /** Aluno lido de uma relação, na posição em que aparece. */
 export interface AlunoDaRelacao {
@@ -10,10 +26,9 @@ export interface AlunoDaRelacao {
   linha: number;
 }
 
-/** Uma relação: a turma atual, o total declarado no cabeçalho e os alunos. */
+/** Uma relação: a turma atual e os alunos, na ordem da chamada. */
 export interface Relacao {
   turma: string;
-  totalDeclarado: number | null;
   alunos: AlunoDaRelacao[];
 }
 
@@ -21,12 +36,6 @@ export interface LeituraDasRelacoes {
   relacoes: Relacao[];
   erros: string[];
 }
-
-// Travessão, meia-risca ou hífen separam os campos das linhas.
-const SEPARADOR = "\\s*[\\u2014\\u2013-]\\s*";
-const CABECALHO = new RegExp(`^rela[cç][aã]o atual${SEPARADOR}(.+)$`, "i");
-const LINHA_ALUNO = new RegExp(`^(.+?)${SEPARADOR}turma original:\\s*(.+)$`, "i");
-const TOTAL = /^total de (?:estudantes|alunos):\s*(\d+)/i;
 
 /** Nome como chave de comparação: sem acento, sem caixa e com espaços simples. */
 export function chaveDeNome(nome: string): string {
@@ -44,51 +53,155 @@ export function chaveDeTurma(rotulo: string): string {
     .trim();
 }
 
-/**
- * Lê uma ou mais relações coladas ou vindas de arquivos. Aceita quebras de
- * linha reais ou escritas como "\n" no texto. Linhas fora do formato que não
- * sejam cabeçalho viram erro com o número da linha.
- */
-export function lerRelacoes(texto: string): LeituraDasRelacoes {
-  const linhas = texto.replace(/\\n/g, "\n").split(/\r?\n/);
-  const relacoes: Relacao[] = [];
-  const erros: string[] = [];
-  let atual: Relacao | null = null;
-  linhas.forEach((bruta, indice) => {
-    const linha = bruta.trim();
-    if (linha === "") return;
-    const cabecalho = CABECALHO.exec(linha);
-    if (cabecalho) {
-      atual = { turma: (cabecalho[1] ?? "").trim(), totalDeclarado: null, alunos: [] };
-      relacoes.push(atual);
-      return;
-    }
-    const total = TOTAL.exec(linha);
-    if (total) {
-      if (atual) atual.totalDeclarado = Number(total[1]);
-      return;
-    }
-    const aluno = LINHA_ALUNO.exec(linha);
-    if (aluno) {
-      if (!atual) {
-        erros.push(`Linha ${indice + 1}: aluno antes do cabeçalho "RELAÇÃO ATUAL".`);
-        return;
+/** Campo seguro para CSV: sem fórmula e com aspas quando precisa. */
+function campo(valor: string): string {
+  const semFormula = /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
+  return /[";\r\n]/.test(semFormula) ? `"${semFormula.replace(/"/g, '""')}"` : semFormula;
+}
+
+/** Desfaz a proteção contra fórmula aplicada na exportação. */
+function semProtecao(valor: string): string {
+  return /^'[=+\-@]/.test(valor) ? valor.slice(1) : valor;
+}
+
+/** Registros do CSV com aspas duplas, separador dado e o número da linha de cada um. */
+function registros(texto: string, separador: string): { campos: string[]; linha: number }[] {
+  const saida: { campos: string[]; linha: number }[] = [];
+  let campos: string[] = [];
+  let atual = "";
+  let entreAspas = false;
+  let linha = 1;
+  let inicio = 1;
+  for (let indice = 0; indice < texto.length; indice += 1) {
+    const caractere = texto[indice] ?? "";
+    if (entreAspas) {
+      if (caractere === '"' && texto[indice + 1] === '"') {
+        atual += '"';
+        indice += 1;
+      } else if (caractere === '"') {
+        entreAspas = false;
+      } else {
+        if (caractere === "\n") linha += 1;
+        atual += caractere;
       }
-      atual.alunos.push({
-        nome: (aluno[1] ?? "").replace(/\s+/g, " ").trim(),
-        origem: (aluno[2] ?? "").trim(),
-        posicao: atual.alunos.length + 1,
-        linha: indice + 1,
-      });
-      return;
+      continue;
     }
-    // Linhas de identificação do documento, sem aluno, são ignoradas.
-    if (!atual || atual.alunos.length === 0) return;
-    erros.push(`Linha ${indice + 1}: fora do formato "NOME, Turma original: turma".`);
-  });
-  if (relacoes.length === 0)
-    erros.push('Nenhuma relação encontrada. Falta a linha "RELAÇÃO ATUAL".');
+    if (caractere === '"' && atual === "") {
+      entreAspas = true;
+    } else if (caractere === separador) {
+      campos.push(atual);
+      atual = "";
+    } else if (caractere === "\n" || caractere === "\r") {
+      if (caractere === "\r" && texto[indice + 1] === "\n") indice += 1;
+      campos.push(atual);
+      saida.push({ campos, linha: inicio });
+      campos = [];
+      atual = "";
+      linha += 1;
+      inicio = linha;
+    } else {
+      atual += caractere;
+    }
+  }
+  if (atual !== "" || campos.length > 0) {
+    campos.push(atual);
+    saida.push({ campos, linha: inicio });
+  }
+  return saida.filter((registro) => registro.campos.some((valor) => valor.trim() !== ""));
+}
+
+/**
+ * Lê a relação em CSV pelo schema padrão. Cada linha fora do padrão vira erro
+ * com o número da linha e a coluna, para a interface mostrar o que corrigir.
+ */
+export function lerRelacaoCsv(texto: string): LeituraDasRelacoes {
+  const limpo = texto.replace(/^\uFEFF/, "");
+  const primeira = limpo.split(/\r?\n/, 1)[0] ?? "";
+  const separador = primeira.includes(";") ? ";" : ",";
+  const todos = registros(limpo, separador);
+  const [cabecalho, ...linhas] = todos;
+  if (!cabecalho) return { relacoes: [], erros: ["O arquivo está vazio."] };
+  const nomes = cabecalho.campos.map((valor) => valor.trim().toLowerCase());
+  if (nomes.join(";") !== CABECALHO_RELACAO) {
+    return {
+      relacoes: [],
+      erros: [
+        `Linha 1: o cabeçalho precisa ser exatamente ${CABECALHO_RELACAO}. Veio ${nomes.join(";") || "vazio"}.`,
+      ],
+    };
+  }
+  if (linhas.length === 0) return { relacoes: [], erros: ["O arquivo não tem nenhum aluno."] };
+  if (linhas.length > MAXIMO_LINHAS) {
+    return { relacoes: [], erros: [`O arquivo tem mais de ${MAXIMO_LINHAS} alunos.`] };
+  }
+
+  const erros: string[] = [];
+  const porTurma = new Map<
+    string,
+    { turma: string; itens: (AlunoDaRelacao & { ordem: number })[] }
+  >();
+  for (const { campos, linha } of linhas) {
+    if (campos.length !== COLUNAS_RELACAO.length) {
+      erros.push(`Linha ${linha}: esperadas 4 colunas, encontradas ${campos.length}.`);
+      continue;
+    }
+    const [turma = "", ordemTexto = "", nomeBruto = "", origem = ""] = campos.map((valor) =>
+      semProtecao(valor.trim()),
+    );
+    const nome = nomeBruto.replace(/\s+/g, " ");
+    const ordem = Number(ordemTexto);
+    const problemas: string[] = [];
+    if (turma === "") problemas.push("turma_atual vazia");
+    if (!/^\d{1,4}$/.test(ordemTexto.trim()) || ordem < 1) {
+      problemas.push("ordem precisa ser um número inteiro de 1 a 9999");
+    }
+    if (nome.length < 2 || nome.length > 100)
+      problemas.push("nome precisa ter de 2 a 100 caracteres");
+    if (origem === "") problemas.push("turma_original vazia");
+    if (problemas.length > 0) {
+      erros.push(`Linha ${linha}: ${problemas.join("; ")}.`);
+      continue;
+    }
+    const chave = chaveDeTurma(turma);
+    const grupo = porTurma.get(chave) ?? { turma, itens: [] };
+    if (grupo.itens.some((item) => item.ordem === ordem)) {
+      erros.push(`Linha ${linha}: a ordem ${ordem} já foi usada na turma ${grupo.turma}.`);
+      continue;
+    }
+    grupo.itens.push({ nome, origem, posicao: 0, linha, ordem });
+    porTurma.set(chave, grupo);
+  }
+
+  const relacoes: Relacao[] = [...porTurma.values()].map((grupo) => ({
+    turma: grupo.turma,
+    alunos: grupo.itens
+      .sort((a, b) => a.ordem - b.ordem)
+      .map(({ nome, origem, linha }, indice) => ({ nome, origem, linha, posicao: indice + 1 })),
+  }));
   return { relacoes, erros };
+}
+
+/** Linha da relação exportada: turmas pelo rótulo completo de exibição. */
+export interface LinhaDaRelacao {
+  turmaAtual: string;
+  ordem: number;
+  nome: string;
+  turmaOriginal: string;
+}
+
+/**
+ * Relação no mesmo schema da importação, com BOM e CRLF para o Excel pt-BR.
+ * A ordem é renumerada de 1 em diante por turma: reimportar o arquivo não
+ * muda nada.
+ */
+export function relacaoParaCsv(linhas: LinhaDaRelacao[]): string {
+  const contagem = new Map<string, number>();
+  const corpo = linhas.map((linha) => {
+    const ordem = (contagem.get(linha.turmaAtual) ?? 0) + 1;
+    contagem.set(linha.turmaAtual, ordem);
+    return [linha.turmaAtual, String(ordem), linha.nome, linha.turmaOriginal].map(campo).join(";");
+  });
+  return `\uFEFF${[CABECALHO_RELACAO, ...corpo].join("\r\n")}\r\n`;
 }
 
 /** O que muda em um aluno já cadastrado. */
@@ -127,9 +240,9 @@ export interface PlanoDeImportacao {
   desativar: { alunoId: string; nome: string; turmaId: string }[];
   /** Impedem a aplicação: turma desconhecida, homônimo ou nome repetido. */
   bloqueios: string[];
-  /** Não impedem: total do cabeçalho diferente da lista. */
+  /** Não impedem a aplicação, mas pedem conferência. */
   avisos: string[];
-  turmas: { turmaId: string; rotulo: string; alunos: number; totalDeclarado: number | null }[];
+  turmas: { turmaId: string; rotulo: string; alunos: number }[];
 }
 
 /**
@@ -171,17 +284,7 @@ export function planejarImportacao(
       continue;
     }
     turmasImportadas.add(turma.id);
-    resumoTurmas.push({
-      turmaId: turma.id,
-      rotulo: turma.rotulo,
-      alunos: relacao.alunos.length,
-      totalDeclarado: relacao.totalDeclarado,
-    });
-    if (relacao.totalDeclarado !== null && relacao.totalDeclarado !== relacao.alunos.length) {
-      avisos.push(
-        `${turma.rotulo}: o cabeçalho diz ${relacao.totalDeclarado} e a lista tem ${relacao.alunos.length}.`,
-      );
-    }
+    resumoTurmas.push({ turmaId: turma.id, rotulo: turma.rotulo, alunos: relacao.alunos.length });
     for (const aluno of relacao.alunos) {
       const origem = resolver(aluno.origem);
       if (origem) entradas.push({ aluno, turma, origem });
@@ -210,7 +313,7 @@ export function planejarImportacao(
   for (const { aluno, turma, origem } of entradas) {
     const chave = chaveDeNome(aluno.nome);
     if ((vistos.get(chave) ?? 0) > 1) {
-      bloqueios.push(`${aluno.nome} aparece mais de uma vez nas relações.`);
+      bloqueios.push(`${aluno.nome} aparece mais de uma vez no arquivo.`);
       continue;
     }
     const achados = candidatos.get(chave) ?? [];

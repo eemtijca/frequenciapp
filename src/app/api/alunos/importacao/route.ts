@@ -1,4 +1,4 @@
-// Importação das relações de turma pela administração: prévia ou aplicação.
+// Importação da relação de alunos em CSV pela administração: prévia ou aplicação.
 import { importarRelacoes } from "@/application/importacao-alunos";
 import { corpoJson, erroApi, executarRota, exigirAdmin, json, origemPermitida } from "@/infra/http";
 

@@ -4,7 +4,17 @@
 // excluir, agrupados por turma com busca por nome.
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, FileUp, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
+import {
+  Check,
+  FileDown,
+  FileUp,
+  LoaderCircle,
+  Pencil,
+  Plus,
+  Power,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -19,6 +29,7 @@ import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import DialogoImportarRelacao from "@/components/gestao/dialogo-importar-relacao";
+import { relacaoParaCsv } from "@/domain/importacao-alunos";
 import {
   Dialog,
   DialogContent,
@@ -239,9 +250,43 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     });
   }
 
+  // A relação sai no mesmo schema da importação: turmas na ordem do cadastro e
+  // alunos ativos na ordem da chamada.
+  function exportarRelacao() {
+    const posicao = new Map(turmas.map((turma, indice) => [turma.id, indice]));
+    const linhas = alunos
+      .filter((aluno) => aluno.ativo)
+      .sort(
+        (a, b) =>
+          (posicao.get(a.turmaId) ?? 0) - (posicao.get(b.turmaId) ?? 0) ||
+          a.ordem - b.ordem ||
+          a.nome.localeCompare(b.nome, "pt-BR"),
+      )
+      .map((aluno) => ({
+        turmaAtual: rotulo(aluno.turmaId),
+        ordem: aluno.ordem,
+        nome: aluno.nome,
+        turmaOriginal: rotulo(aluno.turmaOriginalId),
+      }));
+    const blob = new Blob([relacaoParaCsv(linhas)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "frequenciapp-relacao-alunos.csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    avisarSucesso(
+      "Relação exportada.",
+      `${linhas.length} ${linhas.length === 1 ? "aluno ativo" : "alunos ativos"} no padrão CSV da importação.`,
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* No celular, as ações ficam numa grade de duas colunas, sem corte. */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-muted-foreground text-sm">
           {modoSelecao
             ? `${selecionados.size} ${
@@ -250,20 +295,28 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             : `${alunos.length} no total · ${ativos} ativos`}
         </p>
         {modoSelecao ? (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-11 rounded-lg" onClick={alternarTodos}>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+            <Button
+              variant="outline"
+              className="h-11 rounded-lg whitespace-nowrap"
+              onClick={alternarTodos}
+            >
               <Check size={16} />
               Selecionar todos
             </Button>
-            <Button variant="ghost" className="h-11 rounded-lg" onClick={cancelarSelecao}>
+            <Button
+              variant="ghost"
+              className="h-11 rounded-lg whitespace-nowrap"
+              onClick={cancelarSelecao}
+            >
               Cancelar
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <Button
               variant="outline"
-              className="h-11 rounded-lg"
+              className="h-11 rounded-lg whitespace-nowrap"
               onClick={() => setImportarAberto(true)}
               disabled={turmas.length === 0}
             >
@@ -272,7 +325,16 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Button>
             <Button
               variant="outline"
-              className="h-11 rounded-lg"
+              className="h-11 rounded-lg whitespace-nowrap"
+              onClick={exportarRelacao}
+              disabled={ativos === 0}
+            >
+              <FileDown size={16} />
+              Exportar relação
+            </Button>
+            <Button
+              variant="outline"
+              className="h-11 rounded-lg whitespace-nowrap"
               onClick={() => setModoSelecao(true)}
               disabled={turmas.length === 0 || alunos.length === 0}
             >
@@ -281,7 +343,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Button>
             <Button
               size="lg"
-              className="h-11 rounded-lg"
+              className="h-11 rounded-lg whitespace-nowrap"
               onClick={abrirNovo}
               disabled={turmas.length === 0}
             >

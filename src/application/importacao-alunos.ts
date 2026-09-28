@@ -1,4 +1,4 @@
-// Importação das relações de turma: prévia do que muda e aplicação em uma
+// Importação da relação de alunos em CSV: prévia do que muda e aplicação em uma
 // transação, mantendo o id de cada aluno para o histórico acompanhar.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
@@ -6,18 +6,18 @@ import { comTransacao, type Transacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import {
-  lerRelacoes,
+  lerRelacaoCsv,
   planejarImportacao,
   type PlanoDeImportacao,
 } from "@/domain/importacao-alunos";
 import { rotuloDeTurma } from "@/domain/frequencia";
 
 export const esquemaImportacao = z.object({
-  texto: z
+  csv: z
     .string()
     .trim()
-    .min(1, "Cole ou escolha ao menos uma relação.")
-    .max(150_000, "Texto grande demais. Importe as turmas em partes."),
+    .min(1, "Escolha ou cole a relação em CSV.")
+    .max(500_000, "Arquivo grande demais. Importe as turmas em partes."),
   aplicar: z.boolean().optional(),
 });
 
@@ -29,7 +29,7 @@ export interface ResultadoImportacao {
 
 async function planejar(
   cliente: Parameters<Transacao<unknown>>[0],
-  texto: string,
+  csv: string,
 ): Promise<PlanoDeImportacao> {
   const [turmas, alunos] = await Promise.all([
     cliente.turma.findMany({ select: { id: true, nome: true, serie: { select: { nome: true } } } }),
@@ -45,7 +45,7 @@ async function planejar(
     }),
   ]);
   return planejarImportacao(
-    lerRelacoes(texto),
+    lerRelacaoCsv(csv),
     turmas.map((turma) => ({ id: turma.id, rotulo: rotuloDeTurma(turma.serie.nome, turma.nome) })),
     alunos,
   );
@@ -64,12 +64,12 @@ export async function importarRelacoes(
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  const texto = dados.data.texto;
-  if (!dados.data.aplicar) return { plano: await planejar(banco(), texto), aplicado: null };
+  const csv = dados.data.csv;
+  if (!dados.data.aplicar) return { plano: await planejar(banco(), csv), aplicado: null };
 
   return comTransacao(async (tx) => {
     // O plano é refeito com o cadastro lido na própria transação.
-    const plano = await planejar(tx, texto);
+    const plano = await planejar(tx, csv);
     if (plano.bloqueios.length > 0) {
       throw new ErroHttp("Corrija os pontos indicados na prévia antes de aplicar.", 400);
     }
