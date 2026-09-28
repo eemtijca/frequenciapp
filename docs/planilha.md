@@ -18,7 +18,7 @@ Integração opcional da administração com a planilha da escola, por Google Ap
 4. Em Implantar, Nova implantação, escolha Aplicativo da Web, execute como a própria conta e permita acesso a qualquer pessoa. Autorize.
 5. Copie o endereço terminado em `/exec`, cole no aplicativo e use Testar conexão.
 
-Cada mudança no código pede uma nova versão da implantação, em Implantar, Gerenciar implantações, Nova versão; o endereço `/exec` não muda. O script está na versão 3, e o Testar conexão avisa quando a versão publicada é outra. O envio de frequência exige a versão 3: com a anterior, a prévia pede a publicação da versão atual. Um teste de unidade guarda o hash de cada versão e falha se o `gas/Codigo.gs` mudar sem versão nova.
+Cada mudança no código pede uma nova versão da implantação, em Implantar, Gerenciar implantações, Nova versão; o endereço `/exec` não muda. O script está na versão 4, e o Testar conexão avisa quando a versão publicada é outra. Publique sempre como nova versão da implantação existente, sem criar implantação nova, para o endereço `/exec` continuar o mesmo. O envio de frequência exige a versão 3 ou maior: com a anterior, a prévia pede a publicação da versão atual. A versão 4 acrescenta a leitura por faixas de colunas, a assinatura atual na leitura (que permite recuperar sozinho um envio sem confirmação), a vinculação e o preenchimento em lote e os tempos de cada etapa no registro de execuções do Apps Script. Um teste de unidade guarda o hash de cada versão e falha se o `gas/Codigo.gs` mudar sem versão nova.
 
 O script marca cada linha e coluna que cria com Developer Metadata na linha ou coluna inteira, único alvo que o Google aceita além da aba e da planilha. A posição é lida da localização do marcador, que acompanha a linha ou coluna quando outras são inseridas ou removidas antes dela; o valor não carrega posição. Assim a remoção fica restrita ao que a integração criou, mesmo depois de edição manual acima. Marcador antigo com valor `linha:2` na linha inteira continua reconhecido.
 
@@ -34,7 +34,15 @@ Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome d
 
 ## Enviar
 
-O envio é manual, com prévia obrigatória. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem e o período selecionados; no card da Gestão, "Enviar o mês de todas as turmas" envia o mês escolhido para todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
+O envio é manual, com prévia obrigatória. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem; no card da Gestão, "Enviar todas as turmas" envia todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
+
+**O que vai por padrão.** Só os dias com chamada criada ou alterada desde o último envio confirmado (resultado `SUCESSO`) de cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. Sem envio anterior, valem os dias com chamada do período escolhido. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio.
+
+**Uma turma por requisição.** A prévia monta o plano de cada turma; o envio faz uma requisição por turma, em sequência, e mostra o andamento de cada uma. A falha de uma turma não impede as seguintes. A leitura da aba se limita às colunas que o plano usa: aluno, turma atual, total e os dias do período que já têm coluna.
+
+**Estrutura sempre atual.** Depois de um envio que cria coluna ou linha, o aplicativo relê a estrutura daquela aba e atualiza o esquema e a assinatura salvos; o envio do dia seguinte funciona sem Revisar estrutura. Se a assinatura lida na prévia não bater com a salva (por exemplo, porque um envio anterior criou o dia e não chegou a responder), a estrutura daquela aba é detectada de novo e a prévia avisa. A proteção contra mudança manual entre a prévia e o envio continua: o envio recalcula o plano e exige o mesmo hash.
+
+**Resultado sem confirmação.** O registro de cada turma nasce `PARCIAL` antes da chamada ao script e só vira `SUCESSO` com a resposta. Timeout, queda de rede ou 504 depois de enviada a requisição ficam `PARCIAL`, com a mensagem de que não foi possível confirmar o resultado e de que a aba precisa ser conferida; nunca "nada foi alterado". O envio nunca é repetido automaticamente. Os dias continuam pendentes, e o reenvio é seguro: o modo conservador não sobrescreve célula ocupada, e a coluna do dia já criada é reconhecida pela estrutura relida, sem ser criada de novo.
 
 A prévia mostra:
 
