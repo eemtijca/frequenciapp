@@ -1,5 +1,5 @@
-// Extras do 3º ano: agrupar Alunos por origem, buscar por origem na Chamada
-// e definir origem em massa na Gestão.
+// Extras do 3º ano: agrupar Alunos por origem, buscar por origem na Chamada,
+// turma original em círculo na turma reorganizada e origem em massa na Gestão.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
@@ -74,7 +74,23 @@ test.describe("consulta por origem (coordenação)", () => {
     await page.getByLabel("Buscar aluno ou turma de origem").fill("E2E Origem B");
     await expect(secao.getByText("E2E Origem Um")).toBeVisible();
     await expect(secao.getByText("E2E Origem Dois")).toBeHidden();
-    await expect(secao.getByText("Origem E2E Origem B")).toBeVisible();
+    const circulo = secao.getByRole("img", { name: "Turma original E2E Origem B" });
+    await expect(circulo).toHaveText("E2E B");
+  });
+
+  test("mostra a turma original em círculo para toda a turma reorganizada", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Chamada", "chamada");
+    const secao = page.locator('section[aria-label="Fazer chamada"]');
+    const turma = secao.getByRole("button", { name: /E2E Origem A/ }).first();
+    if (await turma.isVisible().catch(() => false)) await turma.click();
+    await expect(
+      secao.getByRole("button", { name: /^E2E Origem Um, turma original E2E Origem B:/ }),
+    ).toBeVisible();
+    await expect(
+      secao.getByRole("button", { name: /^E2E Origem Dois, turma original E2E Origem A:/ }),
+    ).toBeVisible();
   });
 });
 

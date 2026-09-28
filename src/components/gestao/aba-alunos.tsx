@@ -4,7 +4,7 @@
 // excluir, agrupados por turma com busca por nome.
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Check, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
+import { Check, FileUp, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
+import DialogoImportarRelacao from "@/components/gestao/dialogo-importar-relacao";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [origemEmMassa, setOrigemEmMassa] = useState("");
+  const [importarAberto, setImportarAberto] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
   const opcoesTurma = useMemo(
@@ -182,7 +184,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     const corpo = {
       nome: formulario.nome,
       turmaId: formulario.turmaId,
-      ...(formulario.turmaOriginalId !== formulario.turmaId
+      // Na edição a origem vai sempre, para mudar de turma não mexer nela.
+      ...(emEdicao || formulario.turmaOriginalId !== formulario.turmaId
         ? { turmaOriginalId: formulario.turmaOriginalId }
         : {}),
     };
@@ -258,6 +261,15 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           </div>
         ) : (
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-11 rounded-lg"
+              onClick={() => setImportarAberto(true)}
+              disabled={turmas.length === 0}
+            >
+              <FileUp size={16} />
+              Importar relação
+            </Button>
             <Button
               variant="outline"
               className="h-11 rounded-lg"
@@ -501,8 +513,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                   setFormulario((atual) => ({
                     ...atual,
                     turmaId: valor,
+                    // Só o cadastro novo acompanha a turma; na edição a origem
+                    // do aluno fica como está.
                     turmaOriginalId:
-                      emEdicao === null || atual.turmaOriginalId === atual.turmaId
+                      emEdicao === null && atual.turmaOriginalId === atual.turmaId
                         ? valor
                         : atual.turmaOriginalId,
                   }))
@@ -539,6 +553,12 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+      <DialogoImportarRelacao
+        aberto={importarAberto}
+        onAbrir={setImportarAberto}
+        turmas={turmas}
+        onImportado={onMudanca}
+      />
     </div>
   );
 }
