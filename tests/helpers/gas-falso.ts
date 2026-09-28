@@ -11,6 +11,7 @@ interface Metadado {
   chave: string;
   linha?: number;
   coluna?: number;
+  valor?: string;
 }
 
 interface AbaFalsa {
@@ -34,6 +35,8 @@ export interface GasFalso {
     opcoes?: { formulas?: Record<string, string>; mesclagens?: string[] },
   ): void;
   valor(nome: string, linha: number, coluna: number): string;
+  definirValor(nome: string, linha: number, coluna: number, valor: string): void;
+  vinculos(nome: string): { linha: number; alunoId: string }[];
   formulaDe(nome: string, linha: number, coluna: number): string;
   marcarLinha(nome: string, linha: number): void;
   marcarColuna(nome: string, coluna: number): void;
@@ -45,6 +48,8 @@ export interface GasFalso {
 const MARCADOR_LINHA = "frequenciapp.linha";
 const MARCADOR_COLUNA = "frequenciapp.coluna";
 const MARCADOR_ABA = "frequenciapp.aba";
+const MARCADOR_ALUNO = "frequenciapp.aluno";
+const VERSAO = 3;
 const COPIA_PREFIXO = "_frequenciapp_backup_";
 
 function hashTexto(texto: string): string {
@@ -156,9 +161,9 @@ export async function criarGasFalso(): Promise<GasFalso> {
       case "ping":
         return {
           ok: true,
-          versao: 1,
+          versao: VERSAO,
           dados: {
-            versao: 1,
+            versao: VERSAO,
             planilha: {
               nome: "Planilha de teste",
               id: "falsa",
@@ -176,14 +181,14 @@ export async function criarGasFalso(): Promise<GasFalso> {
       case "estrutura":
         return {
           ok: true,
-          versao: 1,
+          versao: VERSAO,
           dados: {
             planilha: {
               nome: "Planilha de teste",
               id: "falsa",
               url: "https://docs.google.com/spreadsheets/d/falsa",
               fuso,
-              versao: 1,
+              versao: VERSAO,
             },
             abas: abas.map((item) => {
               const linhas = Math.min(Math.max(ultimaLinha(item), 1), 12);
@@ -232,7 +237,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
         }
         return {
           ok: true,
-          versao: 1,
+          versao: VERSAO,
           dados: {
             aba: item.nome,
             linhaInicial,
@@ -243,6 +248,10 @@ export async function criarGasFalso(): Promise<GasFalso> {
             formula,
             linhasCriadas: marcadores(item, MARCADOR_LINHA),
             colunasCriadas: marcadores(item, MARCADOR_COLUNA),
+            alunosDasLinhas: item.metadados
+              .filter((meta) => meta.chave === MARCADOR_ALUNO && (meta.linha ?? 0) > 0)
+              .map((meta) => ({ linha: meta.linha ?? 0, alunoId: meta.valor ?? "" }))
+              .sort((a, b) => a.linha - b.linha),
           },
         };
       }
@@ -278,7 +287,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
             }
           }
         }
-        return { ok: true, versao: 1, dados: contagem };
+        return { ok: true, versao: VERSAO, dados: contagem };
       }
       case "aplicar": {
         if (recusarAplicar) return { ok: false, erro: "Recusa de teste." };
@@ -309,6 +318,15 @@ export async function criarGasFalso(): Promise<GasFalso> {
           linhasCriadas: 0,
           puladasOcupadas: 0,
           puladasFormula: 0,
+          vinculadas: 0,
+          puladasVinculo: 0,
+        };
+        const vincular = (linha: number, alunoId: string) => {
+          item.metadados = item.metadados.filter(
+            (meta) =>
+              meta.chave !== MARCADOR_ALUNO || (meta.linha !== linha && meta.valor !== alunoId),
+          );
+          item.metadados.push({ chave: MARCADOR_ALUNO, linha, valor: alunoId });
         };
         for (const operacao of operacoes) {
           const tipo = String(operacao.tipo);
@@ -361,9 +379,27 @@ export async function criarGasFalso(): Promise<GasFalso> {
             contagem.colunasCriadas += rotulos.length;
             continue;
           }
+          if (tipo === "vincularLinhas") {
+            for (const vinculo of (operacao.itens ?? []) as {
+              linha: number;
+              coluna: number;
+              nome: string;
+              alunoId: string;
+            }[]) {
+              const celula = garantir(item, vinculo.linha, vinculo.coluna);
+              if (celula.valor.trim() !== vinculo.nome.trim()) {
+                contagem.puladasVinculo += 1;
+                continue;
+              }
+              vincular(vinculo.linha, vinculo.alunoId);
+              contagem.vinculadas += 1;
+            }
+            continue;
+          }
           if (tipo === "criarLinhas") {
             for (const linha of (operacao.itens ?? []) as {
               linha: number;
+              alunoId?: string;
               celulas: { coluna: number; valor: string }[];
             }[]) {
               const livre = linha.celulas.every((celula) => {
@@ -378,6 +414,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
                 garantir(item, linha.linha, celula.coluna).valor = celula.valor;
               }
               item.metadados.push({ chave: MARCADOR_LINHA, linha: linha.linha });
+              if (linha.alunoId) vincular(linha.linha, linha.alunoId);
               contagem.linhasCriadas += 1;
             }
             continue;
@@ -393,6 +430,15 @@ export async function criarGasFalso(): Promise<GasFalso> {
             for (const posicao of lista.slice().sort((a, b) => b - a)) {
               if (tipo === "removerLinhas") {
                 item.celulas.splice(posicao - 1, 1);
+                // Como a API real: o metadado da linha some com ela e os de
+                // baixo sobem junto com as linhas.
+                item.metadados = item.metadados
+                  .filter((meta) => meta.linha !== posicao)
+                  .map((meta) =>
+                    meta.linha !== undefined && meta.linha > posicao
+                      ? { ...meta, linha: meta.linha - 1 }
+                      : meta,
+                  );
                 contagem.removidasLinhas += 1;
               } else {
                 item.celulas.forEach((fileira) => fileira.splice(posicao - 1, 1));
@@ -402,7 +448,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
             continue;
           }
         }
-        return { ok: true, versao: 1, dados: contagem };
+        return { ok: true, versao: VERSAO, dados: contagem };
       }
       case "criarAba": {
         const nome = String(corpo.nome ?? "").trim();
@@ -422,7 +468,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
           garantir(nova, 1, indice + 1).valor = valor;
         });
         abas.push(nova);
-        return { ok: true, versao: 1, dados: { aba: nome } };
+        return { ok: true, versao: VERSAO, dados: { aba: nome } };
       }
       case "removerAba": {
         const item = aba(nomeAba);
@@ -431,13 +477,13 @@ export async function criarGasFalso(): Promise<GasFalso> {
           return { ok: false, erro: "Esta aba não foi criada pela integração." };
         }
         abas.splice(abas.indexOf(item), 1);
-        return { ok: true, versao: 1, dados: { aba: nomeAba } };
+        return { ok: true, versao: VERSAO, dados: { aba: nomeAba } };
       }
       case "listarCopias": {
         const prefixo = `${COPIA_PREFIXO}${nomeAba}_`;
         return {
           ok: true,
-          versao: 1,
+          versao: VERSAO,
           dados: {
             copias: abas
               .filter((item) => item.nome.startsWith(prefixo))
@@ -456,7 +502,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
         atual.celulas = copia.celulas.map((fileira) => fileira.map((celula) => ({ ...celula })));
         return {
           ok: true,
-          versao: 1,
+          versao: VERSAO,
           dados: { aba: nomeAba, copia: copia.nome, anterior: "copia" },
         };
       }
@@ -542,6 +588,15 @@ export async function criarGasFalso(): Promise<GasFalso> {
       const item = aba(nome);
       return item ? garantir(item, linha, coluna).valor : "";
     },
+    definirValor: (nome, linha, coluna, valor) => {
+      const item = aba(nome);
+      if (item) garantir(item, linha, coluna).valor = valor;
+    },
+    vinculos: (nome) =>
+      (aba(nome)?.metadados ?? [])
+        .filter((meta) => meta.chave === MARCADOR_ALUNO)
+        .map((meta) => ({ linha: meta.linha ?? 0, alunoId: meta.valor ?? "" }))
+        .sort((a, b) => a.linha - b.linha),
     formulaDe: (nome, linha, coluna) => {
       const item = aba(nome);
       return item ? garantir(item, linha, coluna).formula : "";

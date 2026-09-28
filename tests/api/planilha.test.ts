@@ -225,6 +225,19 @@ describe("integração com a planilha", () => {
     const sugestao = dados.sugestoes.find((item) => item.aba === "QP Ano A");
     expect(sugestao?.turmaOriginalId).toBe(turmaAId);
 
+    const repetido = await autenticado("/api/planilha/mapa", {
+      method: "POST",
+      body: JSON.stringify({
+        planilha: dados.planilha,
+        abas: dados.abas,
+        mapa: [
+          { aba: "QP Ano A", turmaOriginalId: turmaAId },
+          { aba: "QP Ano A", turmaOriginalId: turmaAId },
+        ],
+      }),
+    });
+    expect(repetido.status).toBe(400);
+
     const salvo = await autenticado("/api/planilha/mapa", {
       method: "POST",
       body: JSON.stringify({
@@ -274,6 +287,34 @@ describe("integração com a planilha", () => {
     expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
     expect(gas?.valor("QP Ano A", 2, 3)).toBe("P");
     expect(gas?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
+  });
+
+  it("grava o código dos alunos e acha pelo código depois de renomear na planilha", async () => {
+    const vinculos = gas?.vinculos("QP Ano A") ?? [];
+    expect(vinculos.map((item) => item.linha)).toEqual([2, 3]);
+    expect(vinculos.find((item) => item.linha === 3)?.alunoId).toBe(alunoBId);
+
+    gas?.definirValor("QP Ano A", 3, 1, "B. Renomeado");
+    const simulado = await json<{
+      planos: { resumo: { novosAlunos: number; vincular: number; ambiguidades: number } }[];
+    }>(
+      await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify({
+          turmaOriginalId: turmaAId,
+          de: DIA,
+          ate: DIA,
+          permitirInserirColunas: true,
+          permitirNovosAlunos: true,
+        }),
+      }),
+    );
+    expect(simulado.planos[0]?.resumo).toMatchObject({
+      novosAlunos: 0,
+      vincular: 0,
+      ambiguidades: 0,
+    });
+    gas?.definirValor("QP Ano A", 3, 1, "QP Bruno");
   });
 
   it("simula o mês de todas as turmas mapeadas", async () => {

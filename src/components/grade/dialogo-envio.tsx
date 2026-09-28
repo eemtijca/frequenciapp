@@ -31,6 +31,7 @@ interface PlanoResumo {
     limpar: number;
     novasColunas: number;
     novosAlunos: number;
+    vincular: number;
     removerLinhas: number;
     removerColunas: number;
     puladasFormula: number;
@@ -304,6 +305,9 @@ export default function DialogoEnvio({
               </span>
               <span>
                 {plano.resumo.novasColunas} colunas novas · {plano.resumo.novosAlunos} alunos novos
+                {plano.resumo.vincular > 0
+                  ? ` · ${plano.resumo.vincular} linhas ganham o código do aluno`
+                  : ""}
                 {modoCompleto && plano.resumo.substituir > 0
                   ? ` · ${plano.resumo.substituir} substituições`
                   : ""}

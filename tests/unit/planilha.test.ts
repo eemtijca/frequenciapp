@@ -497,6 +497,79 @@ describe("planejarSincronizacao", () => {
   });
 });
 
+describe("planejarSincronizacao: código do aluno na linha", () => {
+  const dias = ["2026-09-10"];
+  const frequencias = [frequencia({ faltas: [{ alunoId: "aluno-2", horarios: ["a"] }] })];
+  const turmaDe = (lista: Aluno[]) =>
+    montarTurmaPlanilha("origem-a", "3º ano A", lista, frequencias, [], dias, () => "3º ano B");
+  const alunos = [aluno(), aluno({ id: "aluno-2", nome: "Bruno", ordem: 2 })];
+  const esquema = detectarEsquema(ABA, 2026);
+
+  it("vincula pelo nome único e manda gravar o código", () => {
+    const plano = planejarSincronizacao(esquema, turmaDe(alunos), conteudoDaAba(ABA), opcoes());
+    expect(plano.vincular).toEqual([
+      { linha: 2, coluna: 1, nome: "Alice", alunoId: "aluno-1" },
+      { linha: 3, coluna: 1, nome: "Bruno", alunoId: "aluno-2" },
+    ]);
+    expect(plano.resumo.vincular).toBe(2);
+  });
+
+  it("acha o aluno pelo código mesmo com o nome trocado na planilha", () => {
+    const aba: AbaBruta = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["Alice", "", "", "", ""], ["B. Souza", "", "", "", ""]],
+    };
+    const conteudo = {
+      ...conteudoDaAba(aba),
+      alunosDasLinhas: [
+        { linha: 2, alunoId: "aluno-1" },
+        { linha: 3, alunoId: "aluno-2" },
+      ],
+    };
+    const plano = planejarSincronizacao(esquema, turmaDe(alunos), conteudo, opcoes());
+    expect(plano.vincular).toEqual([]);
+    expect(plano.novosAlunos).toEqual([]);
+    expect(plano.preencher.map((celula) => [celula.celula, celula.valor])).toEqual([
+      ["C2", "P"],
+      ["C3", "F"],
+    ]);
+  });
+
+  it("não usa o nome quando há dois alunos com o mesmo nome na turma", () => {
+    const homonimos = [aluno(), aluno({ id: "aluno-2", nome: "alice", ordem: 2 })];
+    const plano = planejarSincronizacao(esquema, turmaDe(homonimos), conteudoDaAba(ABA), opcoes());
+    expect(plano.vincular).toEqual([]);
+    expect(plano.preencher).toEqual([]);
+    expect(plano.resumo.ambiguidades).toBe(2);
+    expect(plano.avisos[0]).toContain("mais de um aluno chamado Alice");
+  });
+
+  it("cria a linha nova depois da última linha lida, mesmo com o esquema defasado", () => {
+    // O esquema salvo conhece até a linha 3; a leitura já tem Carla na 4.
+    const aba: AbaBruta = {
+      ...ABA,
+      valores: [...ABA.valores, ["Carla", "3º ano B", "", "", ""]],
+      linhas: 4,
+    };
+    const novos = [...alunos, aluno({ id: "aluno-3", nome: "Diego", ordem: 3 })];
+    const plano = planejarSincronizacao(esquema, turmaDe(novos), conteudoDaAba(aba), opcoes());
+    expect(plano.novosAlunos).toEqual([
+      { alunoId: "aluno-3", nome: "Diego", turmaAtual: "3º ano B", linha: 5 },
+    ]);
+  });
+
+  it("aponta para remoção a linha criada cujo código saiu da turma", () => {
+    const aba: AbaBruta = { ...ABA, valores: [...ABA.valores, ["Carla", "", "", "", ""]] };
+    const conteudo = {
+      ...conteudoDaAba(aba),
+      linhasCriadas: [4],
+      alunosDasLinhas: [{ linha: 4, alunoId: "aluno-9" }],
+    };
+    const plano = planejarSincronizacao(esquema, turmaDe(alunos), conteudo, opcoes());
+    expect(plano.candidatosRemocaoLinhas).toEqual([{ linha: 4, nome: "Carla" }]);
+  });
+});
+
 describe("auxiliares da integração", () => {
   it("classifica falha de rede como parcial e recusa como falha", () => {
     expect(resultadoDeFalha(true)).toBe("FALHA");

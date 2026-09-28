@@ -17,7 +17,7 @@ export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
 /** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
-export const VERSAO_SCRIPT = 2;
+export const VERSAO_SCRIPT = 3;
 
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
@@ -297,6 +297,8 @@ export interface LeituraAba {
   colunaInicial: number;
   linhasCriadas?: number[];
   colunasCriadas?: number[];
+  /** Código do aluno gravado em cada linha pelo script (versão 3 em diante). */
+  alunosDasLinhas?: { linha: number; alunoId: string }[];
 }
 
 const ROTULOS_ALUNO = new Set(["aluno", "aluna", "nome", "estudante", "nome do aluno"]);
@@ -604,6 +606,15 @@ export interface AlunoNovoPlano {
   linha: number;
 }
 
+/** Linha existente que recebe o código do aluno, casada pelo nome único. */
+export interface VinculoPlano {
+  linha: number;
+  coluna: number;
+  /** Nome lido na linha: o script só vincula se a célula ainda o mostrar. */
+  nome: string;
+  alunoId: string;
+}
+
 export interface RemocaoPlano {
   linha: number;
   nome: string;
@@ -622,6 +633,7 @@ export interface ResumoPlano {
   limpar: number;
   novasColunas: number;
   novosAlunos: number;
+  vincular: number;
   removerLinhas: number;
   removerColunas: number;
   puladasFormula: number;
@@ -640,6 +652,7 @@ export interface PlanoSincronizacao {
   limpar: CelulaPlano[];
   novasColunas: ColunaNovaPlano[];
   novosAlunos: AlunoNovoPlano[];
+  vincular: VinculoPlano[];
   removerLinhas: RemocaoPlano[];
   removerColunas: ColunaCriada[];
   candidatosRemocaoLinhas: RemocaoPlano[];
@@ -657,32 +670,100 @@ function marcaCombinam(atual: string, desejada: Marca): boolean {
   return atual.trim().toUpperCase() === desejada;
 }
 
-interface LinhaExistente {
+interface LinhaCasada {
   linha: number;
   nome: string;
-  chave: string;
+  /** Casada pelo nome: o plano grava o código do aluno na linha. */
+  vincular: boolean;
 }
 
-interface MapaLinhas {
-  porChave: Map<string, LinhaExistente>;
-  contagens: Map<string, number>;
+interface CasamentoDeLinhas {
+  porAluno: Map<string, LinhaCasada>;
+  /** Alunos pulados por ambiguidade, com o aviso já registrado. */
+  ambiguos: Set<string>;
+  avisos: string[];
+  /** Última linha com qualquer conteúdo na leitura, para a linha nova não cair sobre outra. */
+  ultimaLinha: number;
+  codigoDaLinha: Map<number, string>;
 }
 
-function mapearLinhas(conteudo: LeituraAba, esquema: AbaEsquema): MapaLinhas {
-  const porChave = new Map<string, LinhaExistente>();
-  const contagens = new Map<string, number>();
+/**
+ * Acha a linha de cada aluno. Primeiro pelo código gravado na linha, que
+ * acompanha a linha e não depende do nome. Sem código, pelo nome, só quando
+ * ele é único na turma do aplicativo e entre as linhas ainda sem código: o
+ * vínculo entra no plano para o próximo envio já achar pelo código.
+ */
+function casarLinhas(
+  conteudo: LeituraAba,
+  esquema: AbaEsquema,
+  turma: TurmaPlanilha,
+): CasamentoDeLinhas {
   const colunaAluno = esquema.colunas.find((coluna) => coluna.tipo === "aluno")?.indice ?? 1;
   const colunaRelativa = colunaAluno - conteudo.colunaInicial;
-  for (let linha = esquema.cabecalho + 1; linha <= esquema.ultimaLinhaDados; linha += 1) {
-    const relativa = linha - conteudo.linhaInicial;
-    const bruto = conteudo.valores[relativa]?.[colunaRelativa] ?? "";
-    const nome = textoLimpo(bruto);
+  let ultimaLinha = Math.max(esquema.cabecalho, 0);
+  conteudo.valores.forEach((fileira, indice) => {
+    if (fileira.some((valor) => textoLimpo(valor) !== "")) {
+      ultimaLinha = Math.max(ultimaLinha, conteudo.linhaInicial + indice);
+    }
+  });
+
+  const codigoDaLinha = new Map<number, string>();
+  const linhaDoCodigo = new Map<string, number>();
+  for (const vinculo of conteudo.alunosDasLinhas ?? []) {
+    if (vinculo.linha <= esquema.cabecalho || linhaDoCodigo.has(vinculo.alunoId)) continue;
+    codigoDaLinha.set(vinculo.linha, vinculo.alunoId);
+    linhaDoCodigo.set(vinculo.alunoId, vinculo.linha);
+    ultimaLinha = Math.max(ultimaLinha, vinculo.linha);
+  }
+
+  const nomeDaLinha = (linha: number) =>
+    textoLimpo(conteudo.valores[linha - conteudo.linhaInicial]?.[colunaRelativa] ?? "");
+  const semCodigoPorNome = new Map<string, number[]>();
+  for (let linha = esquema.cabecalho + 1; linha <= ultimaLinha; linha += 1) {
+    if (codigoDaLinha.has(linha)) continue;
+    const nome = nomeDaLinha(linha);
     if (nome === "") continue;
     const chave = normalizar(nome);
-    contagens.set(chave, (contagens.get(chave) ?? 0) + 1);
-    if (!porChave.has(chave)) porChave.set(chave, { linha, nome, chave });
+    semCodigoPorNome.set(chave, [...(semCodigoPorNome.get(chave) ?? []), linha]);
   }
-  return { porChave, contagens };
+  const nomesNoApp = new Map<string, number>();
+  for (const linha of turma.linhas) {
+    const chave = normalizar(linha.nome);
+    nomesNoApp.set(chave, (nomesNoApp.get(chave) ?? 0) + 1);
+  }
+
+  const porAluno = new Map<string, LinhaCasada>();
+  const ambiguos = new Set<string>();
+  const avisos: string[] = [];
+  for (const linha of turma.linhas) {
+    const porCodigo = linhaDoCodigo.get(linha.alunoId);
+    if (porCodigo !== undefined) {
+      porAluno.set(linha.alunoId, {
+        linha: porCodigo,
+        nome: nomeDaLinha(porCodigo),
+        vincular: false,
+      });
+      continue;
+    }
+    const chave = normalizar(linha.nome);
+    const candidatas = semCodigoPorNome.get(chave) ?? [];
+    if (candidatas.length === 0) continue;
+    if ((nomesNoApp.get(chave) ?? 0) > 1) {
+      ambiguos.add(linha.alunoId);
+      avisos.push(
+        `Há mais de um aluno chamado ${linha.nome} na turma; confira as linhas dele na planilha.`,
+      );
+      continue;
+    }
+    const [unica] = candidatas;
+    if (candidatas.length > 1 || unica === undefined) {
+      ambiguos.add(linha.alunoId);
+      avisos.push(`O nome ${linha.nome} aparece mais de uma vez na planilha.`);
+      continue;
+    }
+    porAluno.set(linha.alunoId, { linha: unica, nome: nomeDaLinha(unica), vincular: true });
+  }
+  return { porAluno, ambiguos, avisos: [...new Set(avisos)], ultimaLinha, codigoDaLinha };
 }
 
 /**
@@ -716,6 +797,7 @@ export function planejarSincronizacao(
       limpar: 0,
       novasColunas: 0,
       novosAlunos: 0,
+      vincular: 0,
       removerLinhas: 0,
       removerColunas: 0,
       puladasFormula: 0,
@@ -732,6 +814,7 @@ export function planejarSincronizacao(
       limpar: [],
       novasColunas: [],
       novosAlunos: [],
+      vincular: [],
       removerLinhas: [],
       removerColunas: [],
       candidatosRemocaoLinhas: [],
@@ -765,7 +848,10 @@ export function planejarSincronizacao(
     posicaoNova += 1;
   }
 
-  const { porChave: linhasExistentes, contagens: contagemNomes } = mapearLinhas(conteudo, esquema);
+  const casamento = casarLinhas(conteudo, esquema, turma);
+  avisos.push(...casamento.avisos);
+  const vincular: VinculoPlano[] = [];
+  const colunaAlunoPlano = colunaAluno?.indice ?? 1;
   const celulasPreencher: CelulaPlano[] = [];
   const celulasSubstituir: CelulaPlano[] = [];
   const celulasLimpar: CelulaPlano[] = [];
@@ -788,11 +874,22 @@ export function planejarSincronizacao(
     });
   }
 
-  let linhaNovo = Math.max(esquema.ultimaLinhaDados, esquema.cabecalho) + 1;
+  let linhaNovo = casamento.ultimaLinha + 1;
   for (const linha of turma.linhas) {
-    const chave = normalizar(linha.nome);
-    const existente = linhasExistentes.get(chave);
+    if (casamento.ambiguos.has(linha.alunoId)) {
+      ambiguidades += 1;
+      continue;
+    }
+    const existente = casamento.porAluno.get(linha.alunoId);
     let numeroLinha = existente?.linha ?? 0;
+    if (existente?.vincular) {
+      vincular.push({
+        linha: existente.linha,
+        coluna: colunaAlunoPlano,
+        nome: existente.nome,
+        alunoId: linha.alunoId,
+      });
+    }
     if (!existente) {
       if (!opcoes.permitirNovosAlunos) {
         avisos.push(`O aluno ${linha.nome} não tem linha na planilha.`);
@@ -806,10 +903,6 @@ export function planejarSincronizacao(
       });
       numeroLinha = linhaNovo;
       linhaNovo += 1;
-    } else if ((contagemNomes.get(chave) ?? 0) > 1) {
-      ambiguidades += 1;
-      avisos.push(`O nome ${linha.nome} aparece mais de uma vez na planilha.`);
-      continue;
     }
     for (const dia of turma.dias) {
       const marca = linha.marcas[dia];
@@ -954,16 +1047,18 @@ export function planejarSincronizacao(
 
   // Linhas criadas pela integração para alunos que não estão mais na turma
   // ativa: candidatas à remoção, sempre listadas e desmarcadas por padrão.
+  // Com código, vale o código; sem ele, o nome.
   const nomesDaTurma = new Set(turma.linhas.map((linha) => normalizar(linha.nome)));
+  const idsDaTurma = new Set(turma.linhas.map((linha) => linha.alunoId));
   const colunaAlunoIndice = esquema.colunas.find((coluna) => coluna.tipo === "aluno")?.indice ?? 1;
   const candidatosRemocaoLinhas: RemocaoPlano[] = [];
   for (const linha of conteudo.linhasCriadas ?? []) {
     const relativa = linha - conteudo.linhaInicial;
     const bruto = conteudo.valores[relativa]?.[colunaAlunoIndice - conteudo.colunaInicial] ?? "";
     const nome = textoLimpo(bruto);
-    if (nome !== "" && !nomesDaTurma.has(normalizar(nome))) {
-      candidatosRemocaoLinhas.push({ linha, nome });
-    }
+    const codigo = casamento.codigoDaLinha.get(linha);
+    const saiu = codigo ? !idsDaTurma.has(codigo) : !nomesDaTurma.has(normalizar(nome));
+    if (nome !== "" && saiu) candidatosRemocaoLinhas.push({ linha, nome });
   }
 
   const resumo: ResumoPlano = {
@@ -972,6 +1067,7 @@ export function planejarSincronizacao(
     limpar: celulasLimpar.length,
     novasColunas: novasColunas.length,
     novosAlunos: novosAlunos.length,
+    vincular: vincular.length,
     removerLinhas: removerLinhas.length,
     removerColunas: removerColunas.length,
     puladasFormula,
@@ -988,6 +1084,7 @@ export function planejarSincronizacao(
     limpar: celulasLimpar,
     novasColunas,
     novosAlunos,
+    vincular,
     removerLinhas,
     removerColunas,
     candidatosRemocaoLinhas,
