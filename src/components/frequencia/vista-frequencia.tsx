@@ -702,7 +702,7 @@ export default function VistaFrequencia({
               type="button"
               aria-pressed={filtro === "presentes"}
               onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-              className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
             >
               <span className="numerais-tabulares text-primary text-2xl font-semibold">
                 {carregando ? "" : contagemPresencas}
