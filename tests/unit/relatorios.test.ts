@@ -52,6 +52,7 @@ function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
     atualizadoEm: parcial.atualizadoEm ?? "2026-09-10T12:00:00Z",
     atualizadoPorNome: parcial.atualizadoPorNome ?? null,
     faltas: parcial.faltas ?? [],
+    ...(parcial.alunos ? { alunos: parcial.alunos } : {}),
   };
 }
 
@@ -129,6 +130,26 @@ describe("distribuicaoDoDia", () => {
     expect(primeira?.turmas).toHaveLength(2);
     expect(primeira?.turmas[0]?.percentual).toBeCloseTo(0.5);
     expect(primeira?.turmas[1]?.percentual).toBeCloseTo(0.5);
+  });
+});
+
+describe("distribuicaoDoDia na turma reorganizada", () => {
+  it("conta a falta na turma atual, não na de origem", () => {
+    const alunos = [aluno({ id: "aluno-m", turmaId: "turma-b", turmaOriginalId: "turma-a" })];
+    const doDia = [
+      frequencia({
+        turmaId: "turma-b",
+        alunos: ["aluno-m"],
+        faltas: [{ alunoId: "aluno-m", horarios: ["aula-1"] }],
+      }),
+    ];
+    const marcas = marcasDoDia(alunos, "2026-09-10", doDia);
+    const turmas = [turma(), turma({ id: "turma-b", nome: "B" })];
+    const [primeira] = distribuicaoDoDia([serie()], turmas, alunos, marcas);
+    expect(primeira?.turmas.map((item) => [item.turmaId, item.faltas])).toEqual([
+      ["turma-a", 0],
+      ["turma-b", 1],
+    ]);
   });
 });
 

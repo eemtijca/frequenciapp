@@ -125,7 +125,7 @@ export interface ResumoSerieDia extends ContagemDia {
 }
 
 /**
- * Distribuição das faltas do dia por série e por turma. O percentual da
+ * Distribuição das faltas do dia por série e por turma atual. O percentual da
  * série usa o total da escola; o da turma usa o total da própria série,
  * como nos gráficos de infrequência do aplicativo de referência.
  */
@@ -148,11 +148,13 @@ export function distribuicaoDoDia(
       const turmasDaSerie = turmas
         .filter((turma) => turma.serieId === serie.id)
         .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+      // O Painel mostra o dia como a chamada aconteceu: pela turma atual.
+      // A consolidação pela turma original fica na Grade e na planilha.
       const alunosDaSerie = ativos.filter((aluno) =>
-        turmasDaSerie.some((turma) => turma.id === aluno.turmaOriginalId),
+        turmasDaSerie.some((turma) => turma.id === aluno.turmaId),
       );
       const contagensTurma = turmasDaSerie.map((turma) => {
-        const alunosDaTurma = alunosDaSerie.filter((aluno) => aluno.turmaOriginalId === turma.id);
+        const alunosDaTurma = alunosDaSerie.filter((aluno) => aluno.turmaId === turma.id);
         const marcasDaTurma = new Map<string, Marca>();
         for (const aluno of alunosDaTurma) {
           const marca = marcas.get(aluno.id);
