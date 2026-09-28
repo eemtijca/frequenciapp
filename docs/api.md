@@ -217,10 +217,11 @@ Corpo: `{ "ids": uuid[], "turmaOriginalId": uuid }`, de 1 a 500 alunos.
 
 ### POST /api/alunos/importacao
 
-Importa relações de turma em texto. Cada relação começa pela linha `RELAÇÃO ATUAL`, seguida de travessão, meia-risca ou hífen e da turma atual; cada aluno vem em uma linha com o nome, o mesmo separador e `Turma original: <turma>`. A linha `Total de estudantes: N` é conferida com a lista. Quebras de linha escritas como `\n` no texto também valem. Apenas administração.
+Importa a relação de alunos em CSV, no schema padrão descrito em [operacao.md](operacao.md#schema-da-relação-de-alunos) e usado também pela exportação da Gestão. Apenas administração.
 
-Corpo: `{ "texto": string, "aplicar"?: boolean }`, com até 150 mil caracteres.
+Corpo: `{ "csv": string, "aplicar"?: boolean }`, com até 500 mil caracteres.
 
+- Cada linha fora do schema vira um bloqueio com o número da linha e o problema (cabeçalho diferente, número de colunas, campo vazio, ordem inválida ou repetida na turma, nome fora do tamanho).
 - Os rótulos de turma casam com o cadastro sem as palavras "ano" e "série" (por exemplo "3º A" com "3º ano A").
 - Os alunos casam pelo nome sem acento, sem caixa e com espaços simples, entre os alunos das turmas envolvidas. O aluno encontrado mantém o id e, com ele, todo o histórico.
 - Sem `aplicar`, devolve só a prévia. Com `aplicar`, refaz o plano na transação e grava a turma atual, a turma original e a ordem (a posição na relação) de cada aluno, cria quem não existe e desativa, sem excluir, quem está ativo nas turmas importadas e não aparece em nenhuma relação. A auditoria registra só as contagens (`alunos.importar`).
@@ -228,7 +229,7 @@ Corpo: `{ "texto": string, "aplicar"?: boolean }`, com até 150 mil caracteres.
 Respostas:
 
 - 200 `{"plano": { itens, desativar, bloqueios, avisos, turmas }, "aplicado": { criados, atualizados, desativados } | null}`. Cada item traz `{ nome, turmaId, turmaOriginalId, ordem, alunoId, mudancas }`, com `alunoId` nulo para aluno novo e `mudancas` entre `turma`, `origem`, `ordem` e `reativar`.
-- 400 texto vazio ou grande demais, ou `aplicar` com bloqueio (turma não cadastrada, homônimo no cadastro ou nome repetido nas relações).
+- 400 CSV vazio ou grande demais, ou `aplicar` com bloqueio (linha fora do schema, turma não cadastrada, homônimo no cadastro ou nome repetido no arquivo).
 - 403 sem papel de administração ou origem não confiável.
 
 ## Usuários (administração)

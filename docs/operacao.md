@@ -89,12 +89,43 @@ delete from tentativas_entrada where chave like '%:3a-maria';
 Quando a escola reorganiza turmas, como nas 3ª séries, a Chamada passa a seguir a relação atual de cada turma, e a Grade e a planilha consolidam pela turma original de cada aluno.
 
 1. Publique a versão do aplicativo com a lista da chamada ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)) antes de mover alunos. A migração fixa quem estava em cada chamada já salva.
-2. Em Gestão, Alunos, toque em Importar relação, cole as relações ou escolha os arquivos `.txt` de todas as turmas da série de uma vez, e toque em Conferir.
-3. Confira a prévia: o total por turma precisa bater com o cabeçalho de cada relação, e a lista de desativados só pode ter quem de fato saiu. Corrija no arquivo qualquer turma desconhecida ou nome repetido.
-4. Toque em Aplicar. A Chamada de cada turma passa a mostrar a relação na ordem do arquivo, com a turma original em círculo ao lado de cada nome.
-5. Repetir a mesma relação não muda nada; uma relação nova pode ser importada da mesma forma.
+2. Monte um CSV com todas as turmas da série no schema abaixo. O caminho mais simples é tocar em Exportar relação, editar o arquivo na planilha eletrônica e salvar de novo como CSV.
+3. Em Gestão, Alunos, toque em Importar relação, escolha o arquivo `.csv` ou cole o conteúdo. Linhas fora do padrão aparecem na hora, em vermelho, com o número da linha e o que corrigir.
+4. Toque em Conferir e confira a prévia: o total de alunos por turma e a lista de desativados, que só pode ter quem de fato saiu. Corrija no arquivo qualquer turma desconhecida ou nome repetido.
+5. Toque em Aplicar. A Chamada de cada turma passa a mostrar a relação na ordem do arquivo, com a turma original em círculo ao lado de cada nome.
+6. Reimportar o mesmo arquivo, ou o que acabou de ser exportado, não muda nada.
 
 As relações têm nomes de alunos: não as anexe em issue, pull request ou commit.
+
+### Schema da relação de alunos
+
+O mesmo formato vale para Importar relação e Exportar relação:
+
+- arquivo `.csv` em UTF-8 (com ou sem BOM), uma linha por aluno;
+- separador ponto e vírgula; a vírgula também é aceita na leitura;
+- campos com separador, aspas ou quebra de linha entre aspas duplas, com aspas internas dobradas;
+- cabeçalho obrigatório, exatamente nesta ordem:
+
+```text
+turma_atual;ordem;nome;turma_original
+```
+
+| Coluna           | Conteúdo                                                                    |
+| ---------------- | --------------------------------------------------------------------------- |
+| `turma_atual`    | Turma em que o aluno faz a chamada, como cadastrada (`3º ano A` ou `3º A`). |
+| `ordem`          | Posição na chamada da turma: inteiro de 1 a 9999, sem repetir na turma.     |
+| `nome`           | Nome do aluno, de 2 a 100 caracteres.                                       |
+| `turma_original` | Turma original, pela qual a Grade e a planilha consolidam a frequência.     |
+
+Exemplo:
+
+```text
+turma_atual;ordem;nome;turma_original
+3º ano A;1;Nome do Aluno;3º ano B
+3º ano A;2;Outro Aluno;3º ano A
+```
+
+A exportação leva os alunos ativos de todas as turmas, na ordem do cadastro, renumera a ordem de 1 em diante por turma e protege contra fórmula o campo que começa com `=`, `+`, `-` ou `@` (com um apóstrofo, retirado na importação). Alunos ativos das turmas presentes no arquivo que não estiverem nele são desativados na importação, sem perder o histórico.
 
 ## Conexões administrativas
 

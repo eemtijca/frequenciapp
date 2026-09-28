@@ -13,7 +13,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Rulesets de revisão e qualidade na branch `main`.
 - Lista de cada chamada gravada (`alunos_chamada`): mover um aluno de turma não reescreve os dias já salvos, e a consolidação pela turma original continua certa (ADR-022).
 - Turma original em círculo ao lado do nome na Chamada das turmas reorganizadas.
-- Importação das relações de turma na Gestão, com prévia e aplicação que mantém o histórico de cada aluno.
+- Importação e exportação da relação de alunos em CSV, com schema padrão (`turma_atual;ordem;nome;turma_original`), validação por linha na hora e prévia que mantém o histórico de cada aluno.
 - Código invisível do aluno em cada linha da planilha de frequência (script na versão 3): o envio acha o aluno pelo código, sem trocar nem duplicar alunos (ADR-023).
 
 ### Corrigido
@@ -21,6 +21,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Na edição de um aluno, mudar a turma não altera mais a turma de origem mostrada no formulário.
 - O envio para a planilha lê a aba até a última linha e cria a linha de aluno novo depois dela, sem gravar sobre outra linha quando o esquema salvo está defasado.
 - O mapa da planilha recusa duas abas para a mesma turma original.
+- As ações da aba Alunos na Gestão cabem na tela do celular, sem botão cortado.
 
 ### Modificado
 
