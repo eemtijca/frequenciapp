@@ -109,7 +109,7 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 1. provisionar o projeto Supabase e a role do aplicativo;
 2. configurar `DATABASE_URL` e `DIRECT_URL` na Vercel;
 3. configurar `DIRECT_URL_PROD` como segredo do GitHub;
-4. aplicar as migrations pelo workflow `db-migrate.yml`;
+4. aplicar as migrações pelo workflow `migracoes.yml`;
 5. confirmar `npx prisma migrate status` com a conexão de sessão;
 6. publicar a `main` na Vercel;
 7. verificar login, frequência, histórico e `/api/saude`.
@@ -122,10 +122,10 @@ Os workflows ficam em `.github/workflows/`:
 
 | Workflow         | Responsabilidade                                             |
 | ---------------- | ------------------------------------------------------------ |
-| `quality.yml`    | Formatação, lint, tipos e testes unitários                   |
+| `qualidade.yml`  | Formatação, lint, tipos e testes unitários                   |
 | `build.yml`      | Build de produção do Next.js                                 |
-| `test-db.yml`    | Compose, migração, contas de teste e contratos de API        |
-| `db-migrate.yml` | `prisma migrate deploy` na `main` e no ambiente `production` |
+| `testes.yml`     | Compose, migração, contas de teste e contratos de API        |
+| `migracoes.yml`  | `prisma migrate deploy` na `main` e no ambiente `production` |
 | `codeql.yml`     | Análise de segurança de JavaScript e TypeScript              |
 | `publicacao.yml` | Publicação da imagem no GHCR                                 |
 

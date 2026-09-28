@@ -1,0 +1,50 @@
+name: Melhoria
+description: Proponha uma funcionalidade ou melhoria.
+title: "[Melhoria]: "
+labels:
+  - enhancement
+body:
+  - type: checkboxes
+    id: busca
+    attributes:
+      label: Antes de abrir
+      options:
+        - label: Procurei issues abertas e fechadas e não encontrei uma equivalente.
+          required: true
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema
+      description: Qual necessidade ou dificuldade motiva a proposta?
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+      description: Descreva o comportamento desejado e as alternativas consideradas.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área beneficiada
+      options:
+        - Chamada
+        - Saídas
+        - Relatórios
+        - Alunos
+        - Gestão
+        - Integração com o Google Planilhas
+        - PWA e acessibilidade
+        - API
+        - Todas
+    validations:
+      required: false
+  - type: textarea
+    id: contexto
+    attributes:
+      label: Contexto adicional
+      description: Referências, esboços ou restrições, sem dados sensíveis.
+    validations:
+      required: false
