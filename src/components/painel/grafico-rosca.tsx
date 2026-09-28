@@ -2,6 +2,7 @@
 
 // Rosca de distribuição de faltas com a paleta do app e legenda acessível.
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 export interface FatiaGrafico {
   nome: string;
@@ -91,20 +92,30 @@ export default function GraficoRosca({
       </div>
       <ul className="w-full min-w-0 flex-1 space-y-1.5">
         {visiveis.map((fatia, indice) => (
-          <li key={fatia.nome} className="flex items-center gap-2 text-sm">
-            <span
-              aria-hidden="true"
-              className="size-2.5 shrink-0 rounded-full"
-              style={{ background: CORES[indice % CORES.length] }}
-            />
-            <span className="min-w-0 flex-1 truncate">
-              {fatia.nome}
-              {fatia.detalhe && (
-                <span className="text-muted-foreground ml-1 text-xs">{fatia.detalhe}</span>
-              )}
+          <li key={fatia.nome} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {/* Sem espaço para o nome, os círculos descem para a linha de baixo. */}
+            <span className="flex min-w-24 flex-1 items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ background: CORES[indice % CORES.length] }}
+              />
+              <span className="min-w-0 flex-1 truncate">
+                {fatia.nome}
+                {fatia.detalhe && (
+                  <span className="text-muted-foreground ml-1 text-xs">{fatia.detalhe}</span>
+                )}
+              </span>
             </span>
-            <span className="numerais-tabulares text-muted-foreground shrink-0 text-xs">
-              {fatia.valor} · {percentual.format(fatia.valor / total)}
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <CirculoValor
+                texto={String(fatia.valor)}
+                rotulo={`${fatia.valor} ${fatia.valor === 1 ? "falta" : "faltas"}`}
+              />
+              <CirculoValor
+                texto={percentual.format(fatia.valor / total)}
+                rotulo={`${percentual.format(fatia.valor / total)} do total`}
+              />
             </span>
           </li>
         ))}
