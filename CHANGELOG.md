@@ -17,6 +17,11 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 - Na edição de um aluno, mudar a turma não altera mais a turma de origem mostrada no formulário.
 
+- Lista de cada chamada gravada (`alunos_chamada`): mover um aluno de turma não reescreve os dias já salvos, e a consolidação pela turma original continua certa (ADR-022).
+- Turma original em círculo ao lado do nome na Chamada das turmas reorganizadas.
+
 ### Modificado
+
+- O Painel distribui as faltas do dia pela turma atual, como a chamada aconteceu.
 
 - Workflows renomeados para `qualidade.yml`, `testes.yml` e `migracoes.yml`, com o padrão de nomes em português.

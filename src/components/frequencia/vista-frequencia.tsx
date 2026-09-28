@@ -36,6 +36,7 @@ import {
   horariosDoDia,
   JUSTIFICATIVA_OUTROS,
   normalizar,
+  rotuloCurtoDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
   type FaltaAluno,
@@ -45,7 +46,7 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Input } from "@/components/ui/input";
-import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
+import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import {
@@ -140,6 +141,8 @@ export default function VistaFrequencia({
   const [aulasAbertas, setAulasAbertas] = useState<string | null>(null);
   const [resumoAberto, setResumoAberto] = useState(false);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
+  // Lista gravada da chamada; nula enquanto o dia não foi salvo.
+  const [listaGravada, setListaGravada] = useState<string[] | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -189,6 +192,7 @@ export default function VistaFrequencia({
     setAulasAbertas(null);
     setResumoAberto(false);
     setRevisaoSalva(0);
+    setListaGravada(null);
     setAtualizadoEm("");
     chaveCarregada.current = chave;
 
@@ -202,6 +206,7 @@ export default function VistaFrequencia({
         setJustificativas(paraJustificativas(frequencia?.faltas ?? []));
         setObservacoes(paraObservacoes(frequencia?.faltas ?? []));
         setRevisaoSalva(frequencia?.revisao ?? 0);
+        setListaGravada(frequencia?.alunos ?? null);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
         try {
@@ -269,13 +274,29 @@ export default function VistaFrequencia({
     onPendencia(sujo ? ["chamada"] : []);
   }, [sujo, onPendencia]);
 
-  const ativosDaTurma = useMemo(
-    () =>
-      alunos
-        .filter((aluno) => aluno.ativo && aluno.turmaId === turmaId)
-        .sort((a, b) => a.ordem - b.ordem),
-    [alunos, turmaId],
-  );
+  // Dia novo: a relação atual da turma. Dia salvo: quem estava na chamada,
+  // mesmo que tenha mudado de turma depois; hoje também recebe quem entrou.
+  const ativosDaTurma = useMemo(() => {
+    const daTurma = (aluno: Aluno) => aluno.ativo && aluno.turmaId === turmaId;
+    const naLista = new Set(listaGravada ?? []);
+    return alunos
+      .filter((aluno) =>
+        listaGravada === null
+          ? daTurma(aluno)
+          : naLista.has(aluno.id) || (dia === diaCorrente && daTurma(aluno)),
+      )
+      .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [alunos, turmaId, listaGravada, dia, diaCorrente]);
+
+  // Turma reorganizada: algum aluno da chamada veio de outra turma. Nela, a
+  // turma original de cada aluno aparece em um círculo ao lado do nome.
+  const turmaReorganizada = ativosDaTurma.some((aluno) => aluno.turmaOriginalId !== turmaId);
+  const rotuloCurtoDe = useMemo(() => {
+    const mapa = new Map(
+      turmas.map((item) => [item.id, rotuloCurtoDeTurma(item.serieNome, item.nome)]),
+    );
+    return (id: string) => mapa.get(id) ?? "";
+  }, [turmas]);
 
   const aulasDoDia = useMemo(() => (turma ? horariosDoDia(turma.horarios, dia) : []), [turma, dia]);
   const acumuladoDe = useMemo(() => {
@@ -455,6 +476,7 @@ export default function VistaFrequencia({
       setObservacoes(paraObservacoes(dados.frequencia.faltas));
       setAulasAbertas(null);
       setRevisaoSalva(dados.frequencia.revisao);
+      setListaGravada(dados.frequencia.alunos ?? null);
       setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);
       setConflito(false);
@@ -924,7 +946,11 @@ export default function VistaFrequencia({
                           type="button"
                           aria-pressed={faltando}
                           disabled={bloqueado}
-                          aria-label={`${aluno.nome}: ${
+                          aria-label={`${aluno.nome}${
+                            turmaReorganizada
+                              ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
+                              : ""
+                          }: ${
                             faltando
                               ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
                               : "presente. Toque para marcar falta."
@@ -942,10 +968,18 @@ export default function VistaFrequencia({
                             {String(aluno.ordem).padStart(2, "0")}
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span
-                              className={`block truncate ${faltando ? "font-semibold" : "font-medium"}`}
-                            >
-                              {aluno.nome}
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                              >
+                                {aluno.nome}
+                              </span>
+                              {turmaReorganizada && rotuloCurtoDe(aluno.turmaOriginalId) && (
+                                <CirculoValor
+                                  texto={rotuloCurtoDe(aluno.turmaOriginalId)}
+                                  rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
+                                />
+                              )}
                             </span>
                             {parcial ? (
                               <span className="text-falta-texto block truncate text-xs">
@@ -960,11 +994,6 @@ export default function VistaFrequencia({
                                 />
                               </span>
                             ) : null}
-                            {aluno.turmaOriginalId !== aluno.turmaId && (
-                              <span className="text-muted-foreground block truncate text-xs">
-                                Origem {rotuloOrigemDe(aluno.turmaOriginalId)}
-                              </span>
-                            )}
                           </span>
                           <motion.span
                             key={faltando ? codigo || "F" : "P"}

@@ -122,16 +122,15 @@ export async function estatisticasDoDiretor(
     listarFrequenciasDoPeriodo(periodo.de, periodo.ate),
   ]);
   // Mesmo recorte da Grade: alunos ativos da turma de origem, com a marca
-  // tirada da chamada da turma atual de cada um.
+  // tirada da chamada que tinha cada um na lista, em qualquer turma.
   const daOrigem = alunos.filter(
     (aluno) => aluno.ativo && aluno.turmaOriginalId === vinculo.turmaId,
   );
-  const turmasAtuais = new Set(daOrigem.map((aluno) => aluno.turmaId));
   const grade = montarGrade(
     daOrigem,
-    frequencias.filter((frequencia) => turmasAtuais.has(frequencia.turmaId)),
+    frequencias,
     diasEntre(periodo.de, periodo.ate),
-    turmas.filter((turma) => turmasAtuais.has(turma.id)).flatMap((turma) => turma.horarios),
+    turmas.flatMap((turma) => turma.horarios),
   );
 
   let saidasPorAluno: Map<string, number> | undefined;
