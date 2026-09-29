@@ -55,7 +55,7 @@ export function proxy(request: NextRequest) {
 
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'wasm-unsafe-eval' ${ehDev ? "'unsafe-inline' 'unsafe-eval'" : `'nonce-${nonce}' 'strict-dynamic'`}`,
+    `script-src 'self' https://apis.google.com 'wasm-unsafe-eval' ${ehDev ? "'unsafe-inline' 'unsafe-eval'" : `'nonce-${nonce}' 'strict-dynamic'`}`,
     "style-src 'self' 'unsafe-inline'",
     "style-src-elem 'self' 'unsafe-inline'",
     "style-src-attr 'unsafe-inline'",

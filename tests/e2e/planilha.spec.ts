@@ -118,6 +118,10 @@ test.describe("Google Planilhas", () => {
     // Prévia na Grade, sem enviar.
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Grade" }).click();
+    const turmaE2E = page
+      .locator('section[aria-label="Grade de frequência"]')
+      .getByRole("button", { name: /E2E Ano A/ });
+    await turmaE2E.click();
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
     const dialogo = page.getByRole("dialog");
     await dialogo.getByLabel(/O período inteiro/).check();

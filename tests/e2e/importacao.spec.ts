@@ -66,8 +66,9 @@ test.describe("relação de alunos em CSV", () => {
     const arquivo = await download;
     expect(arquivo.suggestedFilename()).toBe("frequenciapp-relacao-alunos.csv");
     const conteudo = await readFile((await arquivo.path()) ?? "", "utf8");
-    expect(conteudo.replace(/^﻿/, "").split("\r\n").slice(0, 3)).toEqual([
-      CABECALHO,
+    const linhas = conteudo.replace(/^﻿/, "").split("\r\n");
+    expect(linhas[0]).toBe(CABECALHO);
+    expect(linhas.filter((linha) => linha.startsWith("E2E Ano A;"))).toEqual([
       "E2E Ano A;1;E2E Aluno Dois;E2E Ano A",
       "E2E Ano A;2;E2E Aluno Um;E2E Ano A",
     ]);

@@ -12,7 +12,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 
 ## Conectar por OAuth e Sheets API
 
-1. Crie ou escolha um projeto Google Cloud e ative a Google Sheets API e a Google Picker API.
+1. Crie ou escolha um projeto Google Cloud e ative a Google Sheets API, a Google Picker API e a Google Drive API, necessária ao seletor. A leitura e a escrita da planilha continuam pela Sheets API.
 2. Em Google Auth Platform, configure a marca e o público do aplicativo. No modo de teste, adicione a conta da escola como usuária de teste. O token de atualização de um aplicativo externo em teste pode expirar após sete dias; para uso contínuo, publique a configuração de autorização em produção.
 3. Crie um cliente OAuth do tipo Aplicativo da Web. Cadastre a origem pública do FrequenciApp e o URI de redirecionamento exato `https://SEU-DOMINIO/api/planilha/google/retorno`.
 4. Crie uma chave de API restrita à Google Picker API. Nas restrições de site, inclua a origem do FrequenciApp e `https://docs.google.com/*`, pois o Picker abre em um quadro desse domínio.
