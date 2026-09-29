@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   alunoDesistenteNoDia,
   celulasDoMes,
+  CONFIGURACOES_PADRAO,
   diaDaSemanaIso,
   diaLocal,
   diaSeguinte,
@@ -17,7 +18,7 @@ import {
   ehMesValido,
   ehMomentoDeAula,
   ehMomentoValido,
-  ehTerceiraSerie,
+  exibirOrigemNaChamada,
   horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
@@ -141,20 +142,53 @@ describe("rotuloCurtoDeTurma", () => {
 });
 
 describe("indicação da turma de origem na Chamada", () => {
-  it("reconhece somente a terceira série", () => {
-    expect(ehTerceiraSerie("3º ano")).toBe(true);
-    expect(ehTerceiraSerie("3ª série")).toBe(true);
-    expect(ehTerceiraSerie(" 3o ano ")).toBe(true);
-    expect(ehTerceiraSerie("1º ano")).toBe(false);
-    expect(ehTerceiraSerie("2ª série")).toBe(false);
-    expect(ehTerceiraSerie("30º ano")).toBe(false);
+  const turma = { id: "turma-a", serieId: "serie-a" };
+
+  it("começa desligada e não mostra nada sem seleção ou sem turma", () => {
+    expect(exibirOrigemNaChamada(CONFIGURACOES_PADRAO, turma)).toBe(false);
+    const ligada = { ...CONFIGURACOES_PADRAO, origemNaChamada: true };
+    expect(exibirOrigemNaChamada(ligada, turma)).toBe(false);
+    expect(exibirOrigemNaChamada(ligada, undefined)).toBe(false);
   });
 
-  it("oculta asterisco final fora da terceira série sem alterar o nome cadastrado", () => {
+  it("inclui qualquer série selecionada, sem decidir pelo nome", () => {
+    const configuracoes = {
+      ...CONFIGURACOES_PADRAO,
+      origemNaChamada: true,
+      origemNaChamadaSerieIds: ["serie-a"],
+    };
+    expect(exibirOrigemNaChamada(configuracoes, turma)).toBe(true);
+    expect(exibirOrigemNaChamada(configuracoes, { id: "turma-nova", serieId: "serie-a" })).toBe(
+      true,
+    );
+    expect(exibirOrigemNaChamada(configuracoes, { id: "turma-b", serieId: "serie-b" })).toBe(false);
+  });
+
+  it("soma várias séries e turmas avulsas e preserva a seleção ao desligar", () => {
+    const configuracoes = {
+      ...CONFIGURACOES_PADRAO,
+      origemNaChamada: true,
+      origemNaChamadaSerieIds: ["serie-a", "serie-b"],
+      origemNaChamadaTurmaIds: ["turma-c"],
+    };
+    expect(exibirOrigemNaChamada(configuracoes, turma)).toBe(true);
+    expect(exibirOrigemNaChamada(configuracoes, { id: "turma-b", serieId: "serie-b" })).toBe(true);
+    expect(exibirOrigemNaChamada(configuracoes, { id: "turma-c", serieId: "serie-c" })).toBe(true);
+    expect(exibirOrigemNaChamada(configuracoes, { id: "turma-d", serieId: "serie-c" })).toBe(false);
+    const desligada = { ...configuracoes, origemNaChamada: false };
+    expect(exibirOrigemNaChamada(desligada, turma)).toBe(false);
+    expect(desligada.origemNaChamadaSerieIds).toEqual(["serie-a", "serie-b"]);
+    expect(exibirOrigemNaChamada({ ...desligada, origemNaChamada: true }, turma)).toBe(true);
+  });
+
+  it("controla o asterisco visual sem alterar o nome cadastrado", () => {
     const nome = "Aluno Exemplo*";
-    expect(nomeNaChamada(nome, "1º ano")).toBe("Aluno Exemplo");
-    expect(nomeNaChamada("Aluno Exemplo *", "2ª série")).toBe("Aluno Exemplo");
-    expect(nomeNaChamada(nome, "3º ano")).toBe(nome);
+    expect(nomeNaChamada(nome, false, true)).toBe("Aluno Exemplo");
+    expect(nomeNaChamada("Aluno Exemplo *", false)).toBe("Aluno Exemplo");
+    expect(nomeNaChamada(nome, true)).toBe(nome);
+    expect(nomeNaChamada("Aluno Exemplo", true, true)).toBe(nome);
+    expect(nomeNaChamada("Aluno Exemplo", true, false)).toBe("Aluno Exemplo");
+    expect(nome).toBe("Aluno Exemplo*");
   });
 });
 

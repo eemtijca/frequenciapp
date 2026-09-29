@@ -1,10 +1,14 @@
-// Extras do 3º ano: agrupar Alunos por origem, buscar por origem na Chamada,
-// turma original em círculo na turma reorganizada e origem em massa na Gestão.
+// Origem configurável na Chamada, consulta por origem nos Alunos
+// e definição da turma original em massa na Gestão.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
+
+let configuracaoInicial: ConfiguracaoOrigem;
 
 async function criarMassaOrigem(): Promise<void> {
+  configuracaoInicial = await lerOrigem();
   await comBanco(async (cliente) => {
     await cliente.query(
       "delete from alunos where nome like 'E2E Origem %' or nome like 'E2E Movimento %'",
@@ -19,6 +23,17 @@ async function criarMassaOrigem(): Promise<void> {
       "insert into series (nome, ordem) values ('3º ano E2E Origem', 98) returning id",
     );
     const serieId = serie.rows[0]?.id as string;
+    await cliente.query("update configuracoes set origem_na_chamada = true where id = 'principal'");
+    await cliente.query(
+      "delete from configuracoes_origem_series where configuracao_id = 'principal'",
+    );
+    await cliente.query(
+      "delete from configuracoes_origem_turmas where configuracao_id = 'principal'",
+    );
+    await cliente.query(
+      "insert into configuracoes_origem_series (configuracao_id, serie_id) values ('principal', $1)",
+      [serieId],
+    );
     const turmaA = await cliente.query(
       "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
       [serieId],
@@ -69,6 +84,7 @@ async function limparMassaOrigem(): Promise<void> {
       "delete from series where nome in ('3º ano E2E Origem', '2º ano E2E Movimento')",
     );
   });
+  await definirOrigem(configuracaoInicial);
 }
 
 test.describe("consulta por origem (coordenação)", () => {
@@ -114,7 +130,7 @@ test.describe("consulta por origem (coordenação)", () => {
     const turma = secao.getByRole("button", { name: /E2E Origem A/ }).first();
     if (await turma.isVisible().catch(() => false)) await turma.click();
     await expect(
-      secao.getByRole("button", { name: /^E2E Origem Um, turma original 3º ano E2E Origem B:/ }),
+      secao.getByRole("button", { name: /^E2E Origem Um\*, turma original 3º ano E2E Origem B:/ }),
     ).toBeVisible();
     await expect(
       secao.getByRole("button", { name: /^E2E Origem Dois, turma original 3º ano E2E Origem A:/ }),

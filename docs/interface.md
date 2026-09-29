@@ -18,7 +18,9 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 
 ## Fluxo de um toque
 
-Na Chamada, o círculo da turma de origem fica reservado às turmas reorganizadas da 3ª série. Nas 1ª e 2ª séries, o asterisco final de remanejamento não aparece ao lado do nome; o cadastro, a Grade e a sincronização por turma de origem não são modificados.
+Em Gestão, Configurações, Recursos da escola, a chave "Turma de origem na Chamada" controla a indicação. Com o recurso ligado, a administração escolhe séries completas e turmas específicas; a seleção de uma série abrange também as turmas criadas depois. Cada escolha é salva imediatamente. Sem seleção ou com o recurso desligado, nenhuma chamada mostra origem nem asterisco. Desativar preserva a seleção para a próxima ativação.
+
+Nas chamadas selecionadas, a turma de origem aparece em um círculo ao lado do nome. O asterisco visual marca o aluno com origem diferente da turma da chamada e preserva o marcador legado quando habilitado. O nome cadastrado, a Grade e a sincronização por origem continuam iguais. A migração configura a 3ª série já existente para compatibilidade; instalações vazias começam com o recurso desligado. A interface não contém regra fixa por nome de série ([ADR-026](adr/026-origem-configuravel-na-chamada.md)).
 
 Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, um segundo toque devolve a presença. O indicador F ou FJ à direita e o fundo levemente avermelhado confirmam o estado; o seletor de justificativa fica logo abaixo da linha marcada. Todos os alunos começam presentes, então o movimento comum é tocar apenas nos ausentes, como na caderneta de papel. Alvos de toque têm no mínimo 48 pixels de altura na lista e 44 nas ações secundárias.
 

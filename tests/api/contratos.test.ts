@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import type { Configuracoes } from "@/domain/frequencia";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -1288,6 +1289,90 @@ describe("configurações e responsáveis", () => {
     expect(resposta.status).toBe(200);
     const dados = (await resposta.json()) as { responsaveis: { nome: string }[] };
     expect(dados.responsaveis.length).toBeGreaterThan(0);
+  });
+
+  it("persiste a seleção de origem e preserva os dados ao desligar e religar", async () => {
+    const cliente = banco;
+    if (!cliente) throw new Error("O banco isolado é obrigatório para conferir a preservação.");
+    const leitura = await autenticado(cookieAdmin, "/api/configuracoes");
+    const inicial = (await leitura.json()) as { configuracoes: Configuracoes };
+    const serieId = serieQA?.id ?? "";
+    const turmaId = turmaQA?.id ?? "";
+    const alunosAntes = await cliente.query(
+      "select id, nome, turma_id, turma_original_id from alunos where nome like 'QA%' order by id",
+    );
+    const frequenciasAntes = await cliente.query(
+      "select id, turma_id, dia, revisao from frequencias where dia = any($1::date[]) order by id",
+      [DIAS_TESTE],
+    );
+    try {
+      const selecionar = await autenticado(cookieAdmin, "/api/configuracoes", {
+        method: "PATCH",
+        body: JSON.stringify({
+          origemNaChamada: true,
+          origemNaChamadaSerieIds: [serieId, serieId],
+          origemNaChamadaTurmaIds: [turmaId],
+        }),
+      });
+      expect(selecionar.status).toBe(200);
+      const configurada = (await selecionar.json()) as { configuracoes: Configuracoes };
+      expect(configurada.configuracoes.origemNaChamadaSerieIds).toEqual([serieId]);
+      expect(configurada.configuracoes.origemNaChamadaTurmaIds).toEqual([turmaId]);
+      for (const ligada of [false, true]) {
+        const alternar = await autenticado(cookieAdmin, "/api/configuracoes", {
+          method: "PATCH",
+          body: JSON.stringify({ origemNaChamada: ligada }),
+        });
+        expect(alternar.status).toBe(200);
+        const recarregar = await autenticado(cookieCoord, "/api/configuracoes");
+        const dados = (await recarregar.json()) as { configuracoes: Configuracoes };
+        expect(dados.configuracoes).toEqual({
+          ...configurada.configuracoes,
+          origemNaChamada: ligada,
+        });
+      }
+      const alunosDepois = await cliente.query(
+        "select id, nome, turma_id, turma_original_id from alunos where nome like 'QA%' order by id",
+      );
+      const frequenciasDepois = await cliente.query(
+        "select id, turma_id, dia, revisao from frequencias where dia = any($1::date[]) order by id",
+        [DIAS_TESTE],
+      );
+      expect(alunosDepois.rows).toEqual(alunosAntes.rows);
+      expect(frequenciasDepois.rows).toEqual(frequenciasAntes.rows);
+      const copia = await autenticado(cookieAdmin, "/api/backup");
+      const exportada = (await copia.json()) as { configuracoes: Configuracoes };
+      expect(exportada.configuracoes).toEqual(configurada.configuracoes);
+    } finally {
+      const restaurar = await autenticado(cookieAdmin, "/api/configuracoes", {
+        method: "PATCH",
+        body: JSON.stringify(inicial.configuracoes),
+      });
+      expect(restaurar.status).toBe(200);
+    }
+  });
+
+  it("recusa seleções inválidas ou inexistentes sem alterar a configuração", async () => {
+    const antes = await autenticado(cookieAdmin, "/api/configuracoes");
+    const inicial = await antes.json();
+    for (const corpo of [
+      { origemNaChamadaSerieIds: ["inválido"] },
+      { origemNaChamadaTurmaIds: ["00000000-0000-4000-8000-000000000000"] },
+      { origemNaChamada: true, origemNaChamadaSerieIds: ["00000000-0000-4000-8000-000000000000"] },
+    ]) {
+      const resposta = await autenticado(cookieAdmin, "/api/configuracoes", {
+        method: "PATCH",
+        body: JSON.stringify(corpo),
+      });
+      expect(resposta.status).toBe(400);
+    }
+    const coordenacao = await autenticado(cookieCoord, "/api/configuracoes", {
+      method: "PATCH",
+      body: JSON.stringify({ origemNaChamada: true }),
+    });
+    expect(coordenacao.status).toBe(403);
+    const depois = await autenticado(cookieAdmin, "/api/configuracoes");
+    expect(await depois.json()).toEqual(inicial);
   });
 });
 

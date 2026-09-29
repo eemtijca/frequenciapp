@@ -35,7 +35,7 @@ import type {
 import {
   alunoDesistenteNoDia,
   diaSeguinte,
-  ehTerceiraSerie,
+  exibirOrigemNaChamada,
   horaNoFuso,
   horariosDoDia,
   JUSTIFICATIVA_OUTROS,
@@ -307,10 +307,7 @@ export default function VistaFrequencia({
   );
   const participantes = ativosDaTurma.filter((aluno) => !desistentesDaTurma.has(aluno.id));
 
-  // Na terceira série reorganizada, a origem de cada aluno aparece ao lado do nome.
-  const mostrarOrigem = Boolean(turma && ehTerceiraSerie(turma.serieNome));
-  const turmaReorganizada =
-    mostrarOrigem && ativosDaTurma.some((aluno) => aluno.turmaOriginalId !== turmaId);
+  const mostrarOrigem = exibirOrigemNaChamada(configuracoes, turma);
   const rotuloCurtoDe = useMemo(() => {
     const mapa = new Map(
       turmas.map((item) => [item.id, rotuloCurtoDeTurma(item.serieNome, item.nome)]),
@@ -880,7 +877,11 @@ export default function VistaFrequencia({
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium">
-                              {nomeNaChamada(aluno.nome, turma?.serieNome ?? "")}
+                              {nomeNaChamada(
+                                aluno.nome,
+                                mostrarOrigem,
+                                aluno.turmaOriginalId !== turmaId,
+                              )}
                               {codigo && (
                                 <span className="text-primary ml-2 text-xs font-semibold">
                                   {codigo}
@@ -992,7 +993,11 @@ export default function VistaFrequencia({
             ) : (
               <ul className="divide-y">
                 {visiveis.map((aluno) => {
-                  const nomeExibido = nomeNaChamada(aluno.nome, turma?.serieNome ?? "");
+                  const nomeExibido = nomeNaChamada(
+                    aluno.nome,
+                    mostrarOrigem,
+                    aluno.turmaOriginalId !== turmaId,
+                  );
                   const desistente = desistentesDaTurma.has(aluno.id);
                   const faltando = !desistente && ausencias.has(aluno.id);
                   const marcadas = ausencias.get(aluno.id)?.size ?? 0;
@@ -1013,7 +1018,7 @@ export default function VistaFrequencia({
                           aria-pressed={faltando}
                           disabled={bloqueado || desistente}
                           aria-label={`${nomeExibido}${
-                            turmaReorganizada
+                            mostrarOrigem
                               ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
                               : ""
                           }: ${
@@ -1047,7 +1052,7 @@ export default function VistaFrequencia({
                                   DESISTENTE
                                 </span>
                               )}
-                              {turmaReorganizada && rotuloCurtoDe(aluno.turmaOriginalId) && (
+                              {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
                                 <CirculoValor
                                   texto={rotuloCurtoDe(aluno.turmaOriginalId)}
                                   rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
