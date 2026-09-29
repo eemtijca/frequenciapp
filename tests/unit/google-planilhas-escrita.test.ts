@@ -3,6 +3,7 @@ import { mensagemParaRegistro } from "@/infra/planilha";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assinarAba } from "@/domain/planilha";
 import {
+  aplicarGoogle,
   compactarAtualizacoesGoogle,
   enviarLotesGoogle,
   planejarEscritaGoogle,
@@ -205,6 +206,36 @@ describe("gravação pela Sheets API", () => {
     ).rejects.toMatchObject({
       recusado: true,
     });
+  });
+
+  it("classifica falha de leitura antes do lote como recusa e guarda o HTTP", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: URL | string) =>
+        String(entrada).endsWith("/developerMetadata:search")
+          ? Response.json(
+              { error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded" } },
+              { status: 429 },
+            )
+          : Response.json(documento),
+      ),
+    );
+    const falha = await aplicarGoogle(
+      "planilha-de-teste",
+      "acesso",
+      "Turma",
+      1,
+      assinatura,
+      [],
+      false,
+    ).catch((excecao: unknown) => excecao);
+    expect(falha).toMatchObject({
+      recusado: true,
+      detalhe: "HTTP 429 RESOURCE_EXHAUSTED Quota exceeded",
+    });
+    expect(mensagemParaRegistro(falha, "padrão")).toContain("Detalhe: HTTP 429");
+    erro.mockRestore();
   });
 
   it("guarda o motivo do Google e o lote que falhou, sem a requisição", async () => {

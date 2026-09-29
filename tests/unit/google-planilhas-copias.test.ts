@@ -34,7 +34,10 @@ function googleFalso(doc: DocumentoGoogle) {
   const lotes: { requests: Record<string, unknown>[] }[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_entrada: URL | string, opcoes?: RequestInit) => {
+    vi.fn(async (entrada: URL | string, opcoes?: RequestInit) => {
+      if (String(entrada).endsWith("/developerMetadata:search")) {
+        return Response.json({ matchedDeveloperMetadata: [] });
+      }
       if (opcoes?.method !== "POST") return Response.json(doc);
       const lote = JSON.parse(String(opcoes.body)) as { requests: Record<string, unknown>[] };
       lotes.push(lote);

@@ -23,7 +23,7 @@ O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos esc
 
 O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas no modo completo criam uma cópia oculta da aba. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
-Na leitura da Sheets API, marcadores da planilha e da aba vêm nos respectivos campos `developerMetadata`; marcadores de linhas e colunas vêm em `sheets.data.rowMetadata` e `sheets.data.columnMetadata`. A prévia deve reconhecer os códigos já gravados antes de propor novos vínculos, inclusive depois de uma resposta sem confirmação.
+Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
 
 ## Conexão legada por Apps Script
 
@@ -59,7 +59,7 @@ O envio é manual, com prévia obrigatória, exceto o envio ao salvar a chamada,
 
 **Estrutura sempre atual.** Depois de um envio que cria coluna ou linha, o aplicativo relê a estrutura daquela aba e atualiza o esquema e a assinatura salvos; o envio do dia seguinte funciona sem Revisar estrutura. Se a assinatura lida na prévia não bater com a salva (por exemplo, porque um envio anterior criou o dia e não chegou a responder), a estrutura daquela aba é detectada de novo e a prévia avisa. A proteção contra mudança manual entre a prévia e o envio continua: o envio recalcula o plano e exige o mesmo hash.
 
-**Resultado sem confirmação.** O registro de cada turma nasce `PARCIAL` antes da chamada ao Google e só vira `SUCESSO` com a resposta. Timeout, queda de rede ou 504 depois de enviada a requisição ficam `PARCIAL`, com a mensagem de que não foi possível confirmar o resultado e de que a aba precisa ser conferida; nunca "nada foi alterado". O envio nunca é repetido automaticamente. Pela Sheets API, o registro também guarda o motivo técnico (código HTTP, mensagem do Google e o lote que falhou), lido na tabela de sincronizações e no log do servidor; a tela mostra só a frase curta. Os dias continuam pendentes. Ao reenviar, o aplicativo relê a aba, ignora células que encontra ocupadas e reconhece a coluna do dia já criada.
+**Resultado sem confirmação.** O registro de cada turma nasce `PARCIAL` antes da chamada ao Google e só vira `SUCESSO` com a resposta. Timeout, queda de rede ou 504 depois de enviada a requisição ficam `PARCIAL`, com a mensagem de que não foi possível confirmar o resultado e de que a aba precisa ser conferida; nunca "nada foi alterado". Falha na releitura anterior ao lote fica `FALHA`, pois nenhuma escrita começou. O envio nunca é repetido automaticamente. Pela Sheets API, o registro também guarda o motivo técnico da leitura ou da escrita (código HTTP e mensagem do Google; na escrita, o lote que falhou), lido na tabela de sincronizações e no log do servidor; a tela mostra só a frase curta. Os dias continuam pendentes. Ao reenviar, o aplicativo relê a aba, ignora células que encontra ocupadas e reconhece a coluna do dia já criada.
 
 A prévia mostra:
 

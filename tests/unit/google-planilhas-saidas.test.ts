@@ -12,6 +12,9 @@ describe("planilha de saídas pela Sheets API", () => {
       "fetch",
       vi.fn(async (entrada: URL | string, opcoes?: RequestInit) => {
         const url = new URL(String(entrada));
+        if (url.pathname.endsWith("/developerMetadata:search")) {
+          return Response.json({ matchedDeveloperMetadata: [] });
+        }
         if (url.pathname.endsWith(":batchUpdate")) {
           const corpo = JSON.parse(String(opcoes?.body)) as { requests: unknown[] };
           lotes.push(corpo.requests);

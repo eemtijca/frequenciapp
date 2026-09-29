@@ -4,12 +4,14 @@ import { z } from "zod";
 import { assinarAba } from "@/domain/planilha";
 import { ErroHttp } from "@/infra/erros";
 import {
+  ErroLeituraGoogle,
   exigirAbaGoogle,
   lerDocumentoGoogle,
   lerGoogle,
   marcadoresDaAba,
   mesclagensDaAssinatura,
   metadadosDaAba,
+  motivoDoGoogle,
   type DocumentoGoogle,
 } from "@/infra/google-planilhas-api";
 
@@ -462,18 +464,6 @@ export function planejarEscritaGoogle(
   return { requests, contagens, destrutiva };
 }
 
-/** Código HTTP e mensagem de erro do Google, sem o corpo da requisição. */
-async function motivoDoGoogle(resposta: Response): Promise<string> {
-  let mensagem = "";
-  try {
-    const corpo = (await resposta.json()) as { error?: { status?: string; message?: string } };
-    mensagem = [corpo.error?.status, corpo.error?.message].filter(Boolean).join(" ");
-  } catch {
-    // Corpo vazio ou fora do formato: fica só o código HTTP.
-  }
-  return `HTTP ${resposta.status}${mensagem ? ` ${mensagem}` : ""}`.slice(0, 220);
-}
-
 /** Envia lotes sem repetição automática; falha depois do primeiro lote é parcial. */
 export async function enviarLotesGoogle(
   id: string,
@@ -524,8 +514,18 @@ export async function aplicarGoogle(
   operacoes: unknown,
   modoCompleto: boolean,
 ) {
-  const doc = await lerDocumentoGoogle(id, acesso);
-  const leitura = await lerGoogle(id, acesso, nome);
+  let doc: DocumentoGoogle;
+  let leitura: Awaited<ReturnType<typeof lerGoogle>>;
+  try {
+    doc = await lerDocumentoGoogle(id, acesso);
+    leitura = await lerGoogle(id, acesso, nome, undefined, undefined, doc);
+  } catch (erro) {
+    if (erro instanceof ErroLeituraGoogle) {
+      throw new ErroGoogle(erro.message, true, erro.detalhe);
+    }
+    if (erro instanceof ErroHttp) throw new ErroGoogle(erro.message, true);
+    throw erro;
+  }
   let plano: PlanoDeEscritaGoogle;
   try {
     plano = planejarEscritaGoogle(
