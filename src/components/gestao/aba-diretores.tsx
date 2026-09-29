@@ -20,7 +20,7 @@ import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { normalizar, type Turma } from "@/domain/frequencia";
+import { normalizar, rotuloData, rotuloDiaSemana, type Turma } from "@/domain/frequencia";
 import {
   ROTULOS_ESTADO_CREDENCIAL,
   problemaDeIdentificador,
@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Selo, type VarianteSelo } from "@/components/ui/selo";
 import {
   Dialog,
@@ -513,17 +514,15 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
             </fieldset>
             <div className="flex flex-col gap-2">
               <Label htmlFor="inicio-diretor">Acompanha desde</Label>
-              <Input
+              <SeletorPeriodo
                 id="inicio-diretor"
-                type="date"
-                value={formulario.inicio}
+                modo="dia"
+                valor={formulario.inicio || diaCorrente}
                 max={diaCorrente}
-                min="2000-01-01"
-                aria-describedby="dica-inicio-diretor"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, inicio: evento.target.value }))
-                }
-                className="h-11 rounded-lg"
+                rotuloAcessivel="Data de início do acompanhamento"
+                rotulo={rotuloData(formulario.inicio || diaCorrente)}
+                detalhe={rotuloDiaSemana(formulario.inicio || diaCorrente)}
+                onValor={(inicio) => setFormulario((atual) => ({ ...atual, inicio }))}
               />
               <p id="dica-inicio-diretor" className="text-muted-foreground text-xs">
                 {emEdicao
