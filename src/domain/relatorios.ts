@@ -211,6 +211,60 @@ export function distribuicaoDoDia(
     });
 }
 
+/** Alunos ativos da série pela turma atual, que é como a chamada acontece. */
+function alunosAtivosDaSerie(serie: Serie, turmas: Turma[], alunos: Aluno[]): Aluno[] {
+  const idsDasTurmas = new Set(
+    turmas.filter((turma) => turma.serieId === serie.id).map((turma) => turma.id),
+  );
+  return alunos.filter((aluno) => aluno.ativo && idsDasTurmas.has(aluno.turmaId));
+}
+
+/** A série tem aluno cuja turma original difere da turma atual (turma reorganizada). */
+export function serieTemRemanejamento(serie: Serie, turmas: Turma[], alunos: Aluno[]): boolean {
+  return alunosAtivosDaSerie(serie, turmas, alunos).some(
+    (aluno) => aluno.turmaOriginalId !== aluno.turmaId,
+  );
+}
+
+/**
+ * Faltas do dia de uma série agrupadas pela turma original do aluno, a mesma
+ * consolidação da Grade e da planilha. Usa os mesmos alunos e marcas de
+ * `distribuicaoDoDia`, então o total de faltas é o mesmo; muda só o agrupamento.
+ */
+export function distribuicaoPorOrigem(
+  serie: Serie,
+  turmas: Turma[],
+  alunos: Aluno[],
+  marcas: Map<string, Marca>,
+): ResumoTurmaDia[] {
+  const alunosDaSerie = alunosAtivosDaSerie(serie, turmas, alunos);
+  const porOrigem = new Map<string, Aluno[]>();
+  for (const aluno of alunosDaSerie) {
+    const lista = porOrigem.get(aluno.turmaOriginalId) ?? [];
+    lista.push(aluno);
+    porOrigem.set(aluno.turmaOriginalId, lista);
+  }
+  const contagens = [...porOrigem.entries()].map(([turmaId, doGrupo]) => {
+    const marcasDoGrupo = new Map<string, Marca>();
+    for (const aluno of doGrupo) {
+      const marca = marcas.get(aluno.id);
+      if (marca) marcasDoGrupo.set(aluno.id, marca);
+    }
+    return {
+      turmaId,
+      rotulo: turmas.find((turma) => turma.id === turmaId)?.rotulo ?? "Sem turma de origem",
+      ...contagemDeMarcas(marcasDoGrupo, doGrupo.length),
+    };
+  });
+  const totalSerie = contagens.reduce((soma, contagem) => soma + ausencias(contagem), 0);
+  return contagens
+    .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"))
+    .map((contagem) => ({
+      ...contagem,
+      percentual: totalSerie > 0 ? ausencias(contagem) / totalSerie : 0,
+    }));
+}
+
 /** Índice de frequências por dia, para os relatórios por aluno. */
 export function indexarPorDia(frequencias: Frequencia[]): Map<string, Frequencia[]> {
   const porDia = new Map<string, Frequencia[]>();

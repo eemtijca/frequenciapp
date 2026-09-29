@@ -5,6 +5,8 @@ import {
   coberturaDoDia,
   desistenciasNoDia,
   distribuicaoDoDia,
+  distribuicaoPorOrigem,
+  serieTemRemanejamento,
   indexarPorDia,
   marcasDoDia,
   relatorioSaidas,
@@ -221,5 +223,44 @@ describe("relatorioSaidas", () => {
     expect(repetidas).toHaveLength(1);
     expect(repetidas[0]?.alunoId).toBe("aluno-a");
     expect(repetidas[0]?.saidas).toHaveLength(2);
+  });
+});
+
+describe("distribuicaoPorOrigem", () => {
+  const series = [serie()];
+  const turmas = [turma(), turma({ id: "turma-b", nome: "B" })];
+  // Um aluno de A foi remanejado para B; um de B ficou onde estava.
+  const alunos = [
+    aluno({ id: "aluno-a" }),
+    aluno({ id: "aluno-m", turmaId: "turma-b", turmaOriginalId: "turma-a" }),
+    aluno({ id: "aluno-b", turmaId: "turma-b", turmaOriginalId: "turma-b" }),
+    aluno({ id: "aluno-i", ativo: false, turmaId: "turma-b", turmaOriginalId: "turma-a" }),
+  ];
+  const doDia = [
+    frequencia({ turmaId: "turma-b", faltas: [{ alunoId: "aluno-m", horarios: ["aula-1"] }] }),
+    frequencia({ turmaId: "turma-a", faltas: [] }),
+  ];
+  const marcas = marcasDoDia(alunos, "2026-09-10", doDia);
+
+  it("agrupa pela turma original, contando a falta do remanejado na origem", () => {
+    const porOrigem = distribuicaoPorOrigem(series[0] as Serie, turmas, alunos, marcas);
+    expect(porOrigem.map((item) => [item.rotulo, item.esperados, item.faltas])).toEqual([
+      ["1ª série A", 2, 1],
+      ["1ª série B", 1, 0],
+    ]);
+  });
+
+  it("soma o mesmo total de faltas que a distribuição pela turma atual", () => {
+    const porOrigem = distribuicaoPorOrigem(series[0] as Serie, turmas, alunos, marcas);
+    const porAtual = distribuicaoDoDia(series, turmas, alunos, marcas)[0];
+    const total = (lista: { faltas: number; justificadas: number }[]) =>
+      lista.reduce((soma, item) => soma + item.faltas + item.justificadas, 0);
+    expect(total(porOrigem)).toBe(total(porAtual?.turmas ?? []));
+  });
+
+  it("detecta remanejamento só quando a origem difere da turma atual", () => {
+    expect(serieTemRemanejamento(series[0] as Serie, turmas, alunos)).toBe(true);
+    const semRemanejamento = [aluno({ id: "x" }), aluno({ id: "y" })];
+    expect(serieTemRemanejamento(series[0] as Serie, turmas, semRemanejamento)).toBe(false);
   });
 });

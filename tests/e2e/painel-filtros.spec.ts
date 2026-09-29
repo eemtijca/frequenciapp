@@ -30,6 +30,17 @@ test.beforeAll(async () => {
         "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ($1, $2, $2, 1, true, $3)",
         [`E2E Painel Aluno ${indice + 1}`, turma.rows[0]?.id, indice === 0 ? "2020-01-01" : null],
       );
+      if (indice === 0) {
+        // Aluno remanejado: chama na turma B e é da turma A de origem.
+        const turmaB = await cliente.query<{ id: string }>(
+          "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
+          [serie.rows[0]?.id],
+        );
+        await cliente.query(
+          "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Painel Aluno 3', $1, $2, 1, true)",
+          [turmaB.rows[0]?.id, turma.rows[0]?.id],
+        );
+      }
     }
   });
 });
@@ -56,11 +67,20 @@ test("cada botão do Painel mostra só o gráfico do seu escopo", async ({ page 
   await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
   await filtros.getByRole("button", { name: "E2E Painel Um" }).click();
-  await expect(page.getByRole("heading", { name: "E2E Painel Um" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E Painel Um", exact: true })).toBeVisible();
+  // Série com aluno remanejado: o gráfico pela turma original vem logo abaixo.
+  await expect(
+    page.getByRole("heading", { name: "E2E Painel Um por turma original" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "E2E Painel Dois" })).toHaveCount(0);
   await expect(pendente("E2E Painel Dois A")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
+
+  // Série sem remanejamento: um gráfico só.
+  await filtros.getByRole("button", { name: "E2E Painel Dois" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Painel Dois", exact: true })).toBeVisible();
+  await expect(page.getByText("por turma original")).toHaveCount(0);
 
   await filtros.getByRole("button", { name: "Desistentes" }).click();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
