@@ -43,6 +43,8 @@ test("cada botão do Painel mostra só o gráfico do seu escopo", async ({ page 
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
   const filtros = page.getByRole("group", { name: "Filtro por série" });
+  // Só o chip da Cobertura do dia: o mesmo nome também está em seletores da página.
+  const pendente = (turma: string) => page.locator("span.bg-falta-fraca", { hasText: turma });
 
   await expect(filtros.getByRole("button", { name: "Escola" })).toHaveAttribute(
     "aria-pressed",
@@ -51,13 +53,13 @@ test("cada botão do Painel mostra só o gráfico do seu escopo", async ({ page 
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /^E2E Painel (Um|Dois)$/ })).toHaveCount(0);
-  await expect(page.getByText("E2E Painel Dois A")).toBeVisible();
+  await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
   await filtros.getByRole("button", { name: "E2E Painel Um" }).click();
   await expect(page.getByRole("heading", { name: "E2E Painel Um" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "E2E Painel Dois" })).toHaveCount(0);
-  await expect(page.getByText("E2E Painel Dois A")).toHaveCount(0);
+  await expect(pendente("E2E Painel Dois A")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
 
   await filtros.getByRole("button", { name: "Desistentes" }).click();
