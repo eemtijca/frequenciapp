@@ -269,6 +269,9 @@ export default function VistaMinhasTurmas({ contexto }: Props) {
           {semChamada ? (
             <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-8 text-center text-sm">
               Nenhuma chamada registrada neste período.
+              {periodo && dados && periodo.de === dados.vinculo.inicio
+                ? ` Seu acompanhamento desta turma começou em ${dataPorExtenso(dados.vinculo.inicio)}.`
+                : ""}
             </p>
           ) : (
             <>

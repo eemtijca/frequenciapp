@@ -21,6 +21,39 @@ test.describe("diretores de turma na Gestão", () => {
     await restaurarParametrosAcessoE2E();
   });
 
+  test("escolhe a data de início pelo seletor em popover, inteiro na tela do celular", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await page
+      .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
+      .first()
+      .click();
+    const formulario = page.getByRole("dialog");
+    const gatilho = formulario.getByRole("button", {
+      name: /Data de início do acompanhamento: .*, Hoje/,
+    });
+    await expect(gatilho).toBeVisible();
+    await gatilho.click();
+    const painel = page.getByRole("dialog", { name: "Data de início do acompanhamento" });
+    await expect(painel).toBeVisible();
+    const caixa = await painel.boundingBox();
+    expect(caixa?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(360);
+    await painel.getByRole("button", { name: "Mês anterior" }).click();
+    await painel.getByRole("button", { name: /^10 de / }).click();
+    await expect(
+      formulario.getByRole("button", {
+        name: /Data de início do acompanhamento: 10\/\d{2}\/\d{4}/,
+      }),
+    ).toBeVisible();
+    await expect(formulario.getByRole("button", { name: "Cadastrar" })).toBeVisible();
+  });
+
   test("cadastra, gera a palavra-chave uma vez e revoga com motivo", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);

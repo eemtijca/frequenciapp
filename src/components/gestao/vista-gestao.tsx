@@ -93,7 +93,7 @@ export default function VistaGestao({
               <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
             )}
             {aba === "equipe" && <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} />}
-            {aba === "diretores" && <AbaDiretores turmas={turmas} />}
+            {aba === "diretores" && <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} />}
             {aba === "configuracoes" && (
               <AbaConfiguracoes
                 configuracoes={configuracoes}
