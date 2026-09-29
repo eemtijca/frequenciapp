@@ -97,6 +97,7 @@ export default function VistaGestao({
             {aba === "configuracoes" && (
               <AbaConfiguracoes
                 configuracoes={configuracoes}
+                series={series}
                 justificativas={justificativas}
                 liberadores={liberadores}
                 turmas={turmas}

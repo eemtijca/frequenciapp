@@ -281,12 +281,18 @@ export interface SaidaAntecipada {
 export interface Configuracoes {
   frequenciaPorAula: boolean;
   saidaAntecipada: boolean;
+  origemNaChamada: boolean;
+  origemNaChamadaSerieIds: string[];
+  origemNaChamadaTurmaIds: string[];
 }
 
 /** Padrões de fábrica dos recursos. */
 export const CONFIGURACOES_PADRAO: Configuracoes = {
   frequenciaPorAula: false,
   saidaAntecipada: true,
+  origemNaChamada: false,
+  origemNaChamadaSerieIds: [],
+  origemNaChamadaTurmaIds: [],
 };
 
 /** Acumulado de um aluno desde a primeira chamada salva. */
@@ -339,6 +345,25 @@ export function rotuloDeTurma(serieNome: string, turmaNome: string): string {
 export function rotuloCurtoDeTurma(serieNome: string, turmaNome: string): string {
   const [ordinal = ""] = serieNome.trim().split(/\s+/);
   return `${ordinal} ${turmaNome.trim()}`.trim();
+}
+
+/** A seleção de série inclui todas as suas turmas; turmas avulsas se somam. */
+export function exibirOrigemNaChamada(
+  configuracoes: Configuracoes,
+  turma: { id: string; serieId: string } | undefined,
+): boolean {
+  return Boolean(
+    turma &&
+    configuracoes.origemNaChamada &&
+    (configuracoes.origemNaChamadaSerieIds.includes(turma.serieId) ||
+      configuracoes.origemNaChamadaTurmaIds.includes(turma.id)),
+  );
+}
+
+/** O marcador de origem é apenas visual, incluindo os asteriscos legados. */
+export function nomeNaChamada(nome: string, mostrarOrigem: boolean, remanejado = false): string {
+  const semMarcador = nome.replace(/\s*\*+\s*$/, "").trimEnd();
+  return mostrarOrigem && (remanejado || /\*\s*$/.test(nome)) ? `${semMarcador}*` : semMarcador;
 }
 
 /** Rótulo curto de uma aula: ordem + janela, por exemplo "Aula 1 · 07:00 às 07:50". */
