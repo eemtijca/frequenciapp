@@ -445,7 +445,7 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 
 ### GET /api/planilha e PATCH /api/planilha
 
-Leitura e edição da configuração: `{ ativa?, endpoint? }`. Apenas administração. O token volta mascarado.
+Leitura e edição da configuração: `{ ativa?, endpoint?, envioAutomatico? }`. `envioAutomatico` liga o envio da chamada à planilha logo depois de salva (ADR-025); começa desligado. Apenas administração. O token volta mascarado.
 
 - 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
 

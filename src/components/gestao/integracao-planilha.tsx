@@ -35,6 +35,7 @@ interface Sugestao {
 
 interface IntegracaoAdmin {
   ativa: boolean;
+  envioAutomatico: boolean;
   provedor: string;
   googleConectado: boolean;
   googlePlanilha: { id: string; nome: string | null } | null;
@@ -168,6 +169,24 @@ export default function IntegracaoPlanilha({
         );
         setIntegracao(dados.integracao);
         toast.success(valor ? "Integração ativada." : "Integração desativada.");
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
+      } finally {
+        setSalvando(false);
+      }
+    });
+  }
+
+  async function alternarEnvioAutomatico(valor: boolean) {
+    await executarPorChave("alternar-envio-automatico", async () => {
+      setSalvando(true);
+      try {
+        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
+          "/api/planilha",
+          corpoAlteracao("PATCH", { envioAutomatico: valor }),
+        );
+        setIntegracao(dados.integracao);
+        toast.success(valor ? "Envio ao salvar ligado." : "Envio ao salvar desligado.");
       } catch (excecao) {
         toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
       } finally {
@@ -496,6 +515,22 @@ export default function IntegracaoPlanilha({
           >
             Enviar todas as turmas
           </Button>
+        </div>
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg border p-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
+            <p className="text-muted-foreground text-xs">
+              Ao salvar, a chamada daquela turma segue para a planilha sozinha, só preenchendo
+              células vazias e criando a coluna do dia. Se algo pedir revisão, o dia fica para o
+              envio manual.
+            </p>
+          </div>
+          <Switch
+            checked={integracao?.envioAutomatico ?? false}
+            disabled={salvando || !podeEnviar || !estruturaSalva}
+            onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
+            aria-label="Enviar ao salvar a chamada"
+          />
         </div>
 
         <div className="flex flex-col gap-1 text-xs">

@@ -47,6 +47,7 @@ export interface LinhaIntegracao {
   esquemaEm: Date | null;
   modo: "CONSERVADOR" | "COMPLETO";
   modoCompletoAte: Date | null;
+  envioAutomatico: boolean;
   atualizadoEm: Date;
 }
 
@@ -64,6 +65,7 @@ const CAMPOS = {
   esquemaEm: true,
   modo: true,
   modoCompletoAte: true,
+  envioAutomatico: true,
   atualizadoEm: true,
 } as const;
 
@@ -149,6 +151,7 @@ export const esquemaConfiguracao = z
   .object({
     ativa: z.boolean().optional(),
     endpoint: z.string().trim().max(500).optional(),
+    envioAutomatico: z.boolean().optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
@@ -176,6 +179,9 @@ export async function salvarConfiguracao(
       where: { id },
       update: {
         ...(dados.data.ativa !== undefined ? { ativa: dados.data.ativa } : {}),
+        ...(dados.data.envioAutomatico !== undefined
+          ? { envioAutomatico: dados.data.envioAutomatico }
+          : {}),
         ...(dados.data.endpoint !== undefined
           ? {
               endpoint: dados.data.endpoint.trim() || null,
@@ -289,6 +295,7 @@ export async function desconectar(
         googleRefreshToken: null,
         googlePlanilhaId: null,
         googlePlanilhaNome: null,
+        envioAutomatico: false,
         provedor: "GAS",
         esquema: Prisma.DbNull,
         assinaturaEsquema: null,

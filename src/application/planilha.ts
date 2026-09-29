@@ -195,6 +195,7 @@ export async function lerIntegracaoAdmin() {
     modoCompletoAte: modoCompletoAtivo(linha)
       ? (linha.modoCompletoAte?.toISOString() ?? null)
       : null,
+    envioAutomatico: linha.envioAutomatico,
     atualizadoEm: linha.atualizadoEm.toISOString(),
     fuso: ambiente.fuso,
     alteradasDepois: await contarAlteradasDepois(),
@@ -680,6 +681,95 @@ function hashDoEnvio(
       planos.map((item) => [item.turmaOriginalId, item.dias, item.plano?.planoHash ?? null]),
     ]),
   );
+}
+
+export type SituacaoEnvioAutomatico =
+  "enviado" | "desligado" | "sem_mapa" | "pendente_manual" | "sem_confirmacao" | "falhou";
+
+/**
+ * Envia à planilha a chamada recém-salva de uma turma atual. Só roda com a
+ * integração ativa e a chave ligada, em modo conservador, uma turma original
+ * por vez e uma tentativa por salvamento. Nunca lança: o salvamento já foi
+ * confirmado. Plano que precise de mais que preencher célula vazia, criar a
+ * coluna do dia e vincular aluno, ou turma com envio ainda sem confirmação,
+ * fica para o envio manual.
+ */
+export async function enviarAposSalvar(
+  usuario: { id: string },
+  turmaId: string,
+  dia: string,
+): Promise<Map<string, SituacaoEnvioAutomatico>> {
+  const situacoes = new Map<string, SituacaoEnvioAutomatico>();
+  try {
+    const linha = await lerLinha(FINALIDADE);
+    if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) {
+      situacoes.set(turmaId, "desligado");
+      return situacoes;
+    }
+    const salvo = esquemaSalvo(linha);
+    const frequencia = await banco().frequencia.findFirst({
+      where: { turmaId, dia: new Date(`${dia}T12:00:00Z`) },
+      select: { alunos: { select: { aluno: { select: { turmaOriginalId: true } } } } },
+    });
+    const origens = new Set((frequencia?.alunos ?? []).map((item) => item.aluno.turmaOriginalId));
+    for (const origem of origens) {
+      if (!salvo?.mapa.some((par) => par.turmaOriginalId === origem)) {
+        situacoes.set(origem, "sem_mapa");
+        continue;
+      }
+      situacoes.set(origem, await enviarTurmaAutomatico(usuario, linha, origem, dia));
+    }
+  } catch (erro) {
+    console.error(
+      "Envio automático à planilha não concluído.",
+      erro instanceof Error ? erro.name : "",
+    );
+  }
+  return situacoes;
+}
+
+async function enviarTurmaAutomatico(
+  usuario: { id: string },
+  linha: LinhaIntegracao,
+  turmaOriginalId: string,
+  dia: string,
+): Promise<SituacaoEnvioAutomatico> {
+  try {
+    // Envio anterior sem confirmação (ou ainda em curso): nunca se repete sozinho.
+    const ultimo = await banco().sincronizacaoPlanilha.findFirst({
+      where: { finalidade: FINALIDADE, turmaOriginalId },
+      orderBy: { criadoEm: "desc" },
+      select: { resultado: true },
+    });
+    if (ultimo?.resultado === "PARCIAL") return "sem_confirmacao";
+    const entrada: EntradaEnvio = {
+      turmaOriginalId,
+      de: dia,
+      ate: dia,
+      permitirInserirColunas: true,
+      permitirNovosAlunos: false,
+      somenteAlteradas: false,
+    };
+    const simulacao = await montarSimulacao(linha, entrada);
+    const item = simulacao.planos[0];
+    if (!item?.plano || simulacao.modalidade !== "conservador") return "pendente_manual";
+    const { resumo } = item.plano;
+    const naoSeguro =
+      resumo.substituir + resumo.limpar + resumo.removerLinhas + resumo.removerColunas > 0 ||
+      resumo.novosAlunos > 0 ||
+      resumo.ambiguidades > 0;
+    if (naoSeguro) return "pendente_manual";
+    if (resumo.preencher + resumo.novasColunas + resumo.vincular === 0) return "enviado";
+    const resposta = await aplicarEnvio(usuario, {
+      ...entrada,
+      planoHashGeral: simulacao.planoHashGeral,
+    });
+    const resultado = resposta.resultados[0]?.resultado;
+    if (resultado === "sucesso" || resultado === "sem_envio") return "enviado";
+    return resultado === "parcial" ? "sem_confirmacao" : "falhou";
+  } catch {
+    return "falhou";
+  }
 }
 
 const RESUMO_VAZIO = {

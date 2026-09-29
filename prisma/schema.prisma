@@ -392,6 +392,8 @@ model IntegracaoPlanilha {
   esquemaEm         DateTime?            @map("esquema_em") @db.Timestamptz
   modo              ModoPlanilha         @default(CONSERVADOR)
   modoCompletoAte   DateTime?            @map("modo_completo_ate") @db.Timestamptz
+  // Envia a chamada à planilha logo depois de salva; só a frequência usa.
+  envioAutomatico   Boolean              @default(false) @map("envio_automatico")
   modoCompletoPorId String?              @map("modo_completo_por_id") @db.Uuid
   atualizadoEm      DateTime             @updatedAt @map("atualizado_em") @db.Timestamptz
   atualizadoPorId   String?              @map("atualizado_por_id") @db.Uuid
