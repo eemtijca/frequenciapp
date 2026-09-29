@@ -51,7 +51,7 @@ Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome d
 
 ## Enviar
 
-O envio é manual, com prévia obrigatória. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem; no card da Gestão, "Enviar todas as turmas" envia todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
+O envio é manual, com prévia obrigatória, exceto o envio ao salvar a chamada, descrito abaixo. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem; no card da Gestão, "Enviar todas as turmas" envia todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
 
 **O que vai por padrão.** Só os dias com chamada criada ou alterada desde o último envio confirmado (resultado `SUCESSO`) de cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. Sem envio anterior, valem os dias com chamada do período escolhido. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio.
 
@@ -71,6 +71,17 @@ A prévia mostra:
 **Identificação do aluno.** Cada linha de aluno guarda, de forma invisível, o código do aluno no aplicativo. O envio acha a linha pelo código; o nome só é usado para vincular uma linha que ainda não tem código, e apenas quando ele é único na turma e na aba. A prévia informa quantas linhas ganham o código. Alunos com o mesmo nome na turma não são vinculados pelo nome: o aviso pede conferência para evitar associar marcas ao aluno errado. A leitura vai até a última linha com conteúdo da aba, e a linha de aluno novo entra depois dela. O mapa aceita uma aba por turma original.
 
 Depois de revisar, o envio recalcula tudo e exige o mesmo hash de plano. Se alguém salvou uma chamada ou editou a planilha no meio do caminho, o aplicativo recusa e pede nova prévia. Na gravação, cada célula é conferida outra vez: o que estiver ocupado ou com fórmula é pulado e relatado.
+
+## Enviar ao salvar a chamada
+
+Em Gestão, Configurações, Planilha de frequência, o interruptor "Enviar ao salvar a chamada" liga o envio automático. Ele começa desligado e só liga com a integração ativa e a estrutura salva. Ligado, cada chamada salva dispara, depois de a resposta do salvamento já ter saído, o envio daquele dia para a aba de cada turma original dos alunos da lista da chamada (na 3ª série remanejada, a chamada da turma atual vai para as abas de origem).
+
+O envio automático é mais estreito que o manual, porque ninguém revisa a prévia:
+
+- roda só no modo conservador e desiste se o modo completo estiver aberto;
+- só preenche célula vazia, cria a coluna do dia e vincula aluno; plano com substituição, limpeza, remoção, linha de aluno novo ou ambiguidade não é enviado e o dia fica pendente para o envio manual;
+- faz uma tentativa por salvamento e nunca repete depois de timeout, 504 ou queda: se o último registro da turma for `PARCIAL`, os salvamentos seguintes não enviam até a aba ser conferida e um envio manual concluir;
+- falha ou desistência não altera o salvamento, que já foi confirmado.
 
 ## Modo completo
 
