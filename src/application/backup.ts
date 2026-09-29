@@ -57,6 +57,7 @@ const esquemaCopia = z.object({
         nome: z.string().trim().min(2).max(100),
         ordem: z.number().int().min(1).max(9999),
         ativo: z.boolean(),
+        desistenteEm: dia.nullish(),
       }),
     )
     .max(50000),
@@ -201,6 +202,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         nome: true,
         ordem: true,
         ativo: true,
+        desistenteEm: true,
       },
     }),
     banco().frequencia.findMany({
@@ -247,7 +249,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     series,
     turmas,
     horarios,
-    alunos,
+    alunos: alunos.map((aluno) => ({
+      ...aluno,
+      desistenteEm: aluno.desistenteEm?.toISOString().slice(0, 10) ?? null,
+    })),
     frequencias: frequencias.map((frequencia) => ({
       dia: frequencia.dia.toISOString().slice(0, 10),
       turmaId: frequencia.turmaId,
@@ -438,6 +443,7 @@ export async function importarCopia(
             nome: true,
             ordem: true,
             ativo: true,
+            desistenteEm: true,
           },
         })
       ).map((aluno) => [aluno.id, aluno]),
@@ -448,7 +454,13 @@ export async function importarCopia(
         idsTurmas.has(aluno.turmaId) &&
         idsTurmas.has(aluno.turmaOriginalId),
     );
-    if (alunosNovos.length > 0) await tx.aluno.createMany({ data: alunosNovos });
+    if (alunosNovos.length > 0)
+      await tx.aluno.createMany({
+        data: alunosNovos.map((aluno) => ({
+          ...aluno,
+          ...(aluno.desistenteEm ? { situacaoAtualizadaEm: new Date() } : {}),
+        })),
+      });
     for (const aluno of copia.alunos) {
       const atual = alunosAtuais.get(aluno.id);
       if (atual) {
@@ -457,7 +469,8 @@ export async function importarCopia(
           atual.turmaOriginalId === aluno.turmaOriginalId &&
           atual.nome === aluno.nome &&
           atual.ordem === aluno.ordem &&
-          atual.ativo === aluno.ativo;
+          atual.ativo === aluno.ativo &&
+          (atual.desistenteEm?.toISOString().slice(0, 10) ?? null) === (aluno.desistenteEm ?? null);
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
       } else if (idsTurmas.has(aluno.turmaId) && idsTurmas.has(aluno.turmaOriginalId)) {

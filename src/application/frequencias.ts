@@ -362,6 +362,51 @@ export async function salvarFrequencia(
       // salvamento, mas quem já tinha falta registrada continua aceito mesmo
       // que tenha sido desativado depois.
       const comFaltaRegistrada = new Set(existente?.faltas.map((falta) => falta.alunoId) ?? []);
+      const situacoes = await tx.aluno.findMany({
+        where: {
+          id: {
+            in: [
+              ...new Set([
+                ...ausencias.map((ausencia) => ausencia.alunoId),
+                ...(existente?.faltas.map((falta) => falta.alunoId) ?? []),
+              ]),
+            ],
+          },
+        },
+        select: { id: true, desistenteEm: true },
+      });
+      const desistentes = new Set(
+        situacoes
+          .filter((aluno) => aluno.desistenteEm && aluno.desistenteEm <= diaUtc)
+          .map((aluno) => aluno.id),
+      );
+      if (
+        ausencias.some(
+          (ausencia) =>
+            desistentes.has(ausencia.alunoId) && !comFaltaRegistrada.has(ausencia.alunoId),
+        )
+      ) {
+        throw new ErroHttp("Aluno desistente não pode receber nova falta neste dia.", 400);
+      }
+      const ausenciasEditaveis = ausencias.filter((ausencia) => !desistentes.has(ausencia.alunoId));
+      const faltasPreservadas =
+        existente?.faltas.filter((falta) => desistentes.has(falta.alunoId)) ?? [];
+      const faltasParaGravar = [
+        ...faltasPreservadas.map((falta) => ({
+          alunoId: falta.alunoId,
+          horarioId: falta.horarioId,
+          justificativa: falta.justificativa,
+          observacao: falta.observacao,
+        })),
+        ...ausenciasEditaveis.flatMap((ausencia) =>
+          ausencia.horarios.map((horarioId) => ({
+            alunoId: ausencia.alunoId,
+            horarioId,
+            justificativa: ausencia.justificativa,
+            observacao: ausencia.observacao,
+          })),
+        ),
+      ];
       const alunosDaTurma = await tx.aluno.findMany({
         where: { turmaId, ativo: true },
         select: { id: true },
@@ -407,16 +452,7 @@ export async function salvarFrequencia(
             revisao: 1,
             criadoPorId: identidade.id,
             atualizadoPorId: identidade.id,
-            faltas: {
-              create: ausencias.flatMap((ausencia) =>
-                ausencia.horarios.map((horarioId) => ({
-                  alunoId: ausencia.alunoId,
-                  horarioId,
-                  justificativa: ausencia.justificativa,
-                  observacao: ausencia.observacao,
-                })),
-              ),
-            },
+            faltas: { create: faltasParaGravar },
             alunos: { create: [...lista].map((alunoId) => ({ alunoId })) },
           },
           ...COMPLEMENTO,
@@ -446,34 +482,20 @@ export async function salvarFrequencia(
         skipDuplicates: true,
       });
       await tx.falta.deleteMany({ where: { frequenciaId: linha.id } });
-      if (ausencias.length > 0) {
+      if (faltasParaGravar.length > 0) {
         await tx.falta.createMany({
-          data: ausencias.flatMap((ausencia) =>
-            ausencia.horarios.map((horarioId) => ({
-              frequenciaId: linha.id,
-              alunoId: ausencia.alunoId,
-              horarioId,
-              justificativa: ausencia.justificativa,
-              observacao: ausencia.observacao,
-            })),
-          ),
+          data: faltasParaGravar.map((falta) => ({ frequenciaId: linha.id, ...falta })),
         });
       }
+      const resultado = await tx.frequencia.findUnique({
+        where: { turmaId_dia: filtroFrequencia },
+        ...COMPLEMENTO,
+      });
+      if (!resultado) throw new ErroHttp("Frequência não encontrada para atualizar.", 404);
       return {
         situacao: "salvo" as const,
         frequencia: {
-          ...paraFrequencia(linha),
-          alunos: [...new Set([...linha.alunos.map((item) => item.alunoId), ...lista])],
-          faltas: ausencias.map((ausencia) => {
-            if (!ausencia.justificativa)
-              return { alunoId: ausencia.alunoId, horarios: ausencia.horarios };
-            return {
-              alunoId: ausencia.alunoId,
-              horarios: ausencia.horarios,
-              justificativa: ausencia.justificativa,
-              observacao: ausencia.observacao,
-            };
-          }),
+          ...paraFrequencia(resultado),
         },
       };
     });

@@ -136,18 +136,20 @@ model Turma {
 // frequência diária) e turma original (referência de origem para a
 // consulta agrupada). Nenhum outro dado pessoal é armazenado.
 model Aluno {
-  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId         String            @map("turma_id") @db.Uuid
-  turmaOriginalId String            @map("turma_original_id") @db.Uuid
-  nome            String
-  ordem           Int
-  ativo           Boolean           @default(true)
-  criadoEm        DateTime          @default(now()) @map("criado_em") @db.Timestamptz
-  turma           Turma             @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
-  turmaOriginal   Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
-  faltas          Falta[]
-  saidas          SaidaAntecipada[]
-  chamadas        AlunoDaChamada[]
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId              String            @map("turma_id") @db.Uuid
+  turmaOriginalId      String            @map("turma_original_id") @db.Uuid
+  nome                 String
+  ordem                Int
+  ativo                Boolean           @default(true)
+  desistenteEm         DateTime?         @map("desistente_em") @db.Date
+  situacaoAtualizadaEm DateTime?         @map("situacao_atualizada_em") @db.Timestamptz
+  criadoEm             DateTime          @default(now()) @map("criado_em") @db.Timestamptz
+  turma                Turma             @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
+  turmaOriginal        Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
+  faltas               Falta[]
+  saidas               SaidaAntecipada[]
+  chamadas             AlunoDaChamada[]
 
   @@index([turmaId, ordem])
   @@index([turmaOriginalId])
@@ -376,29 +378,29 @@ model Auditoria {
 // finalidade: o endpoint e o token nunca saem para o cliente e ficam fora da
 // cópia JSON.
 model IntegracaoPlanilha {
-  id                String               @id @default("principal")
-  finalidade        FinalidadeIntegracao @default(FREQUENCIA)
-  ativa             Boolean              @default(false)
-  endpoint          String?              @db.VarChar(500)
-  token             String?              @db.VarChar(120)
-  versaoScript      String?              @map("versao_script") @db.VarChar(20)
-  provedor          String               @default("GAS") @db.VarChar(10)
+  id                 String               @id @default("principal")
+  finalidade         FinalidadeIntegracao @default(FREQUENCIA)
+  ativa              Boolean              @default(false)
+  endpoint           String?              @db.VarChar(500)
+  token              String?              @db.VarChar(120)
+  versaoScript       String?              @map("versao_script") @db.VarChar(20)
+  provedor           String               @default("GAS") @db.VarChar(10)
   // Autorização OAuth da frequência, cifrada com AUTH_SECRET no servidor.
-  googleRefreshToken String?             @map("google_refresh_token") @db.Text
-  googlePlanilhaId   String?             @map("google_planilha_id") @db.VarChar(200)
-  googlePlanilhaNome String?             @map("google_planilha_nome") @db.VarChar(200)
-  esquema           Json?
-  assinaturaEsquema String?              @map("assinatura_esquema") @db.VarChar(64)
-  esquemaEm         DateTime?            @map("esquema_em") @db.Timestamptz
-  modo              ModoPlanilha         @default(CONSERVADOR)
-  modoCompletoAte   DateTime?            @map("modo_completo_ate") @db.Timestamptz
+  googleRefreshToken String?              @map("google_refresh_token") @db.Text
+  googlePlanilhaId   String?              @map("google_planilha_id") @db.VarChar(200)
+  googlePlanilhaNome String?              @map("google_planilha_nome") @db.VarChar(200)
+  esquema            Json?
+  assinaturaEsquema  String?              @map("assinatura_esquema") @db.VarChar(64)
+  esquemaEm          DateTime?            @map("esquema_em") @db.Timestamptz
+  modo               ModoPlanilha         @default(CONSERVADOR)
+  modoCompletoAte    DateTime?            @map("modo_completo_ate") @db.Timestamptz
   // Envia a chamada à planilha logo depois de salva; só a frequência usa.
-  envioAutomatico   Boolean              @default(false) @map("envio_automatico")
-  modoCompletoPorId String?              @map("modo_completo_por_id") @db.Uuid
-  atualizadoEm      DateTime             @updatedAt @map("atualizado_em") @db.Timestamptz
-  atualizadoPorId   String?              @map("atualizado_por_id") @db.Uuid
-  modoCompletoPor   Usuario?             @relation("IntegracaoModoPor", fields: [modoCompletoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor     Usuario?             @relation("IntegracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  envioAutomatico    Boolean              @default(false) @map("envio_automatico")
+  modoCompletoPorId  String?              @map("modo_completo_por_id") @db.Uuid
+  atualizadoEm       DateTime             @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId    String?              @map("atualizado_por_id") @db.Uuid
+  modoCompletoPor    Usuario?             @relation("IntegracaoModoPor", fields: [modoCompletoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor      Usuario?             @relation("IntegracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("integracoes_planilha")
 }

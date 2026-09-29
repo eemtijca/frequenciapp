@@ -31,6 +31,7 @@ interface PlanoResumo {
   bloqueado: boolean;
   resumo: {
     preencher: number;
+    sinalizar: number;
     substituir: number;
     limpar: number;
     novasColunas: number;
@@ -46,6 +47,7 @@ interface PlanoResumo {
   novasColunas: { dia: string; antesDe: string | null }[];
   novosAlunos: { nome: string }[];
   substituir: { celula: string; valor: string; anterior: string; campo?: "nome" | "turma" }[];
+  sinalizar: { celula: string; valor: string; anterior: string }[];
   candidatosRemocaoLinhas: { linha: number; nome: string }[];
   candidatosRemocaoColunas: { coluna: number; letra: string; rotulo: string }[];
 }
@@ -418,6 +420,9 @@ export default function DialogoEnvio({
                         {!estado && modoCompleto && item.resumo.substituir > 0
                           ? ` · ${item.resumo.substituir} substituições`
                           : ""}
+                        {!estado && item.resumo.sinalizar > 0
+                          ? ` · ${item.resumo.sinalizar} situações de aluno`
+                          : ""}
                       </>
                     )}
                     {estado && detalhes[item.turmaOriginalId] && (
@@ -443,6 +448,9 @@ export default function DialogoEnvio({
               </span>
               <span>
                 {plano.resumo.novasColunas} colunas novas · {plano.resumo.novosAlunos} alunos novos
+                {plano.resumo.sinalizar > 0
+                  ? ` · ${plano.resumo.sinalizar} situações de aluno`
+                  : ""}
                 {plano.resumo.vincular > 0
                   ? ` · ${plano.resumo.vincular} linhas ganham o código do aluno`
                   : ""}
@@ -450,6 +458,16 @@ export default function DialogoEnvio({
                   ? ` · ${plano.resumo.substituir} substituições`
                   : ""}
               </span>
+              {plano.sinalizar.length > 0 && (
+                <span className="text-muted-foreground">
+                  Situação ao lado do nome:{" "}
+                  {plano.sinalizar
+                    .slice(0, 5)
+                    .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
+                    .join(", ")}
+                  {plano.sinalizar.length > 5 ? " ..." : ""}
+                </span>
+              )}
               {plano.novasColunas.length > 0 && (
                 <span className="text-muted-foreground">
                   Dias novos: {plano.novasColunas.map((coluna) => coluna.dia).join(", ")}

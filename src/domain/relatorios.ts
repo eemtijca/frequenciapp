@@ -1,6 +1,7 @@
 // Indicadores do dia e relatórios por período e por aluno. Regras puras,
 // compartilhadas entre servidor, API e interface.
 import {
+  alunoDesistenteNoDia,
   marcaDoAluno,
   type Aluno,
   type Frequencia,
@@ -105,6 +106,25 @@ export function coberturaDoDia(
     esperados: ativos.length,
     registrados: ativos.filter((aluno) => salvas.has(aluno.turmaId)).length,
     turmasPendentes: turmasComAlunos.filter((turma) => !salvas.has(turma.id)),
+  };
+}
+
+/** Desistências vigentes no dia, agrupadas pela turma atual. */
+export function desistenciasNoDia(series: Serie[], turmas: Turma[], alunos: Aluno[], dia: string) {
+  const desistentes = alunos.filter((aluno) => aluno.ativo && alunoDesistenteNoDia(aluno, dia));
+  return {
+    total: desistentes.length,
+    series: series.map((serie) => ({
+      serieId: serie.id,
+      nome: serie.nome,
+      turmas: turmas
+        .filter((turma) => turma.serieId === serie.id)
+        .map((turma) => ({
+          turmaId: turma.id,
+          rotulo: turma.rotulo,
+          quantidade: desistentes.filter((aluno) => aluno.turmaId === turma.id).length,
+        })),
+    })),
   };
 }
 

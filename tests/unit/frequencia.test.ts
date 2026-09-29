@@ -1,6 +1,7 @@
 // Domínio da frequência: datas, horas, aulas, marca do aluno e grade.
 import { describe, expect, it } from "vitest";
 import {
+  alunoDesistenteNoDia,
   celulasDoMes,
   diaDaSemanaIso,
   diaLocal,
@@ -46,6 +47,7 @@ function aluno(parcial: Partial<Aluno> = {}): Aluno {
     turmaOriginalId: parcial.turmaOriginalId ?? "turma-a",
     ordem: parcial.ordem ?? 1,
     ativo: parcial.ativo ?? true,
+    desistenteEm: parcial.desistenteEm ?? null,
   };
 }
 
@@ -84,6 +86,21 @@ describe("ehDiaValido", () => {
     expect(ehDiaValido("25/09/2026")).toBe(false);
     expect(ehDiaValido("")).toBe(false);
     expect(ehDiaValido("2026-13-01")).toBe(false);
+  });
+});
+
+describe("desistência na chamada", () => {
+  it("mantém as marcas antigas e bloqueia marcas desde a data da desistência", () => {
+    const estudante = aluno({ desistenteEm: "2026-09-11" });
+    const chamada = frequencia({
+      faltas: [{ alunoId: estudante.id, horarios: ["aula-1"] }],
+    });
+    expect(alunoDesistenteNoDia(estudante, "2026-09-10")).toBe(false);
+    expect(marcaDoAluno(estudante, "2026-09-10", [chamada], [horario()])).toBe("F");
+    expect(alunoDesistenteNoDia(estudante, "2026-09-11")).toBe(true);
+    expect(marcaDoAluno(estudante, "2026-09-11", [], [horario()])).toBeNull();
+    const grade = montarGrade([estudante], [chamada], ["2026-09-10", "2026-09-11"], [horario()]);
+    expect(grade.linhas[0]?.marcas).toEqual({ "2026-09-10": "F", "2026-09-11": undefined });
   });
 });
 

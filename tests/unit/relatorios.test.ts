@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import {
   coberturaDoDia,
+  desistenciasNoDia,
   distribuicaoDoDia,
   indexarPorDia,
   marcasDoDia,
@@ -41,6 +42,7 @@ function aluno(parcial: Partial<Aluno> = {}): Aluno {
     turmaOriginalId: parcial.turmaOriginalId ?? parcial.turmaId ?? "turma-a",
     ordem: parcial.ordem ?? 1,
     ativo: parcial.ativo ?? true,
+    desistenteEm: parcial.desistenteEm ?? null,
   };
 }
 
@@ -164,6 +166,26 @@ describe("coberturaDoDia", () => {
     expect(cobertura.esperados).toBe(2);
     expect(cobertura.registrados).toBe(1);
     expect(cobertura.turmasPendentes.map((item) => item.id)).toEqual(["turma-b"]);
+  });
+});
+
+describe("desistenciasNoDia", () => {
+  it("conta a situação pela turma atual sem alterar o dia anterior", () => {
+    const series = [serie()];
+    const turmas = [turma(), turma({ id: "turma-b", nome: "B" })];
+    const alunos = [
+      aluno({
+        id: "a",
+        turmaId: "turma-b",
+        turmaOriginalId: "turma-a",
+        desistenteEm: "2026-09-11",
+      }),
+      aluno({ id: "b", turmaId: "turma-a", desistenteEm: "2026-09-12" }),
+    ];
+    expect(desistenciasNoDia(series, turmas, alunos, "2026-09-10").total).toBe(0);
+    const atual = desistenciasNoDia(series, turmas, alunos, "2026-09-11");
+    expect(atual.total).toBe(1);
+    expect(atual.series[0]?.turmas.map((item) => item.quantidade)).toEqual([0, 1]);
   });
 });
 

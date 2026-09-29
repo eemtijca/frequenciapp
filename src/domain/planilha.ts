@@ -121,6 +121,7 @@ export function hashTexto(texto: string): string {
 export interface LinhaTurmaPlanilha {
   alunoId: string;
   nome: string;
+  nomeParaPlanilha?: string;
   turmaAtual: string;
   marcas: Record<string, Marca | undefined>;
 }
@@ -151,6 +152,9 @@ export function montarTurmaPlanilha(
     linhas: grade.linhas.map((linha) => ({
       alunoId: linha.aluno.id,
       nome: linha.aluno.nome,
+      nomeParaPlanilha: linha.aluno.desistenteEm
+        ? `${linha.aluno.nome} (DESISTENTE)`
+        : linha.aluno.nome,
       turmaAtual: rotuloDaTurma(linha.aluno.turmaId),
       marcas: linha.marcas,
     })),
@@ -172,6 +176,9 @@ export function turmaPlanilhaDaGrade(
     linhas: linhas.map((linha) => ({
       alunoId: linha.aluno.id,
       nome: linha.aluno.nome,
+      nomeParaPlanilha: linha.aluno.desistenteEm
+        ? `${linha.aluno.nome} (DESISTENTE)`
+        : linha.aluno.nome,
       turmaAtual: rotuloDaTurma(linha.aluno.turmaId),
       marcas: linha.marcas,
     })),
@@ -220,7 +227,7 @@ export function paraCsv(turma: TurmaPlanilha): string {
       return marca ?? "";
     });
     return [
-      linha.nome,
+      linha.nomeParaPlanilha ?? linha.nome,
       linha.turmaAtual,
       ...marcas,
       String(faltas),
@@ -638,6 +645,7 @@ export interface OpcoesPlano {
   modo: "conservador" | "completo";
   permitirInserirColunas: boolean;
   permitirNovosAlunos: boolean;
+  sinalizarSituacao?: boolean;
   substituirDivergencias?: boolean;
   limparCelulas?: string[];
   removerLinhas?: number[];
@@ -654,7 +662,7 @@ export interface CelulaPlano {
   alunoNome: string;
   dia: string;
   /** Identificação substituída no modo completo; ausente nas marcas de dia. */
-  campo?: "nome" | "turma";
+  campo?: "nome" | "turma" | "situacao";
 }
 
 export interface ColunaNovaPlano {
@@ -696,6 +704,7 @@ export interface ColunaCriada {
 
 export interface ResumoPlano {
   preencher: number;
+  sinalizar?: number;
   substituir: number;
   limpar: number;
   novasColunas: number;
@@ -715,6 +724,7 @@ export interface PlanoSincronizacao {
   assinatura: string;
   planoHash: string;
   preencher: CelulaPlano[];
+  sinalizar?: CelulaPlano[];
   substituir: CelulaPlano[];
   limpar: CelulaPlano[];
   novasColunas: ColunaNovaPlano[];
@@ -735,6 +745,10 @@ function celulaA1(linha: number, coluna: number): string {
 
 function marcaCombinam(atual: string, desejada: Marca): boolean {
   return atual.trim().toUpperCase() === desejada;
+}
+
+function nomeSemSituacao(nome: string): string {
+  return nome.replace(/\s+\(DESISTENTE\)$/i, "").trim();
 }
 
 interface LinhaCasada {
@@ -793,7 +807,7 @@ function casarLinhas(
     if (codigoDaLinha.has(linha)) continue;
     const nome = nomeDaLinha(linha);
     if (nome === "") continue;
-    const chave = normalizar(nome);
+    const chave = normalizar(nomeSemSituacao(nome));
     semCodigoPorNome.set(chave, [...(semCodigoPorNome.get(chave) ?? []), linha]);
   }
   const nomesNoApp = new Map<string, number>();
@@ -863,6 +877,7 @@ export function planejarSincronizacao(
   if (esquema.bloqueio) {
     const resumo: ResumoPlano = {
       preencher: 0,
+      sinalizar: 0,
       substituir: 0,
       limpar: 0,
       novasColunas: 0,
@@ -880,6 +895,7 @@ export function planejarSincronizacao(
       aba: esquema.nome,
       assinatura: esquema.assinatura,
       preencher: [],
+      sinalizar: [],
       substituir: [],
       limpar: [],
       novasColunas: [],
@@ -923,6 +939,7 @@ export function planejarSincronizacao(
   const vincular: VinculoPlano[] = [];
   const colunaAlunoPlano = colunaAluno?.indice ?? 1;
   const celulasPreencher: CelulaPlano[] = [];
+  const celulasSinalizar: CelulaPlano[] = [];
   const celulasSubstituir: CelulaPlano[] = [];
   const celulasLimpar: CelulaPlano[] = [];
   const novosAlunos: AlunoNovoPlano[] = [];
@@ -967,12 +984,43 @@ export function planejarSincronizacao(
       }
       novosAlunos.push({
         alunoId: linha.alunoId,
-        nome: linha.nome,
+        nome: linha.nomeParaPlanilha ?? linha.nome,
         turmaAtual: linha.turmaAtual,
         linha: linhaNovo,
       });
       numeroLinha = linhaNovo;
       linhaNovo += 1;
+    }
+    if (opcoes.sinalizarSituacao && existente && colunaAluno) {
+      const desejado = linha.nomeParaPlanilha ?? linha.nome;
+      const atual = existente.nome;
+      if (atual !== desejado && (atual === linha.nome || atual === `${linha.nome} (DESISTENTE)`)) {
+        const relativaLinha = numeroLinha - conteudo.linhaInicial;
+        const relativaColuna = colunaAluno.indice - conteudo.colunaInicial;
+        if (conteudo.formula[relativaLinha]?.[relativaColuna]) {
+          puladasFormula += 1;
+          avisos.push(`O nome de ${linha.nome} contém fórmula; a situação não será alterada.`);
+        } else {
+          celulasSinalizar.push({
+            linha: numeroLinha,
+            coluna: colunaAluno.indice,
+            celula: celulaA1(numeroLinha, colunaAluno.indice),
+            valor: desejado,
+            anterior: atual,
+            alunoId: linha.alunoId,
+            alunoNome: linha.nome,
+            dia: "",
+            campo: "situacao",
+          });
+        }
+      } else if (
+        atual !== desejado &&
+        (desejado.endsWith(" (DESISTENTE)") || atual.endsWith(" (DESISTENTE)"))
+      ) {
+        avisos.push(
+          `O nome de ${linha.nome} foi alterado na planilha; confira a situação manualmente.`,
+        );
+      }
     }
     for (const dia of turma.dias) {
       const marca = linha.marcas[dia];
@@ -1043,8 +1091,17 @@ export function planejarSincronizacao(
         valor: string;
         campo: "nome" | "turma";
       }[] = [];
-      if (colunaAluno)
-        identificacoes.push({ coluna: colunaAluno, valor: linha.nome, campo: "nome" });
+      if (
+        colunaAluno &&
+        !celulasSinalizar.some(
+          (celula) => celula.linha === numeroLinha && celula.coluna === colunaAluno.indice,
+        )
+      )
+        identificacoes.push({
+          coluna: colunaAluno,
+          valor: linha.nomeParaPlanilha ?? linha.nome,
+          campo: "nome",
+        });
       if (colunaTurma) {
         identificacoes.push({ coluna: colunaTurma, valor: linha.turmaAtual, campo: "turma" });
       }
@@ -1127,12 +1184,15 @@ export function planejarSincronizacao(
     const bruto = conteudo.valores[relativa]?.[colunaAlunoIndice - conteudo.colunaInicial] ?? "";
     const nome = textoLimpo(bruto);
     const codigo = casamento.codigoDaLinha.get(linha);
-    const saiu = codigo ? !idsDaTurma.has(codigo) : !nomesDaTurma.has(normalizar(nome));
+    const saiu = codigo
+      ? !idsDaTurma.has(codigo)
+      : !nomesDaTurma.has(normalizar(nomeSemSituacao(nome)));
     if (nome !== "" && saiu) candidatosRemocaoLinhas.push({ linha, nome });
   }
 
   const resumo: ResumoPlano = {
     preencher: celulasPreencher.length,
+    sinalizar: celulasSinalizar.length,
     substituir: celulasSubstituir.length,
     limpar: celulasLimpar.length,
     novasColunas: novasColunas.length,
@@ -1150,6 +1210,7 @@ export function planejarSincronizacao(
     aba: esquema.nome,
     assinatura: esquema.assinatura,
     preencher: celulasPreencher,
+    sinalizar: celulasSinalizar,
     substituir: celulasSubstituir,
     limpar: celulasLimpar,
     novasColunas,

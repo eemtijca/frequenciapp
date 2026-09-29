@@ -167,6 +167,14 @@ describe("planejarImportacao", () => {
     ]);
   });
 
+  it("não desativa desistente que ficou fora da relação importada", () => {
+    const comDesistente = alunos.map((aluno) =>
+      aluno.id === "a4" ? { ...aluno, desistenteEm: new Date("2026-09-29T12:00:00Z") } : aluno,
+    );
+    const resultado = planejarImportacao(lerRelacaoCsv(texto), turmas, comDesistente);
+    expect(resultado.desativar).toEqual([]);
+  });
+
   it("bloqueia erro de schema, turma desconhecida, homônimo e nome repetido", () => {
     const bloqueado = planejarImportacao(
       lerRelacaoCsv(

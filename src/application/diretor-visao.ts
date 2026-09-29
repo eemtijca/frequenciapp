@@ -6,7 +6,14 @@ import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { ambiente } from "@/infra/ambiente";
-import { diaLocal, diasEntre, ehDiaValido, montarGrade, rotuloDeTurma } from "@/domain/frequencia";
+import {
+  alunoDesistenteNoDia,
+  diaLocal,
+  diasEntre,
+  ehDiaValido,
+  montarGrade,
+  rotuloDeTurma,
+} from "@/domain/frequencia";
 import { categoriasValidas, recortarAoVinculo, vinculoVigente } from "@/domain/diretores";
 import {
   estatisticasDaGrade,
@@ -124,7 +131,10 @@ export async function estatisticasDoDiretor(
   // Mesmo recorte da Grade: alunos ativos da turma de origem, com a marca
   // tirada da chamada que tinha cada um na lista, em qualquer turma.
   const daOrigem = alunos.filter(
-    (aluno) => aluno.ativo && aluno.turmaOriginalId === vinculo.turmaId,
+    (aluno) =>
+      aluno.ativo &&
+      aluno.turmaOriginalId === vinculo.turmaId &&
+      !alunoDesistenteNoDia(aluno, periodo.ate),
   );
   const grade = montarGrade(
     daOrigem,

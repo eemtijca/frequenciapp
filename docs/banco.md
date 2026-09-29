@@ -10,7 +10,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `sessoes`                 | Sessões opacas: hash SHA-256 do token, dono e expiração.                                         |
 | `series`                  | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
 | `turmas`                  | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
-| `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem e situação.                                   |
+| `alunos`                  | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
 | `horarios`                | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
 | `frequencias`             | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
 | `alunos_chamada`          | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
@@ -30,6 +30,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 Restrições de integridade relevantes:
 
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
+- `alunos.desistente_em` é uma data opcional: a partir dela o aluno continua na lista da chamada, sem novas marcas. `situacao_atualizada_em` permite incluir a mudança no próximo envio incremental à planilha. A turma de origem não muda quando a turma atual é alterada.
 - `alunos_chamada` tem chave composta (`frequencia_id`, `aluno_id`) e exclusão em cascata com a frequência e com o aluno. A migração `lista_da_chamada` preenche as chamadas já salvas com quem tem falta nelas e com os alunos ativos que estão na turma da chamada.
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
 - `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`. A linha exige código de justificativa ou texto livre, e `liberado_por_codigo`, quando preenchido, aponta para o catálogo `liberadores`, validado na aplicação.

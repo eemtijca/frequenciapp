@@ -237,6 +237,14 @@ export interface Aluno {
   turmaOriginalId: string;
   ordem: number;
   ativo: boolean;
+  desistenteEm?: string | null;
+}
+
+/** A desistência vale desde o dia registrado, sem mudar chamadas anteriores. */
+export function alunoDesistenteNoDia(aluno: Aluno, dia: string): boolean {
+  return (
+    aluno.desistenteEm !== null && aluno.desistenteEm !== undefined && aluno.desistenteEm <= dia
+  );
 }
 
 /** Falta de um aluno nas aulas indicadas, com justificativa opcional. */
@@ -591,6 +599,7 @@ export function marcaDoAluno(
   frequenciasDoDia: Frequencia[],
   horarios: Horario[],
 ): Marca | null {
+  if (alunoDesistenteNoDia(aluno, dia)) return null;
   // Aula para situação de justificativa: todas as faltas da mesma aula
   // precisam estar justificadas para a marca ser FJ.
   const faltasDoAluno = new Map<string, boolean>();

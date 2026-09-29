@@ -79,17 +79,19 @@ O rótulo de exibição é composto por série e nome, por exemplo "1º ano A". 
 
 ## Aluno (aluno)
 
-| Campo           | Tipo     | Observação                                                     |
-| --------------- | -------- | -------------------------------------------------------------- |
-| id              | uuid     | Gerado pelo banco.                                             |
-| turmaId         | uuid     | Turma atual, de onde parte a frequência diária.                |
-| turmaOriginalId | uuid     | Turma de origem para a consulta agrupada.                      |
-| nome            | texto    | Nome do aluno, de 2 a 100 caracteres.                          |
-| ordem           | inteiro  | Ordem de apresentação dentro da turma atual.                   |
-| ativo           | booleano | Desativado sai das frequências futuras e preserva o histórico. |
-| criadoEm        | data     |                                                                |
+| Campo                | Tipo     | Observação                                                     |
+| -------------------- | -------- | -------------------------------------------------------------- |
+| id                   | uuid     | Gerado pelo banco.                                             |
+| turmaId              | uuid     | Turma atual, de onde parte a frequência diária.                |
+| turmaOriginalId      | uuid     | Turma de origem para a consulta agrupada.                      |
+| nome                 | texto    | Nome do aluno, de 2 a 100 caracteres.                          |
+| ordem                | inteiro  | Ordem de apresentação dentro da turma atual.                   |
+| ativo                | booleano | Desativado sai das frequências futuras e preserva o histórico. |
+| desistenteEm         | data     | Data opcional da desistência; bloqueia novas marcas.           |
+| situacaoAtualizadaEm | data     | Última alteração da desistência para o envio incremental.      |
+| criadoEm             | data     |                                                                |
 
-A origem nasce igual à turma atual e muda quando a administração transfere o aluno. Nomes de alunos são dados pessoais mínimos e necessários à finalidade de frequência, conforme [lgpd.md](lgpd.md). A exclusão apaga o aluno e as faltas dele; a desativação apenas o retira das frequências futuras.
+A origem nasce igual à turma atual e é preservada quando a administração transfere o aluno. Nomes de alunos são dados pessoais mínimos e necessários à finalidade de frequência, conforme [lgpd.md](lgpd.md). A exclusão apaga o aluno e as faltas dele; a desativação apenas o retira das frequências futuras. A desistência mantém o aluno na Chamada, preserva as faltas anteriores e retira suas marcas e contagens a partir da data registrada.
 
 ## Aula (horario)
 

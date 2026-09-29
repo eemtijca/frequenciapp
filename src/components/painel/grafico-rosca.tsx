@@ -18,6 +18,8 @@ interface Props {
   titulo: string;
   fatias: FatiaGrafico[];
   rotuloTotal?: string;
+  unidadeSingular?: string;
+  unidadePlural?: string;
   vazio?: string;
 }
 
@@ -25,6 +27,8 @@ export default function GraficoRosca({
   titulo,
   fatias,
   rotuloTotal = "faltas",
+  unidadeSingular = "falta",
+  unidadePlural = "faltas",
   vazio = "Nenhuma falta registrada",
 }: Props) {
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
@@ -64,7 +68,10 @@ export default function GraficoRosca({
             <Tooltip
               formatter={(valor: unknown, nome: unknown) => {
                 const total = Number(valor) || 0;
-                return [`${total} ${total === 1 ? "falta" : "faltas"}`, String(nome ?? "")];
+                return [
+                  `${total} ${total === 1 ? unidadeSingular : unidadePlural}`,
+                  String(nome ?? ""),
+                ];
               }}
               contentStyle={{
                 background: "var(--popover)",
@@ -110,7 +117,7 @@ export default function GraficoRosca({
             <span className="ml-auto flex shrink-0 items-center gap-1">
               <CirculoValor
                 texto={String(fatia.valor)}
-                rotulo={`${fatia.valor} ${fatia.valor === 1 ? "falta" : "faltas"}`}
+                rotulo={`${fatia.valor} ${fatia.valor === 1 ? unidadeSingular : unidadePlural}`}
               />
               <CirculoValor
                 texto={percentual.format(fatia.valor / total)}

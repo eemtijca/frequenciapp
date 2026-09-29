@@ -5,7 +5,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 ## Princípios
 
 - A chamada continua sendo feita nas turmas atuais; a planilha recebe o recorte por turma de origem, o mesmo da Grade.
-- No modo conservador a integração confere de novo os dados antes do envio e só preenche célula observada vazia e sem fórmula. Não substitui, não limpa, não remove e não cria linha sem autorização explícita. Na Sheets API, uma edição manual entre a última leitura e a escrita ainda pode causar conflito, pois a API não oferece condição de gravação baseada no conteúdo anterior da célula.
+- No modo conservador a integração confere de novo os dados antes do envio e só preenche célula observada vazia e sem fórmula. A exceção pela Sheets API é a situação de desistência ao lado do nome: só troca o sufixo `(DESISTENTE)` de uma linha vinculada ao aluno, com valor anterior idêntico ao da prévia e cópia de segurança da aba. Não limpa, não remove e não cria linha sem autorização explícita. Uma edição manual entre a última leitura e a escrita ainda pode causar conflito, pois a API não oferece condição de gravação baseada no conteúdo anterior da célula.
 - O modo completo existe para atualizar e remover, sempre com frase, senha, janela curta e cópia de segurança antes de cada operação destrutiva.
 - O token de atualização OAuth fica cifrado no servidor. O navegador recebe somente um token de acesso breve para abrir o Google Picker. Na conexão legada, o endereço do script e o token ficam apenas no servidor.
 - A integração fica fora da cópia JSON e desligá-la não altera a planilha.
@@ -21,7 +21,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 
 O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As duas finalidades mantêm seleção, modo e esquema próprios. A conta da frequência pode ser usada para selecionar a planilha de saídas sem uma segunda autorização.
 
-O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas no modo completo criam uma cópia oculta da aba. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
+O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças da situação ao lado do nome criam uma cópia oculta da aba. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
 Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
 
@@ -53,7 +53,7 @@ Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome d
 
 O envio é manual, com prévia obrigatória, exceto o envio ao salvar a chamada, descrito abaixo. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem; no card da Gestão, "Enviar todas as turmas" envia todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
 
-**O que vai por padrão.** Só os dias com chamada criada ou alterada desde o último envio confirmado (resultado `SUCESSO`) de cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. Sem envio anterior, valem os dias com chamada do período escolhido. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio.
+**O que vai por padrão.** Só os dias com chamada criada ou alterada desde o último envio confirmado (resultado `SUCESSO`) de cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. Pela Sheets API, uma situação de desistência alterada também inclui o último dia do período para atualizar o nome. Sem envio anterior, valem os dias com chamada do período escolhido e as situações pendentes. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio e sinaliza a desistência no nome.
 
 **Uma turma por requisição.** A prévia monta o plano de cada turma; o envio faz uma requisição por turma, em sequência, e mostra o andamento de cada uma. A falha de uma turma não impede as seguintes. A leitura da aba se limita às colunas que o plano usa: aluno, turma atual, total e os dias do período que já têm coluna.
 
@@ -66,9 +66,12 @@ A prévia mostra:
 - células a preencher, células ocupadas ignoradas e fórmulas protegidas;
 - colunas de dia que serão criadas, sempre antes da coluna de total quando ela existe;
 - alunos novos que serão acrescentados no fim do bloco;
+- situações de desistência que aparecerão ao lado do nome pela Sheets API;
 - divergências existentes, apenas listadas no modo conservador.
 
 **Identificação do aluno.** Cada linha de aluno guarda, de forma invisível, o código do aluno no aplicativo. O envio acha a linha pelo código; o nome só é usado para vincular uma linha que ainda não tem código, e apenas quando ele é único na turma e na aba. A prévia informa quantas linhas ganham o código. Alunos com o mesmo nome na turma não são vinculados pelo nome: o aviso pede conferência para evitar associar marcas ao aluno errado. A leitura vai até a última linha com conteúdo da aba, e a linha de aluno novo entra depois dela. O mapa aceita uma aba por turma original.
+
+**Desistência.** A administração usa uma ação própria, sem desativar o aluno. Pela Sheets API, o nome passa a `Nome (DESISTENTE)` na linha da turma de origem, inclusive quando a turma atual é outra; ao desfazer, o sufixo é retirado. A prévia lista cada mudança. O aplicativo só sinaliza um nome original exato ou o mesmo nome com esse sufixo, sem fórmula. As células de frequência anteriores e as últimas linhas da aba permanecem intactas. Na conexão legada por Apps Script, o CSV inclui o sufixo, mas a situação em nome existente só é atualizada pelo modo completo; a ação automática de situação é própria da Sheets API.
 
 Depois de revisar, o envio recalcula tudo e exige o mesmo hash de plano. Se alguém salvou uma chamada ou editou a planilha no meio do caminho, o aplicativo recusa e pede nova prévia. Na gravação, cada célula é conferida outra vez: o que estiver ocupado ou com fórmula é pulado e relatado.
 
@@ -79,7 +82,7 @@ Em Gestão, Configurações, Planilha de frequência, o interruptor "Enviar ao s
 O envio automático é mais estreito que o manual, porque ninguém revisa a prévia:
 
 - roda só no modo conservador e desiste se o modo completo estiver aberto;
-- só preenche célula vazia, cria a coluna do dia e vincula aluno; plano com substituição, limpeza, remoção, linha de aluno novo ou ambiguidade não é enviado e o dia fica pendente para o envio manual;
+- só preenche célula vazia, cria a coluna do dia, vincula aluno e, pela Sheets API, atualiza o sufixo de desistência após conferir o vínculo; plano com outra substituição, limpeza, remoção, linha de aluno novo ou ambiguidade não é enviado e o dia fica pendente para o envio manual;
 - faz uma tentativa por salvamento e nunca repete depois de timeout, 504 ou queda: se o último registro da turma for `PARCIAL`, os salvamentos seguintes não enviam até a aba ser conferida e um envio manual concluir;
 - falha ou desistência não altera o salvamento, que já foi confirmado.
 

@@ -37,6 +37,29 @@ const formulas = [
   [false, true],
 ];
 const assinatura = assinarAba("Turma", valores[0] ?? [], []);
+const alunoId = "00000000-0000-4000-8000-000000000001";
+const documentoVinculado: DocumentoGoogle = {
+  ...documento,
+  sheets: [
+    {
+      properties: {
+        sheetId: 7,
+        title: "Turma",
+        gridProperties: { rowCount: 100, columnCount: 26 },
+      },
+      developerMetadata: [
+        {
+          metadataId: 12,
+          metadataKey: "frequenciapp.aluno",
+          metadataValue: alunoId,
+          location: {
+            dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 },
+          },
+        },
+      ],
+    },
+  ],
+};
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -150,6 +173,87 @@ describe("gravação pela Sheets API", () => {
         false,
       ),
     ).toThrow("modo completo não está ativo");
+  });
+
+  it("sinaliza apenas o nome vinculado e exige cópia de segurança", () => {
+    const plano = planejarEscritaGoogle(
+      documentoVinculado,
+      "Turma",
+      valores,
+      formulas,
+      1,
+      assinatura,
+      [
+        {
+          tipo: "sinalizar",
+          linha: 2,
+          coluna: 1,
+          valor: "Ana (DESISTENTE)",
+          anterior: "Ana",
+          alunoId,
+        },
+      ],
+      false,
+    );
+    expect(plano.destrutiva).toBe(true);
+    expect(plano.contagens.sinalizadas).toBe(1);
+    expect(plano.requests).toMatchObject([
+      { updateCells: { range: { startRowIndex: 1, startColumnIndex: 0 } } },
+    ]);
+  });
+
+  it("recusa sinalização em linha sem vínculo ou com nome alterado", () => {
+    const item = {
+      tipo: "sinalizar",
+      linha: 2,
+      coluna: 1,
+      valor: "Ana (DESISTENTE)",
+      anterior: "Ana",
+      alunoId,
+    };
+    expect(() =>
+      planejarEscritaGoogle(documento, "Turma", valores, formulas, 1, assinatura, [item], false),
+    ).toThrow("situação do aluno mudou");
+    expect(() =>
+      planejarEscritaGoogle(
+        documentoVinculado,
+        "Turma",
+        [
+          ["Aluno", "Dia"],
+          ["Ana editada", ""],
+        ],
+        formulas,
+        1,
+        assinatura,
+        [item],
+        false,
+      ),
+    ).toThrow("situação do aluno mudou");
+  });
+
+  it("permite vínculo verificado e sinalização no mesmo lote", () => {
+    const plano = planejarEscritaGoogle(
+      documento,
+      "Turma",
+      valores,
+      formulas,
+      1,
+      assinatura,
+      [
+        { tipo: "vincularLinhas", itens: [{ linha: 2, coluna: 1, nome: "Ana", alunoId }] },
+        {
+          tipo: "sinalizar",
+          linha: 2,
+          coluna: 1,
+          valor: "Ana (DESISTENTE)",
+          anterior: "Ana",
+          alunoId,
+        },
+      ],
+      false,
+    );
+    expect(plano.contagens).toMatchObject({ vinculadas: 1, sinalizadas: 1 });
+    expect(plano.requests).toHaveLength(2);
   });
 
   it("agrupa escritas contíguas para reduzir chamadas ao Google", () => {

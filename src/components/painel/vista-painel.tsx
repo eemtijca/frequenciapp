@@ -5,8 +5,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Aluno, Frequencia, SaidaAntecipada, Serie, Turma } from "@/domain/frequencia";
-import { diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
-import { coberturaDoDia, distribuicaoDoDia, marcasDoDia, resumoDoDia } from "@/domain/relatorios";
+import { alunoDesistenteNoDia, diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
+import {
+  coberturaDoDia,
+  desistenciasNoDia,
+  distribuicaoDoDia,
+  marcasDoDia,
+  resumoDoDia,
+} from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -101,7 +107,14 @@ export default function VistaPainel({
     [compartilhado, dia, saidas, doDia],
   );
 
-  const ativos = useMemo(() => alunos.filter((aluno) => aluno.ativo), [alunos]);
+  const ativos = useMemo(
+    () => alunos.filter((aluno) => aluno.ativo && !alunoDesistenteNoDia(aluno, dia)),
+    [alunos, dia],
+  );
+  const desistencias = useMemo(
+    () => desistenciasNoDia(series, turmas, alunos, dia),
+    [series, turmas, alunos, dia],
+  );
   const horarios = useMemo(() => turmas.flatMap((turma) => turma.horarios), [turmas]);
   const marcas = useMemo(
     () => marcasDoDia(ativos, dia, frequenciasDoDia, horarios),
@@ -112,15 +125,20 @@ export default function VistaPainel({
     [marcas, ativos.length, saidasDoDia],
   );
   const distribuicao = useMemo(
-    () => distribuicaoDoDia(series, turmas, alunos, marcas),
-    [series, turmas, alunos, marcas],
+    () => distribuicaoDoDia(series, turmas, ativos, marcas),
+    [series, turmas, ativos, marcas],
   );
   const cobertura = useMemo(
-    () => coberturaDoDia(turmas, alunos, frequenciasDoDia),
-    [turmas, alunos, frequenciasDoDia],
+    () => coberturaDoDia(turmas, ativos, frequenciasDoDia),
+    [turmas, ativos, frequenciasDoDia],
   );
 
   const serieSelecionada = series.find((serie) => serie.id === filtro) ?? null;
+  const totalDesistentesVisiveis = serieSelecionada
+    ? (desistencias.series
+        .find((serie) => serie.serieId === serieSelecionada.id)
+        ?.turmas.reduce((soma, turma) => soma + turma.quantidade, 0) ?? 0)
+    : desistencias.total;
   const rotuloDia = dia.split("-").reverse().join("/");
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const carregandoPainel = carregando && !compartilhado;
@@ -315,6 +333,39 @@ export default function VistaPainel({
                   ? "Nenhuma chamada salva neste dia"
                   : "Nenhuma falta registrada neste dia"
               }
+            />
+          </div>
+
+          <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-medium">Desistentes até este dia</h2>
+              <span className="numerais-tabulares text-muted-foreground text-sm">
+                {totalDesistentesVisiveis} {totalDesistentesVisiveis === 1 ? "aluno" : "alunos"}
+              </span>
+            </div>
+            <GraficoRosca
+              titulo={
+                serieSelecionada
+                  ? `Desistentes por turma da ${serieSelecionada.nome}`
+                  : "Desistentes por série"
+              }
+              fatias={
+                serieSelecionada
+                  ? (desistencias.series
+                      .find((item) => item.serieId === serieSelecionada.id)
+                      ?.turmas.map((turma) => ({
+                        nome: turma.rotulo,
+                        valor: turma.quantidade,
+                      })) ?? [])
+                  : desistencias.series.map((serie) => ({
+                      nome: serie.nome,
+                      valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
+                    }))
+              }
+              rotuloTotal="desistentes"
+              unidadeSingular="desistente"
+              unidadePlural="desistentes"
+              vazio="Nenhum aluno desistente até este dia"
             />
           </div>
 
