@@ -83,6 +83,11 @@ test.describe("Google Planilhas", () => {
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
+    // O envio ao salvar a chamada nasce desligado e só se libera com a estrutura salva.
+    const envioAoSalvar = cartao.getByRole("switch", { name: "Enviar ao salvar a chamada" });
+    await expect(envioAoSalvar).toBeEnabled();
+    await expect(envioAoSalvar).not.toBeChecked();
+
     // Envio de todas as turmas: por padrão só o que mudou; sem chamada, nada
     // a enviar, e o período inteiro fica como opção de conferência.
     await page.getByRole("button", { name: "Enviar todas as turmas" }).click();
