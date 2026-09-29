@@ -72,6 +72,10 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await expect(aluno.getByText("DESISTENTE", { exact: true })).toBeVisible();
 
   await trocarVisao(page, "Painel", "painel");
+  await page
+    .getByRole("group", { name: "Filtro por série" })
+    .getByRole("button", { name: "Desistentes" })
+    .click();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Desistentes por série" })).toContainText("1");
 });
