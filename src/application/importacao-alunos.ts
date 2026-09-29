@@ -41,6 +41,7 @@ async function planejar(
         turmaOriginalId: true,
         ordem: true,
         ativo: true,
+        desistenteEm: true,
       },
     }),
   ]);

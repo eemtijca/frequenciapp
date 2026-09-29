@@ -423,6 +423,7 @@ interface SimulacaoInterna {
 async function diasDoEnvio(
   turmaOriginalId: string,
   entrada: EntradaEnvio,
+  incluirSituacao: boolean,
 ): Promise<{ dias: string[]; incremental: boolean }> {
   const periodo = diasEntre(entrada.de, entrada.ate);
   if (entrada.somenteAlteradas === false) return { dias: periodo, incremental: false };
@@ -433,20 +434,30 @@ async function diasDoEnvio(
   });
   const linhas = await banco().frequencia.findMany({
     where: {
-      ...(ultimo
-        ? { atualizadoEm: { gt: ultimo.criadoEm } }
-        : {
-            dia: {
-              gte: new Date(`${entrada.de}T12:00:00Z`),
-              lte: new Date(`${entrada.ate}T12:00:00Z`),
-            },
-          }),
+      ...(ultimo ? { atualizadoEm: { gt: ultimo.criadoEm } } : {}),
+      dia: {
+        gte: new Date(`${entrada.de}T12:00:00Z`),
+        lte: new Date(`${entrada.ate}T12:00:00Z`),
+      },
       alunos: { some: { aluno: { turmaOriginalId } } },
     },
     select: { dia: true },
     orderBy: { dia: "asc" },
   });
-  const dias = [...new Set(linhas.map((item) => item.dia.toISOString().slice(0, 10)))];
+  const situacaoPendente = incluirSituacao
+    ? await banco().aluno.count({
+        where: {
+          turmaOriginalId,
+          situacaoAtualizadaEm: ultimo ? { gt: ultimo.criadoEm } : { not: null },
+        },
+      })
+    : 0;
+  const dias = [
+    ...new Set([
+      ...linhas.map((item) => item.dia.toISOString().slice(0, 10)),
+      ...(situacaoPendente > 0 ? [entrada.ate] : []),
+    ]),
+  ].sort();
   // Mais que o limite de um envio: vão os mais recentes; o resto fica pendente.
   return { dias: dias.slice(-LIMITE_DIAS_ENVIO), incremental: true };
 }
@@ -590,7 +601,10 @@ async function montarSimulacao(
   }
   const diasPorTurma = new Map<string, { dias: string[]; incremental: boolean }>();
   for (const par of pares) {
-    diasPorTurma.set(par.turmaOriginalId, await diasDoEnvio(par.turmaOriginalId, entrada));
+    diasPorTurma.set(
+      par.turmaOriginalId,
+      await diasDoEnvio(par.turmaOriginalId, entrada, linha.provedor === "GOOGLE"),
+    );
   }
   const todosOsDias = [...diasPorTurma.values()].flatMap((item) => item.dias).sort();
   const [turmas, alunos, frequencias] = await Promise.all([
@@ -644,6 +658,7 @@ async function montarSimulacao(
     }
     const plano = planejarSincronizacao(esquemaAba, turmaPlanilha, leitura.conteudo, {
       ...opcoesBase,
+      sinalizarSituacao: linha.provedor === "GOOGLE",
       substituirDivergencias: completo && (entrada.substituirDivergencias ?? false),
       limparCelulas: completo ? (entrada.limparCelulas ?? []) : [],
       removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
@@ -757,9 +772,11 @@ async function enviarTurmaAutomatico(
     const naoSeguro =
       resumo.substituir + resumo.limpar + resumo.removerLinhas + resumo.removerColunas > 0 ||
       resumo.novosAlunos > 0 ||
-      resumo.ambiguidades > 0;
+      resumo.ambiguidades > 0 ||
+      item.plano.avisos.length > 0;
     if (naoSeguro) return "pendente_manual";
-    if (resumo.preencher + resumo.novasColunas + resumo.vincular === 0) return "enviado";
+    if (resumo.preencher + (resumo.sinalizar ?? 0) + resumo.novasColunas + resumo.vincular === 0)
+      return "enviado";
     const resposta = await aplicarEnvio(usuario, {
       ...entrada,
       planoHashGeral: simulacao.planoHashGeral,
@@ -774,6 +791,7 @@ async function enviarTurmaAutomatico(
 
 const RESUMO_VAZIO = {
   preencher: 0,
+  sinalizar: 0,
   substituir: 0,
   limpar: 0,
   novasColunas: 0,
@@ -821,6 +839,7 @@ export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
         novasColunas: plano?.novasColunas ?? [],
         novosAlunos: plano?.novosAlunos ?? [],
         substituir: plano?.substituir.slice(0, 20) ?? [],
+        sinalizar: plano?.sinalizar?.slice(0, 20) ?? [],
         removerLinhas: plano?.removerLinhas ?? [],
         removerColunas: plano?.removerColunas ?? [],
         candidatosRemocaoLinhas: plano?.candidatosRemocaoLinhas ?? [],
@@ -833,7 +852,7 @@ export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
 }
 
 function amostraDeCelulas(plano: PlanoSincronizacao): CelulaPlano[] {
-  return [...plano.substituir, ...plano.preencher].slice(0, 8);
+  return [...(plano.sinalizar ?? []), ...plano.substituir, ...plano.preencher].slice(0, 8);
 }
 
 interface ResultadoTurma {
@@ -1003,6 +1022,17 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
       valor: celula.valor,
     });
   }
+  for (const celula of plano.sinalizar ?? []) {
+    operacoes.push({
+      tipo: "sinalizar",
+      linha: celula.linha,
+      coluna: celula.coluna,
+      valor: celula.valor,
+      anterior: celula.anterior,
+      alunoId: celula.alunoId,
+      nomeOriginal: celula.alunoNome,
+    });
+  }
   for (const celula of plano.substituir) {
     operacoes.push({
       tipo: "substituir",
@@ -1086,7 +1116,10 @@ async function concluirRegistro(
     where: { id },
     data: {
       preenchidas: sucesso ? numero("preenchidas", plano.resumo.preencher) : 0,
-      substituidas: sucesso ? numero("substituidas", plano.resumo.substituir) : 0,
+      substituidas: sucesso
+        ? numero("substituidas", plano.resumo.substituir) +
+          numero("sinalizadas", plano.resumo.sinalizar ?? 0)
+        : 0,
       limpas: sucesso ? numero("limpas", plano.resumo.limpar) : 0,
       removidasLinhas: sucesso ? numero("removidasLinhas", plano.resumo.removerLinhas) : 0,
       removidasColunas: sucesso ? numero("removidasColunas", plano.resumo.removerColunas) : 0,

@@ -169,9 +169,11 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
                       </p>
                     )}
                   </div>
-                  {!aluno.ativo && (
+                  {aluno.desistenteEm ? (
+                    <span className="text-muted-foreground text-xs">Desistente</span>
+                  ) : !aluno.ativo ? (
                     <span className="text-muted-foreground text-xs">desativado</span>
-                  )}
+                  ) : null}
                 </li>
               ))}
             </ul>

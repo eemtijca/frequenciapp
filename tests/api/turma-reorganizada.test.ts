@@ -131,6 +131,7 @@ describe("chamada pela turma atual, consolidação pela turma original", () => {
     const { aluno } = await json<{ aluno: Aluno }>(resposta);
     expect(aluno.turmaId).toBe(turmaB);
     expect(aluno.turmaOriginalId).toBe(turmaA);
+    expect(aluno.ordem).toBe(2);
   });
 
   it("faz a chamada da turma B com a relação atual, incluindo o aluno movido", async () => {
@@ -168,5 +169,52 @@ describe("chamada pela turma atual, consolidação pela turma original", () => {
     expect(marcas[ids.movido]).toEqual(["P", "F"]);
     expect(marcas[ids.fica]).toEqual(["F", "P"]);
     expect(marcas[ids.deB]).toBeUndefined();
+  });
+
+  it("mantém o desistente na turma e preserva a falta anterior sem aceitar outra", async () => {
+    const marcar = await chamar(
+      `/api/alunos/${ids.movido}`,
+      { method: "PATCH", body: JSON.stringify({ desistente: true }) },
+      cookieAdmin,
+    );
+    expect(marcar.status).toBe(200);
+    const { aluno } = await json<{ aluno: Aluno }>(marcar);
+    expect(aluno.desistenteEm).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(aluno.ativo).toBe(true);
+    expect(aluno.turmaId).toBe(turmaB);
+    expect(aluno.turmaOriginalId).toBe(turmaA);
+    if (!banco) throw new Error("Banco de teste não configurado.");
+    await banco.query("update alunos set desistente_em = $1 where id = $2", [DIA_2, ids.movido]);
+    const antes = await carregar(DIA_2, turmaB);
+    expect(antes?.faltas.some((falta) => falta.alunoId === ids.movido)).toBe(true);
+    const depois = await salvar(DIA_2, turmaB, [], antes?.revisao ?? 0);
+    expect(depois.alunos).toContain(ids.movido);
+    expect(depois.faltas.some((falta) => falta.alunoId === ids.movido)).toBe(true);
+
+    const marcarOutro = await chamar(
+      `/api/alunos/${ids.deB}`,
+      { method: "PATCH", body: JSON.stringify({ desistente: true }) },
+      cookieAdmin,
+    );
+    expect(marcarOutro.status).toBe(200);
+    await banco.query("update alunos set desistente_em = $1 where id = $2", [DIA_2, ids.deB]);
+    const novaFalta = await chamar(
+      "/api/frequencias",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          dia: DIA_2,
+          turmaId: turmaB,
+          faltas: [ids.deB],
+          revisao: depois.revisao,
+        }),
+      },
+      cookieCoord,
+    );
+    expect(novaFalta.status).toBe(400);
+    const copia = await chamar("/api/backup", {}, cookieAdmin);
+    expect(copia.status).toBe(200);
+    const documento = await json<{ alunos: { id: string; desistenteEm?: string | null }[] }>(copia);
+    expect(documento.alunos.find((item) => item.id === ids.movido)?.desistenteEm).toBe(DIA_2);
   });
 });

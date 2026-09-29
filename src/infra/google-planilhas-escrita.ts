@@ -20,6 +20,12 @@ const celula = z.object({ linha: numero, coluna: numero, valor: z.string() });
 const operacao = z.discriminatedUnion("tipo", [
   celula.extend({ tipo: z.literal("preencher") }),
   celula.extend({ tipo: z.literal("substituir"), anterior: z.string().optional() }),
+  celula.extend({
+    tipo: z.literal("sinalizar"),
+    anterior: z.string(),
+    alunoId: z.string().uuid(),
+    nomeOriginal: z.string().min(1),
+  }),
   z.object({
     tipo: z.literal("limpar"),
     linha: numero,
@@ -275,10 +281,11 @@ export function planejarEscritaGoogle(
   if (assinarAba(nome, cabecalho, mesclagensDaAssinatura(aba)) !== assinatura) {
     throw new ErroHttp("A estrutura da planilha mudou. Confira de novo antes de enviar.", 409);
   }
-  const destrutiva = lidas.data.some((item) =>
+  const exigeCompleto = lidas.data.some((item) =>
     ["substituir", "limpar", "removerLinhas", "removerColunas"].includes(item.tipo),
   );
-  if (destrutiva && !modoCompleto) throw new ErroHttp("O modo completo não está ativo.", 400);
+  const destrutiva = exigeCompleto || lidas.data.some((item) => item.tipo === "sinalizar");
+  if (exigeCompleto && !modoCompleto) throw new ErroHttp("O modo completo não está ativo.", 400);
 
   const requests: PedidoGoogle[] = [];
   const contagens: Record<string, number> = {
@@ -293,11 +300,13 @@ export function planejarEscritaGoogle(
     puladasFormula: 0,
     vinculadas: 0,
     puladasVinculo: 0,
+    sinalizadas: 0,
   };
   const metadados = metadadosDaAba(doc, aba);
   const linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
   const colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
   const vinculos = metadados.filter((item) => item.metadataKey === "frequenciapp.aluno");
+  const novosVinculos = new Set<string>();
   let capacidadeLinhas = aba.properties.gridProperties?.rowCount ?? 1000;
   let capacidadeColunas = aba.properties.gridProperties?.columnCount ?? 26;
 
@@ -328,6 +337,7 @@ export function planejarEscritaGoogle(
       }
     }
     requests.push(metadadoLinha(sheetId, linha, "frequenciapp.aluno", alunoId));
+    novosVinculos.add(`${linha}:${alunoId}`);
   };
 
   for (const item of lidas.data) {
@@ -396,6 +406,29 @@ export function planejarEscritaGoogle(
         });
         contar("linhasCriadas");
       }
+    } else if (item.tipo === "sinalizar") {
+      const vinculado =
+        vinculos.some(
+          (vinculo) =>
+            vinculo.metadataValue === item.alunoId &&
+            vinculo.location.dimensionRange?.startRowIndex === item.linha - 1,
+        ) || novosVinculos.has(`${item.linha}:${item.alunoId}`);
+      const anterior = celulaAtual(valores, item.linha, item.coluna);
+      const transicaoValida =
+        item.nomeOriginal !== "DESISTENTE" &&
+        ((item.valor === "DESISTENTE" && item.anterior === item.nomeOriginal) ||
+          (item.anterior === "DESISTENTE" && item.valor === item.nomeOriginal));
+      if (
+        !vinculado ||
+        temFormula(formulas, item.linha, item.coluna) ||
+        anterior !== item.anterior ||
+        !transicaoValida
+      ) {
+        throw new ErroHttp("A situação do aluno mudou na planilha. Confira a prévia de novo.", 409);
+      }
+      requests.push(escrever(sheetId, item.linha, item.coluna, item.valor));
+      atribuir(valores, item.linha, item.coluna, item.valor);
+      contar("sinalizadas");
     } else if (item.tipo === "preencher" || item.tipo === "substituir" || item.tipo === "limpar") {
       assegurarLinha(item.linha);
       assegurarColuna(item.coluna);

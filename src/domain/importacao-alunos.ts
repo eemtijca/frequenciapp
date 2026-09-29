@@ -215,6 +215,7 @@ export interface AlunoCadastrado {
   turmaOriginalId: string;
   ordem: number;
   ativo: boolean;
+  desistenteEm?: Date | null;
 }
 
 /** Turma do cadastro, com o rótulo completo de exibição. */
@@ -341,7 +342,13 @@ export function planejarImportacao(
   }
 
   const desativar = alunos
-    .filter((aluno) => aluno.ativo && turmasImportadas.has(aluno.turmaId) && !usados.has(aluno.id))
+    .filter(
+      (aluno) =>
+        aluno.ativo &&
+        !aluno.desistenteEm &&
+        turmasImportadas.has(aluno.turmaId) &&
+        !usados.has(aluno.id),
+    )
     .map((aluno) => ({ alunoId: aluno.id, nome: aluno.nome, turmaId: aluno.turmaId }));
 
   return { itens, desativar, bloqueios: [...new Set(bloqueios)], avisos, turmas: resumoTurmas };

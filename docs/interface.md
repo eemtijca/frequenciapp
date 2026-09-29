@@ -20,6 +20,8 @@ Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo origina
 
 Na lista da Chamada, a linha inteira do aluno é o alvo: um toque marca falta, um segundo toque devolve a presença. O indicador F ou FJ à direita e o fundo levemente avermelhado confirmam o estado; o seletor de justificativa fica logo abaixo da linha marcada. Todos os alunos começam presentes, então o movimento comum é tocar apenas nos ausentes, como na caderneta de papel. Alvos de toque têm no mínimo 48 pixels de altura na lista e 44 nas ações secundárias.
 
+Na Gestão, a edição do aluno permite escolher outra turma atual sem mudar a turma de origem e oferece uma ação separada para registrar ou desfazer desistência. O aluno desistente continua na lista da Chamada com o texto "Desistente" ao lado do nome e a marcação bloqueada. As marcas anteriores são preservadas. O Painel não o inclui na infrequência a partir da data da desistência e mostra um gráfico da quantidade de desistentes por série ou turma atual.
+
 Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora novos toques, para o toque duplo acidental não duplicar chamadas, cadastros, arquivos ou envios. Alternâncias locais, como marcar falta e trocar filtros, continuam respondendo a cada toque. Um toque acidental repetido em ações sem resposta de rede também é absorvido por uma janela curta.
 
 ## Tema e paleta

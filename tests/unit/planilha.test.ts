@@ -30,6 +30,7 @@ function aluno(parcial: Partial<Aluno> = {}): Aluno {
     turmaOriginalId: parcial.turmaOriginalId ?? "origem-a",
     ordem: parcial.ordem ?? 1,
     ativo: parcial.ativo ?? true,
+    desistenteEm: parcial.desistenteEm ?? null,
   };
 }
 
@@ -163,6 +164,19 @@ describe("dataframe e CSV", () => {
 
   it("gera nome de arquivo sem acento", () => {
     expect(nomeArquivoCsv(turma)).toBe("frequenciapp-grade-3o-ano-a-2026-09-10-a-2026-09-11.csv");
+  });
+
+  it("escreve DESISTENTE no campo do nome no CSV sem apagar marcas antigas", () => {
+    const comDesistente = montarTurmaPlanilha(
+      "origem-a",
+      "3º ano A",
+      [aluno({ desistenteEm: "2026-09-11" })],
+      [frequencia()],
+      [],
+      dias,
+      () => "3º ano A",
+    );
+    expect(paraCsv(comDesistente)).toContain("DESISTENTE;3º ano A;P;");
   });
 });
 
@@ -515,6 +529,88 @@ describe("planejarSincronizacao: código do aluno na linha", () => {
       { linha: 3, coluna: 1, nome: "Bruno", alunoId: "aluno-2" },
     ]);
     expect(plano.resumo.vincular).toBe(2);
+  });
+
+  it("sinaliza desistência no nome da linha vinculada, preservando os dias ocupados", () => {
+    const lista = [
+      aluno({ desistenteEm: "2026-09-11" }),
+      aluno({ id: "aluno-2", nome: "Bruno", ordem: 2 }),
+    ];
+    const conteudo = {
+      ...conteudoDaAba(ABA),
+      alunosDasLinhas: [{ linha: 2, alunoId: "aluno-1" }],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe(lista),
+      conteudo,
+      opcoes({ sinalizarSituacao: true }),
+    );
+    expect(plano.sinalizar).toMatchObject([
+      { celula: "A2", anterior: "Alice", valor: "DESISTENTE" },
+    ]);
+    expect(plano.preencher.some((item) => item.celula === "C2")).toBe(false);
+    expect(plano.limpar).toEqual([]);
+  });
+
+  it("vincula pelo nome e sinaliza a situação no mesmo plano", () => {
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno({ desistenteEm: "2026-09-11" })]),
+      conteudoDaAba(ABA),
+      opcoes({ sinalizarSituacao: true }),
+    );
+    expect(plano.vincular).toMatchObject([{ linha: 2, alunoId: "aluno-1" }]);
+    expect(plano.sinalizar).toMatchObject([{ celula: "A2", valor: "DESISTENTE" }]);
+  });
+
+  it("restaura o nome original apenas pela linha vinculada", () => {
+    const aba = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["DESISTENTE", "", "", "", ""], ...ABA.valores.slice(2)],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno()]),
+      { ...conteudoDaAba(aba), alunosDasLinhas: [{ linha: 2, alunoId: "aluno-1" }] },
+      opcoes({ sinalizarSituacao: true }),
+    );
+    expect(plano.sinalizar).toMatchObject([
+      { celula: "A2", anterior: "DESISTENTE", valor: "Alice" },
+    ]);
+  });
+
+  it("não acrescenta aluno quando há DESISTENTE sem vínculo identificável", () => {
+    const aba = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["DESISTENTE", "", "", "", ""]],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno({ desistenteEm: "2026-09-11" })]),
+      conteudoDaAba(aba),
+      opcoes({ sinalizarSituacao: true, permitirNovosAlunos: true }),
+    );
+    expect(plano.novosAlunos).toEqual([]);
+    expect(plano.resumo.ambiguidades).toBe(1);
+  });
+
+  it("não troca nome editado à mão pela situação de desistência", () => {
+    const aba = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["Outro nome", "", "", "", ""], ...ABA.valores.slice(2)],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno({ desistenteEm: "2026-09-11" })]),
+      { ...conteudoDaAba(aba), alunosDasLinhas: [{ linha: 2, alunoId: "aluno-1" }] },
+      opcoes({ sinalizarSituacao: true, modo: "completo", substituirDivergencias: true }),
+    );
+    expect(plano.sinalizar).toEqual([]);
+    expect(plano.substituir.filter((item) => item.campo === "nome")).toEqual([]);
+    expect(plano.avisos).toContain(
+      "O nome de Alice foi alterado na planilha; confira a situação manualmente.",
+    );
   });
 
   it("acha o aluno pelo código mesmo com o nome trocado na planilha", () => {

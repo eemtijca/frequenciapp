@@ -31,6 +31,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import {
+  alunoDesistenteNoDia,
   diaSeguinte,
   horaNoFuso,
   horariosDoDia,
@@ -287,6 +288,14 @@ export default function VistaFrequencia({
       )
       .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
   }, [alunos, turmaId, listaGravada, dia, diaCorrente]);
+  const desistentesDaTurma = useMemo(
+    () =>
+      new Set(
+        ativosDaTurma.filter((aluno) => alunoDesistenteNoDia(aluno, dia)).map((aluno) => aluno.id),
+      ),
+    [ativosDaTurma, dia],
+  );
+  const participantes = ativosDaTurma.filter((aluno) => !desistentesDaTurma.has(aluno.id));
 
   // Turma reorganizada: algum aluno da chamada veio de outra turma. Nela, a
   // turma original de cada aluno aparece em um círculo ao lado do nome.
@@ -319,14 +328,14 @@ export default function VistaFrequencia({
     [catalogoJustificativas],
   );
 
-  const contagemFaltas = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id)).length;
-  const contagemJustificadas = ativosDaTurma.filter((aluno) => justificativas.has(aluno.id)).length;
-  const contagemPresencas = ativosDaTurma.length - contagemFaltas;
-  const contagemParciais = ativosDaTurma.filter((aluno) => {
+  const contagemFaltas = participantes.filter((aluno) => ausencias.has(aluno.id)).length;
+  const contagemJustificadas = participantes.filter((aluno) => justificativas.has(aluno.id)).length;
+  const contagemPresencas = participantes.length - contagemFaltas;
+  const contagemParciais = participantes.filter((aluno) => {
     const marcadas = ausencias.get(aluno.id)?.size ?? 0;
     return marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
   }).length;
-  const infrequencia = ativosDaTurma.length > 0 ? contagemFaltas / ativosDaTurma.length : 0;
+  const infrequencia = participantes.length > 0 ? contagemFaltas / participantes.length : 0;
 
   const visiveis = useMemo(() => {
     const termo = normalizar(busca);
@@ -338,12 +347,13 @@ export default function VistaFrequencia({
         (origem !== "" && normalizar(origem).includes(termo));
       const combinaFiltro =
         filtro === "todos" ||
-        (filtro === "faltas" && ausencias.has(aluno.id)) ||
-        (filtro === "justificadas" && justificativas.has(aluno.id)) ||
-        (filtro === "presentes" && !ausencias.has(aluno.id));
+        (!desistentesDaTurma.has(aluno.id) &&
+          ((filtro === "faltas" && ausencias.has(aluno.id)) ||
+            (filtro === "justificadas" && justificativas.has(aluno.id)) ||
+            (filtro === "presentes" && !ausencias.has(aluno.id))));
       return combinaBusca && combinaFiltro;
     });
-  }, [ativosDaTurma, busca, filtro, ausencias, justificativas, rotuloOrigemDe]);
+  }, [ativosDaTurma, busca, filtro, ausencias, justificativas, rotuloOrigemDe, desistentesDaTurma]);
 
   const bloqueado = carregando || salvando || conflito;
   const travado = bloqueado || sujo;
@@ -351,7 +361,7 @@ export default function VistaFrequencia({
 
   const alternarFalta = useCallback(
     (alunoId: string) => {
-      if (bloqueado || chaveCarregada.current !== chave) return;
+      if (bloqueado || desistentesDaTurma.has(alunoId) || chaveCarregada.current !== chave) return;
       setAusencias((atuais) => {
         const proximas = new Map(atuais);
         if (proximas.has(alunoId)) {
@@ -378,12 +388,12 @@ export default function VistaFrequencia({
       setSujo(true);
       setErro("");
     },
-    [aulasDoDia, ausencias, bloqueado, chave],
+    [aulasDoDia, ausencias, bloqueado, chave, desistentesDaTurma],
   );
 
   const definirJustificativa = useCallback(
     (alunoId: string, codigo: string) => {
-      if (bloqueado || chaveCarregada.current !== chave) return;
+      if (bloqueado || desistentesDaTurma.has(alunoId) || chaveCarregada.current !== chave) return;
       setJustificativas((atuais) => {
         const proximas = new Map(atuais);
         if (codigo === "") proximas.delete(alunoId);
@@ -401,12 +411,12 @@ export default function VistaFrequencia({
       setSujo(true);
       setErro("");
     },
-    [bloqueado, chave],
+    [bloqueado, chave, desistentesDaTurma],
   );
 
   const definirObservacao = useCallback(
     (alunoId: string, texto: string) => {
-      if (bloqueado || chaveCarregada.current !== chave) return;
+      if (bloqueado || desistentesDaTurma.has(alunoId) || chaveCarregada.current !== chave) return;
       setObservacoes((atuais) => {
         const proximas = new Map(atuais);
         if (texto === "") proximas.delete(alunoId);
@@ -416,12 +426,12 @@ export default function VistaFrequencia({
       setSujo(true);
       setErro("");
     },
-    [bloqueado, chave],
+    [bloqueado, chave, desistentesDaTurma],
   );
 
   const alternarAula = useCallback(
     (alunoId: string, horarioId: string) => {
-      if (bloqueado || chaveCarregada.current !== chave) return;
+      if (bloqueado || desistentesDaTurma.has(alunoId) || chaveCarregada.current !== chave) return;
       setAusencias((atuais) => {
         const proximas = new Map(atuais);
         const aulas = new Set(proximas.get(alunoId) ?? []);
@@ -434,11 +444,11 @@ export default function VistaFrequencia({
       setSujo(true);
       setErro("");
     },
-    [bloqueado, chave],
+    [bloqueado, chave, desistentesDaTurma],
   );
 
   function definirAulas(alunoId: string, ids: string[]) {
-    if (bloqueado || chaveCarregada.current !== chave) return;
+    if (bloqueado || desistentesDaTurma.has(alunoId) || chaveCarregada.current !== chave) return;
     setAusencias((atuais) => {
       const proximas = new Map(atuais);
       if (ids.length === 0) proximas.delete(alunoId);
@@ -608,7 +618,9 @@ export default function VistaFrequencia({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Chamada</h1>
           <p className="text-muted-foreground text-sm">
-            {carregando ? "" : `${ativosDaTurma.length} alunos ativos`}
+            {carregando
+              ? ""
+              : `${ativosDaTurma.length} na lista · ${desistentesDaTurma.size} desistentes`}
           </p>
         </div>
         <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
@@ -735,7 +747,7 @@ export default function VistaFrequencia({
           <p className="text-muted-foreground text-xs">
             Infrequência de{" "}
             <span className="numerais-tabulares font-semibold">{rotuloInfrequencia}</span> (F + FJ
-            sobre o total). Todos começam presentes; toque no aluno para marcar falta.
+            sobre o total de alunos em chamada. Toque no aluno para marcar falta.
           </p>
           {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
@@ -928,7 +940,8 @@ export default function VistaFrequencia({
             ) : (
               <ul className="divide-y">
                 {visiveis.map((aluno) => {
-                  const faltando = ausencias.has(aluno.id);
+                  const desistente = desistentesDaTurma.has(aluno.id);
+                  const faltando = !desistente && ausencias.has(aluno.id);
                   const marcadas = ausencias.get(aluno.id)?.size ?? 0;
                   const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
                   const codigo = justificativas.get(aluno.id) ?? "";
@@ -945,15 +958,17 @@ export default function VistaFrequencia({
                         <button
                           type="button"
                           aria-pressed={faltando}
-                          disabled={bloqueado}
+                          disabled={bloqueado || desistente}
                           aria-label={`${aluno.nome}${
                             turmaReorganizada
                               ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
                               : ""
                           }: ${
-                            faltando
-                              ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
-                              : "presente. Toque para marcar falta."
+                            desistente
+                              ? "desistente. Marcação bloqueada."
+                              : faltando
+                                ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                                : "presente. Toque para marcar falta."
                           }${
                             temAcumulado && acumulado
                               ? ` ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
@@ -974,6 +989,11 @@ export default function VistaFrequencia({
                               >
                                 {aluno.nome}
                               </span>
+                              {desistente && (
+                                <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
+                                  DESISTENTE
+                                </span>
+                              )}
                               {turmaReorganizada && rotuloCurtoDe(aluno.turmaOriginalId) && (
                                 <CirculoValor
                                   texto={rotuloCurtoDe(aluno.turmaOriginalId)}
@@ -996,7 +1016,7 @@ export default function VistaFrequencia({
                             ) : null}
                           </span>
                           <motion.span
-                            key={faltando ? codigo || "F" : "P"}
+                            key={desistente ? "D" : faltando ? codigo || "F" : "P"}
                             initial={semMovimento ? false : MARCAS.escondido}
                             animate={MARCAS.visivel}
                             transition={
@@ -1005,14 +1025,16 @@ export default function VistaFrequencia({
                                 : { type: "spring", stiffness: 500, damping: 28 }
                             }
                             className={
-                              faltando
-                                ? codigo
-                                  ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                                  : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                                : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
+                              desistente
+                                ? "bg-secondary text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                : faltando
+                                  ? codigo
+                                    ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                                    : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                  : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
                             }
                           >
-                            {faltando ? (codigo ? "FJ" : "F") : "P"}
+                            {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                           </motion.span>
                         </button>
                         {faltando && configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (

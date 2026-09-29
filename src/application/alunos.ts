@@ -5,7 +5,8 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import type { Aluno } from "@/domain/frequencia";
+import { ambiente } from "@/infra/ambiente";
+import { diaLocal, type Aluno } from "@/domain/frequencia";
 
 const nomeAluno = z
   .string()
@@ -28,6 +29,7 @@ export const esquemaAtualizarAluno = z
     turmaOriginalId: idTurma.optional(),
     ordem: z.number().int().min(1).max(9999).optional(),
     ativo: z.boolean().optional(),
+    desistente: z.boolean().optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
@@ -40,6 +42,7 @@ interface LinhaAluno {
   turmaOriginalId: string;
   ordem: number;
   ativo: boolean;
+  desistenteEm: Date | null;
 }
 
 function paraAluno(linha: LinhaAluno): Aluno {
@@ -50,6 +53,7 @@ function paraAluno(linha: LinhaAluno): Aluno {
     turmaOriginalId: linha.turmaOriginalId,
     ordem: linha.ordem,
     ativo: linha.ativo,
+    desistenteEm: linha.desistenteEm?.toISOString().slice(0, 10) ?? null,
   };
 }
 
@@ -105,6 +109,12 @@ export async function atualizarAluno(
   }
   const existente = await banco().aluno.findUnique({ where: { id } });
   if (!existente) throw new ErroHttp("Aluno não encontrado.", 404);
+  if (dados.data.desistente === true && (!existente.ativo || dados.data.ativo === false)) {
+    throw new ErroHttp("Reative o aluno antes de registrar a desistência.", 400);
+  }
+  if (dados.data.ativo === false && existente.desistenteEm && dados.data.desistente !== false) {
+    throw new ErroHttp("Desfaça a desistência antes de desativar o aluno.", 400);
+  }
   if (dados.data.turmaId) {
     const turma = await banco().turma.findUnique({ where: { id: dados.data.turmaId } });
     if (!turma) throw new ErroHttp("Turma não encontrada.", 404);
@@ -114,6 +124,14 @@ export async function atualizarAluno(
     if (!origem) throw new ErroHttp("Turma de origem não encontrada.", 404);
   }
   const linha = await comTransacao(async (tx) => {
+    const turmaMudou = dados.data.turmaId !== undefined && dados.data.turmaId !== existente.turmaId;
+    const ultimoDaTurma = turmaMudou
+      ? await tx.aluno.findFirst({
+          where: { turmaId: dados.data.turmaId },
+          orderBy: { ordem: "desc" },
+          select: { ordem: true },
+        })
+      : null;
     const atualizado = await tx.aluno.update({
       where: { id },
       data: {
@@ -122,8 +140,23 @@ export async function atualizarAluno(
         ...(dados.data.turmaOriginalId !== undefined
           ? { turmaOriginalId: dados.data.turmaOriginalId }
           : {}),
-        ...(dados.data.ordem !== undefined ? { ordem: dados.data.ordem } : {}),
+        ...(dados.data.ordem !== undefined
+          ? { ordem: dados.data.ordem }
+          : turmaMudou
+            ? { ordem: (ultimoDaTurma?.ordem ?? 0) + 1 }
+            : {}),
         ...(dados.data.ativo !== undefined ? { ativo: dados.data.ativo } : {}),
+        ...(dados.data.desistente !== undefined
+          ? {
+              desistenteEm: dados.data.desistente
+                ? (existente.desistenteEm ??
+                  new Date(`${diaLocal(new Date(), ambiente.fuso)}T12:00:00Z`))
+                : null,
+              ...(Boolean(existente.desistenteEm) !== dados.data.desistente
+                ? { situacaoAtualizadaEm: new Date() }
+                : {}),
+            }
+          : {}),
       },
     });
     await auditar(tx, admin.id, "aluno.atualizar", `aluno:${id}`);

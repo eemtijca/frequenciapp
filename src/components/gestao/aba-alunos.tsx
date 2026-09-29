@@ -14,6 +14,7 @@ import {
   Power,
   Trash2,
   UserRound,
+  UserRoundX,
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -203,7 +204,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     try {
       if (emEdicao) {
         await pedir<{ aluno: Aluno }>(`/api/alunos/${emEdicao.id}`, corpoAlteracao("PATCH", corpo));
-        avisarSucesso("Aluno atualizado.", "A lista da Chamada já mostra os dados novos.");
+        avisarSucesso(
+          emEdicao.turmaId !== formulario.turmaId ? "Aluno movido de turma." : "Aluno atualizado.",
+          "O histórico e a turma de origem foram preservados.",
+        );
       } else {
         await pedir<{ aluno: Aluno }>("/api/alunos", corpoJson(corpo));
         avisarSucesso("Aluno cadastrado.", "O aluno entra na chamada de hoje e nos próximos dias.");
@@ -231,6 +235,26 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       } catch (excecao) {
         const mensagem =
           excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
+        toast.error(mensagem);
+      }
+    });
+  }
+
+  function alternarDesistencia(aluno: Aluno) {
+    void executarPorChave(aluno.id, async () => {
+      try {
+        await pedir<{ aluno: Aluno }>(
+          `/api/alunos/${aluno.id}`,
+          corpoAlteracao("PATCH", { desistente: !aluno.desistenteEm }),
+        );
+        toast.success(
+          aluno.desistenteEm ? "Desistência desfeita." : "Aluno marcado como desistente.",
+        );
+        setDialogoAberto(false);
+        await onMudanca();
+      } catch (excecao) {
+        const mensagem =
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.";
         toast.error(mensagem);
       }
     });
@@ -468,9 +492,11 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                             Origem {rotulo(aluno.turmaOriginalId)}
                           </p>
                         )}
-                        {!aluno.ativo && (
+                        {aluno.desistenteEm ? (
+                          <p className="text-muted-foreground text-xs">Desistente</p>
+                        ) : !aluno.ativo ? (
                           <p className="text-muted-foreground text-xs">desativado</p>
-                        )}
+                        ) : null}
                       </div>
                       {!modoSelecao && (
                         <div className="flex shrink-0 items-center gap-1">
@@ -491,7 +517,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                               aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`
                             }
                             onClick={() => alternarAtivo(aluno)}
-                            disabled={chaveAtiva === aluno.id}
+                            disabled={chaveAtiva === aluno.id || Boolean(aluno.desistenteEm)}
                           >
                             <Power size={16} />
                           </Button>
@@ -566,7 +592,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="turma-aluno-gestao">Turma</Label>
+              <Label htmlFor="turma-aluno-gestao">Turma atual</Label>
               <Selecionar
                 id="turma-aluno-gestao"
                 value={formulario.turmaId}
@@ -585,7 +611,46 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                 }
                 opcoes={opcoesTurma}
               />
+              {emEdicao && (
+                <p className="text-muted-foreground text-xs">
+                  Escolha outra turma para mover o aluno. As chamadas anteriores e a turma de origem
+                  são preservadas.
+                </p>
+              )}
             </div>
+            {emEdicao && emEdicao.ativo && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="outline" className="justify-start">
+                    <UserRoundX size={16} />
+                    {emEdicao.desistenteEm ? "Desfazer desistência" : "Marcar como desistente"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {emEdicao.desistenteEm
+                        ? `Desfazer a desistência de ${emEdicao.nome}?`
+                        : `Marcar ${emEdicao.nome} como desistente?`}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {emEdicao.desistenteEm
+                        ? "O aluno volta a poder receber marcas nas chamadas atuais. Os registros anteriores permanecem."
+                        : "O aluno continua visível na Chamada, com a marcação bloqueada. As faltas anteriores permanecem."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => alternarDesistencia(emEdicao)}
+                      disabled={chaveAtiva === emEdicao.id}
+                    >
+                      Confirmar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="origem-aluno-gestao">Turma de origem</Label>
               <Selecionar
