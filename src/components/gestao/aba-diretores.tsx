@@ -54,15 +54,17 @@ import {
 
 interface Props {
   turmas: Turma[];
+  diaCorrente: string;
 }
 
 interface Formulario {
   nome: string;
   identificador: string;
   turmaIds: string[];
+  inicio: string;
 }
 
-const VAZIO: Formulario = { nome: "", identificador: "", turmaIds: [] };
+const VAZIO: Formulario = { nome: "", identificador: "", turmaIds: [], inicio: "" };
 
 const VARIANTE_ESTADO: Record<EstadoCredencial, VarianteSelo> = {
   sem_palavra: "neutro",
@@ -76,12 +78,13 @@ function dataCurta(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("pt-BR") : "";
 }
 
-export default function AbaDiretores({ turmas }: Props) {
+export default function AbaDiretores({ turmas, diaCorrente }: Props) {
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
   const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<DiretorDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
+  const [inicioBase, setInicioBase] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
@@ -130,17 +133,21 @@ export default function AbaDiretores({ turmas }: Props) {
 
   function abrirNovo() {
     setEmEdicao(null);
-    setFormulario(VAZIO);
+    setFormulario({ ...VAZIO, inicio: diaCorrente });
+    setInicioBase(diaCorrente);
     setErro("");
     setDialogoAberto(true);
   }
 
   function abrirEdicao(diretor: DiretorDTO) {
     setEmEdicao(diretor);
+    const maisAntigo = diretor.turmas.map((vinculo) => vinculo.inicio).sort()[0] ?? diaCorrente;
+    setInicioBase(maisAntigo);
     setFormulario({
       nome: diretor.nome,
       identificador: diretor.identificador,
       turmaIds: diretor.turmas.map((vinculo) => vinculo.turmaId),
+      inicio: maisAntigo,
     });
     setErro("");
     setDialogoAberto(true);
@@ -163,14 +170,28 @@ export default function AbaDiretores({ turmas }: Props) {
       if (emEdicao) {
         await pedir<{ diretor: DiretorDTO }>(
           `/api/diretores/${emEdicao.id}`,
-          corpoAlteracao("PATCH", { nome: formulario.nome, turmaIds: formulario.turmaIds }),
+          corpoAlteracao("PATCH", {
+            nome: formulario.nome,
+            turmaIds: formulario.turmaIds,
+            ...(formulario.inicio && formulario.inicio !== inicioBase
+              ? { inicioVinculo: formulario.inicio }
+              : {}),
+          }),
         );
         avisarSucesso(
           "Diretor atualizado.",
           "Turma retirada deixa de aparecer para o diretor na hora.",
         );
       } else {
-        await pedir<{ diretor: DiretorDTO }>("/api/diretores", corpoJson(formulario));
+        await pedir<{ diretor: DiretorDTO }>(
+          "/api/diretores",
+          corpoJson({
+            nome: formulario.nome,
+            identificador: formulario.identificador,
+            turmaIds: formulario.turmaIds,
+            ...(formulario.inicio ? { inicioVinculo: formulario.inicio } : {}),
+          }),
+        );
         avisarSucesso(
           "Diretor cadastrado.",
           "Gere a palavra-chave para liberar o primeiro acesso.",
@@ -490,6 +511,26 @@ export default function AbaDiretores({ turmas }: Props) {
                 </div>
               )}
             </fieldset>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="inicio-diretor">Acompanha desde</Label>
+              <Input
+                id="inicio-diretor"
+                type="date"
+                value={formulario.inicio}
+                max={diaCorrente}
+                min="2000-01-01"
+                aria-describedby="dica-inicio-diretor"
+                onChange={(evento) =>
+                  setFormulario((atual) => ({ ...atual, inicio: evento.target.value }))
+                }
+                className="h-11 rounded-lg"
+              />
+              <p id="dica-inicio-diretor" className="text-muted-foreground text-xs">
+                {emEdicao
+                  ? "Só antecipa o início das turmas já acompanhadas; turmas novas começam nesta data."
+                  : "O diretor vê a turma a partir desta data. Use uma data passada para incluir o histórico de quando já exercia a função."}
+              </p>
+            </div>
             {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>

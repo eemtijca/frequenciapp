@@ -49,3 +49,7 @@ Na virada do ano letivo, a Gestão revisa os vínculos. O fim de um vínculo é 
 - Uma rota nova sem guarda reprova `tests/unit/guardas-rotas.test.ts`; as rotas públicas ficam listadas no teste com o motivo.
 - Decidir acesso comparando o papel dentro de uma rota também reprova o teste. A interface usa `temCapacidade` para mostrar ou esconder ações, sem que isso substitua a guarda do servidor.
 - A mensagem de recusa de quem não tem `operar` é genérica e não revela o papel. A de gestão continua "Apenas o administrador pode fazer esta operação."
+
+## Adendo: início do acompanhamento informado pela Gestão
+
+O recorte pelo vínculo permanece, mas o início deixa de ser sempre o dia do cadastro. A Gestão informa desde quando o diretor acompanha cada turma, no cadastro e na edição. A data pode ser retroativa (a partir de 2000-01-01) e nunca futura; na edição ela só antecipa o início já registrado, para não esconder dias que o diretor já via, e vale como início das turmas acrescentadas. Sem a data, o comportamento anterior continua: o vínculo começa hoje. Quando o período consultado não tem chamada e coincide com o início do vínculo, a tela informa a data em que o acompanhamento começou.
