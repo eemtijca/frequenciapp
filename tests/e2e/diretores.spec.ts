@@ -94,6 +94,36 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(item.getByText(/revogada: Teste de ponta a ponta/)).toBeVisible();
   });
 
+  test("desativa e reativa o diretor, bloqueando a palavra-chave enquanto desativado", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await page
+      .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
+      .first()
+      .click();
+    const formulario = page.getByRole("dialog");
+    await formulario.getByLabel("Nome").fill("E2E Desativar");
+    await formulario.getByLabel("Identificador de acesso").fill("e2e-desativar");
+    await formulario.getByRole("button", { name: "Cadastrar" }).click();
+    await expect(page.getByText("Diretor cadastrado.")).toBeVisible();
+
+    const item = page.locator('[data-diretor="e2e-desativar"]');
+    await expect(item.getByText("desativado")).toHaveCount(0);
+    await item.getByRole("button", { name: "Desativar E2E Desativar" }).click();
+    await expect(page.getByText("Diretor desativado.")).toBeVisible();
+    await expect(item.getByText("desativado")).toBeVisible();
+    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeDisabled();
+
+    await item.getByRole("button", { name: "Reativar E2E Desativar" }).click();
+    await expect(page.getByText("Diretor reativado.")).toBeVisible();
+    await expect(item.getByText("desativado")).toHaveCount(0);
+    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeEnabled();
+  });
+
   test("ajusta os parâmetros de acesso em Configurações", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
