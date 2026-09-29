@@ -6,7 +6,7 @@ import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 const CAMPOS_ESTRUTURA =
-  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,developerMetadata(metadataId,metadataKey,metadataValue,location))";
+  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
   "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue))))";
 
@@ -47,6 +47,18 @@ const documento = z.object({
       properties: propriedades,
       merges: z.array(faixa).optional(),
       developerMetadata: z.array(metadado).optional(),
+      data: z
+        .array(
+          z.object({
+            rowMetadata: z
+              .array(z.object({ developerMetadata: z.array(metadado).optional() }))
+              .optional(),
+            columnMetadata: z
+              .array(z.object({ developerMetadata: z.array(metadado).optional() }))
+              .optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
 });
@@ -77,9 +89,15 @@ function intervaloA1(item: z.infer<typeof faixa>): string {
 }
 
 export function metadadosDaAba(doc: DocumentoGoogle, aba: AbaGoogle): MetadadoGoogle[] {
+  // A Sheets API devolve marcadores de linha e coluna em GridData, não em Sheet.
+  const marcadoresDimensoes = (aba.data ?? []).flatMap((grade) =>
+    [...(grade.rowMetadata ?? []), ...(grade.columnMetadata ?? [])].flatMap(
+      (dimensao) => dimensao.developerMetadata ?? [],
+    ),
+  );
   return [
     ...new Map(
-      [...(doc.developerMetadata ?? []), ...(aba.developerMetadata ?? [])]
+      [...(doc.developerMetadata ?? []), ...(aba.developerMetadata ?? []), ...marcadoresDimensoes]
         .filter((item) => {
           const id = item.location.dimensionRange?.sheetId ?? item.location.sheetId;
           return id === aba.properties.sheetId;

@@ -23,6 +23,8 @@ O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos esc
 
 O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas no modo completo criam uma cópia oculta da aba. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
+Na leitura da Sheets API, marcadores da planilha e da aba vêm nos respectivos campos `developerMetadata`; marcadores de linhas e colunas vêm em `sheets.data.rowMetadata` e `sheets.data.columnMetadata`. A prévia deve reconhecer os códigos já gravados antes de propor novos vínculos, inclusive depois de uma resposta sem confirmação.
+
 ## Conexão legada por Apps Script
 
 ## Publicar o script

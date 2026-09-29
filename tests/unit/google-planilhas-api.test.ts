@@ -8,16 +8,6 @@ const documento = {
   spreadsheetId: "planilha-de-teste",
   spreadsheetUrl: "https://docs.google.com/spreadsheets/d/planilha-de-teste/edit",
   properties: { title: "Escola", timeZone: "America/Fortaleza" },
-  developerMetadata: [
-    {
-      metadataId: 1,
-      metadataKey: "frequenciapp.aluno",
-      metadataValue: "00000000-0000-4000-8000-000000000001",
-      location: {
-        dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 },
-      },
-    },
-  ],
   sheets: [
     {
       properties: {
@@ -27,6 +17,40 @@ const documento = {
         gridProperties: { rowCount: 100, columnCount: 26, frozenRowCount: 1 },
       },
       merges: [],
+      data: [
+        {
+          rowMetadata: [
+            {},
+            {
+              developerMetadata: [
+                {
+                  metadataId: 1,
+                  metadataKey: "frequenciapp.aluno",
+                  metadataValue: "00000000-0000-4000-8000-000000000001",
+                  location: {
+                    dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 },
+                  },
+                },
+              ],
+            },
+          ],
+          columnMetadata: [
+            {},
+            {
+              developerMetadata: [
+                {
+                  metadataId: 2,
+                  metadataKey: "frequenciapp.coluna",
+                  metadataValue: "1",
+                  location: {
+                    dimensionRange: { sheetId: 7, startColumnIndex: 1, endColumnIndex: 2 },
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
     },
   ],
 };
@@ -89,7 +113,10 @@ describe("leitura pela Sheets API", () => {
     expect(leitura.alunosDasLinhas).toEqual([
       { linha: 2, alunoId: "00000000-0000-4000-8000-000000000001" },
     ]);
+    expect(leitura.colunasCriadas).toEqual([2]);
     expect(chamada).toHaveBeenCalledTimes(3);
+    expect(String(chamada.mock.calls[0]?.[0])).toContain("rowMetadata");
+    expect(String(chamada.mock.calls[0]?.[0])).toContain("columnMetadata");
   });
 
   it("devolve a estrutura com dimensões utilizadas e fuso", async () => {
