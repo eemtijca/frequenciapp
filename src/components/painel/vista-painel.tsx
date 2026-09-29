@@ -10,8 +10,10 @@ import {
   coberturaDoDia,
   desistenciasNoDia,
   distribuicaoDoDia,
+  distribuicaoPorOrigem,
   marcasDoDia,
   resumoDoDia,
+  serieTemRemanejamento,
 } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
@@ -139,6 +141,14 @@ export default function VistaPainel({
   const turmasPendentes = serieSelecionada
     ? cobertura.turmasPendentes.filter((turma) => turma.serieId === serieSelecionada.id)
     : cobertura.turmasPendentes;
+  // Só a série com aluno remanejado ganha o gráfico pela turma original.
+  const porOrigem = useMemo(
+    () =>
+      serieSelecionada && serieTemRemanejamento(serieSelecionada, turmas, ativos)
+        ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
+        : null,
+    [serieSelecionada, turmas, ativos, marcas],
+  );
   const coberturaRegistrados = distribuicaoDaSerie?.registrados ?? cobertura.registrados;
   const coberturaEsperados = distribuicaoDaSerie?.esperados ?? cobertura.esperados;
   const rotuloDia = dia.split("-").reverse().join("/");
@@ -373,6 +383,33 @@ export default function VistaPainel({
                   }
                 />
               </div>
+
+              {serieSelecionada && porOrigem && (
+                <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="flex items-center gap-2 font-medium">
+                      <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
+                      {serieSelecionada.nome} por turma original
+                    </h2>
+                    <span className="text-muted-foreground text-xs">
+                      Mesmas faltas, agrupadas pela turma de origem
+                    </span>
+                  </div>
+                  <GraficoRosca
+                    titulo={`Faltas do dia por turma original da ${serieSelecionada.nome}`}
+                    fatias={porOrigem.map((turma) => ({
+                      nome: turma.rotulo,
+                      valor: turma.faltas + turma.justificadas,
+                      detalhe: `${turma.registrados} de ${turma.esperados} com chamada`,
+                    }))}
+                    vazio={
+                      frequenciasDoDia.length === 0
+                        ? "Nenhuma chamada salva neste dia"
+                        : "Nenhuma falta registrada neste dia"
+                    }
+                  />
+                </div>
+              )}
 
               <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
