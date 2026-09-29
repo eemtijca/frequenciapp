@@ -51,13 +51,13 @@ Diretor: `{ id, nome, identificador, ativo, estado, emitidaEm, expiraEm, primeir
 
 ### POST /api/diretores
 
-Corpo: `{ "nome": string, "identificador": string, "turmaIds"?: uuid[] }`. O identificador usa minúsculas, números, ponto e hífen, de 3 a 40 caracteres, sem arroba. A conta nasce sem palavra-chave e não entra até a emissão; os vínculos começam hoje.
+Corpo: `{ "nome": string, "identificador": string, "turmaIds"?: uuid[], "inicioVinculo"?: "YYYY-MM-DD" }`. O identificador usa minúsculas, números, ponto e hífen, de 3 a 40 caracteres, sem arroba. A conta nasce sem palavra-chave e não entra até a emissão; os vínculos começam em `inicioVinculo` (padrão: hoje), que pode ser retroativo, a partir de 2000-01-01, e nunca futuro.
 
 - 201 `{"diretor": Diretor}`; 400 validação; 404 turma inexistente; 409 identificador em uso.
 
 ### PATCH /api/diretores/{id}
 
-Corpo parcial: `{ nome?, ativo?, turmaIds? }`. Turma retirada deixa de valer na hora: o vínculo termina ontem ou, se começou hoje, sai inteiro. Desativar encerra as sessões.
+Corpo parcial: `{ nome?, ativo?, turmaIds?, inicioVinculo? }`. `inicioVinculo` antecipa o início das turmas já acompanhadas (nunca o adia) e vale como início das turmas novas; data futura é recusada. Turma retirada deixa de valer na hora: o vínculo termina ontem ou, se começou hoje, sai inteiro. Desativar encerra as sessões.
 
 - 200 `{"diretor": Diretor}`; 404 diretor ou turma inexistente.
 

@@ -10,7 +10,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp, ehDuplicidade } from "@/infra/erros";
 import { ambiente } from "@/infra/ambiente";
-import { diaLocal, diaSeguinte, rotuloDeTurma } from "@/domain/frequencia";
+import { diaLocal, diaSeguinte, ehDiaValido, rotuloDeTurma } from "@/domain/frequencia";
 import {
   estadoDaCredencial,
   normalizarLogin,
@@ -41,10 +41,15 @@ const turmasDoDiretor = z
   .max(20, "Um diretor acompanha no máximo 20 turmas.")
   .transform((lista) => [...new Set(lista)]);
 
+const inicioDoVinculo = z
+  .string()
+  .refine(ehDiaValido, "A data de início do acompanhamento é inválida.");
+
 export const esquemaCriarDiretor = z.object({
   nome: nomeDiretor,
   identificador: identificadorDiretor,
   turmaIds: turmasDoDiretor.default([]),
+  inicioVinculo: inicioDoVinculo.optional(),
 });
 
 export const esquemaAtualizarDiretor = z
@@ -52,6 +57,7 @@ export const esquemaAtualizarDiretor = z
     nome: nomeDiretor.optional(),
     ativo: z.boolean().optional(),
     turmaIds: turmasDoDiretor.optional(),
+    inicioVinculo: inicioDoVinculo.optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
@@ -75,6 +81,20 @@ function dataCivil(dia: string): Date {
 
 function hoje(): string {
   return diaLocal(new Date(), ambiente.fuso);
+}
+
+const PRIMEIRO_DIA_ACOMPANHAMENTO = "2000-01-01";
+
+/** Início pedido para o acompanhamento: passado à vontade, futuro nunca. */
+function inicioPedido(informado: string | undefined, dia: string): string {
+  if (informado === undefined) return dia;
+  if (informado > dia) {
+    throw new ErroHttp("A data de início do acompanhamento não pode ser futura.", 400);
+  }
+  if (informado < PRIMEIRO_DIA_ACOMPANHAMENTO) {
+    throw new ErroHttp("A data de início do acompanhamento é anterior ao permitido.", 400);
+  }
+  return informado;
 }
 
 /** Hash de uma senha aleatória descartada: a conta existe, mas ninguém entra. */
@@ -174,7 +194,8 @@ export async function listarDiretores(): Promise<DiretorDTO[]> {
 
 /**
  * Cadastra o diretor sem palavra-chave: a conta só permite entrar depois da
- * emissão. Os vínculos começam hoje.
+ * emissão. Os vínculos começam na data informada (padrão: hoje), que pode ser
+ * retroativa para o acompanhamento cobrir o período em que já exercia a função.
  */
 export async function criarDiretor(admin: { id: string }, entrada: unknown): Promise<DiretorDTO> {
   const dados = esquemaCriarDiretor.safeParse(entrada);
@@ -188,7 +209,7 @@ export async function criarDiretor(admin: { id: string }, entrada: unknown): Pro
   if (existente) throw new ErroHttp("Já existe uma conta com este identificador.", 409);
   await conferirTurmas(dados.data.turmaIds);
   const senhaHash = await hashInutilizavel();
-  const inicio = dataCivil(hoje());
+  const inicio = dataCivil(inicioPedido(dados.data.inicioVinculo, hoje()));
   try {
     const id = await comTransacao(async (tx) => {
       const criado = await tx.usuario.create({
@@ -246,7 +267,8 @@ export async function atualizarDiretor(
   const turmaIds = dados.data.turmaIds;
   if (turmaIds) await conferirTurmas(turmaIds);
   const dia = hoje();
-  const diaData = dataCivil(dia);
+  const inicioNovo = inicioPedido(dados.data.inicioVinculo, dia);
+  const diaData = dataCivil(inicioNovo);
 
   await comTransacao(async (tx) => {
     await tx.usuario.update({
@@ -258,6 +280,25 @@ export async function atualizarDiretor(
     });
     if (dados.data.ativo === false) {
       await tx.sessao.deleteMany({ where: { usuarioId: id } });
+    }
+    if (turmaIds || dados.data.inicioVinculo !== undefined) {
+      const vigentes = await tx.vinculoDiretor.findMany({
+        where: { usuarioId: id, fim: null },
+        select: { id: true, turmaId: true, inicio: true },
+      });
+      // Antecipar o início de quem já é acompanhado: a data informada só vale
+      // se for anterior à registrada, para nunca esconder dias já visíveis.
+      if (dados.data.inicioVinculo !== undefined) {
+        for (const vinculo of vigentes) {
+          const mantida = turmaIds ? turmaIds.includes(vinculo.turmaId) : true;
+          if (mantida && inicioNovo < diaDe(vinculo.inicio)) {
+            await tx.vinculoDiretor.update({
+              where: { id: vinculo.id },
+              data: { inicio: diaData },
+            });
+          }
+        }
+      }
     }
     if (turmaIds) {
       const vigentes = await tx.vinculoDiretor.findMany({
@@ -292,6 +333,7 @@ export async function atualizarDiretor(
       dados.data.nome !== undefined ? "nome" : null,
       dados.data.ativo !== undefined ? "situação" : null,
       turmaIds !== undefined ? "turmas" : null,
+      dados.data.inicioVinculo !== undefined ? "início" : null,
     ].filter((parte): parte is string => parte !== null);
     await auditar(tx, admin.id, "diretor.atualizar", `${alvo.email} (${mudancas.join(", ")})`);
   });
