@@ -17,6 +17,10 @@ A escola atual reorganizou a 3ª série. Outras escolas podem reorganizar qualqu
 - A migração seleciona as séries de ordinal 3 já existentes para preservar o uso atual. A regra de compatibilidade existe somente nessa migração. Em uma instalação vazia, o padrão desligado continua após a criação do cadastro ou a execução do seed.
 - A API valida as referências e grava a seleção com auditoria na mesma transação. Desligar não modifica alunos, histórico, origem ou sincronização com planilhas.
 
+## Alternativas
+
+Inferir a seleção pelo nome da série manteria uma regra específica da escola na interface. Guardar listas de identificadores em JSON dispensaria as relações, mas não garantiria referências válidas nem a limpeza das seleções após excluir uma série ou turma. As relações permitem validar essas referências no banco.
+
 ## Consequências
 
 A escola pode alterar a exibição sem implantação de código. Selecionar uma série abrange novas turmas automaticamente; selecionar uma turma limita a indicação àquela turma. A cópia JSON exporta a chave e as seleções, mantendo a compatibilidade de leitura com cópias anteriores.
