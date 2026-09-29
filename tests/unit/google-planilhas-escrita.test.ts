@@ -1,4 +1,5 @@
 // Confere o planejamento da gravação pela Sheets API sem tocar em dados reais.
+import { mensagemParaRegistro } from "@/infra/planilha";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assinarAba } from "@/domain/planilha";
 import {
@@ -204,5 +205,46 @@ describe("gravação pela Sheets API", () => {
     ).rejects.toMatchObject({
       recusado: true,
     });
+  });
+
+  it("guarda o motivo do Google e o lote que falhou, sem a requisição", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded" } }),
+            { status: 429 },
+          ),
+      ),
+    );
+    const falha = await enviarLotesGoogle("planilha", "acesso", [{ updateCells: {} }]).catch(
+      (excecao: unknown) => excecao,
+    );
+    expect(falha).toMatchObject({
+      recusado: true,
+      detalhe: "lote 1 de 1: HTTP 429 RESOURCE_EXHAUSTED Quota exceeded",
+    });
+    expect(mensagemParaRegistro(falha, "padrão")).toContain("Detalhe: lote 1 de 1: HTTP 429");
+    erro.mockRestore();
+  });
+
+  it("registra a queda de rede como sem resposta, ainda incerta", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("tempo", "TimeoutError");
+      }),
+    );
+    const falha = await enviarLotesGoogle("planilha", "acesso", [{ updateCells: {} }]).catch(
+      (excecao: unknown) => excecao,
+    );
+    expect(falha).toMatchObject({
+      recusado: false,
+      detalhe: "lote 1 de 1: sem resposta do Google (TimeoutError)",
+    });
+    erro.mockRestore();
   });
 });

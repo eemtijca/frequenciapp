@@ -54,12 +54,17 @@ type PedidoGoogle = Record<string, unknown>;
 
 /** Recusa antes da escrita ou resultado incerto depois do envio ao Google. */
 export class ErroGoogle extends ErroHttp {
+  /** Motivo técnico para o registro e o log; nunca vai à tela. */
+  readonly detalhe: string | null;
+
   constructor(
     mensagem: string,
     public readonly recusado: boolean,
+    detalhe: string | null = null,
   ) {
     super(mensagem, recusado ? 409 : 502);
     this.name = "ErroGoogle";
+    this.detalhe = detalhe;
   }
 }
 
@@ -457,6 +462,18 @@ export function planejarEscritaGoogle(
   return { requests, contagens, destrutiva };
 }
 
+/** Código HTTP e mensagem de erro do Google, sem o corpo da requisição. */
+async function motivoDoGoogle(resposta: Response): Promise<string> {
+  let mensagem = "";
+  try {
+    const corpo = (await resposta.json()) as { error?: { status?: string; message?: string } };
+    mensagem = [corpo.error?.status, corpo.error?.message].filter(Boolean).join(" ");
+  } catch {
+    // Corpo vazio ou fora do formato: fica só o código HTTP.
+  }
+  return `HTTP ${resposta.status}${mensagem ? ` ${mensagem}` : ""}`.slice(0, 220);
+}
+
 /** Envia lotes sem repetição automática; falha depois do primeiro lote é parcial. */
 export async function enviarLotesGoogle(
   id: string,
@@ -466,6 +483,7 @@ export async function enviarLotesGoogle(
   const compactadas = compactarAtualizacoesGoogle(requests);
   for (let inicio = 0; inicio < compactadas.length; inicio += 500) {
     const parte = compactadas.slice(inicio, inicio + 500);
+    const posicao = `lote ${Math.floor(inicio / 500) + 1} de ${Math.ceil(compactadas.length / 500)}`;
     let resposta: Response;
     try {
       resposta = await fetch(
@@ -478,15 +496,20 @@ export async function enviarLotesGoogle(
           signal: AbortSignal.timeout(45_000),
         },
       );
-    } catch {
-      throw new ErroHttp("Não foi possível confirmar o resultado na planilha.", 502);
+    } catch (erro) {
+      const detalhe = `${posicao}: sem resposta do Google (${erro instanceof Error ? erro.name : "erro"})`;
+      console.error(`Sheets API batchUpdate: ${detalhe}`);
+      throw new ErroGoogle("Não foi possível confirmar o resultado na planilha.", false, detalhe);
     }
     if (!resposta.ok) {
+      const detalhe = `${posicao}: ${await motivoDoGoogle(resposta)}`;
+      console.error(`Sheets API batchUpdate: ${detalhe}`);
       throw new ErroGoogle(
         resposta.status === 403
           ? "A conta Google não pode alterar a planilha escolhida."
           : "O Google recusou a alteração da planilha.",
         inicio === 0,
+        detalhe,
       );
     }
   }
