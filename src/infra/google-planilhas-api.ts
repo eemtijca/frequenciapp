@@ -5,6 +5,13 @@ import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
+const CHAVES_METADADOS = [
+  "frequenciapp.aluno",
+  "frequenciapp.linha",
+  "frequenciapp.coluna",
+  "frequenciapp.aba",
+  "frequenciapp.copia",
+];
 const CAMPOS_ESTRUTURA =
   "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
@@ -61,6 +68,9 @@ const documento = z.object({
         .optional(),
     }),
   ),
+});
+const resultadoBusca = z.object({
+  matchedDeveloperMetadata: z.array(z.object({ developerMetadata: metadado })).optional(),
 });
 
 export type DocumentoGoogle = z.infer<typeof documento>;
@@ -137,22 +147,67 @@ export function mesclagensDaAssinatura(aba: AbaGoogle): string[] {
   return mesclagensDaAba(aba).filter((intervalo) => colunasDoIntervalo(intervalo).length > 1);
 }
 
-async function requisitar(url: URL, acesso: string): Promise<unknown> {
+/** Falha de leitura antes de qualquer escrita, com motivo apenas para o registro. */
+export class ErroLeituraGoogle extends ErroHttp {
+  constructor(
+    mensagem: string,
+    public readonly detalhe: string,
+    status = 502,
+  ) {
+    super(mensagem, status);
+    this.name = "ErroLeituraGoogle";
+  }
+}
+
+/** Código HTTP e mensagem do Google, sem URL, credencial ou corpo da requisição. */
+export async function motivoDoGoogle(resposta: Response): Promise<string> {
+  let mensagem = "";
+  try {
+    const corpo = (await resposta.json()) as { error?: { status?: string; message?: string } };
+    mensagem = [corpo.error?.status, corpo.error?.message].filter(Boolean).join(" ");
+  } catch {
+    // Corpo vazio ou fora do formato: fica só o código HTTP.
+  }
+  return `HTTP ${resposta.status}${mensagem ? ` ${mensagem}` : ""}`.slice(0, 220);
+}
+
+async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<unknown> {
   let resposta: Response;
   try {
     resposta = await fetch(url, {
-      headers: { Authorization: `Bearer ${acesso}` },
+      method: corpo === undefined ? "GET" : "POST",
+      headers: {
+        Authorization: `Bearer ${acesso}`,
+        ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
       cache: "no-store",
       signal: AbortSignal.timeout(30_000),
     });
-  } catch {
-    throw new ErroHttp("Não foi possível falar com a planilha agora.", 502);
+  } catch (erro) {
+    const detalhe = `sem resposta do Google (${erro instanceof Error ? erro.name : "erro"})`;
+    console.error(`Sheets API leitura: ${detalhe}`);
+    throw new ErroLeituraGoogle("Não foi possível falar com a planilha agora.", detalhe);
   }
-  if (resposta.status === 401) throw new ErroHttp("Reconecte a conta Google.", 401);
-  if (resposta.status === 403 || resposta.status === 404) {
-    throw new ErroHttp("A conta Google não tem acesso à planilha escolhida.", 403);
+  if (!resposta.ok) {
+    const detalhe = await motivoDoGoogle(resposta);
+    console.error(`Sheets API leitura: ${detalhe}`);
+    const mensagem =
+      resposta.status === 401
+        ? "Reconecte a conta Google."
+        : resposta.status === 403 || resposta.status === 404
+          ? "A conta Google não tem acesso à planilha escolhida."
+          : "O Google recusou a leitura da planilha.";
+    throw new ErroLeituraGoogle(
+      mensagem,
+      detalhe,
+      resposta.status === 401
+        ? 401
+        : resposta.status === 403 || resposta.status === 404
+          ? 403
+          : 502,
+    );
   }
-  if (!resposta.ok) throw new ErroHttp("O Google recusou a leitura da planilha.", 502);
   try {
     return (await resposta.json()) as unknown;
   } catch {
@@ -163,9 +218,27 @@ async function requisitar(url: URL, acesso: string): Promise<unknown> {
 export async function lerDocumentoGoogle(id: string, acesso: string): Promise<DocumentoGoogle> {
   const url = new URL(`${BASE}/${encodeURIComponent(id)}`);
   url.searchParams.set("fields", CAMPOS_ESTRUTURA);
-  const lido = documento.safeParse(await requisitar(url, acesso));
+  const busca = new URL(`${BASE}/${encodeURIComponent(id)}/developerMetadata:search`);
+  const [estrutura, marcadores] = await Promise.all([
+    requisitar(url, acesso),
+    requisitar(busca, acesso, {
+      dataFilters: CHAVES_METADADOS.map((metadataKey) => ({
+        developerMetadataLookup: { metadataKey },
+      })),
+    }),
+  ]);
+  const lido = documento.safeParse(estrutura);
   if (!lido.success) throw new ErroHttp("A estrutura da planilha não pôde ser lida.", 502);
-  return lido.data;
+  const encontrados = resultadoBusca.safeParse(marcadores);
+  if (!encontrados.success)
+    throw new ErroHttp("Os marcadores da planilha não puderam ser lidos.", 502);
+  return {
+    ...lido.data,
+    developerMetadata: [
+      ...(lido.data.developerMetadata ?? []),
+      ...(encontrados.data.matchedDeveloperMetadata ?? []).map((item) => item.developerMetadata),
+    ],
+  };
 }
 
 export function exigirAbaGoogle(doc: DocumentoGoogle, nome: string): AbaGoogle {
@@ -310,8 +383,9 @@ export async function lerGoogle(
   nome: string,
   pedidos?: { coluna: number; colunas: number }[],
   cabecalhoLinha?: number,
+  documentoInicial?: DocumentoGoogle,
 ) {
-  const doc = await lerDocumentoGoogle(id, acesso);
+  const doc = documentoInicial ?? (await lerDocumentoGoogle(id, acesso));
   const aba = exigirAbaGoogle(doc, nome);
   const usado = await tamanhoUtilizado(id, acesso, nome);
   const faixas = pedidos?.length ? pedidos : [{ coluna: 1, colunas: Math.max(usado.colunas, 1) }];

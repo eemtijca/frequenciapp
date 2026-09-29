@@ -70,6 +70,9 @@ describe("leitura pela Sheets API", () => {
   it("lê valores exibidos, fórmula e código do aluno sem trocar as posições", async () => {
     const chamada = vi.fn(async (entrada: URL | string) => {
       const url = new URL(String(entrada));
+      if (url.pathname.endsWith("/developerMetadata:search")) {
+        return Response.json({ matchedDeveloperMetadata: [] });
+      }
       if (url.pathname.includes("/values/")) {
         return Response.json({
           values: [
@@ -114,9 +117,73 @@ describe("leitura pela Sheets API", () => {
       { linha: 2, alunoId: "00000000-0000-4000-8000-000000000001" },
     ]);
     expect(leitura.colunasCriadas).toEqual([2]);
-    expect(chamada).toHaveBeenCalledTimes(3);
-    expect(String(chamada.mock.calls[0]?.[0])).toContain("rowMetadata");
-    expect(String(chamada.mock.calls[0]?.[0])).toContain("columnMetadata");
+    expect(chamada).toHaveBeenCalledTimes(4);
+    expect(chamada.mock.calls.some(([entrada]) => String(entrada).includes("rowMetadata"))).toBe(
+      true,
+    );
+    expect(chamada.mock.calls.some(([entrada]) => String(entrada).includes("columnMetadata"))).toBe(
+      true,
+    );
+  });
+
+  it("recupera vínculos pela busca quando o GET omite os metadados das linhas", async () => {
+    const chamada = vi.fn(async (entrada: URL | string, opcoes?: RequestInit) => {
+      const url = new URL(String(entrada));
+      if (url.pathname.endsWith("/developerMetadata:search")) {
+        expect(opcoes?.method).toBe("POST");
+        const corpo = JSON.parse(String(opcoes?.body)) as {
+          dataFilters: { developerMetadataLookup: { metadataKey: string } }[];
+        };
+        expect(corpo.dataFilters.map((item) => item.developerMetadataLookup.metadataKey)).toContain(
+          "frequenciapp.aluno",
+        );
+        return Response.json({
+          matchedDeveloperMetadata: [
+            {
+              developerMetadata: {
+                metadataId: 91,
+                metadataKey: "frequenciapp.aluno",
+                metadataValue: "00000000-0000-4000-8000-000000000001",
+                location: { dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 } },
+              },
+            },
+            {
+              developerMetadata: {
+                metadataId: 92,
+                metadataKey: "frequenciapp.coluna",
+                metadataValue: "1",
+                location: {
+                  dimensionRange: { sheetId: 7, startColumnIndex: 1, endColumnIndex: 2 },
+                },
+              },
+            },
+          ],
+        });
+      }
+      if (url.pathname.includes("/values/")) {
+        return Response.json({
+          values: [
+            ["Aluno", "Dia"],
+            ["Ana", "F"],
+          ],
+        });
+      }
+      if (url.searchParams.get("includeGridData") === "true") {
+        return Response.json({ sheets: [{ data: [{ rowData: [{}, {}] }] }] });
+      }
+      return Response.json({
+        ...documento,
+        sheets: documento.sheets.map((aba) => ({ ...aba, data: [] })),
+      });
+    });
+    vi.stubGlobal("fetch", chamada);
+    const leitura = await lerGoogle("planilha-de-teste", "acesso", "Turma", [
+      { coluna: 2, colunas: 1 },
+    ]);
+    expect(leitura.alunosDasLinhas).toEqual([
+      { linha: 2, alunoId: "00000000-0000-4000-8000-000000000001" },
+    ]);
+    expect(leitura.colunasCriadas).toEqual([2]);
   });
 
   it("devolve a estrutura com dimensões utilizadas e fuso", async () => {
@@ -124,6 +191,9 @@ describe("leitura pela Sheets API", () => {
       "fetch",
       vi.fn(async (entrada: URL | string) => {
         const url = new URL(String(entrada));
+        if (url.pathname.endsWith("/developerMetadata:search")) {
+          return Response.json({ matchedDeveloperMetadata: [] });
+        }
         if (url.pathname.includes("/values/"))
           return Response.json({ values: [["Aluno"], ["Ana"]] });
         if (url.searchParams.get("includeGridData") === "true") {

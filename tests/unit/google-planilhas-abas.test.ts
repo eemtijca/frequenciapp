@@ -32,7 +32,10 @@ describe("abas da Sheets API", () => {
     const lotes: unknown[] = [];
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_entrada: URL | string, opcoes?: RequestInit) => {
+      vi.fn(async (entrada: URL | string, opcoes?: RequestInit) => {
+        if (String(entrada).endsWith("/developerMetadata:search")) {
+          return Response.json({ matchedDeveloperMetadata: [] });
+        }
         if (opcoes?.method === "POST") {
           lotes.push(JSON.parse(String(opcoes.body)) as unknown);
           return Response.json({ replies: [] });
@@ -63,12 +66,18 @@ describe("abas da Sheets API", () => {
   });
 
   it("não remove aba sem marcador da integração", async () => {
-    const chamada = vi.fn(async () => Response.json(documento));
+    const chamada = vi.fn(async (entrada: URL | string) =>
+      Response.json(
+        String(entrada).endsWith("/developerMetadata:search")
+          ? { matchedDeveloperMetadata: [] }
+          : documento,
+      ),
+    );
     vi.stubGlobal("fetch", chamada);
     await expect(removerAbaGoogle("planilha-de-teste", "acesso", "Turma")).rejects.toThrow(
       "não foi criada pela integração",
     );
-    expect(chamada).toHaveBeenCalledOnce();
+    expect(chamada).toHaveBeenCalledTimes(2);
   });
 
   it("separa cópias de abas com nomes parecidos", () => {
