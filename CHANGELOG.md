@@ -8,6 +8,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Bloqueio da Chamada após salvar cada dia e turma, com desbloqueio explícito para corrigir e novo bloqueio depois da correção.
 - Ação própria na Gestão para marcar ou desfazer desistência, mantendo o aluno na Chamada com marcação bloqueada, histórico preservado e gráfico de desistentes no Painel.
 - Selo `DESISTENTE` ao lado do nome na Chamada, com botão bloqueado; no CSV e na planilha pela Sheets API, a célula do nome recebe somente `DESISTENTE`, com prévia, vínculo por aluno, cópia de segurança e atualização incremental.
 - Envio da chamada à planilha ao salvar, por chave na Gestão (desligada por padrão): só preenche célula vazia e cria a coluna do dia, sem repetir depois de envio sem confirmação (ADR-025).
@@ -39,5 +40,6 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Modificado
 
+- A Chamada mostra a turma de origem e o asterisco de remanejamento somente na 3ª série; nas 1ª e 2ª séries, o nome aparece sem esse marcador.
 - O Painel distribui as faltas do dia pela turma atual, como a chamada aconteceu.
 - Workflows renomeados para `qualidade.yml`, `testes.yml` e `migracoes.yml`, com o padrão de nomes em português.

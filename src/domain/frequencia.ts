@@ -341,6 +341,16 @@ export function rotuloCurtoDeTurma(serieNome: string, turmaNome: string): string
   return `${ordinal} ${turmaNome.trim()}`.trim();
 }
 
+/** Reconhece a terceira série para a indicação especial de turma de origem. */
+export function ehTerceiraSerie(serieNome: string): boolean {
+  return /^3(?:[ºª°]|[oa])?(?=\s|$)/i.test(serieNome.trim());
+}
+
+/** Oculta na Chamada o asterisco de remanejamento fora da terceira série. */
+export function nomeNaChamada(nome: string, serieNome: string): string {
+  return ehTerceiraSerie(serieNome) ? nome : nome.replace(/\s*\*+\s*$/, "").trimEnd();
+}
+
 /** Rótulo curto de uma aula: ordem + janela, por exemplo "Aula 1 · 07:00 às 07:50". */
 export function rotuloAula(horario: Horario): string {
   return `${horario.ordem}ª aula · ${horario.inicio} às ${horario.fim}`;

@@ -17,12 +17,14 @@ import {
   ehMesValido,
   ehMomentoDeAula,
   ehMomentoValido,
+  ehTerceiraSerie,
   horaNoFuso,
   horariosDoDia,
   marcaDoAluno,
   mesSeguinte,
   montarGrade,
   nomeDoMes,
+  nomeNaChamada,
   normalizar,
   partesJustificativaSaida,
   partesNoFuso,
@@ -135,6 +137,24 @@ describe("rotuloCurtoDeTurma", () => {
   it("usa só o ordinal da série e a turma", () => {
     expect(rotuloCurtoDeTurma("3º ano", "A")).toBe("3º A");
     expect(rotuloCurtoDeTurma(" 1ª série ", " B ")).toBe("1ª B");
+  });
+});
+
+describe("indicação da turma de origem na Chamada", () => {
+  it("reconhece somente a terceira série", () => {
+    expect(ehTerceiraSerie("3º ano")).toBe(true);
+    expect(ehTerceiraSerie("3ª série")).toBe(true);
+    expect(ehTerceiraSerie(" 3o ano ")).toBe(true);
+    expect(ehTerceiraSerie("1º ano")).toBe(false);
+    expect(ehTerceiraSerie("2ª série")).toBe(false);
+    expect(ehTerceiraSerie("30º ano")).toBe(false);
+  });
+
+  it("oculta asterisco final fora da terceira série sem alterar o nome cadastrado", () => {
+    const nome = "Aluno Exemplo*";
+    expect(nomeNaChamada(nome, "1º ano")).toBe("Aluno Exemplo");
+    expect(nomeNaChamada("Aluno Exemplo *", "2ª série")).toBe("Aluno Exemplo");
+    expect(nomeNaChamada(nome, "3º ano")).toBe(nome);
   });
 });
 
