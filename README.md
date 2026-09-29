@@ -17,7 +17,7 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador da barra inferior preso à rolagem quadro a quadro, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
 - **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
-- **Google Planilhas opcional**: a frequência das turmas atuais é reorganizada por turma de origem e gravada na planilha da escola, com esquema conferido, prévia obrigatória e escrita conservadora: só célula vazia, nunca fórmula, nunca substituição. O modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou, sempre com cópia de segurança.
+- **Google Planilhas opcional**: frequência e saídas antecipadas podem ser gravadas em planilhas escolhidas com OAuth e Google Picker, sem publicar Apps Script. A conexão antiga continua disponível. Há conferência do esquema, prévia obrigatória e releitura antes da escrita conservadora. O modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou, sempre com cópia de segurança. Consulte [as condições de escrita pela Sheets API](docs/planilha.md).
 
 ## Começando
 

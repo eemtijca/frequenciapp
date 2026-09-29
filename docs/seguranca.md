@@ -63,16 +63,16 @@ Ações administrativas (criar, atualizar e excluir entidades escolares, gerenci
 - `DATABASE_URL` e `AUTH_SECRET` são validados na partida; `DIRECT_URL` fica restrita ao Prisma CLI, às migrations e às operações administrativas.
 - O runtime usa somente `DATABASE_URL`; opcionais de script são consumidos pelos comandos operacionais.
 - `.env` fora do controle de versão; `.env.example` documenta sem valores.
-- Nunca há chave de serviço de terceiros: o aplicativo não depende de e-mail, armazenamento externo ou inteligência artificial. A integração opcional com o Google Planilhas usa token próprio, guardado no banco, fora da cópia JSON, e só chama o Web App publicado pela escola.
+- A integração OAuth com Google Planilhas guarda o token de atualização cifrado no banco, fora da cópia JSON. O segredo do cliente OAuth fica no servidor; a chave pública do Picker é restrita a sites e à API no projeto Cloud. A conexão legada usa token próprio e Web App publicado pela escola.
 
 ## Integração com Google Planilhas
 
-- Desligada por padrão. O navegador nunca fala com o Google: as chamadas saem do servidor, com o token no corpo e sem registro de segredo nos logs.
-- Cada finalidade (frequência e saídas) tem token, endereço e janela de modo completo próprios; o mesmo script é publicado em cada planilha com implantação separada.
-- O endereço é validado contra `script.google.com/macros/s/.../exec`; loopback só é aceito fora de produção ou com `PERMITIR_ENDPOINT_LOCAL=true`, para os testes.
+- Desligada por padrão. Na conexão OAuth da frequência ou das saídas, o navegador abre o Google Picker com um token de acesso breve. O token de atualização fica cifrado no servidor com uma chave derivada de `AUTH_SECRET`, e as chamadas da Sheets API saem do servidor.
+- OAuth usa estado assinado, PKCE, escopo `drive.file` e seleção explícita da planilha. Só a administração pode conectar a conta e escolher a planilha.
+- Cada finalidade tem seleção de planilha, esquema e janela de modo completo próprios. A conexão legada por Apps Script mantém token e endereço específicos; o endereço é validado contra `script.google.com/macros/s/.../exec`, e loopback só é aceito fora de produção ou com `PERMITIR_ENDPOINT_LOCAL=true`, para os testes.
 - Revelar o token, destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
 - O modo completo expira sozinho, cria cópia oculta da aba antes de operação destrutiva e só remove linha, coluna ou aba com marcador de Developer Metadata da integração.
-- Fórmula nunca é sobrescrita, nem no modo completo; célula ocupada é pulada e relatada.
+- Fórmulas e células ocupadas encontradas na última leitura são preservadas e relatadas. A Sheets API não oferece escrita condicionada ao conteúdo anterior; uma edição manual feita entre leitura e gravação pode conflitar com o lote.
 - Toda ação é auditada sem nomes de alunos: token, esquema, mapa, envios, destrave e restauração.
 
 ## Superfície de dependências

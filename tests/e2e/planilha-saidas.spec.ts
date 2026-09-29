@@ -36,7 +36,7 @@ test.describe("Google Planilhas de saídas", () => {
       );
       await cliente.query(
         `insert into saidas_antecipadas (aluno_id, dia, momento, justificativa)
-         select id, current_date, 'aula_1', 'C' from alunos where nome = 'E2E Aluno Um'`,
+         select id, date '2026-08-10', 'aula_1', 'C' from alunos where nome = 'E2E Aluno Um'`,
       );
     });
   });
@@ -53,6 +53,7 @@ test.describe("Google Planilhas de saídas", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
+    await cartao.getByText("Conexão por Apps Script").click();
 
     // Token com senha.
     await cartao.getByRole("button", { name: "Gerar novo" }).click();
@@ -81,6 +82,11 @@ test.describe("Google Planilhas de saídas", () => {
     // Envio pela vista Saídas.
     await trocarVisao(page, "Saídas", "saidas");
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
+    await page.getByRole("button", { name: /Mês do envio das saídas/ }).click();
+    await page
+      .getByRole("dialog", { name: "Mês do envio das saídas" })
+      .getByRole("button", { name: "Agosto" })
+      .click();
     const dialogo = page.getByRole("dialog");
     await expect(dialogo.getByText(/1 linha nova/)).toBeVisible();
     await dialogo.getByRole("button", { name: "Enviar" }).click();

@@ -382,6 +382,11 @@ model IntegracaoPlanilha {
   endpoint          String?              @db.VarChar(500)
   token             String?              @db.VarChar(120)
   versaoScript      String?              @map("versao_script") @db.VarChar(20)
+  provedor          String               @default("GAS") @db.VarChar(10)
+  // Autorização OAuth da frequência, cifrada com AUTH_SECRET no servidor.
+  googleRefreshToken String?             @map("google_refresh_token") @db.Text
+  googlePlanilhaId   String?             @map("google_planilha_id") @db.VarChar(200)
+  googlePlanilhaNome String?             @map("google_planilha_nome") @db.VarChar(200)
   esquema           Json?
   assinaturaEsquema String?              @map("assinatura_esquema") @db.VarChar(64)
   esquemaEm         DateTime?            @map("esquema_em") @db.Timestamptz

@@ -22,6 +22,7 @@ import AbaConfiguracoes from "@/components/gestao/aba-configuracoes";
 export type Aba = "series" | "turmas" | "alunos" | "equipe" | "diretores" | "configuracoes";
 
 interface Props {
+  abaInicial?: Aba;
   usuarioId: string;
   series: Serie[];
   turmas: Turma[];
@@ -49,6 +50,7 @@ const ABAS: AbaItem<Aba>[] = [
 ];
 
 export default function VistaGestao({
+  abaInicial = "series",
   usuarioId,
   series,
   turmas,
@@ -76,7 +78,7 @@ export default function VistaGestao({
 
       <AbasDeslizantes
         rotuloAcessivel="Áreas de gestão"
-        abaInicial="series"
+        abaInicial={abaInicial}
         abas={ABAS}
         chaveIndicador="indicador-aba"
         dataPager="gestao"

@@ -7,9 +7,10 @@ import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
 const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
-const DIA = "2026-09-10";
-const DE = "2026-09-01";
-const ATE = "2026-09-30";
+// Mês distinto dos dados sintéticos do seed, enviados no teste OAuth real.
+const DIA = "2026-08-10";
+const DE = "2026-08-01";
+const ATE = "2026-08-31";
 const ABA = "Saiu mais cedo";
 
 const CABECALHO = [
@@ -161,7 +162,7 @@ beforeAll(async () => {
   gas.definirAba(ABA, [
     CABECALHO,
     // Linha manual existente, que a integração deve ignorar.
-    ["10/09/2026", "QS Bruno", "QS Ano A", "1ª aula", "Consulta", "", "Direção"],
+    ["10/08/2026", "QS Bruno", "QS Ano A", "1ª aula", "Consulta", "", "Direção"],
   ]);
 });
 
@@ -273,7 +274,7 @@ describe("planilha de saídas", () => {
     );
     expect(aplicado.resultado).toBe("sucesso");
     expect(aplicado.contagens.linhasCriadas).toBe(1);
-    expect(gas?.valor(ABA, 3, 1)).toBe("10/09/2026");
+    expect(gas?.valor(ABA, 3, 1)).toBe("10/08/2026");
     expect(gas?.valor(ABA, 3, 2)).toBe("QS Ana");
 
     const semErro = await json<{

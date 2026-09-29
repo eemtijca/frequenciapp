@@ -55,13 +55,14 @@ export function proxy(request: NextRequest) {
 
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'wasm-unsafe-eval' ${ehDev ? "'unsafe-inline' 'unsafe-eval'" : `'nonce-${nonce}' 'strict-dynamic'`}`,
+    `script-src 'self' https://apis.google.com 'wasm-unsafe-eval' ${ehDev ? "'unsafe-inline' 'unsafe-eval'" : `'nonce-${nonce}' 'strict-dynamic'`}`,
     "style-src 'self' 'unsafe-inline'",
     "style-src-elem 'self' 'unsafe-inline'",
     "style-src-attr 'unsafe-inline'",
     "worker-src 'self' blob:",
     "child-src blob:",
-    "connect-src 'self'",
+    "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
+    "frame-src https://docs.google.com https://drive.google.com",
     "font-src 'self' data:",
     "img-src 'self' data: blob:",
     "object-src 'none'",

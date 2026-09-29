@@ -21,6 +21,7 @@ import { Selecionar } from "@/components/ui/selecionar";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { EtapaPlanilha } from "@/components/gestao/planilha-etapa";
+import { SeletorPlanilhaGoogle } from "@/components/gestao/seletor-planilha-google";
 import {
   BlocoConexaoPlanilha,
   BlocoModoCompletoPlanilha,
@@ -29,6 +30,9 @@ import {
 
 interface IntegracaoSaidasAdmin {
   ativa: boolean;
+  provedor: "GAS" | "GOOGLE";
+  contaGoogle: boolean;
+  googlePlanilha: { id: string; nome: string | null } | null;
   endpoint: string | null;
   token: string | null;
   temToken: boolean;
@@ -120,8 +124,12 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
-  const conectada = Boolean(integracao?.temToken && integracao.endpoint);
-  const podeEnviar = Boolean(integracao?.ativa && integracao.endpoint && integracao.temToken);
+  const conectada = Boolean(
+    integracao?.provedor === "GOOGLE"
+      ? integracao.googlePlanilha
+      : integracao?.temToken && integracao.endpoint,
+  );
+  const podeEnviar = Boolean(integracao?.ativa && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
   const abaEscolhida = abas.find((aba) => aba.nome === abaSelecionada) ?? null;
@@ -259,7 +267,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           </Selo>
           <Selo variante={conectada ? "sucesso" : "atencao"}>
             {conectada
-              ? integracao?.versaoScript
+              ? integracao?.provedor === "GAS" && integracao?.versaoScript
                 ? `Conectada · v${integracao.versaoScript}`
                 : "Conectada"
               : "Sem conexão"}
@@ -279,21 +287,32 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
       acoes={
         <Switch
           checked={integracao?.ativa ?? false}
-          disabled={salvando || !integracao?.temToken}
+          disabled={salvando || !conectada}
           onCheckedChange={(valor) => void alternarAtiva(valor)}
           aria-label="Integração de saídas ativa"
         />
       }
     >
       <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
-        <BlocoConexaoPlanilha
-          idPrefixo="planilha-saidas"
-          urlBase="/api/planilha-saidas"
-          endpoint={endpoint}
-          integracao={integracao}
-          onEndpoint={setEndpoint}
+        <SeletorPlanilhaGoogle
+          finalidade="SAIDAS"
+          conectado={integracao?.contaGoogle ?? false}
+          planilha={integracao?.googlePlanilha ?? null}
           onAtualizar={carregar}
         />
+        <details className="rounded-lg border p-3">
+          <summary className="cursor-pointer text-sm">Conexão por Apps Script</summary>
+          <div className="pt-3">
+            <BlocoConexaoPlanilha
+              idPrefixo="planilha-saidas"
+              urlBase="/api/planilha-saidas"
+              endpoint={endpoint}
+              integracao={integracao}
+              onEndpoint={setEndpoint}
+              onAtualizar={carregar}
+            />
+          </div>
+        </details>
       </EtapaPlanilha>
 
       <EtapaPlanilha
@@ -340,7 +359,8 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           <>
             {planilha && (
               <p className="text-muted-foreground text-xs">
-                {planilha.nome} · fuso {planilha.fuso} · versão do script {planilha.versao}
+                {planilha.nome} · fuso {planilha.fuso}
+                {integracao?.provedor === "GAS" && ` · versão do script ${planilha.versao}`}
               </p>
             )}
             {abas.length > 0 && (

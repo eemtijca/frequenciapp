@@ -3,6 +3,8 @@
 import { z } from "zod";
 import { booleanoDeAmbiente, cookiesSegurosDe, permitirEndpointLocalDe } from "@/infra/booleano";
 
+const ausenteSeVazio = (valor: unknown) => (valor === "" ? undefined : valor);
+
 const esquema = z.object({
   DATABASE_URL: z
     .string()
@@ -12,6 +14,11 @@ const esquema = z.object({
       "DATABASE_URL deve ser uma connection string PostgreSQL (postgresql://usuario:senha@host:porta/banco).",
     ),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET deve ter pelo menos 32 caracteres."),
+  GOOGLE_CLIENT_ID: z.preprocess(ausenteSeVazio, z.string().optional()),
+  GOOGLE_CLIENT_SECRET: z.preprocess(ausenteSeVazio, z.string().optional()),
+  GOOGLE_REDIRECT_URI: z.preprocess(ausenteSeVazio, z.url().optional()),
+  GOOGLE_PICKER_API_KEY: z.preprocess(ausenteSeVazio, z.string().optional()),
+  GOOGLE_PROJECT_NUMBER: z.preprocess(ausenteSeVazio, z.string().regex(/^\d+$/).optional()),
   TZ_APP: z
     .string()
     .min(1)
@@ -49,6 +56,23 @@ if (!resultado.success) {
   throw new Error("Configuração de ambiente inválida. Verifique o .env contra o .env.example.");
 }
 
+const googleConfig = [
+  resultado.data.GOOGLE_CLIENT_ID,
+  resultado.data.GOOGLE_CLIENT_SECRET,
+  resultado.data.GOOGLE_REDIRECT_URI,
+  resultado.data.GOOGLE_PICKER_API_KEY,
+  resultado.data.GOOGLE_PROJECT_NUMBER,
+];
+if (googleConfig.some(Boolean) && !googleConfig.every(Boolean)) {
+  throw new Error("Configure juntas as cinco variáveis Google da integração OAuth.");
+}
+if (
+  resultado.data.GOOGLE_REDIRECT_URI &&
+  new URL(resultado.data.GOOGLE_REDIRECT_URI).pathname !== "/api/planilha/google/retorno"
+) {
+  throw new Error("GOOGLE_REDIRECT_URI deve apontar para /api/planilha/google/retorno.");
+}
+
 const ehProducao = resultado.data.NODE_ENV === "production";
 const permitirHttp = resultado.data.PERMITIR_HTTP;
 const cookiesSeguros = cookiesSegurosDe(ehProducao, permitirHttp);
@@ -76,6 +100,13 @@ if (ehProducao && resultado.data.PERMITIR_ENDPOINT_LOCAL) {
 export const ambiente = {
   databaseUrl: resultado.data.DATABASE_URL,
   authSecret: resultado.data.AUTH_SECRET,
+  google: {
+    clientId: resultado.data.GOOGLE_CLIENT_ID,
+    clientSecret: resultado.data.GOOGLE_CLIENT_SECRET,
+    redirectUri: resultado.data.GOOGLE_REDIRECT_URI,
+    pickerApiKey: resultado.data.GOOGLE_PICKER_API_KEY,
+    projectNumber: resultado.data.GOOGLE_PROJECT_NUMBER,
+  },
   fuso: resultado.data.TZ_APP,
   ehProducao,
   permitirHttp,

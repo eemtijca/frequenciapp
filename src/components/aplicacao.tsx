@@ -64,6 +64,7 @@ interface Props {
   diaCorrente: string;
   fuso: string;
   visaoInicial?: string;
+  abaGestaoInicial?: "configuracoes";
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
@@ -184,6 +185,7 @@ export default function Aplicacao({
   diaCorrente,
   fuso,
   visaoInicial,
+  abaGestaoInicial,
   seriesIniciais,
   turmasIniciais,
   alunosIniciais,
@@ -526,6 +528,7 @@ export default function Aplicacao({
         {alvoVisao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
         {alvoVisao === "gestao" && ehAdmin && (
           <VistaGestao
+            abaInicial={abaGestaoInicial}
             usuarioId={usuario.id}
             series={series}
             turmas={turmas}
