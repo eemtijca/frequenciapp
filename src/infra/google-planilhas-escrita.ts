@@ -24,6 +24,7 @@ const operacao = z.discriminatedUnion("tipo", [
     tipo: z.literal("sinalizar"),
     anterior: z.string(),
     alunoId: z.string().uuid(),
+    nomeOriginal: z.string().min(1),
   }),
   z.object({
     tipo: z.literal("limpar"),
@@ -413,9 +414,10 @@ export function planejarEscritaGoogle(
             vinculo.location.dimensionRange?.startRowIndex === item.linha - 1,
         ) || novosVinculos.has(`${item.linha}:${item.alunoId}`);
       const anterior = celulaAtual(valores, item.linha, item.coluna);
-      const sufixo = " (DESISTENTE)";
       const transicaoValida =
-        item.valor === `${item.anterior}${sufixo}` || item.anterior === `${item.valor}${sufixo}`;
+        item.nomeOriginal !== "DESISTENTE" &&
+        ((item.valor === "DESISTENTE" && item.anterior === item.nomeOriginal) ||
+          (item.anterior === "DESISTENTE" && item.valor === item.nomeOriginal));
       if (
         !vinculado ||
         temFormula(formulas, item.linha, item.coluna) ||

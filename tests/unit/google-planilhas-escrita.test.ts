@@ -188,9 +188,10 @@ describe("gravação pela Sheets API", () => {
           tipo: "sinalizar",
           linha: 2,
           coluna: 1,
-          valor: "Ana (DESISTENTE)",
+          valor: "DESISTENTE",
           anterior: "Ana",
           alunoId,
+          nomeOriginal: "Ana",
         },
       ],
       false,
@@ -207,9 +208,10 @@ describe("gravação pela Sheets API", () => {
       tipo: "sinalizar",
       linha: 2,
       coluna: 1,
-      valor: "Ana (DESISTENTE)",
+      valor: "DESISTENTE",
       anterior: "Ana",
       alunoId,
+      nomeOriginal: "Ana",
     };
     expect(() =>
       planejarEscritaGoogle(documento, "Turma", valores, formulas, 1, assinatura, [item], false),
@@ -231,6 +233,59 @@ describe("gravação pela Sheets API", () => {
     ).toThrow("situação do aluno mudou");
   });
 
+  it("restaura o nome apenas ao reconhecer DESISTENTE na linha vinculada", () => {
+    const comMarcador = [
+      ["Aluno", "Dia"],
+      ["DESISTENTE", ""],
+    ];
+    const plano = planejarEscritaGoogle(
+      documentoVinculado,
+      "Turma",
+      comMarcador,
+      formulas,
+      1,
+      assinatura,
+      [
+        {
+          tipo: "sinalizar",
+          linha: 2,
+          coluna: 1,
+          valor: "Ana",
+          anterior: "DESISTENTE",
+          alunoId,
+          nomeOriginal: "Ana",
+        },
+      ],
+      false,
+    );
+    expect(plano.contagens.sinalizadas).toBe(1);
+  });
+
+  it("recusa uma troca que não corresponda ao nome original", () => {
+    expect(() =>
+      planejarEscritaGoogle(
+        documentoVinculado,
+        "Turma",
+        valores,
+        formulas,
+        1,
+        assinatura,
+        [
+          {
+            tipo: "sinalizar",
+            linha: 2,
+            coluna: 1,
+            valor: "DESISTENTE",
+            anterior: "Ana",
+            alunoId,
+            nomeOriginal: "Outra pessoa",
+          },
+        ],
+        false,
+      ),
+    ).toThrow("situação do aluno mudou");
+  });
+
   it("permite vínculo verificado e sinalização no mesmo lote", () => {
     const plano = planejarEscritaGoogle(
       documento,
@@ -245,9 +300,10 @@ describe("gravação pela Sheets API", () => {
           tipo: "sinalizar",
           linha: 2,
           coluna: 1,
-          valor: "Ana (DESISTENTE)",
+          valor: "DESISTENTE",
           anterior: "Ana",
           alunoId,
+          nomeOriginal: "Ana",
         },
       ],
       false,

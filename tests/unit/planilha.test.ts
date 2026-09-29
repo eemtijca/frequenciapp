@@ -166,7 +166,7 @@ describe("dataframe e CSV", () => {
     expect(nomeArquivoCsv(turma)).toBe("frequenciapp-grade-3o-ano-a-2026-09-10-a-2026-09-11.csv");
   });
 
-  it("escreve a desistência ao lado do nome no CSV sem apagar marcas antigas", () => {
+  it("escreve DESISTENTE no campo do nome no CSV sem apagar marcas antigas", () => {
     const comDesistente = montarTurmaPlanilha(
       "origem-a",
       "3º ano A",
@@ -176,7 +176,7 @@ describe("dataframe e CSV", () => {
       dias,
       () => "3º ano A",
     );
-    expect(paraCsv(comDesistente)).toContain("Alice (DESISTENTE);3º ano A;P;");
+    expect(paraCsv(comDesistente)).toContain("DESISTENTE;3º ano A;P;");
   });
 });
 
@@ -547,7 +547,7 @@ describe("planejarSincronizacao: código do aluno na linha", () => {
       opcoes({ sinalizarSituacao: true }),
     );
     expect(plano.sinalizar).toMatchObject([
-      { celula: "A2", anterior: "Alice", valor: "Alice (DESISTENTE)" },
+      { celula: "A2", anterior: "Alice", valor: "DESISTENTE" },
     ]);
     expect(plano.preencher.some((item) => item.celula === "C2")).toBe(false);
     expect(plano.limpar).toEqual([]);
@@ -561,7 +561,38 @@ describe("planejarSincronizacao: código do aluno na linha", () => {
       opcoes({ sinalizarSituacao: true }),
     );
     expect(plano.vincular).toMatchObject([{ linha: 2, alunoId: "aluno-1" }]);
-    expect(plano.sinalizar).toMatchObject([{ celula: "A2", valor: "Alice (DESISTENTE)" }]);
+    expect(plano.sinalizar).toMatchObject([{ celula: "A2", valor: "DESISTENTE" }]);
+  });
+
+  it("restaura o nome original apenas pela linha vinculada", () => {
+    const aba = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["DESISTENTE", "", "", "", ""], ...ABA.valores.slice(2)],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno()]),
+      { ...conteudoDaAba(aba), alunosDasLinhas: [{ linha: 2, alunoId: "aluno-1" }] },
+      opcoes({ sinalizarSituacao: true }),
+    );
+    expect(plano.sinalizar).toMatchObject([
+      { celula: "A2", anterior: "DESISTENTE", valor: "Alice" },
+    ]);
+  });
+
+  it("não acrescenta aluno quando há DESISTENTE sem vínculo identificável", () => {
+    const aba = {
+      ...ABA,
+      valores: [ABA.valores[0] ?? [], ["DESISTENTE", "", "", "", ""]],
+    };
+    const plano = planejarSincronizacao(
+      esquema,
+      turmaDe([aluno({ desistenteEm: "2026-09-11" })]),
+      conteudoDaAba(aba),
+      opcoes({ sinalizarSituacao: true, permitirNovosAlunos: true }),
+    );
+    expect(plano.novosAlunos).toEqual([]);
+    expect(plano.resumo.ambiguidades).toBe(1);
   });
 
   it("não troca nome editado à mão pela situação de desistência", () => {
@@ -573,9 +604,10 @@ describe("planejarSincronizacao: código do aluno na linha", () => {
       esquema,
       turmaDe([aluno({ desistenteEm: "2026-09-11" })]),
       { ...conteudoDaAba(aba), alunosDasLinhas: [{ linha: 2, alunoId: "aluno-1" }] },
-      opcoes({ sinalizarSituacao: true }),
+      opcoes({ sinalizarSituacao: true, modo: "completo", substituirDivergencias: true }),
     );
     expect(plano.sinalizar).toEqual([]);
+    expect(plano.substituir.filter((item) => item.campo === "nome")).toEqual([]);
     expect(plano.avisos).toContain(
       "O nome de Alice foi alterado na planilha; confira a situação manualmente.",
     );

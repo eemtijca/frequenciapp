@@ -460,7 +460,7 @@ export default function DialogoEnvio({
               </span>
               {plano.sinalizar.length > 0 && (
                 <span className="text-muted-foreground">
-                  Situação ao lado do nome:{" "}
+                  Nome na planilha:{" "}
                   {plano.sinalizar
                     .slice(0, 5)
                     .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)

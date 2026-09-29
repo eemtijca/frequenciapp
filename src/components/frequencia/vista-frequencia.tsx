@@ -991,7 +991,7 @@ export default function VistaFrequencia({
                               </span>
                               {desistente && (
                                 <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
-                                  Desistente
+                                  DESISTENTE
                                 </span>
                               )}
                               {turmaReorganizada && rotuloCurtoDe(aluno.turmaOriginalId) && (

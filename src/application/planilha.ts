@@ -1030,6 +1030,7 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
       valor: celula.valor,
       anterior: celula.anterior,
       alunoId: celula.alunoId,
+      nomeOriginal: celula.alunoNome,
     });
   }
   for (const celula of plano.substituir) {

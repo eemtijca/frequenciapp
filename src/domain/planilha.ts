@@ -152,9 +152,7 @@ export function montarTurmaPlanilha(
     linhas: grade.linhas.map((linha) => ({
       alunoId: linha.aluno.id,
       nome: linha.aluno.nome,
-      nomeParaPlanilha: linha.aluno.desistenteEm
-        ? `${linha.aluno.nome} (DESISTENTE)`
-        : linha.aluno.nome,
+      nomeParaPlanilha: linha.aluno.desistenteEm ? "DESISTENTE" : linha.aluno.nome,
       turmaAtual: rotuloDaTurma(linha.aluno.turmaId),
       marcas: linha.marcas,
     })),
@@ -176,9 +174,7 @@ export function turmaPlanilhaDaGrade(
     linhas: linhas.map((linha) => ({
       alunoId: linha.aluno.id,
       nome: linha.aluno.nome,
-      nomeParaPlanilha: linha.aluno.desistenteEm
-        ? `${linha.aluno.nome} (DESISTENTE)`
-        : linha.aluno.nome,
+      nomeParaPlanilha: linha.aluno.desistenteEm ? "DESISTENTE" : linha.aluno.nome,
       turmaAtual: rotuloDaTurma(linha.aluno.turmaId),
       marcas: linha.marcas,
     })),
@@ -747,10 +743,6 @@ function marcaCombinam(atual: string, desejada: Marca): boolean {
   return atual.trim().toUpperCase() === desejada;
 }
 
-function nomeSemSituacao(nome: string): string {
-  return nome.replace(/\s+\(DESISTENTE\)$/i, "").trim();
-}
-
 interface LinhaCasada {
   linha: number;
   nome: string;
@@ -766,6 +758,7 @@ interface CasamentoDeLinhas {
   /** Última linha com qualquer conteúdo na leitura, para a linha nova não cair sobre outra. */
   ultimaLinha: number;
   codigoDaLinha: Map<number, string>;
+  desistenteSemCodigo: boolean;
 }
 
 /**
@@ -807,7 +800,7 @@ function casarLinhas(
     if (codigoDaLinha.has(linha)) continue;
     const nome = nomeDaLinha(linha);
     if (nome === "") continue;
-    const chave = normalizar(nomeSemSituacao(nome));
+    const chave = normalizar(nome);
     semCodigoPorNome.set(chave, [...(semCodigoPorNome.get(chave) ?? []), linha]);
   }
   const nomesNoApp = new Map<string, number>();
@@ -847,7 +840,14 @@ function casarLinhas(
     }
     porAluno.set(linha.alunoId, { linha: unica, nome: nomeDaLinha(unica), vincular: true });
   }
-  return { porAluno, ambiguos, avisos: [...new Set(avisos)], ultimaLinha, codigoDaLinha };
+  return {
+    porAluno,
+    ambiguos,
+    avisos: [...new Set(avisos)],
+    ultimaLinha,
+    codigoDaLinha,
+    desistenteSemCodigo: (semCodigoPorNome.get(normalizar("DESISTENTE")) ?? []).length > 0,
+  };
 }
 
 /**
@@ -978,6 +978,13 @@ export function planejarSincronizacao(
       });
     }
     if (!existente) {
+      if (casamento.desistenteSemCodigo) {
+        ambiguidades += 1;
+        avisos.push(
+          `Há uma linha DESISTENTE sem código de aluno na planilha; vincule a linha antes de adicionar ${linha.nome}.`,
+        );
+        continue;
+      }
       if (!opcoes.permitirNovosAlunos) {
         avisos.push(`O aluno ${linha.nome} não tem linha na planilha.`);
         continue;
@@ -994,7 +1001,7 @@ export function planejarSincronizacao(
     if (opcoes.sinalizarSituacao && existente && colunaAluno) {
       const desejado = linha.nomeParaPlanilha ?? linha.nome;
       const atual = existente.nome;
-      if (atual !== desejado && (atual === linha.nome || atual === `${linha.nome} (DESISTENTE)`)) {
+      if (atual !== desejado && (atual === linha.nome || atual === "DESISTENTE")) {
         const relativaLinha = numeroLinha - conteudo.linhaInicial;
         const relativaColuna = colunaAluno.indice - conteudo.colunaInicial;
         if (conteudo.formula[relativaLinha]?.[relativaColuna]) {
@@ -1013,10 +1020,7 @@ export function planejarSincronizacao(
             campo: "situacao",
           });
         }
-      } else if (
-        atual !== desejado &&
-        (desejado.endsWith(" (DESISTENTE)") || atual.endsWith(" (DESISTENTE)"))
-      ) {
+      } else if (atual !== desejado && (desejado === "DESISTENTE" || atual === "DESISTENTE")) {
         avisos.push(
           `O nome de ${linha.nome} foi alterado na planilha; confira a situação manualmente.`,
         );
@@ -1093,6 +1097,10 @@ export function planejarSincronizacao(
       }[] = [];
       if (
         colunaAluno &&
+        !(
+          opcoes.sinalizarSituacao &&
+          (linha.nomeParaPlanilha === "DESISTENTE" || existente.nome === "DESISTENTE")
+        ) &&
         !celulasSinalizar.some(
           (celula) => celula.linha === numeroLinha && celula.coluna === colunaAluno.indice,
         )
@@ -1186,7 +1194,7 @@ export function planejarSincronizacao(
     const codigo = casamento.codigoDaLinha.get(linha);
     const saiu = codigo
       ? !idsDaTurma.has(codigo)
-      : !nomesDaTurma.has(normalizar(nomeSemSituacao(nome)));
+      : nome !== "DESISTENTE" && !nomesDaTurma.has(normalizar(nome));
     if (nome !== "" && saiu) candidatosRemocaoLinhas.push({ linha, nome });
   }
 

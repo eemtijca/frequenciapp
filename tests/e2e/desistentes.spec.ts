@@ -69,7 +69,7 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   const aluno = chamada.getByRole("button", { name: /E2E Desistente Um.*desistente/ });
   await expect(aluno).toBeVisible();
   await expect(aluno).toBeDisabled();
-  await expect(aluno.getByText("Desistente", { exact: true })).toBeVisible();
+  await expect(aluno.getByText("DESISTENTE", { exact: true })).toBeVisible();
 
   await trocarVisao(page, "Painel", "painel");
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
