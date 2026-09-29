@@ -27,6 +27,8 @@ import type {
   Configuracoes,
   JustificativaConfigurada,
   LiberadorConfigurado,
+  Serie,
+  Turma,
 } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -54,7 +56,8 @@ interface Props {
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
   liberadores: LiberadorConfigurado[];
-  turmas: { id: string; rotulo: string }[];
+  series: Serie[];
+  turmas: Turma[];
   diaCorrente: string;
   onMudanca: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
@@ -74,6 +77,7 @@ export default function AbaConfiguracoes({
   configuracoes,
   justificativas,
   liberadores,
+  series,
   turmas,
   diaCorrente,
   onMudanca,
@@ -85,7 +89,9 @@ export default function AbaConfiguracoes({
   const [abertoJustificativas, setAbertoJustificativas] = useState(false);
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
   const [abertoCopia, setAbertoCopia] = useState(false);
-  const [salvando, setSalvando] = useState<"frequenciaPorAula" | "saidaAntecipada" | null>(null);
+  const [salvando, setSalvando] = useState<
+    "frequenciaPorAula" | "saidaAntecipada" | "origemNaChamada" | null
+  >(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [baixando, setBaixando] = useState(false);
@@ -145,6 +151,37 @@ export default function AbaConfiguracoes({
         setSalvando(null);
       }
     });
+  }
+
+  async function salvarOrigem(
+    entrada: Partial<
+      Pick<Configuracoes, "origemNaChamada" | "origemNaChamadaSerieIds" | "origemNaChamadaTurmaIds">
+    >,
+  ) {
+    await executarPorChave("recurso-origem", async () => {
+      setSalvando("origemNaChamada");
+      setErro("");
+      try {
+        const dados = await pedir<{ configuracoes: Configuracoes }>(
+          "/api/configuracoes",
+          corpoAlteracao("PATCH", entrada),
+        );
+        onMudanca(dados.configuracoes);
+        toast.success("Indicação de origem atualizada.");
+      } catch (excecao) {
+        setErro(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
+        );
+        setErroVariante(estadoDeErro(excecao));
+        avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
+      } finally {
+        setSalvando(null);
+      }
+    });
+  }
+
+  function selecaoAlterada(ids: string[], id: string, marcado: boolean): string[] {
+    return marcado ? [...ids, id] : ids.filter((atual) => atual !== id);
   }
 
   async function criarJustificativa() {
@@ -451,6 +488,9 @@ export default function AbaConfiguracoes({
             <Selo variante={configuracoes.saidaAntecipada ? "sucesso" : "neutro"}>
               Saída antecipada {configuracoes.saidaAntecipada ? "ligada" : "desligada"}
             </Selo>
+            <Selo variante={configuracoes.origemNaChamada ? "sucesso" : "neutro"}>
+              Origem na Chamada {configuracoes.origemNaChamada ? "ligada" : "desligada"}
+            </Selo>
           </>
         }
       >
@@ -484,6 +524,102 @@ export default function AbaConfiguracoes({
             disabled={salvando !== null}
             onCheckedChange={(valor) => void alternar("saidaAntecipada", valor)}
           />
+        </div>
+
+        <div
+          className="flex flex-col gap-3 rounded-lg border p-3"
+          role="group"
+          aria-label="Turma de origem na Chamada"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <Label htmlFor="config-origem-chamada">Turma de origem na Chamada</Label>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Mostra a origem ao lado do nome e o asterisco de remanejamento nas séries ou turmas
+                selecionadas. Desligar oculta a indicação e preserva as escolhas e os dados.
+              </p>
+            </div>
+            <Switch
+              id="config-origem-chamada"
+              checked={configuracoes.origemNaChamada}
+              disabled={salvando !== null}
+              onCheckedChange={(valor) => void salvarOrigem({ origemNaChamada: valor })}
+            />
+          </div>
+          {configuracoes.origemNaChamada && (
+            <>
+              <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
+                <legend className="mb-1 text-sm font-medium">Séries completas</legend>
+                <p className="text-muted-foreground text-xs">
+                  Inclui todas as turmas da série, inclusive as criadas depois.
+                </p>
+                {series.map((serie) => (
+                  <label
+                    key={serie.id}
+                    className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-primary size-4 shrink-0"
+                      aria-label={`Mostrar origem na série ${serie.nome}`}
+                      checked={configuracoes.origemNaChamadaSerieIds.includes(serie.id)}
+                      onChange={(evento) =>
+                        void salvarOrigem({
+                          origemNaChamadaSerieIds: selecaoAlterada(
+                            configuracoes.origemNaChamadaSerieIds,
+                            serie.id,
+                            evento.target.checked,
+                          ),
+                        })
+                      }
+                    />
+                    {serie.nome}
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
+                <legend className="mb-1 text-sm font-medium">Turmas específicas</legend>
+                <p className="text-muted-foreground text-xs">
+                  Somam-se às séries completas selecionadas.
+                </p>
+                {turmas.map((item) => (
+                  <label
+                    key={item.id}
+                    className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-primary size-4 shrink-0"
+                      aria-label={`Mostrar origem na turma ${item.rotulo}`}
+                      checked={configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
+                      onChange={(evento) =>
+                        void salvarOrigem({
+                          origemNaChamadaTurmaIds: selecaoAlterada(
+                            configuracoes.origemNaChamadaTurmaIds,
+                            item.id,
+                            evento.target.checked,
+                          ),
+                        })
+                      }
+                    />
+                    {item.rotulo}
+                  </label>
+                ))}
+              </fieldset>
+              {configuracoes.origemNaChamadaSerieIds.length === 0 &&
+                configuracoes.origemNaChamadaTurmaIds.length === 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Nenhuma série ou turma selecionada. A indicação não aparece na Chamada.
+                  </p>
+                )}
+            </>
+          )}
+          {salvando === "origemNaChamada" && (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-xs">
+              <LoaderCircle size={14} className="animate-spin" />
+              Salvando indicação de origem...
+            </p>
+          )}
         </div>
 
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}

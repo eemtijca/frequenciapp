@@ -24,7 +24,9 @@ test.describe("chamada com saída por aula", () => {
     await trocarVisao(page, "Chamada", "chamada");
 
     const painel = page.locator('section[aria-label="Fazer chamada"]');
-    const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
+    const pilula = painel
+      .getByRole("group", { name: "Turma atual" })
+      .getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) {
       await pilula.click();
     }
@@ -72,6 +74,7 @@ test.describe("chamada com saída por aula", () => {
     const total = await chips.count();
     await chips.nth(total - 1).click();
     await painel.getByRole("button", { name: "Salvar" }).click();
+    await expect(painel.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
     await expect(painel.getByText("saiu em parte das aulas").first()).toBeVisible({
       timeout: 15_000,
     });
@@ -151,11 +154,14 @@ test.describe("chamada com saída por aula", () => {
     await trocarVisao(page, "Chamada", "chamada");
 
     const painel = page.locator('section[aria-label="Fazer chamada"]');
-    const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
+    const pilula = painel
+      .getByRole("group", { name: "Turma atual" })
+      .getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) {
       await pilula.click();
     }
     const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
+    await painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ }).click();
     await linha.locator("button[aria-pressed]").first().click();
     await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();
     await page.getByRole("option", { name: "D · Doente" }).click();

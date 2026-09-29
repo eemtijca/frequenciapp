@@ -163,15 +163,18 @@ A unicidade de (aluno, dia) impede dois registros no mesmo dia; a correção é 
 
 ## Configuração (configuracao)
 
-| Campo             | Tipo     | Observação                                                 |
-| ----------------- | -------- | ---------------------------------------------------------- |
-| id                | texto    | Linha única `principal`, criada na migração.               |
-| frequenciaPorAula | booleano | Liga a chamada por aula, os chips de aulas e a marca S.    |
-| saidaAntecipada   | booleano | Mostra a área de saídas antecipadas e o relatório semanal. |
-| atualizadoEm      | data     | Momento da última alteração.                               |
-| atualizadoPorId   | uuid     | Quem alterou; anulável.                                    |
+| Campo             | Tipo     | Observação                                                        |
+| ----------------- | -------- | ----------------------------------------------------------------- |
+| id                | texto    | Linha única `principal`, criada na migração.                      |
+| frequenciaPorAula | booleano | Liga a chamada por aula, os chips de aulas e a marca S.           |
+| saidaAntecipada   | booleano | Mostra a área de saídas antecipadas e o relatório semanal.        |
+| origemNaChamada   | booleano | Habilita a indicação de origem nas séries ou turmas selecionadas. |
+| atualizadoEm      | data     | Momento da última alteração.                                      |
+| atualizadoPorId   | uuid     | Quem alterou; anulável.                                           |
 
 Os recursos são ligados e desligados na Gestão, com auditoria. Desligar não apaga dados: a chamada por aula volta a valer quando religada, e as saídas permanecem consultáveis pelos relatórios.
+
+A seleção de origem é armazenada nas relações `configuracoes_origem_series` e `configuracoes_origem_turmas`, com referências ao cadastro e chave composta com a configuração. A Chamada usa a união das duas seleções, condicionada a `origemNaChamada`. Uma série selecionada inclui suas turmas atuais e futuras. Reativar recupera a seleção preservada; o recurso não modifica o nome ou a turma original do aluno.
 
 ## Justificativa (justificativa)
 

@@ -362,11 +362,13 @@ Remove a saída para correção.
 
 ### GET /api/configuracoes
 
-- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean}}`. Qualquer sessão.
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[]}}`. Qualquer sessão.
 
 ### PATCH /api/configuracoes
 
-Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada? }`. Apenas administração, com auditoria.
+Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origemNaChamadaSerieIds?, origemNaChamadaTurmaIds? }`. Apenas administração, com auditoria.
+
+As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A seleção é a união das séries completas com as turmas avulsas. Lista vazia não habilita nenhuma turma; alterar somente `origemNaChamada` preserva as seleções. Desligar controla apenas a exibição, sem modificar alunos, chamadas ou planilhas. Seleção inexistente responde 400 e não altera a configuração.
 
 - 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 403 sem papel de administração.
 
