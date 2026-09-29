@@ -471,6 +471,7 @@ export default function Aplicacao({
             alunos={alunos}
             frequencias={frequencias}
             saidas={saidas}
+            configuracoes={configuracoes}
             onRecarregar={recarregarMes}
           />
         )}

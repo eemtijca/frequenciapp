@@ -4,8 +4,20 @@
 // e resumo de faltas, justificadas e saídas.
 import { useEffect, useMemo, useState } from "react";
 import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
-import type { Aluno, Frequencia, SaidaAntecipada, Serie, Turma } from "@/domain/frequencia";
-import { alunoDesistenteNoDia, diaSeguinte, rotuloDiaSemana } from "@/domain/frequencia";
+import type {
+  Aluno,
+  Configuracoes,
+  Frequencia,
+  SaidaAntecipada,
+  Serie,
+  Turma,
+} from "@/domain/frequencia";
+import {
+  alunoDesistenteNoDia,
+  diaSeguinte,
+  exibirOrigemNaChamada,
+  rotuloDiaSemana,
+} from "@/domain/frequencia";
 import {
   coberturaDoDia,
   desistenciasNoDia,
@@ -13,7 +25,6 @@ import {
   distribuicaoPorOrigem,
   marcasDoDia,
   resumoDoDia,
-  serieTemRemanejamento,
 } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
@@ -32,6 +43,7 @@ interface Props {
   alunos: Aluno[];
   frequencias: Frequencia[];
   saidas: SaidaAntecipada[];
+  configuracoes: Configuracoes;
   onRecarregar: (mes: string) => Promise<void>;
 }
 
@@ -48,6 +60,7 @@ export default function VistaPainel({
   alunos,
   frequencias,
   saidas,
+  configuracoes,
   onRecarregar,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
@@ -141,13 +154,18 @@ export default function VistaPainel({
   const turmasPendentes = serieSelecionada
     ? cobertura.turmasPendentes.filter((turma) => turma.serieId === serieSelecionada.id)
     : cobertura.turmasPendentes;
-  // Só a série com aluno remanejado ganha o gráfico pela turma original.
+  // Só a série indicada em Gestão > Configurações (Origem na Chamada, ADR-026)
+  // ganha o gráfico pela turma original; nas demais a turma atual já é a original.
   const porOrigem = useMemo(
     () =>
-      serieSelecionada && serieTemRemanejamento(serieSelecionada, turmas, ativos)
+      serieSelecionada &&
+      turmas.some(
+        (turma) =>
+          turma.serieId === serieSelecionada.id && exibirOrigemNaChamada(configuracoes, turma),
+      )
         ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
         : null,
-    [serieSelecionada, turmas, ativos, marcas],
+    [serieSelecionada, turmas, ativos, marcas, configuracoes],
   );
   const coberturaRegistrados = distribuicaoDaSerie?.registrados ?? cobertura.registrados;
   const coberturaEsperados = distribuicaoDaSerie?.esperados ?? cobertura.esperados;
