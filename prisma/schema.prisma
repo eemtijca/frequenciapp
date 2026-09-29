@@ -102,11 +102,12 @@ model Sessao {
 
 // Série escolar (por exemplo, "1º ano"). Referência para as turmas.
 model Serie {
-  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome     String
-  ordem    Int
-  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  turmas   Turma[]
+  id                  String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                String
+  ordem               Int
+  criadoEm            DateTime                  @default(now()) @map("criado_em") @db.Timestamptz
+  turmas              Turma[]
+  configuracoesOrigem ConfiguracaoOrigemSerie[]
 
   @@index([ordem])
   @@map("series")
@@ -126,7 +127,8 @@ model Turma {
   horarios       Horario[]
   sincronizacoes SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
 
-  vinculosDiretor VinculoDiretor[] @relation("VinculoDaTurma")
+  vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
+  configuracoesOrigem ConfiguracaoOrigemTurma[]
 
   @@unique([serieId, nome])
   @@map("turmas")
@@ -325,14 +327,41 @@ model ParametrosAcesso {
 // configurações é única, criada na migração; as justificativas nascem com os
 // códigos padrão e podem ser editadas pela administração.
 model Configuracao {
-  id                String   @id @default("principal")
-  frequenciaPorAula Boolean  @default(false) @map("frequencia_por_aula")
-  saidaAntecipada   Boolean  @default(true) @map("saida_antecipada")
-  atualizadoEm      DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
-  atualizadoPorId   String?  @map("atualizado_por_id") @db.Uuid
-  atualizadoPor     Usuario? @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  id                String                    @id @default("principal")
+  frequenciaPorAula Boolean                   @default(false) @map("frequencia_por_aula")
+  saidaAntecipada   Boolean                   @default(true) @map("saida_antecipada")
+  origemNaChamada   Boolean                   @default(false) @map("origem_na_chamada")
+  origemSeries      ConfiguracaoOrigemSerie[]
+  origemTurmas      ConfiguracaoOrigemTurma[]
+  atualizadoEm      DateTime                  @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?                   @map("atualizado_por_id") @db.Uuid
+  atualizadoPor     Usuario?                  @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("configuracoes")
+}
+
+// Seleções de exibição na Chamada, sem alterar a origem dos alunos.
+model ConfiguracaoOrigemSerie {
+  configuracaoId String       @map("configuracao_id")
+  serieId        String       @map("serie_id") @db.Uuid
+  configuracao   Configuracao @relation(fields: [configuracaoId], references: [id], onDelete: Cascade)
+  serie          Serie        @relation(fields: [serieId], references: [id], onDelete: Cascade)
+
+  @@id([configuracaoId, serieId])
+  @@index([serieId])
+  @@map("configuracoes_origem_series")
+}
+
+// Turmas específicas somam-se às séries selecionadas na configuração.
+model ConfiguracaoOrigemTurma {
+  configuracaoId String       @map("configuracao_id")
+  turmaId        String       @map("turma_id") @db.Uuid
+  configuracao   Configuracao @relation(fields: [configuracaoId], references: [id], onDelete: Cascade)
+  turma          Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@id([configuracaoId, turmaId])
+  @@index([turmaId])
+  @@map("configuracoes_origem_turmas")
 }
 
 // Catálogo de justificativas de falta e de saída. O código é estável, porque

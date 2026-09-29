@@ -21,7 +21,6 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
-import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 interface Props {
   diaCorrente: string;
@@ -50,7 +49,7 @@ export default function VistaPainel({
   onRecarregar,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
-  const [filtro, setFiltro] = useState<"escola" | string>("escola");
+  const [filtro, setFiltro] = useState<"escola" | "desistentes" | string>("escola");
   const [doDia, setDoDia] = useState<{
     frequencias: Frequencia[];
     saidas: SaidaAntecipada[];
@@ -134,11 +133,14 @@ export default function VistaPainel({
   );
 
   const serieSelecionada = series.find((serie) => serie.id === filtro) ?? null;
-  const totalDesistentesVisiveis = serieSelecionada
-    ? (desistencias.series
-        .find((serie) => serie.serieId === serieSelecionada.id)
-        ?.turmas.reduce((soma, turma) => soma + turma.quantidade, 0) ?? 0)
-    : desistencias.total;
+  const distribuicaoDaSerie = serieSelecionada
+    ? (distribuicao.find((item) => item.serieId === serieSelecionada.id) ?? null)
+    : null;
+  const turmasPendentes = serieSelecionada
+    ? cobertura.turmasPendentes.filter((turma) => turma.serieId === serieSelecionada.id)
+    : cobertura.turmasPendentes;
+  const coberturaRegistrados = distribuicaoDaSerie?.registrados ?? cobertura.registrados;
+  const coberturaEsperados = distribuicaoDaSerie?.esperados ?? cobertura.esperados;
   const rotuloDia = dia.split("-").reverse().join("/");
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const carregandoPainel = carregando && !compartilhado;
@@ -288,6 +290,14 @@ export default function VistaPainel({
             {serie.nome}
           </button>
         ))}
+        <button
+          type="button"
+          aria-pressed={filtro === "desistentes"}
+          onClick={() => setFiltro("desistentes")}
+          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+        >
+          Desistentes
+        </button>
       </div>
 
       {carregandoPainel ? (
@@ -297,144 +307,107 @@ export default function VistaPainel({
         </div>
       ) : (
         <>
-          <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-medium">
-                <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
-                {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
-              </h2>
-              <span className="text-muted-foreground text-xs">
-                {resumo.ausencias} {resumo.ausencias === 1 ? "falta" : "faltas"} (F + FJ)
-              </span>
+          {filtro === "desistentes" ? (
+            <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-medium">Desistentes até este dia</h2>
+                <span className="numerais-tabulares text-muted-foreground text-sm">
+                  {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
+                </span>
+              </div>
+              <GraficoRosca
+                titulo="Desistentes por série"
+                fatias={desistencias.series.map((serie) => ({
+                  nome: serie.nome,
+                  valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
+                }))}
+                rotuloTotal="desistentes"
+                unidadeSingular="desistente"
+                unidadePlural="desistentes"
+                vazio="Nenhum aluno desistente até este dia"
+              />
             </div>
-            <GraficoRosca
-              titulo={
-                serieSelecionada
-                  ? `Faltas do dia por turma da ${serieSelecionada.nome}`
-                  : "Faltas do dia por série"
-              }
-              fatias={
-                serieSelecionada
-                  ? (distribuicao
-                      .find((item) => item.serieId === serieSelecionada.id)
-                      ?.turmas.map((turma) => ({
-                        nome: turma.rotulo,
-                        valor: turma.faltas + turma.justificadas,
-                        detalhe: `${turma.registrados} de ${turma.esperados} com chamada`,
-                      })) ?? [])
-                  : distribuicao.map((item) => ({
-                      nome: item.nome,
-                      valor: item.faltas + item.justificadas,
-                      detalhe: `${item.registrados} de ${item.esperados} alunos`,
-                    }))
-              }
-              vazio={
-                frequenciasDoDia.length === 0
-                  ? "Nenhuma chamada salva neste dia"
-                  : "Nenhuma falta registrada neste dia"
-              }
-            />
-          </div>
-
-          <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-medium">Desistentes até este dia</h2>
-              <span className="numerais-tabulares text-muted-foreground text-sm">
-                {totalDesistentesVisiveis} {totalDesistentesVisiveis === 1 ? "aluno" : "alunos"}
-              </span>
-            </div>
-            <GraficoRosca
-              titulo={
-                serieSelecionada
-                  ? `Desistentes por turma da ${serieSelecionada.nome}`
-                  : "Desistentes por série"
-              }
-              fatias={
-                serieSelecionada
-                  ? (desistencias.series
-                      .find((item) => item.serieId === serieSelecionada.id)
-                      ?.turmas.map((turma) => ({
-                        nome: turma.rotulo,
-                        valor: turma.quantidade,
-                      })) ?? [])
-                  : desistencias.series.map((serie) => ({
-                      nome: serie.nome,
-                      valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
-                    }))
-              }
-              rotuloTotal="desistentes"
-              unidadeSingular="desistente"
-              unidadePlural="desistentes"
-              vazio="Nenhum aluno desistente até este dia"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {distribuicao.map((serie) => (
-              <div
-                key={serie.serieId}
-                className="bg-card flex flex-col gap-3 rounded-lg border p-4"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="font-medium">{serie.nome}</h3>
-                  <span className="text-muted-foreground numerais-tabulares flex items-center gap-1.5 text-xs">
-                    {serie.faltas + serie.justificadas} de {resumo.ausencias || 0}
-                    {resumo.ausencias > 0 && (
-                      <CirculoValor
-                        texto={percentual.format(serie.percentual)}
-                        rotulo={`${percentual.format(serie.percentual)} das faltas do dia`}
-                      />
-                    )}
+          ) : (
+            <>
+              <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="flex items-center gap-2 font-medium">
+                    <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
+                    {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
+                  </h2>
+                  <span className="text-muted-foreground text-xs">
+                    {serieSelecionada && distribuicaoDaSerie
+                      ? `${distribuicaoDaSerie.faltas + distribuicaoDaSerie.justificadas} `
+                      : `${resumo.ausencias} `}
+                    {(serieSelecionada && distribuicaoDaSerie
+                      ? distribuicaoDaSerie.faltas + distribuicaoDaSerie.justificadas
+                      : resumo.ausencias) === 1
+                      ? "falta"
+                      : "faltas"}{" "}
+                    (F + FJ)
                   </span>
                 </div>
                 <GraficoRosca
-                  titulo={`Faltas do dia nas turmas da ${serie.nome}`}
-                  fatias={serie.turmas.map((turma) => ({
-                    nome: turma.rotulo,
-                    valor: turma.faltas + turma.justificadas,
-                    detalhe: `${turma.registrados}/${turma.esperados}`,
-                  }))}
-                  vazio="Nenhuma falta nesta série"
+                  titulo={
+                    serieSelecionada
+                      ? `Faltas do dia por turma da ${serieSelecionada.nome}`
+                      : "Faltas do dia por série"
+                  }
+                  fatias={
+                    distribuicaoDaSerie
+                      ? distribuicaoDaSerie.turmas.map((turma) => ({
+                          nome: turma.rotulo,
+                          valor: turma.faltas + turma.justificadas,
+                          detalhe: `${turma.registrados} de ${turma.esperados} com chamada`,
+                        }))
+                      : distribuicao.map((item) => ({
+                          nome: item.nome,
+                          valor: item.faltas + item.justificadas,
+                          detalhe: `${item.registrados} de ${item.esperados} alunos`,
+                        }))
+                  }
+                  vazio={
+                    frequenciasDoDia.length === 0
+                      ? "Nenhuma chamada salva neste dia"
+                      : "Nenhuma falta registrada neste dia"
+                  }
                 />
-                <p className="text-muted-foreground text-xs">
-                  {serie.registrados} de {serie.esperados} alunos com chamada salva
-                </p>
               </div>
-            ))}
-          </div>
 
-          <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-medium">Cobertura do dia</h2>
-              <span className="numerais-tabulares text-muted-foreground text-sm">
-                {cobertura.registrados} de {cobertura.esperados} alunos com chamada salva
-              </span>
-            </div>
-            {cobertura.turmasPendentes.length > 0 ? (
-              <>
-                <p className="text-muted-foreground text-sm">
-                  Falta salvar a chamada de {cobertura.turmasPendentes.length}{" "}
-                  {cobertura.turmasPendentes.length === 1 ? "turma" : "turmas"}:
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {cobertura.turmasPendentes.map((turma) => (
-                    <span
-                      key={turma.id}
-                      className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
-                    >
-                      {turma.rotulo}
-                    </span>
-                  ))}
+              <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-medium">Cobertura do dia</h2>
+                  <span className="numerais-tabulares text-muted-foreground text-sm">
+                    {coberturaRegistrados} de {coberturaEsperados} alunos com chamada salva
+                  </span>
                 </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-sm">
-                {cobertura.esperados === 0
-                  ? "Nenhum aluno ativo cadastrado."
-                  : "Todas as turmas com alunos têm chamada salva neste dia."}
-              </p>
-            )}
-          </div>
+                {turmasPendentes.length > 0 ? (
+                  <>
+                    <p className="text-muted-foreground text-sm">
+                      Falta salvar a chamada de {turmasPendentes.length}{" "}
+                      {turmasPendentes.length === 1 ? "turma" : "turmas"}:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {turmasPendentes.map((turma) => (
+                        <span
+                          key={turma.id}
+                          className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
+                        >
+                          {turma.rotulo}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {coberturaEsperados === 0
+                      ? "Nenhum aluno ativo cadastrado."
+                      : "Todas as turmas com alunos têm chamada salva neste dia."}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
     </section>

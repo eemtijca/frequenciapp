@@ -121,7 +121,13 @@ const esquemaCopia = z.object({
     .max(1000)
     .optional(),
   configuracoes: z
-    .object({ frequenciaPorAula: z.boolean(), saidaAntecipada: z.boolean() })
+    .object({
+      frequenciaPorAula: z.boolean(),
+      saidaAntecipada: z.boolean(),
+      origemNaChamada: z.boolean().optional(),
+      origemNaChamadaSerieIds: z.array(z.uuid()).optional(),
+      origemNaChamadaTurmaIds: z.array(z.uuid()).optional(),
+    })
     .optional(),
 });
 
