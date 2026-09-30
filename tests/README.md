@@ -16,7 +16,7 @@ Roda em qualquer ambiente, sem banco e sem rede:
 
 - `entradas.test.ts` e `planilha-entradas.test.ts`: horário, código por aluno e data, preservação de linhas e fórmulas, releitura, mudança de arquivo e falha sem confirmação com dublê de Sheets API.
 - `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
-- `relatorios.test.ts`: indicadores do dia e relatórios por aluno e por saída.
+- `relatorios.test.ts`: indicadores do dia, infrequência acumulada entre meses por série e turma, taxa sobre registros com chamada, listas históricas, desistências, ausência parcial em aulas e relatórios por aluno e por saída.
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
 - `planilha.test.ts`: dataframe, esquema da planilha, CSV e planejamento conservador.
 - `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
@@ -87,6 +87,7 @@ npx playwright test    # headless, execução serial
 - Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
 - Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, indicador da barra inferior na visão ativa, abas da Gestão com toque e teclado, integração com Google Planilhas contra o script falso (token, conexão, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
 - `entradas.spec.ts`: calendário brasileiro mesmo em navegador inglês, navegação diária, seleção de momento e responsável, chegada atrasada, recarga, remoção confirmada e fluxo de aba/prévia/envio com API falsa. Esse spec e `planilha.spec.ts` bloqueiam o service worker para permitir interceptação de requisições. O PWA continua coberto pela suíte própria.
+- `painel-filtros.spec.ts`: gráficos diários por escopo e gráfico Personalizado entre meses, filtros de série e turma, intervalo inválido, ausência de chamadas, presença sem faltas, recuperação de falha e largura de 360 px. A consulta de período é simulada com alunos sintéticos da própria massa; somente esse grupo bloqueia o service worker. A consulta real por período é coberta pelos contratos de API.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
 O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner.

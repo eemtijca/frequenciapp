@@ -8,6 +8,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Botão Personalizado no Painel, após as séries, com calendário de início e fim, filtros de série e turma e gráfico de infrequência para até 366 dias. A taxa usa apenas os registros de aluno por dia com chamada salva, incluindo F e FJ.
 - Horário da saída no formulário Saiu mais cedo, com o mesmo conjunto de campos das entradas; a planilha de saídas passa a levar `HH:MM · Momento`.
 - Seletor de horário próprio em popover, coerente com o calendário, em todos os campos de horário. As abas Saídas e Entradas ficam no topo da área e a aba escolhida vai para a URL.
 

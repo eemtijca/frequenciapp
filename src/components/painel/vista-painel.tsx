@@ -34,6 +34,7 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import GraficoRosca from "@/components/painel/grafico-rosca";
+import VistaPeriodo from "@/components/painel/vista-periodo";
 
 interface Props {
   diaCorrente: string;
@@ -75,9 +76,10 @@ export default function VistaPainel({
   const [recarregar, setRecarregar] = useState(0);
 
   const compartilhado = dia.startsWith(mes);
+  const personalizado = filtro === "personalizado";
 
   useEffect(() => {
-    if (compartilhado) return;
+    if (compartilhado || personalizado) return;
     let viva = true;
     async function buscar() {
       setCarregando(true);
@@ -107,7 +109,7 @@ export default function VistaPainel({
     return () => {
       viva = false;
     };
-  }, [compartilhado, dia, recarregar]);
+  }, [compartilhado, personalizado, dia, recarregar]);
 
   const frequenciasDoDia = useMemo(
     () =>
@@ -191,112 +193,125 @@ export default function VistaPainel({
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Painel</h1>
           <p className="text-muted-foreground text-sm">
-            Infrequência em <span className="numerais-tabulares">{rotuloDia}</span>
-            {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
+            {personalizado ? (
+              "Infrequência por período"
+            ) : (
+              <>
+                Infrequência em <span className="numerais-tabulares">{rotuloDia}</span>
+                {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
+              </>
+            )}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Atualizar indicadores"
-          onClick={() => void atualizar()}
-          disabled={atualizando || carregandoPainel}
-        >
-          {atualizando ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
+        {!personalizado && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10"
+            aria-label="Atualizar indicadores"
+            onClick={() => void atualizar()}
+            disabled={atualizando || carregandoPainel}
+          >
+            {atualizando ? (
+              <LoaderCircle size={18} className="animate-spin" />
+            ) : (
+              <RefreshCw size={18} />
+            )}
+          </Button>
+        )}
+      </div>
+
+      {!personalizado && (
+        <>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Dia anterior"
+              onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+            >
+              <ChevronLeft size={18} />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <SeletorPeriodo
+                id="dia-painel"
+                modo="dia"
+                valor={dia}
+                max={diaCorrente}
+                rotuloAcessivel="Dia do painel"
+                rotulo={rotuloDia}
+                detalhe={diaDaSemana}
+                onValor={setDia}
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-11 shrink-0 rounded-lg"
+              aria-label="Dia seguinte"
+              disabled={dia >= diaCorrente}
+              onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+            >
+              <ChevronRight size={18} />
+            </Button>
+          </div>
+          {dia !== diaCorrente && (
+            <button
+              type="button"
+              onClick={() => setDia(diaCorrente)}
+              className="text-primary pressionavel self-start text-sm font-medium hover:underline"
+            >
+              Voltar para hoje
+            </button>
           )}
-        </Button>
-      </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0 rounded-lg"
-          aria-label="Dia anterior"
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <SeletorPeriodo
-            id="dia-painel"
-            modo="dia"
-            valor={dia}
-            max={diaCorrente}
-            rotuloAcessivel="Dia do painel"
-            rotulo={rotuloDia}
-            detalhe={diaDaSemana}
-            onValor={setDia}
-          />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0 rounded-lg"
-          aria-label="Dia seguinte"
-          disabled={dia >= diaCorrente}
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
-      {dia !== diaCorrente && (
-        <button
-          type="button"
-          onClick={() => setDia(diaCorrente)}
-          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
-        >
-          Voltar para hoje
-        </button>
+          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+
+          <div
+            role="group"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
+            aria-label="Resumo do dia"
+          >
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-2xl font-semibold">
+                {carregandoPainel ? "" : resumo.esperados}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Alunos</span>
+            </div>
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-primary text-2xl font-semibold">
+                {carregandoPainel ? "" : resumo.presentes}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Presentes</span>
+            </div>
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
+                {carregandoPainel ? "" : resumo.ausencias}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Faltas (F + FJ)</span>
+            </div>
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-2xl font-semibold">
+                {carregandoPainel ? "" : resumo.justificadas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
+            </div>
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-2xl font-semibold">
+                {carregandoPainel ? "" : percentual.format(resumo.infrequencia)}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Infrequência</span>
+            </div>
+            <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+              <span className="numerais-tabulares text-2xl font-semibold">
+                {carregandoPainel ? "" : resumo.saidas}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">Saídas</span>
+            </div>
+          </div>
+        </>
       )}
-
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-
-      <div
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
-        aria-label="Resumo do dia"
-      >
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.esperados}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Alunos</span>
-        </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-primary text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.presentes}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Presentes</span>
-        </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.ausencias}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Faltas (F + FJ)</span>
-        </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.justificadas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
-        </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : percentual.format(resumo.infrequencia)}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Infrequência</span>
-        </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.saidas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Saídas</span>
-        </div>
-      </div>
 
       <div role="group" aria-label="Filtro por série" className="flex flex-wrap gap-2">
         <button
@@ -320,6 +335,14 @@ export default function VistaPainel({
         ))}
         <button
           type="button"
+          aria-pressed={personalizado}
+          onClick={() => setFiltro("personalizado")}
+          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+        >
+          Personalizado
+        </button>
+        <button
+          type="button"
           aria-pressed={filtro === "desistentes"}
           onClick={() => setFiltro("desistentes")}
           className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
@@ -328,7 +351,9 @@ export default function VistaPainel({
         </button>
       </div>
 
-      {carregandoPainel ? (
+      {personalizado ? (
+        <VistaPeriodo diaCorrente={diaCorrente} series={series} turmas={turmas} alunos={alunos} />
+      ) : carregandoPainel ? (
         <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
           <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
           Carregando indicadores...
