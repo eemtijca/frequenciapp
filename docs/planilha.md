@@ -113,6 +113,16 @@ Colunas reconhecidas no cabeçalho, por rótulo: Data, Aluno, Turma, Momento, Ju
 
 O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o mês escolhido e prévia obrigatória. No modo conservador só nasce linha para saída que ainda não existe e só célula vazia é preenchida; divergência em linha manual é listada e ignorada. No modo completo, com a mesma frase, senha e prazo, o aplicativo corrige células divergentes de linhas criadas pela integração e permite remover linhas marcadas que não têm mais saída no período enviado. Cada operação destrutiva guarda cópia da aba.
 
+## Planilha de entradas atrasadas
+
+Na área Saídas e entradas, o botão Entradas abre o registro de chegadas atrasadas. A consulta e o envio usam a data e a turma escolhidas na tela. O registro não muda as faltas da chamada.
+
+As entradas usam exclusivamente a Sheets API e a mesma planilha selecionada para saídas na Gestão, sem outra autorização OAuth. A integração de saídas precisa estar ativa e conectada ao Google. A administração confirma "Preparar aba Entradas" para criar a aba com as colunas Data, Aluno, Turma, Horário, Motivo, Registrado por e Código. Aba existente nunca é recriada nem limpa; cabeçalho incompatível, com fórmula ou mesclagens bloqueia envio. A aba Entradas fica reservada às chegadas e não pode ser mapeada para saídas.
+
+"Prévia das entradas" lê toda a aba e informa as linhas novas. "Enviar entradas" relê a estrutura, os dados e os registros, exigindo o mesmo hash. O código combina aluno e data e evita duplicação entre reenvios, correções e restaurações. Conteúdo existente com o mesmo código, mesmo se divergente, permanece intacto e gera aviso. Registro manual sem código com mesmo nome e data é preservado e exige conferência, sem associação automática por nome. Fórmulas e conteúdo das últimas linhas, inclusive em colunas adicionais, são preservados; novas linhas entram depois de todo o conteúdo.
+
+A remoção no aplicativo não remove a linha já enviada. A correção de conteúdo existente na planilha fica a cargo da escola; um reenvio sinaliza a divergência. Não há modo completo de entradas. A escrita conserva as proteções do adaptador da Sheets API, mas uma edição simultânea no Google ainda pode gerar conflito: a API não oferece gravação condicionada ao valor anterior. Resultado sem confirmação exige conferir a aba e fazer nova prévia; não há retentativa automática.
+
 ## Solução de problemas
 
 | Mensagem                                 | Causa provável                                                                   |

@@ -64,6 +64,10 @@ docker compose down -v && docker compose up --build
 
 Depois do primeiro deploy de produção, a regra passa a ser aplicada sem exceção: nunca editar uma migração aplicada; qualquer ajuste entra como migração nova.
 
+## Entradas atrasadas
+
+A migração `20260930005502_entradas_atrasadas` cria apenas a tabela `entradas_atrasadas`, seus índices e referências. Não altera saídas nem frequências existentes. A chave (aluno, dia) impede repetição; horário e motivo são validados pela aplicação. O registro guarda turma e rótulo de quem registrou, preservados depois de transferência de aluno ou exclusão de conta. A turma é protegida por referência; a autoria é anulável. A cópia JSON inclui entradas e importa por mesclagem, sem sobrescrever. Cópias antigas sem esse campo continuam aceitas.
+
 ## Conexões
 
 O runtime da API usa `DATABASE_URL`. O Prisma CLI, o migrador e os scripts administrativos usam `DIRECT_URL` quando essa variável está disponível.

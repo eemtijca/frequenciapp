@@ -80,7 +80,7 @@ test.describe("Google Planilhas de saídas", () => {
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
     // Envio pela vista Saídas.
-    await trocarVisao(page, "Saídas", "saidas");
+    await trocarVisao(page, "Saídas e entradas", "saidas");
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
     await page.getByRole("button", { name: /Mês do envio das saídas/ }).click();
     await page

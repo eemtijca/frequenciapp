@@ -8,6 +8,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Área Saídas e entradas com registro de chegadas atrasadas, horário e motivo, turma histórica, correção auditada e cópia JSON. As entradas podem ser enviadas com prévia à aba Entradas da planilha de saídas pela Sheets API (ADR-027).
+
 - No Painel, o botão de uma série com alunos remanejados (como a 3ª série) ganha um segundo gráfico da infrequência do dia agrupada pela turma original, com as mesmas faltas do gráfico por turma atual.
 - Bloqueio da Chamada após salvar cada dia e turma, com desbloqueio explícito para corrigir e novo bloqueio depois da correção.
 - Ação própria na Gestão para marcar ou desfazer desistência, mantendo o aluno na Chamada com marcação bloqueada, histórico preservado e gráfico de desistentes no Painel.

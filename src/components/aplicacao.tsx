@@ -50,7 +50,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
 import VistaPainel from "@/components/painel/vista-painel";
-import VistaSaidas from "@/components/saidas/vista-saidas";
+import VistaMovimentacoes from "@/components/saidas/vista-movimentacoes";
 import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
@@ -103,7 +103,7 @@ const ITENS_INICIAIS: ItemNav[] = [
   { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
 ];
 
-const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas", icone: DoorOpen };
+const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas e entradas", icone: DoorOpen };
 const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
 
 const ITENS_FIM: ItemNav[] = [
@@ -169,7 +169,7 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
         aria-hidden="true"
         className="hidden lg:block"
       />
-      <span className="whitespace-nowrap">{item.rotulo}</span>
+      <span className="text-center leading-tight lg:text-left">{item.rotulo}</span>
       {pendente && (
         <span
           aria-label="Alterações não salvas"
@@ -492,7 +492,8 @@ export default function Aplicacao({
           />
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
-          <VistaSaidas
+          <VistaMovimentacoes
+            podePrepararPlanilha={ehAdmin}
             diaCorrente={diaCorrente}
             fuso={fuso}
             mes={mes}

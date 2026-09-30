@@ -18,3 +18,5 @@
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
 | [adr/](adr/)                                         | Decisões de arquitetura registradas.                       |
 | [ADR-026](adr/026-origem-configuravel-na-chamada.md) | Exibição de origem configurável por escola, série e turma. |
+
+- [ADR-027](adr/027-entradas-atrasadas.md): entradas independentes da chamada e envio conservador em aba própria.

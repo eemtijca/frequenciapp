@@ -17,7 +17,7 @@ test.describe("saída durante a aula", () => {
   test("registra com texto opcional e mostra na lista do dia", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas", "saidas");
+    await trocarVisao(page, "Saídas e entradas", "saidas");
 
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();
@@ -44,7 +44,7 @@ test.describe("saída durante a aula", () => {
   test("registra a justificativa escrita e a coordenadora que liberou", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas", "saidas");
+    await trocarVisao(page, "Saídas e entradas", "saidas");
 
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();

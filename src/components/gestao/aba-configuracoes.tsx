@@ -138,8 +138,8 @@ export default function AbaConfiguracoes({
               ? "Chamada por aula ativada."
               : "Chamada por aula desativada."
             : valor
-              ? "Saída antecipada ativada."
-              : "Saída antecipada desativada.",
+              ? "Saídas e entradas ativadas."
+              : "Saídas e entradas desativadas.",
         );
       } catch (excecao) {
         setErro(
@@ -486,7 +486,7 @@ export default function AbaConfiguracoes({
               Chamada por aula {configuracoes.frequenciaPorAula ? "ligada" : "desligada"}
             </Selo>
             <Selo variante={configuracoes.saidaAntecipada ? "sucesso" : "neutro"}>
-              Saída antecipada {configuracoes.saidaAntecipada ? "ligada" : "desligada"}
+              Saídas e entradas {configuracoes.saidaAntecipada ? "ligada" : "desligada"}
             </Selo>
             <Selo variante={configuracoes.origemNaChamada ? "sucesso" : "neutro"}>
               Origem na Chamada {configuracoes.origemNaChamada ? "ligada" : "desligada"}
@@ -512,10 +512,10 @@ export default function AbaConfiguracoes({
 
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <Label htmlFor="config-saida-antecipada">Saída antecipada</Label>
+            <Label htmlFor="config-saida-antecipada">Saídas e entradas</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Mostra a área Saídas, com registro, saídas do dia e relatório semanal. Desligado, os
-              registros existentes continuam preservados nos relatórios.
+              Mostra a área Saídas e entradas, com registro de saídas e chegadas atrasadas.
+              Desligado, os registros existentes continuam preservados no banco e na cópia JSON.
             </p>
           </div>
           <Switch
@@ -998,7 +998,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-copia"
         titulo="Cópia de segurança"
-        descricao="A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, justificativas, quem libera e configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve o que já existe."
+        descricao="A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, entradas, justificativas, quem libera e configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve o que já existe."
         icone={Archive}
         aberto={abertoCopia}
         onAbertoChange={setAbertoCopia}
