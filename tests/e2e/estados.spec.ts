@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { aguardarHidratacao } from "./helpers/pagina";
 
 test.describe("telas de estado", () => {
+  // A consulta interceptada deve passar pelo navegador; o worker tem suíte própria.
+  test.use({ serviceWorkers: "block" });
+
   test("a rota desconhecida mostra a página 404 com volta ao início", async ({ page }) => {
     await page.goto("/rota-que-nao-existe");
     await expect(page.getByRole("heading", { name: "Página não encontrada" })).toBeVisible();
@@ -16,9 +19,22 @@ test.describe("telas de estado", () => {
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 
-    // Sem o cookie, a próxima ação recebe 401 e o shell volta para a entrada.
-    await context.clearCookies();
+    // Expira somente quando a ação já iniciou a consulta. Apagar o cookie
+    // antes do clique permite que uma consulta de fundo remova o botão primeiro.
+    await page.route("**/api/frequencias?mes=*", async (rota) => {
+      await context.clearCookies();
+      const resposta = await rota.fetch({
+        headers: { ...rota.request().headers(), cookie: "" },
+      });
+      expect(resposta.status()).toBe(401);
+      await rota.fulfill({ response: resposta });
+    });
+    const respostaExpirada = page.waitForResponse(
+      (resposta) =>
+        new URL(resposta.url()).pathname === "/api/frequencias" && resposta.status() === 401,
+    );
     await page.getByRole("button", { name: "Atualizar indicadores" }).click();
+    await respostaExpirada;
 
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Sessão expirada")).toBeVisible();
