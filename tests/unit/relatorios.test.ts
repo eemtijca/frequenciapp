@@ -5,7 +5,9 @@ import {
   coberturaDoDia,
   desistenciasNoDia,
   distribuicaoDoDia,
+  distribuicaoDoPeriodo,
   distribuicaoPorOrigem,
+  infrequencia,
   indexarPorDia,
   marcasDoDia,
   relatorioSaidas,
@@ -256,5 +258,149 @@ describe("distribuicaoPorOrigem", () => {
     const total = (lista: { faltas: number; justificadas: number }[]) =>
       lista.reduce((soma, item) => soma + item.faltas + item.justificadas, 0);
     expect(total(porOrigem)).toBe(total(porAtual?.turmas ?? []));
+  });
+});
+
+describe("distribuicaoDoPeriodo", () => {
+  const series = [serie(), serie({ id: "serie-2", nome: "2ª série", ordem: 2 })];
+  const turmas = [turma(), turma({ id: "turma-b", serieId: "serie-2", rotulo: "2ª série B" })];
+  const alunos = [aluno(), aluno({ id: "aluno-b", turmaId: "turma-b" })];
+  const chamadas = [
+    frequencia({ dia: "2026-08-31", faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }] }),
+    frequencia({ dia: "2026-09-01", faltas: [] }),
+    frequencia({
+      dia: "2026-09-01",
+      turmaId: "turma-b",
+      faltas: [{ alunoId: "aluno-b", horarios: ["aula-1"], justificativa: "D" }],
+    }),
+    frequencia({ dia: "2026-09-03", faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }] }),
+  ];
+
+  it("soma F e FJ entre meses com limites inclusivos, sem inventar presenças", () => {
+    const resultado = distribuicaoDoPeriodo(
+      series,
+      turmas,
+      alunos,
+      chamadas,
+      "2026-08-31",
+      "2026-09-02",
+    );
+    expect(resultado[0]).toMatchObject({
+      faltas: 1,
+      justificadas: 0,
+      registrados: 2,
+      presentes: 1,
+      percentual: 0.5,
+    });
+    expect(resultado[1]).toMatchObject({
+      faltas: 0,
+      justificadas: 1,
+      registrados: 1,
+      percentual: 0.5,
+    });
+    if (resultado[0]) expect(infrequencia(resultado[0])).toBe(0.5);
+    expect(resultado[0]?.turmas[0]).toMatchObject({ faltas: 1, registrados: 2, percentual: 1 });
+  });
+
+  it("calcula a taxa sobre registros, em vez da média das taxas dos dias", () => {
+    const resultado = distribuicaoDoPeriodo(
+      [serie()],
+      [turma()],
+      [aluno(), aluno({ id: "aluno-c" })],
+      [
+        frequencia({
+          dia: "2026-09-01",
+          alunos: ["aluno-a"],
+          faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }],
+        }),
+        frequencia({ dia: "2026-09-02", alunos: ["aluno-a", "aluno-c"], faltas: [] }),
+      ],
+      "2026-09-01",
+      "2026-09-02",
+    );
+    expect(resultado[0]).toMatchObject({ faltas: 1, registrados: 3, presentes: 2 });
+    if (resultado[0]) expect(infrequencia(resultado[0])).toBeCloseTo(1 / 3);
+  });
+
+  it("não conta aluno que ainda não estava na lista, nem desistência vigente ou inativo", () => {
+    const resultado = distribuicaoDoPeriodo(
+      [serie()],
+      [turma()],
+      [
+        aluno({ desistenteEm: "2026-09-02" }),
+        aluno({ id: "aluno-c" }),
+        aluno({ id: "aluno-i", ativo: false }),
+      ],
+      [
+        frequencia({
+          dia: "2026-09-01",
+          alunos: ["aluno-a", "aluno-i"],
+          faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }],
+        }),
+        frequencia({
+          dia: "2026-09-02",
+          alunos: ["aluno-a", "aluno-c", "aluno-i"],
+          faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }],
+        }),
+      ],
+      "2026-09-01",
+      "2026-09-02",
+    );
+    expect(resultado[0]).toMatchObject({ faltas: 1, registrados: 2, presentes: 1 });
+  });
+
+  it("preserva marcas da lista histórica após transferência e agrupa pela turma atual", () => {
+    const resultado = distribuicaoDoPeriodo(
+      series,
+      turmas,
+      [aluno({ turmaId: "turma-b", turmaOriginalId: "turma-a" })],
+      [frequencia({ alunos: ["aluno-a"], faltas: [] })],
+      "2026-09-10",
+      "2026-09-10",
+    );
+    expect(resultado[0]).toMatchObject({ registrados: 0 });
+    expect(resultado[1]).toMatchObject({ registrados: 1, presentes: 1 });
+  });
+
+  it("não trata ausência parcial em aula como falta integral", () => {
+    const horarios = [1, 2].map((ordem) => ({
+      id: `aula-${ordem}`,
+      turmaId: "turma-a",
+      ordem,
+      inicio: "07:00",
+      fim: "08:00",
+      diasSemana: [1, 2, 3, 4, 5, 6, 7],
+      ativo: true,
+    }));
+    const resultado = distribuicaoDoPeriodo(
+      [serie()],
+      [turma({ horarios })],
+      [aluno()],
+      [frequencia({ faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }] })],
+      "2026-09-10",
+      "2026-09-10",
+    );
+    expect(resultado[0]).toMatchObject({ registrados: 1, faltas: 0, justificadas: 0 });
+  });
+
+  it("distingue período sem chamada de chamadas sem falta", () => {
+    const vazio = distribuicaoDoPeriodo(
+      series,
+      turmas,
+      alunos,
+      chamadas,
+      "2026-09-02",
+      "2026-09-02",
+    );
+    expect(vazio.every((item) => item.registrados === 0 && item.percentual === 0)).toBe(true);
+    const comPresenca = distribuicaoDoPeriodo(
+      [serie()],
+      [turma()],
+      [aluno()],
+      [frequencia()],
+      "2026-09-10",
+      "2026-09-10",
+    );
+    expect(comPresenca[0]).toMatchObject({ registrados: 1, presentes: 1, faltas: 0 });
   });
 });

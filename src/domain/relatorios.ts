@@ -269,6 +269,50 @@ export function indexarPorDia(frequencias: Frequencia[]): Map<string, Frequencia
   return porDia;
 }
 
+/** Soma aluno por dia com chamada salva, mantendo as regras do Painel diário. */
+export function distribuicaoDoPeriodo(
+  series: Serie[],
+  turmas: Turma[],
+  alunos: Aluno[],
+  frequencias: Frequencia[],
+  de: string,
+  ate: string,
+): ResumoSerieDia[] {
+  const horarios = turmas.flatMap((turma) => turma.horarios);
+  const acumulado = distribuicaoDoDia(series, turmas, [], new Map());
+  const porDia = indexarPorDia(frequencias.filter((item) => item.dia >= de && item.dia <= ate));
+  const somar = (destino: ContagemDia, origem: ContagemDia) => {
+    destino.esperados += origem.esperados;
+    destino.registrados += origem.registrados;
+    destino.presentes += origem.presentes;
+    destino.faltas += origem.faltas;
+    destino.justificadas += origem.justificadas;
+  };
+  for (const [dia, doDia] of porDia) {
+    const ativos = alunos.filter((aluno) => aluno.ativo && !alunoDesistenteNoDia(aluno, dia));
+    const marcas = marcasDoDia(ativos, dia, doDia, horarios);
+    const distribuicao = distribuicaoDoDia(series, turmas, ativos, marcas);
+    for (const serie of acumulado) {
+      const doDiaDaSerie = distribuicao.find((item) => item.serieId === serie.serieId);
+      if (!doDiaDaSerie) continue;
+      somar(serie, doDiaDaSerie);
+      for (const turma of serie.turmas) {
+        const doDiaDaTurma = doDiaDaSerie.turmas.find((item) => item.turmaId === turma.turmaId);
+        if (doDiaDaTurma) somar(turma, doDiaDaTurma);
+      }
+    }
+  }
+  const total = acumulado.reduce((soma, serie) => soma + ausencias(serie), 0);
+  for (const serie of acumulado) {
+    const totalSerie = ausencias(serie);
+    serie.percentual = total > 0 ? totalSerie / total : 0;
+    for (const turma of serie.turmas) {
+      turma.percentual = totalSerie > 0 ? ausencias(turma) / totalSerie : 0;
+    }
+  }
+  return acumulado;
+}
+
 /** Resumo de um aluno em um período. */
 export interface ResumoAlunoPeriodo {
   diasComRegistro: number;
