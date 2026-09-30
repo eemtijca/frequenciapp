@@ -78,8 +78,11 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
     }
   }
 
+  // A hora vale na hora: o campo já reflete a escolha e o painel segue aberto
+  // nos minutos. Só o minuto fecha o painel.
   function escolherHora(escolhida: number) {
     setHora(escolhida);
+    onValor(`${dois(escolhida)}:${dois(minuto)}`);
     setColuna("minuto");
   }
 
@@ -115,19 +118,20 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
 
   function classeOpcao(selecionada: boolean) {
     return cn(
-      "pressionavel numerais-tabulares flex h-9 w-full items-center justify-center rounded-md text-sm transition-colors",
+      "pressionavel numerais-tabulares flex h-11 w-full shrink-0 items-center justify-center rounded-md text-base transition-colors",
       selecionada ? "bg-primary text-primary-foreground font-semibold" : "hover:bg-secondary",
     );
   }
 
   function renderColuna(tipo: Coluna, lista: number[], rotulo: string) {
     const foco = tipo === "hora" ? hora : minuto;
-    const escolhido = valor ? partes(valor)[tipo === "hora" ? "hora" : "minuto"] : -1;
+    // Enquanto aberto, o destaque acompanha a escolha em andamento (o rascunho).
+    const escolhido = foco;
     return (
       <div
         role="listbox"
         aria-label={rotulo}
-        className="flex max-h-56 flex-1 flex-col gap-1 overflow-y-auto pr-1"
+        className="flex max-h-64 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1"
         onKeyDown={(evento) => aoTeclar(evento, tipo)}
       >
         {lista.map((numero) => (
@@ -210,7 +214,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
         aria-label={rotuloAcessivel}
         align="center"
         collisionPadding={8}
-        className="w-[min(16rem,calc(100vw-1.5rem))] p-3"
+        className="w-[min(18rem,calc(100vw-1.5rem))] p-3"
         onOpenAutoFocus={(evento) => evento.preventDefault()}
         onCloseAutoFocus={(evento) => {
           // Sem Trigger do Radix, o foco volta ao gatilho por aqui.

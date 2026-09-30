@@ -102,6 +102,32 @@ test("registra a saída com o horário escolhido e mostra na lista", async ({ pa
   await expect(page.getByText(/09:20 · 1ª aula/).first()).toBeVisible();
 });
 
+test("tocar em uma hora atualiza o campo na hora e mantém o painel nos minutos", async ({
+  page,
+}) => {
+  await page.goto("/?visao=saidas&aba=saidas");
+  await aguardarHidratacao(page);
+  const gatilho = page.locator("#saida-horario");
+  await gatilho.click();
+  const painel = page.getByRole("dialog", { name: "Horário da saída" });
+  const horas = painel.getByRole("listbox", { name: "Horas" });
+  await horas.getByRole("option", { name: "07", exact: true }).click();
+  await expect(gatilho).toContainText(/^07:/);
+  await expect(horas.getByRole("option", { name: "07", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(painel).toBeVisible();
+  await horas.getByRole("option", { name: "19", exact: true }).click();
+  await expect(gatilho).toContainText(/^19:/);
+  await painel
+    .getByRole("listbox", { name: "Minutos" })
+    .getByRole("option", { name: "45", exact: true })
+    .click();
+  await expect(painel).toHaveCount(0);
+  await expect(gatilho).toContainText("19:45");
+});
+
 test.describe("360 px", () => {
   test.use({ viewport: { width: 360, height: 740 } });
   test("popover cabe na tela e a página não rola na horizontal", async ({ page }) => {
@@ -114,6 +140,9 @@ test.describe("360 px", () => {
     expect(caixa).not.toBeNull();
     expect((caixa?.x ?? -1) >= 0).toBe(true);
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0) <= 360).toBe(true);
+    // Área de toque confortável: cada item tem ao menos 44 px de altura.
+    const opcao = painel.getByRole("listbox", { name: "Horas" }).getByRole("option").first();
+    expect((await opcao.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     const estouro = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );
