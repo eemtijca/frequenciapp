@@ -34,6 +34,10 @@ services:
       DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
+      CRON_SECRET: ${CRON_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}

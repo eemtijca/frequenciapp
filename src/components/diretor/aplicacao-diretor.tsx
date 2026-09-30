@@ -4,7 +4,7 @@
 // No primeiro acesso, a troca da palavra-chave vem antes de qualquer dado.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, LoaderCircle, LogOut } from "lucide-react";
+import { Bell, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { pedir } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
@@ -14,6 +14,8 @@ import type { ContextoDiretor } from "@/domain/estatisticas-diretor";
 import { Button } from "@/components/ui/button";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import DialogoSenha from "@/components/conta/dialogo-senha";
+import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
+import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 
 interface Props {
@@ -24,6 +26,7 @@ interface Props {
 export default function AplicacaoDiretor({ usuario, contexto }: Props) {
   const router = useRouter();
   const [trocaAberta, setTrocaAberta] = useState(false);
+  const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
 
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
@@ -48,6 +51,18 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
           </div>
           <div className="flex items-center gap-1">
             <SeletorTema />
+            {!contexto.trocaObrigatoria ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-11"
+                aria-label="Configurar notificações"
+                title="Configurar notificações"
+                onClick={() => setNotificacoesAbertas(true)}
+              >
+                <Bell size={18} />
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               size="icon"
@@ -92,6 +107,8 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
           if (contexto.trocaObrigatoria) router.refresh();
         }}
       />
+      <DialogoNotificacoes aberto={notificacoesAbertas} onAbrir={setNotificacoesAbertas} />
+      <RegistroPwa />
     </div>
   );
 }

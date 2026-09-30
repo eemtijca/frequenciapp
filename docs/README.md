@@ -20,3 +20,5 @@
 | [ADR-026](adr/026-origem-configuravel-na-chamada.md) | Exibição de origem configurável por escola, série e turma. |
 
 - [ADR-027](adr/027-entradas-atrasadas.md): entradas independentes da chamada e envio conservador em aba própria.
+- [Notificações push](notificacoes.md): adesão por dispositivo, chaves VAPID, agenda e compatibilidade.
+- [ADR-028](adr/028-notificacoes-web-push.md): avisos voluntários aos diretores, sem dados individuais no payload.

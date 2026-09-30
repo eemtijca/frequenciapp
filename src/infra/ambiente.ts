@@ -14,6 +14,31 @@ const esquema = z.object({
       "DATABASE_URL deve ser uma connection string PostgreSQL (postgresql://usuario:senha@host:porta/banco).",
     ),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET deve ter pelo menos 32 caracteres."),
+  PUSH_VAPID_PUBLIC_KEY: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{87}$/)
+      .optional(),
+  ),
+  PUSH_VAPID_PRIVATE_KEY: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{43}$/)
+      .optional(),
+  ),
+  PUSH_VAPID_SUBJECT: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .refine(
+        (valor) => /^mailto:[^\s@]+@[^\s@]+$/.test(valor),
+        "Use mailto: com o contato da administração.",
+      )
+      .optional(),
+  ),
+  CRON_SECRET: z.preprocess(ausenteSeVazio, z.string().min(32).optional()),
   GOOGLE_CLIENT_ID: z.preprocess(ausenteSeVazio, z.string().optional()),
   GOOGLE_CLIENT_SECRET: z.preprocess(ausenteSeVazio, z.string().optional()),
   GOOGLE_REDIRECT_URI: z.preprocess(ausenteSeVazio, z.url().optional()),
@@ -63,6 +88,14 @@ const googleConfig = [
   resultado.data.GOOGLE_PICKER_API_KEY,
   resultado.data.GOOGLE_PROJECT_NUMBER,
 ];
+const pushConfig = [
+  resultado.data.PUSH_VAPID_PUBLIC_KEY,
+  resultado.data.PUSH_VAPID_PRIVATE_KEY,
+  resultado.data.PUSH_VAPID_SUBJECT,
+];
+if (pushConfig.some(Boolean) && !pushConfig.every(Boolean)) {
+  throw new Error("Configure juntas as três variáveis VAPID das notificações.");
+}
 if (googleConfig.some(Boolean) && !googleConfig.every(Boolean)) {
   throw new Error("Configure juntas as cinco variáveis Google da integração OAuth.");
 }
@@ -100,6 +133,12 @@ if (ehProducao && resultado.data.PERMITIR_ENDPOINT_LOCAL) {
 export const ambiente = {
   databaseUrl: resultado.data.DATABASE_URL,
   authSecret: resultado.data.AUTH_SECRET,
+  push: {
+    publicKey: resultado.data.PUSH_VAPID_PUBLIC_KEY,
+    privateKey: resultado.data.PUSH_VAPID_PRIVATE_KEY,
+    subject: resultado.data.PUSH_VAPID_SUBJECT,
+    cronSecret: resultado.data.CRON_SECRET,
+  },
   google: {
     clientId: resultado.data.GOOGLE_CLIENT_ID,
     clientSecret: resultado.data.GOOGLE_CLIENT_SECRET,

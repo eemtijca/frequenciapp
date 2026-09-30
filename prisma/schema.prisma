@@ -82,6 +82,7 @@ model Usuario {
   vinculosCriados          VinculoDiretor[]        @relation("VinculoCriadoPor")
   credencialDiretor        CredencialDiretor?
   parametrosAtualizados    ParametrosAcesso[]      @relation("ParametrosAtualizadosPor")
+  assinaturasPush          AssinaturaPush[]
 
   @@index([papel])
   @@map("usuarios")
@@ -89,16 +90,55 @@ model Usuario {
 
 // Sessão opaca: o token trafega em cookie HttpOnly apenas como hash.
 model Sessao {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tokenHash String   @unique @map("token_hash")
-  usuarioId String   @map("usuario_id") @db.Uuid
-  criadoEm  DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  expiraEm  DateTime @map("expira_em") @db.Timestamptz
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash       String           @unique @map("token_hash")
+  usuarioId       String           @map("usuario_id") @db.Uuid
+  criadoEm        DateTime         @default(now()) @map("criado_em") @db.Timestamptz
+  expiraEm        DateTime         @map("expira_em") @db.Timestamptz
+  usuario         Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  assinaturasPush AssinaturaPush[]
 
   @@index([usuarioId])
   @@index([expiraEm])
   @@map("sessoes")
+}
+
+// Assinatura voluntária de um dispositivo. A sessão identifica a saída
+// explícita; sua expiração não encerra a preferência de notificações.
+model AssinaturaPush {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuarioId    String        @map("usuario_id") @db.Uuid
+  sessaoId     String?       @map("sessao_id") @db.Uuid
+  endpoint     String        @unique @db.VarChar(2048)
+  p256dh       String        @db.VarChar(87)
+  auth         String        @db.VarChar(22)
+  chaveVapid   String        @map("chave_vapid") @db.VarChar(87)
+  testadoEm    DateTime?     @map("testado_em") @db.Timestamptz
+  criadoEm     DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime      @updatedAt @map("atualizado_em") @db.Timestamptz
+  usuario      Usuario       @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  sessao       Sessao?       @relation(fields: [sessaoId], references: [id], onDelete: SetNull)
+  entregas     EntregaPush[]
+
+  @@index([usuarioId])
+  @@index([sessaoId])
+  @@map("assinaturas_push")
+}
+
+// Um aviso diário por assinatura, com reserva para envios concorrentes
+// e confirmação somente depois da aceitação pelo serviço de push.
+model EntregaPush {
+  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assinaturaId String         @map("assinatura_id") @db.Uuid
+  dia          DateTime       @db.Date
+  reservadaEm  DateTime?      @map("reservada_em") @db.Timestamptz
+  enviadaEm    DateTime?      @map("enviada_em") @db.Timestamptz
+  criadoEm     DateTime       @default(now()) @map("criado_em") @db.Timestamptz
+  assinatura   AssinaturaPush @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
+
+  @@unique([assinaturaId, dia])
+  @@index([dia])
+  @@map("entregas_push")
 }
 
 // Série escolar (por exemplo, "1º ano"). Referência para as turmas.

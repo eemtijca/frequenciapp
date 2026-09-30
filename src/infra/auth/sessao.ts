@@ -97,6 +97,11 @@ export async function encerrarSessao(segredo: string, cookiesSeguros: boolean): 
   if (valor) {
     const token = conferirValor(valor, segredo);
     if (token) {
+      const atual = await banco().sessao.findUnique({
+        where: { tokenHash: hashDoToken(token) },
+        select: { id: true },
+      });
+      if (atual) await banco().assinaturaPush.deleteMany({ where: { sessaoId: atual.id } });
       await banco()
         .sessao.delete({ where: { tokenHash: hashDoToken(token) } })
         .catch(() => undefined);
@@ -123,6 +128,9 @@ export async function encerrarOutrasSessoes(segredo: string, usuarioId: string):
   });
   const remover = ativas.filter((sessao) => sessao.tokenHash !== hashAtual);
   if (remover.length > 0) {
+    await banco().assinaturaPush.deleteMany({
+      where: { sessaoId: { in: remover.map((s) => s.id) } },
+    });
     await banco().sessao.deleteMany({ where: { id: { in: remover.map((s) => s.id) } } });
   }
 }

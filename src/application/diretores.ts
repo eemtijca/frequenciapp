@@ -279,6 +279,7 @@ export async function atualizarDiretor(
       },
     });
     if (dados.data.ativo === false) {
+      await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
       await tx.sessao.deleteMany({ where: { usuarioId: id } });
     }
     if (turmaIds || dados.data.inicioVinculo !== undefined) {
@@ -371,6 +372,7 @@ export async function emitirPalavraChave(
       update: credencial,
       create: { usuarioId: id, ...credencial },
     });
+    await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
     await tx.sessao.deleteMany({ where: { usuarioId: id } });
     await auditar(tx, admin.id, "diretor.emitirPalavraChave", alvo.email);
   });
@@ -402,6 +404,7 @@ export async function revogarPalavraChave(
       where: { usuarioId: id },
       data: { revogadaEm: new Date(), motivoRevogacao: dados.data.motivo },
     });
+    await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
     await tx.sessao.deleteMany({ where: { usuarioId: id } });
     await auditar(tx, admin.id, "diretor.revogarPalavraChave", alvo.email);
   });
