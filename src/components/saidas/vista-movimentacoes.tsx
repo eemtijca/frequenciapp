@@ -37,6 +37,8 @@ export default function VistaMovimentacoes({ podePrepararPlanilha, ...props }: P
           fuso={props.fuso}
           turmas={props.turmas}
           alunos={props.alunos}
+          liberadores={props.liberadores}
+          catalogoJustificativas={props.catalogoJustificativas}
           podePrepararPlanilha={podePrepararPlanilha}
         />
       )}

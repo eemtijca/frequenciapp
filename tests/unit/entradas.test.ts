@@ -62,6 +62,22 @@ describe("entradas atrasadas", () => {
     expect(plano.assinatura).toBe(assinarAba("Entradas", [...CABECALHO_ENTRADAS, ""], []));
     expect(linhas[2]?.[7]).toBe("Anotação manual");
   });
+  it("envia o momento e o responsável escolhido, mantendo compatibilidade com registros antigos", () => {
+    const plano = planejarEntradas(
+      [{ ...entrada, momento: "aula_2", responsavelRegistroNome: "QA Responsável" }],
+      leitura(),
+      [],
+    );
+    expect(plano.criar[0]?.celulas[3]?.valor).toBe("08:15 · 2ª aula");
+    expect(plano.criar[0]?.celulas[5]?.valor).toBe("QA Responsável");
+    const antigo = planejarEntradas(
+      [{ ...entrada, momento: null, responsavelRegistroNome: null }],
+      leitura(),
+      [],
+    );
+    expect(antigo.criar[0]?.celulas[3]?.valor).toBe("08:15");
+    expect(antigo.criar[0]?.celulas[5]?.valor).toBe("QA Coordenação");
+  });
   it("preserva fórmula que exibe célula vazia na última linha", () => {
     const plano = planejarEntradas(
       [entrada],

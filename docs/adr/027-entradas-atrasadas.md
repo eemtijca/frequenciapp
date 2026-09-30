@@ -14,6 +14,8 @@ A navegação passa a Saídas e entradas, com dois seletores e formulários inde
 
 A cópia JSON recebe o campo opcional entradas, com importação por mesclagem sem sobrescrever; versões antigas continuam aceitas. A turma registrada não acompanha transferências posteriores.
 
+Na evolução da issue #56, o formulário segue o padrão de saídas e usa calendário brasileiro, momento de aula/pausa, justificativa por tipo ou texto e responsável selecionado no catálogo de Quem libera. Momento e código/nome do responsável são anuláveis nos históricos. Novos registros exigem esses campos. A autoria autenticada permanece independente; nome do responsável e motivo do catálogo são guardados como retrato, sem acompanhar renomeações.
+
 O envio usa a conexão OAuth já configurada para saídas, exclusivamente pela Sheets API, em aba reservada Entradas. A administração confirma sua criação; aba existente é preservada. Prévia obrigatória e releitura antes da escrita invalidam plano após alteração de dados ou troca de arquivo. Cada linha tem código estável por aluno e data. Escrita apenas acrescenta linhas após todo o conteúdo, sem modo completo, limpeza ou remoção. Divergências existentes são relatadas para correção manual. Falha sem confirmação é auditada e nunca provoca retentativa automática.
 
 ## Alternativas
