@@ -243,6 +243,8 @@ model SaidaAntecipada {
   alunoId           String   @map("aluno_id") @db.Uuid
   dia               DateTime @db.Date
   momento           String   @db.VarChar(20)
+  // HH:MM em que o aluno saiu; anulável para registros anteriores ao campo.
+  horario           String?  @db.VarChar(5)
   justificativa     String?  @db.VarChar(10)
   observacao        String?  @db.VarChar(200)
   texto             String?  @db.VarChar(100)

@@ -65,6 +65,7 @@ interface Props {
   fuso: string;
   visaoInicial?: string;
   abaGestaoInicial?: "configuracoes";
+  abaMovimentacaoInicial?: "saidas" | "entradas";
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
   alunosIniciais: Aluno[];
@@ -186,6 +187,7 @@ export default function Aplicacao({
   fuso,
   visaoInicial,
   abaGestaoInicial,
+  abaMovimentacaoInicial,
   seriesIniciais,
   turmasIniciais,
   alunosIniciais,
@@ -493,6 +495,7 @@ export default function Aplicacao({
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaMovimentacoes
+            abaInicial={abaMovimentacaoInicial}
             podePrepararPlanilha={ehAdmin}
             diaCorrente={diaCorrente}
             fuso={fuso}

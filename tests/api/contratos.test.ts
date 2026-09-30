@@ -1005,6 +1005,7 @@ describe("saídas antecipadas", () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_4,
         momento: "aula_2",
@@ -1019,11 +1020,13 @@ describe("saídas antecipadas", () => {
         id: string;
         alunoId: string;
         momento: string;
+        horario: string | null;
         liberadoPorCodigo: string | null;
         liberadoPorNome: string | null;
       };
     };
     expect(dados.saida.momento).toBe("aula_2");
+    expect(dados.saida.horario).toBe("08:30");
     expect(dados.saida.liberadoPorCodigo).toBe("QADIR");
     expect(dados.saida.liberadoPorNome).toBe("QA Diretor");
     saidaQA = { id: dados.saida.id, alunoId: dados.saida.alunoId, momento: dados.saida.momento };
@@ -1033,6 +1036,7 @@ describe("saídas antecipadas", () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_4,
         momento: "aula_3",
@@ -1045,10 +1049,28 @@ describe("saídas antecipadas", () => {
     expect(dados.error).toContain("já tem uma saída");
   });
 
+  it("exige um horário válido na saída", async () => {
+    for (const horario of [undefined, "", "8:30", "24:00", "08:60", "meio-dia"]) {
+      const resposta = await autenticado(cookieCoord, "/api/saidas", {
+        method: "POST",
+        body: JSON.stringify({
+          ...(horario === undefined ? {} : { horario }),
+          alunoId: alunoQA?.id,
+          dia: DIA_TESTE_5,
+          momento: "aula_1",
+          justificativa: "D",
+          liberadoPorCodigo: "QACOR2",
+        }),
+      });
+      expect(resposta.status).toBe(400);
+    }
+  });
+
   it("recusa momento, justificativa e dia futuro inválidos", async () => {
     const momento = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "madrugada",
@@ -1060,6 +1082,7 @@ describe("saídas antecipadas", () => {
     const justificativa = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "aula_1",
@@ -1071,6 +1094,7 @@ describe("saídas antecipadas", () => {
     const futuro = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: "2099-06-15",
         momento: "aula_1",
@@ -1110,6 +1134,7 @@ describe("saídas antecipadas", () => {
     const foraDeAula = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "intervalo_1",
@@ -1123,6 +1148,7 @@ describe("saídas antecipadas", () => {
     const longo = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "aula_1",
@@ -1137,6 +1163,7 @@ describe("saídas antecipadas", () => {
     const observacao = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "aula_1",
@@ -1152,6 +1179,7 @@ describe("saídas antecipadas", () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "aula_1",
@@ -1180,6 +1208,7 @@ describe("saídas antecipadas", () => {
     const semTexto = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_4,
         momento: "aula_3",
@@ -1207,6 +1236,7 @@ describe("saídas antecipadas", () => {
     const escrita = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE,
         momento: "intervalo_1",
@@ -1231,6 +1261,7 @@ describe("saídas antecipadas", () => {
     const semMotivo = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE,
         momento: "aula_1",
@@ -1242,6 +1273,7 @@ describe("saídas antecipadas", () => {
     const foraDaLista = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE,
         momento: "aula_1",
@@ -1526,6 +1558,7 @@ describe("catálogo de justificativas", () => {
     const saida = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_5,
         momento: "aula_1",
@@ -1656,6 +1689,7 @@ describe("catálogo de quem libera as saídas", () => {
     const saida = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoQA?.id,
         dia: DIA_TESTE_2,
         momento: "aula_1",

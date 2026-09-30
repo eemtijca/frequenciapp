@@ -1,7 +1,12 @@
 // Entradas atrasadas na interface, persistência e prévia com Sheets API falsa.
 import { test, expect, type Page } from "@playwright/test";
 import { criarMassaE2E, criarLiberadoresE2E, limparMassaE2E } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import {
+  abrirAbaMovimentacao,
+  aguardarHidratacao,
+  escolherHorario,
+  trocarVisao,
+} from "./helpers/pagina";
 // O worker encaminha fetch fora do page.route; a suíte PWA o testa separadamente.
 test.use({ serviceWorkers: "block", locale: "en-US" });
 test.beforeAll(async () => {
@@ -31,7 +36,7 @@ test("data brasileira e navegação diária seguem a saída mesmo com navegador 
   const dataSaida = (await page.locator("#dia-saidas").textContent())?.match(
     /\d{2}\/\d{2}\/\d{4}/,
   )?.[0];
-  await page.getByRole("button", { name: "Entradas", exact: true }).click();
+  await abrirAbaMovimentacao(page, "Entradas");
   expect(dataSaida).toBeTruthy();
   await expect(page.locator("#entrada-dia")).toContainText(dataSaida ?? "");
   await expect(page.locator('input[type="date"]')).toHaveCount(0);
@@ -48,13 +53,13 @@ test("registra chegada, preserva após recarregar e remove para correção", asy
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Saídas e entradas", "saidas");
-  await page.getByRole("button", { name: "Entradas", exact: true }).click();
+  await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await page.locator("#entrada-turma").click();
   await page.getByRole("option", { name: "E2E Ano A" }).click();
   await page.locator("#entrada-aluno").click();
   await page.getByRole("option", { name: /E2E Aluno Um/ }).click();
-  await page.locator("#entrada-horario").fill("08:15");
+  await escolherHorario(page, "#entrada-horario", "08:15");
   await page.getByLabel("Momento da entrada", { exact: true }).click();
   await page.getByRole("option", { name: "2ª aula", exact: true }).click();
   await page.getByRole("radio", { name: "Escrever em poucas palavras" }).click();
@@ -73,7 +78,7 @@ test("registra chegada, preserva após recarregar e remove para correção", asy
   await page.reload();
   await aguardarHidratacao(page);
   await trocarVisao(page, "Saídas e entradas", "saidas");
-  await page.getByRole("button", { name: "Entradas", exact: true }).click();
+  await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await expect(
     page.getByRole("region", { name: "Entradas registradas" }).getByText("Transporte atrasou"),
@@ -89,7 +94,7 @@ test("registra justificativa do catálogo com observação e responsável escolh
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Saídas e entradas", "saidas");
-  await page.getByRole("button", { name: "Entradas", exact: true }).click();
+  await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await page.locator("#entrada-aluno").click();
   await page.getByRole("option", { name: /E2E Aluno Dois/ }).click();
@@ -163,7 +168,7 @@ test("revê a aba e o envio em confirmação própria", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Saídas e entradas", "saidas");
-  await page.getByRole("button", { name: "Entradas", exact: true }).click();
+  await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await page.getByRole("button", { name: "Preparar aba Entradas" }).click();
   expect(preparou).toBe(0);

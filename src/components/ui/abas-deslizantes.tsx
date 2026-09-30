@@ -20,6 +20,8 @@ interface Props<T extends string> {
   abas: AbaItem<T>[];
   chaveIndicador: string;
   dataPager: string;
+  /** Avisa a troca de aba (por exemplo, para refletir a aba na URL). */
+  aoTrocar?: (aba: T) => void;
   children: (aba: T, ativa: boolean) => React.ReactNode;
 }
 
@@ -29,6 +31,7 @@ export default function AbasDeslizantes<T extends string>({
   abas,
   chaveIndicador,
   dataPager,
+  aoTrocar,
   children,
 }: Props<T>) {
   const [aba, setAba] = useState<T>(abaInicial);
@@ -54,6 +57,7 @@ export default function AbasDeslizantes<T extends string>({
       if (indice < 0) return;
       const indiceAtual = abas.findIndex((item) => item.valor === aba);
       setAba(proxima);
+      aoTrocar?.(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
       if (ehDesktop && !semMovimento && indice !== indiceAtual) {
         controles.set({ x: (indice > indiceAtual ? 1 : -1) * 24, opacity: 0.65 });
@@ -65,7 +69,7 @@ export default function AbasDeslizantes<T extends string>({
       }
       if (focar) abasRef.current[indice]?.focus();
     },
-    [aba, abas, controles, ehDesktop, semMovimento],
+    [aba, abas, aoTrocar, controles, ehDesktop, semMovimento],
   );
 
   function aoTeclar(evento: React.KeyboardEvent) {

@@ -15,7 +15,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
 | `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
-| `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, justificativa, responsável e autoria.                |
+| `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.       |
 | `configuracoes`               | Linha única com os recursos ligados: chamada por aula, saída antecipada e origem na Chamada.     |
 | `configuracoes_origem_series` | Séries completas selecionadas para exibir a origem na Chamada.                                   |
 | `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                 |
@@ -138,3 +138,5 @@ pg_restore --clean --if-exists -d "$DIRECT_URL" frequenciapp.dump
 ```
 
 O teste de restauração recomendado é restaurar em um banco vazio e conferir contagens de `alunos` e `frequencias`. A rotina completa está em [operacao.md](operacao.md).
+
+A migração `saida_horario` acrescenta `saidas_antecipadas.horario` (`VARCHAR(5)`, `HH:MM`) como coluna anulável. Saídas anteriores ficam sem horário; novas saídas exigem um horário válido. Cópias JSON antigas continuam aceitas sem o campo.

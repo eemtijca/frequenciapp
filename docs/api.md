@@ -340,16 +340,16 @@ Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma 
 - 200 `{"saidas": Saida[]}` em ordem de dia e registro.
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
-Saida: `{ id, alunoId, dia, momento, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
+Saida: `{ id, alunoId, dia, momento, horario, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
 
 ### POST /api/saidas
 
-Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": "HH:MM", "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
 
 A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
 - 201 `{"saida": Saida}`.
-- 400 para momento inválido, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
+- 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
 - 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
 
 ### DELETE /api/saidas/{id}

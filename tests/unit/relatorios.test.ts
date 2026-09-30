@@ -65,6 +65,7 @@ function saida(parcial: Partial<SaidaAntecipada> = {}): SaidaAntecipada {
     alunoId: parcial.alunoId ?? "aluno-a",
     dia: parcial.dia ?? "2026-09-10",
     momento: parcial.momento ?? "aula_2",
+    horario: parcial.horario ?? null,
     justificativa: parcial.justificativa ?? "D",
     observacao: parcial.observacao ?? null,
     texto: parcial.texto ?? null,

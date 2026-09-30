@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { SeletorHorario } from "@/components/ui/seletor-horario";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -280,14 +281,13 @@ export default function VistaEntradas({
         </div>
         <div className="flex flex-col gap-1.5 sm:max-w-xs">
           <Label htmlFor="entrada-horario">Horário da chegada</Label>
-          <Input
+          <SeletorHorario
             id="entrada-horario"
-            type="time"
-            required
-            value={horario}
+            valor={horario}
+            onValor={setHorario}
+            rotuloAcessivel="Horário da chegada"
+            agora={horaNoFuso(new Date().toISOString(), fuso)}
             disabled={executando}
-            onChange={(e) => setHorario(e.target.value)}
-            className="h-11"
           />
         </div>
         <fieldset className="flex flex-col gap-2">

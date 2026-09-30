@@ -261,6 +261,7 @@ export interface SaidaAntecipada {
   alunoId: string;
   dia: string;
   momento: string;
+  horario: string | null;
   /** Código do catálogo. Nulo quando a justificativa foi escrita em poucas palavras. */
   justificativa: string | null;
   observacao: string | null;

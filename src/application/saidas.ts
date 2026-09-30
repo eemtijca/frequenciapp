@@ -15,6 +15,7 @@ import {
   LIMITE_TEXTO_SAIDA,
   type SaidaAntecipada,
 } from "@/domain/frequencia";
+import { ehHorarioEntrada } from "@/domain/entradas";
 import type { Identidade } from "@/domain/usuarios";
 
 export const esquemaCriarSaida = z.object({
@@ -25,6 +26,7 @@ export const esquemaCriarSaida = z.object({
     .trim()
     .max(20, "Momento da saída inválido.")
     .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+  horario: z.string().refine(ehHorarioEntrada, "Horário inválido. Informe hora e minuto."),
   justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
   texto: z
     .string()
@@ -62,6 +64,7 @@ interface LinhaSaida {
   alunoId: string;
   dia: Date;
   momento: string;
+  horario: string | null;
   justificativa: string | null;
   observacao: string | null;
   texto: string | null;
@@ -80,6 +83,7 @@ function paraSaida(
     alunoId: linha.alunoId,
     dia: linha.dia.toISOString().slice(0, 10),
     momento: linha.momento,
+    horario: linha.horario,
     justificativa: linha.justificativa,
     observacao: linha.observacao,
     texto: linha.texto,
@@ -128,7 +132,7 @@ export async function criarSaida(
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  const { alunoId, dia, momento } = dados.data;
+  const { alunoId, dia, momento, horario } = dados.data;
   const campos = camposJustificativaSaida(momento, dados.data);
   if (!campos.ok) throw new ErroHttp(campos.mensagem, 400);
   if (dia > diaLocal(new Date(), ambiente.fuso)) {
@@ -171,6 +175,7 @@ export async function criarSaida(
           alunoId,
           dia: new Date(`${dia}T12:00:00Z`),
           momento,
+          horario,
           justificativa: campos.campos.justificativa,
           observacao: campos.campos.observacao,
           texto: campos.campos.texto,
