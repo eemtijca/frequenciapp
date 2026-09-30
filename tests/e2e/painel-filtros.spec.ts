@@ -2,6 +2,7 @@
 // escolhida mostra só as próprias turmas e Desistentes tem gráfico à parte.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
+import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
@@ -14,8 +15,12 @@ async function limparMassa(): Promise<void> {
   });
 }
 
+let origemOriginal: ConfiguracaoOrigem | null = null;
+
 test.beforeAll(async () => {
   await limparMassa();
+  origemOriginal = await lerOrigem();
+  const serieUm: string[] = [];
   await comBanco(async (cliente) => {
     for (const [indice, nome] of ["E2E Painel Um", "E2E Painel Dois"].entries()) {
       const serie = await cliente.query<{ id: string }>(
@@ -30,22 +35,28 @@ test.beforeAll(async () => {
         "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ($1, $2, $2, 1, true, $3)",
         [`E2E Painel Aluno ${indice + 1}`, turma.rows[0]?.id, indice === 0 ? "2020-01-01" : null],
       );
-      if (indice === 0) {
-        // Aluno remanejado: chama na turma B e é da turma A de origem.
-        const turmaB = await cliente.query<{ id: string }>(
-          "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
-          [serie.rows[0]?.id],
-        );
-        await cliente.query(
-          "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Painel Aluno 3', $1, $2, 1, true)",
-          [turmaB.rows[0]?.id, turma.rows[0]?.id],
-        );
-      }
+      // Aluno remanejado nas duas séries: chama na turma B e é da turma A de origem.
+      const turmaB = await cliente.query<{ id: string }>(
+        "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
+        [serie.rows[0]?.id],
+      );
+      await cliente.query(
+        "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ($1, $2, $3, 1, true)",
+        [`E2E Painel Remanejado ${indice + 1}`, turmaB.rows[0]?.id, turma.rows[0]?.id],
+      );
+      if (indice === 0 && serie.rows[0]) serieUm.push(serie.rows[0].id);
     }
+  });
+  // Só a série "Um" está indicada em Origem na Chamada; a "Dois" tem dado divergente e não pode mostrar.
+  await definirOrigem({
+    origemNaChamada: true,
+    origemNaChamadaSerieIds: serieUm,
+    origemNaChamadaTurmaIds: [],
   });
 });
 
 test.afterAll(async () => {
+  if (origemOriginal) await definirOrigem(origemOriginal);
   await limparMassa();
 });
 

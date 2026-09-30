@@ -24,3 +24,7 @@ Inferir a seleção pelo nome da série manteria uma regra específica da escola
 ## Consequências
 
 A escola pode alterar a exibição sem implantação de código. Selecionar uma série abrange novas turmas automaticamente; selecionar uma turma limita a indicação àquela turma. A cópia JSON exporta a chave e as seleções, mantendo a compatibilidade de leitura com cópias anteriores.
+
+## Adendo: o Painel usa a mesma configuração
+
+O gráfico de infrequência por turma original no Painel segue a mesma seleção de séries e turmas da Chamada (`origemNaChamada` ligada e a série, ou uma de suas turmas, selecionada). Séries fora da seleção mostram um gráfico só, por turma atual, que já é a original. O Painel não infere mais a exibição por dado de aluno remanejado. Desligar a configuração também esconde esse gráfico.

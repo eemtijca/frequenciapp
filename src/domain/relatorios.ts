@@ -219,13 +219,6 @@ function alunosAtivosDaSerie(serie: Serie, turmas: Turma[], alunos: Aluno[]): Al
   return alunos.filter((aluno) => aluno.ativo && idsDasTurmas.has(aluno.turmaId));
 }
 
-/** A série tem aluno cuja turma original difere da turma atual (turma reorganizada). */
-export function serieTemRemanejamento(serie: Serie, turmas: Turma[], alunos: Aluno[]): boolean {
-  return alunosAtivosDaSerie(serie, turmas, alunos).some(
-    (aluno) => aluno.turmaOriginalId !== aluno.turmaId,
-  );
-}
-
 /**
  * Faltas do dia de uma série agrupadas pela turma original do aluno, a mesma
  * consolidação da Grade e da planilha. Usa os mesmos alunos e marcas de

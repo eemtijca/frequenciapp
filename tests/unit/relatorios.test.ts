@@ -6,7 +6,6 @@ import {
   desistenciasNoDia,
   distribuicaoDoDia,
   distribuicaoPorOrigem,
-  serieTemRemanejamento,
   indexarPorDia,
   marcasDoDia,
   relatorioSaidas,
@@ -256,11 +255,5 @@ describe("distribuicaoPorOrigem", () => {
     const total = (lista: { faltas: number; justificadas: number }[]) =>
       lista.reduce((soma, item) => soma + item.faltas + item.justificadas, 0);
     expect(total(porOrigem)).toBe(total(porAtual?.turmas ?? []));
-  });
-
-  it("detecta remanejamento só quando a origem difere da turma atual", () => {
-    expect(serieTemRemanejamento(series[0] as Serie, turmas, alunos)).toBe(true);
-    const semRemanejamento = [aluno({ id: "x" }), aluno({ id: "y" })];
-    expect(serieTemRemanejamento(series[0] as Serie, turmas, semRemanejamento)).toBe(false);
   });
 });
