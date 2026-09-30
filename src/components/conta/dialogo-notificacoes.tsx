@@ -68,6 +68,8 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
       "Notification" in window;
     setSuportado(suporta);
     setCarregando(true);
+    setEstado(null);
+    setAssinatura(null);
     setErro("");
     async function carregar() {
       try {
@@ -161,8 +163,11 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
       setErro(
         excecao instanceof Error ? excecao.message : "Não foi possível alterar as notificações.",
       );
-      if (excecao instanceof ErroApi && excecao.status === 410)
+      if (excecao instanceof ErroApi && excecao.status === 410) {
+        await assinatura?.unsubscribe().catch(() => false);
+        setAssinatura(null);
         setEstado((atual) => (atual ? { ...atual, ativa: false } : atual));
+      }
       avisarErro(excecao, { contexto: "Não foi possível concluir a ação de notificações." });
     }
   });

@@ -3,6 +3,7 @@
 import { createECDH, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import pg from "pg";
+import { diaLocal, diaSeguinte } from "@/domain/frequencia";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SENHA = "PalavraPushTeste2026";
@@ -230,6 +231,115 @@ describe("assinaturas push", () => {
       (await chamar("/api/conta/senha", nova, "POST", { senhaAtual: palavra, senhaNova: SENHA }))
         .status,
     ).toBe(200);
+  });
+  it("a agenda respeita origem, conta, credencial, vínculo e alunos vigentes", async () => {
+    const dados = assinatura("escopo");
+    expect((await chamar("/api/notificacoes/assinatura", principal, "POST", dados)).status).toBe(
+      200,
+    );
+    const dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+    const serie = await cliente.query<{ id: string }>(
+      "insert into series (nome, ordem) values ('QP Push Ano', 98) returning id",
+    );
+    const serieId = serie.rows[0]?.id;
+    try {
+      const turmas = await cliente.query<{ id: string }>(
+        "insert into turmas (serie_id, nome) values ($1, 'Origem'), ($1, 'Atual') returning id",
+        [serieId],
+      );
+      const origemId = turmas.rows[0]?.id;
+      const atualId = turmas.rows[1]?.id;
+      const aluno = await cliente.query<{ id: string }>(
+        `insert into alunos (nome, ordem, turma_id, turma_original_id)
+         values ('QP Push Aluno', 1, $1, $2) returning id`,
+        [atualId, origemId],
+      );
+      const alunoId = aluno.rows[0]?.id;
+      const frequencia = await cliente.query<{ id: string }>(
+        "insert into frequencias (turma_id, dia, atualizado_em) values ($1, $2, now()) returning id",
+        [atualId, dia],
+      );
+      const frequenciaId = frequencia.rows[0]?.id;
+      await cliente.query("insert into alunos_chamada (frequencia_id, aluno_id) values ($1, $2)", [
+        frequenciaId,
+        alunoId,
+      ]);
+      await cliente.query(
+        "insert into vinculos_diretor (usuario_id, turma_id, inicio) values ($1, $2, $3)",
+        [ids[0], origemId, diaSeguinte(dia, -2)],
+      );
+      // Confirma a seleção positiva sem enviar a um serviço externo.
+      await cliente.query(
+        `insert into entregas_push (assinatura_id, dia, enviada_em)
+         select id, $2, now() from assinaturas_push where endpoint = $1`,
+        [dados.endpoint, dia],
+      );
+      async function consultarAgenda() {
+        const resposta = await chamar("/api/notificacoes/resumo", "", "GET", undefined, {
+          Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        });
+        expect(resposta.status).toBe(200);
+        return resposta.json();
+      }
+      expect(await consultarAgenda()).toMatchObject({ enviadas: 0, falhas: 0, ignoradas: 1 });
+      const cenarios: [string, unknown[]][] = [
+        ["update usuarios set ativo = false where id = $1", [ids[0]]],
+        ["update credenciais_diretor set revogada_em = now() where usuario_id = $1", [ids[0]]],
+        [
+          "update credenciais_diretor set emitida_em = now() - interval '2 days', expira_em = now() - interval '1 minute' where usuario_id = $1",
+          [ids[0]],
+        ],
+        ["update credenciais_diretor set troca_obrigatoria = true where usuario_id = $1", [ids[0]]],
+        [
+          "update vinculos_diretor set fim = $2 where usuario_id = $1",
+          [ids[0], diaSeguinte(dia, -1)],
+        ],
+        [
+          "update vinculos_diretor set inicio = $2 where usuario_id = $1",
+          [ids[0], diaSeguinte(dia, 1)],
+        ],
+        ["update alunos set ativo = false where id = $1", [alunoId]],
+        ["update alunos set desistente_em = $2 where id = $1", [alunoId, dia]],
+        ["update alunos set turma_original_id = $2 where id = $1", [alunoId, atualId]],
+        ["update frequencias set dia = $2 where id = $1", [frequenciaId, diaSeguinte(dia, -1)]],
+      ];
+      for (const [sql, valores] of cenarios) {
+        await cliente.query(sql, valores);
+        expect(await consultarAgenda(), sql).toMatchObject({
+          enviadas: 0,
+          falhas: 0,
+          ignoradas: 0,
+        });
+        await cliente.query("update usuarios set ativo = true where id = $1", [ids[0]]);
+        await cliente.query(
+          `update credenciais_diretor set revogada_em = null, troca_obrigatoria = false,
+           expira_em = now() + interval '1 day' where usuario_id = $1`,
+          [ids[0]],
+        );
+        await cliente.query(
+          "update vinculos_diretor set inicio = $2, fim = null where usuario_id = $1",
+          [ids[0], diaSeguinte(dia, -2)],
+        );
+        await cliente.query(
+          "update alunos set ativo = true, desistente_em = null, turma_original_id = $2 where id = $1",
+          [alunoId, origemId],
+        );
+        await cliente.query("update frequencias set dia = $2 where id = $1", [frequenciaId, dia]);
+      }
+    } finally {
+      await cliente.query("update usuarios set ativo = true where id = $1", [ids[0]]);
+      await cliente.query(
+        `update credenciais_diretor set revogada_em = null, troca_obrigatoria = false,
+         expira_em = now() + interval '1 day' where usuario_id = $1`,
+        [ids[0]],
+      );
+      await cliente.query("delete from vinculos_diretor where usuario_id = $1", [ids[0]]);
+      const turmas = "select id from turmas where serie_id = $1";
+      await cliente.query(`delete from frequencias where turma_id in (${turmas})`, [serieId]);
+      await cliente.query(`delete from alunos where turma_id in (${turmas})`, [serieId]);
+      await cliente.query("delete from turmas where serie_id = $1", [serieId]);
+      await cliente.query("delete from series where id = $1", [serieId]);
+    }
   });
   it("recusa agenda sem segredo e não envia a diretores sem turma acompanhada", async () => {
     expect((await chamar("/api/notificacoes/resumo", admin)).status).toBe(403);

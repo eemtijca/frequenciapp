@@ -81,6 +81,29 @@ describe("transporte de push", () => {
       }),
     );
   });
+  it("prepara uma requisição cifrada e assinada com chaves reais, sem rede", async () => {
+    const par = createECDH("prime256v1");
+    par.generateKeys();
+    const dispositivo = {
+      endpoint: assinatura.endpoint,
+      keys: {
+        p256dh: par.getPublicKey().toString("base64url"),
+        auth: randomBytes(16).toString("base64url"),
+      },
+    };
+    vi.spyOn(webpush, "sendNotification").mockImplementation(async (alvo, conteudo, opcoes) => {
+      if (conteudo === undefined || conteudo === null)
+        throw new Error("O aviso precisa ter conteúdo.");
+      const requisicao = webpush.generateRequestDetails(alvo, conteudo, opcoes);
+      expect(requisicao.headers["Content-Encoding"]).toBe("aes128gcm");
+      expect(requisicao.headers.Authorization).toMatch(/^vapid t=.+, k=.+$/);
+      expect(Buffer.isBuffer(requisicao.body)).toBe(true);
+      expect(requisicao.body?.toString()).not.toContain(MENSAGEM_TESTE.corpo);
+      return { statusCode: 201, headers: {}, body: "" };
+    });
+    const { enviarPush } = await import("@/infra/web-push");
+    expect(await enviarPush(dispositivo, MENSAGEM_TESTE)).toBe("enviada");
+  });
   it("descarta 404 e 410, mas permite repetir uma falha temporária", async () => {
     const enviar = vi.spyOn(webpush, "sendNotification");
     const { enviarPush } = await import("@/infra/web-push");

@@ -3,7 +3,6 @@
 // Toda escrita é auditada na mesma transação (ADR-021).
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import { pushConfigurado } from "@/infra/web-push";
 import { banco } from "@/infra/banco";
 import { hashearSenha } from "@/infra/auth/hash";
 import { gerarPalavraChave } from "@/infra/auth/palavra-chave";
@@ -280,7 +279,7 @@ export async function atualizarDiretor(
       },
     });
     if (dados.data.ativo === false) {
-      if (pushConfigurado()) await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
+      await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
       await tx.sessao.deleteMany({ where: { usuarioId: id } });
     }
     if (turmaIds || dados.data.inicioVinculo !== undefined) {
@@ -373,7 +372,7 @@ export async function emitirPalavraChave(
       update: credencial,
       create: { usuarioId: id, ...credencial },
     });
-    if (pushConfigurado()) await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
+    await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
     await tx.sessao.deleteMany({ where: { usuarioId: id } });
     await auditar(tx, admin.id, "diretor.emitirPalavraChave", alvo.email);
   });
@@ -405,7 +404,7 @@ export async function revogarPalavraChave(
       where: { usuarioId: id },
       data: { revogadaEm: new Date(), motivoRevogacao: dados.data.motivo },
     });
-    if (pushConfigurado()) await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
+    await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
     await tx.sessao.deleteMany({ where: { usuarioId: id } });
     await auditar(tx, admin.id, "diretor.revogarPalavraChave", alvo.email);
   });

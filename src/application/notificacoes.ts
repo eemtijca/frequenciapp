@@ -1,6 +1,7 @@
 // Assinaturas voluntárias por dispositivo e avisos diários aos diretores,
 // com escopo vigente no envio, reserva concorrente e limpeza de expiradas.
 import { ECDH } from "node:crypto";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -190,10 +191,17 @@ export async function enviarResumosDiarios() {
   for (let inicio = 0; inicio < assinaturas.length; inicio += 10) {
     await Promise.all(
       assinaturas.slice(inicio, inicio + 10).map(async ({ id }) => {
-        await banco().entregaPush.createMany({
-          data: [{ assinaturaId: id, dia: data }],
-          skipDuplicates: true,
-        });
+        try {
+          await banco().entregaPush.createMany({
+            data: [{ assinaturaId: id, dia: data }],
+            skipDuplicates: true,
+          });
+        } catch (erro) {
+          // A assinatura pode ser cancelada entre a seleção e a reserva.
+          if (!(erro instanceof PrismaClientKnownRequestError) || erro.code !== "P2003") throw erro;
+          totais.ignoradas += 1;
+          return;
+        }
         const entrega = await banco().entregaPush.findUnique({
           where: { assinaturaId_dia: { assinaturaId: id, dia: data } },
         });
@@ -218,7 +226,19 @@ export async function enviarResumosDiarios() {
           return;
         }
         // Reconfere conta e vínculo depois da reserva, inclusive em envios concorrentes.
-        const assinatura = await banco().assinaturaPush.findFirst({ where: { id, ...elegivel } });
+        const assinatura = await banco().assinaturaPush.findFirst({
+          where: {
+            id,
+            ...elegivel,
+            usuario: {
+              ...elegivel.usuario,
+              credencialDiretor: {
+                ...elegivel.usuario.credencialDiretor,
+                expiraEm: { gt: new Date() },
+              },
+            },
+          },
+        });
         if (!assinatura) {
           await banco().entregaPush.updateMany({
             where: { id: entrega.id, reservadaEm },

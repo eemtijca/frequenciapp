@@ -1,13 +1,18 @@
 // Aviso diário: reserva concorrente, confirmação por dia, repetição de
 // falhas e retirada de assinaturas expiradas, sem banco ou rede externos.
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 interface Entrega {
   id: string;
   reservadaEm: Date | null;
   enviadaEm: Date | null;
 }
-const estado = vi.hoisted(() => ({ entrega: null as Entrega | null, ativa: true }));
+const estado = vi.hoisted(() => ({
+  entrega: null as Entrega | null,
+  ativa: true,
+  canceladaNaReserva: false,
+}));
 const assinatura = {
   id: "assinatura-sintetica",
   endpoint: "https://fcm.googleapis.com/fcm/send/sintetico",
@@ -37,6 +42,11 @@ vi.mock("@/infra/banco", () => ({
     },
     entregaPush: {
       createMany: async () => {
+        if (estado.canceladaNaReserva)
+          throw new PrismaClientKnownRequestError("Assinatura cancelada", {
+            code: "P2003",
+            clientVersion: "teste",
+          });
         estado.entrega ??= { id: "entrega-sintetica", reservadaEm: null, enviadaEm: null };
         return { count: 1 };
       },
@@ -70,6 +80,7 @@ import { enviarPush } from "@/infra/web-push";
 beforeEach(() => {
   estado.entrega = null;
   estado.ativa = true;
+  estado.canceladaNaReserva = false;
   vi.mocked(enviarPush).mockReset();
 });
 
@@ -99,6 +110,11 @@ describe("entregas diárias de push", () => {
     expect((await enviarResumosDiarios()).expiradas).toBe(1);
     expect(estado.ativa).toBe(false);
     expect(estado.entrega).toBeNull();
+  });
+  it("ignora o cancelamento entre a seleção e a criação da reserva", async () => {
+    estado.canceladaNaReserva = true;
+    expect((await enviarResumosDiarios()).ignoradas).toBe(1);
+    expect(enviarPush).not.toHaveBeenCalled();
   });
   it("não envia quando a assinatura deixa de ser elegível depois da seleção", async () => {
     estado.ativa = false;

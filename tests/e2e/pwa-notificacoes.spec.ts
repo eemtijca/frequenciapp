@@ -1,5 +1,5 @@
 // Push contra a PWA real: conta sintética, preferência por dispositivo e
-// evento entregue pelo Chromium. Assinatura do navegador e transporte simulados.
+// evento simulado no worker de produção. Assinatura e transporte simulados.
 import { createECDH, randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
@@ -189,6 +189,30 @@ test.describe("notificações da PWA", () => {
       page.getByRole("button", { name: "Ativar notificações", exact: true }),
     ).toBeEnabled();
   });
+  test("retira a assinatura expirada antes de permitir nova ativação", async ({ page }) => {
+    await simularDispositivo(page, "granted");
+    await page.route("**/api/notificacoes/teste", (rota) =>
+      rota.fulfill({
+        status: 410,
+        json: { error: "As notificações expiraram neste dispositivo." },
+      }),
+    );
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
+    await page.getByRole("button", { name: "Enviar notificação de teste" }).click();
+    await expect(page.getByRole("alert")).toContainText("As notificações expiraram");
+    await expect(
+      page.getByRole("button", { name: "Ativar notificações", exact: true }),
+    ).toBeEnabled();
+    expect((await contagens(page)).cancelamentos).toBe(1);
+    await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Desativar notificações", exact: true }),
+    ).toBeEnabled();
+    expect((await contagens(page)).inscricoes).toBe(2);
+  });
   test("mantém a consulta disponível sem configuração de push", async ({ page, context }) => {
     await simularDispositivo(page);
     await context.route("**/api/notificacoes/assinatura*", (rota) =>
@@ -206,46 +230,52 @@ test.describe("notificações da PWA", () => {
     ).toHaveCount(0);
     expect((await contagens(page)).pedidos).toBe(0);
   });
-  test("o worker real mostra um push entregue pelo Chromium", async ({ page, context }) => {
-    await context.grantPermissions(["notifications"]);
-    const cdp = await context.newCDPSession(page);
-    let registroId = "";
-    cdp.on(
-      "ServiceWorker.workerRegistrationUpdated",
-      ({ registrations }: { registrations: { registrationId: string; scopeURL: string }[] }) => {
-        const registro = registrations.find(
-          (item) =>
-            item.scopeURL === `${test.info().project.use.baseURL ?? "http://localhost:3000"}/`,
-        );
-        if (registro) registroId = registro.registrationId;
-      },
-    );
-    await cdp.send("ServiceWorker.enable");
+  test("o worker de produção interpreta um evento push simulado", async ({ page, context }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect.poll(() => registroId).not.toBe("");
     await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
-    await cdp.send("ServiceWorker.deliverPushMessage", {
-      origin: test.info().project.use.baseURL ?? "http://localhost:3000",
-      registrationId: registroId,
-      data: Buffer.from(
-        JSON.stringify({
+    const worker = context.serviceWorkers().find((item) => item.url().endsWith("/sw.js"));
+    if (!worker) throw new Error("Worker do aplicativo não encontrado.");
+    await worker.evaluate(() => {
+      const escopo = self as unknown as {
+        registration: ServiceWorkerRegistration;
+        avisosRecebidos: { titulo: string; corpo: string; etiqueta: string }[];
+      };
+      escopo.avisosRecebidos = [];
+      escopo.registration.showNotification = async (titulo, opcoes) => {
+        escopo.avisosRecebidos.push({
+          titulo,
+          corpo: opcoes?.body ?? "",
+          etiqueta: opcoes?.tag ?? "",
+        });
+      };
+    });
+    // O worker e o parser de PushEvent são reais. A exibição do aviso é
+    // simulada, pois o Chromium sem interface não autoriza notificações nativas.
+    await worker.evaluate(async () => {
+      const evento = new PushEvent("push", {
+        data: JSON.stringify({
           corpo: "Acompanhamento sintético disponível.",
           etiqueta: "resumo-frequencia-e2e",
         }),
-      ).toString("base64"),
+      });
+      const esperas: Promise<unknown>[] = [];
+      Object.defineProperty(evento, "waitUntil", {
+        value: (promessa: Promise<unknown>) => esperas.push(promessa),
+      });
+      self.dispatchEvent(evento);
+      await Promise.all(esperas);
     });
     await expect
       .poll(() =>
-        page.evaluate(async () => {
-          const registro = await navigator.serviceWorker.ready;
-          const avisos = await registro.getNotifications();
-          return avisos.map((aviso) => ({
-            titulo: aviso.title,
-            corpo: aviso.body,
-            etiqueta: aviso.tag,
-          }));
-        }),
+        worker.evaluate(
+          () =>
+            (
+              self as unknown as {
+                avisosRecebidos: { titulo: string; corpo: string; etiqueta: string }[];
+              }
+            ).avisosRecebidos,
+        ),
       )
       .toContainEqual({
         titulo: "FrequenciApp",

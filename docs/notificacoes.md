@@ -55,4 +55,4 @@ Revogar a palavra-chave, gerar outra ou desativar o diretor remove todas as assi
 
 ## Validação
 
-Os testes geram chaves e contas sintéticas, sem enviar mensagens a serviços externos. `tests/gerar-ambiente-push.mjs` escreve as variáveis somente no arquivo de ambiente indicado. A suíte de PWA simula a assinatura do navegador para testar adesão e cancelamento e usa um evento entregue pelo Chromium para exercitar o worker real. A entrega a um celular depende da configuração da instalação e deve ser conferida pela opção de teste no próprio dispositivo.
+Os testes geram chaves e contas sintéticas, sem enviar mensagens a serviços externos. `tests/gerar-ambiente-push.mjs` escreve as variáveis somente no arquivo de ambiente indicado. A suíte de PWA simula a assinatura do navegador para testar adesão e cancelamento. Um evento simulado no worker de produção confere o conteúdo solicitado à API de notificação; a exibição pelo sistema operacional é simulada no Chromium sem interface. A entrega a um celular depende da configuração da instalação e deve ser conferida pela opção de teste no próprio dispositivo.
