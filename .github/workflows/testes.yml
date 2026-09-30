@@ -39,6 +39,9 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Preparar chaves sintéticas de push
+        run: node tests/gerar-ambiente-push.mjs "$GITHUB_ENV"
+
       - name: Validar configurações do Compose
         run: |
           docker compose config --quiet

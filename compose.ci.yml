@@ -11,6 +11,11 @@ services:
     ports: !reset []
     environment:
       AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+      # Chaves sintéticas fornecidas pelo workflow; nenhum envio externo no CI.
+      PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
+      PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
+      PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
+      CRON_SECRET: segredo-ficticio-da-agenda-para-testes-0000
       # O CI usa dublês da Sheets API; não acessa uma conta Google real.
       GOOGLE_CLIENT_ID: ""
       GOOGLE_CLIENT_SECRET: ""

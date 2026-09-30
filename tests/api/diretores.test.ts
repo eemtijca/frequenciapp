@@ -262,6 +262,10 @@ describe("palavra-chave e entrada do diretor", () => {
       "GET /api/auth/sessao",
       "GET /api/saude",
       "POST /api/conta/senha",
+      "GET /api/notificacoes/assinatura",
+      "POST /api/notificacoes/assinatura",
+      "DELETE /api/notificacoes/assinatura",
+      "POST /api/notificacoes/teste",
     ]);
     const rotas = rotasDaApi().filter((rota) => !publicas.has(`${rota.metodo} ${rota.caminho}`));
     expect(rotas.length).toBeGreaterThan(50);

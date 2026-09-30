@@ -8,6 +8,8 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | ----------------------------- | ------------------------------------------------------------------------------------------------ |
 | `usuarios`                    | Contas: login único (e-mail ou identificador do diretor), hash da senha, nome, papel e situação. |
 | `sessoes`                     | Sessões opacas: hash SHA-256 do token, dono e expiração.                                         |
+| `assinaturas_push`            | Preferência voluntária por dispositivo, conta, sessão e chaves de transporte.                    |
+| `entregas_push`               | Reserva e confirmação do aviso diário por assinatura, com retenção de 30 dias.                   |
 | `series`                      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
 | `turmas`                      | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
 | `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
@@ -30,6 +32,9 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `tentativas_entrada`          | Contador de tentativas por chave, compartilhado entre instâncias.                                |
 
 Restrições de integridade relevantes:
+
+- `assinaturas_push` tem endpoint único e exclusão em cascata com a conta; a remoção natural da sessão anula a referência, preservando a preferência. A saída explícita remove as assinaturas dessa sessão antes de encerrá-la.
+- `entregas_push` tem unicidade de assinatura e dia e exclusão em cascata com a assinatura. As duas tabelas ficam fora da cópia JSON e não guardam conteúdo de estudantes.
 
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
 - `alunos.desistente_em` é uma data opcional: a partir dela o aluno continua na lista da chamada, sem novas marcas. `situacao_atualizada_em` permite incluir a mudança no próximo envio incremental à planilha. A turma de origem não muda quando a turma atual é alterada.

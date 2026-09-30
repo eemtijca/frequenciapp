@@ -1,6 +1,6 @@
-// Service worker: casca offline mínima. A API nunca é cacheada; a navegação
-// tenta a rede e os estáticos usam cache com revalidação.
-const VERSAO = "frequenciapp-4";
+// Service worker: casca offline e avisos push sem dados de estudantes.
+// A API nunca é cacheada; a navegação tenta a rede antes da página offline.
+const VERSAO = "frequenciapp-5";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",
@@ -34,6 +34,44 @@ self.addEventListener("message", (evento) => {
   if (evento.data && evento.data.tipo === "pular-espera") {
     void self.skipWaiting();
   }
+});
+
+self.addEventListener("push", (evento) => {
+  evento.waitUntil(
+    (async () => {
+      let mensagem = {};
+      try {
+        mensagem = evento.data?.json() ?? {};
+      } catch {
+        // Mesmo sem conteúdo legível, o aviso mantém um destino próprio.
+      }
+      const corpo =
+        typeof mensagem?.corpo === "string"
+          ? mensagem.corpo.slice(0, 200)
+          : "Há uma atualização de acompanhamento no aplicativo.";
+      const etiqueta =
+        typeof mensagem?.etiqueta === "string" ? mensagem.etiqueta.slice(0, 80) : "acompanhamento";
+      await self.registration.showNotification("FrequenciApp", {
+        body: corpo,
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
+        tag: etiqueta,
+      });
+    })(),
+  );
+});
+
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  evento.waitUntil(
+    (async () => {
+      const janelas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const aberta = janelas.find((janela) => new URL(janela.url).origin === self.location.origin);
+      // Focar preserva qualquer chamada em edição na janela já aberta.
+      if (aberta) await aberta.focus();
+      else await self.clients.openWindow("/");
+    })(),
+  );
 });
 
 function ehImutavel(url) {
