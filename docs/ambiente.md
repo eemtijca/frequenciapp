@@ -27,7 +27,9 @@ O segredo de atualização da conta Google é cifrado com uma chave derivada de 
 
 ## Notificações opcionais
 
-Configurar juntas `PUSH_VAPID_PUBLIC_KEY`, `PUSH_VAPID_PRIVATE_KEY` e `PUSH_VAPID_SUBJECT` para habilitar o cadastro e o envio Web Push. A chave privada fica somente no servidor. `CRON_SECRET`, com pelo menos 32 caracteres, autoriza a agenda diária. Sem VAPID o aplicativo continua operando e informa que as notificações não foram configuradas. Preparação, horários e compatibilidade estão em [notificacoes.md](notificacoes.md).
+O cadastro Web Push funciona sem configuração manual: o servidor deriva um par VAPID estável de `AUTH_SECRET`, com contexto criptográfico exclusivo para notificações. A chave privada fica somente no servidor. Um par já configurado em `PUSH_VAPID_PUBLIC_KEY` e `PUSH_VAPID_PRIVATE_KEY` tem prioridade; as duas chaves precisam estar presentes juntas. `PUSH_VAPID_SUBJECT` permite informar um contato em `mailto:` ou HTTPS, inclusive sem definir chaves próprias.
+
+Trocar `AUTH_SECRET` quando o par é automático exige reativar as notificações nos dispositivos. `CRON_SECRET`, com pelo menos 32 caracteres, continua autorizando a agenda diária e não é necessário para ativar um dispositivo. Preparação, horários e compatibilidade estão em [notificacoes.md](notificacoes.md).
 
 ## HTTP sem TLS
 

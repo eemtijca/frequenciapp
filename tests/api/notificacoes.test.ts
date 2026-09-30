@@ -99,6 +99,20 @@ describe("assinaturas push", () => {
     expect((await chamar("/api/notificacoes/assinatura", coord)).status).toBe(403);
     expect((await chamar("/api/notificacoes/assinatura", primeiro)).status).toBe(403);
   });
+  it("oferece uma chave pública estável antes de ativar o dispositivo", async () => {
+    const resposta = await chamar("/api/notificacoes/assinatura", principal);
+    expect(resposta.status).toBe(200);
+    const estado = (await resposta.json()) as {
+      configurada: boolean;
+      chavePublica: string;
+      ativa: boolean;
+    };
+    expect(estado.configurada).toBe(true);
+    expect(estado.ativa).toBe(false);
+    expect(estado.chavePublica).toMatch(/^B[A-Za-z0-9_-]{86}$/);
+    const novamente = await chamar("/api/notificacoes/assinatura", principal);
+    expect(await novamente.json()).toEqual(estado);
+  });
   it("cadastra e renova sem duplicar, devolvendo apenas a chave pública e o estado", async () => {
     const dados = assinatura("cadastro");
     expect((await chamar("/api/notificacoes/assinatura", principal, "POST", dados)).status).toBe(
@@ -113,7 +127,9 @@ describe("assinaturas push", () => {
     expect(Object.keys(estado).sort()).toEqual(["ativa", "chavePublica", "configurada"]);
     expect(estado.ativa).toBe(true);
     expect(estado.configurada).toBe(true);
-    expect(estado.chavePublica).toBe(process.env.PUSH_VAPID_PUBLIC_KEY);
+    expect(estado.chavePublica).toMatch(/^B[A-Za-z0-9_-]{86}$/);
+    if (process.env.PUSH_VAPID_PUBLIC_KEY)
+      expect(estado.chavePublica).toBe(process.env.PUSH_VAPID_PUBLIC_KEY);
     expect(
       (await cliente.query("select id from assinaturas_push where endpoint = $1", [dados.endpoint]))
         .rowCount,

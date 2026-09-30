@@ -2,6 +2,7 @@
 // não sobe com configuração incompleta ou inválida.
 import { z } from "zod";
 import { booleanoDeAmbiente, cookiesSegurosDe, permitirEndpointLocalDe } from "@/infra/booleano";
+import { configuracaoPushDe } from "@/infra/configuracao-push";
 
 const ausenteSeVazio = (valor: unknown) => (valor === "" ? undefined : valor);
 
@@ -32,10 +33,15 @@ const esquema = z.object({
     ausenteSeVazio,
     z
       .string()
-      .refine(
-        (valor) => /^mailto:[^\s@]+@[^\s@]+$/.test(valor),
-        "Use mailto: com o contato da administração.",
-      )
+      .refine((valor) => {
+        if (/^mailto:[^\s@]+@[^\s@]+$/.test(valor)) return true;
+        try {
+          const url = new URL(valor);
+          return url.protocol === "https:" && !url.username && !url.password;
+        } catch {
+          return false;
+        }
+      }, "Use mailto: ou HTTPS com o contato da administração.")
       .optional(),
   ),
   CRON_SECRET: z.preprocess(ausenteSeVazio, z.string().min(32).optional()),
@@ -88,13 +94,9 @@ const googleConfig = [
   resultado.data.GOOGLE_PICKER_API_KEY,
   resultado.data.GOOGLE_PROJECT_NUMBER,
 ];
-const pushConfig = [
-  resultado.data.PUSH_VAPID_PUBLIC_KEY,
-  resultado.data.PUSH_VAPID_PRIVATE_KEY,
-  resultado.data.PUSH_VAPID_SUBJECT,
-];
+const pushConfig = [resultado.data.PUSH_VAPID_PUBLIC_KEY, resultado.data.PUSH_VAPID_PRIVATE_KEY];
 if (pushConfig.some(Boolean) && !pushConfig.every(Boolean)) {
-  throw new Error("Configure juntas as três variáveis VAPID das notificações.");
+  throw new Error("Configure juntas as duas chaves VAPID das notificações.");
 }
 if (googleConfig.some(Boolean) && !googleConfig.every(Boolean)) {
   throw new Error("Configure juntas as cinco variáveis Google da integração OAuth.");
@@ -134,9 +136,12 @@ export const ambiente = {
   databaseUrl: resultado.data.DATABASE_URL,
   authSecret: resultado.data.AUTH_SECRET,
   push: {
-    publicKey: resultado.data.PUSH_VAPID_PUBLIC_KEY,
-    privateKey: resultado.data.PUSH_VAPID_PRIVATE_KEY,
-    subject: resultado.data.PUSH_VAPID_SUBJECT,
+    ...configuracaoPushDe({
+      segredo: resultado.data.AUTH_SECRET,
+      publicKey: resultado.data.PUSH_VAPID_PUBLIC_KEY,
+      privateKey: resultado.data.PUSH_VAPID_PRIVATE_KEY,
+      subject: resultado.data.PUSH_VAPID_SUBJECT,
+    }),
     cronSecret: resultado.data.CRON_SECRET,
   },
   google: {

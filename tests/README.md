@@ -1,6 +1,6 @@
 # Testes
 
-Para os contratos de notificações, gerar chaves sintéticas com `node tests/gerar-ambiente-push.mjs /tmp/frequenciapp-push.env` e carregar esse arquivo no ambiente do aplicativo e da suíte (`set -a`, `. /tmp/frequenciapp-push.env`, `set +a`). O CI prepara automaticamente o mesmo conjunto no aplicativo e nos testes. Não reutilizar chaves de produção. A suíte não envia push a dispositivos externos; a configuração e a entrega no aparelho são conferidas pela opção de teste da instalação.
+Para os contratos de notificações, gerar chaves sintéticas com `node tests/gerar-ambiente-push.mjs /tmp/frequenciapp-push.env` e carregar esse arquivo no ambiente do aplicativo e da suíte (`set -a`, `. /tmp/frequenciapp-push.env`, `set +a`). O CI prepara automaticamente o mesmo conjunto no aplicativo e nos testes. Os contratos também podem validar o par automático: omitir as três variáveis VAPID e definir somente o mesmo `CRON_SECRET` sintético no servidor e nos testes. Não reutilizar chaves de produção. A suíte não envia push a dispositivos externos; a configuração e a entrega no aparelho são conferidas pela opção de teste da instalação.
 
 Suítes do FrequenciApp com Vitest e Playwright.
 
