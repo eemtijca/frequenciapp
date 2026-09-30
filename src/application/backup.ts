@@ -94,6 +94,7 @@ const esquemaCopia = z.object({
           .trim()
           .max(20)
           .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+        horario: z.string().refine(ehHorarioEntrada, "Horário da saída inválido.").nullish(),
         justificativa: z.string().trim().min(1).max(10).nullish(),
         observacao: z.string().trim().max(200).nullish(),
         texto: z.string().trim().max(100).nullish(),
@@ -113,6 +114,9 @@ const esquemaCopia = z.object({
         horario: z.string().refine(ehHorarioEntrada, "Horário inválido."),
         motivo: z.string().trim().min(2).max(200),
         registradoPorNome: z.string().trim().min(1).max(100),
+        momento: z.string().refine(ehMomentoValido, "Momento da entrada inválido.").nullish(),
+        responsavelRegistroCodigo: z.string().trim().min(1).max(20).nullish(),
+        responsavelRegistroNome: z.string().trim().min(1).max(100).nullish(),
       }),
     )
     .max(50000)
@@ -247,6 +251,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         alunoId: true,
         dia: true,
         momento: true,
+        horario: true,
         justificativa: true,
         observacao: true,
         texto: true,
@@ -265,6 +270,9 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         horario: true,
         motivo: true,
         registradoPorNome: true,
+        momento: true,
+        responsavelRegistroCodigo: true,
+        responsavelRegistroNome: true,
       },
     }),
     banco().justificativa.findMany({
@@ -628,6 +636,7 @@ export async function importarCopia(
         select: {
           id: true,
           momento: true,
+          horario: true,
           justificativa: true,
           observacao: true,
           texto: true,
@@ -637,6 +646,7 @@ export async function importarCopia(
       if (atual) {
         const igual =
           atual.momento === saida.momento &&
+          (atual.horario ?? null) === (saida.horario ?? null) &&
           atual.justificativa === codigo &&
           (atual.observacao ?? null) === (saida.observacao ?? null) &&
           (atual.texto ?? null) === texto &&
@@ -650,6 +660,7 @@ export async function importarCopia(
           alunoId: saida.alunoId,
           dia: diaRepositorio,
           momento: saida.momento,
+          horario: saida.horario ?? null,
           justificativa: codigo,
           observacao: saida.observacao ?? null,
           texto,
@@ -680,7 +691,11 @@ export async function importarCopia(
           atual.motivo === entrada.motivo &&
           atual.turmaId === entrada.turmaId &&
           atual.turmaRotulo === entrada.turmaRotulo &&
-          atual.registradoPorNome === entrada.registradoPorNome;
+          atual.registradoPorNome === entrada.registradoPorNome &&
+          (atual.momento ?? null) === (entrada.momento ?? null) &&
+          (atual.responsavelRegistroCodigo ?? null) ===
+            (entrada.responsavelRegistroCodigo ?? null) &&
+          (atual.responsavelRegistroNome ?? null) === (entrada.responsavelRegistroNome ?? null);
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
         continue;

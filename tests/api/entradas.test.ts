@@ -24,6 +24,7 @@ async function entrar(email: string, senha: string) {
   return resposta.headers.get("set-cookie")?.split(";")[0] ?? "";
 }
 async function limpar() {
+  await banco.query("delete from liberadores where codigo = 'QAENTREG'");
   await banco.query("delete from alunos where nome like 'QA Entrada %'");
   await banco.query(
     "delete from turmas where serie_id in (select id from series where nome = 'QA Entradas')",
@@ -33,6 +34,9 @@ async function limpar() {
 beforeAll(async () => {
   await banco.connect();
   await limpar();
+  await banco.query(
+    "insert into liberadores (codigo, rotulo) values ('QAENTREG', 'QA Responsável')",
+  );
   cookie = await entrar(
     process.env.TESTE_EMAIL ?? "demo@escola.exemplo",
     process.env.TESTE_SENHA ?? "DemoFrequencia2026",
@@ -101,16 +105,51 @@ describe("entradas atrasadas", () => {
   });
   it("valida aluno, horário, motivo, período e data futura", async () => {
     for (const dados of [
-      { alunoId: "inválido", dia, horario: "08:00", motivo: "Transporte" },
-      { alunoId: aluno, dia, horario: "25:00", motivo: "Transporte" },
-      { alunoId: aluno, dia, horario: "08:00", motivo: " " },
-      { alunoId: aluno, dia: "2999-06-15", horario: "08:00", motivo: "Transporte" },
+      {
+        alunoId: "inválido",
+        dia,
+        momento: "aula_2",
+        responsavelRegistroCodigo: "QAENTREG",
+        horario: "08:00",
+        motivo: "Transporte",
+      },
+      {
+        alunoId: aluno,
+        dia,
+        momento: "aula_2",
+        responsavelRegistroCodigo: "QAENTREG",
+        horario: "25:00",
+        motivo: "Transporte",
+      },
+      {
+        alunoId: aluno,
+        dia,
+        momento: "aula_2",
+        responsavelRegistroCodigo: "QAENTREG",
+        horario: "08:00",
+        motivo: " ",
+      },
+      {
+        alunoId: aluno,
+        dia: "2999-06-15",
+        momento: "aula_2",
+        responsavelRegistroCodigo: "QAENTREG",
+        horario: "08:00",
+        motivo: "Transporte",
+      },
     ])
       expect((await chamar("/api/entradas", "POST", dados)).status).toBe(400);
     expect((await chamar(`/api/entradas?de=${dia}&ate=2026-06-14`)).status).toBe(400);
   });
   it("registra uma entrada por aluno e dia sem criar frequência ou saída", async () => {
-    const dados = { alunoId: aluno, dia, horario: "08:15", motivo: "Transporte atrasou" };
+    const dados = {
+      alunoId: aluno,
+      dia,
+      momento: "aula_2",
+      responsavelRegistroCodigo: "QAENTREG",
+      horario: "08:15",
+      motivo: "Transporte atrasou",
+    };
     expect((await chamar("/api/entradas", "POST", dados)).status).toBe(201);
     expect((await chamar("/api/entradas", "POST", dados)).status).toBe(409);
     const resposta = await chamar(`/api/entradas?de=${dia}&ate=${dia}&turmaId=${turma}`);
@@ -118,10 +157,13 @@ describe("entradas atrasadas", () => {
     id = corpo.entradas[0]?.id ?? "";
     expect(corpo.entradas).toHaveLength(1);
     expect(corpo.entradas[0]).toMatchObject({
+      momento: "aula_2",
+      responsavelRegistroCodigo: "QAENTREG",
       horario: "08:15",
       motivo: "Transporte atrasou",
       turmaRotulo: "QA Entradas A",
       registradoPorNome: "Demo",
+      responsavelRegistroNome: "QA Responsável",
     });
     expect(
       (
@@ -140,6 +182,42 @@ describe("entradas atrasadas", () => {
       ).rows[0]?.total,
     ).toBe(0);
   });
+  it("valida momento e responsável e conserva o nome escolhido após renomear o catálogo", async () => {
+    const dados = {
+      alunoId: aluno,
+      dia: "2026-06-17",
+      horario: "09:10",
+      momento: "aula_3",
+      responsavelRegistroCodigo: "QAENTREG",
+      justificativa: "T",
+      observacao: "Ônibus atrasou",
+    };
+    for (const alteracao of [
+      { momento: undefined },
+      { momento: "aula_99" },
+      { responsavelRegistroCodigo: undefined },
+      { responsavelRegistroCodigo: "inexistente" },
+      { justificativa: "inexistente" },
+    ]) {
+      expect((await chamar("/api/entradas", "POST", { ...dados, ...alteracao })).status).toBe(400);
+    }
+    await banco.query("update liberadores set ativo = false where codigo = 'QAENTREG'");
+    expect((await chamar("/api/entradas", "POST", dados)).status).toBe(400);
+    await banco.query("update liberadores set ativo = true where codigo = 'QAENTREG'");
+    expect((await chamar("/api/entradas", "POST", dados)).status).toBe(201);
+    await banco.query(
+      "update liberadores set rotulo = 'QA Nome alterado' where codigo = 'QAENTREG'",
+    );
+    const corpo = (await (await chamar("/api/entradas?de=2026-06-17&ate=2026-06-17")).json()) as {
+      entradas: EntradaAtrasada[];
+    };
+    expect(corpo.entradas[0]).toMatchObject({
+      momento: "aula_3",
+      motivo: "Transporte · Ônibus atrasou",
+      responsavelRegistroNome: "QA Responsável",
+      registradoPorNome: "Demo",
+    });
+  });
   it("preserva a turma registrada depois da transferência", async () => {
     await banco.query("update alunos set turma_id = $1 where id = $2", [outraTurma, aluno]);
     const corpo = (await (
@@ -154,6 +232,8 @@ describe("entradas atrasadas", () => {
   it("exporta, mescla sem sobrescrever e restaura pela cópia JSON", async () => {
     const copia = await (await chamar("/api/backup", "GET", undefined, cookieAdmin)).json();
     expect(copia.entradas.find((entrada: EntradaAtrasada) => entrada.id === id)).toMatchObject({
+      momento: "aula_2",
+      responsavelRegistroCodigo: "QAENTREG",
       horario: "08:15",
       turmaId: turma,
     });
@@ -188,6 +268,32 @@ describe("entradas atrasadas", () => {
       ).rows[0]?.total,
     ).toBe(1);
   });
+  it("restaura cópia antiga de entrada sem momento nem responsável selecionado", async () => {
+    const legado = await banco.query<{ id: string }>(
+      "insert into entradas_atrasadas (aluno_id, turma_id, turma_rotulo, dia, horario, motivo, registrado_por_nome) values ($1, $2, 'QA Entradas A', '2026-06-14', '08:05', 'QA Histórico', 'QA Autoria antiga') returning id",
+      [aluno, turma],
+    );
+    const idLegado = legado.rows[0]?.id ?? "";
+    const copia = await (await chamar("/api/backup", "GET", undefined, cookieAdmin)).json();
+    const registro = copia.entradas.find((entrada: EntradaAtrasada) => entrada.id === idLegado);
+    delete registro.momento;
+    delete registro.responsavelRegistroCodigo;
+    delete registro.responsavelRegistroNome;
+    expect((await chamar(`/api/entradas/${idLegado}`, "DELETE")).status).toBe(200);
+    expect((await chamar("/api/backup", "POST", copia, cookieAdmin)).status).toBe(200);
+    const corpo = (await (await chamar("/api/entradas?de=2026-06-14&ate=2026-06-14")).json()) as {
+      entradas: EntradaAtrasada[];
+    };
+    expect(corpo.entradas[0]).toMatchObject({
+      id: idLegado,
+      horario: "08:05",
+      motivo: "QA Histórico",
+      registradoPorNome: "QA Autoria antiga",
+      momento: null,
+      responsavelRegistroCodigo: null,
+      responsavelRegistroNome: null,
+    });
+  });
   it("não registra entrada para aluno desativado ou desistente", async () => {
     await banco.query("update alunos set ativo = false where id = $1", [aluno]);
     expect(
@@ -195,6 +301,8 @@ describe("entradas atrasadas", () => {
         await chamar("/api/entradas", "POST", {
           alunoId: aluno,
           dia: "2026-06-16",
+          momento: "aula_2",
+          responsavelRegistroCodigo: "QAENTREG",
           horario: "08:00",
           motivo: "Transporte",
         })
@@ -209,6 +317,8 @@ describe("entradas atrasadas", () => {
         await chamar("/api/entradas", "POST", {
           alunoId: aluno,
           dia: "2026-06-16",
+          momento: "aula_2",
+          responsavelRegistroCodigo: "QAENTREG",
           horario: "08:00",
           motivo: "Transporte",
         })

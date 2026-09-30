@@ -3,14 +3,7 @@
 // Saiu mais cedo: registro da saída antecipada, saídas do dia por turma e
 // relatório semanal por aluno. Separado da chamada.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  DoorOpen,
-  FileSpreadsheet,
-  LoaderCircle,
-  RefreshCw,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -54,6 +47,7 @@ import { Label } from "@/components/ui/label";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { SeletorHorario } from "@/components/ui/seletor-horario";
 import DialogoEnvioSaidas, {
   useEstadoPlanilhaSaidas,
 } from "@/components/saidas/dialogo-envio-saidas";
@@ -90,6 +84,7 @@ export default function VistaSaidas({
   const [turmaFiltro, setTurmaFiltro] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
+  const [horario, setHorario] = useState(() => horaNoFuso(new Date().toISOString(), fuso));
   const [formaJustificativa, setFormaJustificativa] = useState<FormaJustificativa>("catalogo");
   const [justificativa, setJustificativa] = useState("");
   const [texto, setTexto] = useState("");
@@ -243,7 +238,8 @@ export default function VistaSaidas({
 
   function textoDaSaida(saida: SaidaAntecipada): string {
     const partes = partesJustificativaSaida(saida, catalogoJustificativas);
-    return `${rotuloMomento(saida.momento)} · ${partes.motivo}${
+    const quando = saida.horario ? `${saida.horario} · ` : "";
+    return `${quando}${rotuloMomento(saida.momento)} · ${partes.motivo}${
       partes.complemento ? ` · ${partes.complemento}` : ""
     }`;
   }
@@ -271,6 +267,7 @@ export default function VistaSaidas({
           alunoId,
           dia,
           momento,
+          horario,
           justificativa: formaJustificativa === "catalogo" ? justificativa : undefined,
           texto:
             formaJustificativa === "texto"
@@ -350,10 +347,7 @@ export default function VistaSaidas({
     <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <DoorOpen size={20} aria-hidden="true" />
-            Saiu mais cedo
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Saiu mais cedo</h1>
           <p className="text-muted-foreground text-sm">
             Registro separado da chamada. A presença ou falta do dia permanece como foi marcada.
           </p>
@@ -456,6 +450,17 @@ export default function VistaSaidas({
               valor: item.codigo,
               rotulo: item.rotulo,
             }))}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+          <Label htmlFor="saida-horario">Horário da saída</Label>
+          <SeletorHorario
+            id="saida-horario"
+            valor={horario}
+            onValor={setHorario}
+            rotuloAcessivel="Horário da saída"
+            agora={horaNoFuso(new Date().toISOString(), fuso)}
+            disabled={enviando}
           />
         </div>
         <fieldset className="flex flex-col gap-2">

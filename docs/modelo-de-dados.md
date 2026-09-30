@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados.
+Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, horário, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados.
 
 ## Usuário (usuario)
 
@@ -145,19 +145,20 @@ A presença não gera linha: quem não tem falta na frequência do dia esteve pr
 
 ## Saída antecipada (saida_antecipada)
 
-| Campo             | Tipo  | Observação                                                                            |
-| ----------------- | ----- | ------------------------------------------------------------------------------------- |
-| id                | uuid  | Gerado pelo banco.                                                                    |
-| alunoId           | uuid  | Aluno que saiu; cascata na exclusão do aluno.                                         |
-| dia               | date  | Dia civil da saída.                                                                   |
-| momento           | texto | Código do momento: aulas, intervalos e almoço.                                        |
-| justificativa     | texto | Código do catálogo; nulo quando a justificativa foi escrita.                          |
-| observacao        | texto | Observação opcional de intervalos e almoço, no tipo Outros.                           |
-| texto             | texto | Até 100 caracteres. Sem código, é a justificativa. Na aula, pode complementar o tipo. |
-| liberadoPorCodigo | texto | Código do catálogo de quem libera; nulo no histórico antigo.                          |
-| liberadoPorId     | uuid  | Conta da equipe nos registros antigos; anulável.                                      |
-| criadoPorId       | uuid  | Quem registrou; anulável.                                                             |
-| criadoEm          | data  | Momento do registro.                                                                  |
+| Campo             | Tipo  | Observação                                                                             |
+| ----------------- | ----- | -------------------------------------------------------------------------------------- |
+| id                | uuid  | Gerado pelo banco.                                                                     |
+| alunoId           | uuid  | Aluno que saiu; cascata na exclusão do aluno.                                          |
+| dia               | date  | Dia civil da saída.                                                                    |
+| momento           | texto | Código do momento: aulas, intervalos e almoço.                                         |
+| horario           | texto | `HH:MM` em que o aluno saiu. Anulável nos registros anteriores; obrigatório nos novos. |
+| justificativa     | texto | Código do catálogo; nulo quando a justificativa foi escrita.                           |
+| observacao        | texto | Observação opcional de intervalos e almoço, no tipo Outros.                            |
+| texto             | texto | Até 100 caracteres. Sem código, é a justificativa. Na aula, pode complementar o tipo.  |
+| liberadoPorCodigo | texto | Código do catálogo de quem libera; nulo no histórico antigo.                           |
+| liberadoPorId     | uuid  | Conta da equipe nos registros antigos; anulável.                                       |
+| criadoPorId       | uuid  | Quem registrou; anulável.                                                              |
+| criadoEm          | data  | Momento do registro.                                                                   |
 
 A unicidade de (aluno, dia) impede dois registros no mesmo dia; a correção é remover o registro com auditoria. A saída não altera a presença nem a falta do dia: é uma informação separada, usada nos relatórios e nos indicadores.
 
@@ -243,5 +244,7 @@ A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pe
 A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência, além do acumulado de F + FJ de todo o histórico. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca.
 
 ## Entrada atrasada (entrada_atrasada)
+
+Novos registros também guardam o momento (aula ou pausa) e o código/nome do responsável selecionado no catálogo de Quem libera. Esses campos são anuláveis para os históricos e opcionais nas cópias antigas. O nome do responsável é um retrato do registro e não acompanha renomeações; a autoria autenticada permanece separada.
 
 O registro guarda aluno, turma e rótulo da turma no momento do registro, data civil, horário `HH:mm`, motivo de até 200 caracteres, nome de quem registrou, autoria anulável e criação. A chave (aluno, dia) impede duplicação, independentemente de saída registrada no mesmo dia. Transferências não alteram a turma histórica. A entrada não gera falta ou presença. Alunos desativados e desistentes na data não podem receber novo registro. Remoção para correção é auditada; linhas já enviadas ao Google permanecem intactas.

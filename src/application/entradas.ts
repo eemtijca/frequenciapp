@@ -5,20 +5,38 @@ import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
-import { diaLocal, ehDiaValido } from "@/domain/frequencia";
+import { diaLocal, ehDiaValido, ehMomentoValido } from "@/domain/frequencia";
 import { ehHorarioEntrada, type EntradaAtrasada } from "@/domain/entradas";
 import type { Identidade } from "@/domain/usuarios";
 
-export const esquemaCriarEntrada = z.object({
-  alunoId: z.uuid("Aluno inválido."),
-  dia: z.string().refine(ehDiaValido, "Data inválida."),
-  horario: z.string().refine(ehHorarioEntrada, "Horário inválido. Informe hora e minuto."),
-  motivo: z
-    .string()
-    .trim()
-    .min(2, "Informe o motivo do atraso.")
-    .max(200, "O motivo deve ter no máximo 200 caracteres."),
-});
+export const esquemaCriarEntrada = z
+  .object({
+    alunoId: z.uuid("Aluno inválido."),
+    dia: z.string().refine(ehDiaValido, "Data inválida."),
+    horario: z.string().refine(ehHorarioEntrada, "Horário inválido. Informe hora e minuto."),
+    momento: z
+      .string("Escolha o momento da entrada.")
+      .trim()
+      .max(20, "Momento da entrada inválido.")
+      .refine(ehMomentoValido, "Escolha o momento da entrada."),
+    responsavelRegistroCodigo: z
+      .string("Escolha o responsável pelo registro.")
+      .trim()
+      .min(1, "Escolha o responsável pelo registro.")
+      .max(20),
+    justificativa: z.string().trim().max(10).optional(),
+    observacao: z.string().trim().max(100).optional(),
+    motivo: z
+      .string()
+      .trim()
+      .min(2, "Informe o motivo do atraso.")
+      .max(200, "O motivo deve ter no máximo 200 caracteres.")
+      .optional(),
+  })
+  .refine(
+    (dados) => Boolean(dados.motivo || dados.justificativa),
+    "Escolha um tipo ou escreva a justificativa da entrada.",
+  );
 
 export const esquemaFiltroEntradas = z
   .object({
@@ -45,6 +63,9 @@ export async function listarEntradas(
       horario: true,
       motivo: true,
       registradoPorNome: true,
+      momento: true,
+      responsavelRegistroCodigo: true,
+      responsavelRegistroNome: true,
       criadoEm: true,
       aluno: { select: { nome: true } },
     },
@@ -65,6 +86,31 @@ export async function criarEntrada(identidade: Identidade, entrada: unknown): Pr
     throw new ErroHttp("Não é possível registrar entrada em dia futuro.", 400);
   try {
     await comTransacao(async (tx) => {
+      const responsavel = await tx.liberador.findFirst({
+        where: { codigo: dados.data.responsavelRegistroCodigo, ativo: true },
+        select: { rotulo: true },
+      });
+      if (!responsavel)
+        throw new ErroHttp("Escolha um responsável ativo do catálogo da Gestão.", 400);
+      let motivo = dados.data.motivo ?? "";
+      if (dados.data.justificativa) {
+        if (dados.data.motivo)
+          throw new ErroHttp(
+            "Escolha um tipo ou texto para a justificativa, sem combinar as duas formas.",
+            400,
+          );
+        const tipo = await tx.justificativa.findFirst({
+          where: { codigo: dados.data.justificativa, ativo: true },
+          select: { rotulo: true },
+        });
+        if (!tipo)
+          throw new ErroHttp("Escolha uma justificativa ativa do catálogo da Gestão.", 400);
+        motivo = `${tipo.rotulo}${dados.data.observacao ? ` · ${dados.data.observacao}` : ""}`;
+      } else if (dados.data.observacao) {
+        throw new ErroHttp("A observação acompanha um tipo de justificativa.", 400);
+      }
+      if (motivo.length > 200)
+        throw new ErroHttp("A justificativa completa deve ter no máximo 200 caracteres.", 400);
       const aluno = await tx.aluno.findUnique({
         where: { id: dados.data.alunoId },
         include: { turma: { include: { serie: true } } },
@@ -77,7 +123,12 @@ export async function criarEntrada(identidade: Identidade, entrada: unknown): Pr
         throw new ErroHttp("Este aluno está desativado ou desistente nesta data.", 409);
       const criada = await tx.entradaAtrasada.create({
         data: {
-          ...dados.data,
+          alunoId: dados.data.alunoId,
+          horario: dados.data.horario,
+          momento: dados.data.momento,
+          motivo,
+          responsavelRegistroCodigo: dados.data.responsavelRegistroCodigo,
+          responsavelRegistroNome: responsavel.rotulo,
           dia: new Date(`${dados.data.dia}T12:00:00Z`),
           turmaId: aluno.turmaId,
           turmaRotulo: `${aluno.turma.serie.nome} ${aluno.turma.nome}`,

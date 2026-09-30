@@ -13,6 +13,7 @@ import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SeletorHorario } from "@/components/ui/seletor-horario";
 import {
   Dialog,
   DialogContent,
@@ -308,30 +309,24 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="aula-inicio">Início</Label>
-                <Input
+                <SeletorHorario
                   id="aula-inicio"
-                  type="time"
-                  value={formulario.inicio}
-                  onChange={(evento) =>
-                    setFormulario((atual) =>
-                      atual ? { ...atual, inicio: evento.target.value } : atual,
-                    )
+                  valor={formulario.inicio}
+                  rotuloAcessivel="Início da aula"
+                  onValor={(valor) =>
+                    setFormulario((atual) => (atual ? { ...atual, inicio: valor } : atual))
                   }
-                  className="numerais-tabulares h-11"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="aula-fim">Fim</Label>
-                <Input
+                <SeletorHorario
                   id="aula-fim"
-                  type="time"
-                  value={formulario.fim}
-                  onChange={(evento) =>
-                    setFormulario((atual) =>
-                      atual ? { ...atual, fim: evento.target.value } : atual,
-                    )
+                  valor={formulario.fim}
+                  rotuloAcessivel="Fim da aula"
+                  onValor={(valor) =>
+                    setFormulario((atual) => (atual ? { ...atual, fim: valor } : atual))
                   }
-                  className="numerais-tabulares h-11"
                 />
               </div>
             </div>

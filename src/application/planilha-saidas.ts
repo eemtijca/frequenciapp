@@ -398,7 +398,9 @@ async function montarSimulacaoSaidas(
       nome: aluno.nome,
       turma: turmasPorId.get(aluno.turmaId) ?? "",
       dia: saida.dia,
-      momento: rotuloMomento(saida.momento),
+      momento: saida.horario
+        ? `${saida.horario} · ${rotuloMomento(saida.momento)}`
+        : rotuloMomento(saida.momento),
       justificativa: partes.motivo,
       observacao: partes.complemento ?? "",
       liberadoPor: saida.liberadoPorNome ?? "",

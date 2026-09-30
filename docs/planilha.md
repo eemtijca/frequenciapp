@@ -115,6 +115,8 @@ O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o
 
 ## Planilha de entradas atrasadas
 
+Na planilha de saídas, a coluna de momento passa a levar o horário quando ele existe (por exemplo `08:15 · 2ª aula`), como nas entradas; registros sem horário mantêm só o momento. O formulário de entradas usa calendário brasileiro, Momento da entrada e Responsável pelo registro. Sem alterar o cabeçalho da aba, novas linhas incluem o momento junto ao horário (por exemplo `08:15 · 2ª aula`) e o responsável escolhido em Registrado por. Históricos sem esses campos mantêm horário e autoria anteriores. Linhas já enviadas nunca são reescritas.
+
 Na área Saídas e entradas, o botão Entradas abre o registro de chegadas atrasadas. A consulta e o envio usam a data e a turma escolhidas na tela. O registro não muda as faltas da chamada.
 
 As entradas usam exclusivamente a Sheets API e a mesma planilha selecionada para saídas na Gestão, sem outra autorização OAuth. A integração de saídas precisa estar ativa e conectada ao Google. A administração confirma "Preparar aba Entradas" para criar a aba com as colunas Data, Aluno, Turma, Horário, Motivo, Registrado por e Código. Aba existente nunca é recriada nem limpa; cabeçalho incompatível, com fórmula ou mesclagens bloqueia envio. A aba Entradas fica reservada às chegadas e não pode ser mapeada para saídas.

@@ -1,7 +1,7 @@
 // Plano conservador da aba de entradas, identificado pelo código do registro.
 import type { EntradaAtrasada } from "./entradas";
 import { assinarAba, hashTexto, type LeituraAba } from "./planilha";
-import { normalizar, rotuloData } from "./frequencia";
+import { normalizar, rotuloData, rotuloMomento } from "./frequencia";
 
 export const ABA_ENTRADAS = "Entradas";
 export const CABECALHO_ENTRADAS = [
@@ -65,9 +65,11 @@ export function planejarEntradas(
         rotuloData(entrada.dia),
         entrada.nome,
         entrada.turmaRotulo,
-        entrada.horario,
+        entrada.momento
+          ? `${entrada.horario} · ${rotuloMomento(entrada.momento)}`
+          : entrada.horario,
         entrada.motivo,
-        entrada.registradoPorNome,
+        entrada.responsavelRegistroNome ?? entrada.registradoPorNome,
         `${entrada.alunoId}:${entrada.dia}`,
       ];
       const linhas = porCodigo.get(`${entrada.alunoId}:${entrada.dia}`);

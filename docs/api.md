@@ -340,16 +340,16 @@ Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma 
 - 200 `{"saidas": Saida[]}` em ordem de dia e registro.
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
-Saida: `{ id, alunoId, dia, momento, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
+Saida: `{ id, alunoId, dia, momento, horario, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
 
 ### POST /api/saidas
 
-Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": "HH:MM", "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
 
 A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
 - 201 `{"saida": Saida}`.
-- 400 para momento inválido, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
+- 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
 - 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
 
 ### DELETE /api/saidas/{id}
@@ -656,14 +656,16 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 
 As rotas exigem a capacidade `operar`; criar a aba exige `administrar`.
 
-| Rota                                   | Corpo ou consulta                            | Resultado                                                              |
-| -------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------- |
-| `GET /api/entradas`                    | `de`, `ate`, `turmaId` opcional              | `{ entradas: EntradaAtrasada[] }`, com turma do registro               |
-| `POST /api/entradas`                   | `{ alunoId, dia, horario: "HH:mm", motivo }` | 201; 409 para aluno desativado, desistente na data ou entrada repetida |
-| `DELETE /api/entradas/:id`             | Identificador                                | Remove com auditoria; preserva chamada e planilha                      |
-| `GET /api/planilha-entradas/estado`    | Nenhum                                       | Disponibilidade da conexão Google e nome da planilha, sem credenciais  |
-| `POST /api/planilha-entradas/preparar` | Nenhum                                       | Cria a aba Entradas se ausente, sem alterar aba existente              |
-| `POST /api/planilha-entradas/simular`  | `{ de, ate, turmaId? }`                      | Prévia com hash, avisos e até 20 amostras; no máximo 92 dias           |
-| `POST /api/planilha-entradas/enviar`   | Período e `planoHash`                        | Recalcula a prévia e cria somente linhas novas; 409 se dados mudaram   |
+| Rota                                   | Corpo ou consulta                                                                                               | Resultado                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `GET /api/entradas`                    | `de`, `ate`, `turmaId` opcional                                                                                 | `{ entradas: EntradaAtrasada[] }`, com turma do registro               |
+| `POST /api/entradas`                   | `{ alunoId, dia, horario: "HH:mm", momento, responsavelRegistroCodigo, motivo? , justificativa?, observacao? }` | 201; 409 para aluno desativado, desistente na data ou entrada repetida |
+| `DELETE /api/entradas/:id`             | Identificador                                                                                                   | Remove com auditoria; preserva chamada e planilha                      |
+| `GET /api/planilha-entradas/estado`    | Nenhum                                                                                                          | Disponibilidade da conexão Google e nome da planilha, sem credenciais  |
+| `POST /api/planilha-entradas/preparar` | Nenhum                                                                                                          | Cria a aba Entradas se ausente, sem alterar aba existente              |
+| `POST /api/planilha-entradas/simular`  | `{ de, ate, turmaId? }`                                                                                         | Prévia com hash, avisos e até 20 amostras; no máximo 92 dias           |
+| `POST /api/planilha-entradas/enviar`   | Período e `planoHash`                                                                                           | Recalcula a prévia e cria somente linhas novas; 409 se dados mudaram   |
+
+Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos.
 
 A integração usa a planilha Google selecionada para saídas; Apps Script não atende entradas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.

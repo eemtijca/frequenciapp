@@ -32,3 +32,29 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
     )
     .toBe(visao);
 }
+
+/** Escolhe um horário "HH:MM" pelo popover próprio, como a pessoa faria com o mouse. */
+export async function escolherHorario(page: Page, id: string, horario: string): Promise<void> {
+  const [hora, minuto] = horario.split(":");
+  await page.locator(id).click();
+  const painel = page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("listbox", { name: "Horas" }) });
+  await painel
+    .getByRole("listbox", { name: "Horas" })
+    .getByRole("option", { name: hora ?? "", exact: true })
+    .click();
+  await painel
+    .getByRole("listbox", { name: "Minutos" })
+    .getByRole("option", { name: minuto ?? "", exact: true })
+    .click();
+  await expect(painel).toHaveCount(0);
+}
+
+/** Abre uma aba da área de saídas e entradas. */
+export async function abrirAbaMovimentacao(
+  page: Page,
+  rotulo: "Saídas" | "Entradas",
+): Promise<void> {
+  await page.getByRole("tab", { name: rotulo, exact: true }).click();
+}

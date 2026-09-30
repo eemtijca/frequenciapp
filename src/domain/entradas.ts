@@ -9,6 +9,9 @@ export interface EntradaAtrasada {
   horario: string;
   motivo: string;
   registradoPorNome: string;
+  momento?: string | null;
+  responsavelRegistroCodigo?: string | null;
+  responsavelRegistroNome?: string | null;
   criadoEm: string;
 }
 

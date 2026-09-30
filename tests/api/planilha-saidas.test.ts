@@ -149,6 +149,7 @@ beforeAll(async () => {
     await autenticado("/api/saidas", {
       method: "POST",
       body: JSON.stringify({
+        horario: "08:30",
         alunoId: alunoAnaId,
         dia: DIA,
         momento: "aula_1",
@@ -318,6 +319,7 @@ describe("planilha de saídas", () => {
       await autenticado("/api/saidas", {
         method: "POST",
         body: JSON.stringify({
+          horario: "08:30",
           alunoId: alunoAnaId,
           dia: DIA,
           momento: "aula_1",
