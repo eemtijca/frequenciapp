@@ -142,7 +142,11 @@ test.describe("360 px", () => {
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0) <= 360).toBe(true);
     // Área de toque confortável: cada item tem ao menos 44 px de altura.
     const opcao = painel.getByRole("listbox", { name: "Horas" }).getByRole("option").first();
-    expect((await opcao.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    // offsetHeight ignora a escala da animação de abertura (zoom-in-95), que
+    // deixava o boundingBox em 42 a 44 px durante os primeiros quadros.
+    expect(
+      await opcao.evaluate((elemento) => (elemento as HTMLElement).offsetHeight),
+    ).toBeGreaterThanOrEqual(44);
     const estouro = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
     );
