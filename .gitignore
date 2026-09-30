@@ -66,3 +66,6 @@ apporiginal.html
 # Cliente Prisma gerado (prisma generate)
 generated/
 tool-results/
+
+# Capturas locais de validação visual
+/docs/imagens/

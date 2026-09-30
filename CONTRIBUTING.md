@@ -157,11 +157,13 @@ A descrição deve conter:
 - o problema e o resultado esperado;
 - o que mudou e por quê;
 - como validar: comandos executados e, quando aplicável, passos de interface;
-- capturas de antes e depois em mudanças visuais;
+- capturas de antes e depois em mudanças visuais, anexadas ao pull request sem entrar nos commits;
 - riscos, migrações ou variáveis de ambiente novas;
 - a issue relacionada, com `Closes #123` quando aplicável.
 
 Quando a mudança tocar dependências, autenticação, permissões, workflows ou dados sensíveis, descreva o risco e como ele foi tratado.
+
+Capturas de tela são artefatos locais de validação e apresentação. Guarde os arquivos em `docs/imagens/`, fora do versionamento, e não faça commit deles.
 
 Antes de abrir, rode as verificações locais:
 
