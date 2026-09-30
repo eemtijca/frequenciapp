@@ -8,6 +8,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Preferências de notificações por conta, resumo e novas chamadas para diretores, aviso de chamadas pendentes para a coordenação e administração, e configuração de tipos e horários na Gestão. Agenda periódica por GitHub Actions compatível com Vercel Hobby, com confirmações independentes por tipo (ADR-030).
 - Notificações Web Push voluntárias por dispositivo para diretores de turma, com teste de envio, aviso diário das chamadas acompanhadas, controle por vínculo vigente e configuração VAPID opcional (ADR-028).
 
 - Botão Personalizado no Painel, após as séries, com calendário de início e fim, filtros de série e turma e gráfico de infrequência para até 366 dias. A taxa usa apenas os registros de aluno por dia com chamada salva, incluindo F e FJ.

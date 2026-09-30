@@ -1,5 +1,5 @@
-// Teste voluntário de envio para a própria assinatura, limitado por dispositivo.
-import { testarNotificacoes } from "@/application/notificacoes";
+// Preferências da própria conta, compartilhadas entre seus dispositivos.
+import { atualizarPreferenciasNotificacoes } from "@/application/notificacoes-configuracao";
 import {
   corpoJson,
   erroApi,
@@ -11,12 +11,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export async function POST(requisicao: Request): Promise<Response> {
+export async function PATCH(requisicao: Request) {
   return executarRota(async () => {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const sessao = await exigirCapacidade("receberNotificacoes");
     if (!sessao.ok) return sessao.resposta;
-    await testarNotificacoes(sessao.usuario, await corpoJson(requisicao));
-    return json({ ok: true });
+    return json({
+      preferencias: await atualizarPreferenciasNotificacoes(
+        sessao.usuario,
+        await corpoJson(requisicao),
+      ),
+    });
   });
 }

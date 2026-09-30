@@ -30,6 +30,15 @@ vi.mock("@/infra/web-push", () => ({
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
+    configuracaoNotificacoes: {
+      findUnique: async () => ({
+        resumoDiario: true,
+        novasChamadas: false,
+        chamadasPendentes: false,
+        horarioResumo: "00:00",
+        horarioPendencias: "17:00",
+      }),
+    },
     alunoDaChamada: { findMany: async () => [{ aluno: { turmaOriginalId: "origem-sintetica" } }] },
     assinaturaPush: {
       findMany: async () => [{ id: assinatura.id }],

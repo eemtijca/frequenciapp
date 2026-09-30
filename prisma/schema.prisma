@@ -21,6 +21,15 @@ enum Papel {
   @@map("papel")
 }
 
+// Tipos de aviso com confirmações independentes por dispositivo.
+enum TipoNotificacao {
+  RESUMO_DIARIO
+  NOVA_CHAMADA
+  CHAMADAS_PENDENTES
+
+  @@map("tipo_notificacao")
+}
+
 // Modo de escrita na planilha: conservador preenche apenas célula vazia;
 // completo permite substituir, limpar e remover o que a integração criou.
 enum ModoPlanilha {
@@ -59,30 +68,32 @@ enum ResultadoSincronizacao {
 // Usuário da aplicação. Sem dados além do necessário: nome de
 // tratamento, e-mail para acesso, hash da senha e papel.
 model Usuario {
-  id                       String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                    String
-  senhaHash                String                  @map("senha_hash")
+  senhaHash                String                     @map("senha_hash")
   nome                     String
-  papel                    Papel                   @default(COORDENACAO)
-  ativo                    Boolean                 @default(true)
-  criadoEm                 DateTime                @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm             DateTime                @updatedAt @map("atualizado_em") @db.Timestamptz
+  papel                    Papel                      @default(COORDENACAO)
+  ativo                    Boolean                    @default(true)
+  criadoEm                 DateTime                   @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm             DateTime                   @updatedAt @map("atualizado_em") @db.Timestamptz
   sessoes                  Sessao[]
-  frequenciasCriadas       Frequencia[]            @relation("FrequenciaCriadaPor")
-  frequenciasAtualizadas   Frequencia[]            @relation("FrequenciaAtualizadaPor")
-  saidasLiberadas          SaidaAntecipada[]       @relation("SaidaLiberadaPor")
-  saidasCriadas            SaidaAntecipada[]       @relation("SaidaCriadaPor")
+  frequenciasCriadas       Frequencia[]               @relation("FrequenciaCriadaPor")
+  frequenciasAtualizadas   Frequencia[]               @relation("FrequenciaAtualizadaPor")
+  saidasLiberadas          SaidaAntecipada[]          @relation("SaidaLiberadaPor")
+  saidasCriadas            SaidaAntecipada[]          @relation("SaidaCriadaPor")
   entradasCriadas          EntradaAtrasada[]
-  configuracoesAtualizadas Configuracao[]          @relation("ConfiguracaoAtualizadaPor")
-  integracoesModo          IntegracaoPlanilha[]    @relation("IntegracaoModoPor")
-  integracoesAtualizadas   IntegracaoPlanilha[]    @relation("IntegracaoAtualizadaPor")
-  sincronizacoesPlanilha   SincronizacaoPlanilha[] @relation("SincronizacaoCriadaPor")
+  configuracoesAtualizadas Configuracao[]             @relation("ConfiguracaoAtualizadaPor")
+  integracoesModo          IntegracaoPlanilha[]       @relation("IntegracaoModoPor")
+  integracoesAtualizadas   IntegracaoPlanilha[]       @relation("IntegracaoAtualizadaPor")
+  sincronizacoesPlanilha   SincronizacaoPlanilha[]    @relation("SincronizacaoCriadaPor")
   auditorias               Auditoria[]
-  vinculosDiretor          VinculoDiretor[]        @relation("VinculoDoDiretor")
-  vinculosCriados          VinculoDiretor[]        @relation("VinculoCriadoPor")
+  vinculosDiretor          VinculoDiretor[]           @relation("VinculoDoDiretor")
+  vinculosCriados          VinculoDiretor[]           @relation("VinculoCriadoPor")
   credencialDiretor        CredencialDiretor?
-  parametrosAtualizados    ParametrosAcesso[]      @relation("ParametrosAtualizadosPor")
+  parametrosAtualizados    ParametrosAcesso[]         @relation("ParametrosAtualizadosPor")
   assinaturasPush          AssinaturaPush[]
+  preferenciaNotificacoes  PreferenciaNotificacoes?
+  notificacoesAtualizadas  ConfiguracaoNotificacoes[] @relation("NotificacoesAtualizadasPor")
 
   @@index([papel])
   @@map("usuarios")
@@ -128,17 +139,48 @@ model AssinaturaPush {
 // Um aviso diário por assinatura, com reserva para envios concorrentes
 // e confirmação somente depois da aceitação pelo serviço de push.
 model EntregaPush {
-  id           String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  assinaturaId String         @map("assinatura_id") @db.Uuid
-  dia          DateTime       @db.Date
-  reservadaEm  DateTime?      @map("reservada_em") @db.Timestamptz
-  enviadaEm    DateTime?      @map("enviada_em") @db.Timestamptz
-  criadoEm     DateTime       @default(now()) @map("criado_em") @db.Timestamptz
-  assinatura   AssinaturaPush @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assinaturaId String          @map("assinatura_id") @db.Uuid
+  dia          DateTime        @db.Date
+  tipo         TipoNotificacao @default(RESUMO_DIARIO)
+  referencia   String          @default("") @db.VarChar(36)
+  reservadaEm  DateTime?       @map("reservada_em") @db.Timestamptz
+  enviadaEm    DateTime?       @map("enviada_em") @db.Timestamptz
+  criadoEm     DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  assinatura   AssinaturaPush  @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
 
-  @@unique([assinaturaId, dia])
+  @@unique([assinaturaId, dia, tipo, referencia])
   @@index([dia])
   @@map("entregas_push")
+}
+
+// Escolhas pessoais valem para todos os dispositivos da conta. Sem linha,
+// os padrões preservam o resumo existente e exigem adesão a novas chamadas.
+model PreferenciaNotificacoes {
+  usuarioId          String    @id @map("usuario_id") @db.Uuid
+  resumoDiario       Boolean   @default(true) @map("resumo_diario")
+  novasChamadas      Boolean   @default(false) @map("novas_chamadas")
+  chamadasPendentes  Boolean   @default(true) @map("chamadas_pendentes")
+  novasChamadasDesde DateTime? @map("novas_chamadas_desde") @db.Timestamptz
+  atualizadoEm       DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
+  usuario            Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("preferencias_notificacoes")
+}
+
+// Regras da escola, alteradas pela Gestão e avaliadas no fuso da instalação.
+model ConfiguracaoNotificacoes {
+  id                String   @id @default("principal")
+  resumoDiario      Boolean  @default(true) @map("resumo_diario")
+  novasChamadas     Boolean  @default(true) @map("novas_chamadas")
+  chamadasPendentes Boolean  @default(false) @map("chamadas_pendentes")
+  horarioResumo     String   @default("17:00") @map("horario_resumo") @db.VarChar(5)
+  horarioPendencias String   @default("17:00") @map("horario_pendencias") @db.VarChar(5)
+  atualizadoEm      DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?  @map("atualizado_por_id") @db.Uuid
+  atualizadoPor     Usuario? @relation("NotificacoesAtualizadasPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("configuracoes_notificacoes")
 }
 
 // Série escolar (por exemplo, "1º ano"). Referência para as turmas.
@@ -228,6 +270,7 @@ model Frequencia {
   turmaId         String           @map("turma_id") @db.Uuid
   dia             DateTime         @db.Date
   revisao         Int              @default(1)
+  criadoEm        DateTime         @default(now()) @map("criado_em") @db.Timestamptz
   criadoPorId     String?          @map("criado_por_id") @db.Uuid
   atualizadoPorId String?          @map("atualizado_por_id") @db.Uuid
   atualizadoEm    DateTime         @updatedAt @map("atualizado_em") @db.Timestamptz

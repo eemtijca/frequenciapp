@@ -117,6 +117,56 @@ async function contagens(page: import("@playwright/test").Page) {
 }
 
 test.describe("notificações da PWA", () => {
+  test("diretor escolhe tipos para a conta sem pedir permissão ao navegador", async ({ page }) => {
+    await simularDispositivo(page);
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
+    await expect(
+      dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }),
+    ).toHaveAttribute("aria-checked", "false");
+    await dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }).click();
+    await expect(
+      dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(await contagens(page)).toEqual({ pedidos: 0, inscricoes: 0, cancelamentos: 0 });
+    await page.reload();
+    await aguardarHidratacao(page);
+    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await expect(
+      dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }),
+    ).toHaveAttribute("aria-checked", "true");
+    await expect(
+      dialogo.getByRole("switch", { name: "Chamadas pendentes", exact: true }),
+    ).toHaveCount(0);
+  });
+  test("coordenação ativa o dispositivo para receber avisos de pendências", async ({ page }) => {
+    await simularDispositivo(page);
+    expect(
+      (
+        await page.request.post("/api/auth/entrar", {
+          data: { login: "demo@escola.exemplo", senha: "DemoFrequencia2026" },
+        })
+      ).ok(),
+    ).toBe(true);
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
+    await expect(
+      dialogo.getByRole("switch", { name: "Chamadas pendentes", exact: true }),
+    ).toBeVisible();
+    await dialogo.getByRole("button", { name: "Ativar notificações", exact: true }).click();
+    await expect(
+      dialogo.getByRole("button", { name: "Desativar notificações", exact: true }),
+    ).toBeEnabled();
+    expect(await contagens(page)).toEqual({ pedidos: 1, inscricoes: 1, cancelamentos: 0 });
+    await dialogo.getByRole("button", { name: "Desativar notificações", exact: true }).click();
+    await expect(
+      dialogo.getByRole("button", { name: "Ativar notificações", exact: true }),
+    ).toBeEnabled();
+  });
   test("ativa apenas após o toque, testa e desativa neste dispositivo", async ({ page }) => {
     await simularDispositivo(page);
     await page.route("**/api/notificacoes/teste", (rota) => rota.fulfill({ json: { ok: true } }));

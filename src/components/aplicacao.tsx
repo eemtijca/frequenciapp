@@ -7,6 +7,7 @@ import { startTransition, useCallback, useEffect, useMemo, useRef, useState } fr
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  Bell,
   ChartPie,
   ClipboardCheck,
   DoorOpen,
@@ -55,6 +56,7 @@ import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vist
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
+import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
 export type Visao = "painel" | "chamada" | "saidas" | "relatorios" | "alunos" | "gestao";
@@ -225,6 +227,7 @@ export default function Aplicacao({
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [saidaComPendencia, setSaidaComPendencia] = useState(false);
   const [senhaAberta, setSenhaAberta] = useState(false);
+  const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [offline, setOffline] = useState(false);
   const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
     abaRelatoriosDe(visaoInicial),
@@ -614,6 +617,15 @@ export default function Aplicacao({
                 variant="ghost"
                 size="sm"
                 className="h-11 w-full justify-start gap-2"
+                onClick={() => setNotificacoesAbertas(true)}
+              >
+                <Bell size={16} />
+                Configurar notificações
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-11 w-full justify-start gap-2"
                 onClick={() => setSenhaAberta(true)}
               >
                 <KeyRound size={16} />
@@ -646,6 +658,16 @@ export default function Aplicacao({
                 </span>
               </div>
               <div className="flex items-center gap-0.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-11 rounded-full"
+                  aria-label="Configurar notificações"
+                  title="Configurar notificações"
+                  onClick={() => setNotificacoesAbertas(true)}
+                >
+                  <Bell size={18} />
+                </Button>
                 <SeletorTema />
                 <Popover>
                   <PopoverTrigger asChild>
@@ -784,6 +806,7 @@ export default function Aplicacao({
       </AlertDialog>
 
       <DialogoSenha aberto={senhaAberta} onAbrir={setSenhaAberta} />
+      <DialogoNotificacoes aberto={notificacoesAbertas} onAbrir={setNotificacoesAbertas} />
       <RegistroPwa />
     </>
   );

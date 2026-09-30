@@ -30,17 +30,21 @@ Encerra a sessão corrente e limpa o cookie.
 
 - 200 `{"usuario": {...}}` ou `{"usuario": null}`.
 
-## Notificações do diretor
+## Notificações
 
-As rotas de preferência exigem `verEstatisticasDasTurmas` e operam somente sobre a conta corrente. Consultar, ativar e testar exigem a troca inicial da palavra-chave concluída. A agenda usa segredo independente, sem autenticação por cookie. Detalhes em [notificacoes.md](notificacoes.md).
+Assinaturas e preferências exigem `receberNotificacoes` e operam somente sobre a conta corrente. Diretores também precisam concluir a troca inicial da palavra-chave. A configuração da escola exige administração e registra auditoria. A agenda usa segredo independente, sem autenticação por cookie. Detalhes em [notificacoes.md](notificacoes.md).
 
-| Método e rota                                   | Corpo e resposta                                                                                                                                                                                  |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/notificacoes/assinatura?endpoint=...` | Endpoint opcional. Responde `{ configurada, chavePublica, ativa }`, sem chaves privadas ou outras assinaturas.                                                                                    |
-| `POST /api/notificacoes/assinatura`             | `{ endpoint, keys: { p256dh, auth } }`. Associa o dispositivo à conta e à sessão; responde `{ ok: true }`. Máximo de cinco dispositivos, 409 ao exceder.                                          |
-| `DELETE /api/notificacoes/assinatura`           | `{ endpoint }`. Remove somente a assinatura da conta; idempotente, responde `{ ok: true }`.                                                                                                       |
-| `POST /api/notificacoes/teste`                  | `{ endpoint }`. Testa a assinatura própria, com limite de um minuto (429). Sem assinatura, 404; expirada, 410; falha temporária, 503.                                                             |
-| `GET /api/notificacoes/resumo`                  | Exige `Authorization: Bearer CRON_SECRET`, sem parâmetros de escopo. Retorna `{ configurada, enviadas, expiradas, falhas, ignoradas }`. Segredo ausente ou incorreto: 403; falha temporária: 503. |
+| Método e rota                                   | Corpo e resposta                                                                                                                                                                                                        |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/notificacoes/assinatura?endpoint=...` | Endpoint opcional. Responde `{ configurada, chavePublica, ativa, preferencias, tipos, horarioResumo, horarioPendencias, fuso }`. Os tipos incluem disponibilidade da escola, sem chaves privadas ou outras assinaturas. |
+| `POST /api/notificacoes/assinatura`             | `{ endpoint, keys: { p256dh, auth } }`. Associa o dispositivo à conta e à sessão; responde `{ ok: true }`. Máximo de cinco dispositivos, 409 ao exceder.                                                                |
+| `DELETE /api/notificacoes/assinatura`           | `{ endpoint }`. Remove somente a assinatura da conta; idempotente, responde `{ ok: true }`.                                                                                                                             |
+| `POST /api/notificacoes/teste`                  | `{ endpoint }`. Testa a assinatura própria, com limite de um minuto (429). Sem assinatura, 404; expirada, 410; falha temporária, 503.                                                                                   |
+| `GET /api/notificacoes/resumo`                  | Exige `Authorization: Bearer CRON_SECRET`, sem parâmetros de escopo. Retorna `{ configurada, enviadas, expiradas, falhas, ignoradas }`. Segredo ausente ou incorreto: 403; falha temporária: 503.                       |
+| `PATCH /api/notificacoes/preferencias`          | Campos booleanos parciais `resumoDiario`, `novasChamadas` e `chamadasPendentes`. Retorna `{ preferencias }` da conta. Tipo incompatível com o papel: 400.                                                               |
+| `GET /api/notificacoes/configuracao`            | Restrito à administração. Retorna `{ configuracao, fuso }`, com tipos disponíveis e horários.                                                                                                                           |
+| `PATCH /api/notificacoes/configuracao`          | Administração. Campos booleanos de disponibilidade e `horarioResumo`, `horarioPendencias` em `HH:MM`. Retorna `{ configuracao, fuso }`, com auditoria. Dados inválidos: 400.                                            |
+| `GET /api/notificacoes/agenda`                  | Mesma autenticação e contagens da rota de resumo. Verifica todos os tipos, respeitando horários, preferências e elegibilidade atual. Não aceita escopo escolhido pelo chamador.                                         |
 
 ## Conta
 

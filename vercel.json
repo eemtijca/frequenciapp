@@ -5,7 +5,7 @@
   "installCommand": "npm ci",
   "outputDirectory": ".next",
   "cleanUrls": true,
-  "crons": [{ "path": "/api/notificacoes/resumo", "schedule": "0 20 * * 1-5" }],
+  "crons": [{ "path": "/api/notificacoes/agenda", "schedule": "0 20 * * 1-5" }],
   "headers": [
     {
       "source": "/(.*)",
