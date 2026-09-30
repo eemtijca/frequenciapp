@@ -414,7 +414,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
         Guardamos apenas o nome do aluno e as turmas. Nenhum outro dado pessoal é necessário para a
-        frequência. A exclusão apaga também o histórico de faltas do aluno; para retirá-lo das
+        frequência. A exclusão apaga também faltas, saídas e entradas do aluno; para retirá-lo das
         frequências preservando o histórico, desative.
       </p>
 
@@ -536,8 +536,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  A exclusão é definitiva e apaga também o histórico de faltas do
-                                  aluno. Para preservar o histórico, desative em vez de excluir.
+                                  A exclusão é definitiva e apaga também faltas, saídas e entradas
+                                  do aluno. Para preservar o histórico, desative em vez de excluir.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

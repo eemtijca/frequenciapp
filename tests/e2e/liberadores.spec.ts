@@ -35,7 +35,7 @@ test.describe("quem libera as saídas", () => {
     await secao.getByRole("button", { name: "Adicionar" }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
 
-    await trocarVisao(page, "Saídas", "saidas");
+    await trocarVisao(page, "Saídas e entradas", "saidas");
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();
     await page.locator("#saida-aluno").click();

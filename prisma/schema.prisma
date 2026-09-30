@@ -72,6 +72,7 @@ model Usuario {
   frequenciasAtualizadas   Frequencia[]            @relation("FrequenciaAtualizadaPor")
   saidasLiberadas          SaidaAntecipada[]       @relation("SaidaLiberadaPor")
   saidasCriadas            SaidaAntecipada[]       @relation("SaidaCriadaPor")
+  entradasCriadas          EntradaAtrasada[]
   configuracoesAtualizadas Configuracao[]          @relation("ConfiguracaoAtualizadaPor")
   integracoesModo          IntegracaoPlanilha[]    @relation("IntegracaoModoPor")
   integracoesAtualizadas   IntegracaoPlanilha[]    @relation("IntegracaoAtualizadaPor")
@@ -126,6 +127,7 @@ model Turma {
   frequencias    Frequencia[]
   horarios       Horario[]
   sincronizacoes SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
+  entradas       EntradaAtrasada[]
 
   vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
   configuracoesOrigem ConfiguracaoOrigemTurma[]
@@ -151,6 +153,7 @@ model Aluno {
   turmaOriginal        Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
   faltas               Falta[]
   saidas               SaidaAntecipada[]
+  entradas             EntradaAtrasada[]
   chamadas             AlunoDaChamada[]
 
   @@index([turmaId, ordem])
@@ -255,6 +258,27 @@ model SaidaAntecipada {
   @@index([dia])
   @@index([alunoId, dia])
   @@map("saidas_antecipadas")
+}
+
+// Chegada atrasada independente da chamada, com turma e autoria históricas.
+model EntradaAtrasada {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alunoId           String   @map("aluno_id") @db.Uuid
+  turmaId           String   @map("turma_id") @db.Uuid
+  turmaRotulo       String   @map("turma_rotulo") @db.VarChar(100)
+  dia               DateTime @db.Date
+  horario           String   @db.VarChar(5)
+  motivo            String   @db.VarChar(200)
+  registradoPorNome String   @map("registrado_por_nome") @db.VarChar(100)
+  criadoPorId       String?  @map("criado_por_id") @db.Uuid
+  criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  aluno             Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma             Turma    @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor         Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@unique([alunoId, dia])
+  @@index([dia, turmaId])
+  @@map("entradas_atrasadas")
 }
 
 // Vínculo de um diretor com uma turma de origem, com período. O fim é

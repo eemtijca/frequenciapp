@@ -13,6 +13,7 @@ import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSaidas } from "@/application/saidas";
 import { listarJustificativas } from "@/application/justificativas";
+import { ABA_ENTRADAS } from "@/domain/planilha-entradas";
 import {
   ativarModoCompleto as ativarModoCompletoComum,
   chamarIntegracao,
@@ -286,7 +287,11 @@ export async function lerEstruturaSaidas() {
         congeladasColunas: item.congeladasColunas,
         mesclagens: item.mesclagens,
       };
-      abas.push(detectarEsquemaSaida(bruta));
+      const detectada = detectarEsquemaSaida(bruta);
+      if (bruta.nome === ABA_ENTRADAS)
+        detectada.bloqueio =
+          "A aba Entradas é reservada às chegadas atrasadas. Escolha outra aba para as saídas.";
+      abas.push(detectada);
     } catch (erro) {
       problemas.push({
         aba: item.nome,
@@ -315,6 +320,11 @@ export async function salvarMapaSaidas(admin: { id: string }, entrada: unknown) 
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Estrutura inválida.", 400);
   }
   const abas = dados.data.abas as unknown as AbaSaidaEsquema[];
+  if (dados.data.aba === ABA_ENTRADAS)
+    throw new ErroHttp(
+      "A aba Entradas é reservada às chegadas atrasadas. Escolha outra aba para as saídas.",
+      400,
+    );
   const escolhida = abas.find((aba) => aba.nome === dados.data.aba);
   if (!escolhida) throw new ErroHttp("Aba escolhida não está na estrutura lida.", 400);
   if (escolhida.bloqueio) throw new ErroHttp(escolhida.bloqueio, 400);

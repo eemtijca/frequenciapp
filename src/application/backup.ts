@@ -1,4 +1,4 @@
-// Cópia de segurança em JSON: exporta cadastro, frequências e saídas e
+// Cópia de segurança em JSON: exporta cadastro, frequências, saídas e entradas e
 // importa mesclando sem sobrescrever, com resultado e auditoria.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
@@ -6,6 +6,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequencia";
+import { ehHorarioEntrada } from "@/domain/entradas";
 import { lerConfiguracoes } from "@/application/configuracoes";
 
 export const FORMATO_COPIA = "frequenciapp";
@@ -101,6 +102,21 @@ const esquemaCopia = z.object({
       }),
     )
     .max(50000),
+  entradas: z
+    .array(
+      z.object({
+        id: uuid,
+        alunoId: uuid,
+        turmaId: uuid,
+        turmaRotulo: z.string().trim().min(1).max(100),
+        dia,
+        horario: z.string().refine(ehHorarioEntrada, "Horário inválido."),
+        motivo: z.string().trim().min(2).max(200),
+        registradoPorNome: z.string().trim().min(1).max(100),
+      }),
+    )
+    .max(50000)
+    .optional(),
   justificativas: z
     .array(
       z.object({
@@ -166,7 +182,7 @@ function faltasIguais(
   return ordemAtual.every((valor, indice) => valor === ordemNova[indice]);
 }
 
-/** Monta a cópia completa do cadastro, das frequências e das saídas. */
+/** Monta a cópia completa do cadastro, das frequências, das saídas e das entradas. */
 export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequenciapp> {
   const [
     series,
@@ -175,6 +191,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     alunos,
     frequencias,
     saidas,
+    entradas,
     justificativas,
     liberadores,
     configuracoes,
@@ -237,6 +254,19 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         liberadoPorCodigo: true,
       },
     }),
+    banco().entradaAtrasada.findMany({
+      orderBy: [{ dia: "asc" }, { horario: "asc" }],
+      select: {
+        id: true,
+        alunoId: true,
+        turmaId: true,
+        turmaRotulo: true,
+        dia: true,
+        horario: true,
+        motivo: true,
+        registradoPorNome: true,
+      },
+    }),
     banco().justificativa.findMany({
       select: { codigo: true, rotulo: true, ativo: true },
     }),
@@ -269,6 +299,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     saidas: saidas.map((saida) => ({
       ...saida,
       dia: saida.dia.toISOString().slice(0, 10),
+    })),
+    entradas: entradas.map((entrada) => ({
+      ...entrada,
+      dia: entrada.dia.toISOString().slice(0, 10),
     })),
     justificativas: ordenarPorRotulo(justificativas),
     liberadores: ordenarPorRotulo(liberadores),
@@ -630,6 +664,37 @@ export async function importarCopia(
       resultado.adicionadas += 1;
     }
 
+    // Entradas ausentes em cópias antigas continuam preservadas.
+    for (const entrada of copia.entradas ?? []) {
+      if (!idsAlunos.has(entrada.alunoId) || !idsTurmas.has(entrada.turmaId)) {
+        resultado.conflitos += 1;
+        continue;
+      }
+      const diaRepositorio = new Date(`${entrada.dia}T12:00:00Z`);
+      const atual = await tx.entradaAtrasada.findUnique({
+        where: { alunoId_dia: { alunoId: entrada.alunoId, dia: diaRepositorio } },
+      });
+      if (atual) {
+        const igual =
+          atual.horario === entrada.horario &&
+          atual.motivo === entrada.motivo &&
+          atual.turmaId === entrada.turmaId &&
+          atual.turmaRotulo === entrada.turmaRotulo &&
+          atual.registradoPorNome === entrada.registradoPorNome;
+        if (igual) resultado.identicas += 1;
+        else resultado.conflitos += 1;
+        continue;
+      }
+      // O código exportado é preservado. Um código já usado não substitui outro registro.
+      if (await tx.entradaAtrasada.findUnique({ where: { id: entrada.id } })) {
+        resultado.conflitos += 1;
+        continue;
+      }
+      await tx.entradaAtrasada.create({
+        data: { ...entrada, dia: diaRepositorio, criadoPorId: admin.id },
+      });
+      resultado.adicionadas += 1;
+    }
     await auditar(
       tx,
       admin.id,

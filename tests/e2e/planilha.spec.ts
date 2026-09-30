@@ -6,6 +6,10 @@ import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
 import { ADMIN_E2E, comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
+// A resposta simulada por page.route exige que o service worker não intercepte a requisição.
+// O funcionamento com service worker é verificado na suíte própria de PWA.
+test.use({ serviceWorkers: "block" });
+
 let gas: GasFalso;
 
 test.describe("Google Planilhas", () => {

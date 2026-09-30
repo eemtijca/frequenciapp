@@ -14,6 +14,7 @@ Suítes do FrequenciApp com Vitest e Playwright.
 
 Roda em qualquer ambiente, sem banco e sem rede:
 
+- `entradas.test.ts` e `planilha-entradas.test.ts`: horário, código por aluno e data, preservação de linhas e fórmulas, releitura, mudança de arquivo e falha sem confirmação com dublê de Sheets API.
 - `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
 - `relatorios.test.ts`: indicadores do dia e relatórios por aluno e por saída.
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
@@ -57,6 +58,8 @@ Variáveis aceitas:
 - `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
 - `DIRECT_URL`: conexão preferida pelos comandos administrativos, quando disponível.
 
+O contrato `entradas.test.ts` cobre duplicidade, validação, turma histórica, separação da chamada, cópia JSON, desistência e permissões.
+
 A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
 
 ## Ponta a ponta com Playwright
@@ -83,6 +86,7 @@ npx playwright test    # headless, execução serial
 - `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
 - Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
 - Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, indicador da barra inferior na visão ativa, abas da Gestão com toque e teclado, integração com Google Planilhas contra o script falso (token, conexão, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
+- `entradas.spec.ts`: chegada atrasada, recarga, remoção confirmada e fluxo de aba/prévia/envio com API falsa. Esse spec e `planilha.spec.ts` bloqueiam o service worker para permitir interceptação de requisições. O PWA continua coberto pela suíte própria.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
 O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner.

@@ -241,3 +241,7 @@ A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pe
 ## Grade por turma de origem
 
 A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência, além do acumulado de F + FJ de todo o histórico. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca.
+
+## Entrada atrasada (entrada_atrasada)
+
+O registro guarda aluno, turma e rótulo da turma no momento do registro, data civil, horário `HH:mm`, motivo de até 200 caracteres, nome de quem registrou, autoria anulável e criação. A chave (aluno, dia) impede duplicação, independentemente de saída registrada no mesmo dia. Transferências não alteram a turma histórica. A entrada não gera falta ou presença. Alunos desativados e desistentes na data não podem receber novo registro. Remoção para correção é auditada; linhas já enviadas ao Google permanecem intactas.
