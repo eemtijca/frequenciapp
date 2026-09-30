@@ -24,4 +24,6 @@ Polling depende de manter o aplicativo aberto. Push com Firebase adicionaria con
 
 ## Consequências
 
+A preparação automática das chaves, sem exigir configuração manual, complementa esta decisão na [ADR-029](029-configuracao-automatica-push.md).
+
 Há uma dependência de transporte, duas tabelas e quatro variáveis opcionais. Chaves privadas e assinaturas não entram na cópia JSON nem nos logs. O aplicativo continua utilizável com push desligado. iOS exige instalação na Tela de Início. O serviço de push oferece entrega eventual, sem confirmação de leitura, e uma interrupção entre aceitação e confirmação pode repetir o aviso. Configuração e limites estão em [notificacoes.md](../notificacoes.md).

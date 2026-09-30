@@ -26,16 +26,20 @@ O sistema operacional e o navegador podem atrasar ou silenciar avisos. A aceita�
 
 Aplicar as migrações antes de servir esta versão: `npx prisma migrate deploy`. A migração `notificacoes_push` cria duas tabelas vazias, sem alterar chamadas ou contas existentes. As assinaturas e chaves ficam fora da cópia JSON do aplicativo.
 
-Gerar um único par VAPID com `npx web-push generate-vapid-keys` e guardar a chave privada no ambiente da implantação, sem incluir em commits, imagens, issues ou logs públicos. Configurar juntas:
+As notificações podem ser ativadas sem ajustes da administração no aplicativo ou variáveis VAPID na hospedagem. O servidor deriva um par estável de `AUTH_SECRET` com HKDF-SHA-256 e contexto exclusivo para Web Push. Reinícios e instâncias com o mesmo segredo mantêm o par. A chave privada permanece somente no servidor, e o contato padrão é o endereço HTTPS do repositório do FrequenciApp.
+
+Uma instalação com par VAPID próprio continua usando suas chaves, sem troca automática. Para definir esse par, gerar uma única vez com `npx web-push generate-vapid-keys` e configurar as duas chaves juntas. Não incluir a chave privada em commits, imagens, issues ou logs públicos. O contato pode ser personalizado de forma independente:
 
 | Variável                 | Conteúdo                                                          |
 | ------------------------ | ----------------------------------------------------------------- |
 | `PUSH_VAPID_PUBLIC_KEY`  | Chave pública do par, compartilhada com o navegador.              |
 | `PUSH_VAPID_PRIVATE_KEY` | Chave privada do mesmo par, somente no servidor.                  |
-| `PUSH_VAPID_SUBJECT`     | Contato da administração em `mailto:administracao@escola.br`.     |
+| `PUSH_VAPID_SUBJECT`     | Contato opcional da administração em `mailto:` ou HTTPS.          |
 | `CRON_SECRET`            | Segredo independente com pelo menos 32 caracteres, para a agenda. |
 
-Sem o grupo VAPID, o aplicativo segue funcional e a opção informa que as notificações não foram configuradas. Grupo parcial impede a partida. Um par que não corresponde é recusado antes do cadastro ou envio. Trocar o par exige ativar novamente nos dispositivos; a reativação remove assinaturas antigas da conta.
+Uma única chave VAPID explícita impede a partida, para não substituir silenciosamente a identidade da instalação. Um par que não corresponde é recusado antes do cadastro ou envio. Trocar um par explícito, ou `AUTH_SECRET` quando o par é automático, exige ativar novamente nos dispositivos; a reativação remove assinaturas antigas da conta. A derivação está registrada na [ADR-029](adr/029-configuracao-automatica-push.md).
+
+Ativação e notificação de teste não dependem de `CRON_SECRET`. O envio diário continua exigindo esse segredo e uma agenda configurada na hospedagem.
 
 Na Vercel, a agenda de `vercel.json` chama `/api/notificacoes/resumo` de segunda a sexta, às 20:00 UTC, equivalente a 17:00 em `America/Fortaleza`. A plataforma envia `Authorization: Bearer CRON_SECRET`. Alterar o horário exige ajustar a expressão da agenda; a data das chamadas usa `TZ_APP`. A plataforma pode executar dentro de uma janela de horário, conforme o plano contratado.
 
