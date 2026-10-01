@@ -1,6 +1,7 @@
 "use client";
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
+import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, FileSpreadsheet, Trash2 } from "lucide-react";
 import type {
@@ -471,6 +472,13 @@ export default function VistaEntradas({
                 >
                   Preparar aba Entradas
                 </Button>
+              )}
+              {podePrepararPlanilha && (
+                <OrganizarPlanilha
+                  rota="/api/planilha-entradas/organizar"
+                  aba="Entradas"
+                  disabled={executando}
+                />
               )}
               <Button
                 variant="outline"

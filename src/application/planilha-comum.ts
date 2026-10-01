@@ -1,5 +1,6 @@
 // Integrações com Google Planilhas: helpers comuns das finalidades, cobrindo
 // a linha da integração, conexão, token, modo completo, abas e cópias.
+import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "../../generated/prisma/client";
@@ -418,7 +419,14 @@ export async function criarAba(
   const linha = await lerLinha(finalidade);
   const resultado = await chamarIntegracao<{ aba: string }>(
     linha,
-    { acao: "criarAba", nome: dados.data.nome, cabecalho: dados.data.cabecalho },
+    {
+      acao: "criarAba",
+      nome: dados.data.nome,
+      cabecalho: dados.data.cabecalho,
+      colunas: colunasDeNovaAba(
+        dados.data.cabecalho?.length ? dados.data.cabecalho : ["Aluno", "Turma atual"],
+      ),
+    },
     { retentavel: false },
   );
   await comTransacao(async (tx) => {

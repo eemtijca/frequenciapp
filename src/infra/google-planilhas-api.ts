@@ -13,7 +13,7 @@ const CHAVES_METADADOS = [
   "frequenciapp.copia",
 ];
 const CAMPOS_ESTRUTURA =
-  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
+  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
   "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue))))";
 
@@ -52,6 +52,7 @@ const documento = z.object({
   sheets: z.array(
     z.object({
       properties: propriedades,
+      bandedRanges: z.array(z.object({ bandedRangeId: z.number(), range: faixa })).optional(),
       merges: z.array(faixa).optional(),
       developerMetadata: z.array(metadado).optional(),
       data: z
@@ -334,7 +335,12 @@ export async function lerBlocosGoogle(
   });
 }
 
-export async function estruturaGoogle(id: string, acesso: string, nome?: string) {
+export async function estruturaGoogle(
+  id: string,
+  acesso: string,
+  nome?: string,
+  apresentacao = false,
+) {
   const doc = await lerDocumentoGoogle(id, acesso);
   const abas = nome
     ? [exigirAbaGoogle(doc, nome)]
@@ -359,7 +365,7 @@ export async function estruturaGoogle(id: string, acesso: string, nome?: string)
           acesso,
           aba.properties.title,
           Math.max(1, Math.min(usado.linhas, 12)),
-          [{ coluna: 1, colunas: Math.max(1, Math.min(usado.colunas, 60)) }],
+          [{ coluna: 1, colunas: Math.max(1, Math.min(usado.colunas, apresentacao ? 400 : 60)) }],
         );
         return {
           nome: aba.properties.title,
@@ -436,7 +442,7 @@ export async function executarAcaoGoogle(
 ): Promise<unknown> {
   if (corpo.acao === "estrutura") {
     const aba = typeof corpo.aba === "string" ? corpo.aba : undefined;
-    return estruturaGoogle(id, acesso, aba);
+    return estruturaGoogle(id, acesso, aba, corpo.apresentacao === true);
   }
   if (corpo.acao === "ler") {
     if (typeof corpo.aba !== "string") throw new ErroHttp("Informe a aba.", 400);
@@ -496,6 +502,29 @@ export async function executarAcaoGoogle(
     const cabecalho = z.array(z.string()).safeParse(corpo.cabecalho);
     const { criarAbaGoogle } = await import("@/infra/google-planilhas-abas");
     return criarAbaGoogle(id, acesso, corpo.nome, cabecalho.success ? cabecalho.data : undefined);
+  }
+  if (corpo.acao === "organizarAba") {
+    const dados = z
+      .object({
+        aba: z.string().min(1),
+        cabecalhoLinha: z.number().int().positive(),
+        assinatura: z.string().min(1),
+        colunas: z
+          .array(
+            z.object({
+              indice: z.number().int().positive(),
+              rotulo: z.string(),
+              largura: z.number().int().min(40).max(400),
+              alinhamento: z.enum(["LEFT", "CENTER"]),
+            }),
+          )
+          .min(1)
+          .max(400),
+      })
+      .safeParse(corpo);
+    if (!dados.success) throw new ErroHttp("Apresentação da planilha inválida.", 400);
+    const { organizarAbaGoogle } = await import("@/infra/google-planilhas-apresentacao");
+    return organizarAbaGoogle(id, acesso, dados.data);
   }
   if (corpo.acao === "removerAba") {
     if (typeof corpo.aba !== "string") throw new ErroHttp("Informe a aba.", 400);

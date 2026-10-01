@@ -13,6 +13,12 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
   mantendo as três mais recentes;
 - recusa qualquer escrita quando o cabeçalho da aba mudou.
 
+## Apresentação na versão 5
+
+Abas novas recebem cabeçalho destacado, colunas ajustadas, alinhamento, quebra de texto e linhas alternadas. A ação `organizarAba` aplica o mesmo padrão à aba existente, depois da prévia administrativa e da conferência da assinatura. Ela recebe `aba`, `cabecalhoLinha`, `assinatura` e `colunas` com índice, largura e alinhamento. Valores, fórmulas e formatos numéricos não são regravados. Faixas manuais de cores em outro intervalo são preservadas e bloqueiam a sobreposição; reaplicar ao mesmo intervalo não acumula faixas. Falhas de serviço podem deixar parte dos estilos aplicada, portanto a operação não tem repetição automática.
+
+Para atualizar, cole o código da versão 5, publique uma nova versão na implantação existente e use Testar conexão no aplicativo. O endereço `/exec` e o token continuam os mesmos. `estrutura` aceita `apresentacao: true` para ampliar a amostra a 400 colunas durante a prévia visual, mantendo a leitura padrão de 60 colunas nos envios.
+
 ## Marcadores
 
 O Google só aceita Developer Metadata na planilha, na aba ou numa linha ou
@@ -43,7 +49,7 @@ agrupa o trabalho: a vinculação faz uma busca de metadados por lote (a 3
 buscava e relia todos os metadados a cada linha), e preenchimentos seguidos
 são lidos e gravados por trecho contíguo de cada coluna, sem pular fórmula nem
 célula ocupada. No dublê dos testes, o envio com vinculação de 35 linhas, dia
-novo e 35 marcas caiu de 3.376 para 97 chamadas, e o envio do dia seguinte, de
+novo e 35 marcas caiu de 3.376 para 97 chamadas na versão 4, e o envio do dia seguinte, de
 156 para 22.
 
 A leitura aceita `blocos` (faixas de colunas), devolve `ultimaLinha` e, com

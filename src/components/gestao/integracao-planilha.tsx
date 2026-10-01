@@ -2,6 +2,7 @@
 
 // Card da planilha de frequência: etapas de conexão, estrutura e envio, modo
 // completo e zona de risco. Restrito à administração.
+import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -103,6 +104,7 @@ export default function IntegracaoPlanilha({
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const [envioAberto, setEnvioAberto] = useState(false);
+  const [abaApresentacao, setAbaApresentacao] = useState("");
 
   const carregar = useCallback(async () => {
     try {
@@ -483,6 +485,31 @@ export default function IntegracaoPlanilha({
           </p>
         )}
       </EtapaPlanilha>
+
+      {conectada && abas.some((aba) => !aba.oculta) && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3">
+          <p className="text-muted-foreground text-xs">
+            Organização visual com prévia, mantendo os dados e os cabeçalhos existentes.
+          </p>
+          <Selecionar
+            id="frequencia-apresentacao"
+            value={abaApresentacao}
+            onValueChange={setAbaApresentacao}
+            placeholder="Escolha a aba para organizar"
+            ariaLabel="Aba para organizar a apresentação"
+            opcoes={abas
+              .filter((aba) => !aba.oculta)
+              .map((aba) => ({ valor: aba.nome, rotulo: aba.nome }))}
+          />
+          <div>
+            <OrganizarPlanilha
+              rota="/api/planilha/organizar"
+              aba={abaApresentacao}
+              disabled={!podeEnviar}
+            />
+          </div>
+        </div>
+      )}
 
       <EtapaPlanilha
         numero={3}

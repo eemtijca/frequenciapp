@@ -526,6 +526,10 @@ Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardand
 
 - 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
 
+### POST /api/planilha/organizar, /api/planilha-saidas/organizar e /api/planilha-entradas/organizar
+
+Somente administração, com origem válida. Corpo `{ aba }` retorna `{ previa }`, com linha do cabeçalho, assinatura, colunas reconhecidas e suas larguras, além de `planoHash`. Essa etapa apenas lê a planilha. A confirmação envia `{ aba, planoHash }` e retorna `{ organizada: true, aba }`, depois de reler e conferir a prévia. Alteração do arquivo, da conexão ou do cabeçalho responde 409 e exige nova prévia. A apresentação é registrada em `planilha.organizar`; valores, fórmulas, formatos numéricos e rótulos não mudam. Não há repetição automática da escrita. A integração legada exige Apps Script 5; a aba Entradas usa somente a conexão Google de saídas e seu cabeçalho padrão.
+
 ### POST /api/planilha/criar-aba
 
 Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria uma aba nova com cabeçalho mínimo e marcador da integração. Apenas administração.

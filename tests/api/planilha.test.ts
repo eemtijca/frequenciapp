@@ -189,6 +189,28 @@ describe("integração com a planilha", () => {
     expect(ping.ping.planilha.nome).toBe("Planilha de teste");
   });
 
+  it("confere a apresentação sem escrever e aplica só após a confirmação", async () => {
+    const corpo = { aba: "QP Ano A" };
+    const chamadas = gas?.chamadas().filter((acao) => acao === "organizarAba").length ?? 0;
+    const resposta = await autenticado("/api/planilha/organizar", {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    });
+    expect(resposta.status).toBe(200);
+    const dados = await json<{ previa: { planoHash: string; colunas: { rotulo: string }[] } }>(
+      resposta,
+    );
+    expect(dados.previa.colunas.some((coluna) => coluna.rotulo === "Aluno")).toBe(true);
+    expect(gas?.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadas);
+    const confirmado = await autenticado("/api/planilha/organizar", {
+      method: "POST",
+      body: JSON.stringify({ ...corpo, planoHash: dados.previa.planoHash }),
+    });
+    expect(confirmado.status).toBe(200);
+    expect(gas?.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadas + 1);
+    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+  });
+
   it("recusa token errado sem tocar na planilha", async () => {
     gas?.definirToken("outro-token");
     const teste = await autenticado("/api/planilha/testar", {
