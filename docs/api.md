@@ -532,6 +532,8 @@ Somente administração, com origem válida. Corpo `{ aba }` retorna `{ previa }
 
 Somente em `/api/planilha/organizar`, `{ aba, ajustarCabecalho: true, anoReferencia?: number }` retorna uma prévia com `ajusteCabecalho`: quantidade de linhas introdutórias reconhecidas a remover e datas a corrigir para `dd/mm/aaaa`. A confirmação repete esses campos e inclui `planoHash`. O ano deve estar entre 2000 e 2100; datas com ano explícito orientam os rótulos curtos próximos. A operação cria cópia oculta antes das alterações, recusa fórmulas nas células afetadas ou introdução não reconhecida, preserva os dados da tabela e atualiza o esquema mantendo o mapa. O provedor legado exige Apps Script 6. Mesclagens somente na introdução podem ser removidas; mesclagens na tabela continuam bloqueadas.
 
+A organização coletiva reutiliza `/api/planilha/organizar` com `{ aba, emLote: true }`, além dos campos de correção quando necessários. Só aceita abas do mapa salvo de frequência. O cliente confere todas as abas e confirma cada plano em sequência, mantendo as requisições curtas. A assinatura coletiva vincula cada prévia ao arquivo, às credenciais e ao mapa; atualizações do cache de esquema causadas por outra aba não a invalidam. Mudanças no cabeçalho continuam exigindo nova prévia. Abas com falha na prévia não recebem confirmação; falhas de escrita não provocam repetição automática.
+
 ### POST /api/planilha/criar-aba
 
 Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria uma aba nova com cabeçalho mínimo e marcador da integração. Apenas administração.

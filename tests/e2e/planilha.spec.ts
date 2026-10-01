@@ -23,8 +23,18 @@ test.describe("Google Planilhas", () => {
       ["E2E Aluno Um", "E2E Ano A", "P", ""],
       ["E2E Aluno Dois", "E2E Ano A", "", ""],
     ]);
+    gas.definirAba("E2E Ano B", [
+      ["Frequência · E2E Ano B"],
+      ["P = presente · F = falta"],
+      [],
+      ["Aluno", "Turma atual", "29/09", "Total"],
+      ["E2E Aluno Três", "E2E Ano B", "P", ""],
+    ]);
     await criarMassaE2E();
     await comBanco(async (cliente) => {
+      await cliente.query(
+        "insert into turmas (serie_id, nome) select id, 'B' from series where nome = 'E2E Ano'",
+      );
       await cliente.query("delete from sincronizacoes_planilha");
       // Execuções seguidas no mesmo banco não esbarram no limite de prévias.
       await cliente.query("delete from tentativas_entrada where chave like 'planilha:%'");
@@ -87,7 +97,7 @@ test.describe("Google Planilhas", () => {
     const painelConfig = page.locator("#painel-configuracoes");
     await expect(painelConfig.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
-    await expect(page.getByText("Estrutura salva.")).toBeVisible();
+    await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
 
     // Organização visual com prévia, cancelamento sem escrita e confirmação.
     await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
@@ -111,50 +121,73 @@ test.describe("Google Planilhas", () => {
     expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 1);
     expect(gas.valor("E2E Ano A", 5, 1)).toBe("E2E Aluno Um");
 
-    // O envio ao salvar a chamada nasce desligado e só se libera com a estrutura salva.
-    // Retira o bloco introdutório somente após a confirmação e mantém o mapa.
+    // Todas as turmas organiza e corrige as duas abas, com uma confirmação.
+    await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
+    await page.getByRole("option", { name: "Todas as turmas", exact: true }).click();
+    const todas = cartao.getByRole("button", {
+      name: "Organizar apresentação de todas as turmas",
+      exact: true,
+    });
+    await todas.click();
+    await expect(apresentacao.getByText(/Abas prontas: 2 de 2/)).toBeVisible();
+    await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
+    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 1);
+    await todas.click();
+    await apresentacao.getByRole("button", { name: "Aplicar apresentação", exact: true }).click();
+    await expect(
+      apresentacao.getByRole("heading", { name: "Resultado da organização" }),
+    ).toBeVisible();
+    await expect(apresentacao.getByText(/Concluídas: 2 de 2. Pendências: 0/)).toBeVisible();
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
     const corrigir = cartao.getByRole("button", {
-      name: "Corrigir cabeçalho e datas de E2E Ano A",
+      name: "Corrigir cabeçalho e datas de todas as turmas",
       exact: true,
     });
     await cartao.getByLabel("Ano das datas sem ano").fill("2026");
     await corrigir.click();
-    await expect(apresentacao.getByText(/Serão retiradas 3 linhas/)).toBeVisible();
+    await expect(
+      apresentacao.getByText(/Linhas a retirar: 3. Datas a corrigir: 1/).first(),
+    ).toBeVisible();
+    const previa = apresentacao.getByRole("region", {
+      name: "Prévia da apresentação de E2E Ano A",
+      exact: true,
+    });
+    await previa.evaluate((elemento) => {
+      elemento.scrollLeft = elemento.scrollWidth;
+    });
     await expect(
       apresentacao.getByRole("columnheader", { name: "10/09/2026", exact: true }),
-    ).toBeVisible();
-    await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-    expect(gas.valor("E2E Ano A", 1, 1)).toContain("Frequência");
-    await corrigir.click();
+    ).toBeInViewport();
     const caixa = await apresentacao.boundingBox();
     expect(caixa?.x).toBeGreaterThanOrEqual(0);
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(
       page.viewportSize()?.width ?? 0,
     );
-    await apresentacao
-      .getByRole("region", { name: "Prévia da apresentação", exact: true })
-      .evaluate((elemento) => {
-        elemento.scrollLeft = elemento.scrollWidth;
-      });
-    await expect(
-      apresentacao.getByRole("columnheader", { name: "10/09/2026", exact: true }),
-    ).toBeInViewport();
-    await apresentacao.screenshot({ path: "test-results/planilha-correcao-previa.png" });
+    await apresentacao.screenshot({ path: "test-results/planilha-todas-previa.png" });
+    await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
+    expect(gas.valor("E2E Ano A", 1, 1)).toContain("Frequência");
+    expect(gas.valor("E2E Ano B", 1, 1)).toContain("Frequência");
+    await corrigir.click();
     await apresentacao
       .getByRole("button", { name: "Aplicar correção", exact: true })
       .evaluate((elemento) => {
         (elemento as HTMLButtonElement).click();
         (elemento as HTMLButtonElement).click();
       });
-    await expect(page.getByText("Cabeçalho e datas corrigidos.")).toBeVisible();
-    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 2);
+    await expect(apresentacao.getByText(/Concluídas: 2 de 2. Pendências: 0/)).toBeVisible();
+    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 5);
     expect(gas.valor("E2E Ano A", 1, 1)).toBe("Aluno");
     expect(gas.valor("E2E Ano A", 1, 3)).toBe("10/09/2026");
     expect(gas.valor("E2E Ano A", 2, 1)).toBe("E2E Aluno Um");
-    expect(gas.abas().some((nome) => nome.startsWith("_frequenciapp_backup_E2E Ano A_"))).toBe(
-      true,
-    );
+    expect(gas.valor("E2E Ano B", 1, 1)).toBe("Aluno");
+    expect(gas.valor("E2E Ano B", 1, 3)).toBe("29/09/2026");
+    expect(gas.valor("E2E Ano B", 2, 3)).toBe("P");
+    for (const nome of ["E2E Ano A", "E2E Ano B"])
+      expect(gas.abas().some((aba) => aba.startsWith(`_frequenciapp_backup_${nome}_`))).toBe(true);
+    await apresentacao.screenshot({ path: "test-results/planilha-todas-resultado.png" });
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
 
+    // O envio ao salvar permanece desligado e o mapa continua disponível.
     const envioAoSalvar = cartao.getByRole("switch", { name: "Enviar ao salvar a chamada" });
     await expect(envioAoSalvar).toBeEnabled();
     await expect(envioAoSalvar).not.toBeChecked();
@@ -183,10 +216,13 @@ test.describe("Google Planilhas", () => {
       previaGeral.getByText(/Não foi possível confirmar o resultado/).first(),
     ).toBeVisible();
     await expect(previaGeral.getByText(/Nada foi alterado/)).toHaveCount(0);
-    expect(corpos).toHaveLength(1);
-    expect(corpos[0]).toMatchObject({ somenteAlteradas: false });
-    expect(corpos[0]?.todas).toBeUndefined();
-    expect(typeof corpos[0]?.turmaOriginalId).toBe("string");
+    await expect.poll(() => corpos.length).toBe(2);
+    for (const corpo of corpos) {
+      expect(corpo).toMatchObject({ somenteAlteradas: false });
+      expect(corpo.todas).toBeUndefined();
+      expect(typeof corpo.turmaOriginalId).toBe("string");
+    }
+    expect(new Set(corpos.map((corpo) => corpo.turmaOriginalId)).size).toBe(2);
     await page.unroute("**/api/planilha/aplicar");
     // O X do diálogo também se chama Fechar; o do rodapé é o último.
     await previaGeral.getByRole("button", { name: "Fechar" }).last().click();

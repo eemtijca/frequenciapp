@@ -8,6 +8,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Opção Todas as turmas para organizar a apresentação ou corrigir cabeçalhos e datas das abas vinculadas, com uma confirmação, andamento e resultado por aba. As operações seguem em sequência e identificam falhas sem repetir a escrita automaticamente.
+
 - Organização visual das planilhas de frequência, saídas e entradas, com cabeçalho destacado, colunas ajustadas, quebra de texto e linhas alternadas. Abas existentes recebem prévia e confirmação administrativas, preservando dados e fórmulas; o provedor legado usa o script na versão 5.
 
 - Rolagem lateral dos gráficos do Painel, com encaixe por cartão, posição atual, navegação por teclado e altura adaptável. Os cartões Escola, séries, Personalizado e Desistentes substituem os botões superiores; o formulário personalizado preserva o estado ao deslizar.

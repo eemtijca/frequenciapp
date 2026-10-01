@@ -39,6 +39,7 @@ export async function organizarPlanilha(
       aba: z.string().trim().min(1).max(200),
       planoHash: z.string().length(64).optional(),
       ajustarCabecalho: z.boolean().default(false),
+      emLote: z.boolean().default(false),
       anoReferencia: z.number().int().min(2000).max(2100).optional(),
     })
     .safeParse(entrada);
@@ -51,6 +52,19 @@ export async function organizarPlanilha(
   const versaoMinima = dados.data.ajustarCabecalho ? 6 : 5;
   const finalidade: FinalidadeIntegracao = tipo === "FREQUENCIA" ? "FREQUENCIA" : "SAIDAS";
   const linha = await lerLinha(finalidade);
+  const mapa = z
+    .object({ mapa: z.array(z.object({ aba: z.string(), turmaOriginalId: z.string() })) })
+    .safeParse(linha.esquema);
+  if (
+    dados.data.emLote &&
+    (tipo !== "FREQUENCIA" ||
+      !mapa.success ||
+      !mapa.data.mapa.some((item) => item.aba === dados.data.aba))
+  )
+    throw new ErroHttp(
+      "Organize em conjunto apenas as abas vinculadas às turmas na estrutura salva.",
+      409,
+    );
   if (
     tipo === "ENTRADAS" &&
     (linha.provedor !== "GOOGLE" ||
@@ -130,6 +144,7 @@ export async function organizarPlanilha(
     colunas,
     ...(ajusteCabecalho ? { ajusteCabecalho } : {}),
   };
+  // No lote, renovar o esquema de uma aba conserva as prévias das demais.
   const planoHash = createHmac("sha256", ambiente.authSecret)
     .update(
       JSON.stringify([
@@ -137,7 +152,16 @@ export async function organizarPlanilha(
         linha.provedor,
         linha.googlePlanilhaId,
         linha.endpoint,
-        linha.atualizadoEm,
+        dados.data.emLote
+          ? [
+              "lote",
+              linha.ativa,
+              linha.token,
+              linha.googleRefreshToken,
+              linha.versaoScript,
+              mapa.success ? mapa.data.mapa : null,
+            ]
+          : linha.atualizadoEm,
         plano,
       ]),
     )
