@@ -58,3 +58,19 @@ export async function abrirAbaMovimentacao(
 ): Promise<void> {
   await page.getByRole("tab", { name: rotulo, exact: true }).click();
 }
+
+/** Rola a faixa nativa até o cartão de gráfico indicado. */
+export async function rolarAteGrafico(page: Page, nome: string) {
+  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  await faixa.evaluate((elemento, rotulo) => {
+    const primeiro = elemento.firstElementChild;
+    const cartao = Array.from(elemento.children).find((item) =>
+      item.getAttribute("aria-label")?.endsWith(`: ${rotulo}`),
+    );
+    if (!(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement))
+      throw new Error("Cartão não encontrado.");
+    elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
+  }, nome);
+  await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeInViewport();
+  return faixa;
+}
