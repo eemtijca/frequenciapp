@@ -4,6 +4,7 @@ import { createECDH, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import pg from "pg";
 import { diaLocal, diaSeguinte } from "@/domain/frequencia";
+import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SENHA = "PalavraPushTeste2026";
@@ -14,6 +15,7 @@ let principal = "";
 let outro = "";
 let primeiro = "";
 const ids: string[] = [];
+let configuracaoAnterior: ConfiguracaoNotificacoes | undefined;
 
 async function chamar(
   caminho: string,
@@ -57,6 +59,16 @@ beforeAll(async () => {
   await cliente.query("delete from tentativas_entrada where chave like '%qp-push-%'");
   admin = await entrar("direcao@escola.exemplo", "DirecaoFrequencia2026");
   coord = await entrar("demo@escola.exemplo", "DemoFrequencia2026");
+  configuracaoAnterior = (await (await chamar("/api/notificacoes/configuracao", admin)).json())
+    .configuracao;
+  expect(
+    (
+      await chamar("/api/notificacoes/configuracao", admin, "PATCH", {
+        resumoDiario: true,
+        horarioResumo: "00:00",
+      })
+    ).status,
+  ).toBe(200);
   for (const nome of ["principal", "outro", "primeiro"]) {
     const criado = await chamar("/api/diretores", admin, "POST", {
       nome: `QP Push ${nome}`,
@@ -87,6 +99,10 @@ beforeEach(async () => {
   outro = await entrar("qp-push-outro", SENHA);
 });
 afterAll(async () => {
+  if (configuracaoAnterior)
+    expect(
+      (await chamar("/api/notificacoes/configuracao", admin, "PATCH", configuracaoAnterior)).status,
+    ).toBe(200);
   await cliente.query("delete from usuarios where email like 'qp-push-%'");
   await cliente.query("delete from tentativas_entrada where chave like '%qp-push-%'");
   await cliente.end();
