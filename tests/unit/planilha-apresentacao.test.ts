@@ -442,3 +442,91 @@ describe("correção do cabeçalho", () => {
     },
   );
 });
+
+// A correção de uma aba renova o cache, mantendo as prévias das outras válidas.
+describe("organização das turmas em conjunto", () => {
+  const nomes = ["QA Ano A", "QA Ano B"];
+  const mapa = nomes.map((aba, indice) => ({ aba, turmaOriginalId: `origem-${indice}` }));
+  const amostra = [["Frequência"], ["Aluno", "29/09"], ["QA Aluno", "P"]];
+  beforeEach(() => {
+    dubl.linha.mockResolvedValue({
+      provedor: "GAS",
+      ativa: true,
+      versaoScript: "6",
+      endpoint: "endpoint-sintetico",
+      token: "token-sintetico",
+      esquema: { mapa },
+      atualizadoEm: new Date("2026-10-01T12:00:00Z"),
+    });
+    dubl.chamar.mockImplementation(async (_linha, corpo) =>
+      corpo.acao === "estrutura" ? { abas: [{ nome: corpo.aba, amostra }] } : { aba: corpo.aba },
+    );
+  });
+  it("conserva a prévia da segunda turma quando a primeira renova o esquema", async () => {
+    const entrada = { emLote: true, ajustarCabecalho: true, anoReferencia: 2026 };
+    const primeira = await organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+      ...entrada,
+      aba: nomes[0],
+    });
+    const segunda = await organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+      ...entrada,
+      aba: nomes[1],
+    });
+    dubl.atualizar.mockImplementation(async () => {
+      dubl.linha.mockResolvedValue({
+        provedor: "GAS",
+        ativa: true,
+        versaoScript: "6",
+        endpoint: "endpoint-sintetico",
+        token: "token-sintetico",
+        esquema: { mapa, abas: [{ nome: nomes[0], cabecalho: 1 }] },
+        atualizadoEm: new Date("2026-10-01T12:01:00Z"),
+      });
+    });
+    await organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+      ...entrada,
+      aba: nomes[0],
+      planoHash: primeira.previa?.planoHash,
+    });
+    await organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+      ...entrada,
+      aba: nomes[1],
+      planoHash: segunda.previa?.planoHash,
+    });
+    expect(
+      dubl.chamar.mock.calls.filter(([, corpo]) => corpo.acao === "organizarAba"),
+    ).toHaveLength(2);
+    expect(dubl.atualizar).toHaveBeenCalledTimes(2);
+  });
+  it.each(["endpoint", "token", "googleRefreshToken", "googlePlanilhaId", "mapa"])(
+    "recusa mudança de %s depois da prévia coletiva",
+    async (campo) => {
+      const entrada = { aba: nomes[0], emLote: true };
+      const previa = await organizarPlanilha({ id: "admin" }, "FREQUENCIA", entrada);
+      const linha = await dubl.linha();
+      dubl.linha.mockResolvedValue(
+        campo === "mapa"
+          ? {
+              ...linha,
+              esquema: { mapa: mapa.map((item) => ({ ...item, turmaOriginalId: "outra-origem" })) },
+            }
+          : { ...linha, [campo]: "outro-valor" },
+      );
+      await expect(
+        organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+          ...entrada,
+          planoHash: previa.previa?.planoHash,
+        }),
+      ).rejects.toThrow("A planilha mudou");
+      expect(
+        dubl.chamar.mock.calls.filter(([, corpo]) => corpo.acao === "organizarAba"),
+      ).toHaveLength(0);
+    },
+  );
+  it("exclui abas auxiliares que não pertencem ao mapa salvo", async () => {
+    await expect(
+      organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: "QA Notas", emLote: true }),
+    ).rejects.toThrow("abas vinculadas");
+    expect(dubl.chamar).not.toHaveBeenCalled();
+  });
+});
