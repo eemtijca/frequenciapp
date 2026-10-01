@@ -257,7 +257,6 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     <SecaoRecolhivel
       dataSecao="planilha-saidas"
       titulo="Planilha de saídas"
-      descricao="Registra as saídas antecipadas em outra planilha, uma linha por saída."
       icone={DoorOpen}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -324,8 +323,8 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           estruturaSalva && !estruturaEmEdicao
             ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
             : podeEnviar
-              ? "Escolha a aba única que recebe as saídas."
-              : "Conecte a planilha e ligue a integração para liberar."
+              ? "Escolha a aba para as saídas."
+              : "Conecte e ative a integração."
         }
         acoes={
           estruturaEmEdicao ? (
@@ -424,19 +423,11 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
               </Button>
             </div>
           </>
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            Aba {integracao?.esquema?.aba} pronta para receber as saídas. Use Revisar estrutura para
-            reler a planilha.
-          </p>
-        )}
+        ) : null}
       </EtapaPlanilha>
 
       {(abaSelecionada || integracao?.esquema?.aba) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs">
-            Organização visual com prévia, mantendo os dados e os cabeçalhos existentes.
-          </p>
           <div>
             <OrganizarPlanilha
               rota="/api/planilha-saidas/organizar"
@@ -451,11 +442,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
         numero={3}
         titulo="Envio pela vista Saídas"
         estado={estruturaSalva ? "atual" : "pendente"}
-        resumo={
-          estruturaSalva
-            ? "O envio é manual, por mês, com prévia obrigatória."
-            : "Salve a estrutura antes de enviar."
-        }
+        resumo={estruturaSalva ? "Envio mensal com prévia." : "Salve a estrutura antes de enviar."}
       >
         <div className="flex flex-wrap items-center gap-2">
           {onAbrirSaidas && (

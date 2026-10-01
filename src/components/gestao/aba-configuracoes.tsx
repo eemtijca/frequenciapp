@@ -455,7 +455,6 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-recursos"
         titulo="Recursos da escola"
-        descricao="O que estiver desligado continua preservado nos dados e pode ser religado depois."
         icone={Settings2}
         aberto={abertoRecursos}
         onAbertoChange={setAbertoRecursos}
@@ -477,8 +476,7 @@ export default function AbaConfiguracoes({
           <div className="min-w-0">
             <Label htmlFor="config-frequencia-aula">Chamada por aula</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Com o recurso ligado, a Chamada registra falta por aula, a Grade mostra a marca S e a
-              gestão de aulas volta a valer. Desligado, a chamada é única por dia.
+              Ligada: faltas por aula. Desligada: chamada diária.
             </p>
           </div>
           <Switch
@@ -493,8 +491,7 @@ export default function AbaConfiguracoes({
           <div className="min-w-0">
             <Label htmlFor="config-saida-antecipada">Saídas e entradas</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Mostra a área Saídas e entradas, com registro de saídas e chegadas atrasadas.
-              Desligado, os registros existentes continuam preservados no banco e na cópia JSON.
+              Desligar oculta a área e preserva os registros.
             </p>
           </div>
           <Switch
@@ -514,8 +511,7 @@ export default function AbaConfiguracoes({
             <div className="min-w-0">
               <Label htmlFor="config-origem-chamada">Turma de origem na Chamada</Label>
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Mostra a origem ao lado do nome e o asterisco de remanejamento nas séries ou turmas
-                selecionadas. Desligar oculta a indicação e preserva as escolhas e os dados.
+                Mostra a origem e o remanejamento nas séries e turmas selecionadas.
               </p>
             </div>
             <Switch
@@ -529,9 +525,7 @@ export default function AbaConfiguracoes({
             <>
               <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-medium">Séries completas</legend>
-                <p className="text-muted-foreground text-xs">
-                  Inclui todas as turmas da série, inclusive as criadas depois.
-                </p>
+                <p className="text-muted-foreground text-xs">Inclui as turmas atuais e futuras.</p>
                 {series.map((serie) => (
                   <label
                     key={serie.id}
@@ -558,9 +552,6 @@ export default function AbaConfiguracoes({
               </fieldset>
               <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-medium">Turmas específicas</legend>
-                <p className="text-muted-foreground text-xs">
-                  Somam-se às séries completas selecionadas.
-                </p>
                 {turmas.map((item) => (
                   <label
                     key={item.id}
@@ -588,7 +579,7 @@ export default function AbaConfiguracoes({
               {configuracoes.origemNaChamadaSerieIds.length === 0 &&
                 configuracoes.origemNaChamadaTurmaIds.length === 0 && (
                   <p className="text-muted-foreground text-xs">
-                    Nenhuma série ou turma selecionada. A indicação não aparece na Chamada.
+                    Nenhuma série ou turma selecionada.
                   </p>
                 )}
             </>
@@ -611,7 +602,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-justificativas"
         titulo="Justificativas"
-        descricao="Valem para a falta justificada e para a saída antecipada. O código é fixo depois de criado; rótulo e situação podem mudar."
+        descricao="Códigos fixos após o cadastro."
         icone={ScrollText}
         aberto={abertoJustificativas}
         onAbertoChange={setAbertoJustificativas}
@@ -788,7 +779,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-liberadores"
         titulo="Quem libera as saídas"
-        descricao="Vale para o registro de saída antecipada. O código é fixo depois de criado; rótulo e situação podem mudar."
+        descricao="Códigos fixos após o cadastro."
         icone={UserCheck}
         aberto={abertoLiberadores}
         onAbertoChange={setAbertoLiberadores}
@@ -854,9 +845,7 @@ export default function AbaConfiguracoes({
         )}
 
         {liberadores.length === 0 && (
-          <p className="text-muted-foreground text-sm">
-            Nenhum nome cadastrado ainda. Use o formulário para adicionar quem pode liberar a saída.
-          </p>
+          <p className="text-muted-foreground text-sm">Nenhum nome cadastrado.</p>
         )}
 
         <ul className="divide-y overflow-hidden rounded-lg border">
@@ -978,11 +967,11 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-copia"
         titulo="Cópia de segurança"
-        descricao="A cópia reúne séries, turmas, aulas, alunos, chamadas, saídas, entradas, justificativas, quem libera e configurações em um arquivo JSON. A importação adiciona o que falta e nunca sobrescreve o que já existe."
+        descricao="A importação adiciona dados ausentes, sem sobrescrever os existentes."
         icone={Archive}
         aberto={abertoCopia}
         onAbertoChange={setAbertoCopia}
-        resumo={<Selo>Arquivo JSON com todos os dados</Selo>}
+        resumo={<Selo>Arquivo JSON</Selo>}
       >
         <div className="flex flex-wrap gap-2">
           <Button

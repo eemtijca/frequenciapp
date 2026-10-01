@@ -262,10 +262,13 @@ export function BlocoConexaoPlanilha({
             Gerar novo
           </Button>
         </div>
-        <p className="text-muted-foreground text-xs leading-relaxed">
-          Cole o token em Configurações do projeto, Propriedades do script, no Apps Script, com o
-          nome FREQUENCIAPP_TOKEN. O código está em gas/Codigo.gs no repositório.
-        </p>
+        <details className="text-muted-foreground text-xs">
+          <summary className="cursor-pointer">Ajuda para conectar</summary>
+          <p className="mt-2 leading-relaxed">
+            No Apps Script, salve o token nas Propriedades do script como FREQUENCIAPP_TOKEN. Use
+            gas/Codigo.gs do repositório e informe a URL /exec da implantação.
+          </p>
+        </details>
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border p-3">
@@ -433,7 +436,6 @@ export function BlocoModoCompletoPlanilha({
       <SecaoRecolhivel
         nivel="interna"
         titulo="Modo completo"
-        descricao="Permite corrigir e remover o que a integração criou, com cópia antes de cada operação destrutiva."
         icone={Lock}
         aberto={aberto}
         onAbertoChange={setAberto}
@@ -445,9 +447,8 @@ export function BlocoModoCompletoPlanilha({
       >
         {ativo && restanteMinutos !== null && (
           <p className="text-muted-foreground text-xs leading-relaxed">
-            Ações destrutivas liberadas até {hora}
-            {restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}. A janela expira
-            sozinha.
+            Expira às {hora}
+            {restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}.
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -646,7 +647,6 @@ export function BlocoRiscoPlanilha({
         nivel="interna"
         variante="perigo"
         titulo="Zona de risco"
-        descricao="Cópias de segurança, remoção de aba criada pela integração e desconexão."
         icone={TriangleAlert}
         aberto={aberto}
         onAbertoChange={setAberto}
@@ -717,9 +717,6 @@ export function BlocoRiscoPlanilha({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">Desconectar integração</p>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Apaga o token e a estrutura salva. Nada é removido da planilha.
-            </p>
           </div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
