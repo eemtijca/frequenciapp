@@ -1,10 +1,10 @@
-// Painel: cada botão mostra só o seu escopo. Escola tem um gráfico, a série
-// escolhida mostra só as próprias turmas e Desistentes tem gráfico à parte.
+// Painel: rolagem lateral entre escola, séries, período personalizado e desistentes.
+// Confere os recortes, teclado, gesto no celular e preservação do formulário.
 import { expect, test, type Page } from "@playwright/test";
 import type { Aluno, Frequencia } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -61,24 +61,22 @@ test.afterAll(async () => {
   await limparMassa();
 });
 
-test("cada botão do Painel mostra só o gráfico do seu escopo", async ({ page }) => {
+test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
-  const filtros = page.getByRole("group", { name: "Filtro por série" });
+  await expect(page.getByRole("group", { name: "Filtro por série" })).toHaveCount(0);
   // Só o chip da Cobertura do dia: o mesmo nome também está em seletores da página.
-  const pendente = (turma: string) => page.locator("span.bg-falta-fraca", { hasText: turma });
+  const pendente = (turma: string) =>
+    page.getByRole("article").locator("span.bg-falta-fraca", { hasText: turma });
 
-  await expect(filtros.getByRole("button", { name: "Escola" })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /^E2E Painel (Um|Dois)$/ })).toHaveCount(0);
   await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
-  await filtros.getByRole("button", { name: "E2E Painel Um" }).click();
+  await rolarAteGrafico(page, "E2E Painel Um");
   await expect(page.getByRole("heading", { name: "E2E Painel Um", exact: true })).toBeVisible();
   // Série com aluno remanejado: o gráfico pela turma original vem logo abaixo.
   await expect(
@@ -90,26 +88,112 @@ test("cada botão do Painel mostra só o gráfico do seu escopo", async ({ page 
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
 
   // Série sem remanejamento: um gráfico só.
-  await filtros.getByRole("button", { name: "E2E Painel Dois" }).click();
+  await rolarAteGrafico(page, "E2E Painel Dois");
   await expect(page.getByRole("heading", { name: "E2E Painel Dois", exact: true })).toBeVisible();
-  await expect(page.getByText("por turma original")).toHaveCount(0);
+  await expect(page.getByRole("article").getByText("por turma original")).toHaveCount(0);
 
-  await filtros.getByRole("button", { name: "Desistentes" }).click();
+  await rolarAteGrafico(page, "Desistentes");
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Desistentes por série" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Cobertura do dia" })).toHaveCount(0);
 });
 
-test("no celular, a fila de botões quebra linha sem cortar o Desistentes", async ({ page }) => {
+test("a faixa aceita teclado e mantém o cartão ao mudar a largura", async ({ page }) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel");
+  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  await faixa.focus();
+  await faixa.press("End");
+  await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
+  await faixa.press("ArrowLeft");
+  await expect(page.getByRole("region", { name: "Infrequência personalizada" })).toBeVisible();
+  await page.setViewportSize({ width: 360, height: 780 });
+  const cartao = page.getByRole("article", { name: /: Personalizado$/ });
+  await expect(cartao).toBeVisible();
+  await expect
+    .poll(() =>
+      cartao.evaluate((elemento) => {
+        const pai = elemento.parentElement;
+        return pai
+          ? Math.abs(elemento.getBoundingClientRect().left - pai.getBoundingClientRect().left)
+          : Infinity;
+      }),
+    )
+    .toBeLessThan(1);
+  const seletor = page.getByRole("combobox", { name: "Série", exact: true });
+  await seletor.focus();
+  await seletor.press("ArrowLeft");
+  await expect(cartao).toBeVisible();
+  await expect(seletor).toBeFocused();
+  await trocarVisao(page, "Chamada", "chamada");
+  await trocarVisao(page, "Painel", "painel");
+  await expect(cartao).toBeVisible();
+  await faixa.focus();
+  await faixa.press("Home");
+  await expect(page.getByRole("heading", { name: "Toda a escola", exact: true })).toBeVisible();
+  await faixa.press("ArrowRight");
+  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
+});
+
+test("no celular, a faixa rola sem alargar a página e ajusta a altura", async ({
+  page,
+  browserName,
+}) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
-  const botao = page
-    .getByRole("group", { name: "Filtro por série" })
-    .getByRole("button", { name: "Desistentes" });
-  await expect(botao).toBeInViewport({ ratio: 1 });
+  await rolarAteGrafico(page, "Personalizado");
+  await rolarAteGrafico(page, "Desistentes");
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.getByRole("group", { name: "Cartões de gráficos" }).evaluate((elemento) => {
+        const cartao = elemento.querySelector('[aria-hidden="false"]');
+        return cartao ? elemento.clientHeight - cartao.getBoundingClientRect().height : Infinity;
+      }),
+    )
+    .toBeLessThan(12);
+  // O Playwright não oferece roda do mouse no WebKit móvel.
+  if (browserName === "chromium") {
+    const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+    const pagina = page.getByRole("group", { name: "Painel", exact: true });
+    await pagina.evaluate((elemento) => elemento.scrollTo({ top: 0 }));
+    await faixa.hover();
+    await page.mouse.wheel(0, 200);
+    await expect.poll(() => pagina.evaluate((elemento) => elemento.scrollTop)).toBeGreaterThan(0);
+    await expect.poll(() => faixa.evaluate((elemento) => elemento.scrollTop)).toBe(0);
+  }
+});
+
+test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserName, isMobile }) => {
+  test.skip(browserName !== "chromium" || !isMobile, "Gesto nativo por CDP disponível no Android.");
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel");
+  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  await faixa.scrollIntoViewIfNeeded();
+  const caixa = await faixa.boundingBox();
+  if (!caixa) throw new Error("Faixa não encontrada.");
+  const sessao = await page.context().newCDPSession(page);
+  const y = caixa.y + 80;
+  const x = caixa.x + caixa.width - 30;
+  await sessao.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let passo = 1; passo <= 10; passo += 1) {
+    await sessao.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x - ((caixa.width - 60) * passo) / 10, y }],
+    });
+    await page.waitForTimeout(20);
+  }
+  await sessao.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sessao.detach();
+  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
+  await expect(page.getByRole("article")).toBeInViewport();
 });
 
 test.describe("gráfico personalizado por período", () => {
@@ -120,10 +204,7 @@ test.describe("gráfico personalizado por período", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Painel", "painel");
-    await page
-      .getByRole("group", { name: "Filtro por série" })
-      .getByRole("button", { name: "Personalizado" })
-      .click();
+    await rolarAteGrafico(page, "Personalizado");
     return page.getByRole("region", { name: "Infrequência personalizada" });
   }
 
@@ -187,11 +268,12 @@ test.describe("gráfico personalizado por período", () => {
       consultas.push(new URL(rota.request().url()).search);
       await rota.fulfill({ json: { frequencias: chamadas } });
     });
-    const filtros = page.getByRole("group", { name: "Filtro por série" });
-    const nomes = await filtros.getByRole("button").allTextContents();
-    expect(nomes.at(-2)).toBe("Personalizado");
-    expect(nomes.at(-1)).toBe("Desistentes");
-    await expect(page.getByRole("group", { name: "Resumo do dia" })).toHaveCount(0);
+    const nomes = await page
+      .locator('article[aria-roledescription="cartão"]')
+      .evaluateAll((elementos) => elementos.map((item) => item.getAttribute("aria-label")));
+    expect(nomes.at(-2)).toMatch(/: Personalizado$/);
+    expect(nomes.at(-1)).toMatch(/: Desistentes$/);
+    await expect(page.getByRole("group", { name: "Resumo do dia" })).toBeVisible();
     await escolherDia(page, "#periodo-painel-de", "Agosto de 2026", "31 de agosto de 2026");
     await escolherDia(page, "#periodo-painel-ate", "Setembro de 2026", "1 de setembro de 2026");
     await expect(painel.getByRole("combobox", { name: "Turma", exact: true })).toBeDisabled();
@@ -215,10 +297,17 @@ test.describe("gráfico personalizado por período", () => {
     await expect(resumo.locator("strong")).toHaveText(["1", "2", "50%"]);
     await expect(painel.getByRole("list")).not.toContainText("E2E Painel Dois");
 
-    await filtros.getByRole("button", { name: "Escola", exact: true }).click();
+    await rolarAteGrafico(page, "Toda a escola");
     await expect(painel).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Resumo do dia" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Toda a escola", exact: true })).toBeVisible();
+    await rolarAteGrafico(page, "Personalizado");
+    await expect(
+      painel.getByRole("group", { name: "Resumo do período" }).locator("strong"),
+    ).toHaveText(["1", "2", "50%"]);
+    await expect(painel.getByRole("combobox", { name: "Turma", exact: true })).toContainText(
+      "E2E Painel Um B",
+    );
   });
 
   test("distingue período vazio, presença sem falta e falha com nova tentativa", async ({
@@ -239,7 +328,11 @@ test.describe("gráfico personalizado por período", () => {
             frequencias:
               estado === "vazio"
                 ? []
-                : chamadas.map((item) => ({ ...item, dia: "2026-09-01", faltas: [] })),
+                : chamadas.map((item) => ({
+                    ...item,
+                    dia: new URL(rota.request().url()).searchParams.get("de") ?? "",
+                    faltas: [],
+                  })),
           },
         });
     });
@@ -291,7 +384,14 @@ test.describe("gráfico personalizado por período", () => {
     const chamadas = await chamadasSinteticas(page);
     await page.route("**/api/frequencias?de=**", async (rota) => {
       await rota.fulfill({
-        json: { frequencias: chamadas.filter((item) => item.dia === "2026-09-01") },
+        json: {
+          frequencias: chamadas
+            .filter((item) => item.dia === "2026-09-01")
+            .map((item) => ({
+              ...item,
+              dia: new URL(rota.request().url()).searchParams.get("de") ?? "",
+            })),
+        },
       });
     });
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();

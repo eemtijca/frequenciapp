@@ -2,7 +2,7 @@
 // isolada e limpeza ao final.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -59,7 +59,9 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
     .getByRole("button", { name: "Marcar como desistente" })
     .click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar" }).click();
-  await expect(page.locator("#painel-alunos").getByText("Desistente")).toBeVisible();
+  await expect(
+    page.locator("#painel-alunos").getByText("Desistente", { exact: true }),
+  ).toBeVisible();
 
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
@@ -72,10 +74,9 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await expect(aluno.getByText("DESISTENTE", { exact: true })).toBeVisible();
 
   await trocarVisao(page, "Painel", "painel");
-  await page
-    .getByRole("group", { name: "Filtro por série" })
-    .getByRole("button", { name: "Desistentes" })
-    .click();
+  await rolarAteGrafico(page, "Desistentes");
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
-  await expect(page.getByRole("img", { name: "Desistentes por série" })).toContainText("1");
+  await expect(page.getByRole("img", { name: "Desistentes por série" })).toBeVisible();
+  const legenda = page.getByRole("listitem").filter({ hasText: "E2E Desistencia" });
+  await expect(legenda.getByRole("img", { name: "1 desistente", exact: true })).toBeVisible();
 });

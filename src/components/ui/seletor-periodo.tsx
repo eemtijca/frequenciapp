@@ -316,7 +316,7 @@ export function SeletorPeriodo({
         aria-label={rotuloAcessivel}
         align="center"
         collisionPadding={8}
-        className="w-[min(24rem,calc(100vw-1.5rem))] p-3"
+        className="max-h-[var(--radix-popover-content-available-height)] w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto p-3"
         onOpenAutoFocus={(evento) => evento.preventDefault()}
       >
         {painel}

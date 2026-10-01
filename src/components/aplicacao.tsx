@@ -469,6 +469,7 @@ export default function Aplicacao({
       <div className={`mx-auto w-full ${LARGURAS[alvoVisao]}`}>
         {alvoVisao === "painel" && (
           <VistaPainel
+            ativo={ativo}
             diaCorrente={diaCorrente}
             mes={mes}
             series={series}
