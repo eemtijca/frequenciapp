@@ -345,13 +345,8 @@ export default function VistaSaidas({
 
   return (
     <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Saiu mais cedo</h1>
-          <p className="text-muted-foreground text-sm">
-            Registro separado da chamada. A presença ou falta do dia permanece como foi marcada.
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-3">
+        <h1 className="sr-only">Saiu mais cedo</h1>
         <Button
           type="button"
           variant="outline"

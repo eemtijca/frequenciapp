@@ -195,12 +195,6 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
         </Button>
       </div>
 
-      <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
-        Cada pessoa entra com o próprio e-mail e senha. A coordenação faz a frequência e consulta o
-        histórico; a administração também cuida de contas e cadastros. Ao desativar, o acesso é
-        bloqueado na hora.
-      </p>
-
       {carregando ? (
         <div className="text-muted-foreground flex min-h-32 items-center justify-center gap-2 text-sm">
           <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
