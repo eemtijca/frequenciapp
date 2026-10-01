@@ -41,13 +41,21 @@ O script marca cada linha e coluna que cria com Developer Metadata na linha ou c
 
 ## Organização visual e cabeçalhos
 
-Abas novas recebem cabeçalho verde com texto branco e negrito, altura de 44 pixels e congelamento até o cabeçalho. Colunas de aluno têm 260 pixels; turma, 140; dias da frequência, 68. Datas e totais ficam centralizados; observações e motivos recebem espaço e quebra de texto. As linhas alternam branco e verde claro por faixas nativas, que acompanham a planilha. Novas colunas de dia também recebem largura e alinhamento próprios.
+Abas novas recebem cabeçalho verde com texto branco e negrito, altura de 44 pixels e congelamento até o cabeçalho. Colunas de aluno têm 260 pixels; turma, 140; dias da frequência com ano completo, 110. Datas e totais ficam centralizados; observações e motivos recebem espaço e quebra de texto. As linhas alternam branco e verde claro por faixas nativas, que acompanham a planilha. Novas colunas de dia também recebem largura e alinhamento próprios.
 
 Para abas existentes, na Gestão, escolha a aba de frequência e use Organizar apresentação. A planilha de saídas oferece a mesma ação para a aba escolhida. Na área Entradas, a ação aparece somente para a administração, junto de Preparar aba Entradas. A prévia mostra os cabeçalhos e as larguras; Cancelar não altera a planilha. Aplicar apresentação substitui a aparência das colunas reconhecidas e registra a ação na auditoria. Valores, fórmulas, formatos numéricos, rótulos e colunas auxiliares são preservados. Regras de formatação condicional da escola continuam em vigor e podem prevalecer sobre as cores alternadas.
 
 A prévia é assinada e vinculada ao arquivo, à conexão e ao cabeçalho. A confirmação relê a estrutura e o provedor confere a assinatura novamente antes de aplicar estilos. Uma edição manual após essa última leitura ainda pode causar conflito, pois o Google não oferece escrita condicionada à assinatura. Abas ocultas, células mescladas, mais de 400 colunas ou faixas de cores alternadas que se sobrepõem em outro intervalo exigem ajuste manual antes da organização. Reaplicar ao mesmo intervalo atualiza as cores sem acumular faixas. O congelamento já existente não é reduzido.
 
 A Sheets API oferece o padrão diretamente. No provedor legado, publique o `gas/Codigo.gs` como nova versão da implantação existente e use Testar conexão para registrar a versão 5. Versões anteriores continuam atendendo os envios compatíveis, mas a nova ação de apresentação pede a atualização. A organização visual não exige modo completo, pois não altera registros. Os arquivos CSV continuam sendo texto, sem cores ou larguras de coluna.
+
+## Retirar título e legenda e corrigir datas
+
+As novas colunas da frequência e os cabeçalhos do CSV usam `dd/mm/aaaa`. Para corrigir as abas existentes, na Gestão, escolha a aba e use **Corrigir cabeçalho e datas**. O ano informado atende datas sem nenhum ano explícito na aba; quando há uma data com ano, a correção usa a data explícita mais próxima, respeitando a virada de dezembro para janeiro. A prévia mostra as datas completas e a quantidade de linhas que serão retiradas. Cancelar não grava nada.
+
+A confirmação remove somente as linhas iniciais reconhecidas como título de frequência, legenda de presença/falta ou espaço vazio. A linha Aluno e os dias passam para a primeira linha. Conteúdo manual diferente, fórmulas nessas linhas ou nos cabeçalhos que seriam alterados e mesclagens na tabela bloqueiam a operação. Mesclagens inteiramente dentro da introdução podem ser removidas junto com ela.
+
+Antes de alterar, a integração cria uma cópia oculta para restauração. As chamadas, colunas auxiliares e fórmulas da tabela permanecem; o Google ajusta as referências após a remoção das linhas. O esquema da aba é relido e o mapa das turmas é conservado. A correção não é automática nas planilhas já conectadas: exige a prévia e a confirmação administrativas. No provedor Apps Script, publique a **versão 6** de `gas/Codigo.gs` na implantação existente e use Testar conexão antes da correção. A apresentação sem correção continua compatível com a versão 5.
 
 ## Conferir a estrutura
 

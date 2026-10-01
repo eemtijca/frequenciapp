@@ -157,7 +157,9 @@ describe("dataframe e CSV", () => {
     const csv = paraCsv(turma);
     expect(csv.startsWith("\uFEFF")).toBe(true);
     const linhas = csv.replace("\uFEFF", "").trim().split("\r\n");
-    expect(linhas[0]).toBe("Aluno;Turma atual;10/09;11/09;Faltas;Justificadas;Total (F + FJ)");
+    expect(linhas[0]).toBe(
+      "Aluno;Turma atual;10/09/2026;11/09/2026;Faltas;Justificadas;Total (F + FJ)",
+    );
     expect(linhas[1]).toBe("Alice;3º ano A;P;;0;0;0");
     expect(linhas[2]).toBe("Bruno;3º ano A;F;;1;0;1");
   });
@@ -339,7 +341,11 @@ describe("planejarSincronizacao", () => {
     );
     const primeira = planejarSincronizacao(esquema, turmaTresDias, conteudo, opcoes());
     expect(primeira.novasColunas.map((coluna) => coluna.dia)).toEqual(["2026-09-12"]);
-    expect(primeira.novasColunas[0]).toMatchObject({ antesDe: "E", indice: 5 });
+    expect(primeira.novasColunas[0]).toMatchObject({
+      antesDe: "E",
+      indice: 5,
+      rotulo: "12/09/2026",
+    });
     expect(primeira.preencher.map((celula) => celula.celula)).toContain("E2");
     const semColuna = planejarSincronizacao(
       detectarEsquema(

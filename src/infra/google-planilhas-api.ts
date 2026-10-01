@@ -509,6 +509,21 @@ export async function executarAcaoGoogle(
         aba: z.string().min(1),
         cabecalhoLinha: z.number().int().positive(),
         assinatura: z.string().min(1),
+        ajusteCabecalho: z
+          .object({
+            linhasRemover: z.number().int().min(0).max(9),
+            assinaturaIntroducao: z.string().min(1),
+            datas: z
+              .array(
+                z.object({
+                  indice: z.number().int().positive().max(400),
+                  anterior: z.string(),
+                  rotulo: z.string().regex(/^\d{2}\/\d{2}\/\d{4}$/),
+                }),
+              )
+              .max(400),
+          })
+          .optional(),
         colunas: z
           .array(
             z.object({

@@ -5,8 +5,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
-import { VERSAO_SCRIPT } from "@/domain/planilha";
+import { colunasDeApresentacao, planejarAjusteCabecalho } from "@/domain/planilha-apresentacao";
+import { VERSAO_SCRIPT, hashTexto } from "@/domain/planilha";
 
 type TipoLocal = "SPREADSHEET" | "SHEET" | "ROW" | "COLUMN";
 
@@ -297,7 +297,15 @@ class AbaFalsa {
     this.deslocar("COLUMN", coluna + 1, -1);
     return this;
   }
+  deleteRows(linha: number, quantidade: number) {
+    for (let indice = 0; indice < quantidade; indice += 1) this.deleteRow(linha);
+    return this;
+  }
   deleteRow(linha: number) {
+    for (const banda of this.bandas) banda.deslocarLinhaRemovida(linha);
+    this.mesclagens = this.mesclagens.filter(
+      (intervalo) => (intervaloA1(intervalo)?.linhaInicial ?? 0) > linha,
+    );
     this.celulas.splice(linha - 1, 1);
     this.maxLinhas -= 1;
     this.metadados = this.metadados.filter(
@@ -375,8 +383,18 @@ class AbaFalsa {
 class BandaFalsa {
   constructor(
     private readonly aba: AbaFalsa,
-    private readonly faixa: FaixaFalsa,
+    private faixa: FaixaFalsa,
   ) {}
+  deslocarLinhaRemovida(linha: number) {
+    const faixa = this.faixa;
+    this.faixa = this.aba.getRange(
+      Math.max(1, faixa.getRow() - (linha < faixa.getRow() ? 1 : 0)),
+      faixa.getColumn(),
+      faixa.getNumRows() -
+        (linha >= faixa.getRow() && linha < faixa.getRow() + faixa.getNumRows() ? 1 : 0),
+      faixa.getNumColumns(),
+    );
+  }
   getRange() {
     return this.faixa;
   }
@@ -1037,6 +1055,92 @@ describe("Apps Script: apresentação", () => {
       colunas: colunasDeApresentacao(["Aluno", "Turma atual", "10/09", "11/09", "Total"]),
     });
   }
+
+  function prepararCorrecao(local: Contexto) {
+    local.aba.insertRowsBefore(1, 3);
+    local.aba.getRange(1, 1).setValue("Frequência · QA Ano A");
+    local.aba
+      .getRange(2, 1)
+      .setValue("P = presente · F = falta. Atualize as marcações no aplicativo.");
+    local.aba.getRange(4, 3).setValue("28/09/2026");
+    local.aba.getRange(4, 4).setValue("29/09");
+    local.aba.setFrozenRows(4);
+    const amostra = local.aba.getRange(1, 1, 4, 5).getDisplayValues();
+    const ajusteCabecalho = planejarAjusteCabecalho(amostra, 4, 2026);
+    return {
+      acao: "organizarAba",
+      aba: "3º ano A",
+      cabecalhoLinha: 4,
+      assinatura: hashTexto(JSON.stringify(["3º ano A", amostra[3], []])),
+      ajusteCabecalho,
+      colunas: colunasDeApresentacao(["Aluno", "Turma atual", "28/09/2026", "29/09/2026", "Total"]),
+    };
+  }
+  it("retira três linhas introdutórias, corrige datas e cria cópia sem perder chamadas, fórmulas ou marcadores", () => {
+    const local = montarContexto();
+    local.aba
+      .getRange(2, 1, 1, local.aba.getMaxColumns())
+      .addDeveloperMetadata("frequenciapp.aluno", "QA001");
+    const corpo = prepararCorrecao(local);
+    local.aba.getRange(4, 1, local.aba.getMaxRows() - 3, 5).applyRowBanding();
+    local.aba.gravacoes = [];
+    expect(chamar(local, corpo).ok).toBe(true);
+    expect(local.aba.getRange(1, 1, 1, 5).getDisplayValues()[0]).toEqual([
+      "Aluno",
+      "Turma atual",
+      "28/09/2026",
+      "29/09/2026",
+      "Total",
+    ]);
+    expect(local.aba.getCelula(2, 1).valor).toBe("Alice");
+    expect(local.aba.getCelula(2, 5).formula).toBe('=CONT.SE(C2:D3;"F")');
+    expect(local.aba.metadados).toContainEqual({
+      chave: "frequenciapp.aluno",
+      valor: "QA001",
+      tipo: "ROW",
+      indice: 2,
+    });
+    expect(local.aba.congeladasLinhas).toBe(1);
+    expect(local.aba.larguras.get(4)).toBe(110);
+    expect(local.aba.gravacoes).toEqual(["D4"]);
+    const copias = local.planilha
+      .getSheets()
+      .filter((aba) => aba.getName().startsWith("_frequenciapp_backup_"));
+    expect(copias).toHaveLength(1);
+    expect(copias[0]?.getCelula(1, 1).valor).toContain("Frequência");
+    expect(copias[0]?.getCelula(4, 4).valor).toBe("29/09");
+  });
+  it("reconfere a introdução após a cópia antes de remover linhas", () => {
+    const local = montarContexto();
+    const corpo = prepararCorrecao(local);
+    const copiar = local.aba.copyTo.bind(local.aba);
+    local.aba.copyTo = (planilha) => {
+      const copia = copiar(planilha);
+      local.aba.getRange(1, 1).setValue("Anotação manual após a prévia");
+      return copia;
+    };
+    expect(chamar(local, corpo).ok).toBe(false);
+    expect(local.aba.getCelula(1, 1).valor).toBe("Anotação manual após a prévia");
+    expect(local.aba.getCelula(5, 1).valor).toBe("Alice");
+    expect(local.aba.getCelula(4, 4).valor).toBe("29/09");
+  });
+  it.each(["titulo", "formula-introducao", "formula-data", "data", "faixa"])(
+    "recusa alteração insegura antes de copiar ou gravar: %s",
+    (alteracao) => {
+      const local = montarContexto();
+      const corpo = prepararCorrecao(local);
+      if (alteracao === "titulo") local.aba.getRange(1, 1).setValue("Anotação manual");
+      if (alteracao === "formula-introducao") local.aba.getCelula(1, 1).formula = "=A5";
+      if (alteracao === "formula-data") local.aba.getCelula(4, 4).formula = "=HOJE()";
+      if (alteracao === "data") local.aba.getRange(4, 4).setValue("30/09");
+      if (alteracao === "faixa") local.aba.getRange(5, 1, 5, 2).applyRowBanding();
+      local.aba.gravacoes = [];
+      expect(chamar(local, corpo).ok).toBe(false);
+      expect(local.aba.getCelula(5, 1).valor).toBe("Alice");
+      expect(local.planilha.getSheets()).toHaveLength(1);
+      expect(local.aba.gravacoes).toEqual([]);
+    },
+  );
   it("aplica estilos sem regravar valores e fórmulas, e reaplica sem duplicar faixas", () => {
     const local = montarContexto();
     expect(organizar(local).ok).toBe(true);
@@ -1704,6 +1808,7 @@ const VERSOES_DO_SCRIPT = [
   { versao: 3, sha256: "b10946c2d7497c2f4b2cf02e53bbf17e9fc5ddad7b801f7e8509ff6f52a0b933" },
   { versao: 4, sha256: "9b2c7ee0a010bb99c925ca96fe935249b211ef71d253a0ed8f6c56c079836404" },
   { versao: 5, sha256: "dbde00f2ea7499695898621542ee5ef8b5acb963127f4d2e30513172a8876576" },
+  { versao: 6, sha256: "60be58fab892b1f19b0b7a3ff6a721b3eeba120b5e33378875ea027a6a38ae0d" },
 ];
 
 describe("Apps Script: versão", () => {

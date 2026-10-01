@@ -7,8 +7,9 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
 - nunca sobrescreve fórmula, nem no modo completo;
 - grava só as células livres de cada intervalo, em trechos contíguos, sem
   regravar célula ocupada ou com fórmula;
-- remove somente linha, coluna ou aba criada pela própria integração,
-  identificada por Developer Metadata;
+- na sincronização, remove somente linha, coluna ou aba criada pela própria
+  integração, identificada por Developer Metadata; a correção dos cabeçalhos
+  também pode retirar a introdução reconhecida, após prévia e confirmação;
 - cria uma cópia oculta da aba antes de qualquer operação destrutiva,
   mantendo as três mais recentes;
 - recusa qualquer escrita quando o cabeçalho da aba mudou.
@@ -17,7 +18,13 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
 
 Abas novas recebem cabeçalho destacado, colunas ajustadas, alinhamento, quebra de texto e linhas alternadas. A ação `organizarAba` aplica o mesmo padrão à aba existente, depois da prévia administrativa e da conferência da assinatura. Ela recebe `aba`, `cabecalhoLinha`, `assinatura` e `colunas` com índice, largura e alinhamento. Valores, fórmulas e formatos numéricos não são regravados. Faixas manuais de cores em outro intervalo são preservadas e bloqueiam a sobreposição; reaplicar ao mesmo intervalo não acumula faixas. Falhas de serviço podem deixar parte dos estilos aplicada, portanto a operação não tem repetição automática.
 
-Para atualizar, cole o código da versão 5, publique uma nova versão na implantação existente e use Testar conexão no aplicativo. O endereço `/exec` e o token continuam os mesmos. `estrutura` aceita `apresentacao: true` para ampliar a amostra a 400 colunas durante a prévia visual, mantendo a leitura padrão de 60 colunas nos envios.
+Para atualizar, cole o código da versão 6, publique uma nova versão na implantação existente e use Testar conexão no aplicativo. O endereço `/exec` e o token continuam os mesmos. `estrutura` aceita `apresentacao: true` para ampliar a amostra a 400 colunas durante a prévia visual, mantendo a leitura padrão de 60 colunas nos envios.
+
+## Cabeçalhos na versão 6
+
+Novas colunas com datas completas recebem largura de 110 pixels. A ação `organizarAba` aceita também `ajusteCabecalho`, com `linhasRemover`, `assinaturaIntroducao` e `datas` (índice, valor anterior e rótulo completo). O aplicativo cria esse plano durante a prévia administrativa. A confirmação valida a introdução reconhecida, as datas e a ausência de fórmulas nas células afetadas. Depois cria uma cópia oculta, corrige as datas, retira as linhas introdutórias e aplica a apresentação. As chamadas e as colunas auxiliares não são regravadas; a planilha ajusta as referências das fórmulas ao remover linhas. Uma faixa manual sobreposta bloqueia a operação antes da cópia. Falhas não provocam reenvio automático.
+
+Publique a versão 6 na implantação existente e use Testar conexão no aplicativo. A correção precisa dessa versão; a apresentação sem correção continua compatível com a versão 5.
 
 ## Marcadores
 

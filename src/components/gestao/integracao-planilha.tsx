@@ -489,7 +489,7 @@ export default function IntegracaoPlanilha({
       {conectada && abas.some((aba) => !aba.oculta) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3">
           <p className="text-muted-foreground text-xs">
-            Organização visual com prévia, mantendo os dados e os cabeçalhos existentes.
+            Organize a apresentação ou corrija o título, a legenda e as datas, com prévia.
           </p>
           <Selecionar
             id="frequencia-apresentacao"
@@ -501,11 +501,18 @@ export default function IntegracaoPlanilha({
               .filter((aba) => !aba.oculta)
               .map((aba) => ({ valor: aba.nome, rotulo: aba.nome }))}
           />
-          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <OrganizarPlanilha
               rota="/api/planilha/organizar"
               aba={abaApresentacao}
               disabled={!podeEnviar}
+            />
+            <OrganizarPlanilha
+              rota="/api/planilha/organizar"
+              aba={abaApresentacao}
+              disabled={!podeEnviar}
+              ajustarCabecalho
+              onAtualizar={carregar}
             />
           </div>
         </div>
