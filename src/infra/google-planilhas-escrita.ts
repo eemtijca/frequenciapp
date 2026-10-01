@@ -1,6 +1,7 @@
 // Gravação da frequência pela Sheets API: reconfere a aba antes do lote,
 // preserva fórmulas e células ocupadas e marca linhas e colunas criadas.
 import { z } from "zod";
+import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba } from "@/domain/planilha";
 import { ErroHttp } from "@/infra/erros";
 import {
@@ -365,6 +366,30 @@ export function planejarEscritaGoogle(
           inheritFromBefore: antes > 1,
         },
       });
+      for (const estilo of colunasDeApresentacao(item.rotulos)) {
+        const indice = antes - 1 + estilo.indice - 1;
+        requests.push({
+          updateDimensionProperties: {
+            range: { sheetId, dimension: "COLUMNS", startIndex: indice, endIndex: indice + 1 },
+            properties: { pixelSize: estilo.largura },
+            fields: "pixelSize",
+          },
+        });
+        requests.push({
+          repeatCell: {
+            range: {
+              sheetId,
+              startRowIndex: item.cabecalhoLinha - 1,
+              startColumnIndex: indice,
+              endColumnIndex: indice + 1,
+            },
+            cell: {
+              userEnteredFormat: { horizontalAlignment: estilo.alinhamento, wrapStrategy: "WRAP" },
+            },
+            fields: "userEnteredFormat.horizontalAlignment,userEnteredFormat.wrapStrategy",
+          },
+        });
+      }
       capacidadeColunas += item.rotulos.length;
       for (const fileira of valores) fileira.splice(antes - 1, 0, ...item.rotulos.map(() => ""));
       for (const fileira of formulas)

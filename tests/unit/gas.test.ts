@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { beforeAll, describe, expect, it } from "vitest";
+import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { VERSAO_SCRIPT } from "@/domain/planilha";
 
 type TipoLocal = "SPREADSHEET" | "SHEET" | "ROW" | "COLUMN";
@@ -87,6 +88,21 @@ function vazia(): Celula {
 
 class AbaFalsa {
   nome: string;
+  estilos: { intervalo: string; metodo: string; valor: unknown }[] = [];
+  larguras = new Map<number, number>();
+  alturas = new Map<number, number>();
+  bandas: BandaFalsa[] = [];
+  getBandings() {
+    return this.bandas;
+  }
+  setColumnWidth(coluna: number, largura: number) {
+    this.larguras.set(coluna, largura);
+    return this;
+  }
+  setRowHeight(linha: number, altura: number) {
+    this.alturas.set(linha, altura);
+    return this;
+  }
   oculta = false;
   congeladasLinhas = 0;
   congeladasColunas = 0;
@@ -356,6 +372,39 @@ class AbaFalsa {
   }
 }
 
+class BandaFalsa {
+  constructor(
+    private readonly aba: AbaFalsa,
+    private readonly faixa: FaixaFalsa,
+  ) {}
+  getRange() {
+    return this.faixa;
+  }
+  remove() {
+    this.aba.bandas = this.aba.bandas.filter((banda) => banda !== this);
+  }
+  setHeaderRowColor(cor: string) {
+    this.faixa.setBackground(cor);
+    return this;
+  }
+  setFirstRowColor(cor: string) {
+    this.aba.estilos.push({
+      intervalo: this.faixa.getA1Notation(),
+      metodo: "primeiraLinha",
+      valor: cor,
+    });
+    return this;
+  }
+  setSecondRowColor(cor: string) {
+    this.aba.estilos.push({
+      intervalo: this.faixa.getA1Notation(),
+      metodo: "segundaLinha",
+      valor: cor,
+    });
+    return this;
+  }
+}
+
 class FaixaFalsa {
   constructor(
     private readonly aba: AbaFalsa,
@@ -365,6 +414,45 @@ class FaixaFalsa {
     private readonly colunas: number,
   ) {}
 
+  private estilo(metodo: string, valor: unknown) {
+    this.aba.estilos.push({ intervalo: this.getA1Notation(), metodo, valor });
+    return this;
+  }
+  setBackground(valor: string | null) {
+    return this.estilo("fundo", valor);
+  }
+  setFontColor(valor: string) {
+    return this.estilo("corTexto", valor);
+  }
+  setFontWeight(valor: string) {
+    return this.estilo("pesoTexto", valor);
+  }
+  setVerticalAlignment(valor: string) {
+    return this.estilo("vertical", valor);
+  }
+  setHorizontalAlignment(valor: string) {
+    return this.estilo("horizontal", valor);
+  }
+  setWrap(valor: boolean) {
+    return this.estilo("quebraTexto", valor);
+  }
+  applyRowBanding() {
+    if (
+      this.aba.bandas.some((banda) => {
+        const faixa = banda.getRange();
+        return (
+          faixa.getRow() < this.linha + this.linhas &&
+          faixa.getRow() + faixa.getNumRows() > this.linha &&
+          faixa.getColumn() < this.coluna + this.colunas &&
+          faixa.getColumn() + faixa.getNumColumns() > this.coluna
+        );
+      })
+    )
+      throw new Error("This range already has alternating background colors.");
+    const banda = new BandaFalsa(this.aba, this);
+    this.aba.bandas.push(banda);
+    return banda;
+  }
   getRow() {
     return this.linha;
   }
@@ -602,6 +690,7 @@ function montarContexto(opcoes: OpcoesContexto = {}): Contexto {
       getActiveSpreadsheet: () => (opcoes.contador ? contar(planilha, opcoes.contador) : planilha),
       openById: () => (opcoes.contador ? contar(planilha, opcoes.contador) : planilha),
       flush: () => undefined,
+      BandingTheme: { LIGHT_GREY: "LIGHT_GREY" },
       DeveloperMetadataLocationType: {
         SPREADSHEET: "SPREADSHEET",
         SHEET: "SHEET",
@@ -935,6 +1024,87 @@ describe("Apps Script", () => {
     });
     expect(resposta.ok).toBe(true);
     expect(contexto.planilha.getSheetByName("3º ano A")).not.toBeNull();
+  });
+});
+
+describe("Apps Script: apresentação", () => {
+  function organizar(local: Contexto, assinatura?: string) {
+    return chamar(local, {
+      acao: "organizarAba",
+      aba: "3º ano A",
+      cabecalhoLinha: 1,
+      assinatura: assinatura ?? assinaturaDaAba(local.aba),
+      colunas: colunasDeApresentacao(["Aluno", "Turma atual", "10/09", "11/09", "Total"]),
+    });
+  }
+  it("aplica estilos sem regravar valores e fórmulas, e reaplica sem duplicar faixas", () => {
+    const local = montarContexto();
+    expect(organizar(local).ok).toBe(true);
+    expect(local.aba.gravacoes).toEqual([]);
+    expect(local.aba.getCelula(2, 5).formula).toBe('=CONT.SE(C2:D3;"F")');
+    expect(local.aba.larguras.get(1)).toBe(260);
+    expect(local.aba.larguras.get(3)).toBe(68);
+    expect(local.aba.congeladasLinhas).toBe(1);
+    expect(local.aba.estilos).toContainEqual({
+      intervalo: "A1",
+      metodo: "pesoTexto",
+      valor: "bold",
+    });
+    expect(organizar(local).ok).toBe(true);
+    expect(local.aba.bandas).toHaveLength(1);
+  });
+  it("recusa cabeçalho alterado antes do primeiro estilo", () => {
+    const local = montarContexto();
+    expect(organizar(local, "antiga").ok).toBe(false);
+    expect(local.aba.estilos).toEqual([]);
+    expect(local.aba.larguras.size).toBe(0);
+  });
+  it("preserva faixas manuais e recusa sobreposição antes de formatar", () => {
+    const local = montarContexto();
+    local.aba.getRange(2, 1, 5, 2).applyRowBanding();
+    expect(organizar(local).ok).toBe(false);
+    expect(local.aba.bandas).toHaveLength(1);
+    expect(local.aba.estilos).toEqual([]);
+  });
+  it("preserva a coluna auxiliar da escola fora do padrão visual", () => {
+    const local = montarContexto();
+    local.aba.getRange(1, 6).setValue("Anotação da escola");
+    local.aba.getRange(2, 6).setValue("Registro manual");
+    local.aba.gravacoes = [];
+    expect(organizar(local).ok).toBe(true);
+    expect(local.aba.getCelula(2, 6).valor).toBe("Registro manual");
+    expect(local.aba.larguras.has(6)).toBe(false);
+    expect(local.aba.gravacoes).toEqual([]);
+  });
+  it("mantém os títulos de saídas legíveis para clientes anteriores sem plano visual", () => {
+    const local = montarContexto();
+    expect(
+      chamar(local, {
+        acao: "criarAba",
+        nome: "Saídas",
+        cabecalho: [
+          "Data",
+          "Aluno",
+          "Turma",
+          "Momento",
+          "Justificativa",
+          "Observação",
+          "Liberado por",
+        ],
+      }).ok,
+    ).toBe(true);
+    const nova = local.planilha.getSheetByName("Saídas");
+    expect(nova?.larguras.get(1)).toBe(110);
+    expect(nova?.larguras.get(2)).toBe(260);
+    expect(nova?.larguras.get(4)).toBe(160);
+  });
+  it("cria uma aba com cabeçalho legível e faixas nativas", () => {
+    const local = montarContexto();
+    expect(chamar(local, { acao: "criarAba", nome: "Nova" }).ok).toBe(true);
+    const nova = local.planilha.getSheetByName("Nova");
+    expect(nova?.larguras.get(1)).toBe(260);
+    expect(nova?.estilos).toContainEqual({ intervalo: "A1", metodo: "corTexto", valor: "#ffffff" });
+    expect(nova?.bandas).toHaveLength(1);
   });
 });
 
@@ -1533,6 +1703,7 @@ const VERSOES_DO_SCRIPT = [
   { versao: 2, sha256: "3b4a451026e87f8eb9634b7ed0b6d520dbf2d08602c8374f261c03df4b9c9faa" },
   { versao: 3, sha256: "b10946c2d7497c2f4b2cf02e53bbf17e9fc5ddad7b801f7e8509ff6f52a0b933" },
   { versao: 4, sha256: "9b2c7ee0a010bb99c925ca96fe935249b211ef71d253a0ed8f6c56c079836404" },
+  { versao: 5, sha256: "dbde00f2ea7499695898621542ee5ef8b5acb963127f4d2e30513172a8876576" },
 ];
 
 describe("Apps Script: versão", () => {

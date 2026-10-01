@@ -1,13 +1,13 @@
 /**
  * FrequenciApp: ponte conservadora entre o aplicativo e a planilha.
  *
- * Ações: ping, estrutura, ler, escrever, aplicar, criarAba, removerAba,
+ * Ações: ping, estrutura, ler, escrever, aplicar, criarAba, organizarAba, removerAba,
  * listarCopias e restaurarCopia. Toda chamada exige o token guardado em
  * Script Properties (FREQUENCIAPP_TOKEN). Nenhuma ação apaga dado que a
  * integração não tenha criado, e célula com fórmula nunca é sobrescrita.
  */
 
-var VERSAO = 4;
+var VERSAO = 5;
 var PROP_TOKEN = "FREQUENCIAPP_TOKEN";
 var PROP_PLANILHA = "PLANILHA_ID";
 var MAX_LER_CELULAS = 20000;
@@ -32,7 +32,7 @@ var CARIMBO_COPIA = /^(\d{8})-(\d{6})(?:-\d{3})?(?:-[a-z0-9]+)?$/;
 var VALOR_MARCADOR = "1";
 
 /** Ações que alteram a planilha: exceção no meio pode ter aplicado parte. */
-var ACOES_QUE_ALTERAM = ["escrever", "aplicar", "restaurarCopia"];
+var ACOES_QUE_ALTERAM = ["escrever", "aplicar", "restaurarCopia", "criarAba", "organizarAba"];
 
 function doPost(e) {
   var corpo = null;
@@ -84,6 +84,8 @@ function rotear(corpo) {
       return acaoAplicar(corpo);
     case "criarAba":
       return acaoCriarAba(corpo);
+    case "organizarAba":
+      return acaoOrganizarAba(corpo);
     case "removerAba":
       return acaoRemoverAba(corpo);
     case "listarCopias":
@@ -147,16 +149,16 @@ function acaoEstrutura(corpo) {
           congeladasLinhas: aba.getFrozenRows(),
           congeladasColunas: aba.getFrozenColumns(),
           mesclagens: mesclagensDaAba(aba),
-          amostra: amostraDaAba(aba),
+          amostra: amostraDaAba(aba, corpo.apresentacao ? 400 : MAX_AMOSTRA_COLUNAS),
         };
       }),
     },
   };
 }
 
-function amostraDaAba(aba) {
+function amostraDaAba(aba, limiteColunas) {
   var linhas = Math.min(Math.max(aba.getLastRow(), 1), MAX_AMOSTRA_LINHAS);
-  var colunas = Math.min(Math.max(aba.getLastColumn(), 1), MAX_AMOSTRA_COLUNAS);
+  var colunas = Math.min(Math.max(aba.getLastColumn(), 1), limiteColunas || MAX_AMOSTRA_COLUNAS);
   return aba.getRange(1, 1, linhas, colunas).getDisplayValues();
 }
 
@@ -537,6 +539,19 @@ function aplicarInserirColunas(aba, operacao, contagem) {
   }
   var faixa = aba.getRange(operacao.cabecalhoLinha || 1, antesDe, 1, rotulos.length);
   faixa.setValues([rotulos]);
+  rotulos.forEach(function (rotulo, indice) {
+    if (!/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(String(rotulo).trim())) return;
+    aba.setColumnWidth(antesDe + indice, 68);
+    aba
+      .getRange(
+        operacao.cabecalhoLinha || 1,
+        antesDe + indice,
+        aba.getMaxRows() - (operacao.cabecalhoLinha || 1) + 1,
+        1,
+      )
+      .setHorizontalAlignment("center")
+      .setWrap(true);
+  });
   contagem.colunasCriadas += rotulos.length;
   return null;
 }
@@ -674,12 +689,159 @@ function acaoCriarAba(corpo) {
   if (!nome) return { ok: false, erro: "Informe o nome da aba." };
   if (planilha.getSheetByName(nome)) return { ok: false, erro: "Já existe uma aba com esse nome." };
   var aba = planilha.insertSheet(nome);
-  var cabecalho = corpo.cabecalho || ["Aluno", "Turma atual"];
+  var cabecalho =
+    Array.isArray(corpo.cabecalho) && corpo.cabecalho.length
+      ? corpo.cabecalho
+      : ["Aluno", "Turma atual"];
   aba.getRange(1, 1, 1, cabecalho.length).setValues([cabecalho]);
-  aba.setFrozenRows(1);
+  aplicarApresentacao(aba, {
+    cabecalhoLinha: 1,
+    // Clientes anteriores não enviam o plano visual; os títulos padrão continuam legíveis.
+    colunas:
+      corpo.colunas ||
+      cabecalho.map(function (rotulo, indice) {
+        var nome = String(rotulo)
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+          .toLowerCase();
+        var largura = 240;
+        var alinhamento = "LEFT";
+        if (["aluno", "aluna", "nome", "estudante", "nome do aluno"].indexOf(nome) >= 0)
+          largura = 260;
+        else if (["turma", "turma atual", "classe"].indexOf(nome) >= 0) {
+          largura = 140;
+          alinhamento = "CENTER";
+        } else if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(nome)) {
+          largura = 68;
+          alinhamento = "CENTER";
+        } else if (
+          ["data", "dia", "total", "faltas", "justificadas", "total (f + fj)"].indexOf(nome) >= 0
+        ) {
+          largura = 110;
+          alinhamento = "CENTER";
+        } else if (["horario", "aula", "momento", "momento da saida"].indexOf(nome) >= 0) {
+          largura = 160;
+          alinhamento = "CENTER";
+        }
+        return { indice: indice + 1, largura: largura, alinhamento: alinhamento };
+      }),
+  });
   aba.addDeveloperMetadata(MARCADOR_ABA, VALOR_MARCADOR);
   SpreadsheetApp.flush();
   return { ok: true, versao: VERSAO, dados: { aba: aba.getName() } };
+}
+
+/** Apenas estilos: valores, fórmulas, tipos numéricos e cabeçalhos são preservados. */
+function acaoOrganizarAba(corpo) {
+  var aba = resolverAba(corpo.aba);
+  if (aba.isSheetHidden() || mesclagensDaAba(aba).length) {
+    return { ok: false, erro: "Organize apenas abas visíveis e sem células mescladas." };
+  }
+  var conflito = conferirAssinatura(aba, corpo);
+  if (conflito) return conflito;
+  aplicarApresentacao(aba, corpo);
+  SpreadsheetApp.flush();
+  return { ok: true, versao: VERSAO, dados: { aba: aba.getName() } };
+}
+
+function aplicarApresentacao(aba, corpo) {
+  var linha = corpo.cabecalhoLinha;
+  var colunas = corpo.colunas;
+  if (
+    !Number.isInteger(linha) ||
+    linha < 1 ||
+    linha > aba.getMaxRows() ||
+    !Array.isArray(colunas) ||
+    !colunas.length ||
+    colunas.length > 400
+  )
+    throw new Error("Apresentação da planilha inválida.");
+  var indices = {};
+  colunas.forEach(function (coluna) {
+    if (
+      !Number.isInteger(coluna.indice) ||
+      coluna.indice < 1 ||
+      coluna.indice > aba.getMaxColumns() ||
+      indices[coluna.indice] ||
+      !Number.isInteger(coluna.largura) ||
+      coluna.largura < 40 ||
+      coluna.largura > 400 ||
+      ["LEFT", "CENTER"].indexOf(coluna.alinhamento) < 0
+    )
+      throw new Error("Apresentação da planilha inválida.");
+    indices[coluna.indice] = true;
+  });
+  var faixas = [];
+  colunas
+    .slice()
+    .sort(function (a, b) {
+      return a.indice - b.indice;
+    })
+    .forEach(function (coluna) {
+      var ultima = faixas[faixas.length - 1];
+      if (ultima && ultima.coluna + ultima.colunas === coluna.indice) ultima.colunas += 1;
+      else faixas.push({ coluna: coluna.indice, colunas: 1 });
+    });
+  var bandas = aba.getBandings();
+  var planos = faixas.map(function (faixa) {
+    var sobrepostas = bandas.filter(function (banda) {
+      var range = banda.getRange();
+      return (
+        range.getRow() + range.getNumRows() > linha &&
+        range.getColumn() < faixa.coluna + faixa.colunas &&
+        range.getColumn() + range.getNumColumns() > faixa.coluna
+      );
+    });
+    if (
+      sobrepostas.some(function (banda) {
+        var range = banda.getRange();
+        return (
+          range.getRow() !== linha ||
+          range.getColumn() !== faixa.coluna ||
+          range.getNumColumns() !== faixa.colunas
+        );
+      })
+    )
+      throw new Error(
+        "A aba já tem cores alternadas em outro intervalo. Ajuste esse intervalo na planilha antes de organizar.",
+      );
+    return { faixa: faixa, sobrepostas: sobrepostas };
+  });
+  // Todas as recusas acontecem antes do primeiro estilo ser aplicado.
+  planos.forEach(function (plano) {
+    plano.sobrepostas.forEach(function (banda) {
+      banda.remove();
+    });
+    aba
+      .getRange(linha, plano.faixa.coluna, aba.getMaxRows() - linha + 1, plano.faixa.colunas)
+      .applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false)
+      .setHeaderRowColor("#166534")
+      .setFirstRowColor("#ffffff")
+      .setSecondRowColor("#f0f4f1");
+  });
+  aba.setFrozenRows(Math.max(aba.getFrozenRows(), linha));
+  aba.setRowHeight(linha, 44);
+  colunas.forEach(function (coluna) {
+    aba.setColumnWidth(coluna.indice, coluna.largura);
+    aba
+      .getRange(linha, coluna.indice, aba.getMaxRows() - linha + 1, 1)
+      .setVerticalAlignment("top")
+      .setHorizontalAlignment(coluna.alinhamento.toLowerCase())
+      .setWrap(true);
+    if (aba.getMaxRows() > linha) {
+      aba
+        .getRange(linha + 1, coluna.indice, aba.getMaxRows() - linha, 1)
+        .setBackground(null)
+        .setFontColor("#1f2937");
+    }
+    aba
+      .getRange(linha, coluna.indice, 1, 1)
+      .setBackground("#166534")
+      .setFontColor("#ffffff")
+      .setFontWeight("bold")
+      .setVerticalAlignment("middle");
+  });
 }
 
 function acaoRemoverAba(corpo) {
@@ -1032,6 +1194,12 @@ function temMarcador(aba, chave) {
 
 function mensagemDeErro(erro) {
   var texto = String((erro && erro.message) || erro || "");
+  if (
+    texto ===
+      "A aba já tem cores alternadas em outro intervalo. Ajuste esse intervalo na planilha antes de organizar." ||
+    texto === "Apresentação da planilha inválida."
+  )
+    return texto;
   if (texto.indexOf("Aba não encontrada") === 0) return "Aba não encontrada.";
   if (texto.indexOf("Planilha não definida") === 0) return "Planilha não definida no script.";
   return "Não foi possível concluir a operação na planilha.";

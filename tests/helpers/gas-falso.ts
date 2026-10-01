@@ -52,7 +52,7 @@ const MARCADOR_LINHA = "frequenciapp.linha";
 const MARCADOR_COLUNA = "frequenciapp.coluna";
 const MARCADOR_ABA = "frequenciapp.aba";
 const MARCADOR_ALUNO = "frequenciapp.aluno";
-const VERSAO = 4;
+const VERSAO = 5;
 const COPIA_PREFIXO = "_frequenciapp_backup_";
 
 function hashTexto(texto: string): string {
@@ -198,7 +198,10 @@ export async function criarGasFalso(): Promise<GasFalso> {
               .filter((item) => !corpo.aba || item.nome === nomeAba)
               .map((item) => {
                 const linhas = Math.min(Math.max(ultimaLinha(item), 1), 12);
-                const colunas = Math.min(Math.max(ultimaColuna(item), 1), 60);
+                const colunas = Math.min(
+                  Math.max(ultimaColuna(item), 1),
+                  corpo.apresentacao ? 400 : 60,
+                );
                 const amostra: string[][] = [];
                 for (let linha = 1; linha <= linhas; linha += 1) {
                   const fileira: string[] = [];
@@ -472,6 +475,24 @@ export async function criarGasFalso(): Promise<GasFalso> {
           }
         }
         return { ok: true, versao: VERSAO, dados: { ...contagem, tempos: { aplicar: 0 } } };
+      }
+      case "organizarAba": {
+        const item = aba(nomeAba);
+        if (!item) return { ok: false, erro: "Aba não encontrada." };
+        const linha = Number(corpo.cabecalhoLinha ?? 1);
+        const cabecalho = Array.from({ length: Math.max(ultimaColuna(item), 1) }, (_, indice) =>
+          garantir(item, linha, indice + 1).valor.trim(),
+        );
+        const assinatura = hashTexto(
+          JSON.stringify([item.nome, cabecalho, item.mesclagens.slice().sort()]),
+        );
+        if (corpo.assinatura !== assinatura)
+          return {
+            ok: false,
+            erro: "A estrutura da planilha mudou. Confira de novo antes de organizar.",
+          };
+        item.congeladasLinhas = Math.max(item.congeladasLinhas, linha);
+        return { ok: true, versao: VERSAO, dados: { aba: item.nome } };
       }
       case "criarAba": {
         const nome = String(corpo.nome ?? "").trim();

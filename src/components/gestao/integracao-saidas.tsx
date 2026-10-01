@@ -2,6 +2,7 @@
 
 // Card da planilha de saídas: etapas de conexão, aba do registro e envio,
 // modo completo e zona de risco. Restrito à administração.
+import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
 import { DoorOpen, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -430,6 +431,21 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           </p>
         )}
       </EtapaPlanilha>
+
+      {(abaSelecionada || integracao?.esquema?.aba) && (
+        <div className="flex flex-col gap-2 rounded-lg border p-3">
+          <p className="text-muted-foreground text-xs">
+            Organização visual com prévia, mantendo os dados e os cabeçalhos existentes.
+          </p>
+          <div>
+            <OrganizarPlanilha
+              rota="/api/planilha-saidas/organizar"
+              aba={abaSelecionada || integracao?.esquema?.aba || ""}
+              disabled={!podeEnviar}
+            />
+          </div>
+        </div>
+      )}
 
       <EtapaPlanilha
         numero={3}

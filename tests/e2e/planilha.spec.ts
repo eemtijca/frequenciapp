@@ -87,6 +87,28 @@ test.describe("Google Planilhas", () => {
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
+    // Organização visual com prévia, cancelamento sem escrita e confirmação.
+    await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
+    await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
+    const organizar = cartao.getByRole("button", { name: "Organizar apresentação de E2E Ano A" });
+    await organizar.click();
+    const apresentacao = page.getByRole("alertdialog");
+    await expect(
+      apresentacao.getByRole("heading", { name: "Organizar apresentação da aba E2E Ano A?" }),
+    ).toBeVisible();
+    await expect(
+      apresentacao.getByRole("columnheader", { name: "Aluno", exact: true }),
+    ).toBeVisible();
+    await apresentacao.screenshot({ path: "test-results/planilha-apresentacao-previa.png" });
+    const chamadasAntes = gas.chamadas().filter((acao) => acao === "organizarAba").length;
+    await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
+    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes);
+    await organizar.click();
+    await apresentacao.getByRole("button", { name: "Aplicar apresentação" }).click();
+    await expect(page.getByText("Apresentação da planilha atualizada.")).toBeVisible();
+    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 1);
+    expect(gas.valor("E2E Ano A", 2, 1)).toBe("E2E Aluno Um");
+
     // O envio ao salvar a chamada nasce desligado e só se libera com a estrutura salva.
     const envioAoSalvar = cartao.getByRole("switch", { name: "Enviar ao salvar a chamada" });
     await expect(envioAoSalvar).toBeEnabled();

@@ -1,6 +1,8 @@
 // Criação e remoção de abas pelo Google Sheets, com marcadores que impedem
 // apagar uma aba criada manualmente pela escola.
 import { randomInt } from "node:crypto";
+import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
+import { pedidosDeApresentacao } from "@/infra/google-planilhas-apresentacao";
 import { ErroHttp } from "@/infra/erros";
 import { criarCopiaGoogle } from "@/infra/google-planilhas-copias";
 import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
@@ -21,7 +23,19 @@ export async function criarAbaGoogle(
   while (ids.has(sheetId)) sheetId = randomInt(1, 2_147_483_647);
   const titulos = cabecalho?.length ? cabecalho : ["Aluno", "Turma atual"];
   await enviarLotesGoogle(id, acesso, [
-    { addSheet: { properties: { sheetId, title: nome, gridProperties: { frozenRowCount: 1 } } } },
+    {
+      addSheet: {
+        properties: {
+          sheetId,
+          title: nome,
+          gridProperties: {
+            rowCount: 1000,
+            columnCount: Math.max(26, titulos.length),
+            frozenRowCount: 1,
+          },
+        },
+      },
+    },
     {
       createDeveloperMetadata: {
         developerMetadata: {
@@ -47,6 +61,12 @@ export async function criarAbaGoogle(
         fields: "userEnteredValue",
       },
     },
+    ...pedidosDeApresentacao(sheetId, 1000, {
+      aba: nome,
+      cabecalhoLinha: 1,
+      assinatura: "",
+      colunas: colunasDeNovaAba(titulos),
+    }),
   ]);
   return { aba: nome };
 }

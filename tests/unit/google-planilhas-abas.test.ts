@@ -45,7 +45,7 @@ describe("abas da Sheets API", () => {
     );
     expect(await criarAbaGoogle("planilha-de-teste", "acesso", "Nova")).toEqual({ aba: "Nova" });
     expect(lotes).toHaveLength(1);
-    expect(lotes[0]).toMatchObject({
+    expect({ requests: (lotes[0] as { requests: unknown[] }).requests.slice(0, 3) }).toMatchObject({
       requests: [
         { addSheet: { properties: { title: "Nova" } } },
         { createDeveloperMetadata: { developerMetadata: { metadataKey: "frequenciapp.aba" } } },
@@ -62,6 +62,39 @@ describe("abas da Sheets API", () => {
           },
         },
       ],
+    });
+  });
+
+  it("destaca um cabeçalho personalizado de aba nova sem mudar o título", async () => {
+    const pedidos: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", async (entrada: URL | string, opcoes?: RequestInit) => {
+      if (String(entrada).endsWith("/developerMetadata:search"))
+        return Response.json({ matchedDeveloperMetadata: [] });
+      if (opcoes?.method === "POST") {
+        pedidos.push(
+          ...(JSON.parse(String(opcoes.body)) as { requests: Record<string, unknown>[] }).requests,
+        );
+        return Response.json({ replies: [] });
+      }
+      return Response.json(documento);
+    });
+    await criarAbaGoogle("planilha-de-teste", "acesso", "Nova", ["Título da escola"]);
+    expect(pedidos[2]).toMatchObject({
+      updateCells: {
+        rows: [{ values: [{ userEnteredValue: { stringValue: "Título da escola" } }] }],
+      },
+    });
+    expect(pedidos).toContainEqual(expect.objectContaining({ addBanding: expect.anything() }));
+    expect(pedidos).toContainEqual(
+      expect.objectContaining({
+        updateDimensionProperties: expect.objectContaining({ properties: { pixelSize: 240 } }),
+      }),
+    );
+    const cabecalho = pedidos.find((pedido) =>
+      (pedido.repeatCell as { fields?: string } | undefined)?.fields?.includes("textFormat.bold"),
+    );
+    expect(cabecalho).toMatchObject({
+      repeatCell: { cell: { userEnteredFormat: { textFormat: { bold: true } } } },
     });
   });
 
