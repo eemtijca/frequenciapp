@@ -89,7 +89,7 @@ delete from tentativas_entrada where chave like '%:3a-maria';
 Quando a escola reorganiza turmas, como nas 3ª séries, a Chamada passa a seguir a relação atual de cada turma, e a Grade e a planilha consolidam pela turma original de cada aluno.
 
 1. Publique a versão do aplicativo com a lista da chamada ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)) antes de mover alunos. A migração fixa quem estava em cada chamada já salva.
-2. Monte um CSV com todas as turmas da série no schema abaixo. O caminho mais simples é tocar em Exportar relação, editar o arquivo na planilha eletrônica e salvar de novo como CSV.
+2. Monte um CSV com todas as turmas da série no schema abaixo. O caminho mais simples é tocar em Exportar relação, extrair o CSV se a opção ZIP protegido for usada, editar o arquivo na planilha eletrônica e salvar de novo como CSV.
 3. Em Gestão, Alunos, toque em Importar relação, escolha o arquivo `.csv` ou cole o conteúdo. Linhas fora do padrão aparecem na hora, em vermelho, com o número da linha e o que corrigir.
 4. Toque em Conferir e confira a prévia: o total de alunos por turma e a lista de desativados, que só pode ter quem de fato saiu. Corrija no arquivo qualquer turma desconhecida ou nome repetido.
 5. Toque em Aplicar. A Chamada de cada turma passa a mostrar a relação na ordem do arquivo, com a turma original em círculo ao lado de cada nome.
@@ -141,7 +141,7 @@ Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno, texto
 
 ### Cópia JSON pela Gestão
 
-A administração também pode baixar e importar uma cópia JSON em Gestão, Configurações, Cópia de segurança. Ela reúne séries, turmas, aulas, alunos, chamadas, saídas e configurações, serve para migração entre instalações e conferência, e a importação mescla sem sobrescrever o que já existe. A cópia JSON não substitui o `pg_dump`: para restauração completa e rotinas de operação, use o dump do banco.
+A administração também pode baixar e importar uma cópia JSON em Gestão, Configurações, Cópia de segurança. O download exige a senha atual da administração e oferece ZIP protegido por senha; extrair o JSON antes de importar. Ela reúne séries, turmas, aulas, alunos, chamadas, saídas e configurações, serve para migração entre instalações e conferência, e a importação mescla sem sobrescrever o que já existe. A cópia JSON não substitui o `pg_dump`: para restauração completa e rotinas de operação, use o dump do banco. Cuidados em [downloads.md](downloads.md).
 
 ## Restauração
 

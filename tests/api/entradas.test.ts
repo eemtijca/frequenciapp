@@ -230,7 +230,14 @@ describe("entradas atrasadas", () => {
     ).toEqual([]);
   });
   it("exporta, mescla sem sobrescrever e restaura pela cópia JSON", async () => {
-    const copia = await (await chamar("/api/backup", "GET", undefined, cookieAdmin)).json();
+    const copia = await (
+      await chamar(
+        "/api/backup/exportar",
+        "POST",
+        { senha: process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026" },
+        cookieAdmin,
+      )
+    ).json();
     expect(copia.entradas.find((entrada: EntradaAtrasada) => entrada.id === id)).toMatchObject({
       momento: "aula_2",
       responsavelRegistroCodigo: "QAENTREG",
@@ -242,9 +249,10 @@ describe("entradas atrasadas", () => {
     expect(resposta.status).toBe(200);
     expect(
       (
-        await banco.query<{ id: string }>("select id from entradas_atrasadas where aluno_id = $1", [
-          aluno,
-        ])
+        await banco.query<{ id: string }>(
+          "select id from entradas_atrasadas where aluno_id = $1 and dia = $2::date",
+          [aluno, dia],
+        )
       ).rows[0]?.id,
     ).toBe(id);
     copia.entradas.find((entrada: EntradaAtrasada) => entrada.id === id).motivo = "Outro motivo";
@@ -274,7 +282,14 @@ describe("entradas atrasadas", () => {
       [aluno, turma],
     );
     const idLegado = legado.rows[0]?.id ?? "";
-    const copia = await (await chamar("/api/backup", "GET", undefined, cookieAdmin)).json();
+    const copia = await (
+      await chamar(
+        "/api/backup/exportar",
+        "POST",
+        { senha: process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026" },
+        cookieAdmin,
+      )
+    ).json();
     const registro = copia.entradas.find((entrada: EntradaAtrasada) => entrada.id === idLegado);
     delete registro.momento;
     delete registro.responsavelRegistroCodigo;

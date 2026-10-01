@@ -24,3 +24,5 @@
 - [ADR-028](adr/028-notificacoes-web-push.md): avisos voluntários aos diretores, sem dados individuais no payload.
 - [ADR-029](adr/029-configuracao-automatica-push.md): configuração automática de VAPID com identidade estável por instalação.
 - [ADR-030](adr/030-preferencias-agenda-notificacoes.md): tipos de aviso, pendências da coordenação e agenda compatível com Vercel Hobby.
+- [Downloads protegidos](downloads.md): ZIP com senha, confirmação da cópia completa e auditoria mínima de exportações.
+- [ADR-031](adr/031-downloads-protegidos.md): proteção AES-256 no navegador, nomes genéricos e formatos originais por escolha explícita.

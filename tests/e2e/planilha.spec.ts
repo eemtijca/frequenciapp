@@ -162,9 +162,12 @@ test.describe("Google Planilhas", () => {
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const pilula = grade.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    await page.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
+    const downloadDialogo = page.getByRole("dialog", { name: "Preparar download" });
+    await downloadDialogo.getByLabel("Arquivo original sem senha").check();
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByRole("button", { name: "Baixar planilha (CSV)" }).click(),
+      downloadDialogo.getByRole("button", { name: "Baixar arquivo original" }).click(),
     ]);
     const caminho = await download.path();
     expect(caminho).toBeTruthy();

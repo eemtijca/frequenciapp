@@ -18,13 +18,13 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 | Frequência enviada à planilha da escola                   | Reorganizar por turma de origem, quando a integração está ligada. | Na planilha da própria escola, sob controle dela.                                   |
 | Saídas enviadas à planilha da escola                      | Registrar as saídas antecipadas em outra planilha, quando ligada. | Idem, com justificativa e observação sob controle da escola.                        |
 
-Não há coleta de CPF, matrícula, telefone, endereço, dados sensíveis, dados de menores além do prenome necessário para registrar a frequência, nem qualquer dado de navegação, rastreamento ou perfil.
+O cadastro não solicita CPF, matrícula, telefone ou endereço. Nomes e textos livres devem conter somente o necessário à rotina escolar; motivos e observações podem conter dados sensíveis se preenchidos dessa forma, por isso exigem cuidado na coleta e no compartilhamento.
 
 ## Fundamentos
 
 - **Necessidade**: cada campo existe para a finalidade do sistema, que é o registro de frequência (art. 6º, III).
 - **Minimização**: apenas o estritamente necessário, com presença implícita em vez de registro positivo de todos os dias (art. 6º, III).
-- **Finalidade**: dados usados exclusivamente pela equipe da escola e pelos diretores de turma, dentro do aplicativo, sem exportação para fora dele.
+- **Finalidade**: dados usados pela equipe da escola e pelos diretores de turma no escopo autorizado. Downloads e integração opcional com a planilha da escola mantêm a finalidade escolar e exigem controle do destino pela escola.
 - **Segurança**: senha com scrypt, sessões opacas com hash no banco, tráfego protegido por HTTPS no deploy, autoria anulável e trilha de auditoria sem dados de alunos.
 - **Transparência**: este documento e a interface avisam o que é armazenado.
 
@@ -41,6 +41,12 @@ A escola é a controladora dos dados dos alunos que cadastra. O aplicativo ofere
 -- excluir a conta de uma pessoa da equipe (irreversível)
 delete from usuarios where id = '<id da conta>';
 ```
+
+## Segurança das exportações
+
+Todos os downloads oferecem ZIP com senha e AES-256 como escolha inicial. A opção de formato original exige escolha explícita e avisa que o conteúdo ficará legível. Nomes de arquivos protegidos são genéricos, pois o diretório de um ZIP permanece visível. A senha do ZIP fica apenas em memória no navegador, sem transmissão nem armazenamento pelo aplicativo. A senha de acesso, exigida separadamente para a cópia completa, é conferida no servidor com limite de tentativas.
+
+CSV de grade e relação registram preparação na auditoria, apenas com conta, tipo, formato e data. A cópia mantém `backup.exportar`, sem senha nem dados de alunos no evento. A administração deve definir destinatários autorizados, prazo de guarda e descarte de arquivos e cópias extraídas. O passo a passo e os limites estão em [downloads.md](downloads.md).
 
 ## Repartição de papéis
 

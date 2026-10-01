@@ -212,7 +212,11 @@ describe("chamada pela turma atual, consolidação pela turma original", () => {
       cookieCoord,
     );
     expect(novaFalta.status).toBe(400);
-    const copia = await chamar("/api/backup", {}, cookieAdmin);
+    const copia = await chamar(
+      "/api/backup/exportar",
+      { method: "POST", body: JSON.stringify({ senha: SENHA_ADMIN }) },
+      cookieAdmin,
+    );
     expect(copia.status).toBe(200);
     const documento = await json<{ alunos: { id: string; desistenteEm?: string | null }[] }>(copia);
     expect(documento.alunos.find((item) => item.id === ids.movido)?.desistenteEm).toBe(DIA_2);

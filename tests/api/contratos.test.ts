@@ -1220,7 +1220,10 @@ describe("saídas antecipadas", () => {
     const criada = (await semTexto.json()) as { saida: { id: string; texto: string | null } };
     expect(criada.saida.texto).toBeNull();
 
-    const copia = await autenticado(cookieAdmin, "/api/backup");
+    const copia = await autenticado(cookieAdmin, "/api/backup/exportar", {
+      method: "POST",
+      body: JSON.stringify({ senha: SENHA_ADMIN }),
+    });
     expect(copia.status).toBe(200);
     const documento = (await copia.json()) as {
       saidas: { id: string; texto?: string | null; liberadoPorCodigo?: string | null }[];
@@ -1372,7 +1375,10 @@ describe("configurações e responsáveis", () => {
       );
       expect(alunosDepois.rows).toEqual(alunosAntes.rows);
       expect(frequenciasDepois.rows).toEqual(frequenciasAntes.rows);
-      const copia = await autenticado(cookieAdmin, "/api/backup");
+      const copia = await autenticado(cookieAdmin, "/api/backup/exportar", {
+        method: "POST",
+        body: JSON.stringify({ senha: SENHA_ADMIN }),
+      });
       const exportada = (await copia.json()) as { configuracoes: Configuracoes };
       expect(exportada.configuracoes).toEqual(configurada.configuracoes);
     } finally {
@@ -1410,12 +1416,18 @@ describe("configurações e responsáveis", () => {
 
 describe("cópia de segurança", () => {
   it("coordenação não exporta a cópia", async () => {
-    const resposta = await autenticado(cookieCoord, "/api/backup");
+    const resposta = await autenticado(cookieCoord, "/api/backup/exportar", {
+      method: "POST",
+      body: JSON.stringify({ senha: SENHA_ADMIN }),
+    });
     expect(resposta.status).toBe(403);
   });
 
   it("administração exporta e importa a própria cópia sem conflitos", async () => {
-    const exportacao = await autenticado(cookieAdmin, "/api/backup");
+    const exportacao = await autenticado(cookieAdmin, "/api/backup/exportar", {
+      method: "POST",
+      body: JSON.stringify({ senha: SENHA_ADMIN }),
+    });
     expect(exportacao.status).toBe(200);
     const copia = (await exportacao.json()) as {
       formato: string;
@@ -1580,7 +1592,10 @@ describe("catálogo de justificativas", () => {
   });
 
   it("a cópia de segurança inclui os catálogos", async () => {
-    const resposta = await autenticado(cookieAdmin, "/api/backup");
+    const resposta = await autenticado(cookieAdmin, "/api/backup/exportar", {
+      method: "POST",
+      body: JSON.stringify({ senha: SENHA_ADMIN }),
+    });
     expect(resposta.status).toBe(200);
     const copia = (await resposta.json()) as {
       justificativas?: unknown[];

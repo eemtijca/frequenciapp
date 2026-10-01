@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import DialogoDownload from "@/components/conta/dialogo-download";
 import SecaoAcessoDiretores from "@/components/gestao/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/secao-notificacoes";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
@@ -95,7 +96,7 @@ export default function AbaConfiguracoes({
   >(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
-  const [baixando, setBaixando] = useState(false);
+  const [downloadAberto, setDownloadAberto] = useState(false);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
@@ -399,37 +400,14 @@ export default function AbaConfiguracoes({
     });
   }
 
-  async function baixarCopia() {
-    const aviso = "backup-baixar";
-    await executarPorChave(aviso, async () => {
-      setBaixando(true);
-      setErro("");
-      toast.loading("Baixando a cópia de segurança...", { id: aviso });
-      try {
-        const dados = await pedir<unknown>("/api/backup");
-        const conteudo = JSON.stringify(dados, null, 2);
-        const blob = new Blob([conteudo], { type: "application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `frequenciapp-copia-${diaCorrente}.json`;
-        document.body.append(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        avisarSucesso(
-          "Cópia preparada. Confira o download no navegador.",
-          "Guarde o arquivo em lugar seguro: é com ele que os dados voltam, se precisar.",
-          aviso,
-        );
-      } catch (excecao) {
-        setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível gerar a cópia.");
-        setErroVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível gerar a cópia.", id: aviso });
-      } finally {
-        setBaixando(false);
-      }
-    });
+  async function prepararCopia(senha: string) {
+    const dados = await pedir<unknown>("/api/backup/exportar", corpoJson({ senha }));
+    return {
+      blob: new Blob([JSON.stringify(dados, null, 2)], { type: "application/json;charset=utf-8" }),
+      nome: `frequenciapp-copia-${diaCorrente}.json`,
+      nomeNoZip: "copia.json",
+      nomeZip: "frequenciapp-copia.zip",
+    };
   }
 
   async function importar(arquivo: File) {
@@ -1011,14 +989,10 @@ export default function AbaConfiguracoes({
             type="button"
             variant="outline"
             className="h-11 rounded-lg"
-            onClick={() => void baixarCopia()}
-            disabled={baixando || importando}
+            onClick={() => setDownloadAberto(true)}
+            disabled={importando}
           >
-            {baixando ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <Download size={16} />
-            )}
+            <Download size={16} />
             Baixar cópia
           </Button>
           <AlertDialog>
@@ -1074,6 +1048,18 @@ export default function AbaConfiguracoes({
           </p>
         )}
       </SecaoRecolhivel>
+      <DialogoDownload
+        confirmarAdmin
+        aberto={downloadAberto}
+        onAbrir={setDownloadAberto}
+        preparar={prepararCopia}
+        onConcluido={() =>
+          avisarSucesso(
+            "Cópia preparada. Confira o download no navegador.",
+            "Guarde a cópia em local seguro e, se protegida, mantenha a senha separada.",
+          )
+        }
+      />
     </div>
   );
 }
