@@ -69,12 +69,7 @@ export default function VistaGestao({
 }: Props) {
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Gestão</h1>
-        <p className="text-muted-foreground text-sm">
-          Séries, turmas, alunos, equipe, diretores de turma e recursos da escola.
-        </p>
-      </div>
+      <h1 className="sr-only">Gestão</h1>
 
       <AbasDeslizantes
         rotuloAcessivel="Áreas de gestão"

@@ -296,12 +296,6 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
         </Button>
       </div>
 
-      <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
-        O diretor de turma só consulta as estatísticas das turmas marcadas aqui, sem editar nada.
-        Ele entra com o identificador e a palavra-chave, que aparece uma única vez ao ser gerada e
-        precisa ser trocada no primeiro acesso. Entregue a palavra em mãos ou por mensagem direta.
-      </p>
-
       {carregando && diretores === null ? (
         <div className="text-muted-foreground flex min-h-32 items-center justify-center gap-2 text-sm">
           <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />

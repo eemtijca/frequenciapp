@@ -63,6 +63,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Modificado
 
+- Interface mais limpa: sem títulos e textos de apoio visíveis em Chamada, Saiu mais cedo, Entradas atrasadas, Grade e Gestão, nem os avisos fixos das abas Alunos, Equipe e Diretores e a explicação da Planilha de entradas. Os títulos ficam só para leitores de tela, e os avisos de exclusão e de palavra-chave seguem nos diálogos.
 - A exibição da turma de origem e do asterisco na Chamada é configurável pela escola, com ativação e seleção de séries completas ou turmas específicas. Desativar preserva a seleção e os dados. A migração mantém a 3ª série já cadastrada selecionada; instalações novas começam com o recurso desligado.
 - O Painel distribui as faltas do dia pela turma atual, como a chamada aconteceu.
 - Workflows renomeados para `qualidade.yml`, `testes.yml` e `migracoes.yml`, com o padrão de nomes em português.

@@ -3,7 +3,7 @@
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
 import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import type {
   Aluno,
   Turma,
@@ -154,12 +154,7 @@ export default function VistaEntradas({
   }
   return (
     <div className="space-y-5 pb-6">
-      <header>
-        <h1 className="text-xl font-semibold">Entradas atrasadas</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Registro de chegada à escola. A frequência da chamada permanece como foi marcada.
-        </p>
-      </header>
+      <h1 className="sr-only">Entradas atrasadas</h1>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -453,16 +448,9 @@ export default function VistaEntradas({
         )}
       </section>
       <section className="space-y-3 rounded-xl border p-4" aria-label="Planilha de entradas">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <FileSpreadsheet size={18} /> Planilha de entradas
-        </h2>
-        <p className="text-muted-foreground text-sm">
-          A aba Entradas fica na planilha de saídas escolhida na Gestão. O envio usa a data e a
-          turma deste recorte, com prévia obrigatória.
-        </p>
+        <h2 className="sr-only">Planilha de entradas</h2>
         {estado?.podeEnviar ? (
           <>
-            <p className="text-sm">Planilha: {estado.planilhaNome}</p>
             <div className="flex flex-wrap gap-2">
               {podePrepararPlanilha && (
                 <Button

@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   CloudCheck,
@@ -343,7 +342,6 @@ export default function VistaFrequencia({
     const marcadas = ausencias.get(aluno.id)?.size ?? 0;
     return marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
   }).length;
-  const infrequencia = participantes.length > 0 ? contagemFaltas / participantes.length : 0;
 
   const visiveis = useMemo(() => {
     const termo = normalizar(busca);
@@ -559,10 +557,6 @@ export default function VistaFrequencia({
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
-  const rotuloInfrequencia = new Intl.NumberFormat("pt-BR", {
-    style: "percent",
-    maximumFractionDigits: 1,
-  }).format(infrequencia);
 
   const tituloEstado = carregando
     ? "Carregando chamada"
@@ -625,23 +619,7 @@ export default function VistaFrequencia({
 
   return (
     <section aria-label="Fazer chamada" className="flex flex-col gap-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Chamada</h1>
-          <p className="text-muted-foreground text-sm">
-            {carregando
-              ? ""
-              : `${ativosDaTurma.length} na lista · ${desistentesDaTurma.size} desistentes`}
-          </p>
-        </div>
-        <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-          <CalendarDays size={16} aria-hidden="true" />
-          <span>
-            <span className="numerais-tabulares">{rotuloDia}</span>
-            {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
-          </span>
-        </span>
-      </div>
+      <h1 className="sr-only">Chamada</h1>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
         <div className="flex flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
@@ -790,11 +768,6 @@ export default function VistaFrequencia({
               <span className="text-muted-foreground text-xs font-medium">Presentes</span>
             </button>
           </div>
-          <p className="text-muted-foreground text-xs">
-            Infrequência de{" "}
-            <span className="numerais-tabulares font-semibold">{rotuloInfrequencia}</span> (F + FJ
-            sobre o total de alunos em chamada. Toque no aluno para marcar falta.
-          </p>
           {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
               <span>Aulas do dia:</span>
