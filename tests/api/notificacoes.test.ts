@@ -4,6 +4,7 @@ import { createECDH, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import pg from "pg";
 import { diaLocal, diaSeguinte } from "@/domain/frequencia";
+import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SENHA = "PalavraPushTeste2026";
@@ -14,6 +15,7 @@ let principal = "";
 let outro = "";
 let primeiro = "";
 const ids: string[] = [];
+let configuracaoAnterior: ConfiguracaoNotificacoes | undefined;
 
 async function chamar(
   caminho: string,
@@ -57,6 +59,16 @@ beforeAll(async () => {
   await cliente.query("delete from tentativas_entrada where chave like '%qp-push-%'");
   admin = await entrar("direcao@escola.exemplo", "DirecaoFrequencia2026");
   coord = await entrar("demo@escola.exemplo", "DemoFrequencia2026");
+  configuracaoAnterior = (await (await chamar("/api/notificacoes/configuracao", admin)).json())
+    .configuracao;
+  expect(
+    (
+      await chamar("/api/notificacoes/configuracao", admin, "PATCH", {
+        resumoDiario: true,
+        horarioResumo: "00:00",
+      })
+    ).status,
+  ).toBe(200);
   for (const nome of ["principal", "outro", "primeiro"]) {
     const criado = await chamar("/api/diretores", admin, "POST", {
       nome: `QP Push ${nome}`,
@@ -87,16 +99,136 @@ beforeEach(async () => {
   outro = await entrar("qp-push-outro", SENHA);
 });
 afterAll(async () => {
+  if (configuracaoAnterior)
+    expect(
+      (await chamar("/api/notificacoes/configuracao", admin, "PATCH", configuracaoAnterior)).status,
+    ).toBe(200);
   await cliente.query("delete from usuarios where email like 'qp-push-%'");
   await cliente.query("delete from tentativas_entrada where chave like '%qp-push-%'");
   await cliente.end();
 });
 
 describe("assinaturas push", () => {
-  it("exige sessão de diretor e palavra-chave já trocada", async () => {
+  it("oferece tipos por papel e salva preferências da própria conta", async () => {
+    const estado = await (await chamar("/api/notificacoes/assinatura", principal)).json();
+    expect(estado.preferencias).toEqual({
+      resumoDiario: true,
+      novasChamadas: false,
+      chamadasPendentes: false,
+    });
+    expect(estado.tipos.map((item: { tipo: string }) => item.tipo)).toEqual([
+      "resumoDiario",
+      "novasChamadas",
+    ]);
+    const alterada = await chamar("/api/notificacoes/preferencias", principal, "PATCH", {
+      resumoDiario: false,
+      novasChamadas: true,
+    });
+    expect(alterada.status).toBe(200);
+    expect(await alterada.json()).toEqual({
+      preferencias: { resumoDiario: false, novasChamadas: true, chamadasPendentes: false },
+    });
+    expect(
+      (
+        await chamar("/api/notificacoes/preferencias", principal, "PATCH", {
+          chamadasPendentes: true,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (await chamar("/api/notificacoes/preferencias", coord, "PATCH", { novasChamadas: true }))
+        .status,
+    ).toBe(400);
+    expect(
+      (await chamar("/api/notificacoes/preferencias", "", "PATCH", { resumoDiario: false })).status,
+    ).toBe(401);
+    expect(
+      (await chamar("/api/notificacoes/preferencias", primeiro, "PATCH", { resumoDiario: false }))
+        .status,
+    ).toBe(403);
+    expect(
+      (
+        await chamar("/api/notificacoes/preferencias", principal, "PATCH", {
+          resumoDiario: true,
+          novasChamadas: false,
+        })
+      ).status,
+    ).toBe(200);
+  });
+  it("permite à coordenação ativar e cancelar seu próprio dispositivo", async () => {
+    const dados = assinatura("coordenacao");
+    try {
+      const estado = await (await chamar("/api/notificacoes/assinatura", coord)).json();
+      expect(estado.tipos.map((item: { tipo: string }) => item.tipo)).toEqual([
+        "chamadasPendentes",
+      ]);
+      expect((await chamar("/api/notificacoes/assinatura", coord, "POST", dados)).status).toBe(200);
+      expect(await ativa(dados.endpoint, coord)).toBe(true);
+      expect(await ativa(dados.endpoint, principal)).toBe(false);
+    } finally {
+      expect(
+        (
+          await chamar("/api/notificacoes/assinatura", coord, "DELETE", {
+            endpoint: dados.endpoint,
+          })
+        ).status,
+      ).toBe(200);
+    }
+  });
+  it("reserva configuração de tipos e horários à administração", async () => {
+    const caminho = "/api/notificacoes/configuracao";
+    const anterior = await (await chamar(caminho, admin)).json();
+    expect((await chamar(caminho, coord)).status).toBe(403);
+    expect((await chamar(caminho, principal)).status).toBe(403);
+    expect((await chamar(caminho, coord, "PATCH", { chamadasPendentes: true })).status).toBe(403);
+    for (const horario of ["24:00", "12:60", "7:00", "inválido"]) {
+      expect((await chamar(caminho, admin, "PATCH", { horarioPendencias: horario })).status).toBe(
+        400,
+      );
+    }
+    expect((await chamar(caminho, admin, "PATCH", {})).status).toBe(400);
+    expect(
+      (
+        await chamar(
+          caminho,
+          admin,
+          "PATCH",
+          { chamadasPendentes: true },
+          { Origin: "https://outro.exemplo" },
+        )
+      ).status,
+    ).toBe(403);
+    try {
+      const resposta = await chamar(caminho, admin, "PATCH", {
+        chamadasPendentes: true,
+        horarioPendencias: "14:30",
+      });
+      expect(resposta.status).toBe(200);
+      expect((await resposta.json()).configuracao).toMatchObject({
+        chamadasPendentes: true,
+        horarioPendencias: "14:30",
+      });
+      expect((await chamar(caminho, admin)).headers.get("cache-control")).toBe("no-store");
+    } finally {
+      expect((await chamar(caminho, admin, "PATCH", anterior.configuracao)).status).toBe(200);
+    }
+  });
+  it("protege a agenda periódica com o segredo independente do cookie", async () => {
+    for (const cookie of ["", admin, coord, principal]) {
+      expect((await chamar("/api/notificacoes/agenda", cookie)).status).toBe(403);
+    }
+    expect(
+      (
+        await chamar("/api/notificacoes/agenda", "", "GET", undefined, {
+          Authorization: "Bearer incorreto",
+        })
+      ).status,
+    ).toBe(403);
+  });
+  it("aceita a equipe e exige a troca inicial da palavra-chave do diretor", async () => {
     expect((await chamar("/api/notificacoes/assinatura")).status).toBe(401);
-    expect((await chamar("/api/notificacoes/assinatura", admin)).status).toBe(403);
-    expect((await chamar("/api/notificacoes/assinatura", coord)).status).toBe(403);
+    expect((await chamar("/api/notificacoes/assinatura", admin)).status).toBe(200);
+    expect((await chamar("/api/notificacoes/assinatura", coord)).status).toBe(200);
     expect((await chamar("/api/notificacoes/assinatura", primeiro)).status).toBe(403);
   });
   it("oferece uma chave pública estável antes de ativar o dispositivo", async () => {
@@ -124,7 +256,16 @@ describe("assinaturas push", () => {
     const resposta = await chamar(consulta(dados.endpoint), principal);
     expect(resposta.headers.get("cache-control")).toBe("no-store");
     const estado = (await resposta.json()) as Record<string, unknown>;
-    expect(Object.keys(estado).sort()).toEqual(["ativa", "chavePublica", "configurada"]);
+    expect(Object.keys(estado).sort()).toEqual([
+      "ativa",
+      "chavePublica",
+      "configurada",
+      "fuso",
+      "horarioPendencias",
+      "horarioResumo",
+      "preferencias",
+      "tipos",
+    ]);
     expect(estado.ativa).toBe(true);
     expect(estado.configurada).toBe(true);
     expect(estado.chavePublica).toMatch(/^B[A-Za-z0-9_-]{86}$/);

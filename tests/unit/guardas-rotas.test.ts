@@ -50,7 +50,7 @@ describe("guardas das rotas da API", () => {
   it.each(todos.map((item) => [item.chave, item] as const))(
     "%s passa por uma guarda ou está na lista pública",
     (chave, item) => {
-      if (chave === "notificacoes/resumo GET") {
+      if (chave === "notificacoes/resumo GET" || chave === "notificacoes/agenda GET") {
         // A agenda usa Bearer independente do cookie, conforme a ADR-028.
         expect(item.corpo).toMatch(
           /segredoDaAgendaConfere\(requisicao\.headers\.get\("authorization"\)\)/,

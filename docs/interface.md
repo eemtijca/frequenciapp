@@ -45,7 +45,7 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 ## Estados e retorno
 
 - PWA: instalável na tela inicial, atalhos para Chamada e Painel, página própria quando a internet cai, faixa de offline dentro do aplicativo e aviso com botão Atualizar quando há versão nova.
-- Diretores de turma: sino no cabeçalho para ativar, desativar e testar notificações neste dispositivo. A permissão é solicitada somente após Ativar notificações. Sem suporte ou configuração, há orientação no diálogo, sem impedir a consulta das turmas. Ver [notificacoes.md](notificacoes.md).
+- Notificações: sino no cabeçalho para diretores e equipe, com tipos por papel e preferências compartilhadas entre dispositivos da conta. No computador, a equipe também usa Configurar notificações na área da conta. Ativação, desativação e teste continuam por dispositivo, e a permissão só é pedida após Ativar notificações. Gestão, Configurações, Notificações define tipos disponíveis e horários de resumo e pendências. Ver [notificacoes.md](notificacoes.md).
 - Carregamento com esqueleto do shell na primeira visita e mensagens locais nas regiões, sem bloquear a visão inteira.
 - Salvamento com estado explícito na barra fixa: nova chamada, alterações por salvar, salvando, salva na nuvem com hora e autoria.
 - Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida; sessão expirada volta para a tela de entrada.

@@ -18,7 +18,11 @@ export function ehPapelDaEquipe(papel: Papel): papel is PapelDaEquipe {
  * papel: um papel novo só ganha acesso ao que for listado para ele aqui.
  */
 export type Capacidade =
-  "operar" | "administrar" | "alterarPropriaSenha" | "verEstatisticasDasTurmas";
+  | "operar"
+  | "administrar"
+  | "alterarPropriaSenha"
+  | "verEstatisticasDasTurmas"
+  | "receberNotificacoes";
 
 /**
  * Matriz de acesso. É política de segurança, revisada em pull request, e por
@@ -26,9 +30,9 @@ export type Capacidade =
  * as capacidades: esquecer um papel novo quebra a compilação.
  */
 const CAPACIDADES_POR_PAPEL: Record<Papel, readonly Capacidade[]> = {
-  ADMIN: ["operar", "administrar", "alterarPropriaSenha"],
-  COORDENACAO: ["operar", "alterarPropriaSenha"],
-  DIRETOR_TURMA: ["verEstatisticasDasTurmas", "alterarPropriaSenha"],
+  ADMIN: ["operar", "administrar", "alterarPropriaSenha", "receberNotificacoes"],
+  COORDENACAO: ["operar", "alterarPropriaSenha", "receberNotificacoes"],
+  DIRETOR_TURMA: ["verEstatisticasDasTurmas", "alterarPropriaSenha", "receberNotificacoes"],
 };
 
 /** Verdadeiro quando o papel concede a capacidade; o restante é recusado. */

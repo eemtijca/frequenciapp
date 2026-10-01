@@ -38,6 +38,7 @@ import { Switch } from "@/components/ui/switch";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import SecaoAcessoDiretores from "@/components/gestao/secao-acesso-diretores";
+import SecaoNotificacoes from "@/components/gestao/secao-notificacoes";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
 import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import {
@@ -994,6 +995,7 @@ export default function AbaConfiguracoes({
       </SecaoRecolhivel>
 
       <SecaoAcessoDiretores />
+      <SecaoNotificacoes />
 
       <SecaoRecolhivel
         dataSecao="config-copia"

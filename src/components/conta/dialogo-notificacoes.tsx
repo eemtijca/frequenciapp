@@ -8,6 +8,14 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  ROTULOS_NOTIFICACAO,
+  DESCRICOES_NOTIFICACAO,
+  type TipoDeAviso,
+  type PreferenciasNotificacoes,
+} from "@/domain/notificacoes";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +32,10 @@ interface Estado {
   configurada: boolean;
   chavePublica: string | null;
   ativa: boolean;
+  preferencias: PreferenciasNotificacoes;
+  tipos: { tipo: TipoDeAviso; disponivel: boolean }[];
+  horarioResumo: string;
+  horarioPendencias: string;
 }
 
 function chaveDoServidor(chave: string): Uint8Array<ArrayBuffer> {
@@ -56,7 +68,8 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
   const [assinatura, setAssinatura] = useState<PushSubscription | null>(null);
   const [permissao, setPermissao] = useState<NotificationPermission>("default");
   const [erro, setErro] = useState("");
-  const acaoDesejada = useRef<"ativar" | "desativar" | "testar">("ativar");
+  const acaoDesejada = useRef<"ativar" | "desativar" | "testar" | "salvar">("ativar");
+  const preferenciaDesejada = useRef<Partial<PreferenciasNotificacoes>>({});
 
   useEffect(() => {
     if (!aberto) return;
@@ -106,7 +119,14 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
     const acao = acaoDesejada.current;
     setErro("");
     try {
-      if (acao === "ativar") {
+      if (acao === "salvar") {
+        const dados = await pedir<{ preferencias: PreferenciasNotificacoes }>(
+          "/api/notificacoes/preferencias",
+          { ...corpoJson(preferenciaDesejada.current), method: "PATCH" },
+        );
+        setEstado((atual) => (atual ? { ...atual, preferencias: dados.preferencias } : atual));
+        avisarSucesso("Preferências de notificações salvas.");
+      } else if (acao === "ativar") {
         if (!estado?.chavePublica) return;
         // Safari exige a solicitação dentro da ação do usuário, antes de outras esperas.
         const autorizacao =
@@ -172,7 +192,7 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
     }
   });
 
-  function executarAcao(acao: "ativar" | "desativar" | "testar") {
+  function executarAcao(acao: "ativar" | "desativar" | "testar" | "salvar") {
     if (executando) return;
     acaoDesejada.current = acao;
     void executar();
@@ -185,12 +205,11 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
         if (!executando) onAbrir(valor);
       }}
     >
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Notificações</DialogTitle>
           <DialogDescription>
-            Um aviso diário quando há chamada nas turmas acompanhadas. A escolha vale somente para
-            este dispositivo.
+            Escolher os avisos da conta e ativar o recebimento neste dispositivo.
           </DialogDescription>
         </DialogHeader>
         {carregando ? (
@@ -200,6 +219,47 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
           </p>
         ) : (
           <div className="flex flex-col gap-4">
+            {estado?.preferencias ? (
+              <div className="flex flex-col gap-4">
+                <p className="text-sm font-medium">Tipos de aviso</p>
+                {estado.tipos.map(({ tipo, disponivel }) => (
+                  <div key={tipo} className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <Label htmlFor={`preferencia-${tipo}`}>{ROTULOS_NOTIFICACAO[tipo]}</Label>
+                      <p className="text-muted-foreground text-xs">
+                        {DESCRICOES_NOTIFICACAO[tipo]}
+                      </p>
+                      {!disponivel ? (
+                        <p className="text-muted-foreground text-xs">
+                          Este aviso está desligado pela Gestão.
+                        </p>
+                      ) : tipo !== "novasChamadas" ? (
+                        <p className="text-muted-foreground text-xs">
+                          Envio a partir das{" "}
+                          {tipo === "resumoDiario"
+                            ? estado.horarioResumo
+                            : estado.horarioPendencias}
+                          , no horário da escola.
+                        </p>
+                      ) : null}
+                    </div>
+                    <Switch
+                      id={`preferencia-${tipo}`}
+                      checked={estado.preferencias[tipo]}
+                      disabled={executando || !disponivel}
+                      onCheckedChange={(valor) => {
+                        preferenciaDesejada.current = { [tipo]: valor };
+                        executarAcao("salvar");
+                      }}
+                    />
+                  </div>
+                ))}
+                <p className="text-muted-foreground text-xs">
+                  Os tipos escolhidos valem para todos os dispositivos da conta. A ativação abaixo
+                  vale somente para este dispositivo.
+                </p>
+              </div>
+            ) : null}
             {!suportado ? (
               <p className="text-muted-foreground text-sm">
                 Este navegador não oferece notificações push. No iPhone ou iPad, adicione o

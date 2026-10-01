@@ -4,6 +4,8 @@ Para os contratos de notificações, gerar chaves sintéticas com `node tests/ge
 
 Suítes do FrequenciApp com Vitest e Playwright.
 
+`tests/api/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/e2e/notificacoes.spec.ts` valida a Gestão e a coordenação; `pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`; o simulador de Planilhas também precisa de `PERMITIR_ENDPOINT_LOCAL=true`. Essas opções não são necessárias em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
+
 | Suíte            | Comando             | Pré-requisitos                                           |
 | ---------------- | ------------------- | -------------------------------------------------------- |
 | Unidade          | `npm run test:unit` | Nenhum.                                                  |
