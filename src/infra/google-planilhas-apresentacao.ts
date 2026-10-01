@@ -1,7 +1,12 @@
-// Formatação pela Sheets API: máscaras limitadas a estilos e conferência prévia.
+// Apresentação e correção de cabeçalhos pela Sheets API, com conferência e cópia.
 import type { ApresentacaoAba } from "@/domain/planilha-apresentacao";
-import { CORES_PLANILHA, faixasDeApresentacao } from "@/domain/planilha-apresentacao";
-import { assinarAba } from "@/domain/planilha";
+import {
+  CORES_PLANILHA,
+  faixasDeApresentacao,
+  assinaturaIntroducao,
+  introducaoReconhecida,
+} from "@/domain/planilha-apresentacao";
+import { assinarAba, dataDoRotulo } from "@/domain/planilha";
 import { ErroHttp } from "./erros";
 import {
   exigirAbaGoogle,
@@ -164,7 +169,14 @@ export function pedidosDeApresentacao(
 export async function organizarAbaGoogle(id: string, acesso: string, plano: ApresentacaoAba) {
   const doc = await lerDocumentoGoogle(id, acesso);
   const aba = exigirAbaGoogle(doc, plano.aba);
-  if (aba.properties.hidden || aba.merges?.length)
+  const ajuste = plano.ajusteCabecalho;
+  if (
+    aba.properties.hidden ||
+    aba.merges?.some(
+      (mesclagem) =>
+        !ajuste || (mesclagem.endRowIndex ?? Number.POSITIVE_INFINITY) > ajuste.linhasRemover,
+    )
+  )
     throw new ErroHttp("Organize apenas abas visíveis e sem células mescladas.", 409);
   const usado = await tamanhoUtilizado(id, acesso, plano.aba);
   const [bloco] = await lerBlocosGoogle(id, acesso, plano.aba, plano.cabecalhoLinha, [
@@ -178,16 +190,92 @@ export async function organizarAbaGoogle(id: string, acesso: string, plano: Apre
   if (assinatura !== plano.assinatura)
     throw new ErroHttp("A estrutura da planilha mudou. Confira de novo antes de organizar.", 409);
   const linhas = aba.properties.gridProperties?.rowCount ?? Math.max(usado.linhas, 1);
-  await enviarLotesGoogle(
-    id,
-    acesso,
-    pedidosDeApresentacao(
+  // Valida também a apresentação antes de criar cópia ou alterar células.
+  pedidosDeApresentacao(
+    aba.properties.sheetId,
+    linhas,
+    plano,
+    aba.properties.gridProperties?.frozenRowCount,
+    aba.bandedRanges,
+  );
+  const pedidos: Record<string, unknown>[] = [];
+  let apresentacao = plano;
+  let bandas = aba.bandedRanges;
+  let removidas = 0;
+  if (ajuste) {
+    removidas = ajuste.linhasRemover;
+    const introducao = bloco?.valores.slice(0, removidas) ?? [];
+    const cabecalho = bloco?.valores[plano.cabecalhoLinha - 1] ?? [];
+    if (
+      removidas !== plano.cabecalhoLinha - 1 ||
+      !introducaoReconhecida(introducao) ||
+      assinaturaIntroducao(introducao) !== ajuste.assinaturaIntroducao ||
+      bloco?.formula.slice(0, removidas).some((linha) => linha.some(Boolean)) ||
+      ajuste.datas.some((data) => {
+        const ano = Number(data.rotulo.slice(-4));
+        return (
+          cabecalho[data.indice - 1] !== data.anterior ||
+          bloco?.formula[plano.cabecalhoLinha - 1]?.[data.indice - 1] ||
+          !dataDoRotulo(data.rotulo, ano) ||
+          dataDoRotulo(data.anterior, ano) !== dataDoRotulo(data.rotulo, ano)
+        );
+      })
+    )
+      throw new ErroHttp("O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia.", 409);
+    if (removidas || ajuste.datas.length) {
+      const { criarCopiaGoogle } = await import("./google-planilhas-copias");
+      await criarCopiaGoogle(id, acesso, plano.aba);
+      // A cópia usa várias requisições; reconfere as células antes de removê-las.
+      const [depoisDaCopia] = await lerBlocosGoogle(id, acesso, plano.aba, plano.cabecalhoLinha, [
+        { coluna: 1, colunas: Math.max(usado.colunas, 1) },
+      ]);
+      if (JSON.stringify(depoisDaCopia) !== JSON.stringify(bloco))
+        throw new ErroHttp("O cabeçalho mudou durante a cópia. Confira uma nova prévia.", 409);
+    }
+    for (const data of ajuste.datas)
+      pedidos.push({
+        updateCells: {
+          range: {
+            sheetId: aba.properties.sheetId,
+            startRowIndex: plano.cabecalhoLinha - 1,
+            endRowIndex: plano.cabecalhoLinha,
+            startColumnIndex: data.indice - 1,
+            endColumnIndex: data.indice,
+          },
+          rows: [{ values: [{ userEnteredValue: { stringValue: data.rotulo } }] }],
+          fields: "userEnteredValue",
+        },
+      });
+    if (removidas)
+      pedidos.push({
+        deleteDimension: {
+          range: {
+            sheetId: aba.properties.sheetId,
+            dimension: "ROWS",
+            startIndex: 0,
+            endIndex: removidas,
+          },
+        },
+      });
+    apresentacao = { ...plano, cabecalhoLinha: plano.cabecalhoLinha - removidas };
+    bandas = bandas?.map((banda) => ({
+      ...banda,
+      range: {
+        ...banda.range,
+        startRowIndex: Math.max(0, (banda.range.startRowIndex ?? 0) - removidas),
+        endRowIndex: Math.max(0, (banda.range.endRowIndex ?? linhas) - removidas),
+      },
+    }));
+  }
+  pedidos.push(
+    ...pedidosDeApresentacao(
       aba.properties.sheetId,
-      linhas,
-      plano,
-      aba.properties.gridProperties?.frozenRowCount,
-      aba.bandedRanges,
+      linhas - removidas,
+      apresentacao,
+      Math.max(0, (aba.properties.gridProperties?.frozenRowCount ?? 0) - removidas),
+      bandas,
     ),
   );
+  await enviarLotesGoogle(id, acesso, pedidos);
   return { aba: plano.aba };
 }

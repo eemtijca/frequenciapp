@@ -17,7 +17,7 @@ export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
 /** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
-export const VERSAO_SCRIPT = 5;
+export const VERSAO_SCRIPT = 6;
 
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
@@ -191,12 +191,6 @@ export function nomeArquivoCsv(turma: TurmaPlanilha): string {
   return `frequenciapp-grade-${turmaSegura || "turma"}-${primeiro}-a-${ultimo}.csv`;
 }
 
-/** Data curta dd/mm a partir de AAAA-MM-DD. */
-function dataCurta(dia: string): string {
-  const [, mes, numero] = dia.split("-");
-  return `${numero}/${mes}`;
-}
-
 /** Campo CSV seguro: sem fórmula e com escape de aspas, quebras e ponto e vírgula. */
 export function campoCsv(valor: string): string {
   const semFormula = /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
@@ -208,7 +202,7 @@ export function paraCsv(turma: TurmaPlanilha): string {
   const cabecalho = [
     "Aluno",
     "Turma atual",
-    ...turma.dias.map(dataCurta),
+    ...turma.dias.map(rotuloData),
     "Faltas",
     "Justificadas",
     "Total (F + FJ)",
@@ -927,7 +921,7 @@ export function planejarSincronizacao(
     }
     novasColunas.push({
       dia,
-      rotulo: dataCurta(dia),
+      rotulo: rotuloData(dia),
       indice: posicaoNova,
       antesDe: colunaTotal?.letra ?? null,
     });

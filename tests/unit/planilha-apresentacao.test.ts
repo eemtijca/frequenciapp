@@ -1,13 +1,25 @@
 // Prévia visual com dados sintéticos: arquivo, deriva, faixas e escrita de estilos.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { assinarAba } from "@/domain/planilha";
-import { colunasDeApresentacao, colunasDeNovaAba } from "@/domain/planilha-apresentacao";
+import {
+  colunasDeApresentacao,
+  colunasDeNovaAba,
+  planejarAjusteCabecalho,
+} from "@/domain/planilha-apresentacao";
 import { pedidosDeApresentacao, organizarAbaGoogle } from "@/infra/google-planilhas-apresentacao";
-const dubl = vi.hoisted(() => ({ linha: vi.fn(), chamar: vi.fn(), auditar: vi.fn() }));
+const dubl = vi.hoisted(() => ({
+  linha: vi.fn(),
+  chamar: vi.fn(),
+  auditar: vi.fn(),
+  copia: vi.fn(),
+  atualizar: vi.fn(),
+}));
 vi.mock("@/application/planilha-comum", () => ({
   lerLinha: dubl.linha,
   chamarIntegracao: dubl.chamar,
 }));
+vi.mock("@/infra/google-planilhas-copias", () => ({ criarCopiaGoogle: dubl.copia }));
+vi.mock("@/application/planilha", () => ({ atualizarEsquemaDaAba: dubl.atualizar }));
 vi.mock("@/infra/ambiente", () => ({
   ambiente: { authSecret: "segredo-sintetico-para-a-previa-visual" },
 }));
@@ -207,6 +219,225 @@ describe("estilos na Sheets API", () => {
           aba: plano.aba,
         });
         expect(post).toHaveBeenCalledTimes(1);
+      }
+    },
+  );
+});
+
+describe("correção do cabeçalho", () => {
+  const amostra = [
+    ["Frequência · QA Ano A"],
+    ["P = presente · F = falta. Atualize as marcações no aplicativo."],
+    [],
+    ["Aluno", "28/09/2026", "29/09", "30/09", "01/10", "Total"],
+  ];
+  it("mantém o ano das colunas existentes e retira somente as três linhas iniciais", () => {
+    const ajuste = planejarAjusteCabecalho(amostra, 4, 2028);
+    expect(ajuste.linhasRemover).toBe(3);
+    expect(ajuste.datas.map((data) => data.rotulo)).toEqual([
+      "29/09/2026",
+      "30/09/2026",
+      "01/10/2026",
+    ]);
+    expect(colunasDeApresentacao(["29/09/2026"])[0]?.largura).toBe(110);
+  });
+  it("reconhece a virada do ano e preserva datas de outros anos", () => {
+    expect(
+      planejarAjusteCabecalho([["Aluno", "31/12/2026", "01/01", "02/01/2027"]], 1, 2026).datas,
+    ).toEqual([{ indice: 3, anterior: "01/01", rotulo: "01/01/2027" }]);
+    expect(
+      planejarAjusteCabecalho([["Aluno", "31/12", "01/01/2027"]], 1, 2026).datas[0]?.rotulo,
+    ).toBe("31/12/2026");
+    expect(planejarAjusteCabecalho([["Aluno", "29/09"]], 1, 2025).datas[0]?.rotulo).toBe(
+      "29/09/2025",
+    );
+  });
+  it("conserva o ano ao corrigir dia antigo acrescentado fora de ordem", () => {
+    expect(
+      planejarAjusteCabecalho([["Aluno", "28/09/2026", "15/06"]], 1, 2026).datas[0]?.rotulo,
+    ).toBe("15/06/2026");
+  });
+  it("reconhece fevereiro bissexto pelo ano explícito e recusa ano inválido", () => {
+    expect(
+      planejarAjusteCabecalho([["Aluno", "28/02/2024", "29/02"]], 1, 2026).datas[0]?.rotulo,
+    ).toBe("29/02/2024");
+    expect(() => planejarAjusteCabecalho([["Aluno", "29/02"]], 1, 2026)).toThrow("Confira o ano");
+  });
+  it("recusa conteúdo manual acima da tabela", () => {
+    expect(() =>
+      planejarAjusteCabecalho([["Observação importante"], ["Aluno", "29/09"]], 2, 2026),
+    ).toThrow("não pode ser removido");
+  });
+  it("a prévia só lê; a confirmação atualiza o esquema mantendo o mapa", async () => {
+    dubl.chamar.mockResolvedValue({ abas: [{ nome: plano.aba, amostra, mesclagens: ["A1:F1"] }] });
+    const entrada = { aba: plano.aba, ajustarCabecalho: true, anoReferencia: 2026 };
+    const resultado = await organizarPlanilha({ id: "admin" }, "FREQUENCIA", entrada);
+    expect(resultado.previa?.ajusteCabecalho?.linhasRemover).toBe(3);
+    expect(resultado.previa?.colunas[2]?.rotulo).toBe("29/09/2026");
+    expect(dubl.atualizar).not.toHaveBeenCalled();
+    await organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+      ...entrada,
+      planoHash: resultado.previa?.planoHash,
+    });
+    expect(dubl.atualizar).toHaveBeenCalledWith(expect.anything(), plano.aba);
+    expect(dubl.chamar).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        acao: "organizarAba",
+        ajusteCabecalho: expect.objectContaining({ linhasRemover: 3 }),
+      }),
+      { retentavel: false },
+    );
+  });
+  it("recusa versão 5 somente para a correção", async () => {
+    dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "5" });
+    await expect(
+      organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba, ajustarCabecalho: true }),
+    ).rejects.toThrow("versão 6");
+    expect(dubl.chamar).not.toHaveBeenCalled();
+  });
+  it("vincula a confirmação também ao conteúdo removido", async () => {
+    dubl.chamar.mockResolvedValue({ abas: [{ nome: plano.aba, amostra }] });
+    const entrada = { aba: plano.aba, ajustarCabecalho: true, anoReferencia: 2026 };
+    const previa = await organizarPlanilha({ id: "admin" }, "FREQUENCIA", entrada);
+    dubl.chamar.mockResolvedValue({
+      abas: [{ nome: plano.aba, amostra: [["Frequência · outra turma"], ...amostra.slice(1)] }],
+    });
+    await expect(
+      organizarPlanilha({ id: "admin" }, "FREQUENCIA", {
+        ...entrada,
+        planoHash: previa.previa?.planoHash,
+      }),
+    ).rejects.toThrow("A planilha mudou");
+    expect(dubl.atualizar).not.toHaveBeenCalled();
+  });
+  it.each(["normal", "formula", "deriva", "deriva-copia"])(
+    "conserva os dados na Sheets API: %s",
+    async (modo) => {
+      const pedidos: Record<string, unknown>[] = [];
+      const valores = amostra.map((linha) => [...linha]);
+      if (modo === "deriva") valores[0] = ["Frequência · outra turma"];
+      const ordem: string[] = [];
+      dubl.copia.mockImplementation(async () => {
+        ordem.push("copia");
+        if (modo === "deriva-copia") valores[0] = ["Anotação manual após a prévia"];
+      });
+      vi.stubGlobal("fetch", async (entrada: URL | string, opcoes?: RequestInit) => {
+        const url = new URL(String(entrada));
+        if (url.pathname.endsWith("/developerMetadata:search"))
+          return Response.json({ matchedDeveloperMetadata: [] });
+        if (opcoes?.method === "POST") {
+          ordem.push("escrita");
+          pedidos.push(
+            ...(JSON.parse(String(opcoes.body)) as { requests: Record<string, unknown>[] })
+              .requests,
+          );
+          return Response.json({ replies: [] });
+        }
+        if (url.pathname.includes("/values/"))
+          return Response.json({
+            values: [...valores, ["QA Aluno", "P", "F", "P", "P", '=CONT.SE(B5:E5;"F")']],
+          });
+        if (url.searchParams.get("includeGridData") === "true")
+          return Response.json({
+            sheets: [
+              {
+                data: [
+                  {
+                    rowData: valores.map((linha, i) => ({
+                      values: linha.map((formattedValue, j) => ({
+                        formattedValue,
+                        ...(modo === "formula" && i === 3 && j === 2
+                          ? { userEnteredValue: { formulaValue: "=HOJE()" } }
+                          : {}),
+                      })),
+                    })),
+                  },
+                ],
+              },
+            ],
+          });
+        return Response.json({
+          spreadsheetId: arquivo,
+          properties: { title: "QA" },
+          sheets: [
+            {
+              properties: {
+                sheetId: 7,
+                title: plano.aba,
+                gridProperties: { rowCount: 100, columnCount: 26, frozenRowCount: 4 },
+              },
+              merges: [
+                {
+                  sheetId: 7,
+                  startRowIndex: 0,
+                  endRowIndex: 1,
+                  startColumnIndex: 0,
+                  endColumnIndex: 6,
+                },
+              ],
+              bandedRanges: [
+                {
+                  bandedRangeId: 15,
+                  range: {
+                    sheetId: 7,
+                    startRowIndex: 3,
+                    endRowIndex: 100,
+                    startColumnIndex: 0,
+                    endColumnIndex: 6,
+                  },
+                },
+              ],
+            },
+          ],
+        });
+      });
+      const corrigir = {
+        aba: plano.aba,
+        cabecalhoLinha: 4,
+        assinatura: assinarAba(plano.aba, amostra[3] ?? [], ["A1:F1"]),
+        ajusteCabecalho: planejarAjusteCabecalho(amostra, 4, 2026),
+        colunas: colunasDeApresentacao([
+          "Aluno",
+          "28/09/2026",
+          "29/09/2026",
+          "30/09/2026",
+          "01/10/2026",
+          "Total",
+        ]),
+      };
+      if (modo === "normal") {
+        await organizarAbaGoogle(arquivo, "acesso-falso", corrigir);
+        expect(ordem).toEqual(["copia", "escrita"]);
+        expect(pedidos.filter((pedido) => pedido.updateCells)).toHaveLength(3);
+        expect(pedidos).toContainEqual({
+          deleteDimension: { range: { sheetId: 7, dimension: "ROWS", startIndex: 0, endIndex: 3 } },
+        });
+        expect(pedidos).toContainEqual({
+          updateSheetProperties: {
+            properties: { sheetId: 7, gridProperties: { frozenRowCount: 1 } },
+            fields: "gridProperties.frozenRowCount",
+          },
+        });
+        expect(JSON.stringify(pedidos.find((pedido) => pedido.updateBanding))).toContain(
+          '"startRowIndex":0',
+        );
+        expect(
+          pedidos
+            .filter((pedido) => pedido.updateCells)
+            .every(
+              (pedido) =>
+                (pedido.updateCells as { range: { startRowIndex: number } }).range.startRowIndex ===
+                3,
+            ),
+        ).toBe(true);
+      } else {
+        await expect(organizarAbaGoogle(arquivo, "acesso-falso", corrigir)).rejects.toThrow(
+          "O cabeçalho mudou",
+        );
+        if (modo === "deriva-copia") expect(dubl.copia).toHaveBeenCalledOnce();
+        else expect(dubl.copia).not.toHaveBeenCalled();
+        expect(pedidos).toEqual([]);
       }
     },
   );

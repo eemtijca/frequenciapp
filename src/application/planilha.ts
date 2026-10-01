@@ -580,6 +580,11 @@ async function salvarEsquemaDaAba(aba: AbaEsquema): Promise<void> {
   });
 }
 
+/** Relê o cabeçalho após correção sem alterar o mapa das turmas. */
+export async function atualizarEsquemaDaAba(linha: LinhaIntegracao, nome: string): Promise<void> {
+  await salvarEsquemaDaAba(await detectarAba(linha, nome));
+}
+
 /** Monta os planos de todas as turmas mapeadas para o período. */
 async function montarSimulacao(
   linha: LinhaIntegracao,

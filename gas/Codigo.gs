@@ -7,7 +7,7 @@
  * integração não tenha criado, e célula com fórmula nunca é sobrescrita.
  */
 
-var VERSAO = 5;
+var VERSAO = 6;
 var PROP_TOKEN = "FREQUENCIAPP_TOKEN";
 var PROP_PLANILHA = "PLANILHA_ID";
 var MAX_LER_CELULAS = 20000;
@@ -541,7 +541,7 @@ function aplicarInserirColunas(aba, operacao, contagem) {
   faixa.setValues([rotulos]);
   rotulos.forEach(function (rotulo, indice) {
     if (!/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(String(rotulo).trim())) return;
-    aba.setColumnWidth(antesDe + indice, 68);
+    aba.setColumnWidth(antesDe + indice, String(rotulo).split("/").length === 3 ? 110 : 68);
     aba
       .getRange(
         operacao.cabecalhoLinha || 1,
@@ -713,7 +713,7 @@ function acaoCriarAba(corpo) {
           largura = 140;
           alinhamento = "CENTER";
         } else if (/^\d{1,2}\/\d{1,2}(\/\d{2,4})?$/.test(nome)) {
-          largura = 68;
+          largura = nome.split("/").length === 3 ? 110 : 68;
           alinhamento = "CENTER";
         } else if (
           ["data", "dia", "total", "faltas", "justificadas", "total (f + fj)"].indexOf(nome) >= 0
@@ -732,20 +732,119 @@ function acaoCriarAba(corpo) {
   return { ok: true, versao: VERSAO, dados: { aba: aba.getName() } };
 }
 
-/** Apenas estilos: valores, fórmulas, tipos numéricos e cabeçalhos são preservados. */
+/** Corrige somente a introdução reconhecida e datas, com cópia antes da alteração. */
 function acaoOrganizarAba(corpo) {
   var aba = resolverAba(corpo.aba);
-  if (aba.isSheetHidden() || mesclagensDaAba(aba).length) {
+  var ajuste = corpo.ajusteCabecalho;
+  var mesclagens = mesclagensDaAba(aba);
+  if (
+    aba.isSheetHidden() ||
+    mesclagens.some(function (intervalo) {
+      var fim = Number((intervalo.match(/:[A-Z]+(\d+)$/) || [])[1] || Infinity);
+      return !ajuste || fim > ajuste.linhasRemover;
+    })
+  )
     return { ok: false, erro: "Organize apenas abas visíveis e sem células mescladas." };
-  }
   var conflito = conferirAssinatura(aba, corpo);
   if (conflito) return conflito;
+  // A mesma validação de faixas ocorre antes de qualquer alteração ou cópia.
+  aplicarApresentacao(aba, corpo, true);
+  if (ajuste) {
+    var removidas = ajuste.linhasRemover;
+    var largura = Math.max(aba.getLastColumn(), 1);
+    var faixa = aba.getRange(1, 1, corpo.cabecalhoLinha, largura);
+    var valores = faixa.getDisplayValues();
+    var formulas = faixa.getFormulas();
+    var introducao = valores.slice(0, removidas).map(function (linha) {
+      var textos = linha.map(limpar);
+      while (textos.length && textos[textos.length - 1] === "") textos.pop();
+      return textos;
+    });
+    var reconhecida = introducao.every(function (linha) {
+      var textos = linha
+        .map(function (texto) {
+          return texto
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        })
+        .filter(Boolean);
+      return (
+        textos.length === 0 ||
+        (textos.length === 1 &&
+          (/^frequencia(?:\s|[.:·-]|$)/.test(textos[0]) ||
+            /^p\s*=\s*presente\b.*\bf\s*=/.test(textos[0]) ||
+            textos[0] === "atualize as marcacoes no aplicativo."))
+      );
+    });
+    if (
+      !Number.isInteger(removidas) ||
+      removidas < 0 ||
+      removidas !== corpo.cabecalhoLinha - 1 ||
+      !Array.isArray(ajuste.datas) ||
+      ajuste.datas.length > 400 ||
+      !reconhecida ||
+      hashTexto(JSON.stringify(introducao)) !== ajuste.assinaturaIntroducao ||
+      formulas.slice(0, removidas).some(function (linha) {
+        return linha.some(Boolean);
+      }) ||
+      ajuste.datas.some(function (data) {
+        if (
+          !Number.isInteger(data.indice) ||
+          data.indice < 1 ||
+          data.indice > largura ||
+          !/^\d{2}\/\d{2}\/\d{4}$/.test(data.rotulo)
+        )
+          return true;
+        var anterior = limpar(data.anterior).replace(/\s/g, "");
+        var partes = anterior.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/);
+        var iso = anterior.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        var ano = Number(data.rotulo.slice(-4));
+        var dia = Number(data.rotulo.slice(0, 2));
+        var mes = Number(data.rotulo.slice(3, 5));
+        var atual = new Date(Date.UTC(ano, mes - 1, dia));
+        return (
+          valores[corpo.cabecalhoLinha - 1][data.indice - 1] !== data.anterior ||
+          Boolean(formulas[corpo.cabecalhoLinha - 1][data.indice - 1]) ||
+          ano < 2000 ||
+          ano > 2100 ||
+          atual.getUTCDate() !== dia ||
+          atual.getUTCMonth() !== mes - 1 ||
+          (iso
+            ? Number(iso[1]) !== ano || Number(iso[2]) !== mes || Number(iso[3]) !== dia
+            : !partes ||
+              Number(partes[1]) !== dia ||
+              Number(partes[2]) !== mes ||
+              (partes[3] && Number(partes[3].length === 2 ? "20" + partes[3] : partes[3]) !== ano))
+        );
+      })
+    )
+      return { ok: false, erro: "O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia." };
+    if (removidas || ajuste.datas.length) {
+      criarCopia(aba);
+      if (
+        conferirAssinatura(aba, corpo) ||
+        JSON.stringify(faixa.getDisplayValues()) !== JSON.stringify(valores) ||
+        JSON.stringify(faixa.getFormulas()) !== JSON.stringify(formulas)
+      )
+        return { ok: false, erro: "O cabeçalho mudou durante a cópia. Confira uma nova prévia." };
+    }
+    ajuste.datas.forEach(function (data) {
+      aba.getRange(corpo.cabecalhoLinha, data.indice).setValue(data.rotulo);
+    });
+    if (removidas) {
+      var congeladas = aba.getFrozenRows();
+      aba.deleteRows(1, removidas);
+      aba.setFrozenRows(Math.max(0, congeladas - removidas));
+    }
+    corpo.cabecalhoLinha -= removidas;
+  }
   aplicarApresentacao(aba, corpo);
   SpreadsheetApp.flush();
   return { ok: true, versao: VERSAO, dados: { aba: aba.getName() } };
 }
 
-function aplicarApresentacao(aba, corpo) {
+function aplicarApresentacao(aba, corpo, validarSomente) {
   var linha = corpo.cabecalhoLinha;
   var colunas = corpo.colunas;
   if (
@@ -808,6 +907,7 @@ function aplicarApresentacao(aba, corpo) {
       );
     return { faixa: faixa, sobrepostas: sobrepostas };
   });
+  if (validarSomente) return;
   // Todas as recusas acontecem antes do primeiro estilo ser aplicado.
   planos.forEach(function (plano) {
     plano.sobrepostas.forEach(function (banda) {

@@ -174,7 +174,12 @@ describe("envio incremental à planilha", () => {
     const resposta = await aplicar(plano as Plano);
     expect(resposta.status).toBe(200);
     expect((await json<Resultado>(resposta)).resultados[0]?.resultado).toBe("sucesso");
-    expect(cabecalho("QN Ano A").slice(0, 4)).toEqual(["Aluno", "Turma atual", "15/06", "Total"]);
+    expect(cabecalho("QN Ano A").slice(0, 4)).toEqual([
+      "Aluno",
+      "Turma atual",
+      "15/06/2026",
+      "Total",
+    ]);
     expect(gas?.valor("QN Ano A", 2, 3)).toBe("F");
   });
 
@@ -193,8 +198,8 @@ describe("envio incremental à planilha", () => {
     expect(cabecalho("QN Ano A").slice(0, 5)).toEqual([
       "Aluno",
       "Turma atual",
-      "15/06",
-      "16/06",
+      "15/06/2026",
+      "16/06/2026",
       "Total",
     ]);
     expect(gas?.valor("QN Ano A", 2, 4)).toBe("P");
@@ -219,7 +224,7 @@ describe("envio incremental à planilha", () => {
       expect(registro.rows[0]?.resultado).toBe("PARCIAL");
     }
     // A planilha recebeu o dia, mas sem confirmação ele continua pendente.
-    expect(cabecalho("QN Ano A").filter((valor) => valor === "17/06")).toHaveLength(1);
+    expect(cabecalho("QN Ano A").filter((valor) => valor === "17/06/2026")).toHaveLength(1);
 
     const [reenvio] = await simular("A");
     expect(reenvio?.dias).toEqual([DIA_3]);
@@ -227,7 +232,7 @@ describe("envio incremental à planilha", () => {
     expect(reenvio?.avisos.join(" ")).toContain("estrutura da aba mudou");
     const segunda = await aplicar(reenvio as Plano);
     expect((await json<Resultado>(segunda)).resultados[0]?.resultado).toBe("sucesso");
-    expect(cabecalho("QN Ano A").filter((valor) => valor === "17/06")).toHaveLength(1);
+    expect(cabecalho("QN Ano A").filter((valor) => valor === "17/06/2026")).toHaveLength(1);
     expect(gas?.valor("QN Ano A", 2, 5)).toBe("F");
   });
 

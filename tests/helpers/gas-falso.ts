@@ -1,5 +1,10 @@
 // Dublê do Apps Script para os testes: responde 302 como o Content Service e
 // guarda a planilha em memória, aplicando as mesmas invariantes do script.
+import type { AjusteCabecalho } from "../../src/domain/planilha-apresentacao";
+import {
+  assinaturaIntroducao,
+  introducaoReconhecida,
+} from "../../src/domain/planilha-apresentacao";
 import { createServer, type Server } from "node:http";
 
 interface Celula {
@@ -52,7 +57,7 @@ const MARCADOR_LINHA = "frequenciapp.linha";
 const MARCADOR_COLUNA = "frequenciapp.coluna";
 const MARCADOR_ABA = "frequenciapp.aba";
 const MARCADOR_ALUNO = "frequenciapp.aluno";
-const VERSAO = 5;
+const VERSAO = 6;
 const COPIA_PREFIXO = "_frequenciapp_backup_";
 
 function hashTexto(texto: string): string {
@@ -491,7 +496,39 @@ export async function criarGasFalso(): Promise<GasFalso> {
             ok: false,
             erro: "A estrutura da planilha mudou. Confira de novo antes de organizar.",
           };
-        item.congeladasLinhas = Math.max(item.congeladasLinhas, linha);
+        const ajuste = corpo.ajusteCabecalho as AjusteCabecalho | undefined;
+        if (ajuste) {
+          const introducao = item.celulas
+            .slice(0, ajuste.linhasRemover)
+            .map((linha) => linha.map((celula) => celula.valor));
+          if (
+            ajuste.linhasRemover !== linha - 1 ||
+            !introducaoReconhecida(introducao) ||
+            assinaturaIntroducao(introducao) !== ajuste.assinaturaIntroducao ||
+            item.celulas
+              .slice(0, ajuste.linhasRemover)
+              .some((linha) => linha.some((celula) => celula.formula)) ||
+            ajuste.datas.some(
+              (data) =>
+                garantir(item, linha, data.indice).formula ||
+                garantir(item, linha, data.indice).valor !== data.anterior,
+            )
+          )
+            return {
+              ok: false,
+              erro: "O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia.",
+            };
+          if (ajuste.linhasRemover || ajuste.datas.length) criarCopia(item);
+          for (const data of ajuste.datas) garantir(item, linha, data.indice).valor = data.rotulo;
+          item.celulas.splice(0, ajuste.linhasRemover);
+          item.metadados = item.metadados
+            .filter((meta) => !meta.linha || meta.linha > ajuste.linhasRemover)
+            .map((meta) =>
+              meta.linha ? { ...meta, linha: meta.linha - ajuste.linhasRemover } : meta,
+            );
+          item.mesclagens = [];
+          item.congeladasLinhas = Math.max(1, item.congeladasLinhas - ajuste.linhasRemover);
+        } else item.congeladasLinhas = Math.max(item.congeladasLinhas, linha);
         return { ok: true, versao: VERSAO, dados: { aba: item.nome } };
       }
       case "criarAba": {

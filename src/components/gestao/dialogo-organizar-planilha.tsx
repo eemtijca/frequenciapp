@@ -7,6 +7,7 @@ import { CORES_PLANILHA } from "@/domain/planilha-apresentacao";
 import { pedir, corpoJson } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -23,11 +24,16 @@ export function OrganizarPlanilha({
   rota,
   aba,
   disabled = false,
+  ajustarCabecalho = false,
+  onAtualizar,
 }: {
   rota: string;
   aba: string;
   disabled?: boolean;
+  ajustarCabecalho?: boolean;
+  onAtualizar?: () => Promise<void>;
 }) {
+  const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear());
   const [previa, setPrevia] = useState<(ApresentacaoAba & { planoHash: string }) | null>(null);
   const { executar, chaveAtiva } = useAcoesPorChave();
   const executando = chaveAtiva !== null;
@@ -36,7 +42,7 @@ export function OrganizarPlanilha({
       try {
         const dados = await pedir<{ previa: ApresentacaoAba & { planoHash: string } }>(
           rota,
-          corpoJson({ aba }),
+          corpoJson({ aba, ...(ajustarCabecalho ? { ajustarCabecalho, anoReferencia } : {}) }),
         );
         setPrevia(dados.previa);
       } catch (erro) {
@@ -48,9 +54,21 @@ export function OrganizarPlanilha({
     if (!previa) return;
     await executar("apresentacao", async () => {
       try {
-        await pedir(rota, corpoJson({ aba: previa.aba, planoHash: previa.planoHash }));
+        await pedir(
+          rota,
+          corpoJson({
+            aba: previa.aba,
+            planoHash: previa.planoHash,
+            ...(ajustarCabecalho ? { ajustarCabecalho, anoReferencia } : {}),
+          }),
+        );
         setPrevia(null);
-        avisarSucesso("Apresentação da planilha atualizada.");
+        avisarSucesso(
+          ajustarCabecalho
+            ? "Cabeçalho e datas corrigidos."
+            : "Apresentação da planilha atualizada.",
+        );
+        await onAtualizar?.();
       } catch (erro) {
         setPrevia(null);
         avisarErro(erro, {
@@ -61,15 +79,33 @@ export function OrganizarPlanilha({
   }
   return (
     <>
+      {ajustarCabecalho && (
+        <label className="flex items-center gap-2 text-sm">
+          Ano das datas sem ano
+          <Input
+            type="number"
+            min={2000}
+            max={2100}
+            className="w-24"
+            value={anoReferencia}
+            disabled={executando || previa !== null}
+            onChange={(evento) => setAnoReferencia(Number(evento.target.value))}
+          />
+        </label>
+      )}
       <Button
         type="button"
         variant="outline"
         className="h-10"
-        aria-label={`Organizar apresentação de ${aba}`}
+        aria-label={`${ajustarCabecalho ? "Corrigir cabeçalho e datas de" : "Organizar apresentação de"} ${aba}`}
         disabled={disabled || executando || !aba}
         onClick={() => void conferir()}
       >
-        {executando ? "Conferindo..." : "Organizar apresentação"}
+        {executando
+          ? "Conferindo..."
+          : ajustarCabecalho
+            ? "Corrigir cabeçalho e datas"
+            : "Organizar apresentação"}
       </Button>
       <AlertDialog
         open={previa !== null}
@@ -79,12 +115,34 @@ export function OrganizarPlanilha({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Organizar apresentação da aba {previa?.aba}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {ajustarCabecalho
+                ? "Corrigir cabeçalho e datas da aba"
+                : "Organizar apresentação da aba"}{" "}
+              {previa?.aba}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Cabeçalho verde com texto branco e negrito, linhas alternadas, colunas ajustadas e
-              quebra de texto. O cabeçalho da linha {previa?.cabecalhoLinha} ficará fixo durante a
-              rolagem. A aparência anterior dessas colunas será substituída; valores, fórmulas e
-              rótulos serão preservados.
+              {ajustarCabecalho ? (
+                <>
+                  {(previa?.ajusteCabecalho?.linhasRemover ?? 0) === 1
+                    ? "Será retirada 1 linha"
+                    : `Serão retiradas ${previa?.ajusteCabecalho?.linhasRemover ?? 0} linhas`}{" "}
+                  de título, legenda ou espaço acima da tabela.{" "}
+                  {(previa?.ajusteCabecalho?.datas.length ?? 0) === 1
+                    ? "Será corrigida 1 data"
+                    : `Serão corrigidas ${previa?.ajusteCabecalho?.datas.length ?? 0} datas`}{" "}
+                  para dia/mês/ano. O cabeçalho Aluno e os dias permanecerão na primeira linha. Uma
+                  cópia de segurança será criada antes das mudanças. As chamadas e as fórmulas da
+                  tabela serão preservadas.
+                </>
+              ) : (
+                <>
+                  Cabeçalho verde com texto branco e negrito, linhas alternadas, colunas ajustadas e
+                  quebra de texto. O cabeçalho da linha {previa?.cabecalhoLinha} ficará fixo durante
+                  a rolagem. A aparência anterior dessas colunas será substituída; valores, fórmulas
+                  e rótulos serão preservados.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <p className="text-muted-foreground text-xs">
@@ -161,7 +219,11 @@ export function OrganizarPlanilha({
                 void aplicar();
               }}
             >
-              {executando ? "Aplicando..." : "Aplicar apresentação"}
+              {executando
+                ? "Aplicando..."
+                : ajustarCabecalho
+                  ? "Aplicar correção"
+                  : "Aplicar apresentação"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

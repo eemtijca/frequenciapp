@@ -165,15 +165,15 @@ describe("envio automático ao salvar a chamada", () => {
   it("com a chave desligada, salvar não grava na planilha", async () => {
     await salvar(DIA_1, "A", [alunos.A]);
     await new Promise((resolver) => setTimeout(resolver, 1500));
-    expect(cabecalho("QS Ano A")).not.toContain("15/06");
+    expect(cabecalho("QS Ano A")).not.toContain("15/06/2026");
   });
 
   it("com a chave ligada, salvar a chamada da turma B leva o dia à aba da turma de origem", async () => {
     const ligada = await chamar("/api/planilha", "PATCH", { envioAutomatico: true });
     expect(ligada.status).toBe(200);
     await salvar(DIA_2, "B", [alunos.remanejado]);
-    expect(await esperar(() => cabecalho("QS Ano A").includes("16/06"))).toBe(true);
-    const coluna = cabecalho("QS Ano A").indexOf("16/06") + 1;
+    expect(await esperar(() => cabecalho("QS Ano A").includes("16/06/2026"))).toBe(true);
+    const coluna = cabecalho("QS Ano A").indexOf("16/06/2026") + 1;
     expect(gas?.valor("QS Ano A", 3, coluna)).toBe("F");
     expect(await esperarResultado("SUCESSO")).toBe(true);
   });
@@ -181,7 +181,7 @@ describe("envio automático ao salvar a chamada", () => {
   it("queda depois de gravar vira PARCIAL e o salvamento seguinte não repete o envio", async () => {
     gas?.derrubarProximoAplicar();
     await salvar(DIA_3, "A", [alunos.A]);
-    await esperar(() => cabecalho("QS Ano A").includes("17/06"));
+    await esperar(() => cabecalho("QS Ano A").includes("17/06/2026"));
     expect(await esperarResultado("PARCIAL")).toBe(true);
 
     const antes = gas?.chamadas().length ?? 0;

@@ -42,6 +42,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Corrigido
 
+- Datas da frequência em `dd/mm/aaaa` nas novas colunas e no CSV. A Gestão oferece prévia para retirar o título e a legenda acima da tabela e corrigir datas existentes, com cópia de segurança e preservação das chamadas, fórmulas e mapa das turmas. O provedor legado usa o Apps Script 6.
+
 - Diretores de turma podem ativar notificações sem configuração manual de VAPID: o servidor prepara um par estável a partir de `AUTH_SECRET` e preserva pares explícitos existentes (ADR-029).
 - Seletor de horário: tocar em uma hora agora atualiza o campo na hora e o destaque acompanha a escolha (antes só a coluna de minutos parecia responder); itens com 44 px de altura e texto maior para o toque em telas de 360 px.
 - O gráfico do Painel por turma original aparece só nas séries indicadas em Origem na Chamada (a 3ª série), e não mais em qualquer série com aluno de origem diferente da turma atual.

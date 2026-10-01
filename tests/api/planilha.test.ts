@@ -271,6 +271,67 @@ describe("integração com a planilha", () => {
     expect(salvo.status).toBe(200);
   });
 
+  it("corrige a aba mapeada com cópia, conserva fórmulas e relê o esquema sem perder o mapa", async () => {
+    gas?.definirAba(
+      "QP Ano A",
+      [
+        ["Frequência · QP Ano A"],
+        ["P = presente · F = falta. Atualize as marcações no aplicativo."],
+        [],
+        ["Aluno", "Turma atual", "10/09", "Total"],
+        ["QP Alice", "QP Ano A", "P", ""],
+        ["QP Bruno", "QP Ano A", "", ""],
+      ],
+      { formulas: { D5: '=CONT.SE(C5;"F")' } },
+    );
+    const corpo = { aba: "QP Ano A", ajustarCabecalho: true, anoReferencia: 2026 };
+    const resposta = await autenticado("/api/planilha/organizar", {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    });
+    expect(resposta.status).toBe(200);
+    const dados = await json<{
+      previa: { planoHash: string; ajusteCabecalho: { linhasRemover: number } };
+    }>(resposta);
+    expect(dados.previa.ajusteCabecalho.linhasRemover).toBe(3);
+    expect(gas?.valor("QP Ano A", 5, 1)).toBe("QP Alice");
+    const aplicado = await autenticado("/api/planilha/organizar", {
+      method: "POST",
+      body: JSON.stringify({ ...corpo, planoHash: dados.previa.planoHash }),
+    });
+    expect(aplicado.status).toBe(200);
+    expect(gas?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
+    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+    expect(gas?.formulaDe("QP Ano A", 2, 4)).toBe('=CONT.SE(C5;"F")');
+    expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_QP Ano A_"))).toBe(
+      true,
+    );
+    const estado = await json<{
+      integracao: {
+        esquema: {
+          mapa: { aba: string; turmaOriginalId: string }[];
+          abas: { nome: string; cabecalho: number }[];
+        };
+      };
+    }>(await autenticado("/api/planilha"));
+    expect(estado.integracao.esquema.mapa).toEqual([
+      { aba: "QP Ano A", turmaOriginalId: turmaAId },
+    ]);
+    expect(estado.integracao.esquema.abas.find((aba) => aba.nome === "QP Ano A")?.cabecalho).toBe(
+      1,
+    );
+    // Restaura a fórmula sintética usada nos contratos seguintes.
+    gas?.definirAba(
+      "QP Ano A",
+      [
+        ["Aluno", "Turma atual", "10/09/2026", "Total"],
+        ["QP Alice", "QP Ano A", "P", ""],
+        ["QP Bruno", "QP Ano A", "", ""],
+      ],
+      { formulas: { D2: '=CONT.SE(C2:C3;"F")' } },
+    );
+  });
+
   it("simula e aplica somente lacunas, preservando ocupadas e fórmulas", async () => {
     const simulado = await json<{
       modalidade: string;
