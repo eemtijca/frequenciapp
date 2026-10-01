@@ -23,6 +23,9 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `relatorios.test.ts`: indicadores do dia, infrequência acumulada entre meses por série e turma, taxa sobre registros com chamada, listas históricas, desistências, ausência parcial em aulas e relatórios por aluno e por saída.
 - `justificativas.test.ts`: ordenação e validação do catálogo configurável.
 - `planilha.test.ts`: dataframe, esquema da planilha, CSV e planejamento conservador.
+- `downloads.test.ts`: senha de exportação, AES-256 real, preservação de bytes, senha incorreta, sal aleatório e alteração da cifra.
+- `exportacoes.test.ts` na suíte de API: confirmação da cópia, limite de tentativas, CSRF, papéis e auditoria mínima sem dados escolares.
+- `downloads.spec.ts` na suíte de navegador: os três downloads protegidos, formatos originais, cancelamento, senhas locais, toque duplo e repetição após falha.
 - `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
 - `planilha-envios.test.ts`: erro vigente por turma ou por histórico único, data do último envio e datas sem horário em qualquer fuso.
 - `planilha-cliente.test.ts`: cliente do Apps Script com recusa, falha parcial e detalhe técnico.

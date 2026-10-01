@@ -638,7 +638,14 @@ Apaga token e esquema e desliga a integração de saídas. Apenas administraçã
 
 ### GET /api/backup
 
-- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "justificativas", "liberadores", "configuracoes" }`. Apenas administração, com auditoria.
+- A exportação sem confirmação foi encerrada. Com sessão administrativa, responde 405 e orienta confirmar a senha; não devolve dados escolares. Clientes anteriores devem usar a rota abaixo.
+
+### POST /api/backup/exportar
+
+Corpo: `{ "senha": "senha atual do administrador" }`. A senha do ZIP não é recebida por nenhuma API.
+
+- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "entradas", "justificativas", "liberadores", "configuracoes" }`. Apenas administração, com auditoria e `Cache-Control: no-store`.
+- 400 sem senha válida; 401 sem sessão; 403 sem permissão ou origem não permitida; 429 após cinco tentativas incorretas em 15 minutos, por conta e entre instâncias. Sucesso limpa o contador.
 
 ### POST /api/backup
 
@@ -646,6 +653,14 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.
+
+### POST /api/exportacoes/registro
+
+Corpo estrito: `{ "tipo": "grade" | "relacao", "formato": "original" | "zip" }`.
+
+- 200 `{"ok": true}` após registrar `download.preparar` com alvo do tipo `grade:zip`, conta e data. O registro indica preparação, sem comprovar que o navegador salvou o arquivo. Não recebe nomes, conteúdo nem senhas.
+- Grade disponível à administração e coordenação; relação restrita à administração. Diretores não têm acesso. Exige sessão e origem válida, com 400 para corpo inválido e 403 para escopo não permitido.
+- A interface registra depois de preparar o CSV ou ZIP e antes de iniciar o download. Falha no registro permite tentar novamente e não inicia download.
 
 ## Saúde
 

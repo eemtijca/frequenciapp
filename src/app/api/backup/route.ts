@@ -1,5 +1,5 @@
 // Cópia de segurança: exportar e importar JSON, restrito à administração.
-import { exportarCopia, importarCopia } from "@/application/backup";
+import { importarCopia } from "@/application/backup";
 import {
   corpoJsonComLimite,
   erroApi,
@@ -17,7 +17,9 @@ export async function GET(): Promise<Response> {
   return executarRota(async () => {
     const sessao = await exigirAdmin();
     if (!sessao.ok) return sessao.resposta;
-    return json(await exportarCopia(sessao.usuario));
+    const resposta = erroApi("Confirme a senha para baixar a cópia de segurança.", 405);
+    resposta.headers.set("Allow", "POST");
+    return resposta;
   });
 }
 

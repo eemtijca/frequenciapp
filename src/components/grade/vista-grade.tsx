@@ -3,7 +3,7 @@
 // Grade de frequência por turma de origem: modos dia, semana de aula,
 // período personalizado e mês; células P, F e FJ, saída no dia e coluna
 // acumulada (F + FJ) de todo o histórico.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
@@ -25,9 +25,10 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
+import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
@@ -195,22 +196,10 @@ export default function VistaGrade({
     return (id: string) => mapa.get(id) ?? "";
   }, [origens]);
 
-  // Geração de arquivo: uma janela curta evita dois downloads no toque duplo.
-  const ultimoDownload = useRef(0);
+  const [downloadAberto, setDownloadAberto] = useState(false);
 
-  // Exporta o dataframe da turma de origem no período exibido. A busca da
-  // tela não interfere: a planilha leva todos os alunos ativos da turma.
-  function baixarPlanilha() {
-    const agora = Date.now();
-    if (agora - ultimoDownload.current < 800) return;
-    ultimoDownload.current = agora;
-    if (grade.linhas.length === 0) {
-      avisarInfo(
-        "Nada para exportar neste período.",
-        "Escolha outro período ou confira a turma de origem.",
-      );
-      return;
-    }
+  // A busca da tela não interfere: a planilha leva todos os alunos ativos.
+  function prepararPlanilha() {
     const turma = turmaPlanilhaDaGrade(
       turmaEfetiva,
       rotuloDe(turmaEfetiva),
@@ -219,15 +208,13 @@ export default function VistaGrade({
       turmaAtualDe,
     );
     const blob = new Blob([paraCsv(turma)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = nomeArquivoCsv(turma);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    avisarSucesso("Planilha baixada.", "O arquivo leva todos os alunos ativos da turma de origem.");
+    return {
+      blob,
+      nome: nomeArquivoCsv(turma),
+      nomeNoZip: "grade.csv",
+      nomeZip: "frequenciapp-grade.zip",
+      registro: "grade" as const,
+    };
   }
 
   return (
@@ -268,7 +255,7 @@ export default function VistaGrade({
             className="size-10"
             aria-label="Baixar planilha (CSV)"
             title="Baixar planilha (CSV) da turma de origem"
-            onClick={baixarPlanilha}
+            onClick={() => setDownloadAberto(true)}
             disabled={grade.linhas.length === 0 || carregandoPeriodo}
           >
             <Download size={18} />
@@ -585,6 +572,17 @@ export default function VistaGrade({
         </motion.div>
       )}
 
+      <DialogoDownload
+        aberto={downloadAberto}
+        onAbrir={setDownloadAberto}
+        preparar={prepararPlanilha}
+        onConcluido={() =>
+          avisarSucesso(
+            "Planilha baixada.",
+            "O arquivo leva todos os alunos ativos da turma de origem.",
+          )
+        }
+      />
       {estadoPlanilha?.podeEnviar && grade.dias.length > 0 && (
         <DialogoEnvio
           aberto={envioAberto}

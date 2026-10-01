@@ -51,6 +51,12 @@ Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que 
 
 Ações administrativas (criar, atualizar e excluir entidades escolares, gerenciar contas) e trocas de senha são registradas em `auditoria` na mesma transação da ação: quem, o quê e quando, sem nomes de alunos. Salvar frequência não gera linha na trilha: a própria frequência guarda revisão, autoria e momento da atualização. A trilha serve de insumo para apuração interna e políticas de retenção (ver [lgpd.md](lgpd.md)).
 
+## Exportações
+
+Grade, relação e cópia oferecem ZIP AES-256 com senha confirmada, gerado no navegador. A senha do ZIP não é transmitida nem persistida, e o app nunca baixa o formato original como alternativa automática a uma falha de criptografia. Nomes do ZIP são genéricos, sem turma ou aluno. O formato original permanece uma escolha explícita.
+
+A cópia completa exige novamente a senha atual da administração por `POST /api/backup/exportar`, com CSRF, corpo estrito e até cinco tentativas em 15 minutos por conta. O antigo GET não exporta dados. CSV registra preparação com conta, tipo e formato, sem conteúdo nem senha. O registro indica preparação, não confirmação de salvamento pelo navegador. Detalhes em [downloads.md](downloads.md) e [ADR-031](adr/031-downloads-protegidos.md).
+
 ## Entrada e erros
 
 - Corpo JSON validado por zod com limites de tamanho e comprimento; datas e meses conferidos contra o calendário real antes de tocar o banco.

@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
+import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoImportarRelacao from "@/components/gestao/dialogo-importar-relacao";
 import { relacaoParaCsv } from "@/domain/importacao-alunos";
 import {
@@ -78,6 +79,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [origemEmMassa, setOrigemEmMassa] = useState("");
+  const [downloadAberto, setDownloadAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
@@ -276,7 +278,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
 
   // A relação sai no mesmo schema da importação: turmas na ordem do cadastro e
   // alunos ativos na ordem da chamada.
-  function exportarRelacao() {
+  function prepararRelacao() {
     const posicao = new Map(turmas.map((turma, indice) => [turma.id, indice]));
     const linhas = alunos
       .filter((aluno) => aluno.ativo)
@@ -293,18 +295,13 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         turmaOriginal: rotulo(aluno.turmaOriginalId),
       }));
     const blob = new Blob([relacaoParaCsv(linhas)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "frequenciapp-relacao-alunos.csv";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    avisarSucesso(
-      "Relação exportada.",
-      `${linhas.length} ${linhas.length === 1 ? "aluno ativo" : "alunos ativos"} no padrão CSV da importação.`,
-    );
+    return {
+      blob,
+      nome: "frequenciapp-relacao-alunos.csv",
+      nomeNoZip: "relacao-alunos.csv",
+      nomeZip: "frequenciapp-relacao-alunos.zip",
+      registro: "relacao" as const,
+    };
   }
 
   return (
@@ -350,7 +347,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             <Button
               variant="outline"
               className="h-11 rounded-lg whitespace-nowrap"
-              onClick={exportarRelacao}
+              onClick={() => setDownloadAberto(true)}
               disabled={ativos === 0}
             >
               <FileDown size={16} />
@@ -680,6 +677,17 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+      <DialogoDownload
+        aberto={downloadAberto}
+        onAbrir={setDownloadAberto}
+        preparar={prepararRelacao}
+        onConcluido={() =>
+          avisarSucesso(
+            "Relação exportada.",
+            "O arquivo leva os alunos ativos no padrão CSV da importação.",
+          )
+        }
+      />
       <DialogoImportarRelacao
         aberto={importarAberto}
         onAbrir={setImportarAberto}

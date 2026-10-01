@@ -2,6 +2,10 @@
 
 Decisões de interface do FrequenciApp. O princípio é o mesmo do fluxo original: a coordenação em sala quer marcar faltas o mais rápido possível, com uma mão, sem decoração no caminho.
 
+## Downloads
+
+Baixar planilha, Exportar relação e Baixar cópia abrem o mesmo diálogo de preparação. ZIP protegido por senha começa selecionado, com senha confirmada e orientação de guarda; Arquivo original sem senha exige escolha explícita e mostra aviso sobre acesso ao conteúdo. A cópia completa também exige a senha atual da administração, separada da senha do ZIP. Durante a preparação, a ação bloqueia toque duplo e mostra andamento no botão. Cancelar ou fechar limpa os campos e não inicia download. Detalhes em [downloads.md](downloads.md).
+
 ## Estrutura
 
 - **Página única** com troca de visões por botões e navegação inferior no celular: Painel, Chamada, Saídas e entradas e Relatórios para todos, mais Alunos (consulta) para a coordenação ou Gestão para a administração. No desktop, barra lateral fixa com a mesma navegação, o cartão da pessoa, o tema e as ações empilhadas (trocar senha e sair), e o conteúdo ocupa toda a largura, com troca de visão instantânea. O cabeçalho traz identidade, tema de três opções (sistema, claro e escuro) e menu de perfil. A área de saídas e entradas some quando o recurso é desligado na Gestão.

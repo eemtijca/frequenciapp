@@ -61,9 +61,13 @@ test.describe("relação de alunos em CSV", () => {
     await dialogo.getByRole("button", { name: "Aplicar" }).click();
     await expect(page.getByText("Relação importada.")).toBeVisible();
 
-    const download = page.waitForEvent("download");
     await painel.getByRole("button", { name: "Exportar relação" }).click();
-    const arquivo = await download;
+    const downloadDialogo = page.getByRole("dialog", { name: "Preparar download" });
+    await downloadDialogo.getByLabel("Arquivo original sem senha").check();
+    const [arquivo] = await Promise.all([
+      page.waitForEvent("download"),
+      downloadDialogo.getByRole("button", { name: "Baixar arquivo original" }).click(),
+    ]);
     expect(arquivo.suggestedFilename()).toBe("frequenciapp-relacao-alunos.csv");
     const conteudo = await readFile((await arquivo.path()) ?? "", "utf8");
     const linhas = conteudo.replace(/^﻿/, "").split("\r\n");

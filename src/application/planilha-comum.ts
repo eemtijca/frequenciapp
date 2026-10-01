@@ -8,8 +8,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { ambiente } from "@/infra/ambiente";
-import { conferirSenha } from "@/infra/auth/hash";
-import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
+import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
 import { chamarGas, type OpcoesGas } from "@/infra/planilha";
 import { renovarAcesso } from "@/infra/google-oauth";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
@@ -125,22 +124,6 @@ export async function chamarIntegracao<T>(
   }
   const { endpoint, token } = exigirConexao(linha);
   return chamarGas<T>(endpoint, token, corpo, opcoes);
-}
-
-export async function conferirSenhaDoAdmin(
-  usuarioId: string,
-  senha: string,
-  chaveLimite: string,
-): Promise<void> {
-  const chave = `${chaveLimite}:${usuarioId}`;
-  if (!(await limiteDeTentativas(chave, 5))) {
-    throw new ErroHttp("Muitas tentativas incorretas. Aguarde alguns minutos.", 429);
-  }
-  const usuario = await banco().usuario.findUnique({ where: { id: usuarioId } });
-  if (!usuario || !(await conferirSenha(senha, usuario.senhaHash))) {
-    throw new ErroHttp("A senha do administrador está incorreta.", 400);
-  }
-  await limparTentativas(chave);
 }
 
 export const esquemaSenha = z.object({
