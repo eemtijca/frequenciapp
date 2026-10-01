@@ -105,6 +105,10 @@ export default function IntegracaoPlanilha({
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const [envioAberto, setEnvioAberto] = useState(false);
   const [abaApresentacao, setAbaApresentacao] = useState("");
+  const acoesOrganizacao = useAcoesPorChave();
+  const abasMapeadas = [...new Set((integracao?.esquema?.mapa ?? []).map((item) => item.aba))];
+  const todasTurmas = abaApresentacao === "todas";
+  const abaOrganizar = abaApresentacao.startsWith("aba:") ? abaApresentacao.slice(4) : "";
 
   const carregar = useCallback(async () => {
     try {
@@ -489,7 +493,8 @@ export default function IntegracaoPlanilha({
       {conectada && abas.some((aba) => !aba.oculta) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3">
           <p className="text-muted-foreground text-xs">
-            Organize a apresentação ou corrija o título, a legenda e as datas, com prévia.
+            Organize a apresentação ou corrija o título, a legenda e as datas, com prévia. A opção
+            Todas as turmas inclui as abas vinculadas na estrutura salva.
           </p>
           <Selecionar
             id="frequencia-apresentacao"
@@ -497,19 +502,29 @@ export default function IntegracaoPlanilha({
             onValueChange={setAbaApresentacao}
             placeholder="Escolha a aba para organizar"
             ariaLabel="Aba para organizar a apresentação"
-            opcoes={abas
-              .filter((aba) => !aba.oculta)
-              .map((aba) => ({ valor: aba.nome, rotulo: aba.nome }))}
+            disabled={acoesOrganizacao.chaveAtiva !== null}
+            opcoes={[
+              ...(abasMapeadas.length ? [{ valor: "todas", rotulo: "Todas as turmas" }] : []),
+              ...abas
+                .filter((aba) => !aba.oculta)
+                .map((aba) => ({ valor: `aba:${aba.nome}`, rotulo: aba.nome })),
+            ]}
           />
           <div className="flex flex-wrap items-center gap-2">
             <OrganizarPlanilha
               rota="/api/planilha/organizar"
-              aba={abaApresentacao}
+              aba={abaOrganizar}
+              todasTurmas={todasTurmas}
+              abas={abasMapeadas}
+              acoes={acoesOrganizacao}
               disabled={!podeEnviar}
             />
             <OrganizarPlanilha
               rota="/api/planilha/organizar"
-              aba={abaApresentacao}
+              aba={abaOrganizar}
+              todasTurmas={todasTurmas}
+              abas={abasMapeadas}
+              acoes={acoesOrganizacao}
               disabled={!podeEnviar}
               ajustarCabecalho
               onAtualizar={carregar}

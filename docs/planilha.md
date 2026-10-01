@@ -57,6 +57,12 @@ A confirmação remove somente as linhas iniciais reconhecidas como título de f
 
 Antes de alterar, a integração cria uma cópia oculta para restauração. As chamadas, colunas auxiliares e fórmulas da tabela permanecem; o Google ajusta as referências após a remoção das linhas. O esquema da aba é relido e o mapa das turmas é conservado. A correção não é automática nas planilhas já conectadas: exige a prévia e a confirmação administrativas. No provedor Apps Script, publique a **versão 6** de `gas/Codigo.gs` na implantação existente e use Testar conexão antes da correção. A apresentação sem correção continua compatível com a versão 5.
 
+## Organizar todas as turmas
+
+Na Gestão, a seleção **Todas as turmas** organiza a apresentação ou corrige cabeçalhos e datas nas abas vinculadas às turmas na estrutura salva. Abas auxiliares, cópias e turmas sem aba vinculada não entram na seleção. A prévia apresenta cada aba, seus cabeçalhos e as alterações previstas; a confirmação é única.
+
+As leituras e aplicações seguem uma aba por requisição, em sequência, com andamento e resultado por aba. Manter a tela aberta até o resultado. Uma aba que não puder ser conferida fica fora da aplicação. Falhas durante a escrita são identificadas sem repetição automática; as demais abas continuam sendo processadas. Conferir a aba antes de uma nova tentativa, pois uma falha de rede pode ocorrer depois da gravação. As correções conservam o mapa e criam as cópias previstas antes de remover a introdução. Renovar o esquema de uma aba não invalida a prévia das outras; trocar o arquivo, as credenciais ou o mapa exige novas prévias. A versão 6 do Apps Script já atende essa opção, sem nova alteração do script.
+
 ## Conferir a estrutura
 
 A leitura devolve o esquema de cada aba: linha de cabeçalho, coluna de aluno, colunas de dia com a data, coluna de total (inclusive por fórmula), mesclagens e limites. A partir dele o aplicativo:

@@ -332,6 +332,84 @@ describe("integração com a planilha", () => {
     );
   });
 
+  it("corrige duas abas com as prévias originais após a primeira renovar o cache", async () => {
+    const criada = await json<{ turma: { id: string } }>(
+      await autenticado("/api/turmas", {
+        method: "POST",
+        body: JSON.stringify({ serieId, nome: "B" }),
+      }),
+    );
+    gas?.definirAba(
+      "QP Ano A",
+      [
+        ["Frequência · QP Ano A"],
+        ["P = presente · F = falta"],
+        [],
+        ["Aluno", "Turma atual", "10/09", "Total"],
+        ["QP Alice", "QP Ano A", "P", ""],
+        ["QP Bruno", "QP Ano A", "", ""],
+      ],
+      { formulas: { D5: '=CONT.SE(C5:C6;"F")' } },
+    );
+    gas?.definirAba("QP Ano B", [
+      ["Frequência · QP Ano B"],
+      ["P = presente · F = falta"],
+      [],
+      ["Aluno", "Turma atual", "29/09", "Total"],
+      ["QP Aluno Lote", "QP Ano B", "P", ""],
+    ]);
+    const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
+      await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }),
+    );
+    const mapa = [
+      { aba: "QP Ano A", turmaOriginalId: turmaAId },
+      { aba: "QP Ano B", turmaOriginalId: criada.turma.id },
+    ];
+    const salvo = await autenticado("/api/planilha/mapa", {
+      method: "POST",
+      body: JSON.stringify({ ...estrutura, mapa }),
+    });
+    expect(salvo.status).toBe(200);
+    const previas: { aba: string; planoHash: string }[] = [];
+    for (const { aba } of mapa) {
+      const resposta = await autenticado("/api/planilha/organizar", {
+        method: "POST",
+        body: JSON.stringify({ aba, emLote: true, ajustarCabecalho: true, anoReferencia: 2026 }),
+      });
+      expect(resposta.status).toBe(200);
+      const dados = await json<{ previa: { planoHash: string } }>(resposta);
+      previas.push({ aba, planoHash: dados.previa.planoHash });
+    }
+    for (const previa of previas) {
+      const resposta = await autenticado("/api/planilha/organizar", {
+        method: "POST",
+        body: JSON.stringify({
+          ...previa,
+          emLote: true,
+          ajustarCabecalho: true,
+          anoReferencia: 2026,
+        }),
+      });
+      expect(resposta.status).toBe(200);
+    }
+    expect(gas?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
+    expect(gas?.valor("QP Ano B", 1, 3)).toBe("29/09/2026");
+    expect(gas?.valor("QP Ano B", 2, 3)).toBe("P");
+    expect(gas?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
+    const estado = await json<{
+      integracao: { esquema: { planilha: unknown; abas: unknown[]; mapa: unknown[] } };
+    }>(await autenticado("/api/planilha"));
+    expect(estado.integracao.esquema.mapa).toEqual(mapa);
+    const restaurado = await autenticado("/api/planilha/mapa", {
+      method: "POST",
+      body: JSON.stringify({ ...estado.integracao.esquema, mapa: [mapa[0]] }),
+    });
+    expect(restaurado.status).toBe(200);
+    expect((await autenticado(`/api/turmas/${criada.turma.id}`, { method: "DELETE" })).status).toBe(
+      200,
+    );
+  });
+
   it("simula e aplica somente lacunas, preservando ocupadas e fórmulas", async () => {
     const simulado = await json<{
       modalidade: string;
