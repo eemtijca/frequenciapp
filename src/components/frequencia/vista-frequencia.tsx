@@ -555,7 +555,7 @@ export default function VistaFrequencia({
     });
   }
 
-  // Turmas agrupadas por série. Cada série abre e fecha; a da turma atual começa aberta.
+  // Turmas agrupadas por série. Só uma série fica aberta por vez; a da turma atual começa aberta.
   const series = useMemo(() => {
     const grupos: { id: string; nome: string; turmas: Turma[] }[] = [];
     for (const opcao of turmas) {
@@ -565,9 +565,11 @@ export default function VistaFrequencia({
     }
     return grupos;
   }, [turmas]);
-  const [seriesAbertas, setSeriesAbertas] = useState<Record<string, boolean>>({});
+  // undefined segue a série da turma atual; null é tudo recolhido.
+  const [serieAberta, setSerieAberta] = useState<string | null | undefined>(undefined);
   const serieAtualId = turmas.find((opcao) => opcao.id === turmaId)?.serieId;
-  const serieEstaAberta = (id: string) => seriesAbertas[id] ?? id === serieAtualId;
+  const serieEstaAberta = (id: string) =>
+    (serieAberta === undefined ? serieAtualId : serieAberta) === id;
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
@@ -650,9 +652,7 @@ export default function VistaFrequencia({
                       type="button"
                       aria-expanded={aberta}
                       aria-controls={`turmas-serie-${grupo.id}`}
-                      onClick={() =>
-                        setSeriesAbertas((atual) => ({ ...atual, [grupo.id]: !aberta }))
-                      }
+                      onClick={() => setSerieAberta(aberta ? null : grupo.id)}
                       className={`pressionavel flex h-11 min-w-0 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
                         contem ? "border-primary text-primary" : ""
                       }`}

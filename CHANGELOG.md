@@ -9,7 +9,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 ### Adicionado
 
 - Envio automático à planilha ao registrar saídas e entradas, por interruptor em Gestão, Planilha de saídas (desligado por padrão): só acrescenta linhas, sem repetir depois de envio sem confirmação.
-- Chamada com as turmas agrupadas em um botão por série, que expande e recolhe; na Gestão, as turmas específicas da origem ficam numa seção recolhível.
+- Chamada com as turmas agrupadas em um botão por série, que expande e recolhe (apenas uma série aberta por vez); na Gestão, as turmas específicas da origem ficam numa seção recolhível.
 - Opção Todas as turmas para organizar a apresentação ou corrigir cabeçalhos e datas das abas vinculadas, com uma confirmação, andamento e resultado por aba. As operações seguem em sequência e identificam falhas sem repetir a escrita automaticamente.
 
 - Organização visual das planilhas de frequência, saídas e entradas, com cabeçalho destacado, colunas ajustadas, quebra de texto e linhas alternadas. Abas existentes recebem prévia e confirmação administrativas, preservando dados e fórmulas; o provedor legado usa o script na versão 5.
