@@ -133,17 +133,28 @@ export default function VistaFrequenciaParcial({
     );
   }, [series, turmas]);
   const turma = turmas.find((item) => item.id === turmaId);
-  const alunosDisponiveis = useMemo(() => {
-    const registrados = new Set(registros.map((registro) => registro.alunoId));
-    return alunos
-      .filter(
-        (aluno) =>
-          aluno.ativo &&
-          aluno.turmaId === turmaId &&
-          !alunoDesistenteNoDia(aluno, dia) &&
-          !registrados.has(aluno.id),
-      )
-      .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"));
+  const listaAlunos = useMemo(() => {
+    const registrosPorAluno = new Map(registros.map((registro) => [registro.alunoId, registro]));
+    const alunosPorId = new Map(alunos.map((aluno) => [aluno.id, aluno]));
+    const ids = new Set(
+      alunos.filter((aluno) => aluno.ativo && aluno.turmaId === turmaId).map((aluno) => aluno.id),
+    );
+    // Registros salvos preservam o aluno e o nome históricos depois de uma transferência.
+    for (const registro of registros) ids.add(registro.alunoId);
+    return Array.from(ids, (id) => {
+      const aluno = alunosPorId.get(id);
+      const registro = registrosPorAluno.get(id);
+      return {
+        id,
+        nome: registro?.alunoNome ?? aluno?.nome ?? "Aluno",
+        ordem: aluno?.ordem ?? null,
+        registro,
+        desistente: aluno ? alunoDesistenteNoDia(aluno, dia) : false,
+      };
+    }).sort(
+      (a, b) =>
+        (a.ordem ?? Infinity) - (b.ordem ?? Infinity) || a.nome.localeCompare(b.nome, "pt-BR"),
+    );
   }, [alunos, registros, turmaId, dia]);
   const alunosDaEdicao = registroEditado
     ? [
@@ -158,18 +169,20 @@ export default function VistaFrequenciaParcial({
           nome: registroEditado.alunoNome,
         },
       ]
-    : alunosDisponiveis;
-  const registrosFiltrados = useMemo(
+    : alunos.filter((aluno) => aluno.id === edicao.alunoId);
+  const alunosFiltrados = useMemo(
     () =>
-      registros
-        .filter(
-          (registro) =>
-            normalizar(registro.alunoNome).includes(normalizar(busca)) &&
-            (filtro === "todos" ||
-              (filtro === "pendentes" ? !registro.registradoSeduc : registro.registradoSeduc)),
-        )
-        .sort((a, b) => a.alunoNome.localeCompare(b.alunoNome, "pt-BR")),
-    [registros, busca, filtro],
+      listaAlunos.filter(
+        (aluno) =>
+          normalizar(aluno.nome).includes(normalizar(busca)) &&
+          (filtro === "todos" ||
+            (filtro === "sem-registro"
+              ? !aluno.registro
+              : filtro === "pendentes"
+                ? aluno.registro && !aluno.registro.registradoSeduc
+                : aluno.registro?.registradoSeduc)),
+      ),
+    [listaAlunos, busca, filtro],
   );
   const pendentes = registros.filter((registro) => !registro.registradoSeduc).length;
 
@@ -230,8 +243,8 @@ export default function VistaFrequenciaParcial({
     }));
   }, []);
 
-  function abrirEditor(registro: FrequenciaParcial | null = null) {
-    const inicial = edicaoDoRegistro(registro ?? undefined);
+  function abrirEditor(registro: FrequenciaParcial | null, alunoId: string) {
+    const inicial = { ...edicaoDoRegistro(registro ?? undefined), alunoId };
     setRegistroEditado(registro);
     setEdicao(inicial);
     setAssinaturaInicial(assinaturaDaEdicao(inicial));
@@ -283,7 +296,7 @@ export default function VistaFrequenciaParcial({
         variante: "indisponivel",
       });
       const vigente = dados.registros.find((registro) => registro.alunoId === edicao.alunoId);
-      if (vigente) abrirEditor(vigente);
+      if (vigente) abrirEditor(vigente, vigente.alunoId);
       else {
         setRegistroEditado(null);
         setConflito(false);
@@ -409,21 +422,10 @@ export default function VistaFrequenciaParcial({
           <ChevronRight size={18} />
         </Button>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted-foreground text-sm">
-          {registros.length} {registros.length === 1 ? "registro" : "registros"} · {pendentes}{" "}
-          {pendentes === 1 ? "pendente na Seduc" : "pendentes na Seduc"}
-        </p>
-        <Button
-          type="button"
-          onClick={() => abrirEditor()}
-          disabled={carregando || ocupado || !turmaId || alunosDisponiveis.length === 0}
-          className="h-11 rounded-lg"
-        >
-          <Plus size={16} />
-          Registrar frequência parcial
-        </Button>
-      </div>
+      <p className="text-muted-foreground text-sm">
+        {registros.length} {registros.length === 1 ? "registro" : "registros"} · {pendentes}{" "}
+        {pendentes === 1 ? "pendente na Seduc" : "pendentes na Seduc"}
+      </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <BarraBusca
           id="parcial-busca"
@@ -435,11 +437,12 @@ export default function VistaFrequenciaParcial({
         <div className="sm:w-48">
           <Selecionar
             id="parcial-filtro"
-            ariaLabel="Situação na Seduc"
+            ariaLabel="Situação da frequência parcial"
             value={filtro}
             onValueChange={setFiltro}
             opcoes={[
-              { valor: "todos", rotulo: "Todos os registros" },
+              { valor: "todos", rotulo: "Todos os alunos" },
+              { valor: "sem-registro", rotulo: "Sem frequência parcial" },
               { valor: "pendentes", rotulo: "Pendentes na Seduc" },
               { valor: "registrados", rotulo: "Registrados na Seduc" },
             ]}
@@ -461,79 +464,113 @@ export default function VistaFrequenciaParcial({
           <LoaderCircle size={18} className="animate-spin" />
           Carregando chamada parcial...
         </p>
-      ) : registrosFiltrados.length === 0 ? (
-        <div className="bg-card rounded-lg border p-6 text-center">
-          <p className="text-muted-foreground text-sm">
-            {registros.length === 0
-              ? "Nenhuma frequência parcial registrada neste dia."
-              : "Nenhum registro encontrado com estes filtros."}
-          </p>
-        </div>
       ) : (
-        <ul className="flex flex-col gap-3">
-          {registrosFiltrados.map((registro) => (
-            <li
-              key={registro.id}
-              className="bg-card rounded-lg border p-4"
-              data-testid={`parcial-registro-${registro.alunoId}`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-semibold break-words">{registro.alunoNome}</h2>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    {rotuloFrequenciaParcial(registro)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <Label htmlFor={`parcial-seduc-${registro.id}`} className="text-xs">
-                    Registrado na Seduc
-                  </Label>
-                  <Switch
-                    id={`parcial-seduc-${registro.id}`}
-                    aria-label={`Registrado na Seduc: ${registro.alunoNome}`}
-                    checked={registro.registradoSeduc}
-                    disabled={ocupado || editorAberto}
-                    onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
-                  />
-                </div>
-              </div>
-              <p className="mt-3 text-xs" role="status">
-                {registro.registradoSeduc
-                  ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, fuso)}` : ""}`
-                  : "Pendente de lançamento na Seduc"}
-              </p>
-              {registro.observacao && (
-                <p className="text-muted-foreground mt-2 text-sm break-words">
-                  {registro.observacao}
-                </p>
-              )}
-              <div className="mt-3 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => abrirEditor(registro)}
-                  aria-label={`Editar frequência parcial de ${registro.alunoNome}`}
-                  disabled={ocupado}
-                  className="h-11 rounded-lg"
-                >
-                  <Pencil size={15} />
-                  Editar
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setRegistroRemover(registro)}
-                  aria-label={`Remover frequência parcial de ${registro.alunoNome}`}
-                  disabled={ocupado}
-                  className="text-falta-texto h-11 rounded-lg"
-                >
-                  <Trash2 size={15} />
-                  Remover
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="bg-card overflow-hidden rounded-lg border">
+          <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
+            <span className="numerais-tabulares">
+              {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
+            </span>
+            {(filtro !== "todos" || busca !== "") && (
+              <button
+                type="button"
+                className="text-primary pressionavel font-medium hover:underline"
+                onClick={() => {
+                  setFiltro("todos");
+                  setBusca("");
+                }}
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
+          {alunosFiltrados.length === 0 ? (
+            <p className="text-muted-foreground px-6 py-8 text-center text-sm">
+              {listaAlunos.length === 0
+                ? "Nenhum aluno ativo nesta turma."
+                : "Nenhum aluno encontrado com estes filtros."}
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {alunosFiltrados.map((aluno) => {
+                const registro = aluno.registro;
+                return (
+                  <li
+                    key={aluno.id}
+                    className="px-4 py-3"
+                    data-testid={`parcial-aluno-${aluno.id}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+                        {aluno.ordem === null ? "-" : String(aluno.ordem).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
+                        {aluno.desistente && (
+                          <span className="text-muted-foreground text-xs">DESISTENTE</span>
+                        )}
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          {registro ? rotuloFrequenciaParcial(registro) : "Sem frequência parcial"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        <Label htmlFor={`parcial-seduc-${aluno.id}`} className="text-xs">
+                          Registrado na Seduc
+                        </Label>
+                        <Switch
+                          id={`parcial-seduc-${aluno.id}`}
+                          aria-label={`Registrado na Seduc: ${aluno.nome}`}
+                          checked={registro?.registradoSeduc ?? false}
+                          disabled={!registro || ocupado || editorAberto}
+                          onCheckedChange={(valor) => registro && confirmarSeduc(registro, valor)}
+                        />
+                      </div>
+                    </div>
+                    {registro && (
+                      <>
+                        <p className="mt-3 text-xs" role="status">
+                          {registro.registradoSeduc
+                            ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, fuso)}` : ""}`
+                            : "Pendente de lançamento na Seduc"}
+                        </p>
+                        {registro.observacao && (
+                          <p className="text-muted-foreground mt-2 text-sm break-words">
+                            {registro.observacao}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant={registro ? "ghost" : "outline"}
+                        onClick={() => abrirEditor(registro ?? null, aluno.id)}
+                        aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
+                        disabled={ocupado || editorAberto || (!registro && aluno.desistente)}
+                        className="h-11 rounded-lg"
+                      >
+                        {registro ? <Pencil size={15} /> : <Plus size={15} />}
+                        {registro ? "Editar" : "Registrar"}
+                      </Button>
+                      {registro && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setRegistroRemover(registro)}
+                          aria-label={`Remover frequência parcial de ${aluno.nome}`}
+                          disabled={ocupado || editorAberto}
+                          className="text-falta-texto h-11 rounded-lg"
+                        >
+                          <Trash2 size={15} />
+                          Remover
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       )}
       {!carregando && !erro && turmaId && (
         <Button

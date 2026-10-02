@@ -74,7 +74,7 @@ A cobertura da Chamada Parcial protege o registro independente por turno ou aula
 
 `tests/api/backup-parcial.test.ts` usa série, turma e aluno sintéticos próprios. Confere exportação e restauração de identidade, nomes históricos, revisão, datas e confirmação; conflitos por identificador ou aluno e dia sem sobrescrita; cópias antigas sem o campo; referência ausente; conta histórica removida e recusa de tipo, aulas, turno ou confirmação incoerentes.
 
-A integração do terceiro arquivo é testada contra OAuth e Sheets API simulados, incluindo prévia, idempotência por UUID, preservação de dados manuais e fórmulas e atualização explícita de linhas marcadas. A navegação verifica Gestão no cabeçalho móvel e Chamada Parcial ao lado de Chamada; testes de interface acompanham o salvamento e a confirmação manual.
+A integração do terceiro arquivo é testada contra OAuth e Sheets API simulados, incluindo prévia, idempotência por UUID, preservação de dados manuais e fórmulas e atualização explícita de linhas marcadas. A navegação verifica Gestão no cabeçalho móvel e Chamada Parcial ao lado de Chamada; testes de interface acompanham a lista completa antes de salvar, ordem por número, registro pela linha, busca, filtros, bloqueio de desistentes, preservação de nomes históricos, remoção sem ocultar alunos e confirmação manual, incluindo tela de 360 pixels.
 
 ## Ponta a ponta
 
