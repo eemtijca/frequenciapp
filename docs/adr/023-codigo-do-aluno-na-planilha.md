@@ -1,5 +1,7 @@
 # ADR-023: código do aluno na linha da planilha
 
+A conexão e as exigências de Apps Script descritas nesta decisão são históricas e foram substituídas pela [ADR-033](033-integracao-exclusiva-com-google-planilhas.md).
+
 ## Status
 
 Aceita.

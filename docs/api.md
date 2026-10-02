@@ -448,7 +448,7 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 ## Planilha
 
-Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Na conexão legada, o endpoint e o token ficam no servidor. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
 
 ### Conexão OAuth da frequência e das saídas
 
@@ -463,21 +463,9 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 
 ### GET /api/planilha e PATCH /api/planilha
 
-Leitura e edição da configuração: `{ ativa?, endpoint?, envioAutomatico? }`. `envioAutomatico` liga o envio da chamada à planilha logo depois de salva (ADR-025); começa desligado. Apenas administração. O token volta mascarado.
+Leitura e edição da configuração: `{ ativa?, envioAutomatico? }`. `envioAutomatico` liga o envio da chamada à planilha logo depois de salva (ADR-025); começa desligado. Apenas administração. A resposta informa a conexão Google e o arquivo selecionado, sem credenciais. Ativar exige conta Google e arquivo selecionados. Campos antigos como `endpoint` são recusados.
 
-- 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
-
-### POST /api/planilha/token
-
-Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administração, com a senha conferida e limite de tentativas.
-
-- 200 `{"token": string}`; 400 senha incorreta; 429 tentativas em excesso.
-
-### POST /api/planilha/testar
-
-Na conexão legada, corpo `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso do script difere de `TZ_APP` ou quando a versão publicada está atrasada.
-
-- 200 `{"ping": { ..., "avisos": string[] }}`; 400 endereço ou token ausente; 502 sem resposta.
+- 200 `{"integracao": {...}}`; 400 configuração inválida ou conexão Google incompleta; 403 sem papel de administração.
 
 ### POST /api/planilha/estrutura
 
@@ -501,7 +489,7 @@ Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"
 
 Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao Google e vira `SUCESSO` com a resposta; o envio nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
 
-- 200 `{"resultados", "resumo"}`; cada resultado é `sucesso`, `parcial` (sem confirmação: timeout ou queda depois de enviar, com a mensagem para conferir a aba), `falha` (recusa do script) ou `sem_envio`.
+- 200 `{"resultados", "resumo"}`; cada resultado é `sucesso`, `parcial` (sem confirmação: timeout ou queda depois de enviar, com a mensagem para conferir a aba), `falha` (recusa antes da escrita) ou `sem_envio`.
 - 400 sem prévia ou com `todas`; 409 quando os dados mudaram; 429 envios em excesso.
 
 ### POST /api/planilha/modo-completo
@@ -528,9 +516,9 @@ Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, sem cria
 
 ### POST /api/planilha/organizar, /api/planilha-saidas/organizar e /api/planilha-entradas/organizar
 
-Somente administração, com origem válida. Corpo `{ aba }` retorna `{ previa }`, com linha do cabeçalho, assinatura, colunas reconhecidas e suas larguras, além de `planoHash`. Essa etapa apenas lê a planilha. A confirmação envia `{ aba, planoHash }` e retorna `{ organizada: true, aba }`, depois de reler e conferir a prévia. Alteração do arquivo, da conexão ou do cabeçalho responde 409 e exige nova prévia. A apresentação é registrada em `planilha.organizar`; valores, fórmulas, formatos numéricos e rótulos não mudam. Não há repetição automática da escrita. A integração legada exige Apps Script 5; a aba Entradas usa somente a conexão Google de saídas e seu cabeçalho padrão.
+Somente administração, com origem válida. Corpo `{ aba }` retorna `{ previa }`, com linha do cabeçalho, assinatura, colunas reconhecidas e suas larguras, além de `planoHash`. Essa etapa apenas lê a planilha. A confirmação envia `{ aba, planoHash }` e retorna `{ organizada: true, aba }`, depois de reler e conferir a prévia. Alteração do arquivo, da conexão ou do cabeçalho responde 409 e exige nova prévia. A apresentação é registrada em `planilha.organizar`; valores, fórmulas, formatos numéricos e rótulos não mudam. Não há repetição automática da escrita. A aba Entradas usa a conexão Google de saídas e seu cabeçalho padrão.
 
-Somente em `/api/planilha/organizar`, `{ aba, ajustarCabecalho: true, anoReferencia?: number }` retorna uma prévia com `ajusteCabecalho`: quantidade de linhas introdutórias reconhecidas a remover e datas a corrigir para `dd/mm/aaaa`. A confirmação repete esses campos e inclui `planoHash`. O ano deve estar entre 2000 e 2100; datas com ano explícito orientam os rótulos curtos próximos. A operação não cria cópias internas, recusa fórmulas nas células afetadas ou introdução não reconhecida, preserva os dados da tabela e atualiza o esquema mantendo o mapa. O provedor legado exige Apps Script 7. Mesclagens somente na introdução podem ser removidas; mesclagens na tabela continuam bloqueadas.
+Somente em `/api/planilha/organizar`, `{ aba, ajustarCabecalho: true, anoReferencia?: number }` retorna uma prévia com `ajusteCabecalho`: quantidade de linhas introdutórias reconhecidas a remover e datas a corrigir para `dd/mm/aaaa`. A confirmação repete esses campos e inclui `planoHash`. O ano deve estar entre 2000 e 2100; datas com ano explícito orientam os rótulos curtos próximos. A operação não cria cópias internas, recusa fórmulas nas células afetadas ou introdução não reconhecida, preserva os dados da tabela e atualiza o esquema mantendo o mapa. Mesclagens somente na introdução podem ser removidas; mesclagens na tabela continuam bloqueadas.
 
 A organização coletiva reutiliza `/api/planilha/organizar` com `{ aba, emLote: true }`, além dos campos de correção quando necessários. Só aceita abas do mapa salvo de frequência. O cliente confere todas as abas e confirma cada plano em sequência, mantendo as requisições curtas. A assinatura coletiva vincula cada prévia ao arquivo, às credenciais e ao mapa; atualizações do cache de esquema causadas por outra aba não a invalidam. Mudanças no cabeçalho continuam exigindo nova prévia. Abas com falha na prévia não recebem confirmação; falhas de escrita não provocam repetição automática.
 
@@ -548,13 +536,13 @@ Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apena
 
 ### POST /api/planilha/desconectar
 
-Apaga token e esquema e desliga a integração. Apenas administração. A planilha não é alterada.
+Apaga a autorização OAuth e o esquema e desliga a integração. Apenas administração. A planilha não é alterada.
 
 - 200 `{"ok": true}`.
 
 ## Planilha de saídas
 
-Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Pode usar o OAuth e a Sheets API descritos acima ou a conexão legada por Apps Script. A seleção da planilha, o modo e o mapa são próprios desta finalidade. A configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Usa o OAuth e a Sheets API descritos acima. A seleção da planilha, o modo e o mapa são próprios desta finalidade. A configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
 
 ### GET /api/planilha-saidas/estado
 
@@ -562,21 +550,9 @@ Segunda finalidade da integração, em aba única de registro das saídas anteci
 
 ### GET /api/planilha-saidas e PATCH /api/planilha-saidas
 
-Leitura e edição da configuração: `{ ativa?, endpoint?, envioAutomatico? }`. `envioAutomatico` liga o envio ao registrar saídas e entradas. Apenas administração. O token volta mascarado.
+Leitura e edição da configuração: `{ ativa?, envioAutomatico? }`. `envioAutomatico` liga o envio ao registrar saídas e entradas. Apenas administração. A resposta informa a conexão Google e o arquivo selecionado, sem credenciais. Ativar exige conta Google e arquivo selecionados. Campos antigos como `endpoint` são recusados.
 
-- 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
-
-### POST /api/planilha-saidas/token
-
-Corpo: `{ "acao": "gerar" | "revelar", "senha": string }`. Apenas administração, com a senha conferida e limite de tentativas.
-
-- 200 `{"token": string}`; 400 senha incorreta; 429 tentativas em excesso.
-
-### POST /api/planilha-saidas/testar
-
-Corpo: `{ "endpoint"?: string }`. Faz `ping` no Web App, guarda a versão do script e avisa quando o fuso ou a versão divergem.
-
-- 200 `{"ping": { ..., "avisos": string[] }}`; 400 endereço ou token ausente; 502 sem resposta.
+- 200 `{"integracao": {...}}`; 400 configuração inválida ou conexão Google incompleta; 403 sem papel de administração.
 
 ### POST /api/planilha-saidas/estrutura
 
@@ -638,7 +614,7 @@ Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apena
 
 ### POST /api/planilha-saidas/desconectar
 
-Apaga token e esquema e desliga a integração de saídas. Apenas administração. A planilha não é alterada.
+Apaga a autorização OAuth e o esquema e desliga a integração de saídas. Apenas administração. A planilha não é alterada.
 
 - 200 `{"ok": true}`.
 
@@ -707,8 +683,8 @@ As rotas exigem a capacidade `operar`; criar a aba exige `administrar`.
 
 Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos.
 
-A integração usa a planilha Google selecionada para saídas; Apps Script não atende entradas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.
+A integração usa a planilha Google selecionada para saídas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.
 
 ### POST /api/planilha/limpar-copias e /api/planilha-saidas/limpar-copias
 
-Apenas administração e origem válida. `{}` retorna `{ previa: { copias: string[], planoHash } }`, sem alterar a planilha. A confirmação envia `{ planoHash, senha, frase: "EDITAR PLANILHA" }` e retorna `{ removidas }`. Lista e conexão alteradas invalidam a prévia. A exclusão reconhece somente nomes de backup com carimbo e marcador da integração; não remove turmas ou abas manuais. A escrita não é repetida automaticamente. No provedor legado, exige Apps Script 7.
+Apenas administração e origem válida. `{}` retorna `{ previa: { copias: string[], planoHash } }`, sem alterar a planilha. A confirmação envia `{ planoHash, senha, frase: "EDITAR PLANILHA" }` e retorna `{ removidas }`. Lista e conexão alteradas invalidam a prévia. A exclusão reconhece somente nomes de backup com carimbo e marcador da integração; não remove turmas ou abas manuais. A escrita não é repetida automaticamente.

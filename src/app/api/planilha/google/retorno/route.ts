@@ -35,7 +35,7 @@ export async function GET(requisicao: Request): Promise<Response> {
     const id = finalidade === "SAIDAS" ? "saidas" : "principal";
     const anterior = await banco().integracaoPlanilha.findUnique({
       where: { id },
-      select: { provedor: true },
+      select: { googlePlanilhaId: true },
     });
     const tokenCifrado = cifrarToken(refreshToken);
     await comTransacao(async (tx) => {
@@ -44,7 +44,7 @@ export async function GET(requisicao: Request): Promise<Response> {
         update: {
           googleRefreshToken: tokenCifrado,
           atualizadoPorId: sessao.usuario.id,
-          ...(anterior?.provedor === "GOOGLE"
+          ...(anterior?.googlePlanilhaId
             ? {
                 ativa: false,
                 googlePlanilhaId: null,

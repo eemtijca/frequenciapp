@@ -1,10 +1,10 @@
 // Contratos do envio incremental à planilha de frequência: só os dias
 // alterados, dois dias seguidos sem reconferir a estrutura, queda depois de
 // gravar registrada como PARCIAL com reenvio sem coluna duplicada e uma turma
-// por requisição. Massa com prefixo QN, contra o Apps Script falso.
+// por requisição. Massa com prefixo QN, contra a Sheets API sintética.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -17,7 +17,7 @@ const MES = { de: "2026-06-01", ate: "2026-06-30" };
 
 let cookieAdmin = "";
 let banco: pg.Client | null = null;
-let gas: GasFalso | null = null;
+let google: GoogleFalso | null = null;
 const turmas: Record<"A" | "B", string> = { A: "", B: "" };
 const alunos: Record<"A" | "B", string> = { A: "", B: "" };
 
@@ -41,8 +41,8 @@ async function limparMassa() {
   if (!banco) return;
   await banco.query(`delete from sincronizacoes_planilha where turma_original_id in (${daSerie})`);
   await banco.query(
-    `update integracoes_planilha set ativa = false, endpoint = null, token = null,
-       versao_script = null, esquema = null, assinatura_esquema = null, esquema_em = null,
+    `update integracoes_planilha set ativa = false, google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+       esquema = null, assinatura_esquema = null, esquema_em = null,
        modo = 'CONSERVADOR', modo_completo_ate = null, atualizado_em = now()
      where id = 'principal'`,
   );
@@ -100,7 +100,7 @@ async function aplicar(plano: Plano): Promise<Response> {
 }
 
 function cabecalho(aba: string): string[] {
-  return Array.from({ length: 8 }, (_, indice) => gas?.valor(aba, 1, indice + 1) ?? "");
+  return Array.from({ length: 8 }, (_, indice) => google?.valor(aba, 1, indice + 1) ?? "");
 }
 
 beforeAll(async () => {
@@ -110,7 +110,7 @@ beforeAll(async () => {
     await banco.connect();
   }
   await limparMassa();
-  gas = await criarGasFalso();
+  google = await criarGoogleFalso();
   const entrada = await fetch(`${APP_URL}/api/auth/entrar`, {
     method: "POST",
     headers: { Origin: APP_URL, "Content-Type": "application/json" },
@@ -130,23 +130,14 @@ beforeAll(async () => {
       await chamar("/api/alunos", { nome: `QN Aluno ${nome}`, turmaId: turma.turma.id }),
     );
     alunos[nome] = aluno.aluno.id;
-    gas.definirAba(`QN Ano ${nome}`, [
+    google.definirAba(`QN Ano ${nome}`, [
       ["Aluno", "Turma atual", "Total"],
       [`QN Aluno ${nome}`, `QN Ano ${nome}`, ""],
     ]);
   }
 
-  const gerado = await json<{ token: string }>(
-    await chamar("/api/planilha/token", { acao: "gerar", senha: SENHA_ADMIN }),
-  );
-  gas.definirToken(gerado.token);
-  await fetch(`${APP_URL}/api/planilha`, {
-    method: "PATCH",
-    headers: { Origin: APP_URL, Cookie: cookieAdmin, "Content-Type": "application/json" },
-    body: JSON.stringify({ ativa: true, endpoint: gas.url }),
-  });
-  const scriptTestado = await chamar("/api/planilha/testar", { endpoint: gas.url });
-  expect(scriptTestado.status).toBe(200);
+  if (!banco) throw new Error("Banco sintético indisponível.");
+  await google.conectar(banco, "FREQUENCIA");
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha/estrutura", {}),
   );
@@ -164,7 +155,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await chamar("/api/planilha/desconectar", {}).catch(() => undefined);
   await limparMassa();
-  await gas?.fechar();
+  await google?.fechar();
   if (banco) await banco.end();
 });
 
@@ -182,7 +173,7 @@ describe("envio incremental à planilha", () => {
       "15/06/2026",
       "Total",
     ]);
-    expect(gas?.valor("QN Ano A", 2, 3)).toBe("F");
+    expect(google?.valor("QN Ano A", 2, 3)).toBe("F");
   });
 
   it("sem nada alterado desde o último envio, não há o que enviar", async () => {
@@ -204,14 +195,14 @@ describe("envio incremental à planilha", () => {
       "16/06/2026",
       "Total",
     ]);
-    expect(gas?.valor("QN Ano A", 2, 4)).toBe("P");
+    expect(google?.valor("QN Ano A", 2, 4)).toBe("P");
   });
 
   it("queda depois de gravar vira PARCIAL, e o reenvio não duplica a coluna", async () => {
     await chamada(DIA_3, "A", [alunos.A]);
     const [plano] = await simular("A");
     expect(plano?.dias).toEqual([DIA_3]);
-    gas?.derrubarProximoAplicar();
+    google?.perderProximaResposta();
     const resposta = await aplicar(plano as Plano);
     expect(resposta.status).toBe(200);
     const [resultado] = (await json<Resultado>(resposta)).resultados;
@@ -235,7 +226,7 @@ describe("envio incremental à planilha", () => {
     const segunda = await aplicar(reenvio as Plano);
     expect((await json<Resultado>(segunda)).resultados[0]?.resultado).toBe("sucesso");
     expect(cabecalho("QN Ano A").filter((valor) => valor === "17/06/2026")).toHaveLength(1);
-    expect(gas?.valor("QN Ano A", 2, 5)).toBe("F");
+    expect(google?.valor("QN Ano A", 2, 5)).toBe("F");
   });
 
   it("envia uma turma por requisição, e a falha de uma não impede a outra", async () => {
@@ -254,7 +245,7 @@ describe("envio incremental à planilha", () => {
     // A aba da turma B some depois da prévia: o envio dela falha, o da A segue.
     const planoB = planos.find((item) => item.turmaOriginalId === turmas.B) as Plano;
     const planoA = planos.find((item) => item.turmaOriginalId === turmas.A) as Plano;
-    gas?.renomearAba("QN Ano B", "QN Ano B antiga");
+    google?.renomearAba("QN Ano B", "QN Ano B antiga");
     const falha = await aplicar(planoB);
     expect(falha.status).not.toBe(200);
     const sucesso = await aplicar(planoA);

@@ -16,9 +16,6 @@ export const FRASE_MODO_COMPLETO = "EDITAR PLANILHA";
 export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
-/** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
-export const VERSAO_SCRIPT = 7;
-
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {
   return recusado ? "FALHA" : "PARCIAL";
@@ -76,30 +73,6 @@ export function rotuloUltimoEnvio(
     null,
   );
   return recente ? `Último envio em ${rotuloInstante(recente, fuso)}` : "Sem envios";
-}
-
-/** Endpoint aceito: Web App do Google. Fora de produção o teste aceita local. */
-export function validarEndpoint(valor: string, permitirLocal: boolean): string | null {
-  let url: URL;
-  try {
-    url = new URL(valor.trim());
-  } catch {
-    return "Informe uma URL válida, começando por https://.";
-  }
-  const local =
-    permitirLocal &&
-    url.protocol === "http:" &&
-    (url.hostname === "127.0.0.1" || url.hostname === "localhost");
-  if (!local) {
-    if (url.protocol !== "https:") return "O endereço da planilha precisa usar https.";
-    if (url.hostname !== "script.google.com") {
-      return "O endereço precisa ser o aplicativo da Web publicado no Google Apps Script.";
-    }
-    if (!/^\/macros\/s\/[^/]+\/exec\/?$/.test(url.pathname)) {
-      return "O endereço precisa terminar em /exec, como no Apps Script.";
-    }
-  }
-  return null;
 }
 
 /** Hash estável e curto o bastante para assinatura de esquema e de plano. */
@@ -271,7 +244,7 @@ export interface PlanilhaEsquema {
   abas: AbaEsquema[];
 }
 
-/** Leitura bruta de uma aba, como o Apps Script devolve. */
+/** Leitura bruta de uma aba da planilha. */
 export interface AbaBruta {
   nome: string;
   valores: string[][];

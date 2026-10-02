@@ -18,7 +18,6 @@ const dubl = vi.hoisted(() => ({
   turmas: vi.fn(),
   frequencias: vi.fn(),
   acesso: vi.fn(),
-  gas: vi.fn(),
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
@@ -38,10 +37,6 @@ vi.mock("@/infra/banco", () => ({
 vi.mock("@/infra/ambiente", () => ({ ambiente: { fuso: "America/Fortaleza" } }));
 vi.mock("@/infra/auth/limite", () => ({ limiteDeTentativas: async () => true }));
 vi.mock("@/infra/google-oauth", () => ({ renovarAcesso: dubl.acesso }));
-vi.mock("@/infra/planilha", async (importarOriginal) => ({
-  ...(await importarOriginal<typeof import("@/infra/planilha")>()),
-  chamarGas: dubl.gas,
-}));
 vi.mock("@/application/alunos", () => ({ listarTodosAlunos: dubl.alunos }));
 vi.mock("@/application/turmas", () => ({ listarTodasTurmas: dubl.turmas }));
 vi.mock("@/application/frequencias", () => ({ listarFrequenciasDoPeriodo: dubl.frequencias }));
@@ -208,10 +203,7 @@ beforeEach(() => {
   );
   linha = {
     ativa: true,
-    provedor: "GOOGLE",
-    endpoint: null,
-    token: null,
-    versaoScript: null,
+
     googleRefreshToken: "refresh-sintetico",
     googlePlanilhaId: "planilha-google-sintetica",
     googlePlanilhaNome: "QA Frequência",
@@ -264,7 +256,6 @@ describe("enviar ao salvar com a conta Google", () => {
     expect(lotes).toHaveLength(1);
     expect(registros).toMatchObject([{ resultado: "SUCESSO", preenchidas: 1, erro: null }]);
     expect(dubl.acesso).toHaveBeenCalledWith("refresh-sintetico");
-    expect(dubl.gas).not.toHaveBeenCalled();
     const reenvio = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
     expect(reenvio.get(turmaId)).toBe("enviado");
     expect(lotes).toHaveLength(1);
@@ -285,7 +276,6 @@ describe("enviar ao salvar com a conta Google", () => {
     expect(formula).toBe(temFormula);
     expect(lotes).toHaveLength(0);
     expect(registros).toHaveLength(0);
-    expect(dubl.gas).not.toHaveBeenCalled();
   });
 
   it.each([

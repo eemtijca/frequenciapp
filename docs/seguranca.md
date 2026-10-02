@@ -75,7 +75,7 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 
 - Desligada por padrão. Na conexão OAuth da frequência ou das saídas, o navegador abre o Google Picker com um token de acesso breve. O token de atualização fica cifrado no servidor com uma chave derivada de `AUTH_SECRET`, e as chamadas da Sheets API saem do servidor.
 - OAuth usa estado assinado, PKCE, escopo `drive.file` e seleção explícita da planilha. Só a administração pode conectar a conta e escolher a planilha.
-- Cada finalidade tem seleção de planilha, esquema e janela de modo completo próprios. A conexão legada por Apps Script mantém token e endereço específicos; o endereço é validado contra `script.google.com/macros/s/.../exec`, e loopback só é aceito fora de produção ou com `PERMITIR_ENDPOINT_LOCAL=true`, para os testes.
+- Cada finalidade tem seleção de planilha, esquema e janela de modo completo próprios. Somente OAuth e Sheets API atendem as integrações; nenhuma configuração aceita URL arbitrária ou token de script. O simulador HTTP é carregado apenas no servidor de testes, com tokens sintéticos e destino limitado ao loopback.
 - Revelar o token, destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
 - O modo completo expira sozinho, cria cópia oculta da aba antes de operação destrutiva e só remove linha, coluna ou aba com marcador de Developer Metadata da integração.
 - Fórmulas e células ocupadas encontradas na última leitura são preservadas e relatadas. A Sheets API não oferece escrita condicionada ao conteúdo anterior; uma edição manual feita entre leitura e gravação pode conflitar com o lote.
