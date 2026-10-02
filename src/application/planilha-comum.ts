@@ -110,6 +110,17 @@ export function exigirConexao(linha: LinhaIntegracao): { endpoint: string; token
   return { endpoint: linha.endpoint, token: linha.token };
 }
 
+/** Recusa local da versão, antes de iniciar qualquer escrita na planilha. */
+export class ErroVersaoPlanilha extends ErroHttp {
+  constructor() {
+    super(
+      "Atualize o Apps Script para a versão 7 e teste a conexão antes de alterar a planilha.",
+      400,
+    );
+    this.name = "ErroVersaoPlanilha";
+  }
+}
+
 /** Escolhe a fonte da finalidade: Sheets API ou protocolo legado. */
 export async function chamarIntegracao<T>(
   linha: LinhaIntegracao,
@@ -129,10 +140,7 @@ export async function chamarIntegracao<T>(
     ) &&
     Number(linha.versaoScript ?? 0) < 7
   )
-    throw new ErroHttp(
-      "Atualize o Apps Script para a versão 7 e teste a conexão antes de alterar a planilha.",
-      400,
-    );
+    throw new ErroVersaoPlanilha();
   const { endpoint, token } = exigirConexao(linha);
   return chamarGas<T>(endpoint, token, corpo, opcoes);
 }

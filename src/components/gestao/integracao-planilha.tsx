@@ -574,8 +574,8 @@ export default function IntegracaoPlanilha({
           <p className="text-muted-foreground">
             {integracao?.alteradasDepois ?? 0}{" "}
             {integracao?.alteradasDepois === 1
-              ? "chamada alterada desde o último envio"
-              : "chamadas alteradas desde o último envio"}
+              ? "chamada pendente de envio"
+              : "chamadas pendentes de envio"}
           </p>
           {integracao?.ultimoErro && (
             <p className="text-falta-texto">
