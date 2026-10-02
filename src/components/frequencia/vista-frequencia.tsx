@@ -652,7 +652,12 @@ export default function VistaFrequencia({
                       type="button"
                       aria-expanded={aberta}
                       aria-controls={`turmas-serie-${grupo.id}`}
-                      onClick={() => setSerieAberta(aberta ? null : grupo.id)}
+                      onClick={() => {
+                        setSerieAberta(aberta ? null : grupo.id);
+                        // Abrir uma série já seleciona a primeira turma dela (o destaque verde).
+                        const primeira = grupo.turmas[0];
+                        if (!aberta && !contem && !travado && primeira) setTurmaId(primeira.id);
+                      }}
                       className={`pressionavel flex h-11 min-w-0 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
                         contem ? "border-primary text-primary" : ""
                       }`}
