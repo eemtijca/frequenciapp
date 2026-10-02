@@ -20,6 +20,8 @@ import {
   criarAba as criarAbaComum,
   desconectar,
   desativarModoCompleto as desativarModoCompletoComum,
+  emSequencia,
+  type SituacaoEnvioMovimentacao,
   gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
@@ -37,6 +39,8 @@ import {
   atualizarLimitesSaida,
   detectarEsquemaSaida,
   planejarSaidas,
+  saidasEnviaveisSozinhas,
+  saidasTemNovidade,
   type AbaSaidaEsquema,
   type PlanoSaidas,
   type SaidaPlanilha,
@@ -143,6 +147,7 @@ export async function lerIntegracaoSaidasAdmin() {
     modoCompletoAte: modoCompletoAtivo(linha)
       ? (linha.modoCompletoAte?.toISOString() ?? null)
       : null,
+    envioAutomatico: linha.envioAutomatico,
     atualizadoEm: linha.atualizadoEm.toISOString(),
     fuso: ambiente.fuso,
     ultimoErro: ultimoErro
@@ -598,4 +603,45 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
     );
     return { resultado: parcial ? ("parcial" as const) : ("falha" as const), erro: mensagem };
   }
+}
+
+/**
+ * Envia à planilha as saídas recém-registradas de um dia. Só roda com a
+ * integração ativa e a chave ligada, em modo conservador, só acrescentando
+ * linhas e sem repetir depois de um envio sem confirmação. Nunca lança: o
+ * registro já foi confirmado. O que pedir revisão fica para o envio manual.
+ */
+export function enviarSaidasAposRegistro(
+  usuario: { id: string },
+  dia: string,
+): Promise<SituacaoEnvioMovimentacao> {
+  return emSequencia(async () => {
+    try {
+      const linha = await lerLinha(FINALIDADE);
+      if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
+      const ultimo = await banco().sincronizacaoPlanilha.findFirst({
+        where: { finalidade: FINALIDADE },
+        orderBy: { criadoEm: "desc" },
+        select: { resultado: true },
+      });
+      if (ultimo?.resultado === "PARCIAL") return "sem_confirmacao";
+      const periodo = { de: dia, ate: dia };
+      const simulacao = await montarSimulacaoSaidas(linha, periodo);
+      if (simulacao.modalidade !== "conservador" || !saidasEnviaveisSozinhas(simulacao.plano))
+        return "pendente_manual";
+      if (!saidasTemNovidade(simulacao.plano)) return "enviado";
+      const resposta = await aplicarEnvioSaidas(usuario, {
+        ...periodo,
+        planoHash: simulacao.plano.planoHash,
+      });
+      if (resposta.resultado === "sucesso") return "enviado";
+      return resposta.resultado === "parcial" ? "sem_confirmacao" : "falhou";
+    } catch (erro) {
+      console.error(
+        "Envio automático das saídas não concluído.",
+        erro instanceof Error ? erro.name : "",
+      );
+      return "falhou";
+    }
+  });
 }

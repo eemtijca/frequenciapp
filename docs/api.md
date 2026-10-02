@@ -562,7 +562,7 @@ Segunda finalidade da integração, em aba única de registro das saídas anteci
 
 ### GET /api/planilha-saidas e PATCH /api/planilha-saidas
 
-Leitura e edição da configuração: `{ ativa?, endpoint? }`. Apenas administração. O token volta mascarado.
+Leitura e edição da configuração: `{ ativa?, endpoint?, envioAutomatico? }`. `envioAutomatico` liga o envio ao registrar saídas e entradas. Apenas administração. O token volta mascarado.
 
 - 200 `{"integracao": {...}}`; 400 endereço fora do padrão; 403 sem papel de administração.
 

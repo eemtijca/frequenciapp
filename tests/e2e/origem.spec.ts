@@ -2,7 +2,7 @@
 // e definição da turma original em massa na Gestão.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 
 let configuracaoInicial: ConfiguracaoOrigem;
@@ -113,8 +113,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
     const secao = page.locator('section[aria-label="Fazer chamada"]');
-    const turma = secao.getByRole("button", { name: /E2E Origem A/ }).first();
-    if (await turma.isVisible().catch(() => false)) await turma.click();
+    await escolherTurmaNaChamada(secao, /E2E Origem A/);
     await page.getByLabel("Buscar aluno ou turma de origem").fill("E2E Origem B");
     await expect(secao.getByText("E2E Origem Um")).toBeVisible();
     await expect(secao.getByText("E2E Origem Dois")).toBeHidden();
@@ -127,8 +126,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
     const secao = page.locator('section[aria-label="Fazer chamada"]');
-    const turma = secao.getByRole("button", { name: /E2E Origem A/ }).first();
-    if (await turma.isVisible().catch(() => false)) await turma.click();
+    await escolherTurmaNaChamada(secao, /E2E Origem A/);
     await expect(
       secao.getByRole("button", { name: /^E2E Origem Um\*, turma original 3º ano E2E Origem B:/ }),
     ).toBeVisible();
@@ -142,8 +140,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
     const secao = page.locator('section[aria-label="Fazer chamada"]');
-    const turma = secao.getByRole("button", { name: /2º ano E2E Movimento B/ }).first();
-    if (await turma.isVisible().catch(() => false)) await turma.click();
+    await escolherTurmaNaChamada(secao, /2º ano E2E Movimento B/);
     const linha = secao.getByRole("button", { name: /^E2E Movimento Um:/ });
     await expect(linha).toBeVisible();
     await expect(linha.getByText("E2E Movimento Um", { exact: true })).toBeVisible();

@@ -171,3 +171,16 @@ A remoção no aplicativo não remove a linha já enviada. A correção de conte
 ## Privacidade
 
 A integração é opcional e, quando ligada, envia a frequência para a conta Google da própria escola, controladora dos dados. Não há serviço contratado pelo aplicativo, telemetria ou compartilhamento com terceiros. Desligar a integração apaga token e esquema do banco; a planilha permanece como estiver.
+
+## Enviar ao registrar saídas e entradas
+
+Em Gestão, Configurações, Planilha de saídas, o interruptor "Enviar ao registrar" liga o envio automático das saídas e das entradas. Depois de cada registro, a resposta sai primeiro e o envio roda em seguida, para o dia registrado, sem atrasar nem derrubar o registro. A chave pertence à conexão de saídas, então vale também para a aba Entradas da mesma planilha.
+
+Como ninguém revisa a prévia, o envio automático é mais estreito que o manual:
+
+- só acrescenta: cria a linha da saída (ou da entrada) e preenche células vazias; substituição, remoção, plano bloqueado ou modo completo ficam para o envio manual;
+- nas saídas, depois de um envio sem confirmação (`PARCIAL`) nenhum automático roda até o envio manual conferir;
+- nas entradas, a aba Entradas precisa estar preparada; sem ela, o registro fica para o envio manual;
+- os envios deste processo seguem em fila, e o plano sempre pula a linha que já existe, o que evita duplicar quando dois registros chegam juntos.
+
+Falha do envio nunca desfaz o registro. A consulta de saídas por período também foi corrigida: `de` e `até` agora valem juntos, e o envio de um dia não leva saídas de outros dias.
