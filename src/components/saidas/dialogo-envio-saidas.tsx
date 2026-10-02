@@ -1,12 +1,12 @@
 "use client";
 
-// Envio das saídas para a planilha: mês, prévia obrigatória, remoções marcadas
-// no modo completo e confirmação. Nada é gravado sem revisão.
+// Envio das saídas e das entradas para a planilha em um só passo: mês, prévia
+// obrigatória das duas abas, remoções marcadas no modo completo (saídas) e
+// confirmação. Nada é gravado sem revisão.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
@@ -53,6 +53,15 @@ interface SimulacaoSaidas {
   candidatosRemocao: { linha: number; nome: string; dia: string }[];
 }
 
+interface PreviaEntradas {
+  planoHash: string;
+  novas: number;
+  existentes: number;
+  bloqueado: boolean;
+  avisos: string[];
+  criar: { nome: string; linha: number }[];
+}
+
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
@@ -87,6 +96,8 @@ export default function DialogoEnvioSaidas({
 }: Props) {
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<SimulacaoSaidas | null>(null);
+  const [previaEntradas, setPreviaEntradas] = useState<PreviaEntradas | null>(null);
+  const [avisoEntradas, setAvisoEntradas] = useState("");
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
@@ -106,15 +117,26 @@ export default function DialogoEnvioSaidas({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
-    try {
-      const dados = await pedir<SimulacaoSaidas>(
-        "/api/planilha-saidas/simular",
-        corpoJson(entradas()),
-      );
-      setSimulacao(dados);
-    } catch (excecao) {
+    setAvisoEntradas("");
+    const [saidas, entradasPrevia] = await Promise.allSettled([
+      pedir<SimulacaoSaidas>("/api/planilha-saidas/simular", corpoJson(entradas())),
+      pedir<PreviaEntradas>("/api/planilha-entradas/simular", corpoJson({ de, ate })),
+    ]);
+    if (saidas.status === "fulfilled") setSimulacao(saidas.value);
+    else {
+      setSimulacao(null);
+      const excecao = saidas.reason;
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.");
       setErroVariante(estadoDeErro(excecao));
+    }
+    // As entradas dependem da aba Entradas preparada; sem ela, só as saídas seguem.
+    if (entradasPrevia.status === "fulfilled") setPreviaEntradas(entradasPrevia.value);
+    else {
+      setPreviaEntradas(null);
+      const excecao = entradasPrevia.reason;
+      setAvisoEntradas(
+        excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar as entradas.",
+      );
     }
   });
 
@@ -127,47 +149,77 @@ export default function DialogoEnvioSaidas({
     onMes(novo);
   }
 
+  const podeSaidas = Boolean(simulacao && !simulacao.bloqueado);
+  const podeEntradas = Boolean(previaEntradas && !previaEntradas.bloqueado);
+
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
-    if (!simulacao) return;
+    if (!podeSaidas && !podeEntradas) return;
     setErro("");
-    try {
-      const dados = await pedir<{
-        resultado: "sucesso" | "parcial" | "falha";
-        contagens?: Record<string, number>;
-        erro?: string;
-      }>(
-        "/api/planilha-saidas/aplicar",
-        corpoJson({ ...entradas(), planoHash: simulacao.planoHash }),
-      );
-      if (dados.resultado === "sucesso") {
-        const criadas = dados.contagens?.linhasCriadas ?? simulacao.resumo.criar;
-        const corrigidas = dados.contagens?.substituidas ?? simulacao.resumo.substituir;
-        const removidas = dados.contagens?.removidasLinhas ?? simulacao.resumo.remover;
-        toast.success(
-          `${criadas} ${criadas === 1 ? "linha criada" : "linhas criadas"} · ${corrigidas} ${
-            corrigidas === 1 ? "corrigida" : "corrigidas"
-          } · ${removidas} ${removidas === 1 ? "removida" : "removidas"}.`,
+    const feitos: string[] = [];
+    const problemas: string[] = [];
+    let parcial = false;
+
+    if (simulacao && podeSaidas) {
+      try {
+        const dados = await pedir<{
+          resultado: "sucesso" | "parcial" | "falha";
+          contagens?: Record<string, number>;
+          erro?: string;
+        }>(
+          "/api/planilha-saidas/aplicar",
+          corpoJson({ ...entradas(), planoHash: simulacao.planoHash }),
         );
-        onAbrir(false);
-        aoConcluir();
-        return;
+        if (dados.resultado === "sucesso") {
+          const criadas = dados.contagens?.linhasCriadas ?? simulacao.resumo.criar;
+          const corrigidas = dados.contagens?.substituidas ?? simulacao.resumo.substituir;
+          const removidas = dados.contagens?.removidasLinhas ?? simulacao.resumo.remover;
+          feitos.push(
+            `Saídas: ${criadas} ${criadas === 1 ? "linha criada" : "linhas criadas"} · ${corrigidas} ${
+              corrigidas === 1 ? "corrigida" : "corrigidas"
+            } · ${removidas} ${removidas === 1 ? "removida" : "removidas"}`,
+          );
+        } else {
+          parcial = parcial || dados.resultado === "parcial";
+          problemas.push(`Saídas: ${dados.erro ?? "não foi possível enviar."}`);
+        }
+      } catch (excecao) {
+        problemas.push(
+          `Saídas: ${excecao instanceof ErroApi ? excecao.message : "não foi possível enviar."}`,
+        );
+        setErroVariante(estadoDeErro(excecao));
       }
-      setErro(dados.erro ?? "Não foi possível enviar as saídas.");
-      setErroVariante(dados.resultado === "parcial" ? "indisponivel" : "dados_invalidos");
-      toast.error(
-        dados.resultado === "parcial"
-          ? "O envio ficou parcial. Confira a planilha antes de tentar de novo."
-          : "Não foi possível enviar as saídas.",
-      );
-      aoConcluir();
-    } catch (excecao) {
-      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível enviar.");
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, {
-        contexto: "Não foi possível enviar.",
-        descricao: "Confira a planilha antes de tentar de novo.",
-      });
     }
+
+    if (previaEntradas && podeEntradas) {
+      try {
+        const dados = await pedir<{ resultado: string; linhasCriadas?: number }>(
+          "/api/planilha-entradas/enviar",
+          corpoJson({ de, ate, planoHash: previaEntradas.planoHash }),
+        );
+        const criadas = dados.linhasCriadas ?? previaEntradas.novas;
+        feitos.push(`Entradas: ${criadas} ${criadas === 1 ? "linha criada" : "linhas criadas"}`);
+      } catch (excecao) {
+        problemas.push(
+          `Entradas: ${excecao instanceof ErroApi ? excecao.message : "não foi possível enviar."}`,
+        );
+        setErroVariante(estadoDeErro(excecao));
+      }
+    }
+
+    if (problemas.length === 0) {
+      toast.success(`${feitos.join(". ")}.`);
+      onAbrir(false);
+      aoConcluir();
+      return;
+    }
+    setErro(problemas.join(" "));
+    if (feitos.length > 0) toast.success(`${feitos.join(". ")}.`);
+    toast.error(
+      parcial
+        ? "O envio ficou parcial. Confira a planilha antes de tentar de novo."
+        : "Parte do envio não foi concluída. Confira a planilha antes de tentar de novo.",
+    );
+    aoConcluir();
   });
 
   const bloqueado = simulacao?.bloqueado ?? false;
@@ -176,17 +228,17 @@ export default function DialogoEnvioSaidas({
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Enviar saídas · {rotuloMes(mes)}</DialogTitle>
+          <DialogTitle>Enviar saídas e entradas · {rotuloMes(mes)}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
           <div className="w-full sm:w-56">
             <SeletorPeriodo
-              id="saidas-mes-envio"
+              id="envio-mes"
               modo="mes"
               valor={mes}
               max={mes}
-              rotuloAcessivel="Mês do envio das saídas"
+              rotuloAcessivel="Mês do envio das saídas e entradas"
               rotulo={rotuloMes(mes)}
               onValor={trocarMes}
             />
@@ -267,6 +319,28 @@ export default function DialogoEnvioSaidas({
             </div>
           )}
 
+          {!carregando && previaEntradas && (
+            <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
+              <span className="font-medium">Aba Entradas</span>
+              {previaEntradas.bloqueado ? (
+                <span className="text-falta-texto">
+                  {previaEntradas.avisos[0] ?? "A aba Entradas precisa de conferência."}
+                </span>
+              ) : (
+                <span>
+                  {previaEntradas.novas}{" "}
+                  {previaEntradas.novas === 1 ? "linha nova" : "linhas novas"} ·{" "}
+                  {previaEntradas.existentes}{" "}
+                  {previaEntradas.existentes === 1 ? "já está na planilha" : "já estão na planilha"}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!carregando && !previaEntradas && avisoEntradas && (
+            <p className="text-muted-foreground text-xs">Entradas: {avisoEntradas}</p>
+          )}
+
           {modoCompleto &&
             !carregando &&
             simulacao?.candidatosRemocao.map((item) => (
@@ -297,7 +371,7 @@ export default function DialogoEnvioSaidas({
           <Button
             type="button"
             onClick={() => void enviar()}
-            disabled={enviando || carregando || !simulacao || bloqueado || !online}
+            disabled={enviando || carregando || (!podeSaidas && !podeEntradas) || !online}
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
             Enviar

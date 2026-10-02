@@ -81,14 +81,16 @@ test.describe("Google Planilhas de saídas", () => {
 
     // Envio pela vista Saídas.
     await trocarVisao(page, "Saídas e entradas", "saidas");
-    await page.getByRole("button", { name: "Enviar as saídas para a planilha" }).click();
-    await page.getByRole("button", { name: /Mês do envio das saídas/ }).click();
+    await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
+    await page.getByRole("button", { name: /Mês do envio das saídas e entradas/ }).click();
     await page
-      .getByRole("dialog", { name: "Mês do envio das saídas" })
+      .getByRole("dialog", { name: "Mês do envio das saídas e entradas" })
       .getByRole("button", { name: "Agosto" })
       .click();
     const dialogo = page.getByRole("dialog");
     await expect(dialogo.getByText(/1 linha nova/)).toBeVisible();
+    // As entradas entram no mesmo envio; sem a conexão Google, o aviso aparece e as saídas seguem.
+    await expect(dialogo.getByText(/^Entradas:/)).toBeVisible();
     await dialogo.getByRole("button", { name: "Enviar" }).click();
     await expect(page.getByText(/1 linha criada/)).toBeVisible();
     await expect.poll(() => gas.valor(ABA, 2, 2)).toBe("E2E Aluno Um");
@@ -96,7 +98,7 @@ test.describe("Google Planilhas de saídas", () => {
     expect(gas.valor(ABA, 2, 5)).toBe("Consulta");
 
     // O segundo envio do mesmo mês não duplica linhas.
-    await page.getByRole("button", { name: "Enviar as saídas para a planilha" }).click();
+    await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
     await expect(page.getByRole("dialog").getByText(/0 linhas novas/)).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
   });

@@ -57,8 +57,7 @@ export default function VistaMovimentacoes({
 
   const aoTrocar = useCallback((proxima: AbaMovimentacao) => setAba(proxima), []);
 
-  // O envio para a planilha fica ao lado das abas. Nas Saídas abre o envio do
-  // mês; nas Entradas leva à seção da planilha de entradas.
+  // Um só botão ao lado das abas envia as saídas e as entradas do mês para a planilha.
   const [envioAberto, setEnvioAberto] = useState(false);
   const [mesEnvio, setMesEnvio] = useState(props.diaCorrente.slice(0, 7));
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilhaSaidas();
@@ -67,16 +66,6 @@ export default function VistaMovimentacoes({
   useEffect(() => {
     if (ativo) void recarregarPlanilha();
   }, [ativo, recarregarPlanilha]);
-
-  function aoToqueNaPlanilha() {
-    if (aba === "saidas") {
-      setEnvioAberto(true);
-      return;
-    }
-    document
-      .querySelector('section[aria-label="Planilha de entradas"]')
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
 
   return (
     <div className="space-y-4">
@@ -92,20 +81,14 @@ export default function VistaMovimentacoes({
             type="button"
             variant="outline"
             className="h-auto min-h-12 shrink-0 rounded-lg px-3"
-            aria-label={
-              aba === "saidas" ? "Enviar as saídas para a planilha" : "Ir à planilha de entradas"
-            }
-            disabled={
-              aba === "saidas" && (!estadoPlanilha?.podeEnviar || !estadoPlanilha.configurada)
-            }
+            aria-label="Enviar saídas e entradas para a planilha"
+            disabled={!estadoPlanilha?.podeEnviar}
             title={
-              aba === "saidas"
-                ? estadoPlanilha?.configurada
-                  ? "Enviar as saídas do mês para o Google Planilhas"
-                  : "Configure a planilha de saídas na Gestão"
-                : "Planilha de entradas"
+              estadoPlanilha?.podeEnviar
+                ? "Enviar as saídas e as entradas do mês para o Google Planilhas"
+                : "Conecte a planilha de saídas na Gestão"
             }
-            onClick={aoToqueNaPlanilha}
+            onClick={() => setEnvioAberto(true)}
           >
             <FileSpreadsheet size={18} aria-hidden="true" />
           </Button>
