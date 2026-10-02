@@ -28,12 +28,7 @@ const esquemaEnvio = esquemaFiltroEntradas.and(
 
 async function conexao(): Promise<LinhaIntegracao> {
   const linha = await lerLinha("SAIDAS");
-  if (
-    !linha.ativa ||
-    linha.provedor !== "GOOGLE" ||
-    !linha.googleRefreshToken ||
-    !linha.googlePlanilhaId
-  )
+  if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId)
     throw new ErroHttp(
       "Ative a conexão Google da planilha de saídas na Gestão para enviar as entradas.",
       400,
@@ -50,12 +45,7 @@ async function conexao(): Promise<LinhaIntegracao> {
 export async function estadoPlanilhaEntradas() {
   const linha = await lerLinha("SAIDAS");
   return {
-    podeEnviar: Boolean(
-      linha.ativa &&
-      linha.provedor === "GOOGLE" &&
-      linha.googleRefreshToken &&
-      linha.googlePlanilhaId,
-    ),
+    podeEnviar: Boolean(linha.ativa && linha.googleRefreshToken && linha.googlePlanilhaId),
     planilhaNome: linha.googlePlanilhaNome,
   };
 }
@@ -64,11 +54,11 @@ export async function prepararAbaEntradas(admin: { id: string }) {
   const linha = await conexao();
   const estrutura = await chamarIntegracao<{ abas: AbaBruta[] }>(linha, { acao: "estrutura" });
   if (estrutura.abas.some((aba) => aba.nome === ABA_ENTRADAS)) return { criada: false };
-  await chamarIntegracao(
-    linha,
-    { acao: "criarAba", nome: ABA_ENTRADAS, cabecalho: CABECALHO_ENTRADAS },
-    { retentavel: false },
-  );
+  await chamarIntegracao(linha, {
+    acao: "criarAba",
+    nome: ABA_ENTRADAS,
+    cabecalho: CABECALHO_ENTRADAS,
+  });
   await auditar(banco(), admin.id, "planilha.entradas.criarAba", "aba:Entradas");
   return { criada: true };
 }
@@ -119,23 +109,19 @@ export async function enviarEntradas(usuario: { id: string }, entrada: unknown) 
   if (plano.criar.length === 0) return { resultado: "sucesso", linhasCriadas: 0 };
   await auditar(banco(), usuario.id, "planilha.entradas.iniciar", `plano:${plano.planoHash}`);
   try {
-    const contagens = await chamarIntegracao<{ linhasCriadas?: number }>(
-      linha,
-      {
-        acao: "aplicar",
-        aba: ABA_ENTRADAS,
-        cabecalhoLinha: 1,
-        assinatura: plano.assinatura,
-        modoCompleto: false,
-        operacoes: [
-          {
-            tipo: "criarLinhas",
-            itens: plano.criar.map(({ linha, celulas }) => ({ linha, celulas })),
-          },
-        ],
-      },
-      { retentavel: false },
-    );
+    const contagens = await chamarIntegracao<{ linhasCriadas?: number }>(linha, {
+      acao: "aplicar",
+      aba: ABA_ENTRADAS,
+      cabecalhoLinha: 1,
+      assinatura: plano.assinatura,
+      modoCompleto: false,
+      operacoes: [
+        {
+          tipo: "criarLinhas",
+          itens: plano.criar.map(({ linha, celulas }) => ({ linha, celulas })),
+        },
+      ],
+    });
     if (contagens.linhasCriadas !== plano.criar.length)
       throw new ErroHttp("Parte das linhas não foi confirmada.", 502);
     await auditar(banco(), usuario.id, "planilha.entradas.sucesso", `plano:${plano.planoHash}`);

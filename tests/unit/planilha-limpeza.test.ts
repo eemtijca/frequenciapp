@@ -19,7 +19,6 @@ const nomes = ["_frequenciapp_backup_QA_20260930-130258-674"];
 beforeEach(() => {
   vi.clearAllMocks();
   dubl.linha.mockResolvedValue({
-    provedor: "GOOGLE",
     googlePlanilhaId: "arquivo",
     googleRefreshToken: "credencial-sintetica",
   });
@@ -44,11 +43,10 @@ describe("limpeza administrativa das cópias", () => {
       senha: "senha-sintetica",
       frase: "EDITAR PLANILHA",
     });
-    expect(dubl.chamar).toHaveBeenLastCalledWith(
-      expect.anything(),
-      { acao: "removerAbasBackup", copias: nomes },
-      { retentavel: false },
-    );
+    expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
+      acao: "removerAbasBackup",
+      copias: nomes,
+    });
     expect(dubl.senha).toHaveBeenCalledOnce();
     expect(dubl.auditar).toHaveBeenCalledOnce();
   });
@@ -59,7 +57,6 @@ describe("limpeza administrativa das cópias", () => {
       if (tipo === "lista") dubl.chamar.mockResolvedValue({ copias: [...nomes, "outra"] });
       else
         dubl.linha.mockResolvedValue({
-          provedor: "GOOGLE",
           googlePlanilhaId: tipo === "arquivo" ? "outro" : "arquivo",
           googleRefreshToken: tipo === "credencial" ? "outra" : "credencial-sintetica",
         });
@@ -87,11 +84,6 @@ describe("limpeza administrativa das cópias", () => {
         frase: "EDITAR PLANILHA",
       }),
     ).rejects.toThrow("Senha incorreta");
-    expect(dubl.chamar).not.toHaveBeenCalled();
-  });
-  it("exige a nova versão do Apps Script antes da limpeza", async () => {
-    dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "6" });
-    await expect(previa()).rejects.toThrow("versão 7");
     expect(dubl.chamar).not.toHaveBeenCalled();
   });
 });

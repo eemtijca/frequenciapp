@@ -123,7 +123,7 @@ src/
     erros.ts                tradução de exceções para português
     transacoes.ts           transações ACID com repetição
     auditoria.ts            trilha de ações administrativas
-    planilha.ts             cliente HTTP do Apps Script, com redirecionamento e retentativa segura
+    planilha-erros.ts       diagnóstico limitado dos erros de integração
     auth/
       hash.ts               scrypt de senhas
       sessao.ts             sessões opacas em cookie HttpOnly
@@ -132,7 +132,6 @@ src/
 prisma/                     schema e migrações
 prisma.config.ts            configuração do CLI do Prisma 7
 generated/                  cliente Prisma gerado (fora do git)
-gas/                        Apps Script da integração com Google Planilhas
 public/                     manifest, service worker, offline e ícones
 docker/                     entrypoint e migrador do contêiner
 scripts/                    criar-admin, criar-coordenacao e seed

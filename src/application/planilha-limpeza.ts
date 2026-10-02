@@ -34,11 +34,6 @@ export async function limparCopiasDaPlanilha(
       );
     }
     const linha = await lerLinha(finalidade);
-    if (linha.provedor !== "GOOGLE" && Number(linha.versaoScript ?? 0) < 7)
-      throw new ErroHttp(
-        "Atualize o Apps Script para a versão 7 e teste a conexão antes de remover as cópias.",
-        400,
-      );
     const lista = z
       .object({ copias: z.array(z.string().min(1)).max(1000) })
       .safeParse(await chamarIntegracao(linha, { acao: "listarAbasBackup" }));
@@ -46,16 +41,7 @@ export async function limparCopiasDaPlanilha(
     const copias = [...new Set(lista.data.copias)].sort();
     const planoHash = createHmac("sha256", ambiente.authSecret)
       .update(
-        JSON.stringify([
-          finalidade,
-          linha.provedor,
-          linha.googlePlanilhaId,
-          linha.endpoint,
-          linha.token,
-          linha.googleRefreshToken,
-          linha.versaoScript,
-          copias,
-        ]),
+        JSON.stringify([finalidade, linha.googlePlanilhaId, linha.googleRefreshToken, copias]),
       )
       .digest("hex");
     if (!dados.data.planoHash) return { previa: { copias, planoHash } };
@@ -64,11 +50,10 @@ export async function limparCopiasDaPlanilha(
         "As cópias ou a conexão mudaram. Confira uma nova prévia antes de remover.",
         409,
       );
-    const resultado = await chamarIntegracao<{ removidas: number }>(
-      linha,
-      { acao: "removerAbasBackup", copias },
-      { retentavel: false },
-    );
+    const resultado = await chamarIntegracao<{ removidas: number }>(linha, {
+      acao: "removerAbasBackup",
+      copias,
+    });
     await auditar(
       banco(),
       admin.id,

@@ -44,7 +44,7 @@ beforeEach(() => {
   rotulos = cabecalho;
   dubl.linha.mockImplementation(async () => ({
     ativa: true,
-    provedor: "GOOGLE",
+
     googlePlanilhaId: arquivo,
     atualizadoEm: new Date("2026-10-01T12:00:00Z"),
   }));
@@ -112,11 +112,10 @@ describe("organização visual", () => {
       aba: plano.aba,
       planoHash: resultado.previa?.planoHash,
     });
-    expect(dubl.chamar).toHaveBeenLastCalledWith(
-      expect.anything(),
-      { acao: "organizarAba", ...plano },
-      { retentavel: false },
-    );
+    expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
+      acao: "organizarAba",
+      ...plano,
+    });
     expect(dubl.auditar).toHaveBeenCalledTimes(1);
   });
   it.each(["arquivo", "cabeçalho"])("bloqueia mudança de %s depois da prévia", async (mudanca) => {
@@ -130,13 +129,6 @@ describe("organização visual", () => {
       }),
     ).rejects.toThrow("A planilha mudou");
     expect(dubl.chamar.mock.calls.every(([, corpo]) => corpo.acao === "estrutura")).toBe(true);
-  });
-  it("orienta atualizar o script antes de formatar pelo provedor legado", async () => {
-    dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "4" });
-    await expect(
-      organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba }),
-    ).rejects.toThrow("versão 7");
-    expect(dubl.chamar).not.toHaveBeenCalled();
   });
   it.each([{ oculta: true }, { mesclagens: ["A1:B1"] }, { colunas: 401 }])(
     "recusa estrutura insegura %j",
@@ -312,15 +304,7 @@ describe("correção do cabeçalho", () => {
         acao: "organizarAba",
         ajusteCabecalho: expect.objectContaining({ linhasRemover: 3 }),
       }),
-      { retentavel: false },
     );
-  });
-  it("recusa script anterior à versão 7 antes de corrigir", async () => {
-    dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "5" });
-    await expect(
-      organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba, ajustarCabecalho: true }),
-    ).rejects.toThrow("versão 7");
-    expect(dubl.chamar).not.toHaveBeenCalled();
   });
   it("vincula a confirmação também ao conteúdo removido", async () => {
     dubl.chamar.mockResolvedValue({ abas: [{ nome: plano.aba, amostra }] });
@@ -493,11 +477,8 @@ describe("organização das turmas em conjunto", () => {
   const amostra = [["Frequência"], ["Aluno", "29/09"], ["QA Aluno", "P"]];
   beforeEach(() => {
     dubl.linha.mockResolvedValue({
-      provedor: "GAS",
       ativa: true,
-      versaoScript: "7",
-      endpoint: "endpoint-sintetico",
-      token: "token-sintetico",
+
       esquema: { mapa },
       atualizadoEm: new Date("2026-10-01T12:00:00Z"),
     });
@@ -517,11 +498,8 @@ describe("organização das turmas em conjunto", () => {
     });
     dubl.atualizar.mockImplementation(async () => {
       dubl.linha.mockResolvedValue({
-        provedor: "GAS",
         ativa: true,
-        versaoScript: "7",
-        endpoint: "endpoint-sintetico",
-        token: "token-sintetico",
+
         esquema: { mapa, abas: [{ nome: nomes[0], cabecalho: 1 }] },
         atualizadoEm: new Date("2026-10-01T12:01:00Z"),
       });
@@ -541,7 +519,7 @@ describe("organização das turmas em conjunto", () => {
     ).toHaveLength(2);
     expect(dubl.atualizar).toHaveBeenCalledTimes(2);
   });
-  it.each(["endpoint", "token", "googleRefreshToken", "googlePlanilhaId", "mapa"])(
+  it.each(["googleRefreshToken", "googlePlanilhaId", "mapa"])(
     "recusa mudança de %s depois da prévia coletiva",
     async (campo) => {
       const entrada = { aba: nomes[0], emLote: true };

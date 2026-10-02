@@ -1,10 +1,8 @@
-// Contratos do envio automático ao salvar a chamada: chave desligada não grava,
-// chave ligada leva o dia da turma de origem (aluno remanejado), queda vira
-// PARCIAL e o salvamento seguinte não repete o envio. Massa com prefixo QS,
-// contra o Apps Script falso.
+// Contratos do envio ao salvar: remanejamento, idempotência, pendências e
+// respostas perdidas, com massa sintética QS contra a Sheets API sintética.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -12,10 +10,13 @@ const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
 const DIA_1 = "2026-06-15";
 const DIA_2 = "2026-06-16";
 const DIA_3 = "2026-06-17";
+const DIA_4 = "2026-06-18";
+const DIA_5 = "2026-06-19";
+const DIA_6 = "2026-06-22";
 
 let cookieAdmin = "";
 let banco: pg.Client | null = null;
-let gas: GasFalso | null = null;
+let google: GoogleFalso | null = null;
 const turmas: Record<"A" | "B", string> = { A: "", B: "" };
 const alunos: Record<"A" | "remanejado", string> = { A: "", remanejado: "" };
 
@@ -26,8 +27,8 @@ async function limparMassa() {
   if (!banco) return;
   await banco.query(`delete from sincronizacoes_planilha where turma_original_id in (${daSerie})`);
   await banco.query(
-    `update integracoes_planilha set ativa = false, endpoint = null, token = null,
-       versao_script = null, esquema = null, assinatura_esquema = null, esquema_em = null,
+    `update integracoes_planilha set ativa = false, google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+       esquema = null, assinatura_esquema = null, esquema_em = null,
        modo = 'CONSERVADOR', modo_completo_ate = null, envio_automatico = false,
        atualizado_em = now()
      where id = 'principal'`,
@@ -65,7 +66,32 @@ async function salvar(dia: string, turma: "A" | "B", faltas: string[], revisao =
 }
 
 function cabecalho(aba: string): string[] {
-  return Array.from({ length: 8 }, (_, indice) => gas?.valor(aba, 1, indice + 1) ?? "");
+  return Array.from({ length: 20 }, (_, indice) => google?.valor(aba, 1, indice + 1) ?? "");
+}
+
+function quantidadeAplicacoes(): number {
+  return google?.chamadas().filter((acao) => acao === "gravar").length ?? 0;
+}
+
+async function diasPendentes(): Promise<string[]> {
+  const resposta = await chamar("/api/planilha/simular", "POST", {
+    turmaOriginalId: turmas.A,
+    de: "2026-06-01",
+    ate: "2026-06-30",
+    somenteAlteradas: true,
+    permitirInserirColunas: true,
+    permitirNovosAlunos: false,
+  });
+  expect(resposta.status).toBe(200);
+  const previa = await json<{ planos: { dias: string[] }[] }>(resposta);
+  return previa.planos[0]?.dias ?? [];
+}
+
+async function quantidadeChamadasPendentes(): Promise<number> {
+  const resposta = await chamar("/api/planilha", "GET");
+  expect(resposta.status).toBe(200);
+  const estado = await json<{ integracao: { alteradasDepois: number } }>(resposta);
+  return estado.integracao.alteradasDepois;
 }
 
 async function esperar(condicao: () => boolean, tempoMs = 15_000): Promise<boolean> {
@@ -77,19 +103,21 @@ async function esperar(condicao: () => boolean, tempoMs = 15_000): Promise<boole
   return condicao();
 }
 
-async function ultimoResultado(): Promise<string | undefined> {
+async function ultimoResultado(dia?: string): Promise<string | undefined> {
   if (!banco) return undefined;
   const registro = await banco.query<{ resultado: string }>(
-    "select resultado from sincronizacoes_planilha where turma_original_id = $1 order by criado_em desc limit 1",
-    [turmas.A],
+    `select resultado from sincronizacoes_planilha where turma_original_id = $1
+       ${dia ? "and de <= $2::date and ate >= $2::date" : ""}
+       order by criado_em desc limit 1`,
+    dia ? [turmas.A, dia] : [turmas.A],
   );
   return registro.rows[0]?.resultado;
 }
 
-async function esperarResultado(esperado: string): Promise<boolean> {
+async function esperarResultado(esperado: string, dia?: string): Promise<boolean> {
   const limite = Date.now() + 15_000;
   while (Date.now() < limite) {
-    if ((await ultimoResultado()) === esperado) return true;
+    if ((await ultimoResultado(dia)) === esperado) return true;
     await new Promise((resolver) => setTimeout(resolver, 200));
   }
   return false;
@@ -102,7 +130,7 @@ beforeAll(async () => {
     await banco.connect();
   }
   await limparMassa();
-  gas = await criarGasFalso();
+  google = await criarGoogleFalso();
   const entrada = await fetch(`${APP_URL}/api/auth/entrar`, {
     method: "POST",
     headers: { Origin: APP_URL, "Content-Type": "application/json" },
@@ -132,19 +160,14 @@ beforeAll(async () => {
     }),
   );
   alunos.remanejado = remanejado.aluno.id;
-  gas.definirAba("QS Ano A", [
+  google.definirAba("QS Ano A", [
     ["Aluno", "Turma atual", "Total"],
     ["QS Aluno A", "QS Ano A", ""],
     ["QS Aluno Remanejado", "QS Ano B", ""],
   ]);
 
-  const gerado = await json<{ token: string }>(
-    await chamar("/api/planilha/token", "POST", { acao: "gerar", senha: SENHA_ADMIN }),
-  );
-  gas.definirToken(gerado.token);
-  await chamar("/api/planilha", "PATCH", { ativa: true, endpoint: gas.url });
-  const scriptTestado = await chamar("/api/planilha/testar", "POST", { endpoint: gas.url });
-  expect(scriptTestado.status).toBe(200);
+  if (!banco) throw new Error("Banco sintético indisponível.");
+  await google.conectar(banco, "FREQUENCIA");
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha/estrutura", "POST", {}),
   );
@@ -159,7 +182,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await chamar("/api/planilha/desconectar", "POST", {}).catch(() => undefined);
   await limparMassa();
-  await gas?.fechar();
+  await google?.fechar();
   if (banco) await banco.end();
 });
 
@@ -176,24 +199,77 @@ describe("envio automático ao salvar a chamada", () => {
     await salvar(DIA_2, "B", [alunos.remanejado]);
     expect(await esperar(() => cabecalho("QS Ano A").includes("16/06/2026"))).toBe(true);
     const coluna = cabecalho("QS Ano A").indexOf("16/06/2026") + 1;
-    expect(gas?.valor("QS Ano A", 3, coluna)).toBe("F");
+    expect(google?.valor("QS Ano A", 3, coluna)).toBe("F");
     expect(await esperarResultado("SUCESSO")).toBe(true);
   });
 
+  it("envia o dia seguinte após um envio bem-sucedido sem reconferir o mapa", async () => {
+    const antes = quantidadeAplicacoes();
+    await salvar(DIA_4, "A", [alunos.A]);
+    expect(await esperarResultado("SUCESSO", DIA_4)).toBe(true);
+    expect(cabecalho("QS Ano A").filter((valor) => valor === "18/06/2026")).toHaveLength(1);
+    const coluna = cabecalho("QS Ano A").indexOf("18/06/2026") + 1;
+    expect(google?.valor("QS Ano A", 2, coluna)).toBe("F");
+    expect(quantidadeAplicacoes()).toBe(antes + 1);
+  });
+
+  it("salvar as mesmas marcas de novo não repete a escrita nem duplica o dia", async () => {
+    const antes = quantidadeAplicacoes();
+    await salvar(DIA_4, "A", [alunos.A], 1);
+    await new Promise((resolver) => setTimeout(resolver, 2000));
+    expect(quantidadeAplicacoes()).toBe(antes);
+    expect(cabecalho("QS Ano A").filter((valor) => valor === "18/06/2026")).toHaveLength(1);
+    expect(await ultimoResultado(DIA_4)).toBe("SUCESSO");
+    expect(await diasPendentes()).not.toContain(DIA_4);
+  });
+
+  it("mantém a correção conservadora pendente mesmo após enviar outro dia com sucesso", async () => {
+    const antes = quantidadeAplicacoes();
+    const pendentesAntes = await quantidadeChamadasPendentes();
+    await salvar(DIA_4, "A", [], 2);
+    await new Promise((resolver) => setTimeout(resolver, 2000));
+    const coluna = cabecalho("QS Ano A").indexOf("18/06/2026") + 1;
+    expect(google?.valor("QS Ano A", 2, coluna)).toBe("F");
+    expect(quantidadeAplicacoes()).toBe(antes);
+
+    await salvar(DIA_5, "A", []);
+    expect(await esperarResultado("SUCESSO", DIA_5)).toBe(true);
+    const colunaNova = cabecalho("QS Ano A").indexOf("19/06/2026") + 1;
+    expect(google?.valor("QS Ano A", 2, colunaNova)).toBe("P");
+    expect(await diasPendentes()).toContain(DIA_4);
+    expect(await quantidadeChamadasPendentes()).toBe(pendentesAntes + 1);
+  });
+
+  it("uma divergência ocupada impede o envio automático das outras células vazias do dia", async () => {
+    const coluna = cabecalho("QS Ano A").indexOf("18/06/2026") + 1;
+    expect(google?.valor("QS Ano A", 2, coluna)).toBe("F");
+    expect(google?.valor("QS Ano A", 3, coluna)).toBe("");
+    const antes = quantidadeAplicacoes();
+    await salvar(DIA_4, "B", [alunos.remanejado]);
+    await new Promise((resolver) => setTimeout(resolver, 2000));
+    expect(quantidadeAplicacoes()).toBe(antes);
+    expect(google?.valor("QS Ano A", 2, coluna)).toBe("F");
+    expect(google?.valor("QS Ano A", 3, coluna)).toBe("");
+
+    await salvar(DIA_6, "A", []);
+    expect(await esperarResultado("SUCESSO", DIA_6)).toBe(true);
+    expect(await diasPendentes()).toContain(DIA_4);
+  });
+
   it("queda depois de gravar vira PARCIAL e o salvamento seguinte não repete o envio", async () => {
-    gas?.derrubarProximoAplicar();
+    google?.perderProximaResposta();
     await salvar(DIA_3, "A", [alunos.A]);
     await esperar(() => cabecalho("QS Ano A").includes("17/06/2026"));
     expect(await esperarResultado("PARCIAL")).toBe(true);
 
-    const antes = gas?.chamadas().length ?? 0;
+    const antes = google?.chamadas().length ?? 0;
     await salvar(DIA_3, "A", [], 1);
     await new Promise((resolver) => setTimeout(resolver, 2000));
     expect(
-      gas
+      google
         ?.chamadas()
         .slice(antes)
-        .filter((acao) => acao.includes("aplicar")),
+        .filter((acao) => acao === "gravar"),
     ).toEqual([]);
     expect(await ultimoResultado()).toBe("PARCIAL");
   });

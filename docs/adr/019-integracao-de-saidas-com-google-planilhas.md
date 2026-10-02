@@ -1,5 +1,7 @@
 # ADR-019: integração de saídas antecipadas com Google Planilhas
 
+A conexão e as exigências de Apps Script descritas nesta decisão são históricas e foram substituídas pela [ADR-033](033-integracao-exclusiva-com-google-planilhas.md).
+
 ## Status
 
 Aceita.

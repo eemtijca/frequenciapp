@@ -15,7 +15,6 @@ import {
   paraCsv,
   planejarSincronizacao,
   resultadoDeFalha,
-  validarEndpoint,
   type AbaBruta,
   type LeituraAba,
   type OpcoesPlano,
@@ -79,23 +78,6 @@ function opcoes(parcial: Partial<OpcoesPlano> = {}): OpcoesPlano {
     ...parcial,
   };
 }
-
-describe("validarEndpoint", () => {
-  it("aceita o Web App do Apps Script", () => {
-    expect(validarEndpoint("https://script.google.com/macros/s/ABC123/exec", false)).toBeNull();
-    expect(validarEndpoint("https://script.google.com/macros/s/ABC-123_/exec/", false)).toBeNull();
-  });
-  it("recusa endereços fora do padrão e sem https", () => {
-    expect(validarEndpoint("http://script.google.com/macros/s/ABC/exec", false)).not.toBeNull();
-    expect(validarEndpoint("https://exemplo.com/macros/s/ABC/exec", false)).not.toBeNull();
-    expect(validarEndpoint("https://script.google.com/macros/s/ABC/dev", false)).not.toBeNull();
-    expect(validarEndpoint("não é url", false)).not.toBeNull();
-  });
-  it("aceita loopback apenas quando o ambiente permite", () => {
-    expect(validarEndpoint("http://127.0.0.1:4567/exec", true)).toBeNull();
-    expect(validarEndpoint("http://127.0.0.1:4567/exec", false)).not.toBeNull();
-  });
-});
 
 describe("dataDoRotulo", () => {
   it("reconhece os formatos usados em cabeçalho", () => {

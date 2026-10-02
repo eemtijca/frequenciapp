@@ -4,7 +4,7 @@ Para os contratos de notificações, gerar chaves sintéticas com `node tests/ge
 
 Suítes do FrequenciApp com Vitest e Playwright.
 
-`tests/api/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/e2e/notificacoes.spec.ts` valida a Gestão e a coordenação; `pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`; o simulador de Planilhas também precisa de `PERMITIR_ENDPOINT_LOCAL=true`. Essas opções não são necessárias em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
+`tests/api/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/e2e/notificacoes.spec.ts` valida a Gestão e a coordenação; `pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
 
 | Suíte            | Comando             | Pré-requisitos                                           |
 | ---------------- | ------------------- | -------------------------------------------------------- |
@@ -26,9 +26,8 @@ Roda em qualquer ambiente, sem banco e sem rede:
 - `downloads.test.ts`: senha de exportação, AES-256 real, preservação de bytes, senha incorreta, sal aleatório e alteração da cifra.
 - `exportacoes.test.ts` na suíte de API: confirmação da cópia, limite de tentativas, CSRF, papéis e auditoria mínima sem dados escolares.
 - `downloads.spec.ts` na suíte de navegador: os três downloads protegidos, formatos originais, cancelamento, senhas locais, toque duplo e repetição após falha.
-- `gas.test.ts`: `gas/Codigo.gs` em `vm` com dublês fiéis às recusas das APIs do Google.
 - `planilha-envios.test.ts`: erro vigente por turma ou por histórico único, data do último envio e datas sem horário em qualquer fuso.
-- `planilha-cliente.test.ts`: cliente do Apps Script com recusa, falha parcial e detalhe técnico.
+- `planilha-erros.test.ts`: diagnóstico limitado sem divulgar credenciais.
 - `usuarios.test.ts`: política de senha, primeiro nome, rótulo de papel e capacidades por papel.
 - `erros.test.ts`: tradução das exceções do Prisma para português com status correto.
 - `hash.test.ts`: scrypt de senhas.
@@ -50,8 +49,14 @@ npx prisma migrate deploy
 ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção npm run criar-admin
 CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo npm run criar-coordenacao
 
-# 3. aplicativo no ar em outra sessão
-npm run dev
+# 3. aplicativo de testes com configuração Google sintética
+# Usar os mesmos DATABASE_URL e AUTH_SECRET no servidor e nas suítes.
+export GOOGLE_CLIENT_ID=cliente-sintetico
+export GOOGLE_CLIENT_SECRET=segredo-sintetico
+export GOOGLE_REDIRECT_URI=http://localhost:3000/api/planilha/google/retorno
+export GOOGLE_PICKER_API_KEY=picker-sintetico
+export GOOGLE_PROJECT_NUMBER=123456789
+NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" npm run dev
 
 # 4. suíte
 DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm run test:api
@@ -68,6 +73,8 @@ Variáveis aceitas:
 O contrato `entradas.test.ts` cobre duplicidade, validação, momento, responsável ativo e nome histórico, turma histórica, separação da chamada, cópia JSON, desistência e permissões.
 
 A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
+
+Os testes de planilha criam um servidor HTTP local que responde nos formatos OAuth e Sheets API, com dados sintéticos. O módulo de transporte acima aceita apenas tokens de teste e endereço HTTP em `127.0.0.1`. Não carregar esse módulo em produção. O Compose de CI monta o módulo somente no serviço de testes. O `AUTH_SECRET` usado para cifrar a conexão sintética precisa ser o mesmo do aplicativo; o script do Playwright repassa esse segredo ao contêiner.
 
 ## Ponta a ponta com Playwright
 
@@ -92,13 +99,13 @@ npx playwright test    # headless, execução serial
 - `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
 - `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
 - Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
-- Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, indicador da barra inferior na visão ativa, abas da Gestão com toque e teclado, integração com Google Planilhas contra o script falso (token, conexão, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
+- Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, indicador da barra inferior na visão ativa, abas da Gestão com toque e teclado, integração com Google Planilhas contra OAuth e Sheets API simulados (conexão Google, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
 - `estados.spec.ts`: verifica 404 e reentrada com aviso de sessão expirada. A consulta de atualização do Painel recebe um 401 real depois do clique; a limpeza do cookie ocorre nessa consulta, para não concorrer com pedidos de fundo. O service worker é bloqueado nesse spec para permitir a interceptação.
 - `entradas.spec.ts`: calendário brasileiro mesmo em navegador inglês, navegação diária, seleção de momento e responsável, chegada atrasada, recarga, remoção confirmada e fluxo de aba/prévia/envio com API falsa. Esse spec e `planilha.spec.ts` bloqueiam o service worker para permitir interceptação de requisições. O PWA continua coberto pela suíte própria.
 - `painel-filtros.spec.ts`: gráficos diários por escopo e gráfico Personalizado entre meses, filtros de série e turma, intervalo inválido, ausência de chamadas, presença sem faltas, recuperação de falha e largura de 360 px. A consulta de período é simulada com alunos sintéticos da própria massa; somente esse grupo bloqueia o service worker. A consulta real por período é coberta pelos contratos de API.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
-O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e `PERMITIR_ENDPOINT_LOCAL=true` (ver `compose.ci.yml`), para o Apps Script falso responder no loopback do runner.
+O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e carrega o transporte de testes por `NODE_OPTIONS` (ver `compose.ci.yml`), para OAuth e Sheets API simulados responderem no loopback do runner.
 
 ## Verificação visual e de ponta a ponta
 

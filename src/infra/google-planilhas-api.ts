@@ -1,5 +1,5 @@
 // Cliente da Sheets API para a planilha escolhida: leitura de células,
-// estrutura e marcadores sem depender de uma implantação Apps Script.
+// estrutura e marcadores da integração autorizada pela conta Google.
 import { z } from "zod";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
@@ -25,11 +25,32 @@ const faixa = z.object({
   startColumnIndex: z.number().optional(),
   endColumnIndex: z.number().optional(),
 });
+const dimensao = faixa
+  .extend({
+    dimension: z.enum(["ROWS", "COLUMNS"]).optional(),
+    startIndex: z.number().optional(),
+    endIndex: z.number().optional(),
+  })
+  .transform(({ dimension, startIndex, endIndex, ...range }) => {
+    if (dimension === "ROWS")
+      return {
+        ...range,
+        startRowIndex: startIndex ?? range.startRowIndex ?? 0,
+        endRowIndex: endIndex ?? range.endRowIndex,
+      };
+    if (dimension === "COLUMNS")
+      return {
+        ...range,
+        startColumnIndex: startIndex ?? range.startColumnIndex ?? 0,
+        endColumnIndex: endIndex ?? range.endColumnIndex,
+      };
+    return range;
+  });
 const metadado = z.object({
   metadataId: z.number(),
   metadataKey: z.string(),
   metadataValue: z.string().optional(),
-  location: z.object({ sheetId: z.number().optional(), dimensionRange: faixa.optional() }),
+  location: z.object({ sheetId: z.number().optional(), dimensionRange: dimensao.optional() }),
 });
 const propriedades = z.object({
   sheetId: z.number(),
@@ -363,7 +384,6 @@ export async function estruturaGoogle(
       id: doc.spreadsheetId,
       url: doc.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${doc.spreadsheetId}/edit`,
       fuso: doc.properties.timeZone ?? "UTC",
-      versao: 1,
     },
     abas: await Promise.all(
       abas.map(async (aba) => {

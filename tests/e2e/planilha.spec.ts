@@ -1,21 +1,21 @@
-// Integração com o Google Planilhas na interface, contra o Apps Script falso:
-// token, conexão, estrutura, mapa, prévia na Grade e desconexão.
+// Integração com o Google Planilhas na interface, contra a Sheets API sintética:
+// conta Google, estrutura, mapa, prévia na Grade e desconexão.
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
-import { ADMIN_E2E, comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
+import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 // A resposta simulada por page.route exige que o service worker não intercepte a requisição.
 // O funcionamento com service worker é verificado na suíte própria de PWA.
 test.use({ serviceWorkers: "block" });
 
-let gas: GasFalso;
+let google: GoogleFalso;
 
 test.describe("Google Planilhas", () => {
   test.beforeAll(async () => {
-    gas = await criarGasFalso();
-    gas.definirAba("E2E Ano A", [
+    google = await criarGoogleFalso();
+    google.definirAba("E2E Ano A", [
       ["Frequência · E2E Ano A"],
       ["P = presente · F = falta. Atualize as marcações no aplicativo."],
       [],
@@ -23,7 +23,7 @@ test.describe("Google Planilhas", () => {
       ["E2E Aluno Um", "E2E Ano A", "P", ""],
       ["E2E Aluno Dois", "E2E Ano A", "", ""],
     ]);
-    gas.definirAba("E2E Ano B", [
+    google.definirAba("E2E Ano B", [
       ["Frequência · E2E Ano B"],
       ["P = presente · F = falta"],
       [],
@@ -43,10 +43,8 @@ test.describe("Google Planilhas", () => {
          values ('principal', false, 'CONSERVADOR', now())
          on conflict (id) do update set
            ativa = false,
-           endpoint = null,
-           token = null,
-           versao_script = null,
-           esquema = null,
+           google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+       esquema = null,
            assinatura_esquema = null,
            esquema_em = null,
            modo = 'CONSERVADOR',
@@ -58,7 +56,7 @@ test.describe("Google Planilhas", () => {
 
   test.afterAll(async () => {
     await limparMassaE2E();
-    await gas.fechar();
+    await google.fechar();
   });
 
   test("admin conecta, confere a estrutura, salva o mapa e revisa a prévia", async ({ page }) => {
@@ -67,30 +65,15 @@ test.describe("Google Planilhas", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
-    await cartao.getByText("Conexão por Apps Script").click();
-
-    // Antes de conectar, a leitura da estrutura fica bloqueada.
+    await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
+    await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
-
-    // Token com senha.
-    await cartao.getByRole("button", { name: "Gerar novo" }).click();
-    const dialogoSenha = page.getByRole("dialog");
-    await dialogoSenha.getByLabel("Senha do administrador").fill(ADMIN_E2E.senha);
-    await dialogoSenha.getByRole("button", { name: "Confirmar" }).click();
-    const campoToken = cartao.locator("input[readonly]");
-    await expect
-      .poll(async () => (await campoToken.inputValue()).length, { timeout: 15_000 })
-      .toBeGreaterThan(20);
-    const token = await campoToken.inputValue();
-    gas.definirToken(token);
-
-    // Endereço, ativação e teste de conexão.
-    await cartao.getByLabel("URL /exec").fill(gas.url);
-    await cartao.getByRole("button", { name: "Salvar", exact: true }).click();
-    await cartao.getByRole("switch", { name: "Integração ativa" }).click();
-    await cartao.getByRole("button", { name: "Testar conexão" }).click();
-    await expect(cartao.getByText(/Conectado a Planilha de teste/)).toBeVisible();
-    await expect(cartao.getByText("Ligada", { exact: true })).toBeVisible();
+    await comBanco((cliente) => google.conectar(cliente, "FREQUENCIA"));
+    await page.reload();
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: "Configurações" }).click();
+    await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
@@ -112,14 +95,14 @@ test.describe("Google Planilhas", () => {
       apresentacao.getByRole("columnheader", { name: "Aluno", exact: true }),
     ).toBeVisible();
     await apresentacao.screenshot({ path: "test-results/planilha-apresentacao-previa.png" });
-    const chamadasAntes = gas.chamadas().filter((acao) => acao === "organizarAba").length;
+    const chamadasAntes = google.chamadas().filter((acao) => acao === "gravar").length;
     await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes);
+    expect(google.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadasAntes);
     await organizar.click();
     await apresentacao.getByRole("button", { name: "Aplicar apresentação" }).click();
     await expect(page.getByText("Apresentação da planilha atualizada.")).toBeVisible();
-    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 1);
-    expect(gas.valor("E2E Ano A", 5, 1)).toBe("E2E Aluno Um");
+    expect(google.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadasAntes + 1);
+    expect(google.valor("E2E Ano A", 5, 1)).toBe("E2E Aluno Um");
 
     // Todas as turmas organiza e corrige as duas abas, com uma confirmação.
     await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
@@ -131,7 +114,7 @@ test.describe("Google Planilhas", () => {
     await todas.click();
     await expect(apresentacao.getByText(/Abas prontas: 2 de 2/)).toBeVisible();
     await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 1);
+    expect(google.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadasAntes + 1);
     await todas.click();
     await apresentacao.getByRole("button", { name: "Aplicar apresentação", exact: true }).click();
     await expect(
@@ -165,8 +148,8 @@ test.describe("Google Planilhas", () => {
     );
     await apresentacao.screenshot({ path: "test-results/planilha-todas-previa.png" });
     await apresentacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-    expect(gas.valor("E2E Ano A", 1, 1)).toContain("Frequência");
-    expect(gas.valor("E2E Ano B", 1, 1)).toContain("Frequência");
+    expect(google.valor("E2E Ano A", 1, 1)).toContain("Frequência");
+    expect(google.valor("E2E Ano B", 1, 1)).toContain("Frequência");
     await corrigir.click();
     await apresentacao
       .getByRole("button", { name: "Aplicar correção", exact: true })
@@ -175,15 +158,17 @@ test.describe("Google Planilhas", () => {
         (elemento as HTMLButtonElement).click();
       });
     await expect(apresentacao.getByText(/Concluídas: 2 de 2. Pendências: 0/)).toBeVisible();
-    expect(gas.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadasAntes + 5);
-    expect(gas.valor("E2E Ano A", 1, 1)).toBe("Aluno");
-    expect(gas.valor("E2E Ano A", 1, 3)).toBe("10/09/2026");
-    expect(gas.valor("E2E Ano A", 2, 1)).toBe("E2E Aluno Um");
-    expect(gas.valor("E2E Ano B", 1, 1)).toBe("Aluno");
-    expect(gas.valor("E2E Ano B", 1, 3)).toBe("29/09/2026");
-    expect(gas.valor("E2E Ano B", 2, 3)).toBe("P");
+    expect(google.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadasAntes + 5);
+    expect(google.valor("E2E Ano A", 1, 1)).toBe("Aluno");
+    expect(google.valor("E2E Ano A", 1, 3)).toBe("10/09/2026");
+    expect(google.valor("E2E Ano A", 2, 1)).toBe("E2E Aluno Um");
+    expect(google.valor("E2E Ano B", 1, 1)).toBe("Aluno");
+    expect(google.valor("E2E Ano B", 1, 3)).toBe("29/09/2026");
+    expect(google.valor("E2E Ano B", 2, 3)).toBe("P");
     for (const nome of ["E2E Ano A", "E2E Ano B"])
-      expect(gas.abas().some((aba) => aba.startsWith(`_frequenciapp_backup_${nome}_`))).toBe(false);
+      expect(google.abas().some((aba) => aba.startsWith(`_frequenciapp_backup_${nome}_`))).toBe(
+        false,
+      );
     await apresentacao.screenshot({ path: "test-results/planilha-todas-resultado.png" });
     await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
 
@@ -192,12 +177,12 @@ test.describe("Google Planilhas", () => {
     await expect(envioAoSalvar).toBeEnabled();
     await expect(envioAoSalvar).not.toBeChecked();
 
-    // Envio de todas as turmas: por padrão só o que mudou; sem chamada, nada
+    // Envio de todas as turmas: por padrão só pendências; sem chamada, nada
     // a enviar, e o período inteiro fica como opção de conferência.
     await page.getByRole("button", { name: "Enviar todas as turmas" }).click();
     const previaGeral = page.getByRole("dialog");
-    await expect(previaGeral.getByLabel("Só o que mudou desde o último envio")).toBeChecked();
-    await expect(previaGeral.getByText(/Nada mudou desde o último envio/)).toBeVisible();
+    await expect(previaGeral.getByLabel("Só chamadas pendentes")).toBeChecked();
+    await expect(previaGeral.getByText(/Nenhuma chamada pendente/)).toBeVisible();
     await expect(previaGeral.getByRole("button", { name: "Enviar" })).toBeDisabled();
     await previaGeral.getByLabel(/O período inteiro/).check();
     await expect(previaGeral.getByText(/E2E Ano A/)).toBeVisible();

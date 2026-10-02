@@ -279,10 +279,9 @@ export default function DialogoEnvio({
                 className="mt-0.5 size-4 accent-[var(--primary)]"
               />
               <span>
-                Só o que mudou desde o último envio
+                Só chamadas pendentes
                 <span className="text-muted-foreground block text-xs">
-                  Dias com chamada criada ou alterada depois do último envio confirmado de cada
-                  turma.
+                  Dias com chamadas ainda não confirmadas na planilha para cada turma de origem.
                 </span>
               </span>
             </label>
@@ -393,8 +392,8 @@ export default function DialogoEnvio({
 
           {simulacao && !carregando && nadaAEnviar && (
             <p className="bg-secondary/40 rounded-lg px-3 py-2 text-sm">
-              Nada mudou desde o último envio{todas ? " em nenhuma turma" : ""}. Para conferir o
-              período inteiro, escolha a segunda opção.
+              Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
+              inteiro, escolha a segunda opção.
             </p>
           )}
 

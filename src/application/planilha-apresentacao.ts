@@ -54,7 +54,6 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
     throw new ErroHttp("Escolha a aba Entradas.", 400);
   if (dados.data.ajustarCabecalho && tipo !== "FREQUENCIA")
     throw new ErroHttp("A correção do cabeçalho está disponível para a frequência.", 400);
-  const versaoMinima = 7;
   const finalidade: FinalidadeIntegracao = tipo === "FREQUENCIA" ? "FREQUENCIA" : "SAIDAS";
   const linha = await lerLinha(finalidade);
   const mapa = z
@@ -70,17 +69,8 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
       "Organize em conjunto apenas as abas vinculadas às turmas na estrutura salva.",
       409,
     );
-  if (
-    tipo === "ENTRADAS" &&
-    (linha.provedor !== "GOOGLE" ||
-      (linha.esquema as { aba?: unknown } | null)?.aba === ABA_ENTRADAS)
-  )
+  if (tipo === "ENTRADAS" && (linha.esquema as { aba?: unknown } | null)?.aba === ABA_ENTRADAS)
     throw new ErroHttp("Confira a conexão Google e a aba de saídas na Gestão.", 400);
-  if (linha.provedor !== "GOOGLE" && Number(linha.versaoScript ?? 0) < versaoMinima)
-    throw new ErroHttp(
-      `Atualize o Apps Script para a versão ${versaoMinima} e teste a conexão antes de organizar.`,
-      400,
-    );
   const resposta = estrutura.safeParse(
     await chamarIntegracao(linha, { acao: "estrutura", aba: dados.data.aba, apresentacao: true }),
   );
@@ -154,18 +144,9 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
     .update(
       JSON.stringify([
         tipo,
-        linha.provedor,
         linha.googlePlanilhaId,
-        linha.endpoint,
         dados.data.emLote
-          ? [
-              "lote",
-              linha.ativa,
-              linha.token,
-              linha.googleRefreshToken,
-              linha.versaoScript,
-              mapa.success ? mapa.data.mapa : null,
-            ]
+          ? ["lote", linha.ativa, linha.googleRefreshToken, mapa.success ? mapa.data.mapa : null]
           : linha.atualizadoEm,
         plano,
       ]),
@@ -174,7 +155,7 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
   if (!dados.data.planoHash) return { previa: { ...plano, planoHash } };
   if (dados.data.planoHash !== planoHash)
     throw new ErroHttp("A planilha mudou. Confira uma nova prévia antes de organizar.", 409);
-  await chamarIntegracao(linha, { acao: "organizarAba", ...plano }, { retentavel: false });
+  await chamarIntegracao(linha, { acao: "organizarAba", ...plano });
   if (ajusteCabecalho && (ajusteCabecalho.linhasRemover || ajusteCabecalho.datas.length)) {
     const { atualizarEsquemaDaAba } = await import("./planilha");
     await atualizarEsquemaDaAba(linha, aba.nome);

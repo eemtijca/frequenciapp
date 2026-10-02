@@ -12,7 +12,7 @@ async function abrir(page: Page, comMapa = true) {
         integracao: {
           ativa: true,
           envioAutomatico: false,
-          provedor: "GOOGLE",
+
           googleConectado: true,
           googlePlanilha: { id: "arquivo-sintetico", nome: "QA Planilha" },
           modo: "conservador",
@@ -20,7 +20,7 @@ async function abrir(page: Page, comMapa = true) {
           sincronizacoes: [],
           alteradasDepois: 0,
           esquema: {
-            planilha: { nome: "QA", url: "", fuso: "America/Fortaleza", versao: 1 },
+            planilha: { nome: "QA", url: "", fuso: "America/Fortaleza" },
             abas: [...nomes, "QA Notas"].map((nome) => ({ nome, oculta: false, colunas: [] })),
             mapa: comMapa
               ? nomes.map((aba, indice) => ({ aba, turmaOriginalId: `origem-${indice}` }))

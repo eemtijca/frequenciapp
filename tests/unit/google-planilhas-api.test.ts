@@ -28,7 +28,7 @@ const documento = {
                   metadataKey: "frequenciapp.aluno",
                   metadataValue: "00000000-0000-4000-8000-000000000001",
                   location: {
-                    dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 },
+                    dimensionRange: { sheetId: 7, dimension: "ROWS", startIndex: 1, endIndex: 2 },
                   },
                 },
               ],
@@ -43,7 +43,12 @@ const documento = {
                   metadataKey: "frequenciapp.coluna",
                   metadataValue: "1",
                   location: {
-                    dimensionRange: { sheetId: 7, startColumnIndex: 1, endColumnIndex: 2 },
+                    dimensionRange: {
+                      sheetId: 7,
+                      dimension: "COLUMNS",
+                      startIndex: 1,
+                      endIndex: 2,
+                    },
                   },
                 },
               ],
@@ -162,7 +167,9 @@ describe("leitura pela Sheets API", () => {
                 metadataId: 91,
                 metadataKey: "frequenciapp.aluno",
                 metadataValue: "00000000-0000-4000-8000-000000000001",
-                location: { dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 } },
+                location: {
+                  dimensionRange: { sheetId: 7, dimension: "ROWS", startIndex: 1, endIndex: 2 },
+                },
               },
             },
             {
@@ -171,7 +178,7 @@ describe("leitura pela Sheets API", () => {
                 metadataKey: "frequenciapp.coluna",
                 metadataValue: "1",
                 location: {
-                  dimensionRange: { sheetId: 7, startColumnIndex: 1, endColumnIndex: 2 },
+                  dimensionRange: { sheetId: 7, dimension: "COLUMNS", startIndex: 1, endIndex: 2 },
                 },
               },
             },
@@ -202,6 +209,50 @@ describe("leitura pela Sheets API", () => {
       { linha: 2, alunoId: "00000000-0000-4000-8000-000000000001" },
     ]);
     expect(leitura.colunasCriadas).toEqual([2]);
+  });
+
+  it("reconhece a primeira dimensão quando o Google omite o índice inicial", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: URL | string) => {
+        const url = new URL(String(entrada));
+        if (url.pathname.endsWith("/developerMetadata:search"))
+          return Response.json({
+            matchedDeveloperMetadata: [
+              {
+                developerMetadata: {
+                  metadataId: 93,
+                  metadataKey: "frequenciapp.aluno",
+                  metadataValue: "00000000-0000-4000-8000-000000000001",
+                  location: { dimensionRange: { sheetId: 7, dimension: "ROWS", endIndex: 1 } },
+                },
+              },
+              {
+                developerMetadata: {
+                  metadataId: 94,
+                  metadataKey: "frequenciapp.coluna",
+                  metadataValue: "1",
+                  location: { dimensionRange: { sheetId: 7, dimension: "COLUMNS", endIndex: 1 } },
+                },
+              },
+            ],
+          });
+        if (url.pathname.includes("/values/")) return Response.json({ values: [["Ana", "F"]] });
+        if (url.searchParams.get("includeGridData") === "true")
+          return Response.json({ sheets: [{ data: [{ rowData: [{}] }] }] });
+        return Response.json({
+          ...documento,
+          sheets: documento.sheets.map((aba) => ({ ...aba, data: [] })),
+        });
+      }),
+    );
+    const leitura = await lerGoogle("planilha-de-teste", "acesso", "Turma", [
+      { coluna: 2, colunas: 1 },
+    ]);
+    expect(leitura.alunosDasLinhas).toEqual([
+      { linha: 1, alunoId: "00000000-0000-4000-8000-000000000001" },
+    ]);
+    expect(leitura.colunasCriadas).toEqual([1]);
   });
 
   it("devolve a estrutura com dimensões utilizadas e fuso", async () => {

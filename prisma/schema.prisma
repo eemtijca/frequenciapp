@@ -515,17 +515,12 @@ model Auditoria {
   @@map("auditoria")
 }
 
-// Integração opcional com Google Planilhas via Apps Script. Uma linha por
-// finalidade: o endpoint e o token nunca saem para o cliente e ficam fora da
-// cópia JSON.
+// Integração com Google Planilhas por conta autorizada. Uma linha por finalidade,
+// com a credencial OAuth cifrada no servidor e fora da cópia JSON.
 model IntegracaoPlanilha {
   id                 String               @id @default("principal")
   finalidade         FinalidadeIntegracao @default(FREQUENCIA)
   ativa              Boolean              @default(false)
-  endpoint           String?              @db.VarChar(500)
-  token              String?              @db.VarChar(120)
-  versaoScript       String?              @map("versao_script") @db.VarChar(20)
-  provedor           String               @default("GAS") @db.VarChar(10)
   // Autorização OAuth da frequência, cifrada com AUTH_SECRET no servidor.
   googleRefreshToken String?              @map("google_refresh_token") @db.Text
   googlePlanilhaId   String?              @map("google_planilha_id") @db.VarChar(200)

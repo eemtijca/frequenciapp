@@ -20,11 +20,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { EtapaPlanilha } from "@/components/gestao/planilha-etapa";
-import {
-  BlocoConexaoPlanilha,
-  BlocoModoCompletoPlanilha,
-  BlocoRiscoPlanilha,
-} from "@/components/gestao/planilha-blocos";
+import { BlocoModoCompletoPlanilha, BlocoRiscoPlanilha } from "@/components/gestao/planilha-blocos";
 import DialogoEnvio from "@/components/grade/dialogo-envio";
 import { SeletorPlanilhaGoogle } from "@/components/gestao/seletor-planilha-google";
 
@@ -37,15 +33,10 @@ interface Sugestao {
 interface IntegracaoAdmin {
   ativa: boolean;
   envioAutomatico: boolean;
-  provedor: string;
   googleConectado: boolean;
   googlePlanilha: { id: string; nome: string | null } | null;
-  endpoint: string | null;
-  token: string | null;
-  temToken: boolean;
-  versaoScript: string | null;
   esquema: {
-    planilha: { nome: string; url: string; fuso: string; versao: number };
+    planilha: { nome: string; url: string; fuso: string };
     mapa: MapaAba[];
     abas: AbaEsquema[];
   } | null;
@@ -89,7 +80,6 @@ export default function IntegracaoPlanilha({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
-  const [endpoint, setEndpoint] = useState("");
   const [lendo, setLendo] = useState(false);
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [abas, setAbas] = useState<AbaEsquema[]>([]);
@@ -97,7 +87,6 @@ export default function IntegracaoPlanilha({
     nome: string;
     url: string;
     fuso: string;
-    versao: number;
   } | null>(null);
   const [mapa, setMapa] = useState<Record<string, string>>({});
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
@@ -114,14 +103,12 @@ export default function IntegracaoPlanilha({
     try {
       const dados = await pedir<{ integracao: IntegracaoAdmin }>("/api/planilha");
       setIntegracao(dados.integracao);
-      setEndpoint(dados.integracao.endpoint ?? "");
       setAberto((atual) => atual ?? !dados.integracao.esquema);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
           url: dados.integracao.esquema.planilha.url,
           fuso: dados.integracao.esquema.planilha.fuso,
-          versao: dados.integracao.esquema.planilha.versao,
         });
         setAbas(dados.integracao.esquema.abas ?? []);
         setMapa(
@@ -153,11 +140,7 @@ export default function IntegracaoPlanilha({
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
-  const conectada = Boolean(
-    integracao?.provedor === "GOOGLE"
-      ? integracao.googleConectado && integracao.googlePlanilha
-      : integracao?.temToken && integracao.endpoint,
-  );
+  const conectada = Boolean(integracao?.googleConectado && integracao.googlePlanilha);
   const podeEnviar = Boolean(integracao?.ativa && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
@@ -208,7 +191,7 @@ export default function IntegracaoPlanilha({
       toast.loading("Lendo as abas da planilha...", { id: aviso });
       try {
         const dados = await pedir<{
-          planilha: { nome: string; url: string; fuso: string; versao: number };
+          planilha: { nome: string; url: string; fuso: string };
           abas: AbaEsquema[];
           sugestoes: Sugestao[];
         }>("/api/planilha/estrutura", corpoJson({}));
@@ -235,7 +218,7 @@ export default function IntegracaoPlanilha({
       } catch (excecao) {
         avisarErro(excecao, {
           contexto: "Não foi possível ler a planilha.",
-          descricao: "Confira a conexão e o token, e tente de novo em instantes.",
+          descricao: "Confira a conexão Google, e tente de novo em instantes.",
           tentarDeNovo: () => void lerEstrutura(),
           id: aviso,
         });
@@ -322,13 +305,7 @@ export default function IntegracaoPlanilha({
             {integracao?.ativa ? "Ligada" : "Desligada"}
           </Selo>
           <Selo variante={conectada ? "sucesso" : "atencao"}>
-            {conectada
-              ? integracao?.provedor === "GOOGLE"
-                ? "Google conectado"
-                : integracao?.versaoScript
-                  ? `Conectada · v${integracao.versaoScript}`
-                  : "Conectada"
-              : "Sem conexão"}
+            {conectada ? "Google conectado" : "Sem conexão"}
           </Selo>
           <Selo variante={estruturaSalva ? "sucesso" : "neutro"}>
             {estruturaSalva
@@ -357,19 +334,6 @@ export default function IntegracaoPlanilha({
           planilha={integracao?.googlePlanilha ?? null}
           onAtualizar={carregar}
         />
-        <details className="mt-3">
-          <summary className="cursor-pointer text-sm">Conexão por Apps Script</summary>
-          <div className="mt-3">
-            <BlocoConexaoPlanilha
-              idPrefixo="planilha"
-              urlBase="/api/planilha"
-              endpoint={endpoint}
-              integracao={integracao}
-              onEndpoint={setEndpoint}
-              onAtualizar={carregar}
-            />
-          </div>
-        </details>
       </EtapaPlanilha>
 
       <EtapaPlanilha
@@ -417,7 +381,6 @@ export default function IntegracaoPlanilha({
             {planilha && (
               <p className="text-muted-foreground text-xs">
                 {planilha.nome} · fuso {planilha.fuso}
-                {integracao?.provedor === "GAS" && ` · versão do script ${planilha.versao}`}
               </p>
             )}
             {abas.length > 0 && (
@@ -574,8 +537,8 @@ export default function IntegracaoPlanilha({
           <p className="text-muted-foreground">
             {integracao?.alteradasDepois ?? 0}{" "}
             {integracao?.alteradasDepois === 1
-              ? "chamada alterada desde o último envio"
-              : "chamadas alteradas desde o último envio"}
+              ? "chamada pendente de envio"
+              : "chamadas pendentes de envio"}
           </p>
           {integracao?.ultimoErro && (
             <p className="text-falta-texto">

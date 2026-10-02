@@ -7,7 +7,7 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
-import { ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { mensagemParaRegistro } from "@/infra/planilha-erros";
 import { ErroGoogle } from "@/infra/google-planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -22,16 +22,13 @@ import {
   desativarModoCompleto as desativarModoCompletoComum,
   emSequencia,
   type SituacaoEnvioMovimentacao,
-  gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
   listarCopias as listarCopiasComum,
   modoCompletoAtivo,
   removerAba as removerAbaComum,
   restaurarCopia as restaurarCopiaComum,
-  revelarToken as revelarTokenComum,
   salvarConfiguracao,
-  testarConexao as testarConexaoComum,
   type LinhaIntegracao,
 } from "@/application/planilha-comum";
 import {
@@ -57,7 +54,7 @@ const FINALIDADE = "SAIDAS" as const;
 const LIMITE_DIAS_ENVIO = 92;
 
 export interface EsquemaSaidasSalvo {
-  planilha: { nome: string; url: string; fuso: string; versao: number };
+  planilha: { nome: string; url: string; fuso: string };
   abas: AbaSaidaEsquema[];
   aba: string;
   atualizadoEm: string;
@@ -85,17 +82,12 @@ export async function lerEstadoSaidas() {
     ativa: linha.ativa,
     modo: completo ? ("completo" as const) : ("conservador" as const),
     modoCompletoAte: completo && linha.modoCompletoAte ? linha.modoCompletoAte.toISOString() : null,
-    podeEnviar: Boolean(
-      linha.ativa &&
-      (linha.provedor === "GOOGLE"
-        ? linha.googleRefreshToken && linha.googlePlanilhaId
-        : linha.endpoint && linha.token),
-    ),
+    podeEnviar: Boolean(linha.ativa && linha.googleRefreshToken && linha.googlePlanilhaId),
     configurada: Boolean(esquemaSaidasSalvo(linha)),
   };
 }
 
-/** Configuração completa para a administração. O token nunca volta inteiro. */
+/** Configuração administrativa da planilha, sem revelar credenciais Google. */
 export async function lerIntegracaoSaidasAdmin() {
   const linha = await lerLinha(FINALIDADE);
   const principal = await banco().integracaoPlanilha.findUnique({
@@ -131,16 +123,10 @@ export async function lerIntegracaoSaidasAdmin() {
   const ultimoErro = erroVigente(ultimoEnvio ? [ultimoEnvio] : [], () => FINALIDADE);
   return {
     ativa: linha.ativa,
-    provedor: linha.provedor,
     contaGoogle: Boolean(linha.googleRefreshToken || principal?.googleRefreshToken),
-    googlePlanilha:
-      linha.googlePlanilhaId && linha.provedor === "GOOGLE"
-        ? { id: linha.googlePlanilhaId, nome: linha.googlePlanilhaNome }
-        : null,
-    endpoint: linha.endpoint,
-    token: linha.token ? `••••••••${linha.token.slice(-4)}` : null,
-    temToken: Boolean(linha.token),
-    versaoScript: linha.versaoScript,
+    googlePlanilha: linha.googlePlanilhaId
+      ? { id: linha.googlePlanilhaId, nome: linha.googlePlanilhaNome }
+      : null,
     esquema: esquemaSaidasSalvo(linha),
     esquemaEm: linha.esquemaEm?.toISOString() ?? null,
     modo: modoCompletoAtivo(linha) ? ("completo" as const) : ("conservador" as const),
@@ -166,28 +152,13 @@ export async function lerIntegracaoSaidasAdmin() {
   };
 }
 
-/** Salva integração ativa e endereço do Web App, com validação de host. */
+/** Salva as preferências da planilha conectada pela conta Google. */
 export async function salvarIntegracaoSaidas(admin: { id: string }, entrada: unknown) {
   await salvarConfiguracao(admin, FINALIDADE, entrada);
   return lerIntegracaoSaidasAdmin();
 }
 
-/** Gera um token novo. Rotacionar invalida a conexão até atualizar o script. */
-export async function gerarTokenSaidas(admin: { id: string }, entrada: unknown) {
-  return gerarTokenComum(admin, FINALIDADE, entrada);
-}
-
-/** Revela o token com a senha, para reinstalar ou corrigir o script. */
-export async function revelarTokenSaidas(admin: { id: string }, entrada: unknown) {
-  return revelarTokenComum(admin, FINALIDADE, entrada);
-}
-
-/** Testa o Web App publicado: ping sem alterar a planilha. */
-export async function testarConexaoSaidas(entrada: unknown) {
-  return testarConexaoComum(FINALIDADE, entrada);
-}
-
-/** Desliga a integração e apaga token e esquema. A planilha fica intacta. */
+/** Desliga a integração e apaga autorização Google e esquema. A planilha fica intacta. */
 export async function desconectarSaidas(admin: { id: string }) {
   return desconectar(admin, FINALIDADE);
 }
@@ -312,7 +283,6 @@ const esquemaMapaSaidas = z.object({
     nome: z.string().max(200),
     url: z.string().max(500),
     fuso: z.string().max(60),
-    versao: z.number().int().min(1).max(999),
   }),
   abas: z.array(z.record(z.string(), z.unknown())).min(1).max(200),
   aba: z.string().min(1).max(200),
@@ -564,18 +534,14 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
   }
   const destrutiva = temDestrutivaSaidas(simulacao.plano);
   try {
-    const contagens = await chamarIntegracao<Record<string, number>>(
-      linha,
-      {
-        acao: "aplicar",
-        aba: simulacao.plano.aba,
-        cabecalhoLinha: simulacao.esquema.cabecalho,
-        assinatura: simulacao.plano.assinatura,
-        modoCompleto: destrutiva,
-        operacoes,
-      },
-      { retentavel: !destrutiva },
-    );
+    const contagens = await chamarIntegracao<Record<string, number>>(linha, {
+      acao: "aplicar",
+      aba: simulacao.plano.aba,
+      cabecalhoLinha: simulacao.esquema.cabecalho,
+      assinatura: simulacao.plano.assinatura,
+      modoCompleto: destrutiva,
+      operacoes,
+    });
     await registrarSincronizacaoSaidas(
       usuario.id,
       simulacao.plano,
@@ -590,7 +556,7 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
     const mensagem = erro instanceof ErroHttp ? erro.message : "Falha ao enviar para a planilha.";
     const registro = mensagemParaRegistro(erro, mensagem);
     // Falha de rede pode ter aplicado parte do plano; recusa explícita, não.
-    const parcial = (erro instanceof ErroGas || erro instanceof ErroGoogle) && !erro.recusado;
+    const parcial = erro instanceof ErroGoogle && !erro.recusado;
     await registrarSincronizacaoSaidas(
       usuario.id,
       simulacao.plano,

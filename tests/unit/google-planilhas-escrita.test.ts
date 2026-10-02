@@ -1,5 +1,5 @@
 // Confere o planejamento da gravação pela Sheets API sem tocar em dados reais.
-import { mensagemParaRegistro } from "@/infra/planilha";
+import { mensagemParaRegistro } from "@/infra/planilha-erros";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assinarAba } from "@/domain/planilha";
 import {

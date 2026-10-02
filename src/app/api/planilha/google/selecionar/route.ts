@@ -36,7 +36,6 @@ export async function POST(requisicao: Request): Promise<Response> {
       await tx.integracaoPlanilha.upsert({
         where: { id },
         update: {
-          provedor: "GOOGLE",
           googleRefreshToken: token,
           googlePlanilhaId: planilha.spreadsheetId,
           googlePlanilhaNome: planilha.properties.title,
@@ -49,7 +48,6 @@ export async function POST(requisicao: Request): Promise<Response> {
         create: {
           id,
           finalidade: dados.data.finalidade,
-          provedor: "GOOGLE",
           googleRefreshToken: token,
           googlePlanilhaId: planilha.spreadsheetId,
           googlePlanilhaNome: planilha.properties.title,

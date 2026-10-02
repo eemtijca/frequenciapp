@@ -10,7 +10,7 @@
 | [modelo-de-dados.md](modelo-de-dados.md)             | Entidades, regras de frequência e derivações.              |
 | [api.md](api.md)                                     | Contratos das rotas HTTP.                                  |
 | [interface.md](interface.md)                         | Interface, movimento, PWA e acessibilidade.                |
-| [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth ou Apps Script.         |
+| [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
 | [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
@@ -27,3 +27,5 @@
 - [Downloads protegidos](downloads.md): ZIP com senha, confirmação da cópia completa e auditoria mínima de exportações.
 - [ADR-031](adr/031-downloads-protegidos.md): proteção AES-256 no navegador, nomes genéricos e formatos originais por escolha explícita.
 - [ADR-032](adr/032-planilhas-sem-backups-internos.md): fim das cópias automáticas dentro da planilha e limpeza administrativa das cópias antigas.
+
+A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](adr/033-integracao-exclusiva-com-google-planilhas.md).
