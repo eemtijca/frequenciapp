@@ -77,14 +77,16 @@ export async function rolarAteGrafico(page: Page, nome: string) {
 
 /**
  * Escolhe uma turma na Chamada. As turmas ficam em botões de série que
- * expandem e recolhem; abre as séries recolhidas até a turma aparecer.
+ * mostram só as turmas da série ativa; percorre as séries até a turma aparecer.
  */
 export async function escolherTurmaNaChamada(secao: Locator, nome: RegExp): Promise<void> {
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
   const turma = grupo.getByRole("button", { name: nome }).first();
-  const fechadas = grupo.locator('button[aria-expanded="false"]');
-  while (!(await turma.isVisible().catch(() => false)) && (await fechadas.count()) > 0) {
-    await fechadas.first().click();
+  // O primeiro bloco do grupo é o controle de séries; tocar numa série mostra as turmas dela.
+  const seriesBotoes = grupo.locator(":scope > div").first().getByRole("button");
+  const total = await seriesBotoes.count();
+  for (let indice = 0; indice < total && !(await turma.isVisible().catch(() => false)); indice++) {
+    await seriesBotoes.nth(indice).click();
   }
   await turma.click();
 }

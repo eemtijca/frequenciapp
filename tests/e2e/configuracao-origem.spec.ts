@@ -99,13 +99,10 @@ async function conferir(
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
   const grupo = chamada.getByRole("group", { name: "Turma atual", exact: true });
-  // Cada série é um botão que expande as suas turmas; abre se estiver recolhida.
+  // Cada série é um botão que mostra só as suas turmas; ativa a série se preciso.
   const serie = grupo.getByRole("button", { name: series[indice] ?? "", exact: true });
-  if ((await serie.getAttribute("aria-expanded")) === "false") await serie.click();
-  await grupo
-    .getByRole("button")
-    .filter({ hasText: `${series[indice]} ${turma}` })
-    .click();
+  if ((await serie.getAttribute("aria-pressed")) !== "true") await serie.click();
+  await grupo.getByRole("button", { name: `${series[indice]} ${turma}`, exact: true }).click();
   const nome = `E2E Config ${nomes[indice]} ${turma}`;
   const linha = chamada.locator("ul li").filter({ hasText: nome });
   await expect(linha.getByText(`${nome}${exibe ? "*" : ""}`, { exact: true })).toBeVisible();

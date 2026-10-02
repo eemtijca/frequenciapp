@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CloudCheck,
@@ -54,6 +53,7 @@ import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { SeletorTurmaChamada } from "@/components/frequencia/seletor-turma-chamada";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -555,22 +555,6 @@ export default function VistaFrequencia({
     });
   }
 
-  // Turmas agrupadas por série. Só uma série fica aberta por vez; a da turma atual começa aberta.
-  const series = useMemo(() => {
-    const grupos: { id: string; nome: string; turmas: Turma[] }[] = [];
-    for (const opcao of turmas) {
-      const existente = grupos.find((grupo) => grupo.id === opcao.serieId);
-      if (existente) existente.turmas.push(opcao);
-      else grupos.push({ id: opcao.serieId, nome: opcao.serieNome, turmas: [opcao] });
-    }
-    return grupos;
-  }, [turmas]);
-  // undefined segue a série da turma atual; null é tudo recolhido.
-  const [serieAberta, setSerieAberta] = useState<string | null | undefined>(undefined);
-  const serieAtualId = turmas.find((opcao) => opcao.id === turmaId)?.serieId;
-  const serieEstaAberta = (id: string) =>
-    (serieAberta === undefined ? serieAtualId : serieAberta) === id;
-
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
@@ -641,68 +625,13 @@ export default function VistaFrequencia({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
         <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
           {turmas.length > 1 && (
-            <div role="group" aria-label="Turma atual" className="flex flex-col gap-2">
-              <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
-                {series.map((grupo) => {
-                  const aberta = serieEstaAberta(grupo.id);
-                  const contem = grupo.turmas.some((opcao) => opcao.id === turmaId);
-                  return (
-                    <button
-                      key={grupo.id}
-                      type="button"
-                      aria-expanded={aberta}
-                      aria-controls={`turmas-serie-${grupo.id}`}
-                      onClick={() => setSerieAberta(aberta ? null : grupo.id)}
-                      className={`pressionavel flex h-11 min-w-0 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
-                        contem ? "border-primary text-primary" : ""
-                      }`}
-                    >
-                      <span className="truncate">{grupo.nome}</span>
-                      <ChevronDown
-                        size={16}
-                        aria-hidden="true"
-                        className={`shrink-0 transition-transform motion-reduce:transition-none ${
-                          aberta ? "rotate-180" : ""
-                        }`}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-              {series.map((grupo) =>
-                serieEstaAberta(grupo.id) ? (
-                  <div
-                    key={grupo.id}
-                    id={`turmas-serie-${grupo.id}`}
-                    role="group"
-                    aria-label={`Turmas de ${grupo.nome}`}
-                    className="flex flex-wrap gap-2"
-                  >
-                    {grupo.turmas.map((opcao) => {
-                      const ativo = opcao.id === turmaId;
-                      const quantidade = alunos.filter(
-                        (a) => a.ativo && a.turmaId === opcao.id,
-                      ).length;
-                      return (
-                        <button
-                          key={opcao.id}
-                          type="button"
-                          aria-pressed={ativo}
-                          disabled={travado}
-                          onClick={() => setTurmaId(opcao.id)}
-                          className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center gap-2 rounded-lg border px-4 text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                          <span>{opcao.rotulo}</span>
-                          <span className="numerais-tabulares text-xs opacity-70">
-                            {quantidade}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null,
-              )}
-            </div>
+            <SeletorTurmaChamada
+              turmas={turmas}
+              alunos={alunos}
+              turmaId={turmaId}
+              travado={travado}
+              onEscolher={setTurmaId}
+            />
           )}
 
           <div className="flex items-center gap-2">

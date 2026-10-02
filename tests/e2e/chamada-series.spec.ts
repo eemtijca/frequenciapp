@@ -47,31 +47,9 @@ test.afterAll(async () => {
   await limpar();
 });
 
-test("Chamada: um botão por série expande e recolhe as turmas", async ({ page }) => {
-  await page.goto("/");
-  await aguardarHidratacao(page);
-  await trocarVisao(page, "Chamada", "chamada");
-  const grupo = page
-    .locator('section[aria-label="Fazer chamada"]')
-    .getByRole("group", { name: "Turma atual", exact: true });
-  const botaoDois = grupo.getByRole("button", { name: series[1] ?? "", exact: true });
-  const turmaDoisA = grupo.getByRole("button", { name: /Faixa Dois E2E Serie A/ });
-
-  await expect(botaoDois).toHaveAttribute("aria-expanded", "false");
-  await expect(turmaDoisA).toHaveCount(0);
-  await botaoDois.click();
-  await expect(botaoDois).toHaveAttribute("aria-expanded", "true");
-  await turmaDoisA.click();
-  await expect(turmaDoisA).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByText("E2E Serie 2A", { exact: true }).first()).toBeVisible();
-
-  // A série da turma escolhida segue marcada e recolher só esconde as turmas.
-  await botaoDois.click();
-  await expect(botaoDois).toHaveAttribute("aria-expanded", "false");
-  await expect(turmaDoisA).toHaveCount(0);
-});
-
-test("Chamada: abrir uma série fecha as turmas das outras", async ({ page }) => {
+test("Chamada: tocar no ano ativa a série, mostra só as turmas dela e seleciona a primeira", async ({
+  page,
+}) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
@@ -80,16 +58,29 @@ test("Chamada: abrir uma série fecha as turmas das outras", async ({ page }) =>
     .getByRole("group", { name: "Turma atual", exact: true });
   const botaoUm = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   const botaoDois = grupo.getByRole("button", { name: series[1] ?? "", exact: true });
+  const turmaDoisA = grupo.getByRole("button", { name: /Faixa Dois E2E Serie A/ });
+  const turmaUmA = grupo.getByRole("button", { name: /Faixa Um E2E Serie A/ });
 
-  // A série da turma atual pode já começar aberta; o estado final é o que importa.
   await botaoDois.click();
-  await expect(botaoDois).toHaveAttribute("aria-expanded", "true");
-  await expect(botaoUm).toHaveAttribute("aria-expanded", "false");
-  await botaoUm.click();
-  await expect(botaoUm).toHaveAttribute("aria-expanded", "true");
+  await expect(botaoDois).toHaveAttribute("aria-pressed", "true");
+  await expect(botaoUm).toHaveAttribute("aria-pressed", "false");
+  await expect(turmaDoisA).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaUmA).toHaveCount(0);
+  await expect(page.getByText("E2E Serie 2A", { exact: true }).first()).toBeVisible();
+
+  // Tocar na série ativa só recolhe as turmas; o destaque verde permanece.
+  await botaoDois.click();
   await expect(botaoDois).toHaveAttribute("aria-expanded", "false");
-  await expect(grupo.getByRole("group", { name: `Turmas de ${series[1]}` })).toHaveCount(0);
-  await expect(grupo.getByRole("group", { name: `Turmas de ${series[0]}` })).toBeVisible();
+  await expect(botaoDois).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaDoisA).toHaveCount(0);
+  await botaoDois.click();
+  await expect(turmaDoisA).toHaveAttribute("aria-pressed", "true");
+
+  // Voltar à primeira série seleciona a primeira turma dela.
+  await botaoUm.click();
+  await expect(botaoUm).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaUmA).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaDoisA).toHaveCount(0);
 });
 
 test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ page }) => {
