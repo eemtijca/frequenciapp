@@ -26,3 +26,4 @@
 - [ADR-030](adr/030-preferencias-agenda-notificacoes.md): tipos de aviso, pendências da coordenação e agenda compatível com Vercel Hobby.
 - [Downloads protegidos](downloads.md): ZIP com senha, confirmação da cópia completa e auditoria mínima de exportações.
 - [ADR-031](adr/031-downloads-protegidos.md): proteção AES-256 no navegador, nomes genéricos e formatos originais por escolha explícita.
+- [ADR-032](adr/032-planilhas-sem-backups-internos.md): fim das cópias automáticas dentro da planilha e limpeza administrativa das cópias antigas.

@@ -64,6 +64,62 @@ const documentoVinculado: DocumentoGoogle = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("gravação pela Sheets API", () => {
+  it("aplica uma mudança de desistência sem criar abas de backup", async () => {
+    const lotes: Record<string, unknown>[][] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (entrada: URL | string, opcoes?: RequestInit) => {
+        const url = new URL(String(entrada));
+        if (url.pathname.endsWith("/developerMetadata:search"))
+          return Response.json({ matchedDeveloperMetadata: [] });
+        if (opcoes?.method === "POST") {
+          lotes.push(
+            (JSON.parse(String(opcoes.body)) as { requests: Record<string, unknown>[] }).requests,
+          );
+          return Response.json({ replies: [] });
+        }
+        if (url.pathname.includes("/values/")) return Response.json({ values: valores });
+        if (url.searchParams.get("includeGridData") === "true")
+          return Response.json({
+            sheets: [
+              {
+                data: [
+                  {
+                    rowData: valores.map((linha) => ({
+                      values: linha.map((formattedValue) => ({ formattedValue })),
+                    })),
+                  },
+                ],
+              },
+            ],
+          });
+        return Response.json(documentoVinculado);
+      }),
+    );
+    const resultado = await aplicarGoogle(
+      "planilha-de-teste",
+      "acesso",
+      "Turma",
+      1,
+      assinatura,
+      [
+        {
+          tipo: "sinalizar",
+          linha: 2,
+          coluna: 1,
+          valor: "DESISTENTE",
+          anterior: "Ana",
+          alunoId,
+          nomeOriginal: "Ana",
+        },
+      ],
+      false,
+    );
+    expect(resultado.sinalizadas).toBe(1);
+    expect(lotes).toHaveLength(1);
+    expect(lotes.flat().some((pedido) => pedido.duplicateSheet)).toBe(false);
+    expect(lotes[0]?.[0]).toHaveProperty("updateCells");
+  });
   it("preenche somente célula vazia sem fórmula na releitura", () => {
     const plano = planejarEscritaGoogle(
       documento,

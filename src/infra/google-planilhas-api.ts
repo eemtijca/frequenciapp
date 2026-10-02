@@ -496,6 +496,16 @@ export async function executarAcaoGoogle(
     const { listarCopiasGoogle } = await import("@/infra/google-planilhas-copias");
     return listarCopiasGoogle(id, acesso, corpo.aba);
   }
+  if (corpo.acao === "listarAbasBackup") {
+    const { listarAbasBackupGoogle } = await import("./google-planilhas-limpeza");
+    return listarAbasBackupGoogle(id, acesso);
+  }
+  if (corpo.acao === "removerAbasBackup") {
+    const nomes = z.array(z.string().min(1)).max(1000).safeParse(corpo.copias);
+    if (!nomes.success) throw new ErroHttp("Confira as cópias antes de remover.", 400);
+    const { removerAbasBackupGoogle } = await import("./google-planilhas-limpeza");
+    return removerAbasBackupGoogle(id, acesso, nomes.data);
+  }
   if (corpo.acao === "restaurarCopia") {
     if (typeof corpo.aba !== "string" || typeof corpo.copia !== "string") {
       throw new ErroHttp("Escolha uma cópia válida.", 400);

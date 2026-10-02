@@ -143,6 +143,8 @@ beforeAll(async () => {
   );
   gas.definirToken(gerado.token);
   await chamar("/api/planilha", "PATCH", { ativa: true, endpoint: gas.url });
+  const scriptTestado = await chamar("/api/planilha/testar", "POST", { endpoint: gas.url });
+  expect(scriptTestado.status).toBe(200);
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha/estrutura", "POST", {}),
   );

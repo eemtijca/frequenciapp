@@ -2,12 +2,12 @@
  * FrequenciApp: ponte conservadora entre o aplicativo e a planilha.
  *
  * Ações: ping, estrutura, ler, escrever, aplicar, criarAba, organizarAba, removerAba,
- * listarCopias e restaurarCopia. Toda chamada exige o token guardado em
+ * listarCopias, restaurarCopia, listarAbasBackup e removerAbasBackup. Toda chamada exige o token guardado em
  * Script Properties (FREQUENCIAPP_TOKEN). Nenhuma ação apaga dado que a
  * integração não tenha criado, e célula com fórmula nunca é sobrescrita.
  */
 
-var VERSAO = 6;
+var VERSAO = 7;
 var PROP_TOKEN = "FREQUENCIAPP_TOKEN";
 var PROP_PLANILHA = "PLANILHA_ID";
 var MAX_LER_CELULAS = 20000;
@@ -18,7 +18,6 @@ var MAX_AMOSTRA_LINHAS = 12;
 var MAX_AMOSTRA_COLUNAS = 60;
 var MAX_DETALHE = 300;
 var COPIA_PREFIXO = "_frequenciapp_backup_";
-var COPIA_MAXIMA = 3;
 var MARCADOR_LINHA = "frequenciapp.linha";
 var MARCADOR_COLUNA = "frequenciapp.coluna";
 var MARCADOR_ABA = "frequenciapp.aba";
@@ -32,7 +31,14 @@ var CARIMBO_COPIA = /^(\d{8})-(\d{6})(?:-\d{3})?(?:-[a-z0-9]+)?$/;
 var VALOR_MARCADOR = "1";
 
 /** Ações que alteram a planilha: exceção no meio pode ter aplicado parte. */
-var ACOES_QUE_ALTERAM = ["escrever", "aplicar", "restaurarCopia", "criarAba", "organizarAba"];
+var ACOES_QUE_ALTERAM = [
+  "escrever",
+  "aplicar",
+  "restaurarCopia",
+  "criarAba",
+  "organizarAba",
+  "removerAbasBackup",
+];
 
 function doPost(e) {
   var corpo = null;
@@ -90,6 +96,10 @@ function rotear(corpo) {
       return acaoRemoverAba(corpo);
     case "listarCopias":
       return acaoListarCopias(corpo);
+    case "listarAbasBackup":
+      return acaoListarAbasBackup();
+    case "removerAbasBackup":
+      return acaoRemoverAbasBackup(corpo);
     case "restaurarCopia":
       return acaoRestaurarCopia(corpo);
     default:
@@ -318,7 +328,7 @@ function trecho(linha, inicio, fim) {
 
 /**
  * Aplica um plano do modo completo. Operações destrutivas exigem o modo
- * declarado e criam cópia oculta da aba antes de qualquer alteração.
+ * declarado. Não são criadas abas de backup dentro da planilha.
  */
 function acaoAplicar(corpo) {
   var aba = resolverAba(corpo.aba);
@@ -332,7 +342,6 @@ function acaoAplicar(corpo) {
     if (corpo.modoCompleto !== true) {
       return { ok: false, erro: "O modo completo não está ativo." };
     }
-    criarCopia(aba);
   }
   var contagem = {
     preenchidas: 0,
@@ -732,7 +741,7 @@ function acaoCriarAba(corpo) {
   return { ok: true, versao: VERSAO, dados: { aba: aba.getName() } };
 }
 
-/** Corrige somente a introdução reconhecida e datas, com cópia antes da alteração. */
+/** Corrige somente a introdução reconhecida e datas, sem criar abas de backup. */
 function acaoOrganizarAba(corpo) {
   var aba = resolverAba(corpo.aba);
   var ajuste = corpo.ajusteCabecalho;
@@ -821,13 +830,12 @@ function acaoOrganizarAba(corpo) {
     )
       return { ok: false, erro: "O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia." };
     if (removidas || ajuste.datas.length) {
-      criarCopia(aba);
       if (
         conferirAssinatura(aba, corpo) ||
         JSON.stringify(faixa.getDisplayValues()) !== JSON.stringify(valores) ||
         JSON.stringify(faixa.getFormulas()) !== JSON.stringify(formulas)
       )
-        return { ok: false, erro: "O cabeçalho mudou durante a cópia. Confira uma nova prévia." };
+        return { ok: false, erro: "O cabeçalho mudou antes da correção. Confira uma nova prévia." };
     }
     ajuste.datas.forEach(function (data) {
       aba.getRange(corpo.cabecalhoLinha, data.indice).setValue(data.rotulo);
@@ -953,47 +961,69 @@ function acaoRemoverAba(corpo) {
   if (!temMarcador(aba, MARCADOR_ABA)) {
     return { ok: false, erro: "Esta aba não foi criada pela integração." };
   }
-  criarCopia(aba);
   planilha.deleteSheet(aba);
   return { ok: true, versao: VERSAO, dados: { aba: corpo.aba } };
 }
 
 // ------------------------------------------------------------------ cópias
 
-/**
- * Duplica a aba como cópia oculta. Se o copyTo levar os metadados da aba, a
- * cópia perde os de nível de aba (a cópia não é aba criada pela integração);
- * os de linha e coluna ficam, para a restauração recriá-los. A restauração
- * adia a poda, que apagaria a cópia sendo restaurada quando ela é a mais
- * antiga.
- */
-function criarCopia(aba, adiarPoda) {
-  var planilha = abrirPlanilha();
-  var base = COPIA_PREFIXO + aba.getName() + "_" + carimboAgora(planilha);
-  var nome = base;
-  for (var sufixo = 2; planilha.getSheetByName(nome); sufixo += 1) {
-    nome = base + "-" + sufixo;
-  }
-  var copia = aba.copyTo(planilha).setName(nome);
-  removerMarcadoresDeAba(copia, MARCADOR_ABA);
-  removerMarcadoresDeAba(copia, MARCADOR_COPIA);
-  copia.hideSheet();
-  copia.addDeveloperMetadata(MARCADOR_COPIA, VALOR_MARCADOR);
-  if (!adiarPoda) podarCopias(aba.getName());
-  return copia;
+/** Reconhece apenas cópias antigas com carimbo e marcador da integração. */
+function abasBackupAntigas(planilha) {
+  return planilha.getSheets().filter(function (aba) {
+    return (
+      /^_frequenciapp_backup_.+_\d{8}-\d{6}(?:-\d{3})?(?:-[a-z0-9]+)?$/.test(aba.getName()) &&
+      aba
+        .createDeveloperMetadataFinder()
+        .withKey(MARCADOR_COPIA)
+        .find()
+        .some(function (item) {
+          return (
+            item.getValue() === "1" &&
+            item.getLocation().getLocationType() ===
+              SpreadsheetApp.DeveloperMetadataLocationType.SHEET
+          );
+        })
+    );
+  });
 }
 
-/** Carimbo com milissegundos; o sufixo em criarCopia resolve o empate. */
-function carimboAgora(planilha) {
-  return Utilities.formatDate(new Date(), planilha.getSpreadsheetTimeZone(), "yyyyMMdd-HHmmss-SSS");
+function acaoListarAbasBackup() {
+  var copias = abasBackupAntigas(abrirPlanilha())
+    .map(function (aba) {
+      return aba.getName();
+    })
+    .sort();
+  return { ok: true, versao: VERSAO, dados: { copias: copias } };
 }
 
-function podarCopias(nomeAba) {
+function acaoRemoverAbasBackup(corpo) {
   var planilha = abrirPlanilha();
-  var copias = copiasDaAba(planilha, nomeAba);
-  for (var i = COPIA_MAXIMA; i < copias.length; i += 1) {
-    planilha.deleteSheet(copias[i]);
-  }
+  var copias = abasBackupAntigas(planilha);
+  var nomes = copias
+    .map(function (aba) {
+      return aba.getName();
+    })
+    .sort();
+  if (
+    !Array.isArray(corpo.copias) ||
+    JSON.stringify(nomes) !== JSON.stringify(corpo.copias.slice().sort())
+  )
+    return { ok: false, erro: "As cópias mudaram. Confira uma nova prévia antes de remover." };
+  if (
+    !planilha.getSheets().some(function (aba) {
+      return (
+        !aba.isSheetHidden() &&
+        !copias.some(function (copia) {
+          return copia.getSheetId() === aba.getSheetId();
+        })
+      );
+    })
+  )
+    return { ok: false, erro: "A planilha precisa manter uma aba visível." };
+  copias.forEach(function (aba) {
+    planilha.deleteSheet(aba);
+  });
+  return { ok: true, versao: VERSAO, dados: { removidas: copias.length } };
 }
 
 /**
@@ -1060,7 +1090,6 @@ function acaoRestaurarCopia(corpo) {
   if (nomeCopia.indexOf(prefixo) !== 0 || !CARIMBO_COPIA.test(nomeCopia.slice(prefixo.length))) {
     return { ok: false, erro: "Esta aba não é uma cópia da integração." };
   }
-  var anterior = criarCopia(atual, true);
   var linhas = copia.getMaxRows();
   var colunas = copia.getMaxColumns();
   if (atual.getMaxRows() < linhas) {
@@ -1080,11 +1109,10 @@ function acaoRestaurarCopia(corpo) {
   recriarVinculos(copia, atual);
   if (atual.isSheetHidden()) atual.showSheet();
   SpreadsheetApp.flush();
-  podarCopias(nomeAba);
   return {
     ok: true,
     versao: VERSAO,
-    dados: { aba: nomeAba, copia: nomeCopia, anterior: anterior.getName() },
+    dados: { aba: nomeAba, copia: nomeCopia },
   };
 }
 

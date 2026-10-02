@@ -4,7 +4,6 @@ import { randomInt } from "node:crypto";
 import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
 import { pedidosDeApresentacao } from "@/infra/google-planilhas-apresentacao";
 import { ErroHttp } from "@/infra/erros";
-import { criarCopiaGoogle } from "@/infra/google-planilhas-copias";
 import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
 import { exigirAbaGoogle, lerDocumentoGoogle, metadadosDaAba } from "@/infra/google-planilhas-api";
 
@@ -85,7 +84,6 @@ export async function removerAbaGoogle(id: string, acesso: string, nome: string)
   ) {
     throw new ErroHttp("Esta aba não foi criada pela integração.", 409);
   }
-  await criarCopiaGoogle(id, acesso, nome);
   await enviarLotesGoogle(id, acesso, [{ deleteSheet: { sheetId: aba.properties.sheetId } }]);
   return { aba: nome };
 }

@@ -17,7 +17,7 @@ export const DURACOES_MODO_COMPLETO = [5, 15, 30, 60] as const;
 export type DuracaoModoCompleto = (typeof DURACOES_MODO_COMPLETO)[number];
 
 /** Versão esperada do Apps Script; conferida por teste contra gas/Codigo.gs. */
-export const VERSAO_SCRIPT = 6;
+export const VERSAO_SCRIPT = 7;
 
 /** Falha de rede pode ter aplicado parte do plano; recusa explícita não. */
 export function resultadoDeFalha(recusado: boolean): "FALHA" | "PARCIAL" {

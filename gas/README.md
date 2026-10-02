@@ -10,8 +10,7 @@ chamadas autenticadas pelo token e aplica as seguintes regras, sempre:
 - na sincronização, remove somente linha, coluna ou aba criada pela própria
   integração, identificada por Developer Metadata; a correção dos cabeçalhos
   também pode retirar a introdução reconhecida, após prévia e confirmação;
-- cria uma cópia oculta da aba antes de qualquer operação destrutiva,
-  mantendo as três mais recentes;
+- não cria abas de backup; cópias antigas podem ser removidas com prévia administrativa;
 - recusa qualquer escrita quando o cabeçalho da aba mudou.
 
 ## Apresentação na versão 5
@@ -22,9 +21,9 @@ Para atualizar, cole o código da versão 6, publique uma nova versão na implan
 
 ## Cabeçalhos na versão 6
 
-Novas colunas com datas completas recebem largura de 110 pixels. A ação `organizarAba` aceita também `ajusteCabecalho`, com `linhasRemover`, `assinaturaIntroducao` e `datas` (índice, valor anterior e rótulo completo). O aplicativo cria esse plano durante a prévia administrativa. A confirmação valida a introdução reconhecida, as datas e a ausência de fórmulas nas células afetadas. Depois cria uma cópia oculta, corrige as datas, retira as linhas introdutórias e aplica a apresentação. As chamadas e as colunas auxiliares não são regravadas; a planilha ajusta as referências das fórmulas ao remover linhas. Uma faixa manual sobreposta bloqueia a operação antes da cópia. Falhas não provocam reenvio automático.
+Novas colunas com datas completas recebem largura de 110 pixels. A ação `organizarAba` aceita também `ajusteCabecalho`, com `linhasRemover`, `assinaturaIntroducao` e `datas` (índice, valor anterior e rótulo completo). O aplicativo cria esse plano durante a prévia administrativa. A confirmação valida a introdução reconhecida, as datas e a ausência de fórmulas nas células afetadas. Depois reconfere o cabeçalho, corrige as datas, retira as linhas introdutórias e aplica a apresentação. As chamadas e as colunas auxiliares não são regravadas; a planilha ajusta as referências das fórmulas ao remover linhas. Uma faixa manual sobreposta bloqueia a operação antes da alteração. Falhas não provocam reenvio automático.
 
-Publique a versão 6 na implantação existente e use Testar conexão no aplicativo. A correção precisa dessa versão; a apresentação sem correção continua compatível com a versão 5.
+Publique a versão 7 na implantação existente e use Testar conexão no aplicativo. A versão 7 deixa de criar abas de backup e é exigida antes das alterações e da limpeza das cópias antigas.
 
 ## Marcadores
 
@@ -65,10 +64,12 @@ só aquela aba. `ler` e `aplicar` devolvem `tempos` por etapa em milissegundos
 e registram o mesmo objeto com `console.log`, visível em Execuções no editor
 do Apps Script.
 
-## Cópias e restauração
+## Cópias antigas e restauração
 
-A cópia se chama `_frequenciapp_backup_<aba>_<yyyyMMdd-HHmmss-SSS>`, com
-sufixo `-2`, `-3` quando duas cópias caem no mesmo milissegundo. Ela é
+A versão 7 não cria novas abas de backup. `listarAbasBackup` retorna as cópias antigas com carimbo e marcador de aba `frequenciapp.copia`. `removerAbasBackup` exige a mesma lista conferida e remove apenas essas cópias, mantendo uma aba normal visível. A limpeza elimina a restauração dessas cópias. A restauração de uma cópia existente continua disponível, sem guardar outra versão interna.
+
+Cópias antigas se chamam `_frequenciapp_backup_<aba>_<yyyyMMdd-HHmmss-SSS>`, com
+sufixo `-2`, `-3` quando duas cópias caem no mesmo milissegundo. Cada cópia é
 marcada com `frequenciapp.copia` e nunca herda `frequenciapp.aba`. A
 restauração copia valores, fórmulas, formatos, mesclagens e congelamento da
 cópia para dentro da própria aba, que mantém ID, posição e as referências
@@ -125,17 +126,19 @@ configuração de Aplicativo da Web. `gas/.clasp.json` não entra no Git.
 
 ## Ações
 
-| Ação             | Papel                                                       |
-| ---------------- | ----------------------------------------------------------- |
-| `ping`           | Identificação, abas e versão do script.                     |
-| `estrutura`      | Dimensões, congelamento, mesclagens e amostra do cabeçalho. |
-| `ler`            | Janela de células com marcação de fórmula.                  |
-| `escrever`       | Preenche somente células vazias.                            |
-| `aplicar`        | Operações tipadas do modo completo.                         |
-| `criarAba`       | Cria aba nova com cabeçalho mínimo.                         |
-| `removerAba`     | Remove aba criada pela integração.                          |
-| `listarCopias`   | Lista cópias ocultas de uma aba.                            |
-| `restaurarCopia` | Restaura o conteúdo de uma cópia dentro da própria aba.     |
+| Ação                | Papel                                                          |
+| ------------------- | -------------------------------------------------------------- |
+| `ping`              | Identificação, abas e versão do script.                        |
+| `estrutura`         | Dimensões, congelamento, mesclagens e amostra do cabeçalho.    |
+| `ler`               | Janela de células com marcação de fórmula.                     |
+| `escrever`          | Preenche somente células vazias.                               |
+| `aplicar`           | Operações tipadas do modo completo.                            |
+| `criarAba`          | Cria aba nova com cabeçalho mínimo.                            |
+| `removerAba`        | Remove aba criada pela integração.                             |
+| `listarAbasBackup`  | Lista somente as cópias antigas identificadas pela integração. |
+| `removerAbasBackup` | Remove a lista conferida de cópias antigas.                    |
+| `listarCopias`      | Lista cópias ocultas de uma aba.                               |
+| `restaurarCopia`    | Restaura o conteúdo de uma cópia dentro da própria aba.        |
 
 ## Solução de problemas
 

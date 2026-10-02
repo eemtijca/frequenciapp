@@ -145,6 +145,8 @@ beforeAll(async () => {
     headers: { Origin: APP_URL, Cookie: cookieAdmin, "Content-Type": "application/json" },
     body: JSON.stringify({ ativa: true, endpoint: gas.url }),
   });
+  const scriptTestado = await chamar("/api/planilha/testar", { endpoint: gas.url });
+  expect(scriptTestado.status).toBe(200);
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha/estrutura", {}),
   );
