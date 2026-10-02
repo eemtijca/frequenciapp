@@ -85,6 +85,9 @@ test("Chamada: abrir uma série fecha as turmas das outras", async ({ page }) =>
   await botaoDois.click();
   await expect(botaoDois).toHaveAttribute("aria-expanded", "true");
   await expect(botaoUm).toHaveAttribute("aria-expanded", "false");
+  // O botão do ano aberto e a primeira turma dele ficam em verde.
+  await expect(botaoDois).toHaveClass(/border-primary/);
+  await expect(botaoUm).not.toHaveClass(/border-primary/);
   // A primeira turma da série aberta já fica selecionada (destaque verde).
   await expect(grupo.getByRole("button", { name: /Faixa Dois E2E Serie A/ })).toHaveAttribute(
     "aria-pressed",

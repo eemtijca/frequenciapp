@@ -659,7 +659,7 @@ export default function VistaFrequencia({
                         if (!aberta && !contem && !travado && primeira) setTurmaId(primeira.id);
                       }}
                       className={`pressionavel flex h-11 min-w-0 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
-                        contem ? "border-primary text-primary" : ""
+                        aberta || contem ? "border-primary text-primary" : ""
                       }`}
                     >
                       <span className="truncate">{grupo.nome}</span>
