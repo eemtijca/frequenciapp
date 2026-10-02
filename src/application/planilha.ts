@@ -99,8 +99,8 @@ const esquemaEnvio = z.object({
   removerLinhas: z.array(z.number().int().min(1).max(100000)).max(500).optional(),
   removerColunas: z.array(z.number().int().min(1).max(2000)).max(200).optional(),
   planoHashGeral: z.string().max(64).optional(),
-  // Padrão: só os dias com chamada criada ou alterada desde o último envio
-  // bem-sucedido de cada turma. Falso envia o período inteiro, para conferência.
+  // Padrão: só os dias com chamada ainda sem confirmação para a origem.
+  // Falso envia o período inteiro, para conferência.
   somenteAlteradas: z.boolean().optional(),
 });
 
