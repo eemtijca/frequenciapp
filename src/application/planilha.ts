@@ -7,7 +7,7 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
-import { ErroGas, mensagemParaRegistro } from "@/infra/planilha";
+import { mensagemParaRegistro } from "@/infra/planilha-erros";
 import { ErroGoogle } from "@/infra/google-planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -18,17 +18,13 @@ import {
   desconectar,
   desativarModoCompleto as desativarModoCompletoComum,
   chamarIntegracao,
-  ErroVersaoPlanilha,
-  gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
   listarCopias as listarCopiasComum,
   modoCompletoAtivo,
   removerAba as removerAbaComum,
   restaurarCopia as restaurarCopiaComum,
-  revelarToken as revelarTokenComum,
   salvarConfiguracao,
-  testarConexao as testarConexaoComum,
   type LinhaIntegracao,
 } from "@/application/planilha-comum";
 import {
@@ -37,7 +33,6 @@ import {
   hashTexto,
   montarTurmaPlanilha,
   planejarSincronizacao,
-  VERSAO_SCRIPT,
   blocosDeColunas,
   colunasNecessarias,
   leituraDosBlocos,
@@ -59,7 +54,7 @@ export interface MapaAba {
 }
 
 export interface EsquemaSalvo {
-  planilha: { nome: string; url: string; fuso: string; versao: number };
+  planilha: { nome: string; url: string; fuso: string };
   abas: AbaEsquema[];
   mapa: MapaAba[];
   atualizadoEm: string;
@@ -78,7 +73,6 @@ const esquemaMapa = z.object({
     nome: z.string().max(200),
     url: z.string().max(500),
     fuso: z.string().max(60),
-    versao: z.number().int().min(1).max(999),
   }),
   abas: z.array(z.record(z.string(), z.unknown())).min(1).max(200),
   mapa: z
@@ -158,17 +152,12 @@ export async function lerEstadoPlanilha(): Promise<EstadoPlanilha> {
     ativa: linha.ativa,
     modo: completo ? "completo" : "conservador",
     modoCompletoAte: completo && linha.modoCompletoAte ? linha.modoCompletoAte.toISOString() : null,
-    podeEnviar: Boolean(
-      linha.ativa &&
-      (linha.provedor === "GOOGLE"
-        ? linha.googleRefreshToken && linha.googlePlanilhaId
-        : linha.endpoint && linha.token),
-    ),
+    podeEnviar: Boolean(linha.ativa && linha.googleRefreshToken && linha.googlePlanilhaId),
     alteradasDepois: await contarAlteradasDepois(),
   };
 }
 
-/** Configuração completa para a administração. O token nunca volta inteiro. */
+/** Configuração administrativa da planilha, sem revelar credenciais Google. */
 export async function lerIntegracaoAdmin() {
   const linha = await lerLinha(FINALIDADE);
   const sincronizacoes = await banco().sincronizacaoPlanilha.findMany({
@@ -198,15 +187,10 @@ export async function lerIntegracaoAdmin() {
   const ultimoErro = await lerErroVigente();
   return {
     ativa: linha.ativa,
-    provedor: linha.provedor,
     googleConectado: Boolean(linha.googleRefreshToken),
     googlePlanilha: linha.googlePlanilhaId
       ? { id: linha.googlePlanilhaId, nome: linha.googlePlanilhaNome }
       : null,
-    endpoint: linha.endpoint,
-    token: linha.token ? `••••••••${linha.token.slice(-4)}` : null,
-    temToken: Boolean(linha.token),
-    versaoScript: linha.versaoScript,
     esquema: esquemaSalvo(linha),
     esquemaEm: linha.esquemaEm?.toISOString() ?? null,
     modo: modoCompletoAtivo(linha) ? ("completo" as const) : ("conservador" as const),
@@ -267,25 +251,10 @@ async function lerErroVigente() {
   return erroVigente(registros, (registro) => registro.turmaOriginalId);
 }
 
-/** Salva integração ativa e endereço do Web App, com validação de host. */
+/** Salva as preferências da planilha conectada pela conta Google. */
 export async function salvarIntegracao(admin: { id: string }, entrada: unknown) {
   await salvarConfiguracao(admin, FINALIDADE, entrada);
   return lerIntegracaoAdmin();
-}
-
-/** Gera um token novo. Rotacionar invalida a conexão até atualizar o script. */
-export async function gerarToken(admin: { id: string }, entrada: unknown) {
-  return gerarTokenComum(admin, FINALIDADE, entrada);
-}
-
-/** Revela o token com a senha, para reinstalar ou corrigir o script. */
-export async function revelarToken(admin: { id: string }, entrada: unknown) {
-  return revelarTokenComum(admin, FINALIDADE, entrada);
-}
-
-/** Testa o Web App publicado: ping sem alterar a planilha. */
-export async function testarConexao(entrada: unknown) {
-  return testarConexaoComum(FINALIDADE, entrada);
 }
 
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
@@ -494,7 +463,7 @@ async function diasDoEnvio(
   return { dias: dias.slice(-LIMITE_DIAS_ENVIO), incremental: true };
 }
 
-type LeituraGas = {
+type LeituraPlanilha = {
   valores: string[][];
   formula: boolean[][];
   linhaInicial: number;
@@ -509,9 +478,7 @@ type LeituraGas = {
 };
 
 /**
- * Lê da aba só as colunas que o plano usa para os dias pedidos. O script 4
- * lê por faixas e devolve a assinatura atual; o 3 lê da coluna 1 até a última
- * coluna necessária.
+ * Lê as colunas necessárias e confere a assinatura e os vínculos dos alunos.
  */
 async function lerParaPlano(
   linha: LinhaIntegracao,
@@ -519,7 +486,7 @@ async function lerParaPlano(
   dias: string[],
 ): Promise<{ conteudo: LeituraAba; assinatura: string | null }> {
   const colunas = colunasNecessarias(esquema, dias);
-  const leitura = await chamarIntegracao<LeituraGas>(linha, {
+  const leitura = await chamarIntegracao<LeituraPlanilha>(linha, {
     acao: "ler",
     aba: esquema.nome,
     linhaInicial: 1,
@@ -529,10 +496,7 @@ async function lerParaPlano(
     cabecalhoLinha: esquema.cabecalho,
   });
   if (!leitura.alunosDasLinhas) {
-    throw new ErroHttp(
-      `O script da planilha está desatualizado. Publique a versão ${VERSAO_SCRIPT} do gas/Codigo.gs antes de enviar.`,
-      409,
-    );
+    throw new ErroHttp("Não foi possível conferir os vínculos dos alunos na planilha.", 502);
   }
   const base = leitura.blocos
     ? leituraDosBlocos(esquema.nome, leitura.linhaInicial, leitura.blocos)
@@ -638,10 +602,7 @@ async function montarSimulacao(
   }
   const diasPorTurma = new Map<string, { dias: string[]; incremental: boolean }>();
   for (const par of pares) {
-    diasPorTurma.set(
-      par.turmaOriginalId,
-      await diasDoEnvio(par.turmaOriginalId, entrada, linha.provedor === "GOOGLE"),
-    );
+    diasPorTurma.set(par.turmaOriginalId, await diasDoEnvio(par.turmaOriginalId, entrada, true));
   }
   const todosOsDias = [...diasPorTurma.values()].flatMap((item) => item.dias).sort();
   const [turmas, alunos, frequencias] = await Promise.all([
@@ -695,7 +656,7 @@ async function montarSimulacao(
     }
     const plano = planejarSincronizacao(esquemaAba, turmaPlanilha, leitura.conteudo, {
       ...opcoesBase,
-      sinalizarSituacao: linha.provedor === "GOOGLE",
+      sinalizarSituacao: true,
       substituirDivergencias: completo && (entrada.substituirDivergencias ?? false),
       limparCelulas: completo ? (entrada.limparCelulas ?? []) : [],
       removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
@@ -967,20 +928,14 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       continue;
     }
     try {
-      const contagens = await chamarIntegracao<Record<string, unknown>>(
-        linha,
-        {
-          acao: "aplicar",
-          aba: plano.aba,
-          cabecalhoLinha: esquema.cabecalho,
-          assinatura: plano.assinatura,
-          modoCompleto: destrutiva,
-          operacoes,
-        },
-        // Nunca repetir: uma resposta perdida pode ter gravado tudo, e a
-        // segunda tentativa só geraria um erro enganoso de estrutura.
-        { retentavel: false, tempoLimiteMs: Math.max(10_000, 52_000 - (Date.now() - inicio)) },
-      );
+      const contagens = await chamarIntegracao<Record<string, unknown>>(linha, {
+        acao: "aplicar",
+        aba: plano.aba,
+        cabecalhoLinha: esquema.cabecalho,
+        assinatura: plano.assinatura,
+        modoCompleto: destrutiva,
+        operacoes,
+      });
       await concluirRegistro(registro, plano, "SUCESSO", contagens);
       // Coluna ou linha nova muda a assinatura: o esquema salvo acompanha,
       // para o próximo envio não pedir nova conferência de estrutura.
@@ -993,9 +948,7 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       }
       resultados.push({ ...base, resultado: "sucesso", contagens });
     } catch (erro) {
-      const recusado =
-        erro instanceof ErroVersaoPlanilha ||
-        ((erro instanceof ErroGas || erro instanceof ErroGoogle) && erro.recusado);
+      const recusado = erro instanceof ErroGoogle && erro.recusado;
       const mensagem = recusado ? erro.message : ERRO_SEM_CONFIRMACAO;
       await concluirRegistro(
         registro,
@@ -1215,7 +1168,7 @@ export async function removerAba(admin: { id: string }, entrada: unknown) {
   return removerAbaComum(admin, FINALIDADE, entrada);
 }
 
-/** Desliga a integração e apaga token e esquema. A planilha fica intacta. */
+/** Desliga a integração e apaga autorização Google e esquema. A planilha fica intacta. */
 export async function desconectarIntegracao(admin: { id: string }) {
   return desconectar(admin, FINALIDADE);
 }

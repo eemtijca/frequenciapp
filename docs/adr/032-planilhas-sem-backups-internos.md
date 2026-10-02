@@ -1,5 +1,7 @@
 # ADR-032: planilhas sem abas internas de backup
 
+A conexão e as exigências de Apps Script descritas nesta decisão são históricas e foram substituídas pela [ADR-033](033-integracao-exclusiva-com-google-planilhas.md).
+
 ## Estado
 
 Implementada para revisão.

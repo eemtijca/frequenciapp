@@ -1,18 +1,18 @@
 // Planilha de saídas na interface: configuração na Gestão e envio pela vista
-// Saídas, contra o Apps Script falso.
+// Saídas, contra a Sheets API sintética.
 import { expect, test } from "@playwright/test";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
-import { ADMIN_E2E, comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
+import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 const ABA = "Saiu mais cedo";
 
-let gas: GasFalso;
+let google: GoogleFalso;
 
 test.describe("Google Planilhas de saídas", () => {
   test.beforeAll(async () => {
-    gas = await criarGasFalso();
-    gas.definirAba(ABA, [
+    google = await criarGoogleFalso();
+    google.definirAba(ABA, [
       ["Data", "Aluno", "Turma", "Momento", "Justificativa", "Observação", "Liberado por"],
     ]);
     await criarMassaE2E();
@@ -24,10 +24,8 @@ test.describe("Google Planilhas de saídas", () => {
          on conflict (id) do update set
            finalidade = 'SAIDAS',
            ativa = false,
-           endpoint = null,
-           token = null,
-           versao_script = null,
-           esquema = null,
+           google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+       esquema = null,
            assinatura_esquema = null,
            esquema_em = null,
            modo = 'CONSERVADOR',
@@ -43,7 +41,7 @@ test.describe("Google Planilhas de saídas", () => {
 
   test.afterAll(async () => {
     await limparMassaE2E();
-    await gas.fechar();
+    await google.fechar();
   });
 
   test("admin configura e coordenação envia as saídas do mês", async ({ page }) => {
@@ -53,27 +51,16 @@ test.describe("Google Planilhas de saídas", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
-    await cartao.getByText("Conexão por Apps Script").click();
+    await expect(cartao.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
+    await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
+    await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
+    await comBanco((cliente) => google.conectar(cliente, "SAIDAS"));
+    await page.reload();
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: "Configurações" }).click();
+    await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
 
-    // Token com senha.
-    await cartao.getByRole("button", { name: "Gerar novo" }).click();
-    const dialogoSenha = page.getByRole("dialog");
-    await dialogoSenha.getByLabel("Senha do administrador").fill(ADMIN_E2E.senha);
-    await dialogoSenha.getByRole("button", { name: "Confirmar" }).click();
-    const campoToken = cartao.locator("input[readonly]");
-    await expect
-      .poll(async () => (await campoToken.inputValue()).length, { timeout: 15_000 })
-      .toBeGreaterThan(20);
-    gas.definirToken(await campoToken.inputValue());
-
-    // Endereço, ativação e teste de conexão.
-    await cartao.getByLabel("URL /exec").fill(gas.url);
-    await cartao.getByRole("button", { name: "Salvar", exact: true }).click();
-    await cartao.getByRole("switch", { name: "Integração de saídas ativa" }).click();
-    await cartao.getByRole("button", { name: "Testar conexão" }).click();
-    await expect(cartao.getByText(/Conectado a Planilha de teste/)).toBeVisible();
-
-    // Estrutura da aba única.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
     await expect(cartao.getByText(ABA, { exact: true }).first()).toBeVisible();
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
@@ -89,13 +76,13 @@ test.describe("Google Planilhas de saídas", () => {
       .click();
     const dialogo = page.getByRole("dialog");
     await expect(dialogo.getByText(/1 linha nova/)).toBeVisible();
-    // As entradas entram no mesmo envio; sem a conexão Google, o aviso aparece e as saídas seguem.
+    // As entradas participam do mesmo diálogo; aba ainda não preparada gera aviso.
     await expect(dialogo.getByText(/^Entradas:/)).toBeVisible();
     await dialogo.getByRole("button", { name: "Enviar" }).click();
     await expect(page.getByText(/1 linha criada/)).toBeVisible();
-    await expect.poll(() => gas.valor(ABA, 2, 2)).toBe("E2E Aluno Um");
-    expect(gas.valor(ABA, 2, 1)).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
-    expect(gas.valor(ABA, 2, 5)).toBe("Consulta");
+    await expect.poll(() => google.valor(ABA, 2, 2)).toBe("E2E Aluno Um");
+    expect(google.valor(ABA, 2, 1)).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+    expect(google.valor(ABA, 2, 5)).toBe("Consulta");
 
     // O segundo envio do mesmo mês não duplica linhas.
     await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();

@@ -39,7 +39,7 @@ beforeEach(() => {
   dubl.limitar.mockResolvedValue(true);
   dubl.lerLinha.mockImplementation(async () => ({
     ativa: true,
-    provedor: "GOOGLE",
+
     googleRefreshToken: "falso",
     googlePlanilhaId: arquivo,
     esquema: { aba: "Saídas" },
@@ -84,11 +84,11 @@ describe("envio de entradas", () => {
   it("cria explicitamente só a aba ausente com cabeçalho próprio", async () => {
     dubl.chamar.mockResolvedValueOnce({ abas: [] }).mockResolvedValueOnce({});
     expect(await prepararAbaEntradas(usuario)).toEqual({ criada: true });
-    expect(dubl.chamar).toHaveBeenLastCalledWith(
-      expect.anything(),
-      { acao: "criarAba", nome: "Entradas", cabecalho: CABECALHO_ENTRADAS },
-      { retentavel: false },
-    );
+    expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
+      acao: "criarAba",
+      nome: "Entradas",
+      cabecalho: CABECALHO_ENTRADAS,
+    });
   });
   it("exige prévia e envia somente criação conservadora sem repetir requisição", async () => {
     await expect(enviarEntradas(usuario, periodo)).rejects.toThrow("prévia");
@@ -105,7 +105,6 @@ describe("envio de entradas", () => {
         modoCompleto: false,
         operacoes: [expect.objectContaining({ tipo: "criarLinhas" })],
       }),
-      { retentavel: false },
     );
   });
   it("recusa dados alterados ou arquivo trocado depois da prévia", async () => {
@@ -120,12 +119,16 @@ describe("envio de entradas", () => {
       enviarEntradas(usuario, { ...periodo, planoHash: previa.planoHash }),
     ).rejects.toThrow("mudaram");
   });
-  it("não usa Apps Script nem aba configurada para saídas", async () => {
-    dubl.lerLinha.mockResolvedValue({ ativa: true, provedor: "GAS" });
+  it("exige autorização Google e impede uso da aba reservada para entradas", async () => {
+    dubl.lerLinha.mockResolvedValue({
+      ativa: true,
+      googleRefreshToken: null,
+      googlePlanilhaId: null,
+    });
     await expect(simularEntradas(usuario, periodo)).rejects.toThrow("conexão Google");
     dubl.lerLinha.mockResolvedValue({
       ativa: true,
-      provedor: "GOOGLE",
+
       googleRefreshToken: "falso",
       googlePlanilhaId: "qa",
       esquema: { aba: "Entradas" },

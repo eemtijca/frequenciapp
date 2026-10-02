@@ -1,11 +1,11 @@
 // Contratos do envio automático ao registrar saídas: chave desligada não grava,
 // chave ligada acrescenta a linha do dia, queda depois de gravar vira PARCIAL
 // e o registro seguinte não repete o envio. Massa com prefixo QG, contra o
-// Apps Script falso. As entradas usam a conexão Google, sem falso local; aqui só
+// Google falso. Saídas e entradas usam a autorização Google; aqui só
 // se confirma que o registro nunca falha por causa do envio.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -23,7 +23,7 @@ const CABECALHO = [
 
 let cookieAdmin = "";
 let banco: pg.Client | null = null;
-let gas: GasFalso | null = null;
+let google: GoogleFalso | null = null;
 const alunos: string[] = [];
 
 async function limparMassa() {
@@ -39,8 +39,8 @@ async function limparMassa() {
     `insert into integracoes_planilha (id, finalidade, ativa, modo, atualizado_em)
      values ('saidas', 'SAIDAS', false, 'CONSERVADOR', now())
      on conflict (id) do update set
-       finalidade = 'SAIDAS', ativa = false, endpoint = null, token = null,
-       versao_script = null, esquema = null, assinatura_esquema = null, esquema_em = null,
+       finalidade = 'SAIDAS', ativa = false, google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+       esquema = null, assinatura_esquema = null, esquema_em = null,
        modo = 'CONSERVADOR', modo_completo_ate = null, envio_automatico = false,
        atualizado_em = now()`,
   );
@@ -80,10 +80,13 @@ async function registrar(indice: number, dia: string) {
   expect(resposta.status).toBe(201);
 }
 
-async function esperar(condicao: () => boolean, tempoMs = 15_000): Promise<boolean> {
+async function esperar(
+  condicao: () => boolean | Promise<boolean>,
+  tempoMs = 15_000,
+): Promise<boolean> {
   const limite = Date.now() + tempoMs;
   while (Date.now() < limite) {
-    if (condicao()) return true;
+    if (await condicao()) return true;
     await new Promise((resolver) => setTimeout(resolver, 200));
   }
   return condicao();
@@ -92,7 +95,7 @@ async function esperar(condicao: () => boolean, tempoMs = 15_000): Promise<boole
 function linhasDe(aluno: string): number {
   let total = 0;
   for (let linha = 2; linha < 40; linha++) {
-    if (gas?.valor(ABA, linha, 2) === aluno) total += 1;
+    if (google?.valor(ABA, linha, 2) === aluno) total += 1;
   }
   return total;
 }
@@ -112,7 +115,7 @@ beforeAll(async () => {
   }
   await limparMassa();
   await banco?.query("insert into liberadores (codigo, rotulo) values ('QGLIB', 'QG Libera')");
-  gas = await criarGasFalso();
+  google = await criarGoogleFalso();
   const entrada = await fetch(`${APP_URL}/api/auth/entrar`, {
     method: "POST",
     headers: { Origin: APP_URL, "Content-Type": "application/json" },
@@ -132,16 +135,9 @@ beforeAll(async () => {
     );
     alunos.push(aluno.aluno.id);
   }
-  gas.definirAba(ABA, [CABECALHO]);
-  const gerado = await json<{ token: string }>(
-    await chamar("/api/planilha-saidas/token", "POST", { acao: "gerar", senha: SENHA_ADMIN }),
-  );
-  gas.definirToken(gerado.token);
-  await chamar("/api/planilha-saidas", "PATCH", { ativa: true, endpoint: gas.url });
-  // O teste de conexão registra a versão do script antes de liberar escritas.
-  const scriptTestado = await chamar("/api/planilha-saidas/testar", "POST", { endpoint: gas.url });
-  expect(scriptTestado.status).toBe(200);
-  expect((await json<{ ping: { versao: number } }>(scriptTestado)).ping.versao).toBe(7);
+  google.definirAba(ABA, [CABECALHO]);
+  if (!banco) throw new Error("Banco sintético indisponível.");
+  await google.conectar(banco, "SAIDAS");
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha-saidas/estrutura", "POST", {}),
   );
@@ -156,7 +152,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await chamar("/api/planilha-saidas/desconectar", "POST", {}).catch(() => undefined);
   await limparMassa();
-  await gas?.fechar();
+  await google?.fechar();
   if (banco) await banco.end();
 });
 
@@ -177,23 +173,25 @@ describe("envio automático ao registrar a saída", () => {
   it("com a chave ligada, registrar acrescenta a linha do dia sem repetir", async () => {
     await registrar(1, "2026-08-12");
     expect(await esperar(() => linhasDe("QG Bia") === 1)).toBe(true);
-    expect(gas?.valor(ABA, 2, 4) ?? "").not.toBe("");
+    expect(google?.valor(ABA, 2, 4) ?? "").not.toBe("");
     // Outro registro no mesmo dia não duplica a linha da Bia.
     await registrar(2, "2026-08-12");
     expect(await esperar(() => linhasDe("QG Caio") === 1)).toBe(true);
     expect(linhasDe("QG Bia")).toBe(1);
   });
 
-  it("queda depois de gravar é recuperada pela nova tentativa, sem linha duplicada", async () => {
-    gas?.derrubarProximoAplicar();
+  it("queda depois de gravar fica parcial e permite conferência manual sem duplicar", async () => {
+    const antes = google?.chamadas().filter((acao) => acao === "gravar").length ?? 0;
+    google?.perderProximaResposta();
     await registrar(3, "2026-08-13");
-    expect(await esperar(() => linhasDe("QG Davi") >= 1)).toBe(true);
-    const limite = Date.now() + 15_000;
-    while (Date.now() < limite && (await ultimoResultado()) !== "SUCESSO") {
-      await new Promise((resolver) => setTimeout(resolver, 200));
-    }
-    expect(await ultimoResultado()).toBe("SUCESSO");
+    expect(await esperar(() => linhasDe("QG Davi") === 1)).toBe(true);
+    expect(await esperar(async () => (await ultimoResultado()) === "PARCIAL")).toBe(true);
     await new Promise((resolver) => setTimeout(resolver, 1000));
+    expect(google?.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes + 1);
+    const previa = await json<{ resumo: { criar: number } }>(
+      await chamar("/api/planilha-saidas/simular", "POST", { de: "2026-08-13", ate: "2026-08-13" }),
+    );
+    expect(previa.resumo.criar).toBe(0);
     expect(linhasDe("QG Davi")).toBe(1);
   });
 
@@ -202,14 +200,14 @@ describe("envio automático ao registrar a saída", () => {
       `insert into sincronizacoes_planilha (finalidade, de, ate, modalidade, plano_hash, resultado, criado_em)
        values ('SAIDAS', date '2026-08-13', date '2026-08-13', 'CONSERVADOR', 'qgparcial', 'PARCIAL', now() + interval '1 minute')`,
     );
-    const antes = gas?.chamadas().length ?? 0;
+    const antes = google?.chamadas().length ?? 0;
     await registrar(0, "2026-08-14");
     await new Promise((resolver) => setTimeout(resolver, 2000));
     expect(
-      gas
+      google
         ?.chamadas()
         .slice(antes)
-        .filter((acao) => acao.includes("aplicar")),
+        .filter((acao) => acao === "gravar"),
     ).toEqual([]);
     expect(linhasDe("QG Ana")).toBe(0);
   });

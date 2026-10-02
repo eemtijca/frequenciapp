@@ -100,7 +100,7 @@ async function arquivosDoRepositorio(): Promise<string[]> {
     if (FORA_DO_ESCOPO.has(entrada.name) || ARQUIVOS_IGNORADOS.has(entrada.name)) continue;
     const completo = path.join(RAIZ, entrada.name);
     if (entrada.isDirectory()) {
-      if (["src", "docs", "scripts", "docker", "prisma", "tests", "gas"].includes(entrada.name)) {
+      if (["src", "docs", "scripts", "docker", "prisma", "tests"].includes(entrada.name)) {
         alvos.push(...(await listarArquivos(completo)));
       }
     } else if (

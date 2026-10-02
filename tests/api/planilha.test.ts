@@ -1,8 +1,8 @@
-// Contratos da integração com Google Planilhas, contra um Apps Script falso
-// que responde 302 como o Content Service e guarda a planilha em memória.
+// Contratos da integração com Google Planilhas, contra a Sheets API sintética
+// com a planilha em memória e autorização OAuth simulada.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -11,12 +11,11 @@ const DIA = "2026-09-10";
 
 let cookieAdmin = "";
 let banco: pg.Client | null = null;
-let gas: GasFalso | null = null;
+let google: GoogleFalso | null = null;
 let serieId = "";
 let turmaAId = "";
 let aulaId = "";
 let alunoBId = "";
-let token = "";
 
 async function conectarBanco(): Promise<pg.Client | null> {
   const conexao = process.env.DATABASE_URL;
@@ -36,9 +35,7 @@ async function limparMassa() {
      values ('principal', false, 'CONSERVADOR', now())
      on conflict (id) do update set
        ativa = false,
-       endpoint = null,
-       token = null,
-       versao_script = null,
+       google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
        esquema = null,
        assinatura_esquema = null,
        esquema_em = null,
@@ -78,7 +75,7 @@ async function json<T>(resposta: Response): Promise<T> {
 beforeAll(async () => {
   banco = await conectarBanco();
   await limparMassa();
-  gas = await criarGasFalso();
+  google = await criarGoogleFalso();
 
   const entrada = await requisicao("/api/auth/entrar", {
     method: "POST",
@@ -127,7 +124,7 @@ beforeAll(async () => {
     }),
   });
 
-  gas.definirAba(
+  google.definirAba(
     "QP Ano A",
     [
       ["Aluno", "Turma atual", "10/09", "Total"],
@@ -144,7 +141,7 @@ afterAll(async () => {
     body: JSON.stringify({}),
   }).catch(() => undefined);
   await limparMassa();
-  await gas?.fechar();
+  await google?.fechar();
   if (banco) await banco.end();
 });
 
@@ -165,33 +162,39 @@ describe("integração com a planilha", () => {
     expect(resposta.status).toBe(403);
   });
 
-  it("gera token, conecta e testa o script falso", async () => {
-    const gerado = await autenticado("/api/planilha/token", {
-      method: "POST",
-      body: JSON.stringify({ acao: "gerar", senha: SENHA_ADMIN }),
-    });
-    expect(gerado.status).toBe(200);
-    token = (await json<{ token: string }>(gerado)).token;
-    gas?.definirToken(token);
+  it("usa a planilha autorizada pela conta Google", async () => {
+    if (!google || !banco) throw new Error("Google sintético indisponível.");
+    await google.conectar(banco);
+    const resposta = await autenticado("/api/planilha");
+    expect(resposta.status).toBe(200);
+    const dados = await json<{ integracao: Record<string, unknown> }>(resposta);
+    expect(dados.integracao.googleConectado).toBe(true);
+    for (const campo of ["endpoint", "token", "versaoScript", "provedor"])
+      expect(dados.integracao).not.toHaveProperty(campo);
+  });
 
-    const salvo = await autenticado("/api/planilha", {
-      method: "PATCH",
-      body: JSON.stringify({ ativa: true, endpoint: gas?.url }),
-    });
-    expect(salvo.status).toBe(200);
+  it("as rotas antigas de publicação e segredo não existem", async () => {
+    for (const base of ["planilha", "planilha-saidas"])
+      for (const caminho of ["token", "testar"])
+        expect(
+          (await autenticado(`/api/${base}/${caminho}`, { method: "POST", body: "{}" })).status,
+        ).toBe(404);
+  });
 
-    const teste = await autenticado("/api/planilha/testar", {
-      method: "POST",
-      body: JSON.stringify({ endpoint: gas?.url }),
-    });
-    expect(teste.status).toBe(200);
-    const ping = await json<{ ping: { planilha: { nome: string } } }>(teste);
-    expect(ping.ping.planilha.nome).toBe("Planilha de teste");
+  it("recusa configuração antiga sem trocar a conexão Google", async () => {
+    expect(
+      (
+        await autenticado("/api/planilha", {
+          method: "PATCH",
+          body: JSON.stringify({ endpoint: "https://exemplo.invalid/exec" }),
+        })
+      ).status,
+    ).toBe(400);
   });
 
   it("confere a apresentação sem escrever e aplica só após a confirmação", async () => {
     const corpo = { aba: "QP Ano A" };
-    const chamadas = gas?.chamadas().filter((acao) => acao === "organizarAba").length ?? 0;
+    const chamadas = google?.chamadas().filter((acao) => acao === "gravar").length ?? 0;
     const resposta = await autenticado("/api/planilha/organizar", {
       method: "POST",
       body: JSON.stringify(corpo),
@@ -201,35 +204,23 @@ describe("integração com a planilha", () => {
       resposta,
     );
     expect(dados.previa.colunas.some((coluna) => coluna.rotulo === "Aluno")).toBe(true);
-    expect(gas?.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadas);
+    expect(google?.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadas);
     const confirmado = await autenticado("/api/planilha/organizar", {
       method: "POST",
       body: JSON.stringify({ ...corpo, planoHash: dados.previa.planoHash }),
     });
     expect(confirmado.status).toBe(200);
-    expect(gas?.chamadas().filter((acao) => acao === "organizarAba").length).toBe(chamadas + 1);
-    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+    expect(google?.chamadas().filter((acao) => acao === "gravar").length).toBe(chamadas + 1);
+    expect(google?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
   });
 
-  it("recusa token errado sem tocar na planilha", async () => {
-    gas?.definirToken("outro-token");
-    const teste = await autenticado("/api/planilha/testar", {
-      method: "POST",
-      body: JSON.stringify({ endpoint: gas?.url }),
-    });
-    expect(teste.status).toBe(502);
-    gas?.definirToken(token);
-  });
-
-  it("avisa quando o fuso do script difere do aplicativo", async () => {
-    gas?.definirFuso("America/Sao_Paulo");
-    const teste = await autenticado("/api/planilha/testar", {
-      method: "POST",
-      body: JSON.stringify({ endpoint: gas?.url }),
-    });
-    const ping = await json<{ ping: { avisos: string[] } }>(teste);
-    expect(ping.ping.avisos.some((aviso) => aviso.includes("fuso"))).toBe(true);
-    gas?.definirFuso("America/Fortaleza");
+  it("recusa uma autorização Google revogada sem escrever", async () => {
+    google?.recusarAutorizacao(true);
+    const antes = google?.chamadas().filter((acao) => acao === "gravar").length;
+    const leitura = await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" });
+    expect(leitura.status).toBe(401);
+    expect(google?.chamadas().filter((acao) => acao === "gravar").length).toBe(antes);
+    google?.recusarAutorizacao(false);
   });
 
   it("lê a estrutura e salva o mapa por turma de origem", async () => {
@@ -239,7 +230,7 @@ describe("integração com a planilha", () => {
     });
     expect(estrutura.status).toBe(200);
     const dados = await json<{
-      planilha: { nome: string; url: string; fuso: string; versao: number };
+      planilha: { nome: string; url: string; fuso: string };
       abas: unknown[];
       sugestoes: { aba: string; turmaOriginalId: string | null }[];
     }>(estrutura);
@@ -272,7 +263,7 @@ describe("integração com a planilha", () => {
   });
 
   it("corrige a aba mapeada sem criar backup, conserva fórmulas e relê o esquema sem perder o mapa", async () => {
-    gas?.definirAba(
+    google?.definirAba(
       "QP Ano A",
       [
         ["Frequência · QP Ano A"],
@@ -294,16 +285,16 @@ describe("integração com a planilha", () => {
       previa: { planoHash: string; ajusteCabecalho: { linhasRemover: number } };
     }>(resposta);
     expect(dados.previa.ajusteCabecalho.linhasRemover).toBe(3);
-    expect(gas?.valor("QP Ano A", 5, 1)).toBe("QP Alice");
+    expect(google?.valor("QP Ano A", 5, 1)).toBe("QP Alice");
     const aplicado = await autenticado("/api/planilha/organizar", {
       method: "POST",
       body: JSON.stringify({ ...corpo, planoHash: dados.previa.planoHash }),
     });
     expect(aplicado.status).toBe(200);
-    expect(gas?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
-    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
-    expect(gas?.formulaDe("QP Ano A", 2, 4)).toBe('=CONT.SE(C5;"F")');
-    expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_QP Ano A_"))).toBe(
+    expect(google?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
+    expect(google?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+    expect(google?.formulaDe("QP Ano A", 2, 4)).toBe('=CONT.SE(C5;"F")');
+    expect(google?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_QP Ano A_"))).toBe(
       false,
     );
     const estado = await json<{
@@ -321,7 +312,7 @@ describe("integração com a planilha", () => {
       1,
     );
     // Restaura a fórmula sintética usada nos contratos seguintes.
-    gas?.definirAba(
+    google?.definirAba(
       "QP Ano A",
       [
         ["Aluno", "Turma atual", "10/09/2026", "Total"],
@@ -339,7 +330,7 @@ describe("integração com a planilha", () => {
         body: JSON.stringify({ serieId, nome: "B" }),
       }),
     );
-    gas?.definirAba(
+    google?.definirAba(
       "QP Ano A",
       [
         ["Frequência · QP Ano A"],
@@ -351,7 +342,7 @@ describe("integração com a planilha", () => {
       ],
       { formulas: { D5: '=CONT.SE(C5:C6;"F")' } },
     );
-    gas?.definirAba("QP Ano B", [
+    google?.definirAba("QP Ano B", [
       ["Frequência · QP Ano B"],
       ["P = presente · F = falta"],
       [],
@@ -376,7 +367,7 @@ describe("integração com a planilha", () => {
         method: "POST",
         body: JSON.stringify({ aba, emLote: true, ajustarCabecalho: true, anoReferencia: 2026 }),
       });
-      expect(resposta.status).toBe(200);
+      expect(resposta.status, await resposta.clone().text()).toBe(200);
       const dados = await json<{ previa: { planoHash: string } }>(resposta);
       previas.push({ aba, planoHash: dados.previa.planoHash });
     }
@@ -390,12 +381,12 @@ describe("integração com a planilha", () => {
           anoReferencia: 2026,
         }),
       });
-      expect(resposta.status).toBe(200);
+      expect(resposta.status, await resposta.clone().text()).toBe(200);
     }
-    expect(gas?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
-    expect(gas?.valor("QP Ano B", 1, 3)).toBe("29/09/2026");
-    expect(gas?.valor("QP Ano B", 2, 3)).toBe("P");
-    expect(gas?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
+    expect(google?.valor("QP Ano A", 1, 3)).toBe("10/09/2026");
+    expect(google?.valor("QP Ano B", 1, 3)).toBe("29/09/2026");
+    expect(google?.valor("QP Ano B", 2, 3)).toBe("P");
+    expect(google?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
     const estado = await json<{
       integracao: { esquema: { planilha: unknown; abas: unknown[]; mapa: unknown[] } };
     }>(await autenticado("/api/planilha"));
@@ -445,17 +436,17 @@ describe("integração com a planilha", () => {
     const resultado = await json<{ resumo: { sucesso: number; falhas: number } }>(aplicado);
     expect(resultado.resumo).toMatchObject({ sucesso: 1, falhas: 0 });
 
-    expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
-    expect(gas?.valor("QP Ano A", 2, 3)).toBe("P");
-    expect(gas?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
+    expect(google?.valor("QP Ano A", 3, 3)).toBe("F");
+    expect(google?.valor("QP Ano A", 2, 3)).toBe("P");
+    expect(google?.formulaDe("QP Ano A", 2, 4)).toContain("CONT.SE");
   });
 
   it("grava o código dos alunos e acha pelo código depois de renomear na planilha", async () => {
-    const vinculos = gas?.vinculos("QP Ano A") ?? [];
+    const vinculos = google?.vinculos("QP Ano A") ?? [];
     expect(vinculos.map((item) => item.linha)).toEqual([2, 3]);
     expect(vinculos.find((item) => item.linha === 3)?.alunoId).toBe(alunoBId);
 
-    gas?.definirValor("QP Ano A", 3, 1, "B. Renomeado");
+    google?.definirValor("QP Ano A", 3, 1, "B. Renomeado");
     const simulado = await json<{
       planos: { resumo: { novosAlunos: number; vincular: number; ambiguidades: number } }[];
     }>(
@@ -475,7 +466,7 @@ describe("integração com a planilha", () => {
       vincular: 0,
       ambiguidades: 0,
     });
-    gas?.definirValor("QP Ano A", 3, 1, "QP Bruno");
+    google?.definirValor("QP Ano A", 3, 1, "QP Bruno");
   });
 
   it("simula o mês de todas as turmas mapeadas", async () => {
@@ -500,7 +491,7 @@ describe("integração com a planilha", () => {
   });
 
   it("registra falha de recusa e mostra o último erro", async () => {
-    gas?.definirAba(
+    google?.definirAba(
       "QP Ano A",
       [
         ["Aluno", "Turma atual", "10/09", "Total"],
@@ -527,7 +518,7 @@ describe("integração com a planilha", () => {
     );
     expect(simulado.planos[0]?.resumo.preencher).toBe(1);
 
-    gas?.definirRecusarAplicar(true);
+    google?.recusarGravacoes(true);
     const aplicado = await autenticado("/api/planilha/aplicar", {
       method: "POST",
       body: JSON.stringify({
@@ -540,11 +531,11 @@ describe("integração com a planilha", () => {
         planoHashGeral: simulado.planoHashGeral,
       }),
     });
-    gas?.definirRecusarAplicar(false);
+    google?.recusarGravacoes(false);
     expect(aplicado.status).toBe(200);
     const resultado = await json<{ resumo: { falhas: number } }>(aplicado);
     expect(resultado.resumo.falhas).toBe(1);
-    expect(gas?.valor("QP Ano A", 3, 3)).toBe("");
+    expect(google?.valor("QP Ano A", 3, 3)).toBe("");
 
     const config = await json<{
       integracao: {
@@ -555,7 +546,7 @@ describe("integração com a planilha", () => {
     expect(config.integracao.alteradasDepois).toBeGreaterThanOrEqual(0);
     expect(config.integracao.ultimoErro?.resultado).toBe("FALHA");
     expect(config.integracao.ultimoErro?.turma).toBe("QP Ano A");
-    expect(config.integracao.ultimoErro?.erro).toContain("Recusa de teste");
+    expect(config.integracao.ultimoErro?.erro).toContain("Gravação sintética recusada");
   });
 
   it("recusa prévia com hash diferente", async () => {
@@ -596,7 +587,7 @@ describe("integração com a planilha", () => {
     expect(estado.estado.modo).toBe("completo");
   });
 
-  it("substitui divergência no modo completo e cria cópia", async () => {
+  it("substitui divergência no modo completo sem criar cópia", async () => {
     const simulado = await json<{
       modalidade: string;
       planoHashGeral: string;
@@ -621,7 +612,7 @@ describe("integração com a planilha", () => {
 
     // Divergência manual: a planilha marca presença onde o app registrou falta
     // e mantém o nome antigo em caixa diferente.
-    gas?.definirAba(
+    google?.definirAba(
       "QP Ano A",
       [
         ["Aluno", "Turma atual", "10/09", "Total"],
@@ -664,9 +655,9 @@ describe("integração com a planilha", () => {
       }),
     });
     expect(aplicado.status).toBe(200);
-    expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
-    expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
-    expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(false);
+    expect(google?.valor("QP Ano A", 3, 3)).toBe("F");
+    expect(google?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+    expect(google?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(false);
 
     // O sucesso da mesma turma apaga a falha registrada antes para ela.
     const config = await json<{
@@ -695,8 +686,8 @@ describe("integração com a planilha", () => {
     expect(simulacao.planos[0]?.candidatosRemocaoLinhas).toHaveLength(0);
 
     // A integração havia criado a linha do Bruno (marcada); ela é candidata.
-    gas?.marcarLinha("QP Ano A", 3);
-    gas?.definirAba(
+    google?.marcarLinha("QP Ano A", 3);
+    google?.definirAba(
       "QP Ano A",
       [
         ["Aluno", "Turma atual", "10/09", "Total"],
@@ -706,7 +697,7 @@ describe("integração com a planilha", () => {
       ],
       { formulas: { D2: '=CONT.SE(C2:C3;"F")' } },
     );
-    gas?.marcarLinha("QP Ano A", 4);
+    google?.marcarLinha("QP Ano A", 4);
     const depois = await json<{
       planoHashGeral: string;
       planos: { candidatosRemocaoLinhas: { linha: number; nome: string }[] }[];
@@ -758,11 +749,11 @@ describe("integração com a planilha", () => {
       }),
     });
     expect(aplicado.status).toBe(200);
-    expect(gas?.valor("QP Ano A", 4, 1)).toBe("");
+    expect(google?.valor("QP Ano A", 4, 1)).toBe("");
   });
 
   it("remove coluna criada pela integração no modo completo", async () => {
-    gas?.marcarColuna("QP Ano A", 3);
+    google?.marcarColuna("QP Ano A", 3);
     const simulacao = await json<{
       planoHashGeral: string;
       planos: { candidatosRemocaoColunas: { coluna: number; rotulo: string }[] }[];
@@ -811,7 +802,7 @@ describe("integração com a planilha", () => {
       }),
     });
     expect(aplicado.status).toBe(200);
-    expect(gas?.valor("QP Ano A", 1, 3)).toBe("Total");
+    expect(google?.valor("QP Ano A", 1, 3)).toBe("Total");
   });
 
   it("cria aba para turma sem aba e só remove a que a integração criou", async () => {
@@ -820,7 +811,7 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({ nome: "QP Nova" }),
     });
     expect(criada.status).toBe(200);
-    expect(gas?.abas()).toContain("QP Nova");
+    expect(google?.abas()).toContain("QP Nova");
 
     const recusada = await autenticado("/api/planilha/remover-aba", {
       method: "POST",
@@ -833,15 +824,15 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({ aba: "QP Nova", frase: "EDITAR PLANILHA", senha: SENHA_ADMIN }),
     });
     expect(removida.status).toBe(200);
-    expect(gas?.abas()).not.toContain("QP Nova");
+    expect(google?.abas()).not.toContain("QP Nova");
 
-    gas?.definirAba("QP Manual", [["Aluno"], ["QP Alice"]]);
+    google?.definirAba("QP Manual", [["Aluno"], ["QP Alice"]]);
     const manual = await autenticado("/api/planilha/remover-aba", {
       method: "POST",
       body: JSON.stringify({ aba: "QP Manual", frase: "EDITAR PLANILHA", senha: SENHA_ADMIN }),
     });
-    expect(manual.status).toBe(502);
-    expect(gas?.abas()).toContain("QP Manual");
+    expect(manual.status).toBe(409);
+    expect(google?.abas()).toContain("QP Manual");
   });
 
   it("recusa operação destrutiva depois de a janela expirar", async () => {
@@ -876,10 +867,10 @@ describe("integração com a planilha", () => {
   });
 
   it("remove cópias antigas com prévia e senha, preservando as abas das turmas", async () => {
-    const normais = gas?.abas() ?? [];
-    gas?.criarCopiaAntiga("QP Ano A");
-    gas?.criarCopiaAntiga("QP Manual");
-    const antes = gas?.valor("QP Ano A", 2, 1);
+    const normais = google?.abas() ?? [];
+    google?.criarCopiaAntiga("QP Ano A");
+    google?.criarCopiaAntiga("QP Manual");
+    const antes = google?.valor("QP Ano A", 2, 1);
     const previa = await autenticado("/api/planilha/limpar-copias", {
       method: "POST",
       body: JSON.stringify({}),
@@ -892,7 +883,9 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({ planoHash: dados.previa.planoHash }),
     });
     expect(semSenha.status).toBe(400);
-    expect(gas?.abas().filter((nome) => nome.startsWith("_frequenciapp_backup_"))).toHaveLength(2);
+    expect(google?.abas().filter((nome) => nome.startsWith("_frequenciapp_backup_"))).toHaveLength(
+      2,
+    );
     const aplicada = await autenticado("/api/planilha/limpar-copias", {
       method: "POST",
       body: JSON.stringify({
@@ -903,8 +896,8 @@ describe("integração com a planilha", () => {
     });
     expect(aplicada.status).toBe(200);
     expect(await json(aplicada)).toEqual({ removidas: 2 });
-    expect(gas?.abas()).toEqual(normais);
-    expect(gas?.valor("QP Ano A", 2, 1)).toBe(antes);
+    expect(google?.abas()).toEqual(normais);
+    expect(google?.valor("QP Ano A", 2, 1)).toBe(antes);
   });
 
   it("volta ao conservador e desconecta", async () => {
@@ -919,9 +912,9 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({}),
     });
     expect(desconectado.status).toBe(200);
-    const config = await json<{ integracao: { ativa: boolean; temToken: boolean } }>(
+    const config = await json<{ integracao: { ativa: boolean; googleConectado: boolean } }>(
       await autenticado("/api/planilha"),
     );
-    expect(config.integracao).toMatchObject({ ativa: false, temToken: false });
+    expect(config.integracao).toMatchObject({ ativa: false, googleConectado: false });
   });
 });

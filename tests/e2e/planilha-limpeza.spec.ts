@@ -9,7 +9,7 @@ async function abrir(page: Page) {
       json: {
         integracao: {
           ativa: true,
-          provedor: "GOOGLE",
+
           googleConectado: true,
           envioAutomatico: false,
           googlePlanilha: { id: "arquivo-sintetico", nome: "QA" },
@@ -18,7 +18,7 @@ async function abrir(page: Page) {
           sincronizacoes: [],
           alteradasDepois: 0,
           esquema: {
-            planilha: { nome: "QA", url: "", fuso: "America/Fortaleza", versao: 1 },
+            planilha: { nome: "QA", url: "", fuso: "America/Fortaleza" },
             abas: [],
             mapa: [],
           },

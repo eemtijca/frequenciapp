@@ -1,29 +1,21 @@
 // Integrações com Google Planilhas: helpers comuns das finalidades, cobrindo
 // a linha da integração, conexão, token, modo completo, abas e cópias.
 import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
-import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { ambiente } from "@/infra/ambiente";
 import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
-import { chamarGas, type OpcoesGas } from "@/infra/planilha";
 import { renovarAcesso } from "@/infra/google-oauth";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
-import {
-  DURACOES_MODO_COMPLETO,
-  FRASE_MODO_COMPLETO,
-  VERSAO_SCRIPT,
-  validarEndpoint,
-} from "@/domain/planilha";
+import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
 
 /** Finalidade da integração: frequência das turmas ou saídas antecipadas. */
 export type FinalidadeIntegracao = "FREQUENCIA" | "SAIDAS";
 
-/** Cada finalidade tem a sua linha, com endereço, token e modo próprios. */
+/** Cada finalidade tem a sua autorização Google, arquivo e modo próprios. */
 const ID_POR_FINALIDADE: Record<FinalidadeIntegracao, string> = {
   FREQUENCIA: "principal",
   SAIDAS: "saidas",
@@ -35,10 +27,6 @@ export function idDaIntegracao(finalidade: FinalidadeIntegracao): string {
 
 export interface LinhaIntegracao {
   ativa: boolean;
-  provedor: string;
-  endpoint: string | null;
-  token: string | null;
-  versaoScript: string | null;
   googleRefreshToken: string | null;
   googlePlanilhaId: string | null;
   googlePlanilhaNome: string | null;
@@ -53,10 +41,6 @@ export interface LinhaIntegracao {
 
 const CAMPOS = {
   ativa: true,
-  provedor: true,
-  endpoint: true,
-  token: true,
-  versaoScript: true,
   googleRefreshToken: true,
   googlePlanilhaId: true,
   googlePlanilhaNome: true,
@@ -103,46 +87,16 @@ export function modoCompletoAtivo(linha: LinhaIntegracao): boolean {
   );
 }
 
-export function exigirConexao(linha: LinhaIntegracao): { endpoint: string; token: string } {
-  if (!linha.ativa || !linha.endpoint || !linha.token) {
-    throw new ErroHttp("A integração com a planilha não está ativa.", 400);
-  }
-  return { endpoint: linha.endpoint, token: linha.token };
-}
-
-/** Recusa local da versão, antes de iniciar qualquer escrita na planilha. */
-export class ErroVersaoPlanilha extends ErroHttp {
-  constructor() {
-    super(
-      "Atualize o Apps Script para a versão 7 e teste a conexão antes de alterar a planilha.",
-      400,
-    );
-    this.name = "ErroVersaoPlanilha";
-  }
-}
-
-/** Escolhe a fonte da finalidade: Sheets API ou protocolo legado. */
+/** Executa a ação na planilha autorizada pela conta Google. */
 export async function chamarIntegracao<T>(
   linha: LinhaIntegracao,
   corpo: Record<string, unknown>,
-  opcoes?: OpcoesGas,
 ): Promise<T> {
-  if (linha.provedor === "GOOGLE") {
-    if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId) {
-      throw new ErroHttp("A integração com a planilha não está ativa.", 400);
-    }
-    const acesso = await renovarAcesso(linha.googleRefreshToken);
-    return (await executarAcaoGoogle(linha.googlePlanilhaId, acesso, corpo)) as T;
+  if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId) {
+    throw new ErroHttp("Conecte a conta Google e escolha a planilha na Gestão.", 400);
   }
-  if (
-    ["aplicar", "organizarAba", "removerAba", "restaurarCopia", "removerAbasBackup"].includes(
-      String(corpo.acao),
-    ) &&
-    Number(linha.versaoScript ?? 0) < 7
-  )
-    throw new ErroVersaoPlanilha();
-  const { endpoint, token } = exigirConexao(linha);
-  return chamarGas<T>(endpoint, token, corpo, opcoes);
+  const acesso = await renovarAcesso(linha.googleRefreshToken);
+  return (await executarAcaoGoogle(linha.googlePlanilhaId, acesso, corpo)) as T;
 }
 
 export const esquemaSenha = z.object({
@@ -152,14 +106,14 @@ export const esquemaSenha = z.object({
 export const esquemaConfiguracao = z
   .object({
     ativa: z.boolean().optional(),
-    endpoint: z.string().trim().max(500).optional(),
     envioAutomatico: z.boolean().optional(),
   })
+  .strict()
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
   });
 
-/** Salva integração ativa e endereço do Web App, com validação de host. */
+/** Salva as preferências da planilha conectada pela conta Google. */
 export async function salvarConfiguracao(
   admin: { id: string },
   finalidade: FinalidadeIntegracao,
@@ -167,121 +121,26 @@ export async function salvarConfiguracao(
 ): Promise<void> {
   const dados = esquemaConfiguracao.safeParse(entrada);
   if (!dados.success) {
-    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+    throw new ErroHttp("Configuração inválida. Use a conexão Google na Gestão.", 400);
   }
-  if (dados.data.endpoint !== undefined) {
-    const problema = validarEndpoint(dados.data.endpoint, ambiente.permitirEndpointLocal);
-    if (problema) throw new ErroHttp(problema, 400);
+  const linha = await lerLinha(finalidade);
+  if (
+    (dados.data.ativa || dados.data.envioAutomatico) &&
+    (!linha.googleRefreshToken || !linha.googlePlanilhaId)
+  ) {
+    throw new ErroHttp("Conecte a conta Google e escolha a planilha antes de ativar.", 400);
   }
   const id = idDaIntegracao(finalidade);
-  const trocandoProvedor =
-    dados.data.endpoint !== undefined && (await lerLinha(finalidade)).provedor === "GOOGLE";
   await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.upsert({
+    await tx.integracaoPlanilha.update({
       where: { id },
-      update: {
-        ...(dados.data.ativa !== undefined ? { ativa: dados.data.ativa } : {}),
-        ...(dados.data.envioAutomatico !== undefined
-          ? { envioAutomatico: dados.data.envioAutomatico }
-          : {}),
-        ...(dados.data.endpoint !== undefined
-          ? {
-              endpoint: dados.data.endpoint.trim() || null,
-              provedor: "GAS",
-              ...(trocandoProvedor
-                ? {
-                    ativa: false,
-                    esquema: Prisma.DbNull,
-                    assinaturaEsquema: null,
-                    esquemaEm: null,
-                  }
-                : {}),
-            }
-          : {}),
-        atualizadoPorId: admin.id,
-      },
-      create: {
-        id,
-        finalidade,
-        ativa: dados.data.ativa ?? false,
-        endpoint: dados.data.endpoint?.trim() || null,
-        atualizadoPorId: admin.id,
-      },
+      data: { ...dados.data, atualizadoPorId: admin.id },
     });
     await auditar(tx, admin.id, "planilha.salvar", `integracao:${id}`);
   });
 }
 
-/** Gera um token novo. Rotacionar invalida a conexão até atualizar o script. */
-export async function gerarToken(
-  admin: { id: string },
-  finalidade: FinalidadeIntegracao,
-  entrada: unknown,
-): Promise<{ token: string }> {
-  const dados = esquemaSenha.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Informe a senha do administrador.", 400);
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:token:${finalidade}`);
-  const token = randomBytes(32).toString("base64url");
-  const id = idDaIntegracao(finalidade);
-  await comTransacao(async (tx) => {
-    await tx.integracaoPlanilha.upsert({
-      where: { id },
-      update: { token, ativa: false, atualizadoPorId: admin.id },
-      create: { id, finalidade, token, atualizadoPorId: admin.id },
-    });
-    await auditar(tx, admin.id, "planilha.token.gerar", `integracao:${id}`);
-  });
-  return { token };
-}
-
-/** Revela o token com a senha, para reinstalar ou corrigir o script. */
-export async function revelarToken(
-  admin: { id: string },
-  finalidade: FinalidadeIntegracao,
-  entrada: unknown,
-): Promise<{ token: string }> {
-  const dados = esquemaSenha.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Informe a senha do administrador.", 400);
-  await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:token:${finalidade}`);
-  const linha = await lerLinha(finalidade);
-  if (!linha.token) throw new ErroHttp("Ainda não há token gerado.", 404);
-  return { token: linha.token };
-}
-
-/** Testa o Web App publicado: ping sem alterar a planilha. */
-export async function testarConexao(finalidade: FinalidadeIntegracao, entrada: unknown) {
-  const dados = esquemaConfiguracao.safeParse(entrada);
-  if (!dados.success) throw new ErroHttp("Endereço inválido.", 400);
-  const linha = await lerLinha(finalidade);
-  const endpoint = dados.data.endpoint?.trim() || linha.endpoint;
-  if (!endpoint) throw new ErroHttp("Informe o endereço do aplicativo da Web.", 400);
-  const problema = validarEndpoint(endpoint, ambiente.permitirEndpointLocal);
-  if (problema) throw new ErroHttp(problema, 400);
-  if (!linha.token) throw new ErroHttp("Gere o token antes de testar.", 400);
-  const ping = await chamarGas<{
-    versao: number;
-    planilha: { nome: string; url: string; fuso: string };
-    abas: { nome: string; linhas: number; colunas: number; oculta: boolean }[];
-  }>(endpoint, linha.token, { acao: "ping" });
-  const avisos: string[] = [];
-  if (ping.planilha.fuso !== ambiente.fuso) {
-    avisos.push(
-      `O script usa o fuso ${ping.planilha.fuso}, diferente do fuso da escola (${ambiente.fuso}). As datas podem sair deslocadas.`,
-    );
-  }
-  if (ping.versao !== VERSAO_SCRIPT) {
-    avisos.push(
-      `O script publicado está na versão ${ping.versao}; a esperada é ${VERSAO_SCRIPT}. Publique a versão atual do gas/Codigo.gs.`,
-    );
-  }
-  await banco().integracaoPlanilha.update({
-    where: { id: idDaIntegracao(finalidade) },
-    data: { endpoint, versaoScript: String(ping.versao) },
-  });
-  return { ...ping, avisos };
-}
-
-/** Desliga a integração e apaga token e esquema. A planilha fica intacta. */
+/** Desliga a integração e apaga autorização Google e esquema. A planilha fica intacta. */
 export async function desconectar(
   admin: { id: string },
   finalidade: FinalidadeIntegracao,
@@ -292,13 +151,10 @@ export async function desconectar(
       where: { id },
       data: {
         ativa: false,
-        endpoint: null,
-        token: null,
         googleRefreshToken: null,
         googlePlanilhaId: null,
         googlePlanilhaNome: null,
         envioAutomatico: false,
-        provedor: "GAS",
         esquema: Prisma.DbNull,
         assinaturaEsquema: null,
         esquemaEm: null,
@@ -404,11 +260,11 @@ export async function restaurarCopia(
   }
   await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:restaurar:${finalidade}`);
   const linha = await lerLinha(finalidade);
-  const resultado = await chamarIntegracao<{ aba: string; copia: string }>(
-    linha,
-    { acao: "restaurarCopia", aba: dados.data.aba, copia: dados.data.copia },
-    { retentavel: false },
-  );
+  const resultado = await chamarIntegracao<{ aba: string; copia: string }>(linha, {
+    acao: "restaurarCopia",
+    aba: dados.data.aba,
+    copia: dados.data.copia,
+  });
   await comTransacao(async (tx) => {
     await tx.integracaoPlanilha.update({
       where: { id: idDaIntegracao(finalidade) },
@@ -435,18 +291,14 @@ export async function criarAba(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   const linha = await lerLinha(finalidade);
-  const resultado = await chamarIntegracao<{ aba: string }>(
-    linha,
-    {
-      acao: "criarAba",
-      nome: dados.data.nome,
-      cabecalho: dados.data.cabecalho,
-      colunas: colunasDeNovaAba(
-        dados.data.cabecalho?.length ? dados.data.cabecalho : ["Aluno", "Turma atual"],
-      ),
-    },
-    { retentavel: false },
-  );
+  const resultado = await chamarIntegracao<{ aba: string }>(linha, {
+    acao: "criarAba",
+    nome: dados.data.nome,
+    cabecalho: dados.data.cabecalho,
+    colunas: colunasDeNovaAba(
+      dados.data.cabecalho?.length ? dados.data.cabecalho : ["Aluno", "Turma atual"],
+    ),
+  });
   await comTransacao(async (tx) => {
     await auditar(tx, admin.id, "planilha.criarAba", `aba:${dados.data.nome}`);
   });
@@ -477,11 +329,10 @@ export async function removerAba(
     throw new ErroHttp("O modo completo não está ativo.", 400);
   }
   await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:remover:${finalidade}`);
-  const resultado = await chamarIntegracao<{ aba: string }>(
-    linha,
-    { acao: "removerAba", aba: dados.data.aba },
-    { retentavel: false },
-  );
+  const resultado = await chamarIntegracao<{ aba: string }>(linha, {
+    acao: "removerAba",
+    aba: dados.data.aba,
+  });
   await comTransacao(async (tx) => {
     await auditar(tx, admin.id, "planilha.removerAba", `aba:${dados.data.aba}`);
   });

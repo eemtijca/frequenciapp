@@ -1,8 +1,8 @@
-// Contratos da planilha de saídas, contra o Apps Script falso: conexão,
+// Contratos da planilha de saídas, contra a Sheets API sintética: conexão,
 // estrutura da aba única, envio, correção no modo completo e remoção.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { criarGasFalso, type GasFalso } from "../helpers/gas-falso";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -25,12 +25,11 @@ const CABECALHO = [
 
 let cookieAdmin = "";
 let banco: pg.Client | null = null;
-let gas: GasFalso | null = null;
+let google: GoogleFalso | null = null;
 let serieId = "";
 let turmaId = "";
 let alunoAnaId = "";
 let saidaAnaId = "";
-let token = "";
 
 async function conectarBanco(): Promise<pg.Client | null> {
   const conexao = process.env.DATABASE_URL;
@@ -52,9 +51,7 @@ async function limparMassa() {
      on conflict (id) do update set
        finalidade = 'SAIDAS',
        ativa = false,
-       endpoint = null,
-       token = null,
-       versao_script = null,
+       google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
        esquema = null,
        assinatura_esquema = null,
        esquema_em = null,
@@ -109,7 +106,7 @@ beforeAll(async () => {
   banco = await conectarBanco();
   await limparMassa();
   await prepararLiberadores();
-  gas = await criarGasFalso();
+  google = await criarGoogleFalso();
 
   const entrada = await requisicao("/api/auth/entrar", {
     method: "POST",
@@ -160,7 +157,7 @@ beforeAll(async () => {
   );
   saidaAnaId = saida.saida.id;
 
-  gas.definirAba(ABA, [
+  google.definirAba(ABA, [
     CABECALHO,
     // Linha manual existente, que a integração deve ignorar.
     ["10/08/2026", "QS Bruno", "QS Ano A", "1ª aula", "Consulta", "", "Direção"],
@@ -173,7 +170,7 @@ afterAll(async () => {
     body: JSON.stringify({}),
   }).catch(() => undefined);
   await limparMassa();
-  await gas?.fechar();
+  await google?.fechar();
   if (banco) await banco.end();
 });
 
@@ -194,29 +191,11 @@ describe("planilha de saídas", () => {
     expect(resposta.status).toBe(403);
   });
 
-  it("gera token, ativa, testa e lê a estrutura da aba única", async () => {
-    const gerado = await autenticado("/api/planilha-saidas/token", {
-      method: "POST",
-      body: JSON.stringify({ acao: "gerar", senha: SENHA_ADMIN }),
-    });
-    expect(gerado.status).toBe(200);
-    token = (await json<{ token: string }>(gerado)).token;
-    gas?.definirToken(token);
-
-    const salvo = await autenticado("/api/planilha-saidas", {
-      method: "PATCH",
-      body: JSON.stringify({ ativa: true, endpoint: gas?.url }),
-    });
-    expect(salvo.status).toBe(200);
-
-    const teste = await autenticado("/api/planilha-saidas/testar", {
-      method: "POST",
-      body: JSON.stringify({ endpoint: gas?.url }),
-    });
-    expect(teste.status).toBe(200);
-
+  it("usa a conta Google e lê a estrutura da aba única", async () => {
+    if (!google || !banco) throw new Error("Google sintético indisponível.");
+    await google.conectar(banco, "SAIDAS");
     const estrutura = await json<{
-      planilha: { nome: string; url: string; fuso: string; versao: number };
+      planilha: { nome: string; url: string; fuso: string };
       abas: unknown[];
       sugestao: { aba: string } | null;
     }>(
@@ -252,20 +231,22 @@ describe("planilha de saídas", () => {
     expect(simulado.resumo.puladasOcupadas).toBe(0);
 
     // Uma recusa vira o último erro do cartão até o próximo envio dar certo.
-    gas?.definirRecusarAplicar(true);
+    google?.recusarGravacoes(true);
     const recusado = await json<{ resultado: string }>(
       await autenticado("/api/planilha-saidas/aplicar", {
         method: "POST",
         body: JSON.stringify({ de: DE, ate: ATE, planoHash: simulado.planoHash }),
       }),
     );
-    gas?.definirRecusarAplicar(false);
+    google?.recusarGravacoes(false);
     expect(recusado.resultado).toBe("falha");
     const comErro = await json<{
       integracao: { ultimoErro: { resultado: string; erro: string | null } | null };
     }>(await autenticado("/api/planilha-saidas"));
     expect(comErro.integracao.ultimoErro?.resultado).toBe("FALHA");
-    expect(comErro.integracao.ultimoErro?.erro).toContain("Recusa de teste");
+    expect(comErro.integracao.ultimoErro?.erro).toContain(
+      "O Google recusou a alteração da planilha",
+    );
 
     const aplicado = await json<{ resultado: string; contagens: Record<string, number> }>(
       await autenticado("/api/planilha-saidas/aplicar", {
@@ -275,8 +256,8 @@ describe("planilha de saídas", () => {
     );
     expect(aplicado.resultado).toBe("sucesso");
     expect(aplicado.contagens.linhasCriadas).toBe(1);
-    expect(gas?.valor(ABA, 3, 1)).toBe("10/08/2026");
-    expect(gas?.valor(ABA, 3, 2)).toBe("QS Ana");
+    expect(google?.valor(ABA, 3, 1)).toBe("10/08/2026");
+    expect(google?.valor(ABA, 3, 2)).toBe("QS Ana");
 
     const semErro = await json<{
       integracao: {
@@ -351,9 +332,9 @@ describe("planilha de saídas", () => {
       }),
     );
     expect(aplicado.resultado).toBe("sucesso");
-    expect(gas?.valor(ABA, 3, 5)).toBe("Outros");
-    expect(gas?.valor(ABA, 3, 6)).toBe("Liberada mais cedo");
-    expect(gas?.valor(ABA, 3, 7)).toBe("QA Planilha Dois");
+    expect(google?.valor(ABA, 3, 5)).toBe("Outros");
+    expect(google?.valor(ABA, 3, 6)).toBe("Liberada mais cedo");
+    expect(google?.valor(ABA, 3, 7)).toBe("QA Planilha Dois");
 
     // Sem a saída, a linha criada pela integração é candidata e pode sair.
     await autenticado(`/api/saidas/${saidaAnaId}`, { method: "DELETE" });
@@ -382,7 +363,7 @@ describe("planilha de saídas", () => {
       }),
     );
     expect(removido.resultado).toBe("sucesso");
-    expect(gas?.valor(ABA, 3, 2)).toBe("");
+    expect(google?.valor(ABA, 3, 2)).toBe("");
   });
 
   it("volta ao conservador e desconecta", async () => {
@@ -397,10 +378,10 @@ describe("planilha de saídas", () => {
       body: JSON.stringify({}),
     });
     expect(desconectado.status).toBe(200);
-    const config = await json<{ integracao: { ativa: boolean; endpoint: string | null } }>(
+    const config = await json<{ integracao: { ativa: boolean; googlePlanilha: unknown } }>(
       await autenticado("/api/planilha-saidas"),
     );
     expect(config.integracao.ativa).toBe(false);
-    expect(config.integracao.endpoint).toBeNull();
+    expect(config.integracao.googlePlanilha).toBeNull();
   });
 });

@@ -5,11 +5,14 @@ services:
     # Imagem construída pelo passo de build do workflow (com cache).
     # O `up -d` sem `--build` a reaproveita; sem ela, o Compose compila.
     image: frequenciapp:ci
-    # O Apps Script falso das suítes sobe no loopback do runner; a rede do host
+    # O Google falso das suítes sobe no loopback do runner; a rede do host
     # deixa o aplicativo alcançar esse endereço e o PostgreSQL publicado.
     network_mode: host
     ports: !reset []
+    volumes:
+      - ./tests/helpers/redirecionar-google.mjs:/teste-google.mjs:ro
     environment:
+      NODE_OPTIONS: "${NODE_OPTIONS:-} --import /teste-google.mjs"
       AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
       # Chaves sintéticas fornecidas pelo workflow; nenhum envio externo no CI.
       PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
@@ -17,13 +20,11 @@ services:
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
       CRON_SECRET: segredo-ficticio-da-agenda-para-testes-0000
       # O CI usa dublês da Sheets API; não acessa uma conta Google real.
-      GOOGLE_CLIENT_ID: ""
-      GOOGLE_CLIENT_SECRET: ""
-      GOOGLE_REDIRECT_URI: ""
-      GOOGLE_PICKER_API_KEY: ""
-      GOOGLE_PROJECT_NUMBER: ""
+      GOOGLE_CLIENT_ID: "cliente-sintetico"
+      GOOGLE_CLIENT_SECRET: "segredo-sintetico"
+      GOOGLE_REDIRECT_URI: "http://localhost:3000/api/planilha/google/retorno"
+      GOOGLE_PICKER_API_KEY: "picker-sintetico"
+      GOOGLE_PROJECT_NUMBER: "123456789"
       # Na rede do host o banco é alcançado pela porta publicada.
       DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-      # Endpoint local liberado apenas no CI, para o script falso.
-      PERMITIR_ENDPOINT_LOCAL: "true"

@@ -23,23 +23,14 @@ import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { EtapaPlanilha } from "@/components/gestao/planilha-etapa";
 import { SeletorPlanilhaGoogle } from "@/components/gestao/seletor-planilha-google";
-import {
-  BlocoConexaoPlanilha,
-  BlocoModoCompletoPlanilha,
-  BlocoRiscoPlanilha,
-} from "@/components/gestao/planilha-blocos";
+import { BlocoModoCompletoPlanilha, BlocoRiscoPlanilha } from "@/components/gestao/planilha-blocos";
 
 interface IntegracaoSaidasAdmin {
   ativa: boolean;
-  provedor: "GAS" | "GOOGLE";
   contaGoogle: boolean;
   googlePlanilha: { id: string; nome: string | null } | null;
-  endpoint: string | null;
-  token: string | null;
-  temToken: boolean;
-  versaoScript: string | null;
   esquema: {
-    planilha: { nome: string; url: string; fuso: string; versao: number };
+    planilha: { nome: string; url: string; fuso: string };
     abas: AbaSaidaEsquema[];
     aba: string;
   } | null;
@@ -73,14 +64,12 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
-  const [endpoint, setEndpoint] = useState("");
   const [lendo, setLendo] = useState(false);
   const [abas, setAbas] = useState<AbaSaidaEsquema[]>([]);
   const [planilha, setPlanilha] = useState<{
     nome: string;
     url: string;
     fuso: string;
-    versao: number;
   } | null>(null);
   const [abaSelecionada, setAbaSelecionada] = useState("");
   const [novaAba, setNovaAba] = useState(NOME_ABA_PADRAO);
@@ -91,14 +80,12 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     try {
       const dados = await pedir<{ integracao: IntegracaoSaidasAdmin }>("/api/planilha-saidas");
       setIntegracao(dados.integracao);
-      setEndpoint(dados.integracao.endpoint ?? "");
       setAberto((atual) => atual ?? !dados.integracao.esquema);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
           url: dados.integracao.esquema.planilha.url,
           fuso: dados.integracao.esquema.planilha.fuso,
-          versao: dados.integracao.esquema.planilha.versao,
         });
         setAbas(dados.integracao.esquema.abas ?? []);
         setAbaSelecionada(dados.integracao.esquema.aba);
@@ -126,11 +113,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
-  const conectada = Boolean(
-    integracao?.provedor === "GOOGLE"
-      ? integracao.googlePlanilha
-      : integracao?.temToken && integracao.endpoint,
-  );
+  const conectada = Boolean(integracao?.contaGoogle && integracao.googlePlanilha);
   const podeEnviar = Boolean(integracao?.ativa && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
@@ -179,7 +162,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
       toast.loading("Lendo as abas da planilha...", { id: aviso });
       try {
         const dados = await pedir<{
-          planilha: { nome: string; url: string; fuso: string; versao: number };
+          planilha: { nome: string; url: string; fuso: string };
           abas: AbaSaidaEsquema[];
           sugestao: { aba: string; confianca: "alta" | "media" | "baixa" } | null;
         }>("/api/planilha-saidas/estrutura", corpoJson({}));
@@ -198,7 +181,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
       } catch (excecao) {
         avisarErro(excecao, {
           contexto: "Não foi possível ler a planilha.",
-          descricao: "Confira a conexão e o token, e tente de novo em instantes.",
+          descricao: "Confira a conexão Google, e tente de novo em instantes.",
           tentarDeNovo: () => void lerEstrutura(),
           id: aviso,
         });
@@ -285,11 +268,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
             {integracao?.ativa ? "Ligada" : "Desligada"}
           </Selo>
           <Selo variante={conectada ? "sucesso" : "atencao"}>
-            {conectada
-              ? integracao?.provedor === "GAS" && integracao?.versaoScript
-                ? `Conectada · v${integracao.versaoScript}`
-                : "Conectada"
-              : "Sem conexão"}
+            {conectada ? "Google conectado" : "Sem conexão"}
           </Selo>
           <Selo variante={estruturaSalva ? "sucesso" : "neutro"}>
             {estruturaSalva ? `Aba ${integracao?.esquema?.aba}` : "Estrutura pendente"}
@@ -319,19 +298,6 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
           planilha={integracao?.googlePlanilha ?? null}
           onAtualizar={carregar}
         />
-        <details className="rounded-lg border p-3">
-          <summary className="cursor-pointer text-sm">Conexão por Apps Script</summary>
-          <div className="pt-3">
-            <BlocoConexaoPlanilha
-              idPrefixo="planilha-saidas"
-              urlBase="/api/planilha-saidas"
-              endpoint={endpoint}
-              integracao={integracao}
-              onEndpoint={setEndpoint}
-              onAtualizar={carregar}
-            />
-          </div>
-        </details>
       </EtapaPlanilha>
 
       <EtapaPlanilha
@@ -379,7 +345,6 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
             {planilha && (
               <p className="text-muted-foreground text-xs">
                 {planilha.nome} · fuso {planilha.fuso}
-                {integracao?.provedor === "GAS" && ` · versão do script ${planilha.versao}`}
               </p>
             )}
             {abas.length > 0 && (
