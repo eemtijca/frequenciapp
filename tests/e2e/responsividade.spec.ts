@@ -10,10 +10,12 @@ test.describe("responsividade", () => {
     await aguardarHidratacao(page);
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
     await expect(page.locator("aside")).toBeHidden();
-    const gestao = page.locator("header").getByRole("button", { name: "Gestão", exact: true });
-    const notificacoes = page
-      .locator("header")
-      .getByRole("button", { name: "Configurar notificações", exact: true });
+    const cabecalho = page.getByRole("banner");
+    const gestao = cabecalho.getByRole("button", { name: "Gestão", exact: true });
+    const notificacoes = cabecalho.getByRole("button", {
+      name: "Configurar notificações",
+      exact: true,
+    });
     const caixaGestao = await gestao.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
     expect(caixaGestao).not.toBeNull();
@@ -22,9 +24,9 @@ test.describe("responsividade", () => {
       caixaNotificacoes?.x ?? 0,
     );
 
-    const semEstouro = await page
-      .locator("header")
-      .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
+    const semEstouro = await cabecalho.evaluate(
+      (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
+    );
     expect(semEstouro).toBe(true);
 
     await trocarVisao(page, "Gestão", "gestao");

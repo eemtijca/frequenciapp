@@ -271,27 +271,29 @@ export function DialogoEnviarParciais({
                                 </tr>
                               </thead>
                               <tbody>
-                                {linha.celulas.map((celula) => (
-                                  <tr key={celula.coluna} className="border-t">
-                                    <th
-                                      scope="row"
-                                      className="px-2 py-1.5 text-left font-medium break-words"
-                                    >
-                                      {CABECALHO_PARCIAL[celula.coluna - 1] ??
-                                        `Coluna ${celula.coluna}`}
-                                    </th>
-                                    {linha.acao === "Atualizar" && (
+                                {linha.celulas
+                                  .filter((celula) => celula.coluna <= 7)
+                                  .map((celula) => (
+                                    <tr key={celula.coluna} className="border-t">
+                                      <th
+                                        scope="row"
+                                        className="px-2 py-1.5 text-left font-medium break-words"
+                                      >
+                                        {CABECALHO_PARCIAL[celula.coluna - 1] ??
+                                          `Coluna ${celula.coluna}`}
+                                      </th>
+                                      {linha.acao === "Atualizar" && (
+                                        <td className="px-2 py-1.5 break-words">
+                                          {valorParaConferencia(
+                                            linha.anteriores[celula.coluna - 1] ?? "",
+                                          )}
+                                        </td>
+                                      )}
                                       <td className="px-2 py-1.5 break-words">
-                                        {valorParaConferencia(
-                                          linha.anteriores[celula.coluna - 1] ?? "",
-                                        )}
+                                        {valorParaConferencia(celula.valor)}
                                       </td>
-                                    )}
-                                    <td className="px-2 py-1.5 break-words">
-                                      {valorParaConferencia(celula.valor)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                    </tr>
+                                  ))}
                               </tbody>
                             </table>
                           </td>

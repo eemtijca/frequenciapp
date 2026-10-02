@@ -331,6 +331,8 @@ test("refaz a prévia ao incluir atualizações de registros já enviados", asyn
   await expect(
     confirmacao.getByRole("cell", { name: "2026-10-02T18:30:00.000Z", exact: true }),
   ).toBeVisible();
+  await expect(previa.getByRole("rowheader", { name: "Código", exact: true })).toHaveCount(0);
+  await expect(previa.getByRole("rowheader", { name: "Revisão", exact: true })).toHaveCount(0);
   await enviar.getByRole("button", { name: "Confirmar envio" }).click();
   await expect(enviar).toBeHidden();
   expect(simulacoes).toBe(2);
