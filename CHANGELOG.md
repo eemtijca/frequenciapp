@@ -47,6 +47,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 ### Corrigido
 
 - Consulta de saídas por período: `de` e `até` juntos ignoravam o início e traziam saídas de dias anteriores, inclusive no envio à planilha.
+- Organização das planilhas pela conexão Google aguarda o limite temporário de leituras e repete apenas a leitura recusada, com pausas limitadas por aba e mensagem específica para recusa persistente. Cópias, exclusões e gravações não são repetidas.
 - Datas da frequência em `dd/mm/aaaa` nas novas colunas e no CSV. A Gestão oferece prévia para retirar o título e a legenda acima da tabela e corrigir datas existentes, com cópia de segurança e preservação das chamadas, fórmulas e mapa das turmas. O provedor legado usa o Apps Script 6.
 
 - Diretores de turma podem ativar notificações sem configuração manual de VAPID: o servidor prepara um par estável a partir de `AUTH_SECRET` e preserva pares explícitos existentes (ADR-029).
@@ -73,3 +74,4 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - A exibição da turma de origem e do asterisco na Chamada é configurável pela escola, com ativação e seleção de séries completas ou turmas específicas. Desativar preserva a seleção e os dados. A migração mantém a 3ª série já cadastrada selecionada; instalações novas começam com o recurso desligado.
 - O Painel distribui as faltas do dia pela turma atual, como a chamada aconteceu.
 - Workflows renomeados para `qualidade.yml`, `testes.yml` e `migracoes.yml`, com o padrão de nomes em português.
+- Textos de Gestão > Configurações reduzidos, com descrições curtas, menos instruções repetidas e ajuda técnica do Apps Script recolhida. Títulos, estados, rótulos e avisos de confirmação permanecem disponíveis.

@@ -63,6 +63,8 @@ Na Gestão, a seleção **Todas as turmas** organiza a apresentação ou corrige
 
 As leituras e aplicações seguem uma aba por requisição, em sequência, com andamento e resultado por aba. Manter a tela aberta até o resultado. Uma aba que não puder ser conferida fica fora da aplicação. Falhas durante a escrita são identificadas sem repetição automática; as demais abas continuam sendo processadas. Conferir a aba antes de uma nova tentativa, pois uma falha de rede pode ocorrer depois da gravação. As correções conservam o mapa e criam as cópias previstas antes de remover a introdução. Renovar o esquema de uma aba não invalida a prévia das outras; trocar o arquivo, as credenciais ou o mapa exige novas prévias. A versão 6 do Apps Script já atende essa opção, sem nova alteração do script.
 
+Na conexão Google, uma leitura recusada pelo limite temporário (HTTP 429) pode pausar a organização por até um minuto antes de ser repetida. A pausa respeita `Retry-After`, quando informado, e é compartilhada pelas leituras simultâneas da mesma requisição. Cada aba admite até duas pausas; uma recusa persistente ou que peça espera superior a um minuto encerra a tentativa com orientação para aguardar. As rotas de organização reservam até 300 segundos, compatíveis com o limite do Vercel Hobby com Fluid Compute. Só a leitura recusada é repetida: cópias, remoções e escritas já efetuadas não são reenviadas. Erros de acesso, estrutura, rede e gravação continuam exigindo conferência.
+
 ## Conferir a estrutura
 
 A leitura devolve o esquema de cada aba: linha de cabeçalho, coluna de aluno, colunas de dia com a data, coluna de total (inclusive por fórmula), mesclagens e limites. A partir dele o aplicativo:

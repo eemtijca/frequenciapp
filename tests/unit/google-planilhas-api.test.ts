@@ -56,6 +56,24 @@ const documento = {
 };
 
 describe("leitura pela Sheets API", () => {
+  it("identifica o limite temporário de leituras sem confundir com falta de acesso", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ error: { status: "RESOURCE_EXHAUSTED" } }, { status: 429 }),
+      ),
+    );
+    try {
+      await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
+        status: 429,
+        message: "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente.",
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("ignora mesclagens verticais na assinatura como o planejador do aplicativo", () => {
     const aba = {
       properties: { sheetId: 7, title: "Turma" },

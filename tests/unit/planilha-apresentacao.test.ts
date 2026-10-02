@@ -7,6 +7,8 @@ import {
   planejarAjusteCabecalho,
 } from "@/domain/planilha-apresentacao";
 import { pedidosDeApresentacao, organizarAbaGoogle } from "@/infra/google-planilhas-apresentacao";
+import { tamanhoUtilizado } from "@/infra/google-planilhas-api";
+import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
 const dubl = vi.hoisted(() => ({
   linha: vi.fn(),
   chamar: vi.fn(),
@@ -61,9 +63,33 @@ beforeEach(() => {
       : { aba: plano.aba },
   );
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("organização visual", () => {
+  it("habilita a pausa de leituras no caso de uso sem repetir a prévia inteira", async () => {
+    vi.useFakeTimers();
+    const leitura = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ error: {} }, { status: 429 }))
+      .mockResolvedValueOnce(Response.json({ values: [["Aluno"]] }));
+    vi.stubGlobal("fetch", leitura);
+    const conferir = dubl.chamar.getMockImplementation();
+    if (!conferir) throw new Error("Falta o leitor sintético de estrutura.");
+    dubl.chamar.mockImplementation(async (linha, corpo) => {
+      await tamanhoUtilizado("arquivo", "acesso", plano.aba);
+      return conferir(linha, corpo);
+    });
+    const previa = organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba });
+    await vi.runAllTimersAsync();
+    await expect(previa).resolves.toMatchObject({ previa: { aba: plano.aba } });
+    expect(dubl.chamar).toHaveBeenCalledOnce();
+    expect(dubl.auditar).not.toHaveBeenCalled();
+    expect(leitura).toHaveBeenCalledTimes(2);
+  });
   it("mantém colunas auxiliares fora da apresentação e ajusta nomes e dias", () => {
     expect(plano.colunas.map((item) => item.indice)).toEqual([1, 2, 3, 5]);
     expect(plano.colunas[0]?.largura).toBe(260);
@@ -311,19 +337,30 @@ describe("correção do cabeçalho", () => {
     ).rejects.toThrow("A planilha mudou");
     expect(dubl.atualizar).not.toHaveBeenCalled();
   });
-  it.each(["normal", "formula", "deriva", "deriva-copia"])(
+  it.each(["normal", "formula", "deriva", "deriva-copia", "limite-leitura"])(
     "conserva os dados na Sheets API: %s",
     async (modo) => {
       const pedidos: Record<string, unknown>[] = [];
       const valores = amostra.map((linha) => [...linha]);
       if (modo === "deriva") valores[0] = ["Frequência · outra turma"];
       const ordem: string[] = [];
+      let recusou = false;
+      if (modo === "limite-leitura") vi.useFakeTimers();
       dubl.copia.mockImplementation(async () => {
         ordem.push("copia");
         if (modo === "deriva-copia") valores[0] = ["Anotação manual após a prévia"];
       });
       vi.stubGlobal("fetch", async (entrada: URL | string, opcoes?: RequestInit) => {
         const url = new URL(String(entrada));
+        if (
+          modo === "limite-leitura" &&
+          ordem.includes("copia") &&
+          url.searchParams.get("includeGridData") === "true" &&
+          !recusou
+        ) {
+          recusou = true;
+          return Response.json({ error: { status: "RESOURCE_EXHAUSTED" } }, { status: 429 });
+        }
         if (url.pathname.endsWith("/developerMetadata:search"))
           return Response.json({ matchedDeveloperMetadata: [] });
         if (opcoes?.method === "POST") {
@@ -406,9 +443,14 @@ describe("correção do cabeçalho", () => {
           "Total",
         ]),
       };
-      if (modo === "normal") {
-        await organizarAbaGoogle(arquivo, "acesso-falso", corrigir);
+      if (modo === "normal" || modo === "limite-leitura") {
+        const organizacao = comPausasDeLeituraGoogle(() =>
+          organizarAbaGoogle(arquivo, "acesso-falso", corrigir),
+        );
+        if (modo === "limite-leitura") await vi.runAllTimersAsync();
+        await organizacao;
         expect(ordem).toEqual(["copia", "escrita"]);
+        expect(dubl.copia).toHaveBeenCalledOnce();
         expect(pedidos.filter((pedido) => pedido.updateCells)).toHaveLength(3);
         expect(pedidos).toContainEqual({
           deleteDimension: { range: { sheetId: 7, dimension: "ROWS", startIndex: 0, endIndex: 3 } },

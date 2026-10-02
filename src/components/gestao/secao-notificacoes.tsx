@@ -18,22 +18,21 @@ import { Switch } from "@/components/ui/switch";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 
-const CAMPOS: { tipo: TipoDeAviso; rotulo: string; descricao: string }[] = [
+const CAMPOS: { tipo: TipoDeAviso; rotulo: string; descricao?: string }[] = [
   {
     tipo: "resumoDiario",
     rotulo: "Resumo diário para diretores",
-    descricao: "Um aviso por dia quando há chamada nas turmas acompanhadas.",
+    descricao: "Nos dias com chamada salva.",
   },
   {
     tipo: "novasChamadas",
     rotulo: "Novas chamadas para diretores",
-    descricao: "Um aviso por nova chamada salva nas turmas acompanhadas.",
   },
   {
     tipo: "chamadasPendentes",
     rotulo: "Chamadas pendentes para a coordenação",
     descricao:
-      "Um aviso por dia se ainda há turmas com aula prevista e alunos ativos sem chamada salva. Disponível também para a administração.",
+      "Aviso diário sobre turmas com aula prevista, alunos ativos e chamada pendente. Inclui a Gestão.",
   },
 ];
 
@@ -77,7 +76,6 @@ export default function SecaoNotificacoes() {
   return (
     <SecaoRecolhivel
       titulo="Notificações"
-      descricao="Avisos disponíveis e horários de envio da escola."
       icone={Bell}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -108,7 +106,7 @@ export default function SecaoNotificacoes() {
             <div key={tipo} className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-col gap-1">
                 <Label htmlFor={`aviso-${tipo}`}>{rotulo}</Label>
-                <p className="text-muted-foreground text-sm">{descricao}</p>
+                {descricao && <p className="text-muted-foreground text-sm">{descricao}</p>}
               </div>
               <Switch
                 id={`aviso-${tipo}`}
@@ -143,8 +141,7 @@ export default function SecaoNotificacoes() {
             </div>
           </div>
           <p className="text-muted-foreground text-sm">
-            Os avisos são enviados a partir do horário escolhido, no horário da escola. Cada pessoa
-            escolhe seus avisos na conta e ativa as notificações em cada dispositivo.
+            Horários da escola. Ativação na conta, por dispositivo.
           </p>
           <Button type="submit" disabled={salvando} className="self-start">
             {salvando ? <LoaderCircle size={16} className="animate-spin" /> : null}Salvar

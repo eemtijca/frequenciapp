@@ -313,7 +313,6 @@ export default function IntegracaoPlanilha({
     <SecaoRecolhivel
       dataSecao="planilha-frequencia"
       titulo="Planilha de frequência"
-      descricao="Envia a frequência por turma de origem para a planilha da escola."
       icone={FileSpreadsheet}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -381,8 +380,8 @@ export default function IntegracaoPlanilha({
           estruturaSalva && !estruturaEmEdicao
             ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
             : podeEnviar
-              ? "Leia as abas e confira o mapa de cada turma."
-              : "Conecte a planilha e ligue a integração para liberar."
+              ? "Vincule as abas às turmas de origem."
+              : "Conecte e ative a integração."
         }
         acoes={
           estruturaEmEdicao ? (
@@ -478,24 +477,15 @@ export default function IntegracaoPlanilha({
             )}
             {sugestoes.length > 0 && (
               <p className="text-muted-foreground text-xs">
-                Sugestões preenchidas pelo nome das abas. Ajuste antes de salvar.
+                Confira os vínculos sugeridos antes de salvar.
               </p>
             )}
           </>
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            {integracao?.esquema?.mapa.length ?? 0} abas mapeadas. Use Revisar estrutura para reler
-            a planilha.
-          </p>
-        )}
+        ) : null}
       </EtapaPlanilha>
 
       {conectada && abas.some((aba) => !aba.oculta) && (
         <div className="flex flex-col gap-2 rounded-lg border p-3">
-          <p className="text-muted-foreground text-xs">
-            Organize a apresentação ou corrija o título, a legenda e as datas, com prévia. A opção
-            Todas as turmas inclui as abas vinculadas na estrutura salva.
-          </p>
           <Selecionar
             id="frequencia-apresentacao"
             value={abaApresentacao}
@@ -539,7 +529,7 @@ export default function IntegracaoPlanilha({
         estado={estruturaSalva ? "atual" : "pendente"}
         resumo={
           estruturaSalva
-            ? "Envia o que mudou desde o último envio de cada turma, uma turma por vez, com prévia obrigatória. O mês escolhido vale para a conferência do período inteiro."
+            ? "Envia alterações com prévia. O mês vale para o período inteiro."
             : "Salve a estrutura antes de enviar."
         }
       >
@@ -569,9 +559,7 @@ export default function IntegracaoPlanilha({
           <div className="min-w-0">
             <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
             <p className="text-muted-foreground text-xs">
-              Ao salvar, a chamada daquela turma segue para a planilha sozinha, só preenchendo
-              células vazias e criando a coluna do dia. Se algo pedir revisão, o dia fica para o
-              envio manual.
+              Preenche células vazias. Pendências seguem para o envio manual.
             </p>
           </div>
           <Switch
