@@ -51,7 +51,7 @@ test.describe("Google Planilhas de saídas", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
-    await expect(cartao.getByRole("button", { name: "Entrar com Google" })).toBeVisible();
+    await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
     await comBanco((cliente) => google.conectar(cliente, "SAIDAS"));
