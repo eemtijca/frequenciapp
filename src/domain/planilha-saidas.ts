@@ -517,3 +517,17 @@ export function planejarSaidas(
   };
   return { ...plano, planoHash: hashTexto(JSON.stringify(plano)) };
 }
+
+/**
+ * O envio automático ao registrar só acrescenta: cria linhas e preenche
+ * células vazias. Plano bloqueado, substituição ou remoção ficam para o envio
+ * manual com prévia.
+ */
+export function saidasEnviaveisSozinhas(plano: PlanoSaidas): boolean {
+  return !plano.bloqueado && plano.substituir.length === 0 && plano.remover.length === 0;
+}
+
+/** Há algo a gravar no plano das saídas? */
+export function saidasTemNovidade(plano: PlanoSaidas): boolean {
+  return plano.criar.length + plano.preencher.length > 0;
+}

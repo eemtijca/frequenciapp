@@ -479,3 +479,19 @@ export async function removerAba(
   });
   return resultado;
 }
+
+export type SituacaoEnvioMovimentacao =
+  "enviado" | "desligado" | "pendente_manual" | "sem_confirmacao" | "falhou";
+
+let filaDeEnvios: Promise<unknown> = Promise.resolve();
+
+/**
+ * Serializa os envios automáticos deste processo: dois registros em seguida
+ * não leem a planilha ao mesmo tempo e não acrescentam a mesma linha duas
+ * vezes. Não cobre instâncias separadas; o plano sempre pula linha já existente.
+ */
+export function emSequencia<T>(tarefa: () => Promise<T>): Promise<T> {
+  const resultado = filaDeEnvios.then(tarefa, tarefa);
+  filaDeEnvios = resultado.catch(() => undefined);
+  return resultado;
+}

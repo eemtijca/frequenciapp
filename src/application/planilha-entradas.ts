@@ -1,8 +1,20 @@
 // Entradas na Sheets API: aba própria, prévia obrigatória e escrita conservadora.
 import { z } from "zod";
-import { lerLinha, chamarIntegracao, type LinhaIntegracao } from "./planilha-comum";
+import {
+  chamarIntegracao,
+  emSequencia,
+  lerLinha,
+  modoCompletoAtivo,
+  type LinhaIntegracao,
+  type SituacaoEnvioMovimentacao,
+} from "./planilha-comum";
 import { listarEntradas, esquemaFiltroEntradas } from "./entradas";
-import { ABA_ENTRADAS, CABECALHO_ENTRADAS, planejarEntradas } from "@/domain/planilha-entradas";
+import {
+  ABA_ENTRADAS,
+  CABECALHO_ENTRADAS,
+  entradasEnviaveisSozinhas,
+  planejarEntradas,
+} from "@/domain/planilha-entradas";
 import { hashTexto, type AbaBruta, type LeituraAba } from "@/domain/planilha";
 import { ErroHttp } from "@/infra/erros";
 import { banco } from "@/infra/banco";
@@ -142,4 +154,33 @@ export async function enviarEntradas(usuario: { id: string }, entrada: unknown) 
       502,
     );
   }
+}
+
+/**
+ * Envia à planilha as entradas recém-registradas de um dia, na aba Entradas
+ * já preparada. Usa a chave de envio automático da conexão de saídas, só
+ * acrescenta linhas e nunca lança: o registro já foi confirmado.
+ */
+export function enviarEntradasAposRegistro(
+  usuario: { id: string },
+  dia: string,
+): Promise<SituacaoEnvioMovimentacao> {
+  return emSequencia(async () => {
+    try {
+      const linha = await lerLinha("SAIDAS");
+      if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
+      const periodo = { de: dia, ate: dia };
+      const { plano } = await montarPlano(usuario, periodo);
+      if (!entradasEnviaveisSozinhas(plano)) return "pendente_manual";
+      await enviarEntradas(usuario, { ...periodo, planoHash: plano.planoHash });
+      return "enviado";
+    } catch (erro) {
+      const parcial = erro instanceof ErroHttp && erro.status === 502;
+      console.error(
+        "Envio automático das entradas não concluído.",
+        erro instanceof Error ? erro.name : "",
+      );
+      return parcial ? "sem_confirmacao" : "falhou";
+    }
+  });
 }

@@ -301,14 +301,8 @@ export default function VistaPainel({
 
   return (
     <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Painel</h1>
-          <p className="text-muted-foreground text-sm">
-            Infrequência em <span className="numerais-tabulares">{rotuloDia}</span>
-            {diaDaSemana && <span className="hidden sm:inline"> · {diaDaSemana}</span>}
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-3">
+        <h1 className="sr-only">Painel</h1>
         <Button
           variant="ghost"
           size="icon"
