@@ -18,6 +18,7 @@ import {
   desconectar,
   desativarModoCompleto as desativarModoCompletoComum,
   chamarIntegracao,
+  ErroVersaoPlanilha,
   gerarToken as gerarTokenComum,
   idDaIntegracao,
   lerLinha,
@@ -47,6 +48,7 @@ import {
   type PlanoSincronizacao,
 } from "@/domain/planilha";
 import { diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
+import { diasSemEnvioConfirmado } from "@/domain/planilha-envios";
 
 const FINALIDADE = "FREQUENCIA" as const;
 const LIMITE_DIAS_ENVIO = 92;
@@ -97,8 +99,8 @@ const esquemaEnvio = z.object({
   removerLinhas: z.array(z.number().int().min(1).max(100000)).max(500).optional(),
   removerColunas: z.array(z.number().int().min(1).max(2000)).max(200).optional(),
   planoHashGeral: z.string().max(64).optional(),
-  // Padrão: só os dias com chamada criada ou alterada desde o último envio
-  // bem-sucedido de cada turma. Falso envia o período inteiro, para conferência.
+  // Padrão: só os dias com chamada ainda sem confirmação para a origem.
+  // Falso envia o período inteiro, para conferência.
   somenteAlteradas: z.boolean().optional(),
 });
 
@@ -113,17 +115,33 @@ function esquemaSalvo(linha: LinhaIntegracao): EsquemaSalvo | null {
 }
 
 /**
- * Chamadas alteradas desde o último envio bem-sucedido da frequência. Envio
- * parcial não conta: sem confirmação, os dias dele continuam pendentes.
+ * Chamadas sem sucesso completo posterior que cubra o dia de cada origem
+ * da lista. Cada chamada conta uma vez, mesmo com alunos de várias origens.
  */
 async function contarAlteradasDepois(): Promise<number> {
-  const ultima = await banco().sincronizacaoPlanilha.findFirst({
-    where: { finalidade: FINALIDADE, resultado: "SUCESSO" },
-    orderBy: { criadoEm: "desc" },
-    select: { criadoEm: true },
-  });
-  if (!ultima) return 0;
-  return banco().frequencia.count({ where: { atualizadoEm: { gt: ultima.criadoEm } } });
+  const contagem = await banco().$queryRaw<{ total: bigint }[]>`
+    SELECT COUNT(*) AS total
+    FROM frequencias AS frequencia
+    WHERE EXISTS (
+      SELECT 1
+      FROM alunos_chamada AS chamada
+      JOIN alunos AS aluno ON aluno.id = chamada.aluno_id
+      WHERE chamada.frequencia_id = frequencia.id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM sincronizacoes_planilha AS envio
+          WHERE envio.finalidade = ${FINALIDADE}::finalidade_integracao
+            AND envio.turma_original_id = aluno.turma_original_id
+            AND envio.resultado = 'SUCESSO'
+            AND envio.puladas_ocupadas = 0
+            AND envio.puladas_formula = 0
+            AND envio.de <= frequencia.dia
+            AND envio.ate >= frequencia.dia
+            AND envio.criado_em > frequencia.atualizado_em
+        )
+    )
+  `;
+  return Number(contagem[0]?.total ?? 0n);
 }
 
 /** Estado público da integração, para o selo e o botão da Grade. */
@@ -416,9 +434,9 @@ interface SimulacaoInterna {
 
 /**
  * Dias a enviar para uma turma original: com `somenteAlteradas`, os dias com
- * chamada criada ou alterada desde o último envio bem-sucedido daquela turma,
- * em qualquer turma atual que tenha aluno dela na lista. Sem envio anterior,
- * vale o período pedido. Sem a opção, o período pedido inteiro.
+ * chamada sem sucesso posterior à sua atualização que cubra aquele dia,
+ * em qualquer turma atual que tenha aluno dela na lista. Células puladas não
+ * comprovam envio completo. Sem a opção, vale o período pedido inteiro.
  */
 async function diasDoEnvio(
   turmaOriginalId: string,
@@ -427,23 +445,37 @@ async function diasDoEnvio(
 ): Promise<{ dias: string[]; incremental: boolean }> {
   const periodo = diasEntre(entrada.de, entrada.ate);
   if (entrada.somenteAlteradas === false) return { dias: periodo, incremental: false };
-  const ultimo = await banco().sincronizacaoPlanilha.findFirst({
-    where: { finalidade: FINALIDADE, turmaOriginalId, resultado: "SUCESSO" },
-    orderBy: { criadoEm: "desc" },
-    select: { criadoEm: true },
-  });
-  const linhas = await banco().frequencia.findMany({
-    where: {
-      ...(ultimo ? { atualizadoEm: { gt: ultimo.criadoEm } } : {}),
-      dia: {
-        gte: new Date(`${entrada.de}T12:00:00Z`),
-        lte: new Date(`${entrada.ate}T12:00:00Z`),
+  const de = new Date(`${entrada.de}T12:00:00Z`);
+  const ate = new Date(`${entrada.ate}T12:00:00Z`);
+  const sucessoCompleto = {
+    finalidade: FINALIDADE,
+    turmaOriginalId,
+    resultado: "SUCESSO" as const,
+    puladasOcupadas: 0,
+    puladasFormula: 0,
+  };
+  const [linhas, envios, ultimo] = await Promise.all([
+    banco().frequencia.findMany({
+      where: {
+        dia: { gte: de, lte: ate },
+        alunos: { some: { aluno: { turmaOriginalId } } },
       },
-      alunos: { some: { aluno: { turmaOriginalId } } },
-    },
-    select: { dia: true },
-    orderBy: { dia: "asc" },
-  });
+      select: { dia: true, atualizadoEm: true },
+      orderBy: { dia: "asc" },
+    }),
+    banco().sincronizacaoPlanilha.findMany({
+      where: { ...sucessoCompleto, de: { lte: ate }, ate: { gte: de } },
+      select: { de: true, ate: true, criadoEm: true },
+    }),
+    // A situação é conferida para toda a origem em qualquer período enviado.
+    incluirSituacao
+      ? banco().sincronizacaoPlanilha.findFirst({
+          where: sucessoCompleto,
+          orderBy: { criadoEm: "desc" },
+          select: { criadoEm: true },
+        })
+      : Promise.resolve(null),
+  ]);
   const situacaoPendente = incluirSituacao
     ? await banco().aluno.count({
         where: {
@@ -454,7 +486,7 @@ async function diasDoEnvio(
     : 0;
   const dias = [
     ...new Set([
-      ...linhas.map((item) => item.dia.toISOString().slice(0, 10)),
+      ...diasSemEnvioConfirmado(linhas, envios),
       ...(situacaoPendente > 0 ? [entrada.ate] : []),
     ]),
   ].sort();
@@ -778,16 +810,25 @@ async function enviarTurmaAutomatico(
       resumo.substituir + resumo.limpar + resumo.removerLinhas + resumo.removerColunas > 0 ||
       resumo.novosAlunos > 0 ||
       resumo.ambiguidades > 0 ||
+      resumo.puladasOcupadas > 0 ||
+      resumo.puladasFormula > 0 ||
       item.plano.avisos.length > 0;
     if (naoSeguro) return "pendente_manual";
-    if (resumo.preencher + (resumo.sinalizar ?? 0) + resumo.novasColunas + resumo.vincular === 0)
-      return "enviado";
+    // Mesmo sem escrita, a conferência confirma a revisão recém-salva.
+    // O fluxo comum relê e valida o hash antes de registrar o sucesso.
     const resposta = await aplicarEnvio(usuario, {
       ...entrada,
       planoHashGeral: simulacao.planoHashGeral,
     });
-    const resultado = resposta.resultados[0]?.resultado;
-    if (resultado === "sucesso" || resultado === "sem_envio") return "enviado";
+    const envio = resposta.resultados[0];
+    const resultado = envio?.resultado;
+    if (resultado === "sucesso" || resultado === "sem_envio") {
+      const contagens = envio?.contagens;
+      const puladas = ["puladasOcupadas", "puladasFormula", "puladasVinculo"].some(
+        (chave) => Number(contagens?.[chave] ?? 0) > 0,
+      );
+      return puladas ? "pendente_manual" : "enviado";
+    }
     return resultado === "parcial" ? "sem_confirmacao" : "falhou";
   } catch {
     return "falhou";
@@ -920,7 +961,7 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       new Date(inicio),
     );
     if (operacoes.length === 0) {
-      // Nada a gravar: os dias já estão na planilha e deixam de ficar pendentes.
+      // Registra a conferência; células puladas continuam pendentes.
       await concluirRegistro(registro, plano, "SUCESSO", {});
       resultados.push({ ...base, resultado: "sucesso", contagens: {} });
       continue;
@@ -952,7 +993,9 @@ export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
       }
       resultados.push({ ...base, resultado: "sucesso", contagens });
     } catch (erro) {
-      const recusado = (erro instanceof ErroGas || erro instanceof ErroGoogle) && erro.recusado;
+      const recusado =
+        erro instanceof ErroVersaoPlanilha ||
+        ((erro instanceof ErroGas || erro instanceof ErroGoogle) && erro.recusado);
       const mensagem = recusado ? erro.message : ERRO_SEM_CONFIRMACAO;
       await concluirRegistro(
         registro,
@@ -1130,8 +1173,10 @@ async function concluirRegistro(
       removidasColunas: sucesso ? numero("removidasColunas", plano.resumo.removerColunas) : 0,
       alunosCriados: sucesso ? plano.novosAlunos.length : 0,
       colunasCriadas: sucesso ? numero("colunasCriadas", plano.novasColunas.length) : 0,
-      puladasOcupadas: plano.resumo.puladasOcupadas,
-      puladasFormula: plano.resumo.puladasFormula,
+      // Nome alterado impede o vínculo da linha e também mantém o dia pendente.
+      puladasOcupadas:
+        plano.resumo.puladasOcupadas + numero("puladasOcupadas", 0) + numero("puladasVinculo", 0),
+      puladasFormula: plano.resumo.puladasFormula + numero("puladasFormula", 0),
       resultado,
       erro: sucesso ? null : (erro ?? ERRO_SEM_CONFIRMACAO).slice(0, 300),
     },

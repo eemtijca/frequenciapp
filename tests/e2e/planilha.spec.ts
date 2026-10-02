@@ -192,12 +192,12 @@ test.describe("Google Planilhas", () => {
     await expect(envioAoSalvar).toBeEnabled();
     await expect(envioAoSalvar).not.toBeChecked();
 
-    // Envio de todas as turmas: por padrão só o que mudou; sem chamada, nada
+    // Envio de todas as turmas: por padrão só pendências; sem chamada, nada
     // a enviar, e o período inteiro fica como opção de conferência.
     await page.getByRole("button", { name: "Enviar todas as turmas" }).click();
     const previaGeral = page.getByRole("dialog");
-    await expect(previaGeral.getByLabel("Só o que mudou desde o último envio")).toBeChecked();
-    await expect(previaGeral.getByText(/Nada mudou desde o último envio/)).toBeVisible();
+    await expect(previaGeral.getByLabel("Só chamadas pendentes")).toBeChecked();
+    await expect(previaGeral.getByText(/Nenhuma chamada pendente/)).toBeVisible();
     await expect(previaGeral.getByRole("button", { name: "Enviar" })).toBeDisabled();
     await previaGeral.getByLabel(/O período inteiro/).check();
     await expect(previaGeral.getByText(/E2E Ano A/)).toBeVisible();

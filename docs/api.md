@@ -459,7 +459,7 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 
 ### GET /api/planilha/estado
 
-- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. Qualquer sessão.
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. `alteradasDepois` conta chamadas ainda pendentes, considerando confirmação por dia e por origem. Qualquer sessão.
 
 ### GET /api/planilha e PATCH /api/planilha
 
@@ -493,7 +493,7 @@ Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOrigin
 
 ### POST /api/planilha/simular
 
-Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias com chamada criada ou alterada desde o último envio `SUCESSO` dela; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
+Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
 
 - 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 
