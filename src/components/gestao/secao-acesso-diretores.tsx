@@ -100,7 +100,7 @@ export default function SecaoAcessoDiretores() {
     <SecaoRecolhivel
       dataSecao="config-acesso-diretores"
       titulo="Acesso dos diretores de turma"
-      descricao="Validade da palavra-chave, sessão, limites de entrada e o que o diretor vê. Os limites de tentativa valem para toda entrada no aplicativo."
+      descricao="Limites de entrada valem para todos os perfis."
       icone={ShieldCheck}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -176,8 +176,7 @@ export default function SecaoAcessoDiretores() {
               ))}
             </div>
             <p className="text-muted-foreground text-xs">
-              As faltas ficam sempre visíveis. Justificativas e saídas podem trazer informação
-              sensível; libere só o necessário.
+              Faltas sempre visíveis. Libere dados sensíveis apenas quando necessário.
             </p>
           </fieldset>
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
