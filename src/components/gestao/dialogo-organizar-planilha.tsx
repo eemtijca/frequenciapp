@@ -302,7 +302,7 @@ export function OrganizarPlanilha({
                   Abas prontas: {quantidadeProntas} de {conferencias?.length ?? 0}. A confirmação
                   processará cada aba em sequência.
                   {ajustarCabecalho
-                    ? " Cada correção terá uma cópia de segurança; as chamadas e fórmulas da tabela serão preservadas."
+                    ? " Não haverá cópia automática; as chamadas e fórmulas da tabela serão preservadas."
                     : " A aparência será substituída; valores, fórmulas e rótulos serão preservados."}{" "}
                   As abas que não puderem ser conferidas ficarão fora da aplicação.
                 </>
@@ -315,9 +315,8 @@ export function OrganizarPlanilha({
                   {(previa?.ajusteCabecalho?.datas.length ?? 0) === 1
                     ? "Será corrigida 1 data"
                     : `Serão corrigidas ${previa?.ajusteCabecalho?.datas.length ?? 0} datas`}{" "}
-                  para dia/mês/ano. O cabeçalho Aluno e os dias permanecerão na primeira linha. Uma
-                  cópia de segurança será criada antes das mudanças. As chamadas e as fórmulas da
-                  tabela serão preservadas.
+                  para dia/mês/ano. O cabeçalho Aluno e os dias permanecerão na primeira linha. Não
+                  haverá cópia automática. As chamadas e as fórmulas da tabela serão preservadas.
                 </>
               ) : (
                 <>

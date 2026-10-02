@@ -271,7 +271,7 @@ describe("integração com a planilha", () => {
     expect(salvo.status).toBe(200);
   });
 
-  it("corrige a aba mapeada com cópia, conserva fórmulas e relê o esquema sem perder o mapa", async () => {
+  it("corrige a aba mapeada sem criar backup, conserva fórmulas e relê o esquema sem perder o mapa", async () => {
     gas?.definirAba(
       "QP Ano A",
       [
@@ -304,7 +304,7 @@ describe("integração com a planilha", () => {
     expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
     expect(gas?.formulaDe("QP Ano A", 2, 4)).toBe('=CONT.SE(C5;"F")');
     expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_QP Ano A_"))).toBe(
-      true,
+      false,
     );
     const estado = await json<{
       integracao: {
@@ -666,7 +666,7 @@ describe("integração com a planilha", () => {
     expect(aplicado.status).toBe(200);
     expect(gas?.valor("QP Ano A", 3, 3)).toBe("F");
     expect(gas?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
-    expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(true);
+    expect(gas?.abas().some((nome) => nome.startsWith("_frequenciapp_backup_"))).toBe(false);
 
     // O sucesso da mesma turma apaga a falha registrada antes para ela.
     const config = await json<{
@@ -873,6 +873,38 @@ describe("integração com a planilha", () => {
       body: JSON.stringify({ aba: "QP Manual", frase: "EDITAR PLANILHA", senha: SENHA_ADMIN }),
     });
     expect(remocao.status).toBe(400);
+  });
+
+  it("remove cópias antigas com prévia e senha, preservando as abas das turmas", async () => {
+    const normais = gas?.abas() ?? [];
+    gas?.criarCopiaAntiga("QP Ano A");
+    gas?.criarCopiaAntiga("QP Manual");
+    const antes = gas?.valor("QP Ano A", 2, 1);
+    const previa = await autenticado("/api/planilha/limpar-copias", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    expect(previa.status).toBe(200);
+    const dados = await json<{ previa: { planoHash: string; copias: string[] } }>(previa);
+    expect(dados.previa.copias).toHaveLength(2);
+    const semSenha = await autenticado("/api/planilha/limpar-copias", {
+      method: "POST",
+      body: JSON.stringify({ planoHash: dados.previa.planoHash }),
+    });
+    expect(semSenha.status).toBe(400);
+    expect(gas?.abas().filter((nome) => nome.startsWith("_frequenciapp_backup_"))).toHaveLength(2);
+    const aplicada = await autenticado("/api/planilha/limpar-copias", {
+      method: "POST",
+      body: JSON.stringify({
+        planoHash: dados.previa.planoHash,
+        senha: SENHA_ADMIN,
+        frase: "EDITAR PLANILHA",
+      }),
+    });
+    expect(aplicada.status).toBe(200);
+    expect(await json(aplicada)).toEqual({ removidas: 2 });
+    expect(gas?.abas()).toEqual(normais);
+    expect(gas?.valor("QP Ano A", 2, 1)).toBe(antes);
   });
 
   it("volta ao conservador e desconecta", async () => {

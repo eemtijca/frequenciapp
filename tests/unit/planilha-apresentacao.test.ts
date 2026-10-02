@@ -135,7 +135,7 @@ describe("organização visual", () => {
     dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "4" });
     await expect(
       organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba }),
-    ).rejects.toThrow("versão 5");
+    ).rejects.toThrow("versão 7");
     expect(dubl.chamar).not.toHaveBeenCalled();
   });
   it.each([{ oculta: true }, { mesclagens: ["A1:B1"] }, { colunas: 401 }])(
@@ -315,11 +315,11 @@ describe("correção do cabeçalho", () => {
       { retentavel: false },
     );
   });
-  it("recusa versão 5 somente para a correção", async () => {
+  it("recusa script anterior à versão 7 antes de corrigir", async () => {
     dubl.linha.mockResolvedValue({ provedor: "GAS", versaoScript: "5" });
     await expect(
       organizarPlanilha({ id: "admin" }, "FREQUENCIA", { aba: plano.aba, ajustarCabecalho: true }),
-    ).rejects.toThrow("versão 6");
+    ).rejects.toThrow("versão 7");
     expect(dubl.chamar).not.toHaveBeenCalled();
   });
   it("vincula a confirmação também ao conteúdo removido", async () => {
@@ -337,7 +337,7 @@ describe("correção do cabeçalho", () => {
     ).rejects.toThrow("A planilha mudou");
     expect(dubl.atualizar).not.toHaveBeenCalled();
   });
-  it.each(["normal", "formula", "deriva", "deriva-copia", "limite-leitura"])(
+  it.each(["normal", "formula", "deriva", "deriva-reconferencia", "limite-leitura"])(
     "conserva os dados na Sheets API: %s",
     async (modo) => {
       const pedidos: Record<string, unknown>[] = [];
@@ -346,15 +346,17 @@ describe("correção do cabeçalho", () => {
       const ordem: string[] = [];
       let recusou = false;
       if (modo === "limite-leitura") vi.useFakeTimers();
-      dubl.copia.mockImplementation(async () => {
-        ordem.push("copia");
-        if (modo === "deriva-copia") valores[0] = ["Anotação manual após a prévia"];
-      });
+      let leiturasCabecalho = 0;
       vi.stubGlobal("fetch", async (entrada: URL | string, opcoes?: RequestInit) => {
         const url = new URL(String(entrada));
+        if (url.searchParams.get("includeGridData") === "true") {
+          leiturasCabecalho += 1;
+          if (modo === "deriva-reconferencia" && leiturasCabecalho === 2)
+            valores[0] = ["Anotação manual após a prévia"];
+        }
         if (
           modo === "limite-leitura" &&
-          ordem.includes("copia") &&
+          leiturasCabecalho === 2 &&
           url.searchParams.get("includeGridData") === "true" &&
           !recusou
         ) {
@@ -449,8 +451,8 @@ describe("correção do cabeçalho", () => {
         );
         if (modo === "limite-leitura") await vi.runAllTimersAsync();
         await organizacao;
-        expect(ordem).toEqual(["copia", "escrita"]);
-        expect(dubl.copia).toHaveBeenCalledOnce();
+        expect(ordem).toEqual(["escrita"]);
+        expect(dubl.copia).not.toHaveBeenCalled();
         expect(pedidos.filter((pedido) => pedido.updateCells)).toHaveLength(3);
         expect(pedidos).toContainEqual({
           deleteDimension: { range: { sheetId: 7, dimension: "ROWS", startIndex: 0, endIndex: 3 } },
@@ -477,8 +479,7 @@ describe("correção do cabeçalho", () => {
         await expect(organizarAbaGoogle(arquivo, "acesso-falso", corrigir)).rejects.toThrow(
           "O cabeçalho mudou",
         );
-        if (modo === "deriva-copia") expect(dubl.copia).toHaveBeenCalledOnce();
-        else expect(dubl.copia).not.toHaveBeenCalled();
+        expect(dubl.copia).not.toHaveBeenCalled();
         expect(pedidos).toEqual([]);
       }
     },
@@ -494,7 +495,7 @@ describe("organização das turmas em conjunto", () => {
     dubl.linha.mockResolvedValue({
       provedor: "GAS",
       ativa: true,
-      versaoScript: "6",
+      versaoScript: "7",
       endpoint: "endpoint-sintetico",
       token: "token-sintetico",
       esquema: { mapa },
@@ -518,7 +519,7 @@ describe("organização das turmas em conjunto", () => {
       dubl.linha.mockResolvedValue({
         provedor: "GAS",
         ativa: true,
-        versaoScript: "6",
+        versaoScript: "7",
         endpoint: "endpoint-sintetico",
         token: "token-sintetico",
         esquema: { mapa, abas: [{ nome: nomes[0], cabecalho: 1 }] },

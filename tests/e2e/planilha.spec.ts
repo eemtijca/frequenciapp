@@ -183,7 +183,7 @@ test.describe("Google Planilhas", () => {
     expect(gas.valor("E2E Ano B", 1, 3)).toBe("29/09/2026");
     expect(gas.valor("E2E Ano B", 2, 3)).toBe("P");
     for (const nome of ["E2E Ano A", "E2E Ano B"])
-      expect(gas.abas().some((aba) => aba.startsWith(`_frequenciapp_backup_${nome}_`))).toBe(true);
+      expect(gas.abas().some((aba) => aba.startsWith(`_frequenciapp_backup_${nome}_`))).toBe(false);
     await apresentacao.screenshot({ path: "test-results/planilha-todas-resultado.png" });
     await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
 

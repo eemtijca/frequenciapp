@@ -14,6 +14,22 @@ beforeAll(async () => {
   expect(resposta.status).toBe(200);
   cookieCoord = resposta.headers.get("set-cookie")?.split(";")[0] ?? "";
 });
+describe.each(["planilha", "planilha-saidas"])("permissão para limpar cópias de %s", (rota) => {
+  it("exige sessão administrativa e recusa uma origem externa", async () => {
+    for (const [cookie, origem, status] of [
+      ["", base, 401],
+      [cookieCoord, base, 403],
+      [cookieCoord, "https://origem.exemplo", 403],
+    ] as const) {
+      const resposta = await fetch(`${base}/api/${rota}/limpar-copias`, {
+        method: "POST",
+        headers: { Cookie: cookie, Origin: origem, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      expect(resposta.status).toBe(status);
+    }
+  });
+});
 describe.each(["planilha", "planilha-saidas", "planilha-entradas"])(
   "permissão para organizar %s",
   (rota) => {

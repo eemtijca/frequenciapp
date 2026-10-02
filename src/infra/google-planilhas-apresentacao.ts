@@ -1,4 +1,4 @@
-// Apresentação e correção de cabeçalhos pela Sheets API, com conferência e cópia.
+// Apresentação e correção de cabeçalhos pela Sheets API, sem criar abas de backup.
 import type { ApresentacaoAba } from "@/domain/planilha-apresentacao";
 import {
   CORES_PLANILHA,
@@ -190,7 +190,7 @@ export async function organizarAbaGoogle(id: string, acesso: string, plano: Apre
   if (assinatura !== plano.assinatura)
     throw new ErroHttp("A estrutura da planilha mudou. Confira de novo antes de organizar.", 409);
   const linhas = aba.properties.gridProperties?.rowCount ?? Math.max(usado.linhas, 1);
-  // Valida também a apresentação antes de criar cópia ou alterar células.
+  // Valida também a apresentação antes de alterar células.
   pedidosDeApresentacao(
     aba.properties.sheetId,
     linhas,
@@ -223,14 +223,12 @@ export async function organizarAbaGoogle(id: string, acesso: string, plano: Apre
     )
       throw new ErroHttp("O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia.", 409);
     if (removidas || ajuste.datas.length) {
-      const { criarCopiaGoogle } = await import("./google-planilhas-copias");
-      await criarCopiaGoogle(id, acesso, plano.aba);
-      // A cópia usa várias requisições; reconfere as células antes de removê-las.
-      const [depoisDaCopia] = await lerBlocosGoogle(id, acesso, plano.aba, plano.cabecalhoLinha, [
+      // Reconfere as células imediatamente antes de alterar o cabeçalho.
+      const [reconferido] = await lerBlocosGoogle(id, acesso, plano.aba, plano.cabecalhoLinha, [
         { coluna: 1, colunas: Math.max(usado.colunas, 1) },
       ]);
-      if (JSON.stringify(depoisDaCopia) !== JSON.stringify(bloco))
-        throw new ErroHttp("O cabeçalho mudou durante a cópia. Confira uma nova prévia.", 409);
+      if (JSON.stringify(reconferido) !== JSON.stringify(bloco))
+        throw new ErroHttp("O cabeçalho mudou antes da correção. Confira uma nova prévia.", 409);
     }
     for (const data of ajuste.datas)
       pedidos.push({
