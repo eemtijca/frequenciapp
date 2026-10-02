@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
+import { aguardarLimiteDeLeituraGoogle } from "./google-planilhas-limites";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 const CHAVES_METADADOS = [
@@ -175,16 +176,19 @@ export async function motivoDoGoogle(resposta: Response): Promise<string> {
 async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<unknown> {
   let resposta: Response;
   try {
-    resposta = await fetch(url, {
-      method: corpo === undefined ? "GET" : "POST",
-      headers: {
-        Authorization: `Bearer ${acesso}`,
-        ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
-      },
-      ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(30_000),
-    });
+    do {
+      resposta = await fetch(url, {
+        method: corpo === undefined ? "GET" : "POST",
+        headers: {
+          Authorization: `Bearer ${acesso}`,
+          ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
+        },
+        ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
+      });
+      // Este cliente só lê; o POST acima busca metadados e não altera a planilha.
+    } while (await aguardarLimiteDeLeituraGoogle(resposta));
   } catch (erro) {
     const detalhe = `sem resposta do Google (${erro instanceof Error ? erro.name : "erro"})`;
     console.error(`Sheets API leitura: ${detalhe}`);
@@ -198,7 +202,9 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
         ? "Reconecte a conta Google."
         : resposta.status === 403 || resposta.status === 404
           ? "A conta Google não tem acesso à planilha escolhida."
-          : "O Google recusou a leitura da planilha.";
+          : resposta.status === 429
+            ? "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente."
+            : "O Google recusou a leitura da planilha.";
     throw new ErroLeituraGoogle(
       mensagem,
       detalhe,
@@ -206,7 +212,9 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
         ? 401
         : resposta.status === 403 || resposta.status === 404
           ? 403
-          : 502,
+          : resposta.status === 429
+            ? 429
+            : 502,
     );
   }
   try {

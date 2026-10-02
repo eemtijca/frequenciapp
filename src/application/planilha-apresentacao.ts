@@ -6,6 +6,7 @@ import { ambiente } from "@/infra/ambiente";
 import { ErroHttp } from "@/infra/erros";
 import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
+import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
 import { detectarEsquema, assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { detectarEsquemaSaida } from "@/domain/planilha-saidas";
 import { ABA_ENTRADAS, CABECALHO_ENTRADAS } from "@/domain/planilha-entradas";
@@ -34,6 +35,10 @@ export async function organizarPlanilha(
   tipo: TipoApresentacao,
   entrada: unknown,
 ) {
+  return comPausasDeLeituraGoogle(() => organizarAba(admin, tipo, entrada));
+}
+
+async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entrada: unknown) {
   const dados = z
     .object({
       aba: z.string().trim().min(1).max(200),
