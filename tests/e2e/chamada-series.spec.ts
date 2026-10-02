@@ -84,6 +84,11 @@ test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ pa
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(estouro).toBe(false);
+  // Nenhum botão de série ultrapassa a borda da tela (o contêiner pode esconder o excesso).
+  for (const serie of series) {
+    const caixa = await grupo.getByRole("button", { name: serie, exact: true }).boundingBox();
+    expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(360);
+  }
 });
 
 test("Gestão: as turmas específicas da origem ficam numa seção recolhível", async ({ page }) => {

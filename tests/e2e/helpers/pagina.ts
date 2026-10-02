@@ -1,5 +1,5 @@
 // Utilidades comuns dos testes de ponta a ponta.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Aguarda a hidratação do React. O HTML do servidor pode estar visível antes
@@ -73,4 +73,18 @@ export async function rolarAteGrafico(page: Page, nome: string) {
   }, nome);
   await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeInViewport();
   return faixa;
+}
+
+/**
+ * Escolhe uma turma na Chamada. As turmas ficam em botões de série que
+ * expandem e recolhem; abre as séries recolhidas até a turma aparecer.
+ */
+export async function escolherTurmaNaChamada(secao: Locator, nome: RegExp): Promise<void> {
+  const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
+  const turma = grupo.getByRole("button", { name: nome }).first();
+  const fechadas = grupo.locator('button[aria-expanded="false"]');
+  while (!(await turma.isVisible().catch(() => false)) && (await fechadas.count()) > 0) {
+    await fechadas.first().click();
+  }
+  await turma.click();
 }

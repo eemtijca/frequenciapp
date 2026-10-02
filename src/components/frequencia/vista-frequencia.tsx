@@ -637,10 +637,10 @@ export default function VistaFrequencia({
       <h1 className="sr-only">Chamada</h1>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <div className="flex flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
+        <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
           {turmas.length > 1 && (
             <div role="group" aria-label="Turma atual" className="flex flex-col gap-2">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2">
                 {series.map((grupo) => {
                   const aberta = serieEstaAberta(grupo.id);
                   const contem = grupo.turmas.some((opcao) => opcao.id === turmaId);
@@ -653,7 +653,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setSeriesAbertas((atual) => ({ ...atual, [grupo.id]: !aberta }))
                       }
-                      className={`pressionavel flex h-11 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
+                      className={`pressionavel flex h-11 min-w-0 items-center justify-between gap-1 rounded-lg border px-3 text-sm font-medium transition-colors ${
                         contem ? "border-primary text-primary" : ""
                       }`}
                     >
