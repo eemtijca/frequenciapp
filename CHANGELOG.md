@@ -12,6 +12,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Corrigido
 
+- Chamada Parcial exibe a lista da turma na ordem da chamada normal, com registro por aluno, busca e filtros. A chave da Seduc fica bloqueada até salvar; remover a frequência parcial mantém o aluno na lista.
+
 - Avisos no celular e tablet ficam abaixo do cabeçalho, respeitando a área segura e mantendo o novo botão Gestão acessível durante as mensagens.
 
 - Leitura dos marcadores nativos de linha e coluna da Sheets API, preservando identificação do aluno e das dimensões criadas pela integração.

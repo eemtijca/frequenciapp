@@ -7,6 +7,9 @@ test.use({ serviceWorkers: "block" });
 
 let turmaId = "";
 let alunoId = "";
+let segundoAlunoId = "";
+let desistenteId = "";
+let outraTurmaId = "";
 
 async function limparMassa() {
   await comBanco(async (cliente) => {
@@ -35,10 +38,11 @@ async function abrirParcial(page: Page) {
 
 async function abrirRegistro(page: Page) {
   const secao = await abrirParcial(page);
-  await secao.getByRole("button", { name: "Registrar frequência parcial", exact: true }).click();
+  await secao
+    .getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um", exact: true })
+    .click();
   const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial", exact: true });
-  await dialogo.locator("#parcial-aluno").click();
-  await page.getByRole("option", { name: "E2E Parcial Um", exact: true }).click();
+  await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
   return { secao, dialogo };
 }
 
@@ -78,6 +82,25 @@ test.beforeAll(async () => {
     );
     alunoId = aluno.rows[0]?.id ?? "";
     expect(alunoId).not.toBe("");
+    const outraTurma = await cliente.query<{ id: string }>(
+      "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
+      [serie.rows[0]?.id],
+    );
+    outraTurmaId = outraTurma.rows[0]?.id ?? "";
+    const segundo = await cliente.query<{ id: string }>(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Parcial Dois', $1, $1, 2, true) returning id",
+      [turmaId],
+    );
+    segundoAlunoId = segundo.rows[0]?.id ?? "";
+    const desistente = await cliente.query<{ id: string }>(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ('E2E Parcial Desistente', $1, $1, 3, true, '2020-01-01') returning id",
+      [turmaId],
+    );
+    desistenteId = desistente.rows[0]?.id ?? "";
+    await cliente.query(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Parcial Inativo', $1, $1, 4, false), ('E2E Parcial Outra Turma', $2, $2, 1, true)",
+      [turmaId, outraTurmaId],
+    );
     await cliente.query(
       "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '07:00', '07:50', $2, true), ($1, 2, '07:50', '08:40', $2, true), ($1, 3, '08:40', '09:30', $2, true)",
       [turmaId, [1, 2, 3, 4, 5, 6, 7]],
@@ -87,12 +110,98 @@ test.beforeAll(async () => {
 
 test.beforeEach(async () => {
   await comBanco(async (cliente) => {
-    await cliente.query("delete from frequencias_parciais where aluno_id = $1", [alunoId]);
+    await cliente.query("delete from frequencias_parciais where aluno_nome like 'E2E Parcial %'");
+    await cliente.query(
+      "update alunos set nome = 'E2E Parcial Um', turma_id = $1, ativo = true where id = $2",
+      [turmaId, alunoId],
+    );
     await cliente.query("delete from frequencias where turma_id = $1", [turmaId]);
   });
 });
 
 test.afterAll(limparMassa);
+
+test("mostra a turma na ordem da chamada antes de salvar e registra diretamente pela linha", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const secao = await abrirParcial(page);
+  const linhas = secao.getByRole("listitem");
+  await expect(linhas).toHaveCount(3);
+  await expect(linhas.nth(0).getByRole("heading")).toHaveText("E2E Parcial Um");
+  await expect(linhas.nth(1).getByRole("heading")).toHaveText("E2E Parcial Dois");
+  await expect(linhas.nth(0).getByText("01", { exact: true })).toBeVisible();
+  await expect(linhas.nth(1).getByText("02", { exact: true })).toBeVisible();
+  const primeiro = secao.getByTestId(`parcial-aluno-${alunoId}`);
+  const segundo = secao.getByTestId(`parcial-aluno-${segundoAlunoId}`);
+  await expect(primeiro.getByRole("switch")).toBeDisabled();
+  await expect(segundo.getByRole("switch")).toBeDisabled();
+  await expect(
+    secao.getByTestId(`parcial-aluno-${desistenteId}`).getByRole("button"),
+  ).toBeDisabled();
+  await expect(secao.getByText("E2E Parcial Inativo", { exact: true })).toHaveCount(0);
+  await expect(secao.getByText("E2E Parcial Outra Turma", { exact: true })).toHaveCount(0);
+  expect((await registrosDoDia(page)).registros).toHaveLength(0);
+  await page.screenshot({
+    path: `docs/imagens/chamada-parcial-lista-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  await secao.locator("#parcial-busca").fill("Dois");
+  await expect(linhas).toHaveCount(1);
+  await expect(segundo).toBeVisible();
+  await secao.getByRole("button", { name: "Ver todos", exact: true }).click();
+  await expect(linhas).toHaveCount(3);
+  await primeiro
+    .getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um" })
+    .click();
+  const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial", exact: true });
+  await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
+  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await expect(primeiro.getByRole("switch")).toBeEnabled();
+  await expect(segundo.getByRole("switch")).toBeDisabled();
+  await expect(linhas).toHaveCount(3);
+  expect((await registrosDoDia(page)).registros).toHaveLength(1);
+
+  await secao.locator("#parcial-filtro").click();
+  await page.getByRole("option", { name: "Sem frequência parcial", exact: true }).click();
+  await expect(primeiro).toBeHidden();
+  await expect(segundo).toBeVisible();
+  await secao.locator("#parcial-filtro").click();
+  await page.getByRole("option", { name: "Pendentes na Seduc", exact: true }).click();
+  await expect(linhas).toHaveCount(1);
+  await expect(primeiro).toBeVisible();
+  await primeiro.getByRole("switch").click();
+  await expect(linhas).toHaveCount(0);
+  await secao.locator("#parcial-filtro").click();
+  await page.getByRole("option", { name: "Registrados na Seduc", exact: true }).click();
+  await expect(primeiro.getByRole("switch")).toBeChecked();
+});
+
+test("preserva a linha histórica após transferência e desativação do aluno", async ({ page }) => {
+  const { dialogo } = await abrirRegistro(page);
+  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await expect(dialogo).toBeHidden();
+  await comBanco((cliente) =>
+    cliente.query(
+      "update alunos set nome = 'E2E Parcial Nome Atual', turma_id = $1, ativo = false where id = $2",
+      [outraTurmaId, alunoId],
+    ),
+  );
+  const secao = await abrirParcial(page);
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
+  await expect(linha.getByRole("heading")).toHaveText("E2E Parcial Um");
+  await expect(
+    linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }),
+  ).toBeEnabled();
+  await expect(linha.getByRole("switch")).toBeEnabled();
+  await expect(secao.getByTestId(`parcial-aluno-${segundoAlunoId}`)).toBeVisible();
+  await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
+  await expect(page.getByRole("dialog").locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
+});
 
 test("confirma a Seduc, mantém a confirmação após recarga e exige novo lançamento após corrigir", async ({
   page,
@@ -101,7 +210,7 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
   await dialogo.locator("#parcial-turno").click();
   await page.getByRole("option", { name: "Tarde", exact: true }).click();
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  const linha = secao.getByTestId(`parcial-registro-${alunoId}`);
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Tarde", { exact: true })).toBeVisible();
   const dados = await registrosDoDia(page);
   const parcial = dados.registros[0];
@@ -180,18 +289,23 @@ test("pede confirmação para descartar o rascunho e para remover um registro", 
   await expect(dialogo).toBeHidden();
   expect((await registrosDoDia(page)).registros).toHaveLength(0);
 
-  await secao.getByRole("button", { name: "Registrar frequência parcial", exact: true }).click();
-  await dialogo.locator("#parcial-aluno").click();
-  await page.getByRole("option", { name: "E2E Parcial Um", exact: true }).click();
+  await secao
+    .getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um", exact: true })
+    .click();
+  await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  const linha = secao.getByTestId(`parcial-registro-${alunoId}`);
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await linha.getByRole("button", { name: "Remover frequência parcial de E2E Parcial Um" }).click();
   const remover = page.getByRole("alertdialog", { name: "Remover a frequência parcial?" });
   await remover.getByRole("button", { name: "Cancelar" }).click();
   await expect(linha).toBeVisible();
   await linha.getByRole("button", { name: "Remover frequência parcial de E2E Parcial Um" }).click();
   await remover.getByRole("button", { name: "Remover", exact: true }).click();
-  await expect(linha).toBeHidden();
+  await expect(linha).toBeVisible();
+  await expect(
+    linha.getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um" }),
+  ).toBeEnabled();
+  await expect(linha.getByRole("switch")).toBeDisabled();
   expect((await registrosDoDia(page)).registros).toHaveLength(0);
 });
 
@@ -200,7 +314,7 @@ test("mantém a edição local em um conflito e carrega a versão salva antes de
 }) => {
   const { secao, dialogo } = await abrirRegistro(page);
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  const linha = secao.getByTestId(`parcial-registro-${alunoId}`);
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
   const editar = page.getByRole("dialog", { name: "Editar frequência parcial" });
   await editar.locator("#parcial-observacao").fill("Edição deste aparelho");

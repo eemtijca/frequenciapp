@@ -135,16 +135,10 @@ export function DialogoFrequenciaParcial({
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="parcial-aluno">Aluno</Label>
-            <Selecionar
-              id="parcial-aluno"
-              value={edicao.alunoId}
-              onValueChange={(alunoId) => onEdicao({ ...edicao, alunoId })}
-              opcoes={alunos.map((aluno) => ({ valor: aluno.id, rotulo: aluno.nome }))}
-              placeholder="Selecione o aluno"
-              buscavel
-              disabled={salvando || registro !== null}
-            />
+            <p className="text-sm font-medium">Aluno</p>
+            <p id="parcial-aluno" className="bg-secondary rounded-lg px-3 py-2 text-sm break-words">
+              {alunos.find((aluno) => aluno.id === edicao.alunoId)?.nome}
+            </p>
           </div>
           <fieldset disabled={salvando} className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">Presença registrada</legend>
