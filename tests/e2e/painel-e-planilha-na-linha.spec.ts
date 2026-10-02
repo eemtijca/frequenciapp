@@ -30,7 +30,7 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
   const abas = page.getByRole("tablist", { name: "Tipo de registro" });
-  const botao = page.getByRole("button", { name: "Enviar as saídas para a planilha" });
+  const botao = page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" });
   const caixaAbas = await abas.boundingBox();
   const caixaBotao = await botao.boundingBox();
   expect(caixaAbas).not.toBeNull();
@@ -51,10 +51,7 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
   );
   expect(estouro).toBe(false);
 
-  // Nas Entradas, o mesmo botão leva à seção da planilha de entradas.
+  // O mesmo botão único atende as duas abas: não há botão separado nas Entradas.
   await page.getByRole("tab", { name: "Entradas", exact: true }).click();
-  const irEntradas = page.getByRole("button", { name: "Ir à planilha de entradas" });
-  await expect(irEntradas).toBeEnabled();
-  await irEntradas.click();
-  await expect(page.locator('section[aria-label="Planilha de entradas"]')).toBeInViewport();
+  await expect(botao).toBeVisible();
 });
