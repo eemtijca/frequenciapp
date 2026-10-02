@@ -71,6 +71,27 @@ test("Chamada: um botão por série expande e recolhe as turmas", async ({ page 
   await expect(turmaDoisA).toHaveCount(0);
 });
 
+test("Chamada: abrir uma série fecha as turmas das outras", async ({ page }) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Chamada", "chamada");
+  const grupo = page
+    .locator('section[aria-label="Fazer chamada"]')
+    .getByRole("group", { name: "Turma atual", exact: true });
+  const botaoUm = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
+  const botaoDois = grupo.getByRole("button", { name: series[1] ?? "", exact: true });
+
+  // A série da turma atual pode já começar aberta; o estado final é o que importa.
+  await botaoDois.click();
+  await expect(botaoDois).toHaveAttribute("aria-expanded", "true");
+  await expect(botaoUm).toHaveAttribute("aria-expanded", "false");
+  await botaoUm.click();
+  await expect(botaoUm).toHaveAttribute("aria-expanded", "true");
+  await expect(botaoDois).toHaveAttribute("aria-expanded", "false");
+  await expect(grupo.getByRole("group", { name: `Turmas de ${series[1]}` })).toHaveCount(0);
+  await expect(grupo.getByRole("group", { name: `Turmas de ${series[0]}` })).toBeVisible();
+});
+
 test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto("/");
