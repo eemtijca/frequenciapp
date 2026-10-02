@@ -138,6 +138,10 @@ beforeAll(async () => {
   );
   gas.definirToken(gerado.token);
   await chamar("/api/planilha-saidas", "PATCH", { ativa: true, endpoint: gas.url });
+  // O teste de conexão registra a versão do script antes de liberar escritas.
+  const scriptTestado = await chamar("/api/planilha-saidas/testar", "POST", { endpoint: gas.url });
+  expect(scriptTestado.status).toBe(200);
+  expect((await json<{ ping: { versao: number } }>(scriptTestado)).ping.versao).toBe(7);
   const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
     await chamar("/api/planilha-saidas/estrutura", "POST", {}),
   );
