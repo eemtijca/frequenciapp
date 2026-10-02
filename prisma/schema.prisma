@@ -40,12 +40,29 @@ enum ModoPlanilha {
 }
 
 // Finalidade da integração com a planilha: a frequência das turmas de origem
-// ou o registro das saídas antecipadas em outra planilha.
+// ou os registros de saídas e chamada parcial em arquivos próprios.
 enum FinalidadeIntegracao {
   FREQUENCIA
   SAIDAS
+  PARCIAL
 
   @@map("finalidade_integracao")
+}
+
+// Forma de representar a presença parcial sem alterar a chamada regular.
+enum TipoFrequenciaParcial {
+  TURNO
+  AULAS
+
+  @@map("tipo_frequencia_parcial")
+}
+
+// Turno integral escolhido explicitamente para o registro parcial.
+enum TurnoParcial {
+  MANHA
+  TARDE
+
+  @@map("turno_parcial")
 }
 
 // Modalidade registrada em cada sincronização concluída.
@@ -82,6 +99,9 @@ model Usuario {
   saidasLiberadas          SaidaAntecipada[]          @relation("SaidaLiberadaPor")
   saidasCriadas            SaidaAntecipada[]          @relation("SaidaCriadaPor")
   entradasCriadas          EntradaAtrasada[]
+  parciaisCriadas          FrequenciaParcial[]        @relation("ParcialCriadaPor")
+  parciaisAtualizadas      FrequenciaParcial[]        @relation("ParcialAtualizadaPor")
+  parciaisConfirmadas      FrequenciaParcial[]        @relation("ParcialConfirmadaPor")
   configuracoesAtualizadas Configuracao[]             @relation("ConfiguracaoAtualizadaPor")
   integracoesModo          IntegracaoPlanilha[]       @relation("IntegracaoModoPor")
   integracoesAtualizadas   IntegracaoPlanilha[]       @relation("IntegracaoAtualizadaPor")
@@ -199,17 +219,18 @@ model Serie {
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
 // enquanto houver alunos ou frequências vinculadas.
 model Turma {
-  id             String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  serieId        String                  @map("serie_id") @db.Uuid
-  nome           String
-  criadoEm       DateTime                @default(now()) @map("criado_em") @db.Timestamptz
-  serie          Serie                   @relation(fields: [serieId], references: [id], onDelete: Restrict)
-  alunos         Aluno[]                 @relation("AlunoTurma")
-  origemDe       Aluno[]                 @relation("AlunoTurmaOriginal")
-  frequencias    Frequencia[]
-  horarios       Horario[]
-  sincronizacoes SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
-  entradas       EntradaAtrasada[]
+  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serieId             String                  @map("serie_id") @db.Uuid
+  nome                String
+  criadoEm            DateTime                @default(now()) @map("criado_em") @db.Timestamptz
+  serie               Serie                   @relation(fields: [serieId], references: [id], onDelete: Restrict)
+  alunos              Aluno[]                 @relation("AlunoTurma")
+  origemDe            Aluno[]                 @relation("AlunoTurmaOriginal")
+  frequencias         Frequencia[]
+  horarios            Horario[]
+  sincronizacoes      SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
+  entradas            EntradaAtrasada[]
+  frequenciasParciais FrequenciaParcial[]
 
   vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
   configuracoesOrigem ConfiguracaoOrigemTurma[]
@@ -222,20 +243,21 @@ model Turma {
 // frequência diária) e turma original (referência de origem para a
 // consulta agrupada). Nenhum outro dado pessoal é armazenado.
 model Aluno {
-  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId              String            @map("turma_id") @db.Uuid
-  turmaOriginalId      String            @map("turma_original_id") @db.Uuid
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId              String              @map("turma_id") @db.Uuid
+  turmaOriginalId      String              @map("turma_original_id") @db.Uuid
   nome                 String
   ordem                Int
-  ativo                Boolean           @default(true)
-  desistenteEm         DateTime?         @map("desistente_em") @db.Date
-  situacaoAtualizadaEm DateTime?         @map("situacao_atualizada_em") @db.Timestamptz
-  criadoEm             DateTime          @default(now()) @map("criado_em") @db.Timestamptz
-  turma                Turma             @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
-  turmaOriginal        Turma             @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
+  ativo                Boolean             @default(true)
+  desistenteEm         DateTime?           @map("desistente_em") @db.Date
+  situacaoAtualizadaEm DateTime?           @map("situacao_atualizada_em") @db.Timestamptz
+  criadoEm             DateTime            @default(now()) @map("criado_em") @db.Timestamptz
+  turma                Turma               @relation("AlunoTurma", fields: [turmaId], references: [id], onDelete: Restrict)
+  turmaOriginal        Turma               @relation("AlunoTurmaOriginal", fields: [turmaOriginalId], references: [id], onDelete: Restrict)
   faltas               Falta[]
   saidas               SaidaAntecipada[]
   entradas             EntradaAtrasada[]
+  frequenciasParciais  FrequenciaParcial[]
   chamadas             AlunoDaChamada[]
 
   @@index([turmaId, ordem])
@@ -283,6 +305,40 @@ model Frequencia {
   @@unique([turmaId, dia])
   @@index([dia])
   @@map("frequencias")
+}
+
+// Presença parcial por aluno e dia, com retrato da turma e confirmação manual
+// de lançamento na Seduc. Revisão protege correções e confirmações concorrentes.
+model FrequenciaParcial {
+  id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alunoId                String                @map("aluno_id") @db.Uuid
+  dia                    DateTime              @db.Date
+  turmaId                String                @map("turma_id") @db.Uuid
+  alunoNome              String                @map("aluno_nome") @db.VarChar(200)
+  turmaNome              String                @map("turma_nome") @db.VarChar(200)
+  tipo                   TipoFrequenciaParcial
+  turno                  TurnoParcial?
+  aulas                  Int[]
+  observacao             String?               @db.VarChar(300)
+  registradoSeduc        Boolean               @default(false) @map("registrado_seduc")
+  registradoSeducEm      DateTime?             @map("registrado_seduc_em") @db.Timestamptz
+  registradoSeducPorId   String?               @map("registrado_seduc_por_id") @db.Uuid
+  registradoSeducPorNome String?               @map("registrado_seduc_por_nome") @db.VarChar(200)
+  revisao                Int                   @default(1)
+  criadoPorId            String?               @map("criado_por_id") @db.Uuid
+  atualizadoPorId        String?               @map("atualizado_por_id") @db.Uuid
+  criadoEm               DateTime              @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm           DateTime              @updatedAt @map("atualizado_em") @db.Timestamptz
+  aluno                  Aluno                 @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma                  Turma                 @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor              Usuario?              @relation("ParcialCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor          Usuario?              @relation("ParcialAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  registradoSeducPor     Usuario?              @relation("ParcialConfirmadaPor", fields: [registradoSeducPorId], references: [id], onDelete: SetNull)
+
+  @@unique([alunoId, dia])
+  @@index([turmaId, dia])
+  @@index([dia, registradoSeduc])
+  @@map("frequencias_parciais")
 }
 
 // Quem estava na lista da chamada, presente ou ausente. Fixa o histórico:

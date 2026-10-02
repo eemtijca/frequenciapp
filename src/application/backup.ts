@@ -1,4 +1,4 @@
-// Cópia de segurança em JSON: exporta cadastro, frequências, saídas e entradas e
+// Cópia de segurança em JSON: exporta cadastro, frequências regulares e parciais e
 // importa mesclando sem sobrescrever, com resultado e auditoria.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
@@ -19,6 +19,57 @@ const justificativa = z
   .trim()
   .min(1, "Justificativa inválida.")
   .max(10, "Justificativa inválida.");
+const instante = z.iso.datetime({ offset: true });
+const esquemaParcial = z
+  .object({
+    id: uuid,
+    alunoId: uuid,
+    turmaId: uuid,
+    dia,
+    alunoNome: z.string().trim().min(2).max(200),
+    turmaNome: z.string().trim().min(1).max(200),
+    tipo: z.enum(["TURNO", "AULAS"]),
+    turno: z.enum(["MANHA", "TARDE"]).nullish(),
+    aulas: z.array(z.number().int().min(1).max(30)).max(30),
+    observacao: z.string().trim().max(300).nullish(),
+    registradoSeduc: z.boolean(),
+    registradoSeducEm: instante.nullish(),
+    registradoSeducPorId: uuid.nullish(),
+    registradoSeducPorNome: z.string().trim().min(1).max(200).nullish(),
+    revisao: z.number().int().min(1).max(999999),
+    criadoPorId: uuid.nullish(),
+    atualizadoPorId: uuid.nullish(),
+    criadoEm: instante.optional(),
+    atualizadoEm: instante.optional(),
+  })
+  .refine(
+    (item) =>
+      item.tipo === "TURNO"
+        ? item.turno != null && item.aulas.length === 0
+        : item.turno == null && item.aulas.length > 0,
+    "A presença parcial deve informar um turno ou as aulas frequentadas.",
+  )
+  .refine(
+    (item) =>
+      item.aulas.every((aula, indice) => indice === 0 || aula > (item.aulas[indice - 1] ?? 0)),
+    "As aulas devem estar em ordem e sem repetição.",
+  )
+  .refine(
+    (item) =>
+      item.registradoSeduc
+        ? item.registradoSeducEm != null && item.registradoSeducPorNome != null
+        : item.registradoSeducEm == null &&
+          item.registradoSeducPorId == null &&
+          item.registradoSeducPorNome == null,
+    "A confirmação da Seduc deve corresponder à data e ao responsável.",
+  )
+  .refine(
+    (item) =>
+      !item.criadoEm ||
+      !item.atualizadoEm ||
+      new Date(item.atualizadoEm).getTime() >= new Date(item.criadoEm).getTime(),
+    "A atualização deve ser posterior à criação.",
+  );
 
 const esquemaCopia = z.object({
   formato: z.literal(FORMATO_COPIA),
@@ -83,6 +134,8 @@ const esquemaCopia = z.object({
       }),
     )
     .max(50000),
+  // Campo novo na versão 1; cópias anteriores continuam válidas.
+  frequenciasParciais: z.array(esquemaParcial).max(50000).optional(),
   saidas: z
     .array(
       z.object({
@@ -186,7 +239,7 @@ function faltasIguais(
   return ordemAtual.every((valor, indice) => valor === ordemNova[indice]);
 }
 
-/** Monta a cópia completa do cadastro, das frequências, das saídas e das entradas. */
+/** Monta a cópia completa do cadastro e dos registros de frequência, saída e entrada. */
 export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequenciapp> {
   const [
     series,
@@ -194,6 +247,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     horarios,
     alunos,
     frequencias,
+    frequenciasParciais,
     saidas,
     entradas,
     justificativas,
@@ -242,6 +296,30 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
           select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
         },
         alunos: { select: { alunoId: true } },
+      },
+    }),
+    banco().frequenciaParcial.findMany({
+      orderBy: [{ dia: "asc" }, { turmaId: "asc" }, { alunoNome: "asc" }],
+      select: {
+        id: true,
+        alunoId: true,
+        turmaId: true,
+        dia: true,
+        alunoNome: true,
+        turmaNome: true,
+        tipo: true,
+        turno: true,
+        aulas: true,
+        observacao: true,
+        registradoSeduc: true,
+        registradoSeducEm: true,
+        registradoSeducPorId: true,
+        registradoSeducPorNome: true,
+        revisao: true,
+        criadoPorId: true,
+        atualizadoPorId: true,
+        criadoEm: true,
+        atualizadoEm: true,
       },
     }),
     banco().saidaAntecipada.findMany({
@@ -303,6 +381,13 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       revisao: frequencia.revisao,
       faltas: frequencia.faltas,
       alunos: frequencia.alunos.map((item) => item.alunoId),
+    })),
+    frequenciasParciais: frequenciasParciais.map((parcial) => ({
+      ...parcial,
+      dia: parcial.dia.toISOString().slice(0, 10),
+      registradoSeducEm: parcial.registradoSeducEm?.toISOString() ?? null,
+      criadoEm: parcial.criadoEm.toISOString(),
+      atualizadoEm: parcial.atualizadoEm.toISOString(),
     })),
     saidas: saidas.map((saida) => ({
       ...saida,
@@ -538,9 +623,14 @@ export async function importarCopia(
         await tx.usuario.findMany({
           where: {
             id: {
-              in: copia.saidas
-                .map((saida) => saida.liberadoPorId)
-                .filter((valor): valor is string => Boolean(valor)),
+              in: [
+                ...copia.saidas.map((saida) => saida.liberadoPorId),
+                ...(copia.frequenciasParciais ?? []).flatMap((parcial) => [
+                  parcial.criadoPorId,
+                  parcial.atualizadoPorId,
+                  parcial.registradoSeducPorId,
+                ]),
+              ].filter((valor): valor is string => Boolean(valor)),
             },
           },
           select: { id: true },
@@ -611,6 +701,66 @@ export async function importarCopia(
           },
         },
       });
+      resultado.adicionadas += 1;
+    }
+
+    // Registros parciais têm identidade própria e não alteram a chamada regular.
+    for (const parcial of copia.frequenciasParciais ?? []) {
+      if (!idsAlunos.has(parcial.alunoId) || !idsTurmas.has(parcial.turmaId)) {
+        resultado.conflitos += 1;
+        continue;
+      }
+      const diaRepositorio = new Date(`${parcial.dia}T12:00:00Z`);
+      const usuarioExistente = (id: string | null | undefined) =>
+        id && idsUsuarios.has(id) ? id : null;
+      const data = {
+        ...parcial,
+        dia: diaRepositorio,
+        turno: parcial.turno ?? null,
+        observacao: parcial.observacao ?? null,
+        registradoSeducEm: parcial.registradoSeducEm ? new Date(parcial.registradoSeducEm) : null,
+        registradoSeducPorId: usuarioExistente(parcial.registradoSeducPorId),
+        registradoSeducPorNome: parcial.registradoSeducPorNome ?? null,
+        criadoPorId: usuarioExistente(parcial.criadoPorId),
+        atualizadoPorId: usuarioExistente(parcial.atualizadoPorId),
+        ...(parcial.criadoEm ? { criadoEm: new Date(parcial.criadoEm) } : {}),
+        ...(parcial.atualizadoEm ? { atualizadoEm: new Date(parcial.atualizadoEm) } : {}),
+      };
+      const existentes = await tx.frequenciaParcial.findMany({
+        where: {
+          OR: [{ id: parcial.id }, { alunoId: parcial.alunoId, dia: diaRepositorio }],
+        },
+        take: 2,
+      });
+      const atual = existentes[0];
+      if (atual) {
+        const igual =
+          existentes.length === 1 &&
+          atual.alunoId === data.alunoId &&
+          atual.dia.toISOString().slice(0, 10) === parcial.dia &&
+          atual.turmaId === data.turmaId &&
+          atual.alunoNome === data.alunoNome &&
+          atual.turmaNome === data.turmaNome &&
+          atual.tipo === data.tipo &&
+          atual.turno === data.turno &&
+          atual.aulas.join(",") === data.aulas.join(",") &&
+          atual.observacao === data.observacao &&
+          atual.registradoSeduc === data.registradoSeduc &&
+          (atual.registradoSeducEm?.getTime() ?? null) ===
+            (data.registradoSeducEm?.getTime() ?? null) &&
+          atual.registradoSeducPorId === data.registradoSeducPorId &&
+          atual.registradoSeducPorNome === data.registradoSeducPorNome &&
+          atual.revisao === data.revisao &&
+          atual.criadoPorId === data.criadoPorId &&
+          atual.atualizadoPorId === data.atualizadoPorId &&
+          (!data.criadoEm || atual.criadoEm.getTime() === new Date(data.criadoEm).getTime()) &&
+          (!data.atualizadoEm ||
+            atual.atualizadoEm.getTime() === new Date(data.atualizadoEm).getTime());
+        if (igual) resultado.identicas += 1;
+        else resultado.conflitos += 1;
+        continue;
+      }
+      await tx.frequenciaParcial.create({ data });
       resultado.adicionadas += 1;
     }
 

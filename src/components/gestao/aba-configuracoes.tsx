@@ -43,6 +43,7 @@ import SecaoAcessoDiretores from "@/components/gestao/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/secao-notificacoes";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
 import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
+import IntegracaoParcial from "@/components/gestao/integracao-parcial";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ interface Props {
   onJustificativasMudaram: () => Promise<void>;
   onLiberadoresMudaram: () => Promise<void>;
   onAbrirSaidas?: () => void;
+  onAbrirParcial?: () => void;
 }
 
 interface ResultadoImportacao {
@@ -87,6 +89,7 @@ export default function AbaConfiguracoes({
   onJustificativasMudaram,
   onLiberadoresMudaram,
   onAbrirSaidas,
+  onAbrirParcial,
 }: Props) {
   const [abertoRecursos, setAbertoRecursos] = useState(true);
   const [abertoJustificativas, setAbertoJustificativas] = useState(false);
@@ -622,6 +625,8 @@ export default function AbaConfiguracoes({
       <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
 
       <IntegracaoSaidas onAbrirSaidas={onAbrirSaidas} />
+
+      <IntegracaoParcial onAbrirParcial={onAbrirParcial} />
 
       <SecaoRecolhivel
         dataSecao="config-justificativas"

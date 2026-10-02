@@ -13,7 +13,7 @@ export async function POST(requisicao: Request): Promise<Response> {
     const sessao = await exigirAdmin();
     if (!sessao.ok) return sessao.resposta;
     const entrada = z
-      .object({ finalidade: z.enum(["FREQUENCIA", "SAIDAS"]).default("FREQUENCIA") })
+      .object({ finalidade: z.enum(["FREQUENCIA", "SAIDAS", "PARCIAL"]).default("FREQUENCIA") })
       .safeParse(await corpoJson(requisicao));
     if (!entrada.success) return erroApi("Finalidade da planilha inválida.", 400);
     const pedido = iniciarAutorizacao(sessao.usuario.id, entrada.data.finalidade);

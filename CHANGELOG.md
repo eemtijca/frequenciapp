@@ -16,6 +16,9 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Chamada Parcial separada da chamada diária, com presença por turno ou aulas, revisão concorrente e confirmação manual "Registrado na Seduc". Correções reabrem a pendência; nomes históricos e confirmação entram na cópia JSON sem invalidar arquivos antigos (ADR-034).
+- Terceira planilha Google para chamadas parciais, com aba própria, prévia obrigatória e atualização explícita somente de linhas identificadas pela integração.
+
 - Envio automático à planilha ao registrar saídas e entradas, por interruptor em Gestão, Planilha de saídas (desligado por padrão): só acrescenta linhas, sem repetir depois de envio sem confirmação.
 - Chamada com seletor segmentado de séries e as turmas da série ativa logo abaixo; a série e a turma escolhidas ficam em verde, tocar em outra série seleciona a primeira turma dela e tocar na ativa recolhe as turmas; na Gestão, as turmas específicas da origem ficam numa seção recolhível.
 - Opção Todas as turmas para organizar a apresentação ou corrigir cabeçalhos e datas das abas vinculadas, com uma confirmação, andamento e resultado por aba. As operações seguem em sequência e identificam falhas sem repetir a escrita automaticamente.
@@ -77,6 +80,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 - Envio sem resposta (timeout, 504 ou queda de rede) fica registrado como parcial, com orientação para conferir a aba, e não é repetido automaticamente.
 
 ### Modificado
+
+- Gestão passa para o cabeçalho do celular, antes do sino. Chamada Parcial ocupa o lugar ao lado de Chamada na navegação inferior.
 
 - Um só botão da planilha, ao lado das abas Saídas e Entradas, envia as saídas e as entradas do mês juntas, com prévia e confirmação únicas.
 - O botão da planilha passou para a linha das abas Saídas e Entradas, sem a faixa de título que sobrava. O Painel perdeu o botão de atualizar e se atualiza sozinho a cada minuto e ao voltar para a aba do navegador.

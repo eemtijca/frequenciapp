@@ -347,6 +347,46 @@ Acumulado desde a primeira chamada salva até a data informada.
 
 Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta simples ou parcial conta em `faltas`.
 
+## Frequências parciais
+
+As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. A Chamada Parcial não cria nem altera frequências regulares, faltas, saídas ou entradas.
+
+### GET /api/frequencias-parciais
+
+Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` histórico opcional. Sem datas, consulta o dia corrente da escola. Períodos aceitam até 92 dias.
+
+- 200 `{ "registros": FrequenciaParcial[] }`, em ordem de dia e nome histórico.
+- 400 datas inválidas, período incompleto ou invertido, uso simultâneo de dia e período ou turma inválida.
+
+FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, turno, aulas, observacao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, criadoEm, atualizadoEm }`. Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601. Os nomes e a turma retratam a criação, mesmo depois de transferência ou renomeação. Identificadores internos de autoria não são expostos.
+
+### POST /api/frequencias-parciais
+
+Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "TURNO" | "AULAS", turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number }`.
+
+`TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres. Registro novo exige aluno ativo e não desistente na data; data futura é recusada. `turmaId`, quando informado, protege contra transferência concorrente. As aulas são números da presença parcial, independentes da configuração de chamada por aula.
+
+- 200 `{ "registro": FrequenciaParcial }`.
+- Para criar, a revisão pode ser omitida ou zero. Para corrigir um registro já existente por aluno e dia, é obrigatória a revisão vigente.
+- Correção efetiva incrementa revisão e limpa a confirmação da Seduc. Repetir o mesmo conteúdo não altera a confirmação nem a revisão. Nome e turma históricos continuam preservados.
+- 400 conteúdo inválido ou dia futuro; 404 aluno inexistente; 409 revisão obsoleta, transferência concorrente ou aluno desativado/desistente em registro novo.
+
+### POST /api/frequencias-parciais/{id}/seduc
+
+Corpo estrito: `{ "registrado": boolean, "revisao": number }`.
+
+- 200 `{ "registro": FrequenciaParcial }`. Marcar guarda data e nome da conta autenticada; desmarcar limpa confirmação e responsável. Alteração incrementa revisão; repetir o mesmo estado é idempotente.
+- 400 corpo ou identificador inválido; 404 registro inexistente; 409 revisão obsoleta.
+
+A chave confirma manualmente que a revisão corrente foi lançada no sistema da Seduc. Não envia dados para esse sistema e não confirma a gravação na planilha Google.
+
+### DELETE /api/frequencias-parciais/{id}
+
+Corpo: `{ "revisao": number }`.
+
+- 200 `{ "ok": true }`, com auditoria e sem alterar outros registros.
+- 400 corpo ou identificador inválido; 404 inexistente; 409 revisão obsoleta.
+
 ## Saídas antecipadas
 
 ### GET /api/saidas
@@ -450,12 +490,12 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
 
-### Conexão OAuth da frequência e das saídas
+### Conexão OAuth das três finalidades
 
-- `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração.
+- `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração.
 - `GET /api/planilha/google/retorno`: recebe o código OAuth, confere estado e sessão, guarda o token de atualização cifrado e redireciona ao aplicativo.
-- `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar a planilha de saídas.
-- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" }`, confere acesso pela Sheets API, guarda a planilha da finalidade, desliga essa integração e invalida o mapa anterior.
+- `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS|PARCIAL`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar os arquivos de saídas e chamadas parciais.
+- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API, guarda a planilha da finalidade, desliga essa integração e invalida o mapa anterior. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
 
 ### GET /api/planilha/estado
 
@@ -618,6 +658,36 @@ Apaga a autorização OAuth e o esquema e desliga a integração de saídas. Ape
 
 - 200 `{"ok": true}`.
 
+## Planilha de chamada parcial
+
+Terceiro arquivo Google, finalidade `PARCIAL`, com configuração independente. Não há envio automático e o envio à planilha não muda a confirmação manual da Seduc.
+
+### GET /api/planilha-parcial e PATCH /api/planilha-parcial
+
+Apenas administração. A consulta retorna `{ "integracao": { ativa, contaGoogle, googlePlanilha: { id, nome } | null, aba, preparada, podeEnviar } }`, sem credenciais. `aba` é `Chamada Parcial`. A configuração recebe corpo estrito `{ "ativa": boolean }`; ativar exige conta autorizada e arquivo escolhido.
+
+### DELETE /api/planilha-parcial
+
+Apenas administração. Desconecta a integração e desliga o envio; não altera o arquivo externo nem os registros locais. Retorna `{ "ok": true }`.
+
+### GET /api/planilha-parcial/estado
+
+Sessão da equipe. Retorna `{ podeEnviar, planilhaNome, aba }`. O envio só libera depois de conexão, ativação e preparação da aba.
+
+### POST /api/planilha-parcial/preparar
+
+Apenas administração. Corpo `{ "confirmacao": true }`. Cria a aba `Chamada Parcial` quando ausente, com cabeçalho padrão de nove colunas. Aba existente é conferida e não tem seus dados substituídos. Cabeçalho incompatível, fórmulas no cabeçalho ou mesclagens bloqueiam a preparação.
+
+### POST /api/planilha-parcial/simular e /api/planilha-parcial/enviar
+
+Sessão da equipe. Corpo estrito `{ de, ate, turmaId?, atualizarExistentes?: boolean, planoHash? }`, com datas `YYYY-MM-DD` e período inclusivo de até 92 dias. `turmaId` filtra a turma histórica. A simulação devolve a prévia e o `planoHash`; o envio exige o hash corrente e relê dados locais, valores, fórmulas e marcadores externos antes de escrever.
+
+Por padrão, o plano acrescenta somente registros novos e reconhece o UUID da coluna Código para evitar repetição. `atualizarExistentes: true` autoriza explicitamente correções e confirmações já enviadas, somente nas nove colunas de linhas criadas e marcadas pela integração, com código único e sem fórmula. Divergências sem essa autorização, fórmulas ou códigos repetidos bloqueiam a escrita e exigem conferência. Linhas manuais sem código, com mesmo nome e data, são preservadas e aparecem como pendência.
+
+Alterar dados, conexão, arquivo, estrutura ou conteúdo após a prévia exige nova simulação. Escrita enviada sem resposta exige conferência manual; não é repetida automaticamente. Remover um registro local não apaga sua linha na planilha.
+
+O envio parcial obtém exclusão distribuída no PostgreSQL antes de remontar o plano e reler a aba. Trava ocupada responde 409; perda da conexão da trava cancela a requisição HTTP e responde 502 com orientação para conferir a planilha. A transação local não fornece atomicidade nem reversão da escrita no Google. Operações com efeito externo não são repetidas por retentativa de transação.
+
 ## Cópia de segurança
 
 ### GET /api/backup
@@ -628,7 +698,7 @@ Apaga a autorização OAuth e o esquema e desliga a integração de saídas. Ape
 
 Corpo: `{ "senha": "senha atual do administrador" }`. A senha do ZIP não é recebida por nenhuma API.
 
-- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "saidas", "entradas", "justificativas", "liberadores", "configuracoes" }`. Apenas administração, com auditoria e `Cache-Control: no-store`.
+- 200 com o documento `{ "formato": "frequenciapp", "versao": 1, "exportadoEm", "series", "turmas", "horarios", "alunos", "frequencias", "frequenciasParciais", "saidas", "entradas", "justificativas", "liberadores", "configuracoes" }`. Apenas administração, com auditoria e `Cache-Control: no-store`.
 - 400 sem senha válida; 401 sem sessão; 403 sem permissão ou origem não permitida; 429 após cinco tentativas incorretas em 15 minutos, por conta e entre instâncias. Sucesso limpa o contador.
 
 ### POST /api/backup
@@ -636,6 +706,9 @@ Corpo: `{ "senha": "senha atual do administrador" }`. A senha do ZIP não é rec
 Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
+- `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
+- A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
+- Tipo, turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.
 
 ### POST /api/exportacoes/registro

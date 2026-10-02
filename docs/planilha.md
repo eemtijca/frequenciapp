@@ -1,6 +1,6 @@
 # Google Planilhas
 
-Integração opcional da administração com a planilha da escola. A frequência e as saídas antecipadas usam OAuth 2.0, Google Picker e a Sheets API. Desligada por padrão, a integração reorganiza a frequência das turmas atuais por turma de origem. Uma segunda finalidade registra as saídas antecipadas em outra planilha, em aba única.
+Integração opcional da administração com a planilha da escola. A frequência e as saídas antecipadas usam OAuth 2.0, Google Picker e a Sheets API. Desligada por padrão, a integração reorganiza a frequência das turmas atuais por turma de origem. Uma segunda finalidade registra saídas e entradas em outro arquivo. A finalidade `PARCIAL` registra presenças parciais em um terceiro arquivo distinto, com aba própria.
 
 ## Princípios
 
@@ -19,7 +19,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 5. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_PICKER_API_KEY` e `GOOGLE_PROJECT_NUMBER` no servidor. O número do projeto é usado pelo Picker para dar acesso apenas aos arquivos escolhidos. Não coloque o segredo OAuth no navegador nem no repositório.
 6. Como administrador, abra Gestão, Configurações, Planilha de frequência. Use Conectar conta Google, autorize a conta e escolha uma planilha no seletor. Ative a integração, confira as abas, salve o mapa e faça uma prévia antes do primeiro envio. Na Planilha de saídas, escolha a planilha da mesma conta ou conecte outra conta, ative e confira a aba do registro.
 
-O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As duas finalidades mantêm seleção, modo e esquema próprios. A conta da frequência pode ser usada para selecionar a planilha de saídas sem uma segunda autorização.
+O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As três finalidades mantêm seleção e estrutura próprias. A conta da frequência pode ser usada para selecionar os arquivos de saídas e chamada parcial sem uma segunda autorização.
 
 O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças de desistência no nome não criam abas de backup. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
@@ -141,6 +141,20 @@ As entradas usam exclusivamente a Sheets API e a mesma planilha selecionada para
 "Prévia das entradas" lê toda a aba e informa as linhas novas. "Enviar entradas" relê a estrutura, os dados e os registros, exigindo o mesmo hash. O código combina aluno e data e evita duplicação entre reenvios, correções e restaurações. Conteúdo existente com o mesmo código, mesmo se divergente, permanece intacto e gera aviso. Registro manual sem código com mesmo nome e data é preservado e exige conferência, sem associação automática por nome. Fórmulas e conteúdo das últimas linhas, inclusive em colunas adicionais, são preservados; novas linhas entram depois de todo o conteúdo.
 
 A remoção no aplicativo não remove a linha já enviada. A correção de conteúdo existente na planilha fica a cargo da escola; um reenvio sinaliza a divergência. Não há modo completo de entradas. A escrita conserva as proteções do adaptador da Sheets API, mas uma edição simultânea no Google ainda pode gerar conflito: a API não oferece gravação condicionada ao valor anterior. Resultado sem confirmação exige conferir a aba e fazer nova prévia; não há retentativa automática.
+
+## Planilha de chamada parcial
+
+Em Gestão, Configurações, Planilha de chamada parcial, selecionar um terceiro arquivo pelo Google Picker. O arquivo precisa ser distinto dos arquivos de frequência e saídas, mesmo quando a conta Google é a mesma. A integração começa desligada. Depois de conectar e ativar, a administração confirma Preparar aba: o aplicativo cria `Chamada Parcial` apenas quando ausente. Aba existente é validada, sem substituir conteúdo.
+
+O cabeçalho padrão é `Data`, `Aluno`, `Turma`, `Frequência parcial`, `Registrado na Seduc`, `Confirmação Seduc`, `Observação`, `Código` e `Revisão`. Data usa `dd/mm/aaaa`; Aluno e Turma usam os nomes históricos. Frequência parcial identifica Manhã, Tarde ou as aulas selecionadas. A coluna Código guarda o UUID do registro, visível para conferência; marcadores de linha identificam o que a integração criou. Não há publicação de script nem novas credenciais de ambiente.
+
+Na Chamada Parcial, o envio é manual e exige prévia, com período de até 92 dias e turma histórica opcional. O padrão acrescenta registros novos e reconhece códigos existentes, sem duplicar. A opção explícita de atualizar existentes permite refletir correções e a confirmação manual da Seduc em linhas já enviadas. Essa opção só altera campos do registro nas linhas com marcador da integração e código único, sem fórmulas. Código repetido, fórmula, divergência sem autorização ou linha existente sem marcador bloqueiam a escrita. Linhas manuais com mesmo nome e dia, sem código, ficam preservadas e exigem conferência.
+
+A confirmação relê dados locais e conteúdo externo e compara o hash da prévia. A última leitura confere valores anteriores, código, marcador e fórmulas antes do lote. Como a Sheets API não oferece escrita condicionada, uma edição externa depois dessa leitura ainda pode competir com o envio. Falha depois de enviar o lote exige conferência, sem repetição automática. Remover no aplicativo não remove linhas externas. Nenhuma operação cria abas de backup.
+
+Os envios parciais têm trava compartilhada entre instâncias do aplicativo, obtida no PostgreSQL antes de remontar o plano, reler a aba e gravar. Outro envio em andamento responde 409 para aguardar. Perda da conexão que mantém a trava cancela a requisição ao Google e responde 502 com pedido de conferência: um lote já enviado pode ter sido aceito. A tentativa com efeito externo não é repetida automaticamente. A trava não permite reverter Google junto com o banco e não bloqueia edições feitas diretamente na planilha. Os envios de frequência, saídas e entradas continuam usando sua fila em memória nesta etapa.
+
+"Registrado na Seduc" é uma chave manual por registro no aplicativo: confirma o lançamento externo já feito pela equipe. Enviar para o Google não marca essa chave e marcar a chave não envia à Seduc. Depois de uma correção, a chave volta a desligada e a equipe confere o lançamento novamente. Para refletir a mudança em linha Google anterior, usar a atualização explícita com nova prévia. A chamada normal e seus envios permanecem independentes.
 
 ## Solução de problemas
 

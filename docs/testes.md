@@ -66,6 +66,16 @@ A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e 
 
 - Integração com Google Planilhas contra OAuth e Sheets API simulados: conexão, estrutura, mapa, células ocupadas e fórmulas preservadas, marcadores, identificação por código após renomeação, saídas, entradas, envio automático, autorização revogada e resposta perdida sem repetição. Rotas antigas respondem 404 e configuração com endpoint é recusada.
 
+## Chamada Parcial
+
+A cobertura da Chamada Parcial protege o registro independente por turno ou aulas, validação de datas e limites, confirmação manual e revisão concorrente. Correções efetivas reabrem a pendência da Seduc; nenhuma operação cria frequência regular ou altera indicadores da chamada normal.
+
+`tests/unit/backup-parcial.test.ts` verifica a igualdade por dia civil na restauração: o retorno `date` do PostgreSQL à meia-noite UTC deve corresponder ao dia preparado ao meio-dia UTC, e um dia diferente continua sendo conflito.
+
+`tests/api/backup-parcial.test.ts` usa série, turma e aluno sintéticos próprios. Confere exportação e restauração de identidade, nomes históricos, revisão, datas e confirmação; conflitos por identificador ou aluno e dia sem sobrescrita; cópias antigas sem o campo; referência ausente; conta histórica removida e recusa de tipo, aulas, turno ou confirmação incoerentes.
+
+A integração do terceiro arquivo é testada contra OAuth e Sheets API simulados, incluindo prévia, idempotência por UUID, preservação de dados manuais e fórmulas e atualização explícita de linhas marcadas. A navegação verifica Gestão no cabeçalho móvel e Chamada Parcial ao lado de Chamada; testes de interface acompanham o salvamento e a confirmação manual.
+
 ## Ponta a ponta
 
 A execução usa a imagem oficial da Microsoft, sem instalar navegadores no host: rode `npm run test:e2e:docker` com o aplicativo no ar. O script e a alternativa no host estão em [tests/README.md](../tests/README.md).

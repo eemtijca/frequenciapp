@@ -12,13 +12,14 @@ import { renovarAcesso } from "@/infra/google-oauth";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
 
-/** Finalidade da integração: frequência das turmas ou saídas antecipadas. */
-export type FinalidadeIntegracao = "FREQUENCIA" | "SAIDAS";
+/** Arquivos separados de frequência, movimentação e chamada parcial. */
+export type FinalidadeIntegracao = "FREQUENCIA" | "SAIDAS" | "PARCIAL";
 
 /** Cada finalidade tem a sua autorização Google, arquivo e modo próprios. */
 const ID_POR_FINALIDADE: Record<FinalidadeIntegracao, string> = {
   FREQUENCIA: "principal",
   SAIDAS: "saidas",
+  PARCIAL: "parcial",
 };
 
 export function idDaIntegracao(finalidade: FinalidadeIntegracao): string {

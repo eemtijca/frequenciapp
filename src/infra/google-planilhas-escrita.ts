@@ -4,6 +4,7 @@ import { z } from "zod";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba } from "@/domain/planilha";
 import { ErroHttp } from "@/infra/erros";
+import type { ControleTravaParcial } from "./trava-planilha-parcial";
 import {
   ErroLeituraGoogle,
   exigirAbaGoogle,
@@ -527,9 +528,11 @@ export async function enviarLotesGoogle(
   id: string,
   acesso: string,
   requests: PedidoGoogle[],
+  controle?: ControleTravaParcial,
 ): Promise<void> {
   const compactadas = compactarAtualizacoesGoogle(requests);
   for (let inicio = 0; inicio < compactadas.length; inicio += 500) {
+    controle?.conferir();
     const parte = compactadas.slice(inicio, inicio + 500);
     const posicao = `lote ${Math.floor(inicio / 500) + 1} de ${Math.ceil(compactadas.length / 500)}`;
     let resposta: Response;
@@ -541,7 +544,9 @@ export async function enviarLotesGoogle(
           headers: { Authorization: `Bearer ${acesso}`, "Content-Type": "application/json" },
           body: JSON.stringify({ requests: parte }),
           cache: "no-store",
-          signal: AbortSignal.timeout(45_000),
+          signal: controle
+            ? AbortSignal.any([controle.signal, AbortSignal.timeout(45_000)])
+            : AbortSignal.timeout(45_000),
         },
       );
     } catch (erro) {

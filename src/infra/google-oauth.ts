@@ -15,7 +15,7 @@ import { ErroHttp } from "@/infra/erros";
 const ESCOPO = "https://www.googleapis.com/auth/drive.file";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DURACAO_ESTADO_MS = 10 * 60 * 1000;
-export type FinalidadeGoogle = "FREQUENCIA" | "SAIDAS";
+export type FinalidadeGoogle = "FREQUENCIA" | "SAIDAS" | "PARCIAL";
 
 function configuracao() {
   const { clientId, clientSecret, redirectUri, pickerApiKey, projectNumber } = ambiente.google;
@@ -86,7 +86,7 @@ export function conferirEstado(
   const conteudo = z
     .object({
       adminId: z.string().uuid(),
-      finalidade: z.enum(["FREQUENCIA", "SAIDAS"]),
+      finalidade: z.enum(["FREQUENCIA", "SAIDAS", "PARCIAL"]),
       state: z.string(),
       verifier: z.string(),
       expiraEm: z.number(),

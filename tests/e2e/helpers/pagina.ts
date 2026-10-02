@@ -15,13 +15,11 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
 }
 
 /**
- * Troca de visão pela navegação. Em desenvolvimento o Fast Refresh pode trocar
+ * Troca de visão pelo cabeçalho ou pela navegação. O Fast Refresh pode trocar
  * os nós durante a hidratação, então o clique é repetido até o painel mudar.
  */
 export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
-  const botao = page
-    .getByRole("navigation", { name: "Seções do aplicativo" })
-    .getByRole("button", { name: rotulo });
+  const botao = page.locator("header, nav").getByRole("button", { name: rotulo, exact: true });
   await expect
     .poll(
       async () => {
