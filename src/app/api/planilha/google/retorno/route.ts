@@ -7,6 +7,7 @@ import { auditar } from "@/infra/auditoria";
 import { ambiente } from "@/infra/ambiente";
 import { cifrarToken, conferirEstado, trocarCodigo } from "@/infra/google-oauth";
 import { exigirAdmin } from "@/infra/http";
+import { idDaIntegracao } from "@/application/planilha-comum";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!codigo || !state) throw new Error("Resposta OAuth incompleta.");
     const { verifier, finalidade } = conferirEstado(cookie, state, sessao.usuario.id);
     const refreshToken = await trocarCodigo(codigo, verifier);
-    const id = finalidade === "SAIDAS" ? "saidas" : "principal";
+    const id = idDaIntegracao(finalidade);
     const anterior = await banco().integracaoPlanilha.findUnique({
       where: { id },
       select: { googlePlanilhaId: true },

@@ -7,6 +7,7 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 ## Recursos
 
 - **Chamada diária**: turmas por toque, data com navegação por setas, busca por nome, resumo ao vivo e salvamento com rascunho local. A falta pode receber um código de justificativa e vira FJ; o acumulado do aluno aparece na lista e no resumo de faltas.
+- **Chamada Parcial**: registro independente por aluno e dia, com turno inteiro ou aulas frequentadas e chave manual "Registrado na Seduc". Correções reabrem a pendência; uma terceira planilha Google recebe os registros após prévia.
 - **Entradas atrasadas**: a área Saídas e entradas registra data, horário e motivo da chegada, preservando a turma do registro e a chamada. Envio manual com prévia para aba própria pela Sheets API.
 - **Saídas antecipadas**: registro separado da chamada, com momento (aulas, intervalos e almoço), justificativa (tipo do catálogo ou texto escrito), observação e quem libera escolhido em um catálogo da Gestão. As saídas do dia por turma e o relatório semanal por aluno completam a área.
 - **Painel do dia**: gráficos de infrequência por série e por turma, total de faltas (F + FJ), taxa de infrequência, cobertura das chamadas e turmas pendentes.
@@ -16,9 +17,9 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - **Proteção contra conflitos**: uma chamada por turma e dia, compartilhada pela coordenação; salvamentos de outro dispositivo são recusados com aviso em vez de sobrescrita silenciosa (controle por revisão em transação serializável).
 - **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
-- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador da barra inferior preso à rolagem quadro a quadro, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados.
+- **Navegação por deslize**: troca de visões deslizando a tela com o dedo, com o indicador da barra inferior preso à rolagem quadro a quadro, navegação inferior no celular e barra lateral no desktop, com estado e rolagem preservados. Gestão fica no cabeçalho do celular, antes das notificações.
 - **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
-- **Google Planilhas opcional**: frequência e saídas antecipadas podem ser gravadas em planilhas escolhidas com OAuth e Google Picker, pela Sheets API. A conexão antiga continua disponível. Há conferência do esquema, prévia obrigatória e releitura antes da escrita conservadora. O modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou, sempre com cópia de segurança. Consulte [as condições de escrita pela Sheets API](docs/planilha.md).
+- **Google Planilhas opcional**: frequência, saídas e entradas e Chamada Parcial usam arquivos escolhidos com OAuth e Google Picker, pela Sheets API. A Chamada Parcial exige um terceiro arquivo separado. Há conferência do esquema, prévia obrigatória e releitura antes da escrita. Na frequência e nas saídas, o modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou. Não são criadas abas de backup. Consulte [as condições de escrita pela Sheets API](docs/planilha.md).
 
 ## Começando
 
@@ -103,7 +104,7 @@ Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambie
 
 ## Privacidade
 
-O aplicativo guarda o mínimo necessário: nome dos alunos, turmas e as faltas registradas. Nenhum outro dado pessoal é coletado e nenhum serviço de terceiros recebe dados dos alunos. A integração opcional com o Google Planilhas, desligada por padrão, envia a frequência para a conta Google da própria escola, nunca para terceiros contratados. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
+O aplicativo registra cadastro escolar, frequência e os registros operacionais necessários, incluindo presença parcial e autoria da confirmação manual da Seduc. A integração opcional com Google Planilhas, desligada por padrão, envia os campos de cada finalidade aos arquivos escolhidos pela escola. A confirmação manual não transmite dados ao sistema da Seduc. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
 
 ## Licença
 

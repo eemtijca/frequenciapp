@@ -29,7 +29,7 @@ function coluna(letra: string) {
 }
 
 export interface GoogleFalso {
-  conectar(banco: pg.Client, finalidade?: "FREQUENCIA" | "SAIDAS"): Promise<void>;
+  conectar(banco: pg.Client, finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL"): Promise<void>;
   definirFuso(valor: string): void;
   recusarAutorizacao(valor: boolean): void;
   recusarGravacoes(valor: boolean): void;
@@ -151,9 +151,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
   }
   function documento(url: URL) {
     const grade = url.searchParams.get("includeGridData") === "true";
+    const idArquivo = url.pathname.split("/")[3] ?? "planilha-sintetica";
     return {
-      spreadsheetId: "planilha-sintetica",
-      spreadsheetUrl: "https://docs.google.com/spreadsheets/d/planilha-sintetica/edit",
+      spreadsheetId: idArquivo,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${idArquivo}/edit`,
       properties: { title: "Planilha de teste", timeZone: fuso },
       sheets: abas
         .filter(
@@ -421,10 +422,16 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
   credencial = `frequenciapp-teste:${Buffer.from(`http://127.0.0.1:${endereco.port}`).toString("base64url")}`;
   return {
     conectar: async (banco, finalidade = "FREQUENCIA") => {
-      const id = finalidade === "SAIDAS" ? "saidas" : "principal";
+      const id =
+        finalidade === "PARCIAL" ? "parcial" : finalidade === "SAIDAS" ? "saidas" : "principal";
       await banco.query(
-        `insert into integracoes_planilha (id, finalidade, ativa, google_refresh_token, google_planilha_id, google_planilha_nome, atualizado_em) values ($1, $2::finalidade_integracao, true, $3, 'planilha-sintetica', 'Planilha de teste', now()) on conflict (id) do update set ativa = true, google_refresh_token = excluded.google_refresh_token, google_planilha_id = excluded.google_planilha_id, google_planilha_nome = excluded.google_planilha_nome, atualizado_em = now()`,
-        [id, finalidade, cifrarToken(credencial)],
+        `insert into integracoes_planilha (id, finalidade, ativa, google_refresh_token, google_planilha_id, google_planilha_nome, atualizado_em) values ($1, $2::finalidade_integracao, true, $3, $4, 'Planilha de teste', now()) on conflict (id) do update set ativa = true, google_refresh_token = excluded.google_refresh_token, google_planilha_id = excluded.google_planilha_id, google_planilha_nome = excluded.google_planilha_nome, atualizado_em = now()`,
+        [
+          id,
+          finalidade,
+          cifrarToken(credencial),
+          finalidade === "PARCIAL" ? "planilha-parcial-sintetica" : "planilha-sintetica",
+        ],
       );
     },
     definirFuso: (valor) => {

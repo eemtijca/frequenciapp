@@ -63,6 +63,49 @@ const documentoVinculado: DocumentoGoogle = {
 
 afterEach(() => vi.unstubAllGlobals());
 
+describe("interrupção pela perda de exclusividade", () => {
+  it("aborta a requisição em andamento sem repetir o lote", async () => {
+    const controlador = new AbortController();
+    const chamada = vi.fn(async (_url: string, opcoes: RequestInit) => {
+      controlador.abort();
+      opcoes.signal?.throwIfAborted();
+      return Response.json({});
+    });
+    vi.stubGlobal("fetch", chamada);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await expect(
+        enviarLotesGoogle("arquivo", "acesso", [{ createDeveloperMetadata: {} }], {
+          signal: controlador.signal,
+          conferir: () => undefined,
+        }),
+      ).rejects.toMatchObject({ status: 502, recusado: false });
+      expect(chamada).toHaveBeenCalledTimes(1);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("não começa o próximo lote se a proteção deixa de estar ativa", async () => {
+    const controlador = new AbortController();
+    const chamada = vi.fn(async () => {
+      controlador.abort();
+      return Response.json({});
+    });
+    vi.stubGlobal("fetch", chamada);
+    const requests = Array.from({ length: 501 }, (_, indice) => ({
+      createDeveloperMetadata: { metadataId: indice },
+    }));
+    await expect(
+      enviarLotesGoogle("arquivo", "acesso", requests, {
+        signal: controlador.signal,
+        conferir: () => controlador.signal.throwIfAborted(),
+      }),
+    ).rejects.toThrow();
+    expect(chamada).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("gravação pela Sheets API", () => {
   it("aplica uma mudança de desistência sem criar abas de backup", async () => {
     const lotes: Record<string, unknown>[][] = [];

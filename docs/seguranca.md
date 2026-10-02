@@ -42,7 +42,7 @@ Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que 
 ## Papéis e isolamento
 
 - Dois papéis: `ADMIN` gerencia séries, turmas, aulas, alunos e contas; `COORDENACAO` registra a frequência e consulta o histórico e a grade do mês. As duas funções veem os dados escolares, que são o objeto do serviço.
-- Capacidades: `operar` (chamada, saídas, relatórios e envio à planilha), `administrar` (gestão, contas, catálogos, integrações e cópia de segurança) e `alterarPropriaSenha`. `ADMIN` tem as três; `COORDENACAO`, `operar` e `alterarPropriaSenha`. Papel sem a capacidade recebe 403 mesmo com sessão válida, e a página inicial só abre o aplicativo completo com `operar`. Todo manipulador da API passa por uma guarda, conferido em teste; as exceções públicas (entrada, saída, estado da sessão e saúde) ficam listadas no próprio teste.
+- Capacidades: `operar` (chamada normal e parcial, confirmação manual da Seduc, saídas, relatórios e envio à planilha), `administrar` (gestão, contas, catálogos, integrações e cópia de segurança) e `alterarPropriaSenha`. `ADMIN` tem as três; `COORDENACAO`, `operar` e `alterarPropriaSenha`. Papel sem a capacidade recebe 403 mesmo com sessão válida, e a página inicial só abre o aplicativo completo com `operar`. Todo manipulador da API passa por uma guarda, conferido em teste; as exceções públicas (entrada, saída, estado da sessão e saúde) ficam listadas no próprio teste.
 - Guardas intransponíveis: nunca remover o último administrador ativo, nunca rebaixar nem desativar a própria conta. A frequência é dado da escola: excluir uma conta preserva o histórico e anula a autoria.
 - A guarda do último administrador roda dentro da transação serializável, junto da escrita, para duas alterações simultâneas não deixarem a escola sem acesso de configuração.
 - A frequência é única por turma e dia, com revisão; a checagem de duplicata e de revisão acontece no banco, e o salvamento revalida alunos e aulas dentro da transação. A saída antecipada é única por aluno e dia, e o registro separado não altera a chamada. Os contratos de API testam os casos diretamente.
@@ -69,17 +69,18 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 - `DATABASE_URL` e `AUTH_SECRET` são validados na partida; `DIRECT_URL` fica restrita ao Prisma CLI, às migrations e às operações administrativas.
 - O runtime usa somente `DATABASE_URL`; opcionais de script são consumidos pelos comandos operacionais.
 - `.env` fora do controle de versão; `.env.example` documenta sem valores.
-- A integração OAuth com Google Planilhas guarda o token de atualização cifrado no banco, fora da cópia JSON. O segredo do cliente OAuth fica no servidor; a chave pública do Picker é restrita a sites e à API no projeto Cloud. A conexão legada usa token próprio e Web App publicado pela escola.
+- A integração OAuth com Google Planilhas guarda o token de atualização cifrado no banco, fora da cópia JSON. O segredo do cliente OAuth fica no servidor; a chave pública do Picker é restrita a sites e à API no projeto Cloud. As três finalidades usam somente OAuth e Sheets API.
 
 ## Integração com Google Planilhas
 
-- Desligada por padrão. Na conexão OAuth da frequência ou das saídas, o navegador abre o Google Picker com um token de acesso breve. O token de atualização fica cifrado no servidor com uma chave derivada de `AUTH_SECRET`, e as chamadas da Sheets API saem do servidor.
+- Desligada por padrão. Na conexão OAuth de frequência, saídas ou chamadas parciais, o navegador abre o Google Picker com um token de acesso breve. O token de atualização fica cifrado no servidor com uma chave derivada de `AUTH_SECRET`, e as chamadas da Sheets API saem do servidor.
 - OAuth usa estado assinado, PKCE, escopo `drive.file` e seleção explícita da planilha. Só a administração pode conectar a conta e escolher a planilha.
-- Cada finalidade tem seleção de planilha, esquema e janela de modo completo próprios. Somente OAuth e Sheets API atendem as integrações; nenhuma configuração aceita URL arbitrária ou token de script. O simulador HTTP é carregado apenas no servidor de testes, com tokens sintéticos e destino limitado ao loopback.
-- Revelar o token, destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
-- O modo completo expira sozinho, cria cópia oculta da aba antes de operação destrutiva e só remove linha, coluna ou aba com marcador de Developer Metadata da integração.
+- Cada finalidade tem seleção e estrutura próprias. Frequência e saídas têm janela de modo completo; chamadas parciais têm atualização explícita na prévia de linhas criadas pela integração. O arquivo de chamadas parciais é distinto dos outros dois. Somente OAuth e Sheets API atendem as integrações; nenhuma configuração aceita URL arbitrária ou token de script. O simulador HTTP é carregado apenas no servidor de testes, com tokens sintéticos e destino limitado ao loopback.
+- Destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
+- O modo completo expira sozinho e só remove linha, coluna ou aba com marcador de Developer Metadata da integração. Nenhuma finalidade cria abas de backup.
 - Fórmulas e células ocupadas encontradas na última leitura são preservadas e relatadas. A Sheets API não oferece escrita condicionada ao conteúdo anterior; uma edição manual feita entre leitura e gravação pode conflitar com o lote.
-- Toda ação é auditada sem nomes de alunos: token, esquema, mapa, envios, destrave e restauração.
+- Toda ação é auditada sem nomes de alunos: conexão, esquema, mapa, envios, destrave e restauração.
+- A Chamada Parcial exige sessão com `operar`, validação de origem nas mutações e revisão vigente para corrigir, confirmar ou remover. Sua confirmação manual guarda data e nome da conta responsável, é limpa após correção e não dispara requisição à Seduc. O envio Google não altera essa confirmação; registros e histórico entram somente na cópia administrativa, sem credenciais.
 
 ## Superfície de dependências
 

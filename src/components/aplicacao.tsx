@@ -1,8 +1,7 @@
 "use client";
 
-// Shell da aplicação: cabeçalho, troca de visões por botões e navegação
-// inferior no celular, barra lateral no desktop. A administração ganha a
-// visão Gestão no lugar de Alunos.
+// Shell com navegação inferior no celular e barra lateral no desktop.
+// No celular, a administração acessa a Gestão pelo cabeçalho.
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -10,6 +9,7 @@ import {
   Bell,
   ChartPie,
   ClipboardCheck,
+  ClipboardList,
   DoorOpen,
   KeyRound,
   LogOut,
@@ -50,6 +50,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
+import VistaChamadaParcial from "@/components/frequencia-parcial/vista-frequencia-parcial";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaMovimentacoes from "@/components/saidas/vista-movimentacoes";
 import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
@@ -59,7 +60,8 @@ import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
-export type Visao = "painel" | "chamada" | "saidas" | "relatorios" | "alunos" | "gestao";
+export type Visao =
+  "painel" | "chamada" | "chamada-parcial" | "saidas" | "relatorios" | "alunos" | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -80,7 +82,15 @@ interface Props {
 }
 
 const CHAVE_AVISO_ENTRADA = "frequenciapp:aviso-entrada";
-const VISOES: Visao[] = ["painel", "chamada", "saidas", "relatorios", "alunos", "gestao"];
+const VISOES: Visao[] = [
+  "painel",
+  "chamada",
+  "chamada-parcial",
+  "saidas",
+  "relatorios",
+  "alunos",
+  "gestao",
+];
 
 function visaoValida(valor: string | undefined): Visao | null {
   // Valores antigos do manifest e de links continuam abrindo a área certa.
@@ -108,6 +118,11 @@ const ITENS_INICIAIS: ItemNav[] = [
 
 const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas e entradas", icone: DoorOpen };
 const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
+const ITEM_CHAMADA_PARCIAL: ItemNav = {
+  visao: "chamada-parcial",
+  rotulo: "Chamada Parcial",
+  icone: ClipboardList,
+};
 
 const ITENS_FIM: ItemNav[] = [
   { visao: "alunos", rotulo: "Alunos", icone: Users },
@@ -117,6 +132,7 @@ const ITENS_FIM: ItemNav[] = [
 const LARGURAS: Record<Visao, string> = {
   painel: "max-w-5xl lg:max-w-none",
   chamada: "max-w-2xl lg:max-w-none",
+  "chamada-parcial": "max-w-3xl lg:max-w-none",
   saidas: "max-w-3xl lg:max-w-none",
   relatorios: "max-w-5xl lg:max-w-none",
   alunos: "max-w-3xl lg:max-w-none",
@@ -202,10 +218,12 @@ export default function Aplicacao({
 }: Props) {
   const router = useRouter();
   const ehAdmin = temCapacidade(usuario.papel, "administrar");
+  const podeOperar = temCapacidade(usuario.papel, "operar");
   const pedida = visaoValida(visaoInicial);
   const inicial =
     pedida &&
     (pedida !== "gestao" || ehAdmin) &&
+    (pedida !== "chamada-parcial" || podeOperar) &&
     (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
       ? pedida
       : "painel";
@@ -226,6 +244,7 @@ export default function Aplicacao({
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [saidaComPendencia, setSaidaComPendencia] = useState(false);
+  const [visaoComPendencia, setVisaoComPendencia] = useState<Visao | null>(null);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [offline, setOffline] = useState(false);
@@ -240,12 +259,17 @@ export default function Aplicacao({
   );
   const itens = useMemo<ItemNav[]>(() => {
     const lista = [...ITENS_INICIAIS];
+    if (podeOperar) lista.push(ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
     lista.push(ITEM_RELATORIOS);
     if (itemFinal) lista.push(itemFinal);
     return lista;
-  }, [configuracoes.saidaAntecipada, itemFinal]);
+  }, [configuracoes.saidaAntecipada, itemFinal, podeOperar]);
+  // Gestão segue no catálogo dos painéis e da barra lateral; apenas o acesso
+  // do celular muda de lugar, sem invalidar a visão ativa nem perder seu estado.
+  const itensInferiores = useMemo(() => itens.filter((item) => item.visao !== "gestao"), [itens]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
+  const indiceInferiorAtivo = itensInferiores.findIndex((item) => item.visao === visao);
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
   const posicoes = useRef(new Map<Visao, number>());
 
@@ -330,7 +354,7 @@ export default function Aplicacao({
     setLiberadores(dados.liberadores);
   }, []);
 
-  const trocarVisao = useCallback(
+  const ativarVisao = useCallback(
     (proxima: Visao) => {
       if (!itens.some((item) => item.visao === proxima)) return;
       setVisao(proxima);
@@ -338,6 +362,26 @@ export default function Aplicacao({
     },
     [itens],
   );
+  const trocarVisao = useCallback(
+    (proxima: Visao) => {
+      if (!itens.some((item) => item.visao === proxima) || proxima === visao) return;
+      if (visao === "chamada-parcial" && pendencias.includes("chamada-parcial")) {
+        setVisaoComPendencia(proxima);
+        return;
+      }
+      ativarVisao(proxima);
+    },
+    [ativarVisao, itens, pendencias, visao],
+  );
+  const registrarPendenciasChamada = useCallback((novas: "chamada"[]) => {
+    setPendencias((atuais) => [...atuais.filter((item) => item !== "chamada"), ...novas]);
+  }, []);
+  const registrarPendenciaParcial = useCallback((pendente: boolean) => {
+    setPendencias((atuais) => {
+      const restantes = atuais.filter((item) => item !== "chamada-parcial");
+      return pendente ? [...restantes, "chamada-parcial"] : restantes;
+    });
+  }, []);
   // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
   // saem da pintura não perderem a posição ao voltar.
   const guardarRolagem = useCallback((alvo: Visao, evento: React.UIEvent<HTMLElement>) => {
@@ -493,8 +537,19 @@ export default function Aplicacao({
             catalogoJustificativas={justificativas}
             resumo={resumo}
             onFrequenciasMudaram={recarregarFrequencias}
-            onPendencia={setPendencias}
+            onPendencia={registrarPendenciasChamada}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
+          />
+        )}
+        {alvoVisao === "chamada-parcial" && podeOperar && (
+          <VistaChamadaParcial
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            diaInicial={diaCorrente}
+            ativa={ativo}
+            fuso={fuso}
+            onPendencia={registrarPendenciaParcial}
           />
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
@@ -560,6 +615,7 @@ export default function Aplicacao({
             onJustificativasMudaram={recarregarJustificativas}
             onLiberadoresMudaram={recarregarLiberadores}
             onAbrirSaidas={() => trocarVisao("saidas")}
+            onAbrirParcial={() => trocarVisao("chamada-parcial")}
           />
         )}
       </div>
@@ -594,7 +650,7 @@ export default function Aplicacao({
                 key={item.visao}
                 item={item}
                 ativo={visao === item.visao}
-                pendente={item.visao === "chamada" && pendencias.includes("chamada")}
+                pendente={pendencias.includes(item.visao)}
                 indicador="indicador-lateral"
                 onTrocar={trocarVisao}
               />
@@ -651,14 +707,27 @@ export default function Aplicacao({
             className="bg-background/95 supports-[backdrop-filter]:bg-background/85 shrink-0 border-b backdrop-blur lg:hidden"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold tracking-tight">FrequenciApp</span>
+            <div className="flex items-center justify-between gap-1 px-3 py-2.5 sm:gap-3 sm:px-6">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate text-lg font-semibold tracking-tight">FrequenciApp</span>
                 <span className="text-muted-foreground hidden text-sm sm:inline">
                   {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
                 </span>
               </div>
-              <div className="flex items-center gap-0.5">
+              <div className="flex shrink-0 items-center gap-0.5">
+                {ehAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="aria-[current=page]:bg-primary/10 aria-[current=page]:text-primary size-11 rounded-full"
+                    aria-label="Gestão"
+                    title="Gestão"
+                    aria-current={visao === "gestao" ? "page" : undefined}
+                    onClick={() => trocarVisao("gestao")}
+                  >
+                    <Settings2 size={18} aria-hidden="true" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -759,27 +828,31 @@ export default function Aplicacao({
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             <div className="relative">
-              <span
-                aria-hidden="true"
-                data-indicador="inferior"
-                style={{
-                  width: `${100 / itens.length}%`,
-                  left: `${(Math.max(indiceAtivo, 0) * 100) / itens.length}%`,
-                }}
-                className="pointer-events-none absolute top-0 left-0 h-0.5"
-              >
-                <span className="bg-primary/15 mx-4 block h-full rounded-full" />
-              </span>
+              {indiceInferiorAtivo >= 0 && (
+                <span
+                  aria-hidden="true"
+                  data-indicador="inferior"
+                  style={{
+                    width: `${100 / itensInferiores.length}%`,
+                    left: `${(indiceInferiorAtivo * 100) / itensInferiores.length}%`,
+                  }}
+                  className="pointer-events-none absolute top-0 left-0 h-0.5"
+                >
+                  <span className="bg-primary/15 mx-4 block h-full rounded-full" />
+                </span>
+              )}
               <div
                 className="grid"
-                style={{ gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))` }}
+                style={{
+                  gridTemplateColumns: `repeat(${itensInferiores.length}, minmax(0, 1fr))`,
+                }}
               >
-                {itens.map((item) => (
+                {itensInferiores.map((item) => (
                   <ItemNavegacao
                     key={item.visao}
                     item={item}
                     ativo={visao === item.visao}
-                    pendente={item.visao === "chamada" && pendencias.includes("chamada")}
+                    pendente={pendencias.includes(item.visao)}
                     onTrocar={trocarVisao}
                   />
                 ))}
@@ -792,7 +865,7 @@ export default function Aplicacao({
       <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Há alterações não salvas na chamada</AlertDialogTitle>
+            <AlertDialogTitle>Há alterações não salvas</AlertDialogTitle>
             <AlertDialogDescription>
               Se sair agora, as marcações não salvas serão perdidas.
             </AlertDialogDescription>
@@ -801,6 +874,34 @@ export default function Aplicacao({
             <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
             <AlertDialogAction onClick={confirmarSaida} disabled={saindo}>
               Sair mesmo assim
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={visaoComPendencia !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) setVisaoComPendencia(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Há alterações não salvas na Chamada Parcial</AlertDialogTitle>
+            <AlertDialogDescription>
+              Os registros continuam pendentes. Ao voltar, será possível salvá-los.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const proxima = visaoComPendencia;
+                setVisaoComPendencia(null);
+                if (proxima) ativarVisao(proxima);
+              }}
+            >
+              Mudar de tela
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

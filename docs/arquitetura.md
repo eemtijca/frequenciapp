@@ -54,9 +54,19 @@ Uma frequência existe por (turma, dia), garantida por restrição única no ban
 
 O cliente mantém rascunho em sessionStorage enquanto houver marcações não salvas, e o 409 preserva as marcações locais oferecendo a recarga da versão salva. Assim, duas pessoas da coordenação nunca sobrescrevem a mesma chamada sem aviso.
 
+## Chamada Parcial e confirmação manual
+
+`frequencia-parcial.ts` define a presença por turno ou aulas. O caso de uso correspondente guarda uma linha por aluno e dia, com nomes históricos e revisão otimista. Salvamento, confirmação manual da Seduc e exclusão rodam em transação serializável; revisão obsoleta responde 409. A revisão aumenta quando o conteúdo ou a confirmação muda. Corrigir conteúdo limpa data, responsável e chave da confirmação. Nenhuma operação escreve na chamada normal ou altera seus indicadores.
+
+A confirmação representa o lançamento feito pela equipe no sistema externo. Não há chamada à API da Seduc. A terceira integração Google, finalidade `PARCIAL`, recebe uma aba própria em arquivo distinto dos arquivos de frequência e saídas. A prévia vincula dados locais e estrutura externa; envio manual acrescenta registros novos. A opção explícita de atualizar existentes restringe alterações a linhas identificadas e marcadas pela integração, com nova conferência de valores e fórmulas.
+
+O envio da planilha parcial usa exclusão distribuída por `pg_try_advisory_xact_lock` em uma conexão dedicada ao PostgreSQL de runtime (`DATABASE_URL`). A trava é obtida antes de remontar o plano e cobre releitura e escrita. Se estiver ocupada, a operação responde 409; perder a conexão da trava cancela a requisição HTTP e retorna 502, pedindo conferência do resultado. A operação com efeito externo não entra na retentativa automática de transações. Essa trava não torna PostgreSQL e Google atômicos nem desfaz um lote já aceito. Frequência, saídas e entradas mantêm sua fila de envio em memória; a exclusão distribuída desta etapa atende somente a planilha parcial.
+
+A cópia JSON permanece na versão 1 e acrescenta `frequenciasParciais` opcional. A restauração mantém registros existentes por identidade ou aluno e dia, conta divergências e preserva histórico. Conexões Google não fazem parte da cópia. Decisão na [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md).
+
 ## Página única com visões locais
 
-O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Saiu mais cedo e Relatórios para todos; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
+O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Chamada Parcial, Saídas e entradas e Relatórios para a equipe; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
 
 ## Organização de diretórios
 
@@ -72,6 +82,8 @@ src/
       horarios/             aulas da turma: listagem, criação, edição e exclusão
       usuarios/             gestão de contas pelo administrador
       responsaveis/         equipe ativa que pode liberar saídas
+      frequencias-parciais/ presença independente, revisão e confirmação manual da Seduc
+      planilha-parcial/     terceira planilha: configuração, preparação, prévia e envio
       frequencias/          consulta por dia, período ou mês, salvamento e resumo acumulado
       saidas/               registro, consulta e remoção de saídas antecipadas
       configuracoes/        leitura e atualização dos recursos da escola
@@ -89,6 +101,7 @@ src/
     auth/                   tela de entrada
     painel/                 indicadores do dia com gráficos
     frequencia/             vista da chamada diária
+    frequencia-parcial/     vista e formulários da presença parcial
     saidas/                 registro e relatórios das saídas antecipadas
     relatorios/             sub-abas de histórico, grade e por aluno
     historico/              vista do histórico
@@ -99,11 +112,15 @@ src/
     pwa/                    registro do service worker e avisos
     ui/                     conjunto shadcn/ui personalizado
   domain/
+    frequencia-parcial.ts   tipos e rótulos da presença parcial
+    planilha-parcial.ts     planejamento da terceira planilha
     frequencia.ts           regras puras de frequência, justificativas e saídas
     relatorios.ts           indicadores e relatórios derivados
     planilha.ts             dataframe, esquema da planilha, CSV e planejamento conservador
     usuarios.ts             política de senha, papéis e rótulos
   application/
+    frequencia-parcial.ts   salvar, consultar, confirmar e remover com revisão
+    planilha-parcial.ts     preparar a aba, simular e enviar registros parciais
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas
     configuracoes.ts        ler e atualizar os recursos da escola
@@ -161,3 +178,5 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-018: texto opcional na saída durante a aula](adr/018-texto-na-saida-durante-a-aula.md)
 - [ADR-019: integração de saídas antecipadas com Google Planilhas](adr/019-integracao-de-saidas-com-google-planilhas.md)
 - [ADR-020: justificativa escrita e catálogo de quem libera a saída](adr/020-justificativa-escrita-e-catalogo-de-liberadores.md)
+
+- [ADR-034: Chamada Parcial e confirmação manual da Seduc](adr/034-chamada-parcial-e-confirmacao-seduc.md)

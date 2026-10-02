@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { Prisma } from "../../../../../../generated/prisma/client";
 import { banco } from "@/infra/banco";
+import { idDaIntegracao } from "@/application/planilha-comum";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
@@ -19,20 +20,35 @@ export async function POST(requisicao: Request): Promise<Response> {
     const dados = z
       .object({
         id: z.string().regex(/^[\w-]{10,200}$/),
-        finalidade: z.enum(["FREQUENCIA", "SAIDAS"]).default("FREQUENCIA"),
+        finalidade: z.enum(["FREQUENCIA", "SAIDAS", "PARCIAL"]).default("FREQUENCIA"),
       })
       .safeParse(await corpoJson(requisicao));
     if (!dados.success) throw new ErroHttp("Escolha uma planilha válida.", 400);
     const principal = await banco().integracaoPlanilha.findUnique({ where: { id: "principal" } });
-    const saidas =
-      dados.data.finalidade === "SAIDAS"
-        ? await banco().integracaoPlanilha.findUnique({ where: { id: "saidas" } })
+    const especifica =
+      dados.data.finalidade !== "FREQUENCIA"
+        ? await banco().integracaoPlanilha.findUnique({
+            where: { id: idDaIntegracao(dados.data.finalidade) },
+          })
         : null;
-    const token = saidas?.googleRefreshToken ?? principal?.googleRefreshToken;
+    const token = especifica?.googleRefreshToken ?? principal?.googleRefreshToken;
     if (!token) throw new ErroHttp("Conecte a conta Google primeiro.", 400);
     const planilha = await lerPlanilhaEscolhida(dados.data.id, await renovarAcesso(token));
-    const id = dados.data.finalidade === "SAIDAS" ? "saidas" : "principal";
+    const id = idDaIntegracao(dados.data.finalidade);
     await comTransacao(async (tx) => {
+      const conflito = await tx.integracaoPlanilha.findFirst({
+        where: {
+          id: { not: id },
+          googlePlanilhaId: planilha.spreadsheetId,
+          ...(dados.data.finalidade === "PARCIAL" ? {} : { finalidade: "PARCIAL" }),
+        },
+        select: { id: true },
+      });
+      if (conflito)
+        throw new ErroHttp(
+          "A chamada parcial precisa de um terceiro arquivo, separado das outras planilhas.",
+          409,
+        );
       await tx.integracaoPlanilha.upsert({
         where: { id },
         update: {

@@ -31,7 +31,7 @@ test.describe("navegação", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Chamada" }).click();
+    await page.getByRole("button", { name: "Chamada", exact: true }).click();
     await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
     await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
   });
@@ -77,5 +77,43 @@ test.describe("navegação", () => {
     const centroBotao = (caixaBotao?.x ?? 0) + (caixaBotao?.width ?? 0) / 2;
     const centroIndicador = (caixaIndicador?.x ?? 0) + (caixaIndicador?.width ?? 0) / 2;
     expect(Math.abs(centroIndicador - centroBotao)).toBeLessThan(12);
+  });
+
+  test("no celular, Gestão fica no cabeçalho e segue acessível entre as visões", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo" });
+    const gestao = page.locator("header").getByRole("button", { name: "Gestão", exact: true });
+    await expect(gestao).toBeVisible();
+    await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
+
+    await trocarVisao(page, "Gestão", "gestao");
+    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    await expect(gestao).toHaveAttribute("aria-current", "page");
+    await expect(navegacao.locator("[aria-current=page]")).toHaveCount(0);
+    await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
+
+    await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
+    await expect(gestao).not.toHaveAttribute("aria-current", "page");
+    await expect(
+      navegacao.getByRole("button", { name: "Chamada Parcial", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await trocarVisao(page, "Gestão", "gestao");
+    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+  });
+
+  test("um link direto para Gestão mantém o painel ativo no celular", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/?visao=gestao");
+    await aguardarHidratacao(page);
+    await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    await expect(page.locator("header").getByRole("button", { name: "Gestão" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 });

@@ -88,7 +88,7 @@ export function SeletorPlanilhaGoogle({
   planilha,
   onAtualizar,
 }: {
-  finalidade?: "FREQUENCIA" | "SAIDAS";
+  finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   conectado: boolean;
   planilha: { id: string; nome: string | null } | null;
   onAtualizar: () => Promise<void> | void;
@@ -189,8 +189,8 @@ export function SeletorPlanilhaGoogle({
     <div className="flex flex-col gap-3 rounded-lg border p-3">
       <p className="text-sm font-medium">Conta Google</p>
       <p className="text-muted-foreground text-xs">
-        Autorize a conta da escola e escolha a planilha de frequência. O acesso é limitado aos
-        arquivos escolhidos.
+        Autorize a conta da escola e escolha a planilha. O acesso é limitado aos arquivos
+        escolhidos.
       </p>
       {planilha && <p className="text-xs">Planilha escolhida: {planilha.nome ?? planilha.id}</p>}
       <div className="flex flex-wrap gap-2">

@@ -15,6 +15,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
 | `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
+| `frequencias_parciais`        | Presença parcial por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.        |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
 | `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
 | `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.       |
@@ -23,7 +24,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                 |
 | `justificativas`              | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.               |
 | `liberadores`                 | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.          |
-| `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA` e `SAIDAS`) com token, esquema e modo.                    |
+| `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA`, `SAIDAS` e `PARCIAL`) com token, esquema e modo.         |
 | `sincronizacoes_planilha`     | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                 |
 | `auditoria`                   | Trilha de ações administrativas: quem, o quê e quando.                                           |
 | `vinculos_diretor`            | Turmas de origem de cada diretor, com início e fim; o fim fica no histórico.                     |
@@ -50,7 +51,7 @@ Restrições de integridade relevantes:
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.
 - Unicidade de e-mail, nome de série e nome de turma por série é feita por índices funcionais em `lower()`, mantidos no SQL das migrations.
 - Checks de positividade em `frequencias.revisao`, `alunos.ordem`, `series.ordem` e `horarios.ordem` independem da aplicação.
-- `integracoes_planilha` e `sincronizacoes_planilha` separam a frequência das saídas pela coluna `finalidade`; cada finalidade tem a própria linha de token, esquema e modo completo.
+- `integracoes_planilha` e `sincronizacoes_planilha` separam frequência, saídas e chamadas parciais pela coluna `finalidade`; cada finalidade tem a própria linha de token, esquema e modo completo.
 - `vinculos_diretor` tem índice único parcial em (`usuario_id`, `turma_id`) com `fim` nulo, check de fim maior ou igual ao início, exclusão em cascata com a conta e `ON DELETE RESTRICT` na turma.
 - `credenciais_diretor` tem um registro por conta, com check de validade posterior à emissão.
 - `parametros_acesso` é linha única com checks de faixa e de categorias (subconjunto fechado, sempre com `faltas`), criada na migração.
@@ -74,6 +75,16 @@ Depois do primeiro deploy de produção, a regra passa a ser aplicada sem exceç
 A migração `20260930015940_formulario_entradas` acrescenta momento e código/nome do responsável pelo registro como colunas anuláveis. Nenhuma entrada antiga é reescrita. Novos registros exigem momento válido e responsável ativo do catálogo; o nome escolhido é guardado separadamente da autoria autenticada. Cópias JSON antigas continuam aceitas com esses campos ausentes.
 
 A migração `20260930005502_entradas_atrasadas` cria apenas a tabela `entradas_atrasadas`, seus índices e referências. Não altera saídas nem frequências existentes. A chave (aluno, dia) impede repetição; horário e motivo são validados pela aplicação. O registro guarda turma e rótulo de quem registrou, preservados depois de transferência de aluno ou exclusão de conta. A turma é protegida por referência; a autoria é anulável. A cópia JSON inclui entradas e importa por mesclagem, sem sobrescrever. Cópias antigas sem esse campo continuam aceitas.
+
+## Chamada Parcial
+
+`frequencias_parciais` tem unicidade de (aluno, dia), independente de `frequencias` e `faltas`. O aluno usa exclusão em cascata; a turma histórica usa `ON DELETE RESTRICT`. Nome do aluno e rótulo da turma são guardados no registro e não mudam depois de transferência ou renomeação. Autoria e responsável pela confirmação usam `ON DELETE SET NULL`, preservando nomes históricos.
+
+`tipo` aceita `TURNO` ou `AULAS`. Um turno exige `MANHA` ou `TARDE` e lista de aulas vazia; aulas específicas exigem turno nulo e inteiros distintos entre 1 e 30, em ordem crescente. Observações têm até 300 caracteres. A aplicação valida calendário e data futura; revisão positiva protege salvamento, confirmação e exclusão concorrentes. Corrigir conteúdo incrementa a revisão e limpa a confirmação da Seduc. Confirmar ou reabrir também incrementa a revisão.
+
+A migração acrescenta somente o modelo e a finalidade `PARCIAL`, sem reescrever chamadas normais. A cópia JSON versão 1 inclui o campo opcional `frequenciasParciais`: preserva identidade, nomes históricos, revisão, datas e confirmação. Cópias anteriores continuam válidas. Na importação, qualquer identidade ou par (aluno, dia) já existente impede sobrescrita; divergências e referências ausentes entram na contagem de conflitos. Contas históricas inexistentes ficam nulas e seus nomes são preservados. Conexões OAuth continuam fora da cópia.
+
+Detalhes na [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md).
 
 ## Conexões
 

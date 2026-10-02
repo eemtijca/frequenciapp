@@ -42,13 +42,16 @@ describe("OAuth da planilha", () => {
     ).toThrow();
   });
 
-  it("vincula a autorização à planilha de saídas quando solicitada", async () => {
-    const { conferirEstado, iniciarAutorizacao } = await import("@/infra/google-oauth");
-    const admin = "00000000-0000-4000-8000-000000000001";
-    const pedido = iniciarAutorizacao(admin, "SAIDAS");
-    const estado = new URL(pedido.url).searchParams.get("state") ?? "";
-    expect(conferirEstado(pedido.cookie, estado, admin).finalidade).toBe("SAIDAS");
-  });
+  it.each(["SAIDAS", "PARCIAL"] as const)(
+    "vincula a autorização à finalidade %s",
+    async (finalidade) => {
+      const { conferirEstado, iniciarAutorizacao } = await import("@/infra/google-oauth");
+      const admin = "00000000-0000-4000-8000-000000000001";
+      const pedido = iniciarAutorizacao(admin, finalidade);
+      const estado = new URL(pedido.url).searchParams.get("state") ?? "";
+      expect(conferirEstado(pedido.cookie, estado, admin).finalidade).toBe(finalidade);
+    },
+  );
 
   it("cifra o token persistente e rejeita adulteração", async () => {
     const { cifrarToken, decifrarToken } = await import("@/infra/google-oauth");

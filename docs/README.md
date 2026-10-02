@@ -29,3 +29,5 @@
 - [ADR-032](adr/032-planilhas-sem-backups-internos.md): fim das cópias automáticas dentro da planilha e limpeza administrativa das cópias antigas.
 
 A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](adr/033-integracao-exclusiva-com-google-planilhas.md).
+
+- [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md): presença parcial independente, confirmação manual da Seduc, terceira planilha Google e cópia JSON compatível.
