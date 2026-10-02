@@ -69,6 +69,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Modificado
 
+- O botão da planilha passou para a linha das abas Saídas e Entradas, sem a faixa de título que sobrava. O Painel perdeu o botão de atualizar e se atualiza sozinho a cada minuto e ao voltar para a aba do navegador.
 - Integrações de planilhas deixam de criar abas de backup. A Gestão oferece limpeza das cópias antigas com prévia e confirmação administrativa, preservando turmas e abas manuais. A conexão legada exige publicar o Apps Script 7.
 - Painel sem o título e a data "Infrequência em ..." acima dos cartões; o título fica só para leitores de tela.
 - Interface mais limpa: sem títulos e textos de apoio visíveis em Chamada, Saiu mais cedo, Entradas atrasadas, Grade e Gestão, nem os avisos fixos das abas Alunos, Equipe e Diretores e a explicação da Planilha de entradas. Os títulos ficam só para leitores de tela, e os avisos de exclusão e de palavra-chave seguem nos diálogos.

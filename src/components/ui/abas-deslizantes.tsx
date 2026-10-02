@@ -22,6 +22,8 @@ interface Props<T extends string> {
   dataPager: string;
   /** Avisa a troca de aba (por exemplo, para refletir a aba na URL). */
   aoTrocar?: (aba: T) => void;
+  /** Ação ao lado das abas (por exemplo, um botão), na mesma linha. */
+  acao?: React.ReactNode;
   children: (aba: T, ativa: boolean) => React.ReactNode;
 }
 
@@ -32,6 +34,7 @@ export default function AbasDeslizantes<T extends string>({
   chaveIndicador,
   dataPager,
   aoTrocar,
+  acao,
   children,
 }: Props<T>) {
   const [aba, setAba] = useState<T>(abaInicial);
@@ -83,62 +86,65 @@ export default function AbasDeslizantes<T extends string>({
 
   return (
     <>
-      <div
-        role="tablist"
-        aria-label={rotuloAcessivel}
-        onKeyDown={aoTeclar}
-        className="bg-secondary/60 grid gap-1 rounded-lg p-1"
-        style={{ gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))` }}
-      >
-        {abas.map((item, indice) => {
-          const Icone = item.icone;
-          const ativo = aba === item.valor;
-          return (
-            <button
-              key={item.valor}
-              ref={(elemento) => {
-                abasRef.current[indice] = elemento;
-              }}
-              id={`aba-${item.valor}`}
-              type="button"
-              role="tab"
-              aria-label={item.rotuloCurto ? item.rotulo : undefined}
-              aria-selected={ativo}
-              aria-controls={`painel-${item.valor}`}
-              tabIndex={ativo ? 0 : -1}
-              onClick={() => trocarAba(item.valor)}
-              className="pressionavel relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
-            >
-              {ativo &&
-                (semMovimento ? (
-                  <span className="bg-background absolute inset-0 rounded-md shadow-sm" />
-                ) : (
-                  <motion.span
-                    layoutId={chaveIndicador}
-                    className="bg-background absolute inset-0 rounded-md shadow-sm"
-                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                  />
-                ))}
-              <Icone
-                size={15}
-                className={`relative z-10 ${ativo ? "text-primary" : "text-muted-foreground"}`}
-                aria-hidden="true"
-              />
-              <span
-                className={`relative z-10 ${ativo ? "text-foreground" : "text-muted-foreground"}`}
+      <div className={acao ? "flex items-stretch gap-2" : undefined}>
+        <div
+          role="tablist"
+          aria-label={rotuloAcessivel}
+          onKeyDown={aoTeclar}
+          className={`bg-secondary/60 grid gap-1 rounded-lg p-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          style={{ gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))` }}
+        >
+          {abas.map((item, indice) => {
+            const Icone = item.icone;
+            const ativo = aba === item.valor;
+            return (
+              <button
+                key={item.valor}
+                ref={(elemento) => {
+                  abasRef.current[indice] = elemento;
+                }}
+                id={`aba-${item.valor}`}
+                type="button"
+                role="tab"
+                aria-label={item.rotuloCurto ? item.rotulo : undefined}
+                aria-selected={ativo}
+                aria-controls={`painel-${item.valor}`}
+                tabIndex={ativo ? 0 : -1}
+                onClick={() => trocarAba(item.valor)}
+                className="pressionavel relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
               >
-                {item.rotuloCurto ? (
-                  <>
-                    <span className="sm:hidden">{item.rotuloCurto}</span>
-                    <span className="hidden sm:inline">{item.rotulo}</span>
-                  </>
-                ) : (
-                  item.rotulo
-                )}
-              </span>
-            </button>
-          );
-        })}
+                {ativo &&
+                  (semMovimento ? (
+                    <span className="bg-background absolute inset-0 rounded-md shadow-sm" />
+                  ) : (
+                    <motion.span
+                      layoutId={chaveIndicador}
+                      className="bg-background absolute inset-0 rounded-md shadow-sm"
+                      transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                    />
+                  ))}
+                <Icone
+                  size={15}
+                  className={`relative z-10 ${ativo ? "text-primary" : "text-muted-foreground"}`}
+                  aria-hidden="true"
+                />
+                <span
+                  className={`relative z-10 ${ativo ? "text-foreground" : "text-muted-foreground"}`}
+                >
+                  {item.rotuloCurto ? (
+                    <>
+                      <span className="sm:hidden">{item.rotuloCurto}</span>
+                      <span className="hidden sm:inline">{item.rotulo}</span>
+                    </>
+                  ) : (
+                    item.rotulo
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {acao}
       </div>
 
       <motion.div animate={controles} initial={false} className="min-w-0">
