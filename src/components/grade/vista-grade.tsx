@@ -189,8 +189,6 @@ export default function VistaGrade({
     }
   });
 
-  const totalFaltas = grade.linhas.reduce((soma, linha) => soma + linha.faltas, 0);
-  const totalJustificadas = grade.linhas.reduce((soma, linha) => soma + linha.justificadas, 0);
   const turmaAtualDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
     return (id: string) => mapa.get(id) ?? "";
@@ -219,23 +217,8 @@ export default function VistaGrade({
 
   return (
     <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Grade</h1>
-          <p className="text-muted-foreground text-sm">
-            {frequenciasDoPeriodo.length === 0
-              ? "Consulta pelas turmas de origem"
-              : `${frequenciasDoPeriodo.length} ${
-                  frequenciasDoPeriodo.length === 1 ? "frequência" : "frequências"
-                } no período${
-                  totalFaltas + totalJustificadas > 0
-                    ? ` · ${totalFaltas + totalJustificadas} ${
-                        totalFaltas + totalJustificadas === 1 ? "falta" : "faltas"
-                      } (F + FJ)`
-                    : ""
-                }`}
-          </p>
-        </div>
+      <div className="flex items-center justify-end gap-3">
+        <h1 className="sr-only">Grade</h1>
         <div className="flex items-center gap-1">
           {estadoPlanilha?.podeEnviar && (
             <Button
