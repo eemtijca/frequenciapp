@@ -522,7 +522,7 @@ Lista as cópias ocultas de uma aba. Apenas administração.
 
 ### POST /api/planilha/restaurar
 
-Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardando a versão atual e invalidando o esquema. Apenas administração.
+Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, sem criar outra cópia e invalidando o esquema. Apenas administração.
 
 - 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
 
@@ -530,7 +530,7 @@ Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardand
 
 Somente administração, com origem válida. Corpo `{ aba }` retorna `{ previa }`, com linha do cabeçalho, assinatura, colunas reconhecidas e suas larguras, além de `planoHash`. Essa etapa apenas lê a planilha. A confirmação envia `{ aba, planoHash }` e retorna `{ organizada: true, aba }`, depois de reler e conferir a prévia. Alteração do arquivo, da conexão ou do cabeçalho responde 409 e exige nova prévia. A apresentação é registrada em `planilha.organizar`; valores, fórmulas, formatos numéricos e rótulos não mudam. Não há repetição automática da escrita. A integração legada exige Apps Script 5; a aba Entradas usa somente a conexão Google de saídas e seu cabeçalho padrão.
 
-Somente em `/api/planilha/organizar`, `{ aba, ajustarCabecalho: true, anoReferencia?: number }` retorna uma prévia com `ajusteCabecalho`: quantidade de linhas introdutórias reconhecidas a remover e datas a corrigir para `dd/mm/aaaa`. A confirmação repete esses campos e inclui `planoHash`. O ano deve estar entre 2000 e 2100; datas com ano explícito orientam os rótulos curtos próximos. A operação cria cópia oculta antes das alterações, recusa fórmulas nas células afetadas ou introdução não reconhecida, preserva os dados da tabela e atualiza o esquema mantendo o mapa. O provedor legado exige Apps Script 6. Mesclagens somente na introdução podem ser removidas; mesclagens na tabela continuam bloqueadas.
+Somente em `/api/planilha/organizar`, `{ aba, ajustarCabecalho: true, anoReferencia?: number }` retorna uma prévia com `ajusteCabecalho`: quantidade de linhas introdutórias reconhecidas a remover e datas a corrigir para `dd/mm/aaaa`. A confirmação repete esses campos e inclui `planoHash`. O ano deve estar entre 2000 e 2100; datas com ano explícito orientam os rótulos curtos próximos. A operação não cria cópias internas, recusa fórmulas nas células afetadas ou introdução não reconhecida, preserva os dados da tabela e atualiza o esquema mantendo o mapa. O provedor legado exige Apps Script 7. Mesclagens somente na introdução podem ser removidas; mesclagens na tabela continuam bloqueadas.
 
 A organização coletiva reutiliza `/api/planilha/organizar` com `{ aba, emLote: true }`, além dos campos de correção quando necessários. Só aceita abas do mapa salvo de frequência. O cliente confere todas as abas e confirma cada plano em sequência, mantendo as requisições curtas. A assinatura coletiva vincula cada prévia ao arquivo, às credenciais e ao mapa; atualizações do cache de esquema causadas por outra aba não a invalidam. Mudanças no cabeçalho continuam exigindo nova prévia. Abas com falha na prévia não recebem confirmação; falhas de escrita não provocam repetição automática.
 
@@ -542,7 +542,7 @@ Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria uma aba nova com cabe�
 
 ### POST /api/planilha/remover-aba
 
-Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, criando cópia antes. Apenas administração.
+Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, sem criar cópia interna. Apenas administração.
 
 - 200 `{"aba": string}`; 400 frase, senha ou modo inválidos; 502 quando a aba não foi criada pela integração.
 
@@ -620,7 +620,7 @@ Lista as cópias ocultas da aba de saídas. Apenas administração.
 
 ### POST /api/planilha-saidas/restaurar
 
-Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, guardando a versão atual e invalidando o esquema. Apenas administração.
+Corpo: `{ "aba", "copia", "frase", "senha" }`. Troca a aba pela cópia, sem criar outra cópia e invalidando o esquema. Apenas administração.
 
 - 200 `{"aba", "copia", "anterior"}`; 400 frase ou senha inválidas; 502 falha na planilha.
 
@@ -632,7 +632,7 @@ Corpo: `{ "nome": string, "cabecalho"?: string[] }`. Cria a aba de registro com 
 
 ### POST /api/planilha-saidas/remover-aba
 
-Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, criando cópia antes. Apenas administração.
+Corpo: `{ "aba", "frase", "senha" }`. Exige o modo completo ativo e remove apenas aba com marcador da integração, sem criar cópia interna. Apenas administração.
 
 - 200 `{"aba": string}`; 400 frase, senha ou modo inválidos; 502 quando a aba não foi criada pela integração.
 
@@ -708,3 +708,7 @@ As rotas exigem a capacidade `operar`; criar a aba exige `administrar`.
 Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos.
 
 A integração usa a planilha Google selecionada para saídas; Apps Script não atende entradas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.
+
+### POST /api/planilha/limpar-copias e /api/planilha-saidas/limpar-copias
+
+Apenas administração e origem válida. `{}` retorna `{ previa: { copias: string[], planoHash } }`, sem alterar a planilha. A confirmação envia `{ planoHash, senha, frase: "EDITAR PLANILHA" }` e retorna `{ removidas }`. Lista e conexão alteradas invalidam a prévia. A exclusão reconhece somente nomes de backup com carimbo e marcador da integração; não remove turmas ou abas manuais. A escrita não é repetida automaticamente. No provedor legado, exige Apps Script 7.

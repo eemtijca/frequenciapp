@@ -855,6 +855,21 @@ function nomesDeCopias(contexto: Contexto): string[] {
     .filter((nome) => nome.startsWith("_frequenciapp_backup_"));
 }
 
+/** Massa de cópias antigas, criada pelo teste e não pelas operações do script. */
+function copiaAntiga(local: Contexto, aba = local.aba, sufixo = "000") {
+  const copia = aba
+    .copyTo(local.planilha)
+    .setName(`_frequenciapp_backup_${aba.getName()}_20260926-030000-${sufixo}`)
+    .hideSheet();
+  copia
+    .createDeveloperMetadataFinder()
+    .find()
+    .filter((item) => ["frequenciapp.aba", "frequenciapp.copia"].includes(item.getKey()))
+    .forEach((item) => item.remove());
+  copia.addDeveloperMetadata("frequenciapp.copia", "1");
+  return copia;
+}
+
 let contexto: Contexto;
 
 describe("Apps Script", () => {
@@ -952,7 +967,7 @@ describe("Apps Script", () => {
     expect(contexto.aba.getCelula(2, 3).valor).toBe("P");
   });
 
-  it("substitui no modo completo e cria cópia antes de operação destrutiva", () => {
+  it("substitui no modo completo sem criar abas de backup", () => {
     const resposta = aplicar(
       contexto,
       [
@@ -965,7 +980,7 @@ describe("Apps Script", () => {
     expect(resposta.dados).toMatchObject({ limpas: 1, substituidas: 1 });
     expect(contexto.aba.getCelula(2, 3).valor).toBe("");
     expect(contexto.aba.getCelula(2, 4).valor).toBe("F");
-    expect(nomesDeCopias(contexto).length).toBeGreaterThanOrEqual(1);
+    expect(nomesDeCopias(contexto)).toHaveLength(0);
   });
 
   it("recusa remoção de linha sem marcador da integração", () => {
@@ -1029,7 +1044,8 @@ describe("Apps Script", () => {
     expect(contexto.planilha.getSheetByName("3º ano C")).toBeNull();
   });
 
-  it("lista cópias e restaura a mais recente", () => {
+  it("lista cópias antigas e restaura sem criar outra", () => {
+    copiaAntiga(contexto);
     const copias = chamar(contexto, { acao: "listarCopias", aba: "3º ano A" });
     expect(copias.ok).toBe(true);
     const lista = (copias.dados as { copias: { nome: string; criadaEm: string }[] }).copias;
@@ -1106,26 +1122,33 @@ describe("Apps Script: apresentação", () => {
     const copias = local.planilha
       .getSheets()
       .filter((aba) => aba.getName().startsWith("_frequenciapp_backup_"));
-    expect(copias).toHaveLength(1);
-    expect(copias[0]?.getCelula(1, 1).valor).toContain("Frequência");
-    expect(copias[0]?.getCelula(4, 4).valor).toBe("29/09");
+    expect(copias).toHaveLength(0);
   });
-  it("reconfere a introdução após a cópia antes de remover linhas", () => {
+  it("reconfere a introdução antes de remover linhas, sem criar backup", () => {
     const local = montarContexto();
     const corpo = prepararCorrecao(local);
-    const copiar = local.aba.copyTo.bind(local.aba);
-    local.aba.copyTo = (planilha) => {
-      const copia = copiar(planilha);
-      local.aba.getRange(1, 1).setValue("Anotação manual após a prévia");
-      return copia;
+    const obter = local.aba.getRange.bind(local.aba);
+    local.aba.getRange = (...args: Parameters<AbaFalsa["getRange"]>) => {
+      const faixa = obter(...args);
+      if (args[0] === 1 && args[2] === 4) {
+        const lerValores = faixa.getDisplayValues.bind(faixa);
+        let leituras = 0;
+        faixa.getDisplayValues = () => {
+          leituras += 1;
+          if (leituras === 2) local.aba.getCelula(1, 1).valor = "Anotação manual após a prévia";
+          return lerValores();
+        };
+      }
+      return faixa;
     };
     expect(chamar(local, corpo).ok).toBe(false);
     expect(local.aba.getCelula(1, 1).valor).toBe("Anotação manual após a prévia");
     expect(local.aba.getCelula(5, 1).valor).toBe("Alice");
     expect(local.aba.getCelula(4, 4).valor).toBe("29/09");
+    expect(nomesDeCopias(local)).toHaveLength(0);
   });
   it.each(["titulo", "formula-introducao", "formula-data", "data", "faixa"])(
-    "recusa alteração insegura antes de copiar ou gravar: %s",
+    "recusa alteração insegura antes de gravar: %s",
     (alteracao) => {
       const local = montarContexto();
       const corpo = prepararCorrecao(local);
@@ -1460,6 +1483,38 @@ describe("Apps Script: erros", () => {
 });
 
 describe("Apps Script: cópias e restauração", () => {
+  it("remove apenas backups antigos marcados e preserva turmas, fórmulas e abas manuais", () => {
+    const local = montarContexto();
+    const antiga = copiaAntiga(local);
+    const manual = local.planilha.insertSheet("_frequenciapp_backup_manual_20260926-030000-000");
+    manual.getRange(1, 1).setValue("Anotação da escola");
+    const conferir = chamar(local, { acao: "listarAbasBackup" });
+    expect(conferir.dados).toEqual({ copias: [antiga.getName()] });
+    expect(
+      chamar(local, { acao: "removerAbasBackup", copias: [antiga.getName(), local.aba.getName()] })
+        .ok,
+    ).toBe(false);
+    expect(local.planilha.getSheetByName(antiga.getName())).toBe(antiga);
+    expect(chamar(local, { acao: "removerAbasBackup", copias: [antiga.getName()] }).dados).toEqual({
+      removidas: 1,
+    });
+    expect(local.planilha.getSheetByName(antiga.getName())).toBeNull();
+    expect(local.planilha.getSheetByName(local.aba.getName())).toBe(local.aba);
+    expect(local.aba.getCelula(2, 1).valor).toBe("Alice");
+    expect(local.aba.getCelula(2, 5).formula).toBe('=CONT.SE(C2:D3;"F")');
+    expect(manual.getCelula(1, 1).valor).toBe("Anotação da escola");
+  });
+
+  it("recusa uma lista defasada e não remove a última aba visível", () => {
+    const local = montarContexto();
+    const antiga = copiaAntiga(local);
+    expect(chamar(local, { acao: "removerAbasBackup", copias: [] }).ok).toBe(false);
+    local.aba.hideSheet();
+    antiga.showSheet();
+    expect(chamar(local, { acao: "removerAbasBackup", copias: [antiga.getName()] }).ok).toBe(false);
+    expect(local.planilha.getSheetByName(antiga.getName())).toBe(antiga);
+  });
+
   for (const copiaLevaMetadados of [false, true]) {
     const caso = copiaLevaMetadados ? "cópia com metadados" : "cópia sem metadados";
 
@@ -1467,6 +1522,7 @@ describe("Apps Script: cópias e restauração", () => {
       const local = montarContexto({ copiaLevaMetadados });
       const original = local.aba;
       expect(criarCarla(local).ok).toBe(true);
+      copiaAntiga(local);
       const remover = aplicar(local, [{ tipo: "removerLinhas", linhas: [4] }], {
         modoCompleto: true,
       });
@@ -1496,6 +1552,7 @@ describe("Apps Script: cópias e restauração", () => {
       const criada = local.planilha.getSheetByName("3º ano C");
       if (!criada) throw new Error("aba ausente");
       criada.getRange(2, 1, 1, 2).setValues([["Dora", "3º ano C"]]);
+      copiaAntiga(local, criada);
       const limpar = aplicar(
         local,
         [{ tipo: "limpar", linha: 2, coluna: 2, anterior: "3º ano C" }],
@@ -1522,6 +1579,7 @@ describe("Apps Script: cópias e restauração", () => {
     const local = montarContexto();
     const valores = ["P", "F", "A"];
     for (const [indice, valor] of valores.entries()) {
+      copiaAntiga(local, local.aba, String(indice).padStart(3, "0"));
       const anterior = indice === 0 ? "" : (valores[indice - 1] ?? "");
       const resposta = aplicar(
         local,
@@ -1540,7 +1598,7 @@ describe("Apps Script: cópias e restauração", () => {
     expect(nomesDeCopias(local)).toHaveLength(3);
   });
 
-  it("não colide o nome de duas cópias no mesmo instante", () => {
+  it("não cria cópias em alterações destrutivas consecutivas", () => {
     const local = montarContexto({ carimboFixo: true });
     const primeira = aplicar(local, [{ tipo: "limpar", linha: 2, coluna: 3, anterior: "P" }], {
       modoCompleto: true,
@@ -1553,13 +1611,13 @@ describe("Apps Script: cópias e restauração", () => {
     );
     expect(segunda.ok).toBe(true);
     const nomes = nomesDeCopias(local);
-    expect(new Set(nomes).size).toBe(2);
+    expect(nomes).toHaveLength(0);
     const lista = chamar(local, { acao: "listarCopias", aba: "3º ano A" });
     const copias = (lista.dados as { copias: { criadaEm: string }[] }).copias;
-    expect(copias.map((item) => item.criadaEm)).toEqual(["2026-09-26 03:00", "2026-09-26 03:00"]);
+    expect(copias).toEqual([]);
   });
 
-  it("poda as cópias de uma aba sem tocar as de outra com prefixo parecido", () => {
+  it("não cria nem apaga cópias antigas ao alterar uma turma", () => {
     const local = montarContexto();
     const a = local.planilha.insertSheet("A");
     a.getRange(1, 1, 1, 2).setValues([["Aluno", "Turma atual"]]);
@@ -1575,7 +1633,7 @@ describe("Apps Script: cópias e restauração", () => {
     expect(resposta.ok).toBe(true);
     for (const nome of deOutra) expect(local.planilha.getSheetByName(nome)).not.toBeNull();
     const lista = chamar(local, { acao: "listarCopias", aba: "A" });
-    expect((lista.dados as { copias: unknown[] }).copias).toHaveLength(1);
+    expect((lista.dados as { copias: unknown[] }).copias).toHaveLength(0);
   });
 });
 
@@ -1809,6 +1867,7 @@ const VERSOES_DO_SCRIPT = [
   { versao: 4, sha256: "9b2c7ee0a010bb99c925ca96fe935249b211ef71d253a0ed8f6c56c079836404" },
   { versao: 5, sha256: "dbde00f2ea7499695898621542ee5ef8b5acb963127f4d2e30513172a8876576" },
   { versao: 6, sha256: "60be58fab892b1f19b0b7a3ff6a721b3eeba120b5e33378875ea027a6a38ae0d" },
+  { versao: 7, sha256: "d295cfea240bc64d65a587bb20bb21084ca1498269d1c3b2e33ba37b72f9ecae" },
 ];
 
 describe("Apps Script: versão", () => {

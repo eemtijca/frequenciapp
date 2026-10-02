@@ -123,6 +123,16 @@ export async function chamarIntegracao<T>(
     const acesso = await renovarAcesso(linha.googleRefreshToken);
     return (await executarAcaoGoogle(linha.googlePlanilhaId, acesso, corpo)) as T;
   }
+  if (
+    ["aplicar", "organizarAba", "removerAba", "restaurarCopia", "removerAbasBackup"].includes(
+      String(corpo.acao),
+    ) &&
+    Number(linha.versaoScript ?? 0) < 7
+  )
+    throw new ErroHttp(
+      "Atualize o Apps Script para a versão 7 e teste a conexão antes de alterar a planilha.",
+      400,
+    );
   const { endpoint, token } = exigirConexao(linha);
   return chamarGas<T>(endpoint, token, corpo, opcoes);
 }
@@ -386,7 +396,7 @@ export async function restaurarCopia(
   }
   await conferirSenhaDoAdmin(admin.id, dados.data.senha, `planilha:restaurar:${finalidade}`);
   const linha = await lerLinha(finalidade);
-  const resultado = await chamarIntegracao<{ aba: string; copia: string; anterior: string }>(
+  const resultado = await chamarIntegracao<{ aba: string; copia: string }>(
     linha,
     { acao: "restaurarCopia", aba: dados.data.aba, copia: dados.data.copia },
     { retentavel: false },

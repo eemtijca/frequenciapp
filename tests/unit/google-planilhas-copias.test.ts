@@ -1,6 +1,6 @@
 // Testa cópia e restauração em uma planilha sintética sem chamar o Google real.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { criarCopiaGoogle, restaurarCopiaGoogle } from "@/infra/google-planilhas-copias";
+import { restaurarCopiaGoogle } from "@/infra/google-planilhas-copias";
 import type { DocumentoGoogle } from "@/infra/google-planilhas-api";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -62,21 +62,6 @@ function googleFalso(doc: DocumentoGoogle) {
 }
 
 describe("cópias pela Sheets API", () => {
-  it("duplica a aba e a oculta antes de marcar a cópia", async () => {
-    const lotes = googleFalso(planilha());
-    const nome = await criarCopiaGoogle("planilha-de-teste", "acesso", "Turma");
-    expect(nome).toMatch(/^_frequenciapp_backup_Turma_\d{8}-\d{6}-\d{3}$/);
-    expect(lotes[0]?.requests[0]).toMatchObject({
-      duplicateSheet: { sourceSheetId: 7, newSheetName: nome },
-    });
-    expect(lotes[0]?.requests[1]).toMatchObject({
-      updateSheetProperties: { properties: { hidden: true } },
-    });
-    expect(lotes[1]?.requests[0]).toMatchObject({
-      createDeveloperMetadata: { developerMetadata: { metadataKey: "frequenciapp.copia" } },
-    });
-  });
-
   it("restaura dentro da mesma aba e preserva seu identificador", async () => {
     const lotes = googleFalso(planilha());
     const resultado = await restaurarCopiaGoogle(
@@ -86,6 +71,9 @@ describe("cópias pela Sheets API", () => {
       "_frequenciapp_backup_Turma_20260928-180000-000",
     );
     expect(resultado.aba).toBe("Turma");
+    expect(lotes.flatMap((lote) => lote.requests).some((pedido) => pedido.duplicateSheet)).toBe(
+      false,
+    );
     const restauracao = lotes.find((lote) => lote.requests.some((pedido) => "copyPaste" in pedido));
     expect(restauracao?.requests).toContainEqual(
       expect.objectContaining({

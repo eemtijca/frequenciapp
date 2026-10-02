@@ -5,8 +5,8 @@ Integração opcional da administração com a planilha da escola. A frequência
 ## Princípios
 
 - A chamada continua sendo feita nas turmas atuais; a planilha recebe o recorte por turma de origem, o mesmo da Grade.
-- No modo conservador a integração confere de novo os dados antes do envio e só preenche célula observada vazia e sem fórmula. A exceção pela Sheets API é a desistência: troca o nome original por `DESISTENTE` na linha vinculada ao aluno, com valor anterior idêntico ao da prévia e cópia de segurança da aba. Não limpa, não remove e não cria linha sem autorização explícita. Uma edição manual entre a última leitura e a escrita ainda pode causar conflito, pois a API não oferece condição de gravação baseada no conteúdo anterior da célula.
-- O modo completo existe para atualizar e remover, sempre com frase, senha, janela curta e cópia de segurança antes de cada operação destrutiva.
+- No modo conservador a integração confere de novo os dados antes do envio e só preenche célula observada vazia e sem fórmula. A exceção pela Sheets API é a desistência: troca o nome original por `DESISTENTE` na linha vinculada ao aluno, com valor anterior idêntico ao da prévia. Não limpa, não remove e não cria linha sem autorização explícita. Uma edição manual entre a última leitura e a escrita ainda pode causar conflito, pois a API não oferece condição de gravação baseada no conteúdo anterior da célula.
+- O modo completo existe para atualizar e remover, sempre com frase, senha e janela curta, sem criar cópias internas.
 - O token de atualização OAuth fica cifrado no servidor. O navegador recebe somente um token de acesso breve para abrir o Google Picker. Na conexão legada, o endereço do script e o token ficam apenas no servidor.
 - A integração fica fora da cópia JSON e desligá-la não altera a planilha.
 
@@ -21,7 +21,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 
 O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As duas finalidades mantêm seleção, modo e esquema próprios. A conta da frequência pode ser usada para selecionar a planilha de saídas sem uma segunda autorização.
 
-O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças de desistência no nome criam uma cópia oculta da aba. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
+O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças de desistência no nome não criam abas de backup. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
 Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
 
@@ -47,7 +47,7 @@ Para abas existentes, na Gestão, escolha a aba de frequência e use Organizar a
 
 A prévia é assinada e vinculada ao arquivo, à conexão e ao cabeçalho. A confirmação relê a estrutura e o provedor confere a assinatura novamente antes de aplicar estilos. Uma edição manual após essa última leitura ainda pode causar conflito, pois o Google não oferece escrita condicionada à assinatura. Abas ocultas, células mescladas, mais de 400 colunas ou faixas de cores alternadas que se sobrepõem em outro intervalo exigem ajuste manual antes da organização. Reaplicar ao mesmo intervalo atualiza as cores sem acumular faixas. O congelamento já existente não é reduzido.
 
-A Sheets API oferece o padrão diretamente. No provedor legado, publique o `gas/Codigo.gs` como nova versão da implantação existente e use Testar conexão para registrar a versão 5. Versões anteriores continuam atendendo os envios compatíveis, mas a nova ação de apresentação pede a atualização. A organização visual não exige modo completo, pois não altera registros. Os arquivos CSV continuam sendo texto, sem cores ou larguras de coluna.
+A Sheets API oferece o padrão diretamente. No provedor legado, publique o `gas/Codigo.gs` como nova versão da implantação existente e use Testar conexão para registrar a versão 7. A versão 7 deixa de criar backups internos e é exigida antes das alterações. A organização visual não exige modo completo, pois não altera registros. Os arquivos CSV continuam sendo texto, sem cores ou larguras de coluna.
 
 ## Retirar título e legenda e corrigir datas
 
@@ -55,15 +55,15 @@ As novas colunas da frequência e os cabeçalhos do CSV usam `dd/mm/aaaa`. Para 
 
 A confirmação remove somente as linhas iniciais reconhecidas como título de frequência, legenda de presença/falta ou espaço vazio. A linha Aluno e os dias passam para a primeira linha. Conteúdo manual diferente, fórmulas nessas linhas ou nos cabeçalhos que seriam alterados e mesclagens na tabela bloqueiam a operação. Mesclagens inteiramente dentro da introdução podem ser removidas junto com ela.
 
-Antes de alterar, a integração cria uma cópia oculta para restauração. As chamadas, colunas auxiliares e fórmulas da tabela permanecem; o Google ajusta as referências após a remoção das linhas. O esquema da aba é relido e o mapa das turmas é conservado. A correção não é automática nas planilhas já conectadas: exige a prévia e a confirmação administrativas. No provedor Apps Script, publique a **versão 6** de `gas/Codigo.gs` na implantação existente e use Testar conexão antes da correção. A apresentação sem correção continua compatível com a versão 5.
+A integração não cria abas de backup. As chamadas, colunas auxiliares e fórmulas da tabela permanecem; o Google ajusta as referências após a remoção das linhas. O esquema da aba é relido e o mapa das turmas é conservado. A correção não é automática nas planilhas já conectadas: exige a prévia e a confirmação administrativas. No provedor Apps Script, publique a **versão 7** de `gas/Codigo.gs` na implantação existente e use Testar conexão antes da correção. As alterações pelo provedor legado exigem a versão 7 para não recriar backups.
 
 ## Organizar todas as turmas
 
 Na Gestão, a seleção **Todas as turmas** organiza a apresentação ou corrige cabeçalhos e datas nas abas vinculadas às turmas na estrutura salva. Abas auxiliares, cópias e turmas sem aba vinculada não entram na seleção. A prévia apresenta cada aba, seus cabeçalhos e as alterações previstas; a confirmação é única.
 
-As leituras e aplicações seguem uma aba por requisição, em sequência, com andamento e resultado por aba. Manter a tela aberta até o resultado. Uma aba que não puder ser conferida fica fora da aplicação. Falhas durante a escrita são identificadas sem repetição automática; as demais abas continuam sendo processadas. Conferir a aba antes de uma nova tentativa, pois uma falha de rede pode ocorrer depois da gravação. As correções conservam o mapa e criam as cópias previstas antes de remover a introdução. Renovar o esquema de uma aba não invalida a prévia das outras; trocar o arquivo, as credenciais ou o mapa exige novas prévias. A versão 6 do Apps Script já atende essa opção, sem nova alteração do script.
+As leituras e aplicações seguem uma aba por requisição, em sequência, com andamento e resultado por aba. Manter a tela aberta até o resultado. Uma aba que não puder ser conferida fica fora da aplicação. Falhas durante a escrita são identificadas sem repetição automática; as demais abas continuam sendo processadas. Conferir a aba antes de uma nova tentativa, pois uma falha de rede pode ocorrer depois da gravação. As correções conservam o mapa e não criam abas de backup. Renovar o esquema de uma aba não invalida a prévia das outras; trocar o arquivo, as credenciais ou o mapa exige novas prévias. A versão 7 do Apps Script atende a opção sem criar backups internos.
 
-Na conexão Google, uma leitura recusada pelo limite temporário (HTTP 429) pode pausar a organização por até um minuto antes de ser repetida. A pausa respeita `Retry-After`, quando informado, e é compartilhada pelas leituras simultâneas da mesma requisição. Cada aba admite até duas pausas; uma recusa persistente ou que peça espera superior a um minuto encerra a tentativa com orientação para aguardar. As rotas de organização reservam até 300 segundos, compatíveis com o limite do Vercel Hobby com Fluid Compute. Só a leitura recusada é repetida: cópias, remoções e escritas já efetuadas não são reenviadas. Erros de acesso, estrutura, rede e gravação continuam exigindo conferência.
+Na conexão Google, uma leitura recusada pelo limite temporário (HTTP 429) pode pausar a organização por até um minuto antes de ser repetida. A pausa respeita `Retry-After`, quando informado, e é compartilhada pelas leituras simultâneas da mesma requisição. Cada aba admite até duas pausas; uma recusa persistente ou que peça espera superior a um minuto encerra a tentativa com orientação para aguardar. As rotas de organização reservam até 300 segundos, compatíveis com o limite do Vercel Hobby com Fluid Compute. Só a leitura recusada é repetida: remoções e escritas já efetuadas não são reenviadas. Erros de acesso, estrutura, rede e gravação continuam exigindo conferência.
 
 ## Conferir a estrutura
 
@@ -129,7 +129,11 @@ O card mostra o último erro só enquanto ele for vigente: vale o envio mais rec
 
 ## Cópias de segurança
 
-Antes de cada operação destrutiva a integração duplica a aba como cópia oculta `_frequenciapp_backup_<aba>_<data-hora-milissegundos>`, mantendo as três mais recentes. O card lista as cópias por aba e permite restaurar, com senha e frase de novo. A restauração guarda a versão atual como nova cópia, copia o conteúdo, os formatos e as mesclagens da cópia para dentro da própria aba e invalida o esquema salvo, exigindo nova conferência antes do próximo envio. A aba mantém identificador, posição e as fórmulas de outras abas que apontam para ela. Os marcadores de linha e coluna passam a ser os da cópia.
+A integração não cria cópias internas ao enviar, organizar, excluir ou restaurar. As cópias geradas por versões anteriores podem ser consultadas e restauradas enquanto existirem, sem criar outra cópia. A restauração invalida o esquema salvo e exige nova conferência; a aba mantém identificador, posição e referências de outras abas.
+
+Em Gestão > Configurações > Planilha de frequência > Zona de risco, **Remover abas de backup** apresenta as cópias antigas do arquivo conectado. Confirmar com senha administrativa e a frase indicada apaga definitivamente somente abas com o nome de backup, carimbo e marcador de cópia da integração. Abas normais, turmas e nomes parecidos sem marcador são preservados. A planilha de saídas oferece a mesma limpeza. A lista e a conexão são conferidas novamente antes da exclusão; alterações exigem nova prévia. A limpeza não é repetida automaticamente e elimina a restauração dessas cópias. O app não apaga cópias ao abrir a tela ou consultar a estrutura.
+
+Downloads de cópia completa do aplicativo em JSON ou ZIP continuam independentes dessa limpeza. Eles contêm o banco do aplicativo, não os formatos e fórmulas manuais do Google Planilhas. Para recuperar essas edições, exportar a planilha ou usar o histórico de versões do Google antes de alterações destrutivas. No provedor Apps Script, publicar a versão 7 e testar a conexão antes de alterar ou limpar. Na conexão Google, a mudança depende apenas da publicação do app.
 
 ## Planilha de saídas
 
@@ -137,7 +141,7 @@ A segunda finalidade registra as saídas antecipadas em outra planilha, em aba �
 
 Colunas reconhecidas no cabeçalho, por rótulo: Data, Aluno, Turma, Momento, Justificativa, Observação e Liberado por. Aluno e Data são obrigatórios. Colunas desconhecidas são preservadas e não recebem escrita. A coluna Justificativa recebe o rótulo do tipo ou o texto escrito; Liberado por recebe o rótulo do catálogo de quem libera.
 
-O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o mês escolhido e prévia obrigatória. No modo conservador só nasce linha para saída que ainda não existe e só célula vazia é preenchida; divergência em linha manual é listada e ignorada. No modo completo, com a mesma frase, senha e prazo, o aplicativo corrige células divergentes de linhas criadas pela integração e permite remover linhas marcadas que não têm mais saída no período enviado. Cada operação destrutiva guarda cópia da aba.
+O envio é manual, pela vista Saídas, no botão "Enviar para a planilha", com o mês escolhido e prévia obrigatória. No modo conservador só nasce linha para saída que ainda não existe e só célula vazia é preenchida; divergência em linha manual é listada e ignorada. No modo completo, com a mesma frase, senha e prazo, o aplicativo corrige células divergentes de linhas criadas pela integração e permite remover linhas marcadas que não têm mais saída no período enviado. Não são criadas abas de backup.
 
 ## Planilha de entradas atrasadas
 

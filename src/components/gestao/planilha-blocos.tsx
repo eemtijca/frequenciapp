@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/ui/campo-senha";
+import { LimparCopiasPlanilha } from "./dialogo-limpar-copias";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -405,7 +406,7 @@ export function BlocoModoCompletoPlanilha({
         setDestrave(false);
         avisarSucesso(
           "Modo completo ativo.",
-          "As ações destrutivas ficam liberadas pelo prazo escolhido e toda remoção guarda cópia antes.",
+          "As ações destrutivas ficam liberadas pelo prazo escolhido, sem cópia automática.",
         );
         await onMudou();
       } catch (excecao) {
@@ -480,8 +481,8 @@ export function BlocoModoCompletoPlanilha({
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              Permite substituir, limpar e remover dados na planilha. Cópias de segurança são
-              criadas antes de cada operação destrutiva.
+              Permite substituir, limpar e remover dados na planilha. Não há cópia automática;
+              exporte o arquivo antes de alterações que precisem de recuperação.
             </p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${idPrefixo}-frase-destrave`}>Digite {FRASE_MODO_COMPLETO}</Label>
@@ -568,7 +569,8 @@ export function BlocoRiscoPlanilha({
   const [abaRemover, setAbaRemover] = useState<string | null>(null);
   const [senha, setSenha] = useState("");
   const [frase, setFrase] = useState("");
-  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+  const acoes = useAcoesPorChave();
+  const { chaveAtiva, executar: executarPorChave } = acoes;
 
   async function carregarCopias() {
     try {
@@ -615,7 +617,7 @@ export function BlocoRiscoPlanilha({
         setAbaRemover(null);
         setFrase("");
         setSenha("");
-        toast.success("Aba removida. A versão atual foi guardada em cópia.");
+        toast.success("Aba removida.");
         await onMudou();
       } catch (excecao) {
         toast.error(
@@ -655,9 +657,9 @@ export function BlocoRiscoPlanilha({
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Cópias de segurança</p>
+              <p className="text-sm font-medium">Cópias antigas</p>
               <p className="text-muted-foreground text-xs leading-relaxed">
-                Cada operação destrutiva guarda uma cópia oculta da aba.
+                Novas abas de backup não são criadas.
               </p>
             </div>
             <Button
@@ -669,6 +671,14 @@ export function BlocoRiscoPlanilha({
               Listar cópias
             </Button>
           </div>
+          <LimparCopiasPlanilha
+            urlBase={urlBase}
+            onMudou={async () => {
+              setCopias([]);
+              await onMudou();
+            }}
+            acoes={acoes}
+          />
           {copias.map((item) => (
             <div key={item.aba} className="flex flex-col gap-1 text-xs">
               <span className="font-medium">{item.aba}</span>
@@ -757,8 +767,8 @@ export function BlocoRiscoPlanilha({
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              A aba {restaurar?.aba} será trocada pela cópia {restaurar?.copia}. A versão atual é
-              guardada antes. Depois, confira a estrutura de novo.
+              A aba {restaurar?.aba} será trocada pela cópia {restaurar?.copia}, sem guardar a
+              versão atual. Depois, confira a estrutura de novo.
             </p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${idPrefixo}-frase-restaurar`}>Digite {FRASE_MODO_COMPLETO}</Label>
@@ -807,8 +817,8 @@ export function BlocoRiscoPlanilha({
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              A aba {abaRemover} foi criada pela integração e será removida, com uma cópia de
-              segurança guardada antes.
+              A aba {abaRemover} foi criada pela integração e será removida definitivamente, sem
+              cópia automática.
             </p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={`${idPrefixo}-frase-remover-aba`}>Digite {FRASE_MODO_COMPLETO}</Label>

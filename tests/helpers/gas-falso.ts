@@ -48,6 +48,7 @@ export interface GasFalso {
   formulaDe(nome: string, linha: number, coluna: number): string;
   marcarLinha(nome: string, linha: number): void;
   marcarColuna(nome: string, coluna: number): void;
+  criarCopiaAntiga(nome: string): string;
   abas(): string[];
   chamadas(): string[];
   fechar(): Promise<void>;
@@ -57,7 +58,7 @@ const MARCADOR_LINHA = "frequenciapp.linha";
 const MARCADOR_COLUNA = "frequenciapp.coluna";
 const MARCADOR_ABA = "frequenciapp.aba";
 const MARCADOR_ALUNO = "frequenciapp.aluno";
-const VERSAO = 6;
+const VERSAO = 7;
 const COPIA_PREFIXO = "_frequenciapp_backup_";
 
 function hashTexto(texto: string): string {
@@ -147,7 +148,7 @@ export async function criarGasFalso(): Promise<GasFalso> {
       nome: `${COPIA_PREFIXO}${planilhaAba.nome}_20260926-0300${String(contadorCopia).padStart(2, "0")}`,
       oculta: true,
       celulas: planilhaAba.celulas.map((fileira) => fileira.map((celula) => ({ ...celula }))),
-      metadados: [],
+      metadados: [{ chave: "frequenciapp.copia", valor: "1" }],
       congeladasLinhas: planilhaAba.congeladasLinhas,
       congeladasColunas: planilhaAba.congeladasColunas,
       mesclagens: planilhaAba.mesclagens.slice(),
@@ -338,7 +339,6 @@ export async function criarGasFalso(): Promise<GasFalso> {
         if (destrutiva && corpo.modoCompleto !== true) {
           return { ok: false, erro: "O modo completo não está ativo." };
         }
-        if (destrutiva) criarCopia(item);
         const contagem = {
           preenchidas: 0,
           substituidas: 0,
@@ -518,7 +518,6 @@ export async function criarGasFalso(): Promise<GasFalso> {
               ok: false,
               erro: "O cabeçalho mudou ou contém fórmulas. Confira uma nova prévia.",
             };
-          if (ajuste.linhasRemover || ajuste.datas.length) criarCopia(item);
           for (const data of ajuste.datas) garantir(item, linha, data.indice).valor = data.rotulo;
           item.celulas.splice(0, ajuste.linhasRemover);
           item.metadados = item.metadados
@@ -572,6 +571,39 @@ export async function criarGasFalso(): Promise<GasFalso> {
           },
         };
       }
+      case "listarAbasBackup": {
+        const copias = abas.filter(
+          (item) =>
+            item.nome.startsWith(COPIA_PREFIXO) &&
+            item.metadados.some(
+              (meta) => meta.chave === "frequenciapp.copia" && meta.valor === "1",
+            ),
+        );
+        return {
+          ok: true,
+          versao: VERSAO,
+          dados: { copias: copias.map((item) => item.nome).sort() },
+        };
+      }
+      case "removerAbasBackup": {
+        const copias = abas.filter(
+          (item) =>
+            item.nome.startsWith(COPIA_PREFIXO) &&
+            item.metadados.some(
+              (meta) => meta.chave === "frequenciapp.copia" && meta.valor === "1",
+            ),
+        );
+        if (
+          JSON.stringify(copias.map((item) => item.nome).sort()) !==
+          JSON.stringify((corpo.copias as string[]).slice().sort())
+        )
+          return {
+            ok: false,
+            erro: "As cópias mudaram. Confira uma nova prévia antes de remover.",
+          };
+        for (const item of copias) abas.splice(abas.indexOf(item), 1);
+        return { ok: true, versao: VERSAO, dados: { removidas: copias.length } };
+      }
       case "restaurarCopia": {
         const atual = aba(nomeAba);
         const copia = aba(String(corpo.copia ?? ""));
@@ -579,12 +611,11 @@ export async function criarGasFalso(): Promise<GasFalso> {
         if (!copia.nome.startsWith(`${COPIA_PREFIXO}${nomeAba}_`)) {
           return { ok: false, erro: "Esta aba não é uma cópia da integração." };
         }
-        criarCopia(atual);
         atual.celulas = copia.celulas.map((fileira) => fileira.map((celula) => ({ ...celula })));
         return {
           ok: true,
           versao: VERSAO,
-          dados: { aba: nomeAba, copia: copia.nome, anterior: "copia" },
+          dados: { aba: nomeAba, copia: copia.nome },
         };
       }
       default:
@@ -704,6 +735,11 @@ export async function criarGasFalso(): Promise<GasFalso> {
     },
     marcarColuna: (nome, coluna) => {
       aba(nome)?.metadados.push({ chave: MARCADOR_COLUNA, coluna });
+    },
+    criarCopiaAntiga: (nome) => {
+      const item = aba(nome);
+      if (!item) throw new Error("Aba sintética ausente.");
+      return criarCopia(item).nome;
     },
     abas: () => abas.map((item) => item.nome),
     chamadas: () => chamadas.slice(),

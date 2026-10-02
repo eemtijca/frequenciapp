@@ -1,6 +1,5 @@
 // Cópias ocultas e restauração de abas pela Sheets API, mantendo o ID da
 // aba original e os marcadores de linhas, colunas e alunos.
-import { randomInt } from "node:crypto";
 import { ErroHttp } from "@/infra/erros";
 import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
 import {
@@ -46,17 +45,6 @@ export async function listarCopiasGoogle(id: string, acesso: string, nome: strin
   };
 }
 
-function mesmoMarcador(a: MetadadoGoogle, b: MetadadoGoogle): boolean {
-  const localA = a.location.dimensionRange;
-  const localB = b.location.dimensionRange;
-  return (
-    a.metadataKey === b.metadataKey &&
-    a.metadataValue === b.metadataValue &&
-    localA?.startRowIndex === localB?.startRowIndex &&
-    localA?.startColumnIndex === localB?.startColumnIndex
-  );
-}
-
 function copiarMarcador(item: MetadadoGoogle, sheetId: number): Pedido | null {
   const local = item.location.dimensionRange;
   if (!local) return null;
@@ -77,80 +65,6 @@ function copiarMarcador(item: MetadadoGoogle, sheetId: number): Pedido | null {
   };
 }
 
-/** Duplica a aba antes da alteração destrutiva e mantém três cópias. */
-export async function criarCopiaGoogle(
-  id: string,
-  acesso: string,
-  nome: string,
-  adiarPoda = false,
-): Promise<string> {
-  const doc = await lerDocumentoGoogle(id, acesso);
-  const origem = exigirAbaGoogle(doc, nome);
-  const instante = new Date().toISOString().replace(/[-:]/g, "");
-  const base = `${PREFIXO}${nome}_${instante.slice(0, 8)}-${instante.slice(9, 15)}-${instante.slice(16, 19)}`;
-  let titulo = base;
-  for (let sufixo = 2; doc.sheets.some((aba) => aba.properties.title === titulo); sufixo += 1) {
-    titulo = `${base}-${sufixo}`;
-  }
-  const existentes = new Set(doc.sheets.map((aba) => aba.properties.sheetId));
-  let novoId = randomInt(1, 2_147_483_647);
-  while (existentes.has(novoId)) novoId = randomInt(1, 2_147_483_647);
-  await enviarLotesGoogle(id, acesso, [
-    {
-      duplicateSheet: {
-        sourceSheetId: origem.properties.sheetId,
-        newSheetId: novoId,
-        newSheetName: titulo,
-      },
-    },
-    {
-      updateSheetProperties: { properties: { sheetId: novoId, hidden: true }, fields: "hidden" },
-    },
-  ]);
-  const depois = await lerDocumentoGoogle(id, acesso);
-  const copia = exigirAbaGoogle(depois, titulo);
-  const marcadoresOrigem = metadadosDaAba(doc, origem).filter((item) =>
-    ["frequenciapp.linha", "frequenciapp.coluna", "frequenciapp.aluno"].includes(item.metadataKey),
-  );
-  const marcadoresCopia = metadadosDaAba(depois, copia);
-  const pedidos: Pedido[] = marcadoresCopia
-    .filter((item) => ["frequenciapp.aba", "frequenciapp.copia"].includes(item.metadataKey))
-    .map((item) => ({
-      deleteDeveloperMetadata: {
-        dataFilter: { developerMetadataLookup: { metadataId: item.metadataId } },
-      },
-    }));
-  pedidos.push({
-    createDeveloperMetadata: {
-      developerMetadata: {
-        metadataKey: "frequenciapp.copia",
-        metadataValue: "1",
-        visibility: "DOCUMENT",
-        location: { sheetId: novoId },
-      },
-    },
-  });
-  for (const marcador of marcadoresOrigem) {
-    if (marcadoresCopia.some((item) => mesmoMarcador(item, marcador))) continue;
-    const pedido = copiarMarcador(marcador, novoId);
-    if (pedido) pedidos.push(pedido);
-  }
-  await enviarLotesGoogle(id, acesso, pedidos);
-  if (!adiarPoda) await podarCopiasGoogle(id, acesso, nome);
-  return titulo;
-}
-
-export async function podarCopiasGoogle(id: string, acesso: string, nome: string): Promise<void> {
-  const doc = await lerDocumentoGoogle(id, acesso);
-  const antigas = copiasDaAbaGoogle(doc, nome).slice(3);
-  if (antigas.length === 0) return;
-  await enviarLotesGoogle(
-    id,
-    acesso,
-    antigas.map((aba) => ({ deleteSheet: { sheetId: aba.properties.sheetId } })),
-  );
-}
-
 /** Restaura dados e formatos dentro da mesma aba para preservar referências. */
 export async function restaurarCopiaGoogle(
   id: string,
@@ -162,7 +76,6 @@ export async function restaurarCopiaGoogle(
   const atual = exigirAbaGoogle(doc, nome);
   const copia = copiasDaAbaGoogle(doc, nome).find((item) => item.properties.title === nomeCopia);
   if (!copia) throw new ErroHttp("Esta aba não é uma cópia da integração.", 409);
-  const anterior = await criarCopiaGoogle(id, acesso, nome, true);
   const idAtual = atual.properties.sheetId;
   const idCopia = copia.properties.sheetId;
   const linhas = copia.properties.gridProperties?.rowCount ?? 1;
@@ -252,6 +165,5 @@ export async function restaurarCopiaGoogle(
     if (pedido) pedidos.push(pedido);
   }
   await enviarLotesGoogle(id, acesso, pedidos);
-  await podarCopiasGoogle(id, acesso, nome);
-  return { aba: nome, copia: nomeCopia, anterior };
+  return { aba: nome, copia: nomeCopia };
 }

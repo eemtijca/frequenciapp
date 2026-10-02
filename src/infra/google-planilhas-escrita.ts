@@ -600,10 +600,6 @@ export async function aplicarGoogle(
     if (erro instanceof ErroHttp) throw new ErroGoogle(erro.message, true);
     throw erro;
   }
-  if (plano.destrutiva) {
-    const { criarCopiaGoogle } = await import("@/infra/google-planilhas-copias");
-    await criarCopiaGoogle(id, acesso, nome);
-  }
   try {
     await enviarLotesGoogle(id, acesso, plano.requests);
   } catch (erro) {

@@ -54,7 +54,7 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
     throw new ErroHttp("Escolha a aba Entradas.", 400);
   if (dados.data.ajustarCabecalho && tipo !== "FREQUENCIA")
     throw new ErroHttp("A correção do cabeçalho está disponível para a frequência.", 400);
-  const versaoMinima = dados.data.ajustarCabecalho ? 6 : 5;
+  const versaoMinima = 7;
   const finalidade: FinalidadeIntegracao = tipo === "FREQUENCIA" ? "FREQUENCIA" : "SAIDAS";
   const linha = await lerLinha(finalidade);
   const mapa = z
