@@ -16,6 +16,7 @@ import {
   Trash2,
   Upload,
   UserCheck,
+  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -91,6 +92,7 @@ export default function AbaConfiguracoes({
   const [abertoJustificativas, setAbertoJustificativas] = useState(false);
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
   const [abertoCopia, setAbertoCopia] = useState(false);
+  const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
   const [salvando, setSalvando] = useState<
     "frequenciaPorAula" | "saidaAntecipada" | "origemNaChamada" | null
   >(null);
@@ -556,35 +558,55 @@ export default function AbaConfiguracoes({
                   </label>
                 ))}
               </fieldset>
-              <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
-                <legend className="mb-1 text-sm font-medium">Turmas específicas</legend>
-                <p className="text-muted-foreground text-xs">
-                  Somam-se às séries completas selecionadas.
-                </p>
-                {turmas.map((item) => (
-                  <label
-                    key={item.id}
-                    className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+              <SecaoRecolhivel
+                dataSecao="config-origem-turmas"
+                nivel="interna"
+                titulo="Turmas específicas"
+                descricao="Somam-se às séries completas selecionadas."
+                icone={Users}
+                aberto={abertoTurmasOrigem}
+                onAbertoChange={setAbertoTurmasOrigem}
+                resumo={
+                  <Selo
+                    variante={
+                      configuracoes.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"
+                    }
                   >
-                    <input
-                      type="checkbox"
-                      className="accent-primary size-4 shrink-0"
-                      aria-label={`Mostrar origem na turma ${item.rotulo}`}
-                      checked={configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
-                      onChange={(evento) =>
-                        void salvarOrigem({
-                          origemNaChamadaTurmaIds: selecaoAlterada(
-                            configuracoes.origemNaChamadaTurmaIds,
-                            item.id,
-                            evento.target.checked,
-                          ),
-                        })
-                      }
-                    />
-                    {item.rotulo}
-                  </label>
-                ))}
-              </fieldset>
+                    {configuracoes.origemNaChamadaTurmaIds.length === 0
+                      ? "Nenhuma"
+                      : `${configuracoes.origemNaChamadaTurmaIds.length} selecionada${
+                          configuracoes.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
+                        }`}
+                  </Selo>
+                }
+              >
+                <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
+                  <legend className="sr-only">Turmas específicas</legend>
+                  {turmas.map((item) => (
+                    <label
+                      key={item.id}
+                      className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        className="accent-primary size-4 shrink-0"
+                        aria-label={`Mostrar origem na turma ${item.rotulo}`}
+                        checked={configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
+                        onChange={(evento) =>
+                          void salvarOrigem({
+                            origemNaChamadaTurmaIds: selecaoAlterada(
+                              configuracoes.origemNaChamadaTurmaIds,
+                              item.id,
+                              evento.target.checked,
+                            ),
+                          })
+                        }
+                      />
+                      {item.rotulo}
+                    </label>
+                  ))}
+                </fieldset>
+              </SecaoRecolhivel>
               {configuracoes.origemNaChamadaSerieIds.length === 0 &&
                 configuracoes.origemNaChamadaTurmaIds.length === 0 && (
                   <p className="text-muted-foreground text-xs">

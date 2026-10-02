@@ -259,3 +259,52 @@ describe("plano da aba de saídas", () => {
     expect(montar().planoHash).toBe(montar().planoHash);
   });
 });
+
+describe("envio automático ao registrar", () => {
+  const plano = (parcial: Partial<import("@/domain/planilha-saidas").PlanoSaidas>) =>
+    ({
+      aba: "Saiu mais cedo",
+      assinatura: "a",
+      planoHash: "h",
+      criar: [],
+      preencher: [],
+      substituir: [],
+      remover: [],
+      candidatosRemocao: [],
+      resumo: {
+        criar: 0,
+        preencher: 0,
+        substituir: 0,
+        remover: 0,
+        puladasOcupadas: 0,
+        puladasFormula: 0,
+        ambiguidades: 0,
+      },
+      avisos: [],
+      ...parcial,
+    }) as import("@/domain/planilha-saidas").PlanoSaidas;
+
+  it("só acrescenta: substituição, remoção ou plano bloqueado ficam para o manual", async () => {
+    const { saidasEnviaveisSozinhas } = await import("@/domain/planilha-saidas");
+    expect(saidasEnviaveisSozinhas(plano({}))).toBe(true);
+    expect(saidasEnviaveisSozinhas(plano({ bloqueado: true }))).toBe(false);
+    expect(saidasEnviaveisSozinhas(plano({ substituir: [{ linha: 2, coluna: 1 } as never] }))).toBe(
+      false,
+    );
+    expect(saidasEnviaveisSozinhas(plano({ remover: [{ linha: 2 } as never] }))).toBe(false);
+  });
+
+  it("só há o que enviar quando o plano cria linha ou preenche célula", async () => {
+    const { saidasTemNovidade } = await import("@/domain/planilha-saidas");
+    expect(saidasTemNovidade(plano({}))).toBe(false);
+    expect(saidasTemNovidade(plano({ criar: [{} as never] }))).toBe(true);
+    expect(saidasTemNovidade(plano({ preencher: [{} as never] }))).toBe(true);
+  });
+
+  it("entradas: só acrescenta linha em plano não bloqueado", async () => {
+    const { entradasEnviaveisSozinhas } = await import("@/domain/planilha-entradas");
+    expect(entradasEnviaveisSozinhas({ criar: [{}] })).toBe(true);
+    expect(entradasEnviaveisSozinhas({ criar: [] })).toBe(false);
+    expect(entradasEnviaveisSozinhas({ bloqueado: true, criar: [{}] })).toBe(false);
+  });
+});

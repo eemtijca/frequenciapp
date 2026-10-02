@@ -79,7 +79,11 @@ export async function listarEntradas(
   }));
 }
 
-export async function criarEntrada(identidade: Identidade, entrada: unknown): Promise<void> {
+/** Registra a entrada e devolve o dia, para o envio automático à planilha. */
+export async function criarEntrada(
+  identidade: Identidade,
+  entrada: unknown,
+): Promise<{ dia: string }> {
   const dados = esquemaCriarEntrada.safeParse(entrada);
   if (!dados.success) throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   if (dados.data.dia > diaLocal(new Date(), ambiente.fuso))
@@ -138,6 +142,7 @@ export async function criarEntrada(identidade: Identidade, entrada: unknown): Pr
       });
       await auditar(tx, identidade.id, "entrada.criar", `entrada:${criada.id}`);
     });
+    return { dia: dados.data.dia };
   } catch (erro) {
     if (ehDuplicidade(erro))
       throw new ErroHttp(

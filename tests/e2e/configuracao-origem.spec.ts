@@ -70,6 +70,14 @@ async function abrirConfiguracoes(page: Page): Promise<Locator> {
   return page.getByRole("group", { name: "Turma de origem na Chamada", exact: true });
 }
 
+/** As turmas específicas ficam numa seção recolhível; abre se ainda estiver fechada. */
+async function abrirTurmasEspecificas(page: Page): Promise<void> {
+  const gatilho = page
+    .locator('[data-secao="config-origem-turmas"]')
+    .getByRole("button", { name: /Turmas específicas/ });
+  if ((await gatilho.getAttribute("aria-expanded")) === "false") await gatilho.click();
+}
+
 async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
   const resposta = page.waitForResponse(
     (item) =>
@@ -90,8 +98,11 @@ async function conferir(
 ): Promise<void> {
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
-  await chamada
-    .getByRole("group", { name: "Turma atual" })
+  const grupo = chamada.getByRole("group", { name: "Turma atual", exact: true });
+  // Cada série é um botão que expande as suas turmas; abre se estiver recolhida.
+  const serie = grupo.getByRole("button", { name: series[indice] ?? "", exact: true });
+  if ((await serie.getAttribute("aria-expanded")) === "false") await serie.click();
+  await grupo
     .getByRole("button")
     .filter({ hasText: `${series[indice]} ${turma}` })
     .click();
@@ -129,6 +140,7 @@ test("seleciona uma série e mantém a escolha ao recarregar", async ({ page }, 
     contentType: "image/png",
   });
   await alterar(page, painel.getByRole("switch"), true);
+  await abrirTurmasEspecificas(page);
   await alterar(
     page,
     painel.getByRole("checkbox", { name: `Mostrar origem na série ${series[0]}`, exact: true }),
@@ -179,6 +191,7 @@ test("soma várias séries e turmas específicas sem alcançar turmas não selec
     selecao.getByRole("checkbox", { name: `Mostrar origem na série ${series[1]}`, exact: true }),
     false,
   );
+  await abrirTurmasEspecificas(page);
   await alterar(
     page,
     selecao.getByRole("checkbox", { name: `Mostrar origem na turma ${series[1]} B`, exact: true }),
@@ -202,6 +215,7 @@ test("desativar e reativar preserva a seleção e o cadastro dos alunos", async 
   await aguardarHidratacao(page);
   const painel = await abrirConfiguracoes(page);
   await alterar(page, painel.getByRole("switch"), true);
+  await abrirTurmasEspecificas(page);
   await alterar(
     page,
     painel.getByRole("checkbox", { name: `Mostrar origem na turma ${series[1]} B`, exact: true }),
@@ -218,6 +232,7 @@ test("desativar e reativar preserva a seleção e o cadastro dos alunos", async 
   const religar = await abrirConfiguracoes(page);
   await expect(religar.getByRole("switch")).not.toBeChecked();
   await alterar(page, religar.getByRole("switch"), true);
+  await abrirTurmasEspecificas(page);
   await expect(
     religar.getByRole("checkbox", { name: `Mostrar origem na turma ${series[1]} B`, exact: true }),
   ).toBeChecked();

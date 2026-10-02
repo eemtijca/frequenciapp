@@ -104,9 +104,17 @@ export async function listarSaidas(filtros: FiltrosSaidas = {}): Promise<SaidaAn
   const [linhas, liberadores] = await Promise.all([
     banco().saidaAntecipada.findMany({
       where: {
-        ...(filtros.dia ? { dia: new Date(`${filtros.dia}T12:00:00Z`) } : {}),
-        ...(filtros.de ? { dia: { gte: new Date(`${filtros.de}T12:00:00Z`) } } : {}),
-        ...(filtros.ate ? { dia: { lte: new Date(`${filtros.ate}T12:00:00Z`) } } : {}),
+        // De e até valem juntos: dois `dia` separados se sobrescreviam e o início sumia.
+        ...(filtros.dia
+          ? { dia: new Date(`${filtros.dia}T12:00:00Z`) }
+          : filtros.de || filtros.ate
+            ? {
+                dia: {
+                  ...(filtros.de ? { gte: new Date(`${filtros.de}T12:00:00Z`) } : {}),
+                  ...(filtros.ate ? { lte: new Date(`${filtros.ate}T12:00:00Z`) } : {}),
+                },
+              }
+            : {}),
         ...(filtros.alunoId ? { alunoId: filtros.alunoId } : {}),
         ...(filtros.turmaId ? { aluno: { turmaId: filtros.turmaId } } : {}),
       },

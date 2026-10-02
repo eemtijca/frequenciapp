@@ -46,6 +46,7 @@ interface IntegracaoSaidasAdmin {
   esquemaEm: string | null;
   modo: "conservador" | "completo";
   modoCompletoAte: string | null;
+  envioAutomatico: boolean;
   atualizadoEm: string;
   fuso: string;
   ultimoErro: { erro: string | null; resultado: string; criadoEm: string } | null;
@@ -145,6 +146,24 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
         );
         setIntegracao(dados.integracao);
         toast.success(valor ? "Integração ativada." : "Integração desativada.");
+      } catch (excecao) {
+        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
+      } finally {
+        setSalvando(false);
+      }
+    });
+  }
+
+  async function alternarEnvioAutomatico(valor: boolean) {
+    await executarPorChave("alternar-envio-automatico-saidas", async () => {
+      setSalvando(true);
+      try {
+        const dados = await pedir<{ integracao: IntegracaoSaidasAdmin }>(
+          "/api/planilha-saidas",
+          corpoAlteracao("PATCH", { envioAutomatico: valor }),
+        );
+        setIntegracao(dados.integracao);
+        toast.success(valor ? "Envio ao registrar ligado." : "Envio ao registrar desligado.");
       } catch (excecao) {
         toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
       } finally {
@@ -453,7 +472,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
         estado={estruturaSalva ? "atual" : "pendente"}
         resumo={
           estruturaSalva
-            ? "O envio é manual, por mês, com prévia obrigatória."
+            ? "O envio manual é por mês, com prévia obrigatória."
             : "Salve a estrutura antes de enviar."
         }
       >
@@ -469,6 +488,21 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
               Abrir a vista Saídas
             </Button>
           )}
+        </div>
+        <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Enviar ao registrar</p>
+            <p className="text-muted-foreground text-xs">
+              Cada saída e cada entrada registrada segue para a planilha sozinha, só acrescentando
+              linhas. O que pedir revisão fica para o envio manual.
+            </p>
+          </div>
+          <Switch
+            checked={integracao?.envioAutomatico ?? false}
+            disabled={salvando || !podeEnviar || !estruturaSalva}
+            onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
+            aria-label="Enviar ao registrar saídas e entradas"
+          />
         </div>
         <div className="flex flex-col gap-1 text-xs">
           {integracao?.ultimoErro && (

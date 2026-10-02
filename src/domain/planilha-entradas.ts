@@ -104,3 +104,11 @@ export function planejarEntradas(
     planoHash: hashTexto(JSON.stringify({ entradas, leitura, mesclagens, criar })),
   };
 }
+
+/** O envio automático das entradas só acrescenta linhas; plano bloqueado fica para o manual. */
+export function entradasEnviaveisSozinhas(plano: {
+  bloqueado?: boolean;
+  criar: unknown[];
+}): boolean {
+  return !plano.bloqueado && plano.criar.length > 0;
+}
