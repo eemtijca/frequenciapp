@@ -1515,6 +1515,30 @@ describe("Apps Script: cópias e restauração", () => {
     expect(local.planilha.getSheetByName(antiga.getName())).toBe(antiga);
   });
 
+  it("preserva a última aba visível quando o serviço retorna novas referências", () => {
+    const local = montarContexto();
+    const antiga = copiaAntiga(local);
+    local.aba.hideSheet();
+    antiga.showSheet();
+    const listar = local.planilha.getSheets.bind(local.planilha);
+    local.planilha.getSheets = () =>
+      listar().map(
+        (aba) =>
+          new Proxy(aba, {
+            get(alvo, propriedade, receptor) {
+              const valor = Reflect.get(alvo, propriedade, receptor);
+              return typeof valor === "function" ? valor.bind(alvo) : valor;
+            },
+          }),
+      );
+    const resposta = chamar(local, { acao: "removerAbasBackup", copias: [antiga.getName()] });
+    expect(resposta).toMatchObject({
+      ok: false,
+      erro: "A planilha precisa manter uma aba visível.",
+    });
+    expect(local.planilha.getSheetByName(antiga.getName())).toBe(antiga);
+  });
+
   for (const copiaLevaMetadados of [false, true]) {
     const caso = copiaLevaMetadados ? "cópia com metadados" : "cópia sem metadados";
 
@@ -1867,7 +1891,7 @@ const VERSOES_DO_SCRIPT = [
   { versao: 4, sha256: "9b2c7ee0a010bb99c925ca96fe935249b211ef71d253a0ed8f6c56c079836404" },
   { versao: 5, sha256: "dbde00f2ea7499695898621542ee5ef8b5acb963127f4d2e30513172a8876576" },
   { versao: 6, sha256: "60be58fab892b1f19b0b7a3ff6a721b3eeba120b5e33378875ea027a6a38ae0d" },
-  { versao: 7, sha256: "d295cfea240bc64d65a587bb20bb21084ca1498269d1c3b2e33ba37b72f9ecae" },
+  { versao: 7, sha256: "9d6ece97384814cb0f40c8bf7289bf9b41290ee15ffa68e63dd7d0235c1dd5af" },
 ];
 
 describe("Apps Script: versão", () => {

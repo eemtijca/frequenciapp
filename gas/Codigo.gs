@@ -1011,7 +1011,12 @@ function acaoRemoverAbasBackup(corpo) {
     return { ok: false, erro: "As cópias mudaram. Confira uma nova prévia antes de remover." };
   if (
     !planilha.getSheets().some(function (aba) {
-      return !aba.isSheetHidden() && copias.indexOf(aba) < 0;
+      return (
+        !aba.isSheetHidden() &&
+        !copias.some(function (copia) {
+          return copia.getSheetId() === aba.getSheetId();
+        })
+      );
     })
   )
     return { ok: false, erro: "A planilha precisa manter uma aba visível." };

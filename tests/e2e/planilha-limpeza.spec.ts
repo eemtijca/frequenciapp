@@ -63,7 +63,10 @@ test("mostra prévia, permite cancelar e remove uma única vez com senha e frase
   await cartao.getByRole("button", { name: "Remover abas de backup", exact: true }).click();
   const dialogo = page.getByRole("dialog", { name: "Remover abas de backup" });
   await expect(dialogo.getByText(copia, { exact: true })).toBeVisible();
-  await page.screenshot({ path: `docs/imagens/limpeza-backups-${test.info().project.name}.png` });
+  await page.screenshot({
+    animations: "disabled",
+    path: `docs/imagens/limpeza-backups-${test.info().project.name}.png`,
+  });
   await expect(dialogo.getByRole("button", { name: "Remover cópias", exact: true })).toBeDisabled();
   await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   expect(confirmacoes).toEqual([]);
