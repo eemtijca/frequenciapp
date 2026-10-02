@@ -2,8 +2,8 @@
 
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e resumo de faltas, justificadas e saídas.
-import { useEffect, useMemo, useState } from "react";
-import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import type {
   Aluno,
   Configuracoes,
@@ -27,9 +27,7 @@ import {
   resumoDoDia,
 } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
@@ -154,17 +152,35 @@ export default function VistaPainel({
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const carregandoPainel = carregando && !compartilhado;
 
-  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
-    setErro("");
+  // O painel se atualiza sozinho: a cada minuto e ao voltar para a aba do
+  // navegador, sem botão. Sem rede não tenta, e sessão expirada segue o
+  // tratamento das consultas.
+  const emAtualizacao = useRef(false);
+  const atualizarEmSilencio = useCallback(async () => {
+    if (emAtualizacao.current) return;
+    emAtualizacao.current = true;
     try {
       if (compartilhado) await onRecarregar(mes);
       else setRecarregar((valor) => valor + 1);
-    } catch (excecao) {
-      setErro("Não foi possível atualizar os indicadores.");
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, { contexto: "Não foi possível atualizar os indicadores." });
+    } catch {
+      // Mantém os números atuais até a próxima tentativa.
+    } finally {
+      emAtualizacao.current = false;
     }
-  });
+  }, [compartilhado, mes, onRecarregar]);
+
+  useEffect(() => {
+    if (!ativo) return;
+    const quandoVisivel = () => {
+      if (document.visibilityState === "visible" && navigator.onLine) void atualizarEmSilencio();
+    };
+    const intervalo = window.setInterval(quandoVisivel, 60_000);
+    document.addEventListener("visibilitychange", quandoVisivel);
+    return () => {
+      window.clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", quandoVisivel);
+    };
+  }, [ativo, atualizarEmSilencio]);
 
   function graficoDoDia(serieSelecionada: Serie | null) {
     const distribuicaoDaSerie = serieSelecionada
@@ -301,23 +317,7 @@ export default function VistaPainel({
 
   return (
     <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-center justify-end gap-3">
-        <h1 className="sr-only">Painel</h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Atualizar indicadores"
-          onClick={() => void atualizar()}
-          disabled={atualizando || carregandoPainel}
-        >
-          {atualizando ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
-          )}
-        </Button>
-      </div>
+      <h1 className="sr-only">Painel</h1>
 
       <div className="flex items-center gap-2">
         <Button

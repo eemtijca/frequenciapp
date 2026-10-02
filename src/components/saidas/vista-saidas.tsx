@@ -3,7 +3,7 @@
 // Saiu mais cedo: registro da saída antecipada, saídas do dia por turma e
 // relatório semanal por aluno. Separado da chamada.
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, LoaderCircle, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -48,9 +48,6 @@ import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
-import DialogoEnvioSaidas, {
-  useEstadoPlanilhaSaidas,
-} from "@/components/saidas/dialogo-envio-saidas";
 
 interface Props {
   diaCorrente: string;
@@ -62,8 +59,8 @@ interface Props {
   liberadores: LiberadorConfigurado[];
   saidas: SaidaAntecipada[];
   onSaidasMudaram: (mes: string) => Promise<void>;
-  /** A vista é aquecida em segundo plano; só busca o estado quando visível. */
-  ativo: boolean;
+  /** Usado pela área de movimentações; esta vista não precisa dele. */
+  ativo?: boolean;
 }
 
 type FormaJustificativa = "texto" | "catalogo";
@@ -78,7 +75,6 @@ export default function VistaSaidas({
   liberadores,
   saidas,
   onSaidasMudaram,
-  ativo,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turmaFiltro, setTurmaFiltro] = useState("");
@@ -98,15 +94,6 @@ export default function VistaSaidas({
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [turmaAberta, setTurmaAberta] = useState<string | null>(null);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
-  const [envioAberto, setEnvioAberto] = useState(false);
-  const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
-  const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilhaSaidas();
-
-  // A vista é aquecida em segundo plano e pode montar antes de a planilha ser
-  // configurada; ao ficar visível, o estado da integração é relido.
-  useEffect(() => {
-    if (ativo) void recarregarPlanilha();
-  }, [ativo, recarregarPlanilha]);
 
   const [relatorioAberto, setRelatorioAberto] = useState(false);
   const [diaRelatorio, setDiaRelatorio] = useState(diaCorrente);
@@ -345,24 +332,7 @@ export default function VistaSaidas({
 
   return (
     <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-center justify-end gap-3">
-        <h1 className="sr-only">Saiu mais cedo</h1>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 shrink-0 rounded-lg"
-          disabled={!estadoPlanilha?.podeEnviar || !estadoPlanilha.configurada}
-          title={
-            estadoPlanilha?.configurada
-              ? "Enviar as saídas do mês para o Google Planilhas"
-              : "Configure a planilha de saídas na Gestão"
-          }
-          onClick={() => setEnvioAberto(true)}
-        >
-          <FileSpreadsheet size={16} />
-          <span className="hidden sm:inline">Enviar para a planilha</span>
-        </Button>
-      </div>
+      <h1 className="sr-only">Saiu mais cedo</h1>
 
       <div className="flex items-center gap-2">
         <Button
@@ -815,14 +785,6 @@ export default function VistaSaidas({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <DialogoEnvioSaidas
-        aberto={envioAberto}
-        onAbrir={setEnvioAberto}
-        mes={mesEnvio}
-        onMes={setMesEnvio}
-        modoCompleto={estadoPlanilha?.modo === "completo"}
-        aoConcluir={() => void recarregarPlanilha()}
-      />
     </section>
   );
 }

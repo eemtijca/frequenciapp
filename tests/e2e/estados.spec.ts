@@ -19,8 +19,8 @@ test.describe("telas de estado", () => {
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 
-    // Expira somente quando a ação já iniciou a consulta. Apagar o cookie
-    // antes do clique permite que uma consulta de fundo remova o botão primeiro.
+    // Expira somente quando a consulta já foi iniciada: o cookie só é apagado
+    // dentro do tratamento da própria requisição.
     await page.route("**/api/frequencias?mes=*", async (rota) => {
       await context.clearCookies();
       const resposta = await rota.fetch({
@@ -29,12 +29,23 @@ test.describe("telas de estado", () => {
       expect(resposta.status()).toBe(401);
       await rota.fulfill({ response: resposta });
     });
-    const respostaExpirada = page.waitForResponse(
-      (resposta) =>
-        new URL(resposta.url()).pathname === "/api/frequencias" && resposta.status() === 401,
-    );
-    await page.getByRole("button", { name: "Atualizar indicadores" }).click();
-    await respostaExpirada;
+    let expirou = false;
+    page.on("response", (resposta) => {
+      if (new URL(resposta.url()).pathname === "/api/frequencias" && resposta.status() === 401) {
+        expirou = true;
+      }
+    });
+    // O painel se atualiza sozinho; voltar para a aba do navegador dispara a consulta.
+    // O evento se repete até o painel registrar o ouvinte, sem depender de espera fixa.
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+          return expirou;
+        },
+        { timeout: 15_000, intervals: [500] },
+      )
+      .toBe(true);
 
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Sessão expirada")).toBeVisible();
