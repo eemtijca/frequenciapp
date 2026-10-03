@@ -198,7 +198,7 @@ A descrição deve conter:
 
 Quando a mudança tocar dependências, autenticação, permissões, workflows ou dados sensíveis, descreva o risco e como ele foi tratado.
 
-Capturas de tela são artefatos locais de validação e apresentação. Guarde os arquivos em `docs/imagens/`, fora do versionamento, e não faça commit deles.
+Capturas de tela oficiais do README ficam em `docs/imagens/`, são geradas pelo spec `tests/e2e/imagens.spec.ts` com `npm run capturas:readme` e entram no versionamento; não edite os PNGs à mão. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento, e não entram nos commits.
 
 Antes de abrir, rode as verificações locais:
 
@@ -262,13 +262,14 @@ Ferramentas de IA são bem-vindas como apoio, mas a responsabilidade pela mudan�
 
 ## Testes e qualidade
 
-| Suíte            | Requisito                                          | Comando                                         |
-| ---------------- | -------------------------------------------------- | ----------------------------------------------- |
-| Unidade          | Nenhum                                             | `npm run test:unit`                             |
-| Contratos de API | Aplicativo no ar, contas de teste e `DATABASE_URL` | `npm run test:api`                              |
-| Ponta a ponta    | Aplicativo no ar                                   | `npm run test:e2e:docker` ou `npm run test:e2e` |
-| PWA              | Build de produção no ar                            | `npm run test:pwa`                              |
-| Guarda editorial | Nenhum (roda com a unidade)                        | `npm run test:unit`                             |
+| Suíte              | Requisito                                          | Comando                                         |
+| ------------------ | -------------------------------------------------- | ----------------------------------------------- |
+| Unidade            | Nenhum                                             | `npm run test:unit`                             |
+| Contratos de API   | Aplicativo no ar, contas de teste e `DATABASE_URL` | `npm run test:api`                              |
+| Ponta a ponta      | Aplicativo no ar                                   | `npm run test:e2e:docker` ou `npm run test:e2e` |
+| PWA                | Build de produção no ar                            | `npm run test:pwa`                              |
+| Capturas do README | Aplicativo no ar e semente aplicada                | `npm run capturas:readme`                       |
+| Guarda editorial   | Nenhum (roda com a unidade)                        | `npm run test:unit`                             |
 
 Regras:
 
@@ -286,6 +287,8 @@ npm run test:pwa:docker            # PWA
 ```
 
 A variável `TEST_BASE_URL` aponta para o aplicativo (padrão `http://localhost:3000`), e `tests/playwright-container.sh` aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Mantenha a versão da imagem igual à do `@playwright/test` em `package.json`.
+
+As capturas oficiais do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente aplicada. Regenera pelo comando `npm run capturas:readme` (ou `npm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; capturas locais de validação vão para `docs/imagens/locais/`.
 
 A instalação local de navegadores fica como alternativa:
 
