@@ -32,6 +32,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - `npm run test:pwa` roda o próprio `npm run build && npm start`, porque o service worker precisa ser o de produção.
 - Banco: `npm run db:migrate` em desenvolvimento, `npm run db:deploy` em produção. Nunca edite uma migração aplicada; crie uma nova com `npx prisma migrate dev --name ajuste`. O cliente Prisma em `generated/` fica fora do Git; `npm run db:generate` ou o `postinstall` o regenera.
 - Etiquetas: `npm run etiquetas:sync` cria ou atualiza as etiquetas do GitHub conforme `.github/labels.json`.
+- Capturas do README: `npm run capturas:readme` ou `npm run capturas:readme:docker`, com o aplicativo no ar e a semente aplicada. Os PNGs ficam em `docs/imagens/` e não são editados à mão; capturas locais vão para `docs/imagens/locais/`.
 
 ## Ferramentas externas
 

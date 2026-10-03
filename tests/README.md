@@ -83,6 +83,7 @@ Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. 
 ```bash
 npm run test:e2e:docker            # todos os projetos
 npm run test:e2e:docker:chromium   # só o Chromium
+npm run capturas:readme            # capturas do README em docs/imagens
 ```
 
 O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test`. Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
@@ -110,3 +111,12 @@ O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL
 ## Verificação visual e de ponta a ponta
 
 Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, campos de senha com exibir e ocultar, lembrar o acesso no dispositivo (sessão persistente e e-mail preenchido), banco vazio, chamada diária com falta justificada, chamada por aula com saída parcial, painel com gráficos, seletor de período próprio em popover, troca de visão com indicador na visão ativa, barra lateral no desktop, abas da Gestão com toque e teclado, histórico, grade com divisórias e períodos, gestão completa (série, turma com aulas, aluno, contas e configurações), saídas antecipadas, cópia de segurança, troca de senha, tema de três opções, login simétrico, campos do login com margem no celular, PWA e larguras de celular e desktop.
+
+As capturas oficiais do README ficam em `docs/imagens/` e são geradas por `tests/e2e/imagens.spec.ts`, com o aplicativo no ar e a semente aplicada:
+
+```bash
+npm run capturas:readme         # Playwright local
+npm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
+```
+
+O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.

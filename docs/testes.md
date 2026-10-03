@@ -82,6 +82,17 @@ A execução usa a imagem oficial da Microsoft, sem instalar navegadores no host
 
 Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu de perfil no celular), campos de senha com exibir e ocultar, lembrar o acesso no dispositivo com sessão persistente e e-mail preenchido, banco vazio sem carregamento infinito, troca de visão pelos botões com o indicador da barra inferior na visão ativa, integração com Google Planilhas contra respostas HTTP simuladas do Google (conexão Google, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), planilha de saídas (configuração na Gestão, envio pela vista Saídas e reenvio sem duplicar), diretores de turma na Gestão (identificador inválido sinalizado, cadastro com turma, palavra-chave exibida uma vez, revogação só com motivo e parâmetros de acesso; o diretor entra pelo identificador, troca a palavra no diálogo obrigatório e vê só a própria turma, com gráficos, tabela e nenhuma navegação da equipe), relação de alunos em CSV (botões inteiros no celular, arquivo fora do padrão sinalizado antes de conferir, importação com prévia e exportação no mesmo schema), extras do 3º ano (Alunos por origem, busca por origem na Chamada, turma original em círculo na turma reorganizada e origem em massa), saída durante a aula com texto opcional, justificativa escrita e responsável do catálogo de quem libera, tema de três opções, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover com teclado e atalhos, abas da Gestão com toque e teclado, responsividade, login simétrico, campos do login com margem no celular, histórico, grade com divisórias, períodos e coluna acumulada, saídas antecipadas, cópia de segurança e PWA, além de toasts em todas as ações, trava de toque duplo nas ações de rede, tipografia Plus Jakarta Sans com JetBrains Mono nos números e telas de estado (404, sessão expirada e avisos internos). A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
 
+## Capturas do README
+
+As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente de desenvolvimento aplicada. O spec usa o estado de sessão criado pelo setup global, captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sem dados reais. Para regenerar:
+
+```bash
+npm run capturas:readme         # Playwright local, com o aplicativo no ar
+npm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
+```
+
+Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas e confira o diff das imagens no pull request.
+
 ## Convenções
 
 - Cada arquivo cria e limpa a própria massa; nada depende de dados reais.
