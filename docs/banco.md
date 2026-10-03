@@ -156,3 +156,9 @@ pg_restore --clean --if-exists -d "$DIRECT_URL" frequenciapp.dump
 O teste de restauração recomendado é restaurar em um banco vazio e conferir contagens de `alunos` e `frequencias`. A rotina completa está em [operacao.md](operacao.md).
 
 A migração `saida_horario` acrescenta `saidas_antecipadas.horario` (`VARCHAR(5)`, `HH:MM`) como coluna anulável. Saídas anteriores ficam sem horário; novas saídas exigem um horário válido. Cópias JSON antigas continuam aceitas sem o campo.
+
+## Confirmação da Seduc na chamada normal
+
+A migração `20261003011539_confirmacao_seduc_chamada` acrescenta confirmação, data, nome e referência do responsável e revisão própria a `alunos_chamada`. As chamadas existentes começam sem confirmação. A chave composta de frequência e aluno mantém a confirmação vinculada à lista histórica, independente da presença ou falta. Remover a conta preserva o nome do responsável, com a referência anulada.
+
+A operação usa transação serializável e confere tanto a revisão da frequência como `revisao_seduc`. Corrigir a frequência invalida apenas os alunos afetados. A revisão e o horário da chamada não mudam ao confirmar a Seduc. Detalhes na [ADR-035](adr/035-seduc-na-chamada-normal.md).

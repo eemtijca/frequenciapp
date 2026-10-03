@@ -20,6 +20,26 @@ const justificativa = z
   .min(1, "Justificativa inválida.")
   .max(10, "Justificativa inválida.");
 const instante = z.iso.datetime({ offset: true });
+const esquemaSeducChamada = z
+  .object({
+    alunoId: uuid,
+    registradoSeduc: z.boolean(),
+    registradoSeducEm: instante.nullish(),
+    registradoSeducPorId: uuid.nullish(),
+    registradoSeducPorNome: z.string().trim().min(1).max(200).nullish(),
+    revisaoSeduc: z.number().int().min(0).max(999999),
+  })
+  .refine(
+    (item) =>
+      item.registradoSeduc
+        ? item.registradoSeducEm != null &&
+          item.registradoSeducPorNome != null &&
+          item.revisaoSeduc > 0
+        : item.registradoSeducEm == null &&
+          item.registradoSeducPorId == null &&
+          item.registradoSeducPorNome == null,
+    "A confirmação da Seduc deve corresponder à data e ao responsável.",
+  );
 const esquemaParcial = z
   .object({
     id: uuid,
@@ -115,23 +135,32 @@ const esquemaCopia = z.object({
     .max(50000),
   frequencias: z
     .array(
-      z.object({
-        dia,
-        turmaId: uuid,
-        revisao: z.number().int().min(1).max(999999),
-        faltas: z
-          .array(
-            z.object({
-              alunoId: uuid,
-              horarioId: uuid,
-              justificativa: justificativa.nullish(),
-              observacao: z.string().trim().max(200).nullish(),
-            }),
-          )
-          .max(50000),
-        // Lista da chamada. Cópias antigas não trazem; a importação a deduz.
-        alunos: z.array(uuid).max(5000).optional(),
-      }),
+      z
+        .object({
+          dia,
+          turmaId: uuid,
+          revisao: z.number().int().min(1).max(999999),
+          faltas: z
+            .array(
+              z.object({
+                alunoId: uuid,
+                horarioId: uuid,
+                justificativa: justificativa.nullish(),
+                observacao: z.string().trim().max(200).nullish(),
+              }),
+            )
+            .max(50000),
+          // Lista da chamada. Cópias antigas não trazem; a importação a deduz.
+          alunos: z.array(uuid).max(5000).optional(),
+          confirmacoesSeduc: z.array(esquemaSeducChamada).max(5000).optional(),
+        })
+        .refine((item) => {
+          const ids = (item.confirmacoesSeduc ?? []).map((confirmacao) => confirmacao.alunoId);
+          return (
+            new Set(ids).size === ids.length &&
+            (!item.alunos || ids.every((id) => item.alunos?.includes(id)))
+          );
+        }, "As confirmações da Seduc devem pertencer à lista da chamada, sem repetição."),
     )
     .max(50000),
   // Campo novo na versão 1; cópias anteriores continuam válidas.
@@ -295,7 +324,16 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         faltas: {
           select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
         },
-        alunos: { select: { alunoId: true } },
+        alunos: {
+          select: {
+            alunoId: true,
+            registradoSeduc: true,
+            registradoSeducEm: true,
+            registradoSeducPorId: true,
+            registradoSeducPorNome: true,
+            revisaoSeduc: true,
+          },
+        },
       },
     }),
     banco().frequenciaParcial.findMany({
@@ -381,6 +419,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       revisao: frequencia.revisao,
       faltas: frequencia.faltas,
       alunos: frequencia.alunos.map((item) => item.alunoId),
+      confirmacoesSeduc: frequencia.alunos.map((item) => ({
+        ...item,
+        registradoSeducEm: item.registradoSeducEm?.toISOString() ?? null,
+      })),
     })),
     frequenciasParciais: frequenciasParciais.map((parcial) => ({
       ...parcial,
@@ -625,6 +667,9 @@ export async function importarCopia(
             id: {
               in: [
                 ...copia.saidas.map((saida) => saida.liberadoPorId),
+                ...copia.frequencias.flatMap((frequencia) =>
+                  (frequencia.confirmacoesSeduc ?? []).map((item) => item.registradoSeducPorId),
+                ),
                 ...(copia.frequenciasParciais ?? []).flatMap((parcial) => [
                   parcial.criadoPorId,
                   parcial.atualizadoPorId,
@@ -649,13 +694,36 @@ export async function importarCopia(
         where: { turmaId_dia: { turmaId: frequencia.turmaId, dia: diaRepositorio } },
         select: {
           id: true,
+          alunos: {
+            select: {
+              alunoId: true,
+              registradoSeduc: true,
+              registradoSeducEm: true,
+              registradoSeducPorNome: true,
+              revisaoSeduc: true,
+            },
+          },
           faltas: {
             select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
           },
         },
       });
       if (atual) {
-        if (faltasIguais(atual.faltas, frequencia.faltas)) resultado.identicas += 1;
+        const confirmacoesIguais =
+          !frequencia.confirmacoesSeduc ||
+          frequencia.confirmacoesSeduc.every((item) => {
+            const salva = atual.alunos.find((aluno) => aluno.alunoId === item.alunoId);
+            return (
+              salva &&
+              salva.registradoSeduc === item.registradoSeduc &&
+              (salva.registradoSeducEm?.toISOString() ?? null) ===
+                (item.registradoSeducEm ?? null) &&
+              salva.registradoSeducPorNome === (item.registradoSeducPorNome ?? null) &&
+              salva.revisaoSeduc === item.revisaoSeduc
+            );
+          });
+        if (faltasIguais(atual.faltas, frequencia.faltas) && confirmacoesIguais)
+          resultado.identicas += 1;
         else resultado.conflitos += 1;
         continue;
       }
@@ -679,6 +747,17 @@ export async function importarCopia(
             .map((aluno) => aluno.id)
         ).concat(frequencia.faltas.map((falta) => falta.alunoId)),
       );
+      if (
+        (frequencia.confirmacoesSeduc ?? []).some(
+          (item) => !lista.has(item.alunoId) || !idsAlunos.has(item.alunoId),
+        )
+      ) {
+        resultado.conflitos += 1;
+        continue;
+      }
+      const confirmacoes = new Map(
+        (frequencia.confirmacoesSeduc ?? []).map((item) => [item.alunoId, item]),
+      );
       await tx.frequencia.create({
         data: {
           turmaId: frequencia.turmaId,
@@ -697,7 +776,23 @@ export async function importarCopia(
           alunos: {
             create: [...lista]
               .filter((alunoId) => idsAlunos.has(alunoId))
-              .map((alunoId) => ({ alunoId })),
+              .map((alunoId) => {
+                const confirmacao = confirmacoes.get(alunoId);
+                return {
+                  alunoId,
+                  registradoSeduc: confirmacao?.registradoSeduc ?? false,
+                  registradoSeducEm: confirmacao?.registradoSeducEm
+                    ? new Date(confirmacao.registradoSeducEm)
+                    : null,
+                  registradoSeducPorNome: confirmacao?.registradoSeducPorNome ?? null,
+                  registradoSeducPorId:
+                    confirmacao?.registradoSeducPorId &&
+                    idsUsuarios.has(confirmacao.registradoSeducPorId)
+                      ? confirmacao.registradoSeducPorId
+                      : null,
+                  revisaoSeduc: confirmacao?.revisaoSeduc ?? 0,
+                };
+              }),
           },
         },
       });

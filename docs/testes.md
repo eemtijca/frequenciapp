@@ -103,3 +103,9 @@ Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a inte
 ## Cobertura
 
 A cobertura protege o essencial do domínio (derivação de marcas e grade), a segurança de acesso (sessão, CSRF, papéis, guardas do último administrador), a integridade transacional do salvamento (duplicata, revisão, corrida concorrente, validação de aulas) e a tradução de erros. Caminhos de apresentação são verificados pela suíte de ponta a ponta, pela inspeção visual e pela navegação em larguras de celular e desktop.
+
+## Seduc na chamada normal
+
+`tests/api/seduc-chamada.test.ts` cria turma, alunos e aulas sintéticos. Cobre confirmação e reabertura, autoria e auditoria, preservação da frequência e do horário, salvamento sem mudanças, invalidação individual, aulas e justificativas, confirmação concorrente e revisão antiga, sessão e origem, aluno fora da lista e cópia JSON. A cópia preserva confirmações, recusa incoerências e duplicatas e aceita arquivos antigos.
+
+`tests/e2e/seduc-chamada.spec.ts` confere a chave desabilitada antes de salvar e durante a edição, marcação por aluno na chamada bloqueada, recarga, reconfirmação depois de corrigir e recusa de revisão antiga, incluindo tela de 360 pixels. Os testes existentes da chamada e da Chamada Parcial permanecem aplicáveis.

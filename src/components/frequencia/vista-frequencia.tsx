@@ -18,14 +18,15 @@ import {
   Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   AcumuladoAluno,
   Aluno,
   Configuracoes,
+  ConfirmacaoSeducAluno,
   Frequencia,
   JustificativaConfigurada,
   ResumoAcumulado,
@@ -49,6 +50,8 @@ import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -146,6 +149,8 @@ export default function VistaFrequencia({
   const [aulasAbertas, setAulasAbertas] = useState<string | null>(null);
   const [resumoAberto, setResumoAberto] = useState(false);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
+  const [confirmacoesSeduc, setConfirmacoesSeduc] = useState<ConfirmacaoSeducAluno[]>([]);
+  const { chaveAtiva: confirmandoSeduc, executar: executarSeduc } = useAcoesPorChave();
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
   // Lista gravada da chamada; nula enquanto o dia não foi salvo.
   const [listaGravada, setListaGravada] = useState<string[] | null>(null);
@@ -198,6 +203,7 @@ export default function VistaFrequencia({
     setAulasAbertas(null);
     setResumoAberto(false);
     setRevisaoSalva(0);
+    setConfirmacoesSeduc([]);
     setEdicaoLiberada(false);
     setListaGravada(null);
     setAtualizadoEm("");
@@ -213,6 +219,7 @@ export default function VistaFrequencia({
         setJustificativas(paraJustificativas(frequencia?.faltas ?? []));
         setObservacoes(paraObservacoes(frequencia?.faltas ?? []));
         setRevisaoSalva(frequencia?.revisao ?? 0);
+        setConfirmacoesSeduc(frequencia?.confirmacoesSeduc ?? []);
         setListaGravada(frequencia?.alunos ?? null);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
@@ -363,10 +370,46 @@ export default function VistaFrequencia({
   }, [ativosDaTurma, busca, filtro, ausencias, justificativas, rotuloOrigemDe, desistentesDaTurma]);
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
-  const ocupado = carregando || salvando || conflito;
+  const ocupado = carregando || salvando || conflito || confirmandoSeduc !== null;
   const bloqueado = ocupado || chamadaBloqueada;
   const travado = ocupado || sujo;
   const podeSalvar = !bloqueado && (sujo || revisaoSalva === 0);
+
+  const seducPorAluno = useMemo(
+    () => new Map(confirmacoesSeduc.map((confirmacao) => [confirmacao.alunoId, confirmacao])),
+    [confirmacoesSeduc],
+  );
+  async function confirmarSeduc(alunoId: string, registrado: boolean) {
+    if (ocupado || sujo || !chamadaBloqueada || chaveCarregada.current !== chave) return;
+    const anterior = seducPorAluno.get(alunoId);
+    if (!anterior) return;
+    await executarSeduc("seduc", async () => {
+      try {
+        const dados = await pedir<{ confirmacao: ConfirmacaoSeducAluno }>(
+          "/api/frequencias/seduc",
+          corpoJson({
+            dia,
+            turmaId,
+            alunoId,
+            registrado,
+            revisao: revisaoSalva,
+            revisaoSeduc: anterior.revisaoSeduc,
+          }),
+        );
+        if (chaveCarregada.current !== chave) return;
+        setConfirmacoesSeduc((atuais) =>
+          atuais.map((item) => (item.alunoId === alunoId ? dados.confirmacao : item)),
+        );
+        avisarSucesso(
+          registrado ? "Lançamento na Seduc confirmado." : "Confirmação da Seduc desmarcada.",
+        );
+      } catch (excecao) {
+        avisarErro(excecao, { contexto: "Não foi possível atualizar a confirmação da Seduc." });
+        if (excecao instanceof ErroApi && excecao.status === 409)
+          setRecarregar((valor) => valor + 1);
+      }
+    });
+  }
 
   const alternarFalta = useCallback(
     (alunoId: string) => {
@@ -495,6 +538,7 @@ export default function VistaFrequencia({
       setObservacoes(paraObservacoes(dados.frequencia.faltas));
       setAulasAbertas(null);
       setRevisaoSalva(dados.frequencia.revisao);
+      setConfirmacoesSeduc(dados.frequencia.confirmacoesSeduc ?? []);
       setEdicaoLiberada(false);
       setListaGravada(dados.frequencia.alunos ?? null);
       setAtualizadoEm(dados.frequencia.atualizadoEm);
@@ -960,6 +1004,7 @@ export default function VistaFrequencia({
                     mostrarOrigem,
                     aluno.turmaOriginalId !== turmaId,
                   );
+                  const confirmacaoSeduc = seducPorAluno.get(aluno.id);
                   const desistente = desistentesDaTurma.has(aluno.id);
                   const faltando = !desistente && ausencias.has(aluno.id);
                   const marcadas = ausencias.get(aluno.id)?.size ?? 0;
@@ -1057,6 +1102,18 @@ export default function VistaFrequencia({
                             {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                           </motion.span>
                         </button>
+                        <div className="flex shrink-0 flex-col items-end justify-center gap-1.5 py-2 pr-4">
+                          <Label htmlFor={`chamada-seduc-${aluno.id}`} className="text-xs">
+                            Seduc
+                          </Label>
+                          <Switch
+                            id={`chamada-seduc-${aluno.id}`}
+                            aria-label={`Registrado na Seduc: ${nomeExibido}`}
+                            checked={confirmacaoSeduc?.registradoSeduc ?? false}
+                            disabled={ocupado || sujo || !chamadaBloqueada || !confirmacaoSeduc}
+                            onCheckedChange={(valor) => confirmarSeduc(aluno.id, valor)}
+                          />
+                        </div>
                         {faltando && configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
                           <button
                             type="button"
@@ -1072,6 +1129,18 @@ export default function VistaFrequencia({
                           </button>
                         )}
                       </div>
+                      {confirmacaoSeduc?.registradoSeduc && (
+                        <p className="text-muted-foreground px-4 pb-2 text-xs break-words">
+                          Registrado na Seduc por{" "}
+                          {confirmacaoSeduc.registradoSeducPorNome ?? "registro anterior"}
+                          {confirmacaoSeduc.registradoSeducEm &&
+                            ` em ${new Intl.DateTimeFormat("pt-BR", {
+                              dateStyle: "short",
+                              timeStyle: "short",
+                              timeZone: fuso,
+                            }).format(new Date(confirmacaoSeduc.registradoSeducEm))}`}
+                        </p>
+                      )}
                       {faltando && (
                         <div className="border-t px-4 py-2.5">
                           <div className="flex flex-wrap items-center gap-2">
