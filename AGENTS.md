@@ -4,7 +4,7 @@ FrequenciApp: aplicativo de frequência escolar para a coordenação de uma esco
 
 ## Diretrizes do repositório
 
-- Leia o `CONTRIBUTING.md`: ele reúne todas as diretrizes do repositório (ambiente, issues, branches, commits, pull requests, padrões de código, banco, formatação e testes).
+- Leia o `CONTRIBUTING.md`: ele reúne todas as diretrizes do repositório (ambiente, issues, etiquetas, branches, commits, pull requests, padrões de código, banco, formatação e testes).
 - `tests/unit/texto-editorial.test.ts` varre código, documentação, configuração, scripts e os markdown da raiz (incluindo este arquivo). Ele reprova travessão, meia-risca, reticências tipográficas, aspas curvas, setas, entidades HTML de aspas, pronomes de segunda pessoa e plural escrito como o substantivo seguido de parênteses. Rode `npx vitest run tests/unit/texto-editorial.test.ts` depois de escrever texto de interface ou documentação.
 - Todo arquivo próprio começa com um cabeçalho de uma a duas linhas em português descrevendo seu papel.
 - Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`.
@@ -31,11 +31,21 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - Ponta a ponta: rode na imagem oficial da Microsoft com o aplicativo no ar (`npm run test:e2e:docker`, ou `npm run test:e2e:docker:chromium`), conforme "Ferramentas externas". Alternativa no host: `npx playwright install --with-deps chromium webkit` e depois `npm run test:e2e`. Roda em série (`workers: 1`) contra um banco compartilhado; o setup global cria as contas de teste e grava as sessões em `tests/e2e/.auth/`. Sobe `npm run dev` a menos que `PLAYWRIGHT_SKIP_WEBSERVER=1` com `TEST_BASE_URL`. Spec único: `npx playwright test tests/e2e/frequencia.spec.ts --project=chromium`.
 - `npm run test:pwa` roda o próprio `npm run build && npm start`, porque o service worker precisa ser o de produção.
 - Banco: `npm run db:migrate` em desenvolvimento, `npm run db:deploy` em produção. Nunca edite uma migração aplicada; crie uma nova com `npx prisma migrate dev --name ajuste`. O cliente Prisma em `generated/` fica fora do Git; `npm run db:generate` ou o `postinstall` o regenera.
+- Etiquetas: `npm run etiquetas:sync` cria ou atualiza as etiquetas do GitHub conforme `.github/labels.json`.
 
 ## Ferramentas externas
 
-- GitHub: opere issues, pull requests, execuções de workflow e releases pelo GitHub CLI (`gh`), não pela interface web. Antes de operar, confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Exemplos: `gh issue create`, `gh pr create --fill`, `gh pr checks --watch`, `gh run watch` e `gh release create`. Nunca inclua segredos ou dados de alunos em comandos, títulos ou corpos.
+- GitHub: opere issues, pull requests, execuções de workflow e releases pelo GitHub CLI (`gh`), não pela interface web. Antes de operar, confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Exemplos: `gh issue create`, `gh pr create`, `gh pr checks --watch`, `gh run watch` e `gh release create`. Nunca inclua segredos ou dados de alunos em comandos, títulos ou corpos.
 - Playwright: rode a suíte de ponta a ponta na imagem oficial da Microsoft, sem instalar navegadores no host, com o aplicativo no ar. Use `npm run test:e2e:docker` (ou `npm run test:e2e:docker:chromium`) ou o comando direto `docker run --rm --ipc=host --network host -v "$PWD":/work -w /work -e HOME=/tmp -e PLAYWRIGHT_SKIP_WEBSERVER=1 -e TEST_BASE_URL=http://localhost:3000 mcr.microsoft.com/playwright:v1.63.0-noble npx playwright test --project=chromium`. O script `tests/playwright-container.sh` monta o repositório e aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. A instalação de navegadores no host (`npx playwright install --with-deps chromium webkit`) fica como alternativa.
+
+## Fluxo de issues e pull requests
+
+- Aplique etiquetas em toda issue e todo pull request: uma de tipo e, fora do tipo `docs`, uma de área. Use `gh issue create --label "bug" --label "area: chamada"` e `gh pr edit <número> --add-label "area: planilhas"`. O catálogo fica em `.github/labels.json` e é sincronizado com `npm run etiquetas:sync`. Pull requests do Dependabot recebem `dependencies` e dispensam as demais.
+- Faça apenas commits atômicos: uma mudança lógica completa por commit, sem trabalho em andamento nem correção de revisão. Use `git commit --fixup` durante o desenvolvimento e `git rebase -i --autosquash` antes de publicar.
+- Organize todos os commits do assunto em uma única branch e um único pull request. Abra o pull request somente quando estiver finalizado, com título em Conventional Commits, verificações locais, documentação e CHANGELOG prontos. Não use `gh pr create --fill`.
+- Se o CI falhar ou surgir algo novo depois de aberto, converta para rascunho com `gh pr ready --undo`, faça os commits e só marque como pronto com `gh pr ready` quando tudo estiver verde.
+- Nunca peça revisão com o pull request em rascunho nem abra pull request incompleto.
+- Commits com geração relevante por IA levam o rodapé `Assisted-by: ferramenta:modelo`; a autoria e a responsabilidade são humanas.
 
 ## Arquitetura
 
