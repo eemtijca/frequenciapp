@@ -1,0 +1,44 @@
+# Aplica etiquetas de área aos pull requests conforme os caminhos alterados.
+"area: chamada":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/components/frequencia/**"
+          - "src/components/frequencia-parcial/**"
+          - "src/components/grade/**"
+          - "src/app/api/frequencias/**"
+          - "src/app/api/frequencias-parciais/**"
+
+"area: planilhas":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/**/planilha*"
+          - "src/**/google-*"
+          - "gas/**"
+
+"area: gestao":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/components/gestao/**"
+          - "src/components/diretor/**"
+          - "src/app/api/configuracoes/**"
+          - "src/app/api/diretor*/**"
+          - "src/app/api/parametros-acesso/**"
+
+"area: notificacoes":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/app/api/notificacoes/**"
+
+"area: infra":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - ".devcontainer/**"
+          - "docker/**"
+          - "prisma/**"
+          - "scripts/**"
+          - "compose.yml"
+          - "compose.ci.yml"
+          - "Dockerfile"
+          - "next.config.ts"
+          - "vercel.json"

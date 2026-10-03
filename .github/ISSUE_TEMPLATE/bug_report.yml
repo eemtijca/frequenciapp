@@ -3,6 +3,7 @@ description: Reporte um comportamento incorreto.
 title: "[Bug]: "
 labels:
   - bug
+  - triagem
 body:
   - type: markdown
     attributes:
@@ -19,7 +20,14 @@ body:
     id: descricao
     attributes:
       label: Descrição
-      description: O que aconteceu e qual era o comportamento esperado?
+      description: O que aconteceu?
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamento esperado
+      description: O que deveria acontecer?
     validations:
       required: true
   - type: textarea
@@ -30,6 +38,30 @@ body:
         1. Acesse ...
         2. Toque em ...
         3. Observe ...
+    validations:
+      required: true
+  - type: dropdown
+    id: frequencia
+    attributes:
+      label: Frequência
+      description: O problema acontece sempre ou de forma intermitente?
+      options:
+        - Sempre
+        - Às vezes
+        - Uma vez
+        - Não sei
+    validations:
+      required: true
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Impacto
+      description: Quanto o problema atrapalha o uso?
+      options:
+        - Bloqueia o uso
+        - Atrapalha o uso
+        - Incômodo pequeno
+        - Não sei
     validations:
       required: true
   - type: input
@@ -50,8 +82,21 @@ body:
         - Alunos
         - Gestão
         - Integração com o Google Planilhas
+        - Notificações
         - PWA e instalação
         - API
+        - Infraestrutura
+        - Não se aplica
+    validations:
+      required: false
+  - type: dropdown
+    id: papel
+    attributes:
+      label: Papel afetado
+      options:
+        - Direção
+        - Coordenação
+        - Professor
         - Não se aplica
     validations:
       required: false
@@ -64,9 +109,25 @@ body:
     validations:
       required: false
   - type: textarea
-    id: contexto
+    id: evidencias
     attributes:
-      label: Contexto adicional
+      label: Evidências
       description: Capturas e logs relevantes, sem segredos nem dados reais.
+      render: markdown
     validations:
       required: false
+  - type: input
+    id: relacao
+    attributes:
+      label: Issue relacionada
+      description: Número de uma issue relacionada, quando houver.
+      placeholder: "#123"
+    validations:
+      required: false
+  - type: checkboxes
+    id: privacidade
+    attributes:
+      label: Privacidade
+      options:
+        - label: Confirmei que não incluí segredos, credenciais nem dados reais de alunos, responsáveis ou professores.
+          required: true

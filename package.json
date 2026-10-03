@@ -33,6 +33,7 @@
     "criar-admin": "node scripts/criar-admin.mjs",
     "criar-coordenacao": "node scripts/criar-coordenacao.mjs",
     "seed": "node scripts/seed.mjs",
+    "etiquetas:sync": "node scripts/sincronizar-etiquetas.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
