@@ -102,6 +102,7 @@ model Usuario {
   parciaisCriadas          FrequenciaParcial[]        @relation("ParcialCriadaPor")
   parciaisAtualizadas      FrequenciaParcial[]        @relation("ParcialAtualizadaPor")
   parciaisConfirmadas      FrequenciaParcial[]        @relation("ParcialConfirmadaPor")
+  chamadasConfirmadas      AlunoDaChamada[]           @relation("ChamadaConfirmadaPor")
   configuracoesAtualizadas Configuracao[]             @relation("ConfiguracaoAtualizadaPor")
   integracoesModo          IntegracaoPlanilha[]       @relation("IntegracaoModoPor")
   integracoesAtualizadas   IntegracaoPlanilha[]       @relation("IntegracaoAtualizadaPor")
@@ -344,10 +345,16 @@ model FrequenciaParcial {
 // Quem estava na lista da chamada, presente ou ausente. Fixa o histórico:
 // mover o aluno de turma depois não muda a presença dos dias já salvos.
 model AlunoDaChamada {
-  frequenciaId String     @map("frequencia_id") @db.Uuid
-  alunoId      String     @map("aluno_id") @db.Uuid
-  frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
-  aluno        Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  frequenciaId           String     @map("frequencia_id") @db.Uuid
+  alunoId                String     @map("aluno_id") @db.Uuid
+  registradoSeduc        Boolean    @default(false) @map("registrado_seduc")
+  registradoSeducEm      DateTime?  @map("registrado_seduc_em") @db.Timestamptz
+  registradoSeducPorId   String?    @map("registrado_seduc_por_id") @db.Uuid
+  registradoSeducPorNome String?    @map("registrado_seduc_por_nome") @db.VarChar(200)
+  revisaoSeduc           Int        @default(0) @map("revisao_seduc")
+  registradoSeducPor     Usuario?   @relation("ChamadaConfirmadaPor", fields: [registradoSeducPorId], references: [id], onDelete: SetNull)
+  frequencia             Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
+  aluno                  Aluno      @relation(fields: [alunoId], references: [id], onDelete: Cascade)
 
   @@id([frequenciaId, alunoId])
   @@index([alunoId])

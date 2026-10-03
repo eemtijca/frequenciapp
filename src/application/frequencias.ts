@@ -55,7 +55,13 @@ interface LinhaFrequencia {
     justificativa: string | null;
     observacao: string | null;
   }[];
-  alunos: { alunoId: string }[];
+  alunos: {
+    alunoId: string;
+    registradoSeduc: boolean;
+    registradoSeducEm: Date | null;
+    registradoSeducPorNome: string | null;
+    revisaoSeduc: number;
+  }[];
 }
 
 /**
@@ -94,6 +100,13 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     atualizadoEm: linha.atualizadoEm.toISOString(),
     atualizadoPorNome: linha.atualizadoPor?.nome ?? linha.criadoPor?.nome ?? null,
     alunos: linha.alunos.map((item) => item.alunoId),
+    confirmacoesSeduc: linha.alunos.map((item) => ({
+      alunoId: item.alunoId,
+      registradoSeduc: item.registradoSeduc,
+      registradoSeducEm: item.registradoSeducEm?.toISOString() ?? null,
+      registradoSeducPorNome: item.registradoSeducPorNome,
+      revisaoSeduc: item.revisaoSeduc,
+    })),
     faltas: [...porAluno.entries()].map(([alunoId, grupo]) => {
       const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
       const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
@@ -113,7 +126,15 @@ const COMPLEMENTO = {
     faltas: {
       select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
     },
-    alunos: { select: { alunoId: true } },
+    alunos: {
+      select: {
+        alunoId: true,
+        registradoSeduc: true,
+        registradoSeducEm: true,
+        registradoSeducPorNome: true,
+        revisaoSeduc: true,
+      },
+    },
     criadoPor: { select: { nome: true } },
     atualizadoPor: { select: { nome: true } },
   },
@@ -481,6 +502,29 @@ export async function salvarFrequencia(
         data: [...lista].map((alunoId) => ({ frequenciaId: linha.id, alunoId })),
         skipDuplicates: true,
       });
+      // Só uma mudança efetiva na frequência do aluno desfaz sua confirmação.
+      const assinatura = (faltas: LinhaFrequencia["faltas"], alunoId: string) =>
+        JSON.stringify(
+          faltas
+            .filter((falta) => falta.alunoId === alunoId)
+            .map((falta) => [falta.horarioId, falta.justificativa, falta.observacao])
+            .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+        );
+      const alterados = [...lista].filter(
+        (alunoId) =>
+          assinatura(existente?.faltas ?? [], alunoId) !== assinatura(faltasParaGravar, alunoId),
+      );
+      if (alterados.length)
+        await tx.alunoDaChamada.updateMany({
+          where: { frequenciaId: linha.id, alunoId: { in: alterados } },
+          data: {
+            registradoSeduc: false,
+            registradoSeducEm: null,
+            registradoSeducPorId: null,
+            registradoSeducPorNome: null,
+            revisaoSeduc: { increment: 1 },
+          },
+        });
       await tx.falta.deleteMany({ where: { frequenciaId: linha.id } });
       if (faltasParaGravar.length > 0) {
         await tx.falta.createMany({

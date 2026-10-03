@@ -287,7 +287,7 @@ Exclui a conta. As frequências da escola são preservadas e a autoria fica anul
 - 200 `{"frequencia": Frequencia | null}`.
 - 400 quando dia ou turma são inválidos.
 
-Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]` e `alunos` com os ids da lista da chamada.
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]` e `alunos` com os ids da lista da chamada.
 
 ### GET /api/frequencias?mes=YYYY-MM
 
@@ -320,9 +320,9 @@ Três formas de faltas:
 - lista de `{ "alunoId": string, "horarios": string[] }`: falta apenas nas aulas informadas;
 - lista de `{ "alunoId": string, "justificativa"?: string, "observacao"?: string, "horarios"?: string[] }`: falta com justificativa do catálogo. Sem `horarios`, cobre todas as aulas do dia. A observação é aceita para qualquer código e faz sentido no código `O` (Outros).
 
-Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos }`, com `faltas` no formato `[{ alunoId, horarios, justificativa?, observacao? }]`; os dois últimos campos só aparecem quando há justificativa. `alunos` é a lista da chamada: na primeira gravação, a relação atual da turma; depois, a lista gravada, mais quem entrou na turma quando o dia é o corrente ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)).
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios, justificativa?, observacao? }]`; os dois últimos campos só aparecem quando há justificativa. `alunos` é a lista da chamada: na primeira gravação, a relação atual da turma; depois, a lista gravada, mais quem entrou na turma quando o dia é o corrente ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)).
 
-Permissão: qualquer sessão ativa.
+Permissão: administração ou coordenação.
 
 Semântica da `revisao`:
 
@@ -336,7 +336,17 @@ Respostas:
 - 200 `{"frequencia": Frequencia}` com a revisão incrementada.
 - 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
 - 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, quando a justificativa não pertence ao catálogo, ou quando outra validação falha.
-- 403 sem sessão; 404 turma inexistente.
+- 401 sem sessão; 403 sem capacidade de operação; 404 turma inexistente.
+
+### POST /api/frequencias/seduc
+
+Permissão: administração ou coordenação, com origem válida. Corpo: `{ dia, turmaId, alunoId, registrado: boolean, revisao, revisaoSeduc }`. Exige chamada salva e aluno na lista histórica.
+
+- 200 `{ confirmacao: { alunoId, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisaoSeduc } }`.
+- 400 em corpo inválido ou aluno fora da lista; 401 sem sessão e 403 sem capacidade de operação ou com outra origem.
+- 409 quando a chamada ainda não foi salva, a frequência foi corrigida ou a confirmação mudou. A interface recarrega antes de permitir outra tentativa.
+
+A confirmação registra manualmente o lançamento externo, com data e autoria da sessão. Não altera faltas, revisão ou horário de salvamento da chamada, e não envia ao Google. Correções efetivas da chamada invalidam apenas confirmações dos alunos afetados; salvamento sem mudança preserva as confirmações. A revisão própria impede que uma tela antiga refaça uma confirmação desmarcada.
 
 ### GET /api/frequencias/resumo?ate=YYYY-MM-DD
 
@@ -706,6 +716,7 @@ Corpo: `{ "senha": "senha atual do administrador" }`. A senha do ZIP não é rec
 Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
+- As frequências da cópia JSON podem incluir `confirmacoesSeduc`, com autoria, data e revisão por aluno. Cópias anteriores sem esse campo continuam válidas. A mesclagem preserva confirmações divergentes existentes e relata conflito, sem sobrescrever.
 - `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
 - A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
 - Tipo, turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.

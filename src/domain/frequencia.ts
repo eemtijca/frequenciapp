@@ -318,6 +318,15 @@ export interface Responsavel {
   papel: "ADMIN" | "COORDENACAO";
 }
 
+/** Confirmação manual do lançamento de um aluno na Seduc, separada da frequência. */
+export interface ConfirmacaoSeducAluno {
+  alunoId: string;
+  registradoSeduc: boolean;
+  registradoSeducEm: string | null;
+  registradoSeducPorNome: string | null;
+  revisaoSeduc: number;
+}
+
 /** Frequência salva de um dia e turma, compartilhada pela coordenação. */
 export interface Frequencia {
   dia: string;
@@ -331,6 +340,7 @@ export interface Frequencia {
    * quando o aluno muda de turma depois. Ausente só em dado de teste antigo.
    */
   alunos?: string[];
+  confirmacoesSeduc?: ConfirmacaoSeducAluno[];
 }
 
 /** Resultado do salvamento: conflito devolve a versão vigente. */
