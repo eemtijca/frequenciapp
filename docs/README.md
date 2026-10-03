@@ -16,6 +16,7 @@
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
+| [Contribuir](../CONTRIBUTING.md)                     | Fluxo de issues, etiquetas, commits e pull requests.       |
 | [adr/](adr/)                                         | Decisões de arquitetura registradas.                       |
 | [ADR-026](adr/026-origem-configuravel-na-chamada.md) | Exibição de origem configurável por escola, série e turma. |
 
