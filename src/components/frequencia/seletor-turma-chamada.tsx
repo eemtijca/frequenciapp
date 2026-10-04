@@ -1,13 +1,14 @@
 "use client";
 
-// Seletor de série e turma da Chamada: controle segmentado de séries com as turmas
-// da série ativa logo abaixo. A série ativa é sempre a da turma escolhida.
+// Seletor de série e turma da Chamada com acabamento de vidro e seleção acessível.
+// A série ativa é sempre a da turma escolhida; trocar a aparência não altera o registro.
 import { useId, useMemo, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import estilos from "./seletor-turma-chamada.module.css";
 
 interface Props {
   turmas: Turma[];
@@ -55,8 +56,12 @@ export function SeletorTurmaChamada({ turmas, alunos, turmaId, travado, onEscolh
   }
 
   return (
-    <div role="group" aria-label="Turma atual" className="flex flex-col gap-3 font-sans">
-      <div className="bg-secondary/40 grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1 rounded-xl border p-1">
+    <div
+      role="group"
+      aria-label="Turma atual"
+      className={cn("flex flex-col gap-3 font-sans", estilos.seletor)}
+    >
+      <div className={cn("grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1", estilos.faixa)}>
         {series.map((grupo) => {
           const ehAtiva = grupo.id === ativa?.id;
           const total = grupo.turmas.reduce(
@@ -75,12 +80,7 @@ export function SeletorTurmaChamada({ turmas, alunos, turmaId, travado, onEscolh
               aria-controls={ehAtiva ? `${id}-turmas` : undefined}
               disabled={travado && !ehAtiva}
               onClick={() => aoTocarSerie(grupo.id)}
-              className={cn(
-                "h-auto min-h-14 min-w-0 flex-col gap-1 rounded-lg border border-transparent px-2 py-2.5 whitespace-normal motion-reduce:transition-none",
-                ehAtiva
-                  ? "border-primary/30 bg-card text-primary hover:bg-card hover:text-primary shadow-xs"
-                  : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
-              )}
+              className={estilos.serie}
             >
               <span className="flex w-full min-w-0 items-center justify-center gap-1">
                 <span className="truncate font-semibold" title={grupo.nome}>
@@ -132,23 +132,16 @@ export function SeletorTurmaChamada({ turmas, alunos, turmaId, travado, onEscolh
                 aria-pressed={ativo}
                 disabled={travado}
                 onClick={() => onEscolher(opcao.id)}
-                className={cn(
-                  "h-auto min-h-16 min-w-0 flex-col items-start gap-1 rounded-xl px-2 py-2.5 text-left whitespace-normal shadow-none motion-reduce:transition-none",
-                  ativo
-                    ? "border-primary bg-primary/10 text-foreground hover:bg-primary/15 hover:text-foreground dark:border-primary dark:bg-primary/10 dark:hover:bg-primary/15"
-                    : "bg-card hover:border-primary/40 hover:bg-secondary/60 dark:bg-card dark:hover:bg-secondary/60",
-                )}
+                className={estilos.turma}
               >
                 <span className="flex w-full min-w-0 items-center justify-between gap-1">
                   <span className="truncate text-base leading-5 font-semibold" title={opcao.rotulo}>
                     {opcao.nome}
                   </span>
                   {ativo && (
-                    <Check
-                      aria-hidden="true"
-                      className="text-primary size-3.5 shrink-0"
-                      strokeWidth={2.5}
-                    />
+                    <span className={estilos.confirmacao} aria-hidden="true">
+                      <Check className="size-3 shrink-0" strokeWidth={2.5} />
+                    </span>
                   )}
                 </span>
                 <span

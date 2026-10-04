@@ -98,6 +98,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Modificado
 
+- Seletores de ano e turma da Chamada com acabamento de vidro, reflexos discretos e confirmação circular, mantendo a paleta institucional, texto opaco e alternativas de acessibilidade.
+
 - Guia de contribuição e AGENTS.md passam a exigir etiquetas em issues e pull requests, commits atômicos organizados em um único pull request e abertura somente com o trabalho finalizado.
 - Gestão passa para o cabeçalho do celular, antes do sino. Chamada Parcial ocupa o lugar ao lado de Chamada na navegação inferior.
 
