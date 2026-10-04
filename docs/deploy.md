@@ -1,6 +1,6 @@
 # Deploy
 
-O FrequenciApp é um processo Node único com página, rotas de API e service worker. O build de produção usa `npm run build`. O banco pode ser o PostgreSQL do Compose ou uma instância gerenciada.
+O FrequenciApp é um processo Node único com página, rotas de API e service worker. O build de produção usa `npm run build`. O banco pode ser o PostgreSQL do Compose ou uma instância gerenciada. Para AWS, Azure ou GCP com Terraform, consulte [implantacao-nuvem.md](implantacao-nuvem.md).
 
 ## Docker Compose local
 

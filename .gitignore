@@ -69,3 +69,14 @@ tool-results/
 
 # Capturas locais de validação visual
 /docs/imagens/locais/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.local
+!*.tfvars.example
+crash.log
+crash.*.log

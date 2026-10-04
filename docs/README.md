@@ -13,6 +13,7 @@
 | [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
 | [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |
+| [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
@@ -33,3 +34,4 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 
 - [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md): presença parcial independente, confirmação manual da Seduc, terceira planilha Google e cópia JSON compatível.
 - [ADR-035](adr/035-seduc-na-chamada-normal.md): confirmação manual por aluno na chamada normal, revisão independente e preservação da cópia JSON.
+- [ADR-036](adr/036-implantacao-multinuvem.md): implantação em AWS, Azure e GCP com Terraform, com modo local nos emuladores do Floci.

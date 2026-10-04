@@ -35,6 +35,7 @@
           - ".github/**"
           - ".devcontainer/**"
           - "docker/**"
+          - "infra/**"
           - "prisma/**"
           - "scripts/**"
           - "compose.yml"
