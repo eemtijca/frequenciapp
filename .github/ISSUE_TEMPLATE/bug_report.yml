@@ -68,7 +68,7 @@ body:
     id: versao
     attributes:
       label: Versão ou commit
-      placeholder: v1.0.0 ou hash do commit
+      placeholder: v0.1.0 ou hash do commit
     validations:
       required: false
   - type: dropdown
