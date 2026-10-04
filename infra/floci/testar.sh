@@ -125,10 +125,13 @@ EOF
   local alb
   alb="$(terraform -chdir=infra/terraform/aws output -raw alb_dns)"
   log "Conferindo a saúde pelo balanceador ${alb}."
-  local status_saude
-  status_saude="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
-    --retry 30 --retry-delay 5 --retry-all-errors \
-    -H "Host: ${alb}" "http://${ip_floci}/api/saude")"
+  local status_saude='000'
+  for _ in $(seq 1 30); do
+    status_saude="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+      -H "Host: ${alb}" "http://${ip_floci}/api/saude" 2>/dev/null || true)"
+    [ "$status_saude" = '200' ] && break
+    sleep 5
+  done
   if [ "$status_saude" != '200' ]; then
     log "Falha: /api/saude devolveu ${status_saude}."
     exit 1
