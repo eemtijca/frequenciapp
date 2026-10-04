@@ -17,7 +17,7 @@ resource "azurerm_monitor_action_group" "principal" {
 
   name                = "${local.nome_base}-alertas"
   resource_group_name = azurerm_resource_group.principal.name
-  short_name          = "buscapp"
+  short_name          = "frequencia"
 
   dynamic "email_receiver" {
     for_each = var.emails_alarme
