@@ -20,6 +20,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Seletores de ano e turma da Chamada com hierarquia visual mais clara, contagens identificadas e acessíveis, áreas de toque maiores e seleção indicada por borda, fundo suave e ícone.
+
 - Implantação em AWS, Azure e GCP com Terraform, com módulos em `infra/terraform/`, modo local nos emuladores do Floci, workflow `infra.yml` e documentação em `docs/implantacao-nuvem.md` (ADR-036).
 - Sonda de prontidão em `HEALTHCHECK` na imagem Docker, usada pelo Docker e pelos emuladores de Container Apps.
 - README reestruturado no padrão de repositórios de referência, com selos, sumário, demonstração, arquitetura, deploy, FAQ, suporte e créditos.

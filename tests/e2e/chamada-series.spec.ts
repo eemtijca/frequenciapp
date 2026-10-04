@@ -49,6 +49,7 @@ test.afterAll(async () => {
 
 test("Chamada: tocar no ano ativa a série, mostra só as turmas dela e seleciona a primeira", async ({
   page,
+  isMobile,
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
@@ -59,22 +60,42 @@ test("Chamada: tocar no ano ativa a série, mostra só as turmas dela e selecion
   const botaoUm = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   const botaoDois = grupo.getByRole("button", { name: series[1] ?? "", exact: true });
   const turmaDoisA = grupo.getByRole("button", { name: /Faixa Dois E2E Serie A/ });
+  const turmaDoisB = grupo.getByRole("button", { name: /Faixa Dois E2E Serie B/ });
   const turmaUmA = grupo.getByRole("button", { name: /Faixa Um E2E Serie A/ });
 
   await botaoDois.click();
   await expect(botaoDois).toHaveAttribute("aria-pressed", "true");
   await expect(botaoUm).toHaveAttribute("aria-pressed", "false");
   await expect(turmaDoisA).toHaveAttribute("aria-pressed", "true");
+  await expect(botaoDois).toHaveAccessibleDescription("2 alunos");
+  await expect(turmaDoisA).toHaveAccessibleDescription("1 aluno");
   await expect(turmaUmA).toHaveCount(0);
   await expect(page.getByText("E2E Serie 2A", { exact: true }).first()).toBeVisible();
 
-  // Tocar na série ativa só recolhe as turmas; o destaque verde permanece.
-  await botaoDois.click();
+  if (isMobile) await turmaDoisB.click();
+  else {
+    await expect(turmaDoisB).toBeEnabled();
+    await turmaDoisB.focus();
+    await page.keyboard.press("Enter");
+  }
+  await expect(turmaDoisB).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaDoisA).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByText("E2E Serie 2B", { exact: true }).first()).toBeVisible();
+
+  // Recolher e reabrir a série preserva a turma B, por toque ou teclado.
+  if (isMobile) await botaoDois.click();
+  else {
+    await botaoDois.focus();
+    await page.keyboard.press("Space");
+  }
   await expect(botaoDois).toHaveAttribute("aria-expanded", "false");
   await expect(botaoDois).toHaveAttribute("aria-pressed", "true");
-  await expect(turmaDoisA).toHaveCount(0);
-  await botaoDois.click();
-  await expect(turmaDoisA).toHaveAttribute("aria-pressed", "true");
+  await expect(turmaDoisB).toHaveCount(0);
+  if (isMobile) await botaoDois.click();
+  else await page.keyboard.press("Enter");
+  await expect(botaoDois).toHaveAttribute("aria-expanded", "true");
+  await expect(turmaDoisB).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("E2E Serie 2B", { exact: true }).first()).toBeVisible();
 
   // Voltar à primeira série seleciona a primeira turma dela.
   await botaoUm.click();
@@ -91,15 +112,20 @@ test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ pa
   const grupo = page
     .locator('section[aria-label="Fazer chamada"]')
     .getByRole("group", { name: "Turma atual", exact: true });
-  await grupo.getByRole("button", { name: series[0] ?? "", exact: true }).click();
+  const serieInicial = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
+  if ((await serieInicial.getAttribute("aria-expanded")) !== "true") await serieInicial.click();
+  await expect(grupo.getByRole("button", { name: /Faixa Um E2E Serie A/ })).toBeVisible();
   const estouro = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
   );
   expect(estouro).toBe(false);
-  // Nenhum botão de série ultrapassa a borda da tela (o contêiner pode esconder o excesso).
-  for (const serie of series) {
-    const caixa = await grupo.getByRole("button", { name: serie, exact: true }).boundingBox();
+  // Séries e turmas cabem na tela e mantêm altura confortável para o toque.
+  for (const nome of [...series, "Faixa Um E2E Serie A", "Faixa Um E2E Serie B"]) {
+    const caixa = await grupo.getByRole("button", { name: nome, exact: true }).boundingBox();
+    expect(caixa).not.toBeNull();
+    expect(caixa?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(360);
+    expect(caixa?.height ?? 0).toBeGreaterThanOrEqual(44);
   }
 });
 
