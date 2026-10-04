@@ -20,6 +20,8 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Implantação em AWS, Azure e GCP com Terraform, com módulos em `infra/terraform/`, modo local nos emuladores do Floci, workflow `infra.yml` e documentação em `docs/implantacao-nuvem.md` (ADR-036).
+- Sonda de prontidão em `HEALTHCHECK` na imagem Docker, usada pelo Docker e pelos emuladores de Container Apps.
 - README reestruturado no padrão de repositórios de referência, com selos, sumário, demonstração, arquitetura, deploy, FAQ, suporte e créditos.
 - Spec `tests/e2e/imagens.spec.ts` e comandos `capturas:readme` para gerar as capturas versionadas em `docs/imagens/`; capturas locais de validação passam a ficar em `docs/imagens/locais/`, fora do versionamento.
 - Catálogo de etiquetas em `.github/labels.json` e script `npm run etiquetas:sync` para sincronizá-las pelo GitHub CLI.
