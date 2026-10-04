@@ -61,4 +61,8 @@ EXPOSE 3000
 ENV PORT=3000
 # Escuta em todas as interfaces: o healthcheck e o proxy interno usam 127.0.0.1.
 ENV HOSTNAME=0.0.0.0
+# Sonda usada pelo Docker e pelos emuladores de Container Apps: a réplica só é
+# considerada pronta quando GET /api/saude responde sem erro.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT ?? 3000) + '/api/saude').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 CMD ["./docker/app/entrypoint.sh"]
