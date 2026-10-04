@@ -38,6 +38,10 @@ async function abrirDownload(
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: tipo === "relacao" ? "Alunos" : "Configurações" }).click();
     if (tipo === "copia") {
+      await page
+        .getByRole("navigation", { name: "Categorias de configurações" })
+        .getByRole("button", { name: "Dados", exact: true })
+        .click();
       const secao = page.locator('[data-secao="config-copia"]');
       await secao.getByRole("button", { name: "Cópia de segurança" }).click();
       await secao.getByRole("button", { name: "Baixar cópia" }).click();

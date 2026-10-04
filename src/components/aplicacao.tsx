@@ -69,6 +69,7 @@ interface Props {
   fuso: string;
   visaoInicial?: string;
   abaGestaoInicial?: "configuracoes";
+  planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   abaMovimentacaoInicial?: "saidas" | "entradas";
   seriesIniciais: Serie[];
   turmasIniciais: Turma[];
@@ -130,13 +131,13 @@ const ITENS_FIM: ItemNav[] = [
 ];
 
 const LARGURAS: Record<Visao, string> = {
-  painel: "max-w-5xl lg:max-w-none",
-  chamada: "max-w-2xl lg:max-w-none",
-  "chamada-parcial": "max-w-3xl lg:max-w-none",
-  saidas: "max-w-3xl lg:max-w-none",
-  relatorios: "max-w-5xl lg:max-w-none",
-  alunos: "max-w-3xl lg:max-w-none",
-  gestao: "max-w-5xl lg:max-w-none",
+  painel: "max-w-5xl",
+  chamada: "max-w-2xl xl:max-w-6xl",
+  "chamada-parcial": "max-w-4xl",
+  saidas: "max-w-5xl",
+  relatorios: "max-w-7xl",
+  alunos: "max-w-5xl",
+  gestao: "max-w-6xl",
 };
 
 interface ItemNavegacaoProps {
@@ -205,6 +206,7 @@ export default function Aplicacao({
   fuso,
   visaoInicial,
   abaGestaoInicial,
+  planilhaInicial,
   abaMovimentacaoInicial,
   seriesIniciais,
   turmasIniciais,
@@ -233,6 +235,9 @@ export default function Aplicacao({
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
   const [alunos, setAlunos] = useState<Aluno[]>(alunosIniciais);
   const [frequencias, setFrequencias] = useState<Frequencia[]>(frequenciasIniciais);
+  const [carregandoFrequencias, setCarregandoFrequencias] = useState(false);
+  const [erroFrequencias, setErroFrequencias] = useState("");
+  const pedidoFrequencias = useRef(0);
   const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
   const [justificativas, setJustificativas] =
     useState<JustificativaConfigurada[]>(justificativasIniciais);
@@ -290,24 +295,32 @@ export default function Aplicacao({
 
   const recarregarFrequencias = useCallback(
     async (novoMes: string) => {
+      const pedido = ++pedidoFrequencias.current;
       setMes(novoMes);
+      setCarregandoFrequencias(true);
+      setErroFrequencias("");
       try {
         const dados = await pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?mes=${novoMes}`);
+        if (pedido !== pedidoFrequencias.current) return;
         setFrequencias(dados.frequencias);
         setVersaoFrequencias((valor) => valor + 1);
         try {
           const resumoDados = await pedir<{ resumo: ResumoAcumulado }>(
             `/api/frequencias/resumo?ate=${diaCorrente}`,
           );
-          setResumo(resumoDados.resumo);
+          if (pedido === pedidoFrequencias.current) setResumo(resumoDados.resumo);
         } catch {
           // O acumulado é complementar: a chamada segue sem ele.
         }
       } catch (excecao) {
+        if (pedido !== pedidoFrequencias.current) return;
+        setErroFrequencias("Não foi possível carregar as frequências deste mês.");
         avisarErro(excecao, {
           contexto: "Não foi possível atualizar as frequências.",
           descricao: "As informações na tela podem estar desatualizadas.",
         });
+      } finally {
+        if (pedido === pedidoFrequencias.current) setCarregandoFrequencias(false);
       }
     },
     [diaCorrente],
@@ -570,6 +583,8 @@ export default function Aplicacao({
         )}
         {alvoVisao === "relatorios" && (
           <VistaRelatorios
+            carregando={carregandoFrequencias}
+            erro={erroFrequencias}
             abaInicial={abaRelatoriosInicial}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
@@ -592,6 +607,7 @@ export default function Aplicacao({
         {alvoVisao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
         {alvoVisao === "gestao" && ehAdmin && (
           <VistaGestao
+            planilhaInicial={planilhaInicial}
             abaInicial={abaGestaoInicial}
             usuarioId={usuario.id}
             series={series}

@@ -1,18 +1,19 @@
 "use client";
 
-// Configurações de recursos, catálogos de justificativas e de quem libera as
-// saídas, e cópia de segurança em JSON. Restrita à administração, com
-// auditoria no servidor.
+// Configurações da escola agrupadas por assunto, preservando os formulários
+// ao trocar de categoria. Restrita à administração, com auditoria no servidor.
 import { useRef, useState } from "react";
 import {
   Archive,
   Check,
   Download,
+  FileSpreadsheet,
   LoaderCircle,
   Pencil,
   Plus,
   ScrollText,
   Settings2,
+  ShieldCheck,
   Trash2,
   Upload,
   UserCheck,
@@ -57,6 +58,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface Props {
+  planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
   liberadores: LiberadorConfigurado[];
@@ -77,8 +79,16 @@ interface ResultadoImportacao {
 }
 
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
+const CATEGORIAS = [
+  { valor: "escola", rotulo: "Escola", icone: Settings2 },
+  { valor: "planilhas", rotulo: "Planilhas", icone: FileSpreadsheet },
+  { valor: "acesso", rotulo: "Acesso e avisos", icone: ShieldCheck },
+  { valor: "dados", rotulo: "Dados", icone: Archive },
+] as const;
+type Categoria = (typeof CATEGORIAS)[number]["valor"];
 
 export default function AbaConfiguracoes({
+  planilhaInicial,
   configuracoes,
   justificativas,
   liberadores,
@@ -91,6 +101,7 @@ export default function AbaConfiguracoes({
   onAbrirSaidas,
   onAbrirParcial,
 }: Props) {
+  const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
   const [abertoRecursos, setAbertoRecursos] = useState(true);
   const [abertoJustificativas, setAbertoJustificativas] = useState(false);
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
@@ -103,6 +114,7 @@ export default function AbaConfiguracoes({
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [downloadAberto, setDownloadAberto] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [erroCopia, setErroCopia] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
 
@@ -419,7 +431,7 @@ export default function AbaConfiguracoes({
     const aviso = "backup-importar";
     await executarPorChave(aviso, async () => {
       setImportando(true);
-      setErro("");
+      setErroCopia("");
       setResultado(null);
       toast.loading("Importando a cópia de segurança...", { id: aviso });
       try {
@@ -441,8 +453,7 @@ export default function AbaConfiguracoes({
         );
       } catch (excecao) {
         const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
-        setErro(mensagem);
-        setErroVariante("dados_invalidos");
+        setErroCopia(mensagem);
         toast.error(mensagem, {
           id: aviso,
           description: "Confira o arquivo e tente de novo.",
@@ -455,27 +466,14 @@ export default function AbaConfiguracoes({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-4">
+  const escola = (
+    <>
       <SecaoRecolhivel
         dataSecao="config-recursos"
         titulo="Recursos da escola"
         icone={Settings2}
         aberto={abertoRecursos}
         onAbertoChange={setAbertoRecursos}
-        resumo={
-          <>
-            <Selo variante={configuracoes.frequenciaPorAula ? "sucesso" : "neutro"}>
-              Chamada por aula {configuracoes.frequenciaPorAula ? "ligada" : "desligada"}
-            </Selo>
-            <Selo variante={configuracoes.saidaAntecipada ? "sucesso" : "neutro"}>
-              Saídas e entradas {configuracoes.saidaAntecipada ? "ligada" : "desligada"}
-            </Selo>
-            <Selo variante={configuracoes.origemNaChamada ? "sucesso" : "neutro"}>
-              Origem na Chamada {configuracoes.origemNaChamada ? "ligada" : "desligada"}
-            </Selo>
-          </>
-        }
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -621,12 +619,6 @@ export default function AbaConfiguracoes({
 
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
       </SecaoRecolhivel>
-
-      <IntegracaoPlanilha turmas={turmas} diaCorrente={diaCorrente} />
-
-      <IntegracaoSaidas onAbrirSaidas={onAbrirSaidas} />
-
-      <IntegracaoParcial onAbrirParcial={onAbrirParcial} />
 
       <SecaoRecolhivel
         dataSecao="config-justificativas"
@@ -989,10 +981,10 @@ export default function AbaConfiguracoes({
           </AlertDialogContent>
         </AlertDialog>
       </SecaoRecolhivel>
-
-      <SecaoAcessoDiretores />
-      <SecaoNotificacoes />
-
+    </>
+  );
+  const dados = (
+    <>
       <SecaoRecolhivel
         dataSecao="config-copia"
         titulo="Cópia de segurança"
@@ -1056,6 +1048,9 @@ export default function AbaConfiguracoes({
             }}
           />
         </div>
+        {erroCopia && (
+          <AvisoCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
+        )}
         {resultado && (
           <p role="status" className="bg-secondary/60 rounded-lg px-4 py-3 text-sm">
             {resultado.adicionadas}{" "}
@@ -1066,6 +1061,86 @@ export default function AbaConfiguracoes({
           </p>
         )}
       </SecaoRecolhivel>
+    </>
+  );
+
+  return (
+    <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6">
+      <nav
+        aria-label="Categorias de configurações"
+        className="bg-secondary/40 grid grid-cols-2 gap-1 rounded-xl border p-1.5 lg:grid-cols-1"
+      >
+        {CATEGORIAS.map(({ valor, rotulo, icone: Icone }) => (
+          <Button
+            key={valor}
+            id={`categoria-config-${valor}`}
+            type="button"
+            variant="ghost"
+            aria-pressed={categoria === valor}
+            aria-controls={`config-grupo-${valor}`}
+            onClick={() => setCategoria(valor)}
+            className={`h-12 min-w-0 justify-start px-3 text-xs sm:text-sm ${
+              categoria === valor
+                ? "bg-background text-primary ring-primary/20 shadow-sm ring-1"
+                : "text-muted-foreground"
+            }`}
+          >
+            <Icone size={16} aria-hidden="true" />
+            {rotulo}
+          </Button>
+        ))}
+      </nav>
+      <div className="min-w-0">
+        <section
+          id="config-grupo-escola"
+          aria-labelledby="categoria-config-escola"
+          hidden={categoria !== "escola"}
+          inert={categoria !== "escola"}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          {escola}
+        </section>
+        <section
+          id="config-grupo-planilhas"
+          aria-labelledby="categoria-config-planilhas"
+          hidden={categoria !== "planilhas"}
+          inert={categoria !== "planilhas"}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          <IntegracaoPlanilha
+            turmas={turmas}
+            diaCorrente={diaCorrente}
+            abertoInicial={planilhaInicial === "FREQUENCIA"}
+          />
+          <IntegracaoSaidas
+            onAbrirSaidas={onAbrirSaidas}
+            abertoInicial={planilhaInicial === "SAIDAS"}
+          />
+          <IntegracaoParcial
+            onAbrirParcial={onAbrirParcial}
+            abertoInicial={planilhaInicial === "PARCIAL"}
+          />
+        </section>
+        <section
+          id="config-grupo-acesso"
+          aria-labelledby="categoria-config-acesso"
+          hidden={categoria !== "acesso"}
+          inert={categoria !== "acesso"}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          <SecaoAcessoDiretores />
+          <SecaoNotificacoes />
+        </section>
+        <section
+          id="config-grupo-dados"
+          aria-labelledby="categoria-config-dados"
+          hidden={categoria !== "dados"}
+          inert={categoria !== "dados"}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          {dados}
+        </section>
+      </div>
       <DialogoDownload
         confirmarAdmin
         aberto={downloadAberto}

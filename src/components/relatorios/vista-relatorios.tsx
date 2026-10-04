@@ -1,7 +1,7 @@
 "use client";
 
-// Relatórios em sub-abas: Histórico, Grade e Por aluno.
-import { History, Table2, UserRound } from "lucide-react";
+// Relatórios em sub-abas: Resumo, Histórico, Grade e Por aluno.
+import { ChartNoAxesCombined, History, Table2, UserRound } from "lucide-react";
 import type {
   Aluno,
   Frequencia,
@@ -14,8 +14,9 @@ import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes"
 import VistaHistorico from "@/components/historico/vista-historico";
 import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
+import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
 
-export type AbaRelatorio = "historico" | "grade" | "aluno";
+export type AbaRelatorio = "resumo" | "historico" | "grade" | "aluno";
 
 interface Props {
   abaInicial?: AbaRelatorio;
@@ -31,6 +32,8 @@ interface Props {
   resumo: ResumoAcumulado | null;
   versao: number;
   bloqueado: boolean;
+  carregando?: boolean;
+  erro?: string | null;
   rotuloTurma: (id: string) => string;
   onMes: (mes: string) => void;
   onAbrir: (dia: string, turmaId: string) => void;
@@ -38,6 +41,7 @@ interface Props {
 }
 
 const ABAS: AbaItem<AbaRelatorio>[] = [
+  { valor: "resumo", rotulo: "Resumo", icone: ChartNoAxesCombined },
   { valor: "historico", rotulo: "Histórico", icone: History },
   { valor: "grade", rotulo: "Grade", icone: Table2 },
   { valor: "aluno", rotulo: "Por aluno", icone: UserRound },
@@ -57,6 +61,8 @@ export default function VistaRelatorios({
   resumo,
   versao,
   bloqueado,
+  carregando = false,
+  erro = null,
   rotuloTurma,
   onMes,
   onAbrir,
@@ -71,7 +77,7 @@ export default function VistaRelatorios({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Relatórios</h1>
         <p className="text-muted-foreground text-sm">
-          Histórico das chamadas, grade por período e relatório por aluno.
+          Indicadores do mês, histórico, grade e acompanhamento por aluno.
         </p>
       </div>
 
@@ -84,6 +90,22 @@ export default function VistaRelatorios({
       >
         {(aba, ativa) => (
           <>
+            {aba === "resumo" && (
+              <ResumoRelatorios
+                mes={mes}
+                mesCorrente={mesCorrente}
+                diaCorrente={diaCorrente}
+                series={series}
+                turmas={turmas}
+                alunos={alunos}
+                frequencias={frequencias}
+                bloqueado={bloqueado}
+                carregando={carregando}
+                erro={erro}
+                onMes={onMes}
+                onRecarregar={onRecarregar}
+              />
+            )}
             {aba === "historico" && (
               <VistaHistorico
                 frequencias={frequencias}
