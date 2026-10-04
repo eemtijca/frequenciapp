@@ -36,6 +36,12 @@
     "criar-coordenacao": "node scripts/criar-coordenacao.mjs",
     "seed": "node scripts/seed.mjs",
     "etiquetas:sync": "node scripts/sincronizar-etiquetas.mjs",
+    "infra:fmt": "terraform fmt -recursive infra/terraform",
+    "infra:validar": "bash infra/terraform/validar.sh",
+    "infra:floci": "bash infra/floci/testar.sh",
+    "infra:floci:aws": "bash infra/floci/testar.sh aws",
+    "infra:floci:azure": "bash infra/floci/testar.sh azure",
+    "infra:floci:gcp": "bash infra/floci/testar.sh gcp",
     "postinstall": "prisma generate"
   },
   "dependencies": {
