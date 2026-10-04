@@ -60,6 +60,32 @@ iniciar_terraform() {
   terraform -chdir="$1" init -no-color -input=false
 }
 
+# Os emuladores oscilam em operações longas; uma segunda tentativa deixa o
+# teste estável sem esconder erros de configuração.
+aplicar_terraform() {
+  local diretorio="$1"
+  shift
+  if timeout 1800 terraform -chdir="$diretorio" apply -no-color -input=false -auto-approve \
+    -parallelism=4 "$@"; then
+    return 0
+  fi
+  log "A primeira tentativa de apply em ${diretorio} falhou; repetindo."
+  timeout 1800 terraform -chdir="$diretorio" apply -no-color -input=false -auto-approve \
+    -parallelism=4 "$@"
+}
+
+destruir_terraform() {
+  local diretorio="$1"
+  shift
+  if timeout 1800 terraform -chdir="$diretorio" destroy -no-color -input=false -auto-approve \
+    -parallelism=4 "$@"; then
+    return 0
+  fi
+  log "A primeira tentativa de destroy em ${diretorio} falhou; repetindo."
+  timeout 1800 terraform -chdir="$diretorio" destroy -no-color -input=false -auto-approve \
+    -parallelism=4 "$@"
+}
+
 testar_aws() {
   log 'Aplicando o Terraform da AWS.'
   local conteiner_floci="${FLOCI_AWS_CONTAINER:-}"
@@ -87,8 +113,7 @@ habilitar_alarmes  = false
 EOF
 
   iniciar_terraform infra/terraform/aws
-  timeout 1800 terraform -chdir=infra/terraform/aws apply -no-color -input=false -auto-approve \
-    -var-file=terraform.tfvars.local
+  aplicar_terraform infra/terraform/aws -var-file=terraform.tfvars.local
 
   local alb
   alb="$(terraform -chdir=infra/terraform/aws output -raw alb_dns)"
@@ -103,8 +128,7 @@ EOF
   fi
 
   if [ "$MANTER" != 'true' ]; then
-    timeout 1800 terraform -chdir=infra/terraform/aws destroy -no-color -input=false \
-      -auto-approve -var-file=terraform.tfvars.local
+    destruir_terraform infra/terraform/aws -var-file=terraform.tfvars.local
   fi
 }
 
@@ -134,8 +158,7 @@ EOF
     -target=azurerm_postgresql_flexible_server_firewall_rule.local[0]
     -target=azurerm_container_app_environment.local[0]
   )
-  timeout 1800 terraform -chdir=infra/terraform/azure apply -no-color -input=false -auto-approve \
-    -var-file=terraform.tfvars.local -var="sufixo_revisao=${sufixo}" "${alvos[@]}"
+  aplicar_terraform infra/terraform/azure -var-file=terraform.tfvars.local -var="sufixo_revisao=${sufixo}" "${alvos[@]}"
 
   local nome_pg='frequenciapp-local-pg'
   local conteiner_pg
@@ -155,8 +178,7 @@ EOF
     docker exec -e PGPASSWORD='FrequenciaLocal!2026' "$conteiner_pg" createdb -U frequencia frequencia
   fi
 
-  timeout 1800 terraform -chdir=infra/terraform/azure apply -no-color -input=false -auto-approve \
-    -var-file=terraform.tfvars.local -var="endereco_banco_local=${ip_pg}:5432" -var="sufixo_revisao=${sufixo}"
+  aplicar_terraform infra/terraform/azure -var-file=terraform.tfvars.local -var="endereco_banco_local=${ip_pg}:5432" -var="sufixo_revisao=${sufixo}"
 
   local fqdn
   fqdn="$(curl -sk --max-time 10 -H 'Authorization: Bearer fake' \
@@ -184,8 +206,7 @@ EOF
   fi
 
   if [ "$MANTER" != 'true' ]; then
-    timeout 1800 terraform -chdir=infra/terraform/azure destroy -no-color -input=false \
-      -auto-approve -var-file=terraform.tfvars.local -var="endereco_banco_local=${ip_pg}:5432" -var="sufixo_revisao=${sufixo}"
+    destruir_terraform infra/terraform/azure -var-file=terraform.tfvars.local -var="endereco_banco_local=${ip_pg}:5432" -var="sufixo_revisao=${sufixo}"
   fi
 }
 
@@ -202,8 +223,7 @@ EOF
 
   export GOOGLE_OAUTH_ACCESS_TOKEN=floci
   iniciar_terraform infra/terraform/gcp
-  timeout 1800 terraform -chdir=infra/terraform/gcp apply -no-color -input=false -auto-approve \
-    -var-file=terraform.tfvars.local
+  aplicar_terraform infra/terraform/gcp -var-file=terraform.tfvars.local
 
   local url
   url="$(terraform -chdir=infra/terraform/gcp output -raw url_servico_cloud_run)"
@@ -229,8 +249,7 @@ EOF
   fi
 
   if [ "$MANTER" != 'true' ]; then
-    timeout 1800 terraform -chdir=infra/terraform/gcp destroy -no-color -input=false \
-      -auto-approve -var-file=terraform.tfvars.local
+    destruir_terraform infra/terraform/gcp -var-file=terraform.tfvars.local
   fi
 }
 
