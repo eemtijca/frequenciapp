@@ -146,7 +146,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await expect(linha.getByText("E2E Movimento Um", { exact: true })).toBeVisible();
     await expect(linha.getByRole("img", { name: /Turma original/ })).toHaveCount(0);
     await linha.click();
-    await secao.getByRole("button", { name: "Ver resumo de faltas" }).click();
+    await secao.getByRole("button", { name: "Resumo de hoje" }).click();
     await expect(secao.getByText("Origem 2º ano E2E Movimento A")).toHaveCount(0);
   });
 });

@@ -98,6 +98,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Modificado
 
+- Indicadores de faltas, justificadas e presentes ficam dentro do resumo recolhível da Chamada, aberto pelo botão arredondado Resumo de hoje, com filtros preservados e identificação da data consultada.
+
 - Seletores de ano e turma da Chamada com acabamento de vidro, reflexos discretos e confirmação circular, mantendo a paleta institucional, texto opaco e alternativas de acessibilidade.
 
 - Guia de contribuição e AGENTS.md passam a exigir etiquetas em issues e pull requests, commits atômicos organizados em um único pull request e abertura somente com o trabalho finalizado.
