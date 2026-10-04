@@ -7,7 +7,7 @@ FrequenciApp: aplicativo de frequência escolar para a coordenação de uma esco
 - Leia o `CONTRIBUTING.md`: ele reúne todas as diretrizes do repositório (ambiente, issues, etiquetas, branches, commits, pull requests, padrões de código, banco, formatação e testes).
 - `tests/unit/texto-editorial.test.ts` varre código, documentação, configuração, scripts e os markdown da raiz (incluindo este arquivo). Ele reprova travessão, meia-risca, reticências tipográficas, aspas curvas, setas, entidades HTML de aspas, pronomes de segunda pessoa e plural escrito como o substantivo seguido de parênteses. Rode `npx vitest run tests/unit/texto-editorial.test.ts` depois de escrever texto de interface ou documentação.
 - Todo arquivo próprio começa com um cabeçalho de uma a duas linhas em português descrevendo seu papel.
-- Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`.
+- Commits seguem Conventional Commits em português, no imperativo, com escopo opcional: `fix(api): corrige ...`. Branches usam `tipo/descricao-curta`, inclusive as criadas por agentes de IA; a autoria assistida fica no rodapé `Assisted-by` do commit.
 - TypeScript é estrito e ainda tem `noUncheckedIndexedAccess`; o ESLint reprova `any`, asserções não nulas e `console` fora de `warn`/`error` (`scripts/` e `docker/` são isentos). Nenhuma regra é desativada sem justificativa registrada em ADR.
 - Nomes de domínio em português (`frequencias`, `faltas`, `turmas`), termos de infraestrutura em inglês (`prisma`, `middleware`). Artefatos de migração do Prisma mantêm os marcadores em inglês e nunca são editados à mão.
 
