@@ -103,6 +103,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Modificado
 
+- Confirmação da Seduc na Chamada com rótulo RS, abaixo do acumulado e alinhada ao nome, liberando espaço para identificar os alunos no celular. A descrição acessível mantém o significado completo.
+
 - Indicadores de faltas, justificadas e presentes ficam dentro do resumo recolhível da Chamada, aberto pelo botão arredondado Resumo de hoje, com filtros preservados e identificação da data consultada.
 
 - Seletores de ano e turma da Chamada com acabamento de vidro, reflexos discretos e confirmação circular, mantendo a paleta institucional, texto opaco e alternativas de acessibilidade.

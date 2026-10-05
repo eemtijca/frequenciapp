@@ -75,11 +75,11 @@ test("confirma e desmarca por aluno, persiste após recarga e preserva os demais
   await page.setViewportSize({ width: 360, height: 800 });
   const secao = await abrir(page);
   const primeiro = secao.getByRole("switch", {
-    name: `Registrado na Seduc: ${prefixo} Um`,
+    name: `RS, Registrado na Seduc: ${prefixo} Um`,
     exact: true,
   });
   const segundo = secao.getByRole("switch", {
-    name: `Registrado na Seduc: ${prefixo} Dois`,
+    name: `RS, Registrado na Seduc: ${prefixo} Dois`,
     exact: true,
   });
   await expect(primeiro).toBeDisabled();
@@ -107,7 +107,7 @@ test("confirma e desmarca por aluno, persiste após recarga e preserva os demais
     true,
   );
   await page.screenshot({
-    path: `docs/imagens/seduc-chamada-${test.info().project.name}.png`,
+    path: `docs/imagens/locais/seduc-chamada-${test.info().project.name}.png`,
     fullPage: true,
   });
 
@@ -129,7 +129,7 @@ test("recusa uma confirmação desatualizada e recarrega a versão salva", async
   const secao = await abrir(page);
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   const primeiro = secao.getByRole("switch", {
-    name: `Registrado na Seduc: ${prefixo} Um`,
+    name: `RS, Registrado na Seduc: ${prefixo} Um`,
     exact: true,
   });
   await expect(primeiro).toBeEnabled();
