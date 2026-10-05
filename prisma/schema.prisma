@@ -610,6 +610,7 @@ model SincronizacaoPlanilha {
   id               String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   finalidade       FinalidadeIntegracao    @default(FREQUENCIA)
   turmaOriginalId  String?                 @map("turma_original_id") @db.Uuid
+  destino          String?                 @db.VarChar(250)
   de               DateTime                @db.Date
   ate              DateTime                @db.Date
   modalidade       ModalidadeSincronizacao

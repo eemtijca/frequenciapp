@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
+import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { aguardarLimiteDeLeituraGoogle } from "./google-planilhas-limites";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
@@ -11,6 +12,9 @@ const CHAVES_METADADOS = [
   "frequenciapp.linha",
   "frequenciapp.coluna",
   "frequenciapp.aba",
+  "frequenciapp.turma",
+  "frequenciapp.mes",
+  "frequenciapp.geracao",
   "frequenciapp.copia",
 ];
 const CAMPOS_ESTRUTURA =
@@ -138,6 +142,45 @@ export function metadadosDaAba(doc: DocumentoGoogle, aba: AbaGoogle): MetadadoGo
         .map((item) => [item.metadataId, item] as const),
     ).values(),
   ];
+}
+
+/** Metadados vinculam a aba ao destino mesmo quando o título é alterado. */
+export function mensalDaAbaGoogle(
+  doc: DocumentoGoogle,
+  aba: AbaGoogle,
+): AbaMensalPlanilha | undefined {
+  const marcadores = metadadosDaAba(doc, aba);
+  if (
+    !marcadores.some((item) =>
+      ["frequenciapp.turma", "frequenciapp.mes", "frequenciapp.geracao"].includes(item.metadataKey),
+    )
+  )
+    return undefined;
+  const naAba = marcadores.filter((item) => item.location.sheetId === aba.properties.sheetId);
+  const turmas = naAba.filter((item) => item.metadataKey === "frequenciapp.turma");
+  const meses = naAba.filter((item) => item.metadataKey === "frequenciapp.mes");
+  const geracoes = naAba.filter((item) => item.metadataKey === "frequenciapp.geracao");
+  const turma = z.string().uuid().safeParse(turmas[0]?.metadataValue);
+  const geracao = z.string().uuid().safeParse(geracoes[0]?.metadataValue);
+  const mes = meses[0]?.metadataValue;
+  if (
+    turmas.length !== 1 ||
+    meses.length !== 1 ||
+    geracoes.length !== 1 ||
+    !turma.success ||
+    !geracao.success ||
+    !mes ||
+    !mesValido(mes) ||
+    !naAba.some((item) => item.metadataKey === "frequenciapp.aba" && item.metadataValue === "1") ||
+    (aba.properties.sheetType && aba.properties.sheetType !== "GRID")
+  )
+    throw new ErroHttp("Confira a identificação das abas mensais na planilha.", 409);
+  return {
+    aba: aba.properties.title,
+    mes,
+    turmaOriginalId: turma.data,
+    destino: `${doc.spreadsheetId}:${aba.properties.sheetId}:${geracao.data}`,
+  };
 }
 
 export function marcadoresDaAba(
@@ -387,6 +430,7 @@ export async function estruturaGoogle(
     },
     abas: await Promise.all(
       abas.map(async (aba) => {
+        const mensal = mensalDaAbaGoogle(doc, aba);
         const usado = await tamanhoUtilizado(id, acesso, aba.properties.title);
         const amostra = await lerBlocosGoogle(
           id,
@@ -397,6 +441,15 @@ export async function estruturaGoogle(
         );
         return {
           nome: aba.properties.title,
+          ...(mensal
+            ? {
+                mensal: {
+                  mes: mensal.mes,
+                  turmaOriginalId: mensal.turmaOriginalId,
+                  destino: mensal.destino,
+                },
+              }
+            : {}),
           oculta: aba.properties.hidden ?? false,
           criada: metadadosDaAba(doc, aba).some((item) => item.metadataKey === "frequenciapp.aba"),
           linhas: usado.linhas,
@@ -411,6 +464,44 @@ export async function estruturaGoogle(
   };
 }
 
+/** Catálogo da frequência sem consultar o conteúdo de cada mês já conhecido. */
+export async function catalogoFrequenciaGoogle(id: string, acesso: string) {
+  const doc = await lerDocumentoGoogle(id, acesso);
+  return {
+    planilha: {
+      nome: doc.properties.title,
+      url: doc.spreadsheetUrl ?? `https://docs.google.com/spreadsheets/d/${doc.spreadsheetId}/edit`,
+      fuso: doc.properties.timeZone ?? "UTC",
+    },
+    abas: doc.sheets
+      .filter(
+        (aba) =>
+          (!aba.properties.sheetType || aba.properties.sheetType === "GRID") &&
+          !aba.properties.title.startsWith("_frequenciapp_backup_"),
+      )
+      .map((aba) => {
+        const mensal = mensalDaAbaGoogle(doc, aba);
+        return {
+          nome: aba.properties.title,
+          oculta: aba.properties.hidden ?? false,
+          criada: metadadosDaAba(doc, aba).some((item) => item.metadataKey === "frequenciapp.aba"),
+          congeladasLinhas: aba.properties.gridProperties?.frozenRowCount ?? 0,
+          congeladasColunas: aba.properties.gridProperties?.frozenColumnCount ?? 0,
+          mesclagens: mesclagensDaAba(aba),
+          ...(mensal
+            ? {
+                mensal: {
+                  mes: mensal.mes,
+                  turmaOriginalId: mensal.turmaOriginalId,
+                  destino: mensal.destino,
+                },
+              }
+            : {}),
+        };
+      }),
+  };
+}
+
 export async function lerGoogle(
   id: string,
   acesso: string,
@@ -421,6 +512,7 @@ export async function lerGoogle(
 ) {
   const doc = documentoInicial ?? (await lerDocumentoGoogle(id, acesso));
   const aba = exigirAbaGoogle(doc, nome);
+  const mensal = mensalDaAbaGoogle(doc, aba);
   const usado = await tamanhoUtilizado(id, acesso, nome);
   const faixas = pedidos?.length ? pedidos : [{ coluna: 1, colunas: Math.max(usado.colunas, 1) }];
   const blocos = await lerBlocosGoogle(id, acesso, nome, Math.max(usado.linhas, 1), faixas);
@@ -440,6 +532,15 @@ export async function lerGoogle(
   }
   return {
     aba: nome,
+    ...(mensal
+      ? {
+          mensal: {
+            mes: mensal.mes,
+            turmaOriginalId: mensal.turmaOriginalId,
+            destino: mensal.destino,
+          },
+        }
+      : {}),
     linhaInicial: 1,
     colunaInicial: primeiro.coluna,
     linhas: Math.max(usado.linhas, 1),
@@ -468,6 +569,18 @@ export async function executarAcaoGoogle(
   acesso: string,
   corpo: Record<string, unknown>,
 ): Promise<unknown> {
+  if (corpo.acao === "catalogoFrequencia") return catalogoFrequenciaGoogle(id, acesso);
+  if (corpo.acao === "abasMensais") {
+    const { listarAbasMensaisGoogle } = await import("./google-planilhas-mensal");
+    return listarAbasMensaisGoogle(id, acesso);
+  }
+  if (corpo.acao === "prepararMes") {
+    const { prepararAbaMensalGoogle, esquemaPreparacaoMensalGoogle } =
+      await import("./google-planilhas-mensal");
+    const dados = esquemaPreparacaoMensalGoogle.safeParse(corpo);
+    if (!dados.success) throw new ErroHttp("Confira a turma, o mês e a lista de alunos.", 400);
+    return prepararAbaMensalGoogle(id, acesso, dados.data);
+  }
   if (corpo.acao === "estrutura") {
     const aba = typeof corpo.aba === "string" ? corpo.aba : undefined;
     return estruturaGoogle(id, acesso, aba, corpo.apresentacao === true);
@@ -497,6 +610,13 @@ export async function executarAcaoGoogle(
         assinatura: z.string(),
         operacoes: z.unknown(),
         modoCompleto: z.boolean(),
+        mensal: z
+          .object({
+            mes: z.string().refine(mesValido),
+            turmaOriginalId: z.string().uuid(),
+            destino: z.string().min(1).max(200),
+          })
+          .optional(),
       })
       .safeParse(corpo);
     if (!dados.success) throw new ErroHttp("Envio da planilha inválido.", 400);
@@ -509,6 +629,7 @@ export async function executarAcaoGoogle(
       dados.data.assinatura,
       dados.data.operacoes,
       dados.data.modoCompleto,
+      dados.data.mensal,
     );
   }
   if (corpo.acao === "listarCopias") {

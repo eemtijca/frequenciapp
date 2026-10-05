@@ -1,9 +1,7 @@
 "use client";
 
-// Diálogo de envio: prévia obrigatória, opções aditivas marcadas e
-// divergências só com o modo completo. Por padrão vai só o que mudou desde o
-// último envio; o período inteiro fica como conferência. Cada turma vai numa
-// requisição, em sequência, com o andamento na tela.
+// Envio com prévia por aba e mês, processado em sequência com resultado individual.
+// Divergências e remoções dependem do modo completo.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +23,7 @@ interface PlanoResumo {
   turmaOriginalId: string;
   rotulo: string;
   aba: string;
+  mes?: string;
   dias: string[];
   semEnvio: boolean;
   planoHashTurma: string;
@@ -123,11 +122,16 @@ export default function DialogoEnvio({
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
-  const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
-  const [removerColunasMarcadas, setRemoverColunasMarcadas] = useState<number[]>([]);
+  const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
+    {},
+  );
   const [somenteAlteradas, setSomenteAlteradas] = useState(true);
   const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
+  const abaUnica = simulacao?.planos.length === 1 ? simulacao.planos[0]?.aba : undefined;
+  const contextoRemocoes = JSON.stringify([turmaOriginalId, de, ate, somenteAlteradas, abaUnica]);
+  const removerMarcadas = remocoes[contextoRemocoes]?.linhas;
+  const removerColunasMarcadas = remocoes[contextoRemocoes]?.colunas;
 
   const entradas = useCallback(
     () => ({
@@ -137,8 +141,8 @@ export default function DialogoEnvio({
       permitirInserirColunas: criarColunas,
       permitirNovosAlunos: novosAlunos,
       substituirDivergencias: modoCompleto && substituir,
-      removerLinhas: !todas && modoCompleto ? removerMarcadas : undefined,
-      removerColunas: !todas && modoCompleto ? removerColunasMarcadas : undefined,
+      removerLinhas: !todas && modoCompleto && abaUnica ? removerMarcadas : undefined,
+      removerColunas: !todas && modoCompleto && abaUnica ? removerColunasMarcadas : undefined,
       somenteAlteradas,
     }),
     [
@@ -153,11 +157,13 @@ export default function DialogoEnvio({
       substituir,
       removerMarcadas,
       removerColunasMarcadas,
+      abaUnica,
     ],
   );
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
+    setSimulacao(null);
     setAndamento({});
     setDetalhes({});
     try {
@@ -173,17 +179,16 @@ export default function DialogoEnvio({
     if (aberto) void simular();
   }, [aberto, simular, somenteAlteradas]);
 
-  // Uma requisição por turma, em sequência: nenhuma chamada carrega o mês de
-  // todas as turmas, e a falha de uma não impede as seguintes.
+  // Uma requisição por aba: a falha de um mês não impede os demais envios.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
     if (!simulacao) return;
     setErro("");
     const pendentes = simulacao.planos.filter((item) => !item.semEnvio);
-    setAndamento(Object.fromEntries(pendentes.map((item) => [item.turmaOriginalId, "aguardando"])));
+    setAndamento(Object.fromEntries(pendentes.map((item) => [item.aba, "aguardando"])));
     setDetalhes({});
     const finais: Andamento[] = [];
     for (const item of pendentes) {
-      setAndamento((atual) => ({ ...atual, [item.turmaOriginalId]: "enviando" }));
+      setAndamento((atual) => ({ ...atual, [item.aba]: "enviando" }));
       let final: Andamento = "enviado";
       let detalhe = "";
       try {
@@ -195,6 +200,7 @@ export default function DialogoEnvio({
             ...entradas(),
             todas: undefined,
             turmaOriginalId: item.turmaOriginalId,
+            aba: item.aba,
             planoHashGeral: item.planoHashTurma,
           }),
         );
@@ -204,7 +210,7 @@ export default function DialogoEnvio({
           detalhe = resultado.erro ?? SEM_CONFIRMACAO;
         } else if (resultado?.resultado === "falha") {
           final = "falhou";
-          detalhe = resultado.erro ?? "O script recusou o envio.";
+          detalhe = resultado.erro ?? "Não foi possível enviar para esta aba.";
         }
       } catch (excecao) {
         // Sem resposta do servidor (504, queda de rede): a planilha pode ter
@@ -219,29 +225,29 @@ export default function DialogoEnvio({
             : "Não foi possível enviar.";
       }
       finais.push(final);
-      setAndamento((atual) => ({ ...atual, [item.turmaOriginalId]: final }));
-      if (detalhe) setDetalhes((atual) => ({ ...atual, [item.turmaOriginalId]: detalhe }));
+      setAndamento((atual) => ({ ...atual, [item.aba]: final }));
+      if (detalhe) setDetalhes((atual) => ({ ...atual, [item.aba]: detalhe }));
     }
     const enviados = finais.filter((item) => item === "enviado").length;
     const semConfirmacao = finais.filter((item) => item === "sem_confirmacao").length;
     aoConcluir();
     if (enviados === finais.length) {
-      toast.success(`${enviados} ${enviados === 1 ? "turma enviada" : "turmas enviadas"}.`);
+      toast.success(`${enviados} ${enviados === 1 ? "aba enviada" : "abas enviadas"}.`);
       onAbrir(false);
       return;
     }
     avisarErro(new Error("envio incompleto"), {
-      contexto: `${enviados} de ${finais.length} turmas enviadas.`,
+      contexto: `${enviados} de ${finais.length} abas enviadas.`,
       descricao:
         semConfirmacao > 0
-          ? "Algumas turmas ficaram sem confirmação. Confira as abas antes de reenviar."
+          ? "Algumas abas ficaram sem confirmação. Confira antes de reenviar."
           : "Veja no diálogo o que não foi enviado e tente de novo.",
     });
   });
 
   const bloqueado = simulacao?.planos.some((item) => item.bloqueado) ?? false;
   const plano = simulacao?.planos[0];
-  const detalhado = !todas && plano && !plano.semEnvio;
+  const detalhado = !todas && simulacao?.planos.length === 1 && plano && !plano.semEnvio;
   const nadaAEnviar = simulacao !== null && simulacao.planos.every((item) => item.semEnvio);
   const enviou = Object.keys(andamento).length > 0 && !enviando;
 
@@ -339,14 +345,22 @@ export default function DialogoEnvio({
                 <label key={item.linha} className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={removerMarcadas.includes(item.linha)}
-                    onChange={(evento) =>
-                      setRemoverMarcadas((atuais) =>
-                        evento.target.checked
-                          ? [...atuais, item.linha]
-                          : atuais.filter((linha) => linha !== item.linha),
-                      )
-                    }
+                    checked={removerMarcadas?.includes(item.linha) ?? false}
+                    onChange={(evento) => {
+                      const marcado = evento.target.checked;
+                      setRemocoes((atuais) => {
+                        const anteriores = atuais[contextoRemocoes] ?? { linhas: [], colunas: [] };
+                        return {
+                          ...atuais,
+                          [contextoRemocoes]: {
+                            ...anteriores,
+                            linhas: marcado
+                              ? [...anteriores.linhas, item.linha]
+                              : anteriores.linhas.filter((linha) => linha !== item.linha),
+                          },
+                        };
+                      });
+                    }}
                     className="size-4 accent-[var(--primary)]"
                   />
                   Remover {item.nome} (linha {item.linha})
@@ -357,14 +371,22 @@ export default function DialogoEnvio({
                 <label key={`coluna-${item.coluna}`} className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={removerColunasMarcadas.includes(item.coluna)}
-                    onChange={(evento) =>
-                      setRemoverColunasMarcadas((atuais) =>
-                        evento.target.checked
-                          ? [...atuais, item.coluna]
-                          : atuais.filter((coluna) => coluna !== item.coluna),
-                      )
-                    }
+                    checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
+                    onChange={(evento) => {
+                      const marcado = evento.target.checked;
+                      setRemocoes((atuais) => {
+                        const anteriores = atuais[contextoRemocoes] ?? { linhas: [], colunas: [] };
+                        return {
+                          ...atuais,
+                          [contextoRemocoes]: {
+                            ...anteriores,
+                            colunas: marcado
+                              ? [...anteriores.colunas, item.coluna]
+                              : anteriores.colunas.filter((coluna) => coluna !== item.coluna),
+                          },
+                        };
+                      });
+                    }}
                     className="size-4 accent-[var(--primary)]"
                   />
                   Remover coluna {item.rotulo} ({item.letra})
@@ -397,17 +419,23 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          {simulacao && !carregando && !bloqueado && (todas || enviou) && !nadaAEnviar && (
+          {simulacao && !carregando && !bloqueado && (!detalhado || enviou) && !nadaAEnviar && (
             <ul
               className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs"
               aria-label="Turmas do envio"
               aria-live="polite"
             >
               {simulacao.planos.map((item) => {
-                const estado = andamento[item.turmaOriginalId];
+                const estado = andamento[item.aba];
                 return (
-                  <li key={item.turmaOriginalId} data-turma={item.rotulo}>
-                    <span className="font-medium">{item.rotulo}</span>
+                  <li key={item.aba} data-turma={item.rotulo} data-aba={item.aba}>
+                    <span className="font-medium">{item.aba}</span>
+                    {item.mes && (
+                      <span>
+                        {" "}
+                        · {item.mes.slice(5)}/{item.mes.slice(0, 4)}
+                      </span>
+                    )}
                     {item.semEnvio ? (
                       ": sem alterações"
                     ) : (
@@ -424,11 +452,11 @@ export default function DialogoEnvio({
                           : ""}
                       </>
                     )}
-                    {estado && detalhes[item.turmaOriginalId] && (
+                    {estado && detalhes[item.aba] && (
                       <span
                         className={`block ${estado === "sem_confirmacao" ? "text-falta-texto" : "text-muted-foreground"}`}
                       >
-                        {detalhes[item.turmaOriginalId]}
+                        {detalhes[item.aba]}
                       </span>
                     )}
                   </li>
