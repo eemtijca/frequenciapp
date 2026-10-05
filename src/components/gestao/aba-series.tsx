@@ -126,7 +126,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
             ? "As séries organizam as turmas"
             : `${series.length} ${series.length === 1 ? "série" : "séries"}`}
         </p>
-        <Button size="lg" className="h-11 rounded-lg" onClick={abrirNovo}>
+        <Button size="lg" className="h-11" onClick={abrirNovo}>
           <Plus size={16} />
           Nova série
         </Button>
@@ -137,7 +137,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       )}
 
       {series.length === 0 ? (
-        <div className="bg-card flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <GraduationCap size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma série cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -149,12 +149,12 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           </Button>
         </div>
       ) : filtradas.length === 0 ? (
-        <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
           <p className="font-medium">Nenhuma série encontrada</p>
           <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
         </div>
       ) : (
-        <ul className="bg-card divide-y overflow-hidden rounded-lg border">
+        <ul className="superficie-vidro divide-y overflow-hidden">
           {filtradas.map((serie) => (
             <motion.li
               key={serie.id}
@@ -201,7 +201,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
-                        className="bg-falta text-falta-foreground hover:bg-falta/90"
+                        variant="destructive"
                         onClick={() => excluir(serie)}
                         disabled={chaveAtiva === serie.id}
                       >
@@ -241,7 +241,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                   setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
                 }
                 placeholder="Por exemplo: 1º ano"
-                className="h-11 rounded-lg"
+                className="h-11"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -257,7 +257,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 onChange={(evento) =>
                   setFormulario((atual) => ({ ...atual, ordem: evento.target.value }))
                 }
-                className="numerais-tabulares h-11 rounded-lg"
+                className="numerais-tabulares h-11"
               />
               <p className="text-muted-foreground text-xs">
                 Menor número aparece primeiro na listagem.

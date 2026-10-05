@@ -40,8 +40,8 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
   });
 
   return (
-    <div className="bg-background flex min-h-dvh flex-col">
-      <header className="bg-card/80 sticky top-0 z-20 border-b backdrop-blur">
+    <div className="flex min-h-dvh flex-col">
+      <header className="superficie-vidro vidro-flutuante sticky top-0 z-20 rounded-none border-0 border-b">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <div className="min-w-0">
             <p className="truncate font-semibold tracking-tight">FrequenciApp</p>
@@ -55,7 +55,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-11"
+                className="size-11 rounded-full"
                 aria-label="Configurar notificações"
                 title="Configurar notificações"
                 onClick={() => setNotificacoesAbertas(true)}
@@ -66,7 +66,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
             <Button
               variant="ghost"
               size="icon"
-              className="size-11"
+              className="size-11 rounded-full"
               aria-label="Trocar minha palavra-chave"
               title="Trocar minha palavra-chave"
               onClick={() => setTrocaAberta(true)}
@@ -76,7 +76,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
             <Button
               variant="ghost"
               size="icon"
-              className="size-11"
+              className="size-11 rounded-full"
               aria-label="Sair da conta"
               title="Sair da conta"
               disabled={saindo}

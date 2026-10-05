@@ -23,7 +23,12 @@ export function BarraBusca({
   className,
 }: Props) {
   return (
-    <div className={cn("bg-card flex items-center gap-2 rounded-lg border px-3 py-1", className)}>
+    <div
+      className={cn(
+        "controle-vidro focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
+        className,
+      )}
+    >
       <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <label htmlFor={id} className="sr-only">
         {rotulo}
@@ -36,14 +41,14 @@ export function BarraBusca({
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
-        className="h-9 border-0 px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+        className="campo-integrado h-9 px-0 focus-visible:ring-0"
       />
       {valor && (
         <button
           type="button"
           aria-label="Limpar busca"
           onClick={() => onValor("")}
-          className="text-muted-foreground hover:bg-secondary pressionavel flex size-11 shrink-0 items-center justify-center rounded-md"
+          className="vidro-discreto text-muted-foreground focus-visible:ring-ring/50 pressionavel flex size-11 shrink-0 items-center justify-center focus-visible:ring-[3px] focus-visible:outline-none"
         >
           <X size={16} />
         </button>

@@ -169,7 +169,7 @@ export function BlocoModoCompletoPlanilha({
               <div
                 role="radiogroup"
                 aria-label="Duração do modo completo"
-                className="bg-secondary/60 grid grid-cols-4 gap-1 rounded-lg p-1"
+                className="superficie-vidro grid grid-cols-4 gap-1 p-1.5"
               >
                 {DURACOES_MODO_COMPLETO.map((minutos) => (
                   <button
@@ -178,7 +178,7 @@ export function BlocoModoCompletoPlanilha({
                     role="radio"
                     aria-checked={duracao === minutos}
                     onClick={() => setDuracao(minutos)}
-                    className="aria-[checked=true]:bg-background aria-[checked=true]:text-foreground text-muted-foreground pressionavel min-h-10 rounded-md px-1 text-xs font-medium aria-[checked=true]:shadow-sm"
+                    className="controle-vidro vidro-discreto pressionavel min-h-10 px-1 text-xs font-medium"
                   >
                     {minutos} min
                   </button>
@@ -418,10 +418,7 @@ export function BlocoRiscoPlanilha({
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-falta text-falta-foreground hover:bg-falta/90"
-                  onClick={() => void desconectar()}
-                >
+                <AlertDialogAction variant="destructive" onClick={() => void desconectar()}>
                   Desconectar
                 </AlertDialogAction>
               </AlertDialogFooter>

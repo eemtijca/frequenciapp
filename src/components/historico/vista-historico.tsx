@@ -128,7 +128,7 @@ export default function VistaHistorico({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Mês anterior"
           onClick={() => onMes(mesSeguinte(mes, -1))}
         >
@@ -148,7 +148,7 @@ export default function VistaHistorico({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Mês seguinte"
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
@@ -172,7 +172,7 @@ export default function VistaHistorico({
             type="button"
             aria-pressed={serieFiltro === ""}
             onClick={() => setSerieFiltro("")}
-            className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+            className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
           >
             Todas
           </button>
@@ -182,7 +182,7 @@ export default function VistaHistorico({
               type="button"
               aria-pressed={serieFiltro === serie.id}
               onClick={() => setSerieFiltro(serie.id)}
-              className="aria-[pressed=true]:border-primary aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+              className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
             >
               {serie.nome}
             </button>
@@ -199,7 +199,7 @@ export default function VistaHistorico({
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {frequencias.length === 0 ? (
-        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <History size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma frequência neste mês</p>
           <p className="text-muted-foreground text-sm">
@@ -215,12 +215,12 @@ export default function VistaHistorico({
             placeholder="Buscar por turma, dia ou autoria"
           />
           {filtradas.length === 0 ? (
-            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhuma frequência encontrada</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
           ) : (
-            <ul className="bg-card divide-y overflow-hidden rounded-lg border">
+            <ul className="superficie-vidro divide-y overflow-hidden">
               {filtradas.map((frequencia) => {
                 const rotulo = rotuloDia(frequencia.dia);
                 const hora = horaNoFuso(frequencia.atualizadoEm, fuso);

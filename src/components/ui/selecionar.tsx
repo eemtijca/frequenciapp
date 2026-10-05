@@ -50,7 +50,7 @@ export function Selecionar({
         id={id}
         aria-label={ariaLabel}
         className={cn(
-          "border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 text-sm font-medium shadow-none transition-colors focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+          "controle-vidro border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
           className,
         )}
       >
@@ -63,7 +63,7 @@ export function Selecionar({
         <SelectPrimitive.Content
           position="popper"
           sideOffset={4}
-          className="bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border shadow-md"
+          className="superficie-vidro vidro-flutuante text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-7 items-center justify-center">
             <ChevronUp size={14} aria-hidden="true" />
@@ -77,7 +77,7 @@ export function Selecionar({
                 onKeyDown={(evento) => evento.stopPropagation()}
                 placeholder="Filtrar"
                 aria-label="Filtrar opções"
-                className="h-8 border-0 px-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+                className="campo-integrado h-8 px-0 focus-visible:ring-0"
               />
             </div>
           )}
@@ -91,7 +91,10 @@ export function Selecionar({
                 <SelectPrimitive.Item
                   key={opcao.valor}
                   value={opcao.valor}
-                  className="focus:bg-accent focus:text-accent-foreground active:bg-accent pressionavel relative flex min-h-10 w-full cursor-pointer items-center rounded-md py-1.5 pr-8 pl-8 text-sm outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                  className={cn(
+                    "pressionavel focus-visible:ring-ring/50 relative flex min-h-11 w-full cursor-pointer items-center py-1.5 pr-8 pl-8 text-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-inset data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+                    opcao.valor === value ? "vidro-selecionado" : "vidro-discreto",
+                  )}
                 >
                   <span className="absolute left-2 flex size-4 items-center justify-center">
                     <SelectPrimitive.ItemIndicator>

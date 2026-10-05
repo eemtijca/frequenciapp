@@ -646,7 +646,7 @@ export default function VistaFrequencia({
           <h1 className="text-xl font-semibold tracking-tight">Chamada</h1>
           <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
         </div>
-        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma turma cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -685,7 +685,7 @@ export default function VistaFrequencia({
             <Button
               variant="outline"
               size="icon"
-              className="size-11 shrink-0 rounded-lg"
+              className="size-11 shrink-0"
               aria-label="Dia anterior"
               disabled={travado || !dia}
               onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
@@ -708,7 +708,7 @@ export default function VistaFrequencia({
             <Button
               variant="outline"
               size="icon"
-              className="size-11 shrink-0 rounded-lg"
+              className="size-11 shrink-0"
               aria-label="Dia seguinte"
               disabled={travado || !dia || dia >= diaCorrente}
               onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
@@ -728,7 +728,7 @@ export default function VistaFrequencia({
           )}
           {revisaoSalva > 0 && (
             <div
-              className="bg-card flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+              className="superficie-vidro flex items-center justify-between gap-3 px-3 py-2.5"
               role="group"
               aria-label="Bloqueio da chamada"
             >
@@ -794,7 +794,7 @@ export default function VistaFrequencia({
             aria-expanded={resumoAberto}
             aria-controls={idResumo}
             onClick={() => setResumoAberto((atual) => !atual)}
-            className="text-primary border-primary/25 bg-primary/5 hover:bg-primary/10 hover:text-primary dark:border-primary/25 dark:bg-primary/5 dark:hover:bg-primary/10 self-start rounded-full px-4"
+            className="vidro-selecionado self-start rounded-full px-4"
           >
             {tituloResumo}
             <ChevronDown
@@ -833,7 +833,7 @@ export default function VistaFrequencia({
             id={idResumo}
             aria-label={tituloResumo}
             hidden={!resumoAberto}
-            className="bg-card overflow-hidden rounded-lg border"
+            className="superficie-vidro overflow-hidden"
           >
             {resumoAberto && (
               <>
@@ -851,7 +851,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
                       }
-                      className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                      className="controle-vidro aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                         {carregando ? "" : contagemFaltas}
@@ -864,7 +864,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
                       }
-                      className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                      className="controle-vidro aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
                         {carregando ? "" : contagemJustificadas}
@@ -879,7 +879,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))
                       }
-                      className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                      className="controle-vidro pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-primary text-2xl font-semibold">
                         {carregando ? "" : contagemPresencas}
@@ -954,7 +954,7 @@ export default function VistaFrequencia({
             )}
           </section>
 
-          <div className="bg-card overflow-hidden rounded-lg border">
+          <div className="superficie-vidro overflow-hidden">
             <BarraBusca
               id="busca-aluno"
               valor={busca}
@@ -1139,7 +1139,7 @@ export default function VistaFrequencia({
                               onClick={() =>
                                 setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
                               }
-                              className="text-muted-foreground hover:bg-secondary border-border pressionavel my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                              className="controle-vidro text-muted-foreground pressionavel my-2 mr-2 h-9 shrink-0 px-2.5 text-xs font-medium disabled:opacity-50"
                             >
                               Aulas
                             </button>
@@ -1275,7 +1275,7 @@ export default function VistaFrequencia({
 
           <div
             aria-label="Barra de salvamento"
-            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky bottom-3 z-20 rounded-xl border px-4 py-3 shadow-lg backdrop-blur"
+            className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 px-4 py-3"
           >
             <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
               <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">
@@ -1289,7 +1289,7 @@ export default function VistaFrequencia({
                       <Button
                         variant="outline"
                         size="lg"
-                        className="h-11 rounded-lg xl:flex-1"
+                        className="h-11 xl:flex-1"
                         disabled={salvando}
                       >
                         <RotateCcw size={16} />
@@ -1313,7 +1313,7 @@ export default function VistaFrequencia({
                 )}
                 <Button
                   size="lg"
-                  className="h-11 rounded-lg px-6 xl:flex-1 xl:px-0"
+                  className="h-11 px-6 xl:flex-1 xl:px-0"
                   onClick={salvar}
                   disabled={!podeSalvar}
                 >

@@ -207,7 +207,7 @@ export default function VistaPainel({
       </div>
     ) : (
       <>
-        <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+        <div className="superficie-vidro flex flex-col gap-4 p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 font-medium">
               <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
@@ -253,7 +253,7 @@ export default function VistaPainel({
         </div>
 
         {serieSelecionada && porOrigem && (
-          <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+          <div className="superficie-vidro flex flex-col gap-4 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-medium">
                 <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
@@ -279,7 +279,7 @@ export default function VistaPainel({
           </div>
         )}
 
-        <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+        <div className="superficie-vidro flex flex-col gap-3 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-medium">Cobertura do dia</h2>
             <span className="numerais-tabulares text-muted-foreground text-sm">
@@ -323,7 +323,7 @@ export default function VistaPainel({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia anterior"
           onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
         >
@@ -344,7 +344,7 @@ export default function VistaPainel({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia seguinte"
           disabled={dia >= diaCorrente}
           onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
@@ -369,37 +369,37 @@ export default function VistaPainel({
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
         aria-label="Resumo do dia"
       >
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-2xl font-semibold">
             {carregandoPainel ? "" : resumo.esperados}
           </span>
           <span className="text-muted-foreground text-xs font-medium">Alunos</span>
         </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-primary text-2xl font-semibold">
             {carregandoPainel ? "" : resumo.presentes}
           </span>
           <span className="text-muted-foreground text-xs font-medium">Presentes</span>
         </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
             {carregandoPainel ? "" : resumo.ausencias}
           </span>
           <span className="text-muted-foreground text-xs font-medium">Faltas (F + FJ)</span>
         </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-2xl font-semibold">
             {carregandoPainel ? "" : resumo.justificadas}
           </span>
           <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
         </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-2xl font-semibold">
             {carregandoPainel ? "" : percentual.format(resumo.infrequencia)}
           </span>
           <span className="text-muted-foreground text-xs font-medium">Infrequência</span>
         </div>
-        <div className="bg-card flex min-h-20 flex-col items-center justify-center gap-0.5 rounded-lg border px-3 py-2">
+        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
           <span className="numerais-tabulares text-2xl font-semibold">
             {carregandoPainel ? "" : resumo.saidas}
           </span>
@@ -432,7 +432,7 @@ export default function VistaPainel({
             id: "desistentes",
             nome: "Desistentes",
             conteudo: (
-              <div className="bg-card flex flex-col gap-4 rounded-lg border p-4">
+              <div className="superficie-vidro flex flex-col gap-4 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="font-medium">Desistentes até este dia</h2>
                   <span className="numerais-tabulares text-muted-foreground text-sm">

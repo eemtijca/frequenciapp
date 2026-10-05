@@ -506,7 +506,7 @@ export default function AbaConfiguracoes({
         </div>
 
         <div
-          className="flex flex-col gap-3 rounded-lg border p-3"
+          className="superficie-vidro flex flex-col gap-3 p-3"
           role="group"
           aria-label="Turma de origem na Chamada"
         >
@@ -634,7 +634,7 @@ export default function AbaConfiguracoes({
           </>
         }
       >
-        <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-end">
+        <div className="superficie-vidro flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label htmlFor="justificativa-codigo">Código</Label>
             <Input
@@ -663,7 +663,7 @@ export default function AbaConfiguracoes({
           </div>
           <Button
             type="button"
-            className="h-11 rounded-lg sm:w-auto"
+            className="h-11 sm:w-auto"
             onClick={() => void criarJustificativa()}
             disabled={enviandoJustificativa || novaCodigo.trim() === "" || novaRotulo.trim() === ""}
           >
@@ -684,7 +684,7 @@ export default function AbaConfiguracoes({
           />
         )}
 
-        <ul className="divide-y overflow-hidden rounded-lg border">
+        <ul className="superficie-vidro divide-y overflow-hidden">
           {justificativas.map((item) => (
             <li
               key={item.codigo}
@@ -787,7 +787,7 @@ export default function AbaConfiguracoes({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-falta text-falta-foreground hover:bg-falta/90"
+                variant="destructive"
                 onClick={() => excluirAlvo && void removerJustificativa(excluirAlvo)}
               >
                 Excluir
@@ -811,7 +811,7 @@ export default function AbaConfiguracoes({
           </>
         }
       >
-        <div className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-end">
+        <div className="superficie-vidro flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label htmlFor="liberador-codigo">Código</Label>
             <Input
@@ -840,7 +840,7 @@ export default function AbaConfiguracoes({
           </div>
           <Button
             type="button"
-            className="h-11 rounded-lg sm:w-auto"
+            className="h-11 sm:w-auto"
             onClick={() => void criarLiberador()}
             disabled={
               enviandoLiberador ||
@@ -869,7 +869,7 @@ export default function AbaConfiguracoes({
           <p className="text-muted-foreground text-sm">Nenhum nome cadastrado.</p>
         )}
 
-        <ul className="divide-y overflow-hidden rounded-lg border">
+        <ul className="superficie-vidro divide-y overflow-hidden">
           {liberadores.map((item) => (
             <li
               key={item.codigo}
@@ -972,7 +972,7 @@ export default function AbaConfiguracoes({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-falta text-falta-foreground hover:bg-falta/90"
+                variant="destructive"
                 onClick={() => excluirAlvoLiberador && void removerLiberador(excluirAlvoLiberador)}
               >
                 Excluir
@@ -998,7 +998,7 @@ export default function AbaConfiguracoes({
           <Button
             type="button"
             variant="outline"
-            className="h-11 rounded-lg"
+            className="h-11"
             onClick={() => setDownloadAberto(true)}
             disabled={importando}
           >
@@ -1007,12 +1007,7 @@ export default function AbaConfiguracoes({
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 rounded-lg"
-                disabled={importando}
-              >
+              <Button type="button" variant="outline" className="h-11" disabled={importando}>
                 {importando ? (
                   <LoaderCircle size={16} className="animate-spin" />
                 ) : (
@@ -1068,7 +1063,7 @@ export default function AbaConfiguracoes({
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6">
       <nav
         aria-label="Categorias de configurações"
-        className="bg-secondary/40 grid grid-cols-2 gap-1 rounded-xl border p-1.5 lg:grid-cols-1"
+        className="superficie-vidro grid grid-cols-2 gap-1.5 p-1.5 lg:grid-cols-1"
       >
         {CATEGORIAS.map(({ valor, rotulo, icone: Icone }) => (
           <Button
@@ -1080,9 +1075,7 @@ export default function AbaConfiguracoes({
             aria-controls={`config-grupo-${valor}`}
             onClick={() => setCategoria(valor)}
             className={`h-12 min-w-0 justify-start px-3 text-xs sm:text-sm ${
-              categoria === valor
-                ? "bg-background text-primary ring-primary/20 shadow-sm ring-1"
-                : "text-muted-foreground"
+              categoria === valor ? "vidro-selecionado" : "text-muted-foreground"
             }`}
           >
             <Icone size={16} aria-hidden="true" />

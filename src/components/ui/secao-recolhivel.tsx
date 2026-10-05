@@ -42,22 +42,26 @@ export function SecaoRecolhivel({
       open={aberto}
       onOpenChange={onAbertoChange}
       data-secao={dataSecao}
-      className={`flex flex-col rounded-lg border ${nivel === "raiz" ? "bg-card" : "bg-transparent"} ${
+      className={`flex flex-col ${nivel === "raiz" ? "superficie-vidro" : "rounded-2xl border bg-transparent"} ${
         perigo ? "border-falta/40" : ""
       }`}
     >
       <div className="flex items-start gap-2 p-3 sm:p-4">
-        <Collapsible.Trigger className="pressionavel focus-visible:ring-ring/50 flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-lg text-left outline-none focus-visible:ring-[3px]">
+        <Collapsible.Trigger className="pressionavel focus-visible:ring-ring/50 flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-2xl text-left outline-none focus-visible:ring-[3px]">
           <span
-            className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg ${
-              perigo ? "bg-falta-fraca text-falta-texto" : "bg-secondary text-secondary-foreground"
+            className={`mt-0.5 flex size-9 shrink-0 items-center justify-center ${
+              perigo
+                ? "bg-falta-fraca text-falta-texto rounded-full"
+                : "controle-vidro text-secondary-foreground"
             }`}
           >
             <Icone size={16} aria-hidden="true" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className={`min-w-0 truncate font-medium ${perigo ? "text-falta-texto" : ""}`}>
+              <span
+                className={`min-w-0 truncate font-semibold ${perigo ? "text-falta-texto" : ""}`}
+              >
                 {titulo}
               </span>
               <ChevronDown

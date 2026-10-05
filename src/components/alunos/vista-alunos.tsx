@@ -89,7 +89,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
       <div
         role="group"
         aria-label="Agrupamento da lista"
-        className="bg-secondary/60 grid grid-cols-2 gap-1 rounded-lg p-1"
+        className="superficie-vidro grid grid-cols-2 gap-1 p-1.5"
       >
         {AGRUPAMENTOS.map((opcao) => {
           const ativo = agrupamento === opcao.valor;
@@ -99,7 +99,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
               type="button"
               aria-pressed={ativo}
               onClick={() => setAgrupamento(opcao.valor)}
-              className="aria-[pressed=true]:bg-background aria-[pressed=true]:text-foreground text-muted-foreground pressionavel relative flex min-h-10 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors aria-[pressed=true]:shadow-sm"
+              className="controle-vidro vidro-discreto pressionavel relative flex min-h-10 items-center justify-center px-2 text-xs font-medium transition-colors"
             >
               {opcao.rotulo}
             </button>
@@ -118,7 +118,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
       )}
 
       {alunos.length === 0 ? (
-        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum aluno nas suas turmas</p>
           <p className="text-muted-foreground text-sm">
@@ -126,7 +126,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
           </p>
         </div>
       ) : gruposFiltrados.length === 0 ? (
-        <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
           <p className="font-medium">Nenhum aluno encontrado</p>
           <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
         </div>
@@ -139,7 +139,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
             transition={
               semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
             }
-            className="bg-card overflow-hidden rounded-lg border"
+            className="superficie-vidro overflow-hidden"
           >
             <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
               <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>

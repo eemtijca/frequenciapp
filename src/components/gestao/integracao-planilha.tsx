@@ -285,7 +285,7 @@ export default function IntegracaoPlanilha({
       <section
         data-secao="planilha-frequencia"
         aria-label="Planilha de frequência"
-        className="bg-card flex flex-col gap-4 rounded-lg border p-4"
+        className="superficie-vidro flex flex-col gap-4 p-4"
       >
         <h2 className="font-medium">Planilha de frequência</h2>
         <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
@@ -449,7 +449,7 @@ export default function IntegracaoPlanilha({
       </EtapaPlanilha>
 
       {conectada && abas.some((aba) => !aba.oculta) && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3">
+        <div className="superficie-vidro flex flex-col gap-2 p-3">
           <Selecionar
             id="frequencia-apresentacao"
             value={abaApresentacao}
@@ -519,7 +519,7 @@ export default function IntegracaoPlanilha({
             Enviar todas as turmas
           </Button>
         </div>
-        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg border p-3">
+        <div className="superficie-vidro mt-3 flex items-start justify-between gap-3 p-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
             <p className="text-muted-foreground text-xs">

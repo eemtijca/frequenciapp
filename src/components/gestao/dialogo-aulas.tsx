@@ -195,7 +195,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
             Nenhuma aula configurada. Crie a primeira para registrar saídas.
           </div>
         ) : (
-          <ul className="divide-y overflow-hidden rounded-lg border">
+          <ul className="superficie-vidro divide-y overflow-hidden">
             {aulas.map((aula) => (
               <li
                 key={aula.id}
@@ -260,7 +260,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
                       <AlertDialogAction
-                        className="bg-falta text-falta-foreground hover:bg-falta/90"
+                        variant="destructive"
                         onClick={() => excluir(aula)}
                         disabled={chaveAtiva === aula.id}
                       >
@@ -281,7 +281,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
           </Button>
         ) : (
           <form
-            className="flex flex-col gap-3 rounded-lg border p-3"
+            className="superficie-vidro flex flex-col gap-3 p-3"
             onSubmit={(evento) => {
               evento.preventDefault();
               void submeter();
@@ -341,11 +341,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                       type="button"
                       aria-pressed={marcado}
                       onClick={() => alternarDia(dia.valor)}
-                      className={`pressionavel h-9 rounded-lg border px-3 text-xs font-medium transition-colors ${
-                        marcado
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:border-foreground/30"
-                      }`}
+                      className="controle-vidro pressionavel h-11 px-3 text-xs font-medium transition-colors"
                     >
                       {dia.rotulo}
                     </button>

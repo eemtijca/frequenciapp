@@ -1,3 +1,4 @@
+// Layout raiz com a tipografia dos seletores, tema e avisos compartilhados.
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
@@ -64,7 +65,7 @@ export default async function LayoutRaiz({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground antialiased`}
+        className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground font-sans antialiased`}
       >
         <ThemeProvider
           attribute="class"

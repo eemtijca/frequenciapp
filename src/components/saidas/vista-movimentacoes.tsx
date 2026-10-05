@@ -80,7 +80,7 @@ export default function VistaMovimentacoes({
           <Button
             type="button"
             variant="outline"
-            className="h-auto min-h-12 shrink-0 rounded-lg px-3"
+            className="h-auto min-h-12 shrink-0 px-3"
             aria-label="Enviar saídas e entradas para a planilha"
             disabled={!estadoPlanilha?.podeEnviar}
             title={

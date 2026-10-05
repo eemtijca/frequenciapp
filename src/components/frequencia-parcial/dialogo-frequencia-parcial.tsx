@@ -155,7 +155,7 @@ export function DialogoFrequenciaParcial({
                   role="radio"
                   aria-checked={edicao.tipo === tipo}
                   onClick={() => onEdicao({ ...edicao, tipo })}
-                  className="pressionavel aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground flex h-11 flex-1 items-center justify-center rounded-lg border px-3 text-sm font-medium"
+                  className="controle-vidro pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium"
                 >
                   {rotulo}
                 </button>
@@ -190,7 +190,7 @@ export function DialogoFrequenciaParcial({
                     aria-checked={edicao.aulas.includes(aula)}
                     aria-label={`${aula}ª aula frequentada`}
                     onClick={() => alternarAula(aula)}
-                    className="pressionavel aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground flex h-11 items-center justify-center rounded-lg border text-sm font-medium"
+                    className="controle-vidro pressionavel flex h-11 items-center justify-center text-sm font-medium"
                   >
                     {aula}ª aula
                   </button>

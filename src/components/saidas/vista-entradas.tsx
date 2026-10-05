@@ -159,7 +159,7 @@ export default function VistaEntradas({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia anterior"
           disabled={executando}
           onClick={() => escolherDia(diaSeguinte(dia, -1))}
@@ -182,7 +182,7 @@ export default function VistaEntradas({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia seguinte"
           disabled={executando || dia >= diaCorrente}
           onClick={() => escolherDia(diaSeguinte(dia, 1))}
@@ -191,7 +191,7 @@ export default function VistaEntradas({
         </Button>
       </div>
       <form
-        className="bg-card flex flex-col gap-3 rounded-lg border p-4"
+        className="superficie-vidro flex flex-col gap-3 p-4"
         onSubmit={(e) => {
           e.preventDefault();
           void executar(async () => {
@@ -311,7 +311,7 @@ export default function VistaEntradas({
                   setJustificativa("");
                   setObservacao("");
                 }}
-                className="aria-[checked=true]:border-primary aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+                className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
               >
                 {item.rotulo}
               </button>
@@ -386,7 +386,7 @@ export default function VistaEntradas({
           )}
         </div>
         <Button
-          className="h-11 w-full rounded-lg px-6 sm:w-auto"
+          className="h-11 w-full px-6 sm:w-auto"
           size="lg"
           type="submit"
           disabled={
@@ -420,7 +420,7 @@ export default function VistaEntradas({
           entradas.map((entrada) => (
             <article
               key={entrada.id}
-              className="flex items-start justify-between gap-3 rounded-xl border p-4"
+              className="superficie-vidro flex items-start justify-between gap-3 p-4"
             >
               <div className="min-w-0">
                 <h3 className="font-semibold break-words">{entrada.nome}</h3>
@@ -447,7 +447,7 @@ export default function VistaEntradas({
           ))
         )}
       </section>
-      <section className="space-y-3 rounded-xl border p-4" aria-label="Planilha de entradas">
+      <section className="superficie-vidro space-y-3 p-4" aria-label="Planilha de entradas">
         <h2 className="sr-only">Planilha de entradas</h2>
         {estado?.podeEnviar ? (
           <>

@@ -317,19 +317,11 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         </p>
         {modoSelecao ? (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-            <Button
-              variant="outline"
-              className="h-11 rounded-lg whitespace-nowrap"
-              onClick={alternarTodos}
-            >
+            <Button variant="outline" className="h-11 whitespace-nowrap" onClick={alternarTodos}>
               <Check size={16} />
               Selecionar todos
             </Button>
-            <Button
-              variant="ghost"
-              className="h-11 rounded-lg whitespace-nowrap"
-              onClick={cancelarSelecao}
-            >
+            <Button variant="ghost" className="h-11 whitespace-nowrap" onClick={cancelarSelecao}>
               Cancelar
             </Button>
           </div>
@@ -337,7 +329,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <Button
               variant="outline"
-              className="h-11 rounded-lg whitespace-nowrap"
+              className="h-11 whitespace-nowrap"
               onClick={() => setImportarAberto(true)}
               disabled={turmas.length === 0}
             >
@@ -346,7 +338,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Button>
             <Button
               variant="outline"
-              className="h-11 rounded-lg whitespace-nowrap"
+              className="h-11 whitespace-nowrap"
               onClick={() => setDownloadAberto(true)}
               disabled={ativos === 0}
             >
@@ -355,7 +347,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Button>
             <Button
               variant="outline"
-              className="h-11 rounded-lg whitespace-nowrap"
+              className="h-11 whitespace-nowrap"
               onClick={() => setModoSelecao(true)}
               disabled={turmas.length === 0 || alunos.length === 0}
             >
@@ -364,7 +356,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Button>
             <Button
               size="lg"
-              className="h-11 rounded-lg whitespace-nowrap"
+              className="h-11 whitespace-nowrap"
               onClick={abrirNovo}
               disabled={turmas.length === 0}
             >
@@ -376,7 +368,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       </div>
 
       {modoSelecao && (
-        <div className="bg-card flex flex-col gap-3 rounded-lg border p-3">
+        <div className="superficie-vidro flex flex-col gap-3 p-3">
           <p className="text-muted-foreground text-xs leading-relaxed">
             Mudar a turma de origem não move o aluno. A Grade e a planilha passam a agrupar o
             histórico pela origem escolhida.
@@ -394,7 +386,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               />
             </div>
             <Button
-              className="h-11 rounded-lg sm:w-auto"
+              className="h-11 sm:w-auto"
               onClick={() => void aplicarOrigem()}
               disabled={aplicando || selecionados.size === 0 || origemEmMassa === ""}
             >
@@ -409,7 +401,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         </div>
       )}
 
-      <div className="bg-card overflow-hidden rounded-lg border">
+      <div className="superficie-vidro overflow-hidden">
         <BarraBusca
           id="busca-gestao-aluno"
           valor={busca}
@@ -534,7 +526,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                 <AlertDialogAction
-                                  className="bg-falta text-falta-foreground hover:bg-falta/90"
+                                  variant="destructive"
                                   onClick={() => excluir(aluno)}
                                   disabled={chaveAtiva === aluno.id}
                                 >
@@ -579,7 +571,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                   setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
                 }
                 placeholder="Nome do aluno"
-                className="h-11 rounded-lg"
+                className="h-11"
               />
             </div>
             <div className="flex flex-col gap-2">

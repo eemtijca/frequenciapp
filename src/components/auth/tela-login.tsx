@@ -96,10 +96,10 @@ export default function TelaLogin() {
         <SeletorTema />
       </div>
 
-      <aside className="bg-primary text-primary-foreground hidden flex-col justify-between p-10 lg:flex xl:p-14">
+      <aside className="superficie-vidro hidden flex-col justify-between rounded-none border-0 border-r p-10 lg:flex xl:p-14">
         <div>
           <div className="flex items-center gap-2.5">
-            <span className="bg-primary-foreground/15 flex size-10 items-center justify-center rounded-xl">
+            <span className="vidro-selecionado flex size-10 items-center justify-center rounded-2xl">
               <CalendarCheck size={20} aria-hidden="true" />
             </span>
             <span className="text-lg font-semibold tracking-tight">FrequenciApp</span>
@@ -107,17 +107,14 @@ export default function TelaLogin() {
           <h2 className="mt-14 max-w-md text-3xl leading-tight font-semibold tracking-tight">
             A frequência da escola em um só lugar.
           </h2>
-          <p className="text-primary-foreground/80 mt-4 max-w-md text-sm leading-relaxed">
+          <p className="text-muted-foreground mt-4 max-w-md text-sm leading-relaxed">
             Uma chamada por turma e dia, compartilhada pela coordenação, com as saídas no meio da
             aula registradas aula a aula.
           </p>
         </div>
         <ul className="flex flex-col gap-3">
           {DESTAQUES.map(({ Icone, texto }) => (
-            <li
-              key={texto}
-              className="text-primary-foreground/85 flex items-center gap-2.5 text-sm"
-            >
+            <li key={texto} className="text-muted-foreground flex items-center gap-2.5 text-sm">
               <Icone size={16} aria-hidden="true" />
               {texto}
             </li>
@@ -125,11 +122,11 @@ export default function TelaLogin() {
         </ul>
       </aside>
 
-      <main className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
-        <div className="flex w-full max-w-xs flex-col gap-8 sm:max-w-sm">
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
+        <div className="superficie-vidro flex w-full max-w-sm flex-col gap-7 p-6 sm:max-w-md sm:p-8">
           <div className="flex flex-col items-center gap-3 text-center lg:items-start lg:text-left">
             <div
-              className="bg-primary text-primary-foreground flex size-12 items-center justify-center rounded-xl lg:hidden"
+              className="vidro-selecionado flex size-12 items-center justify-center rounded-2xl lg:hidden"
               aria-hidden="true"
             >
               <LockKeyhole size={22} strokeWidth={1.8} />
@@ -203,7 +200,7 @@ export default function TelaLogin() {
                 <p
                   id="erro-entrada"
                   role="alert"
-                  className="bg-falta-fraca text-falta-texto rounded-lg px-4 py-3 text-sm"
+                  className="bg-falta-fraca text-falta-texto rounded-2xl px-4 py-3 text-sm"
                 >
                   {erro}
                 </p>

@@ -173,7 +173,7 @@ export function DialogoEnviarParciais({
             />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+        <div className="superficie-vidro flex items-center justify-between gap-3 p-3">
           <div>
             <Label htmlFor="parcial-envio-atualizar">Atualizar registros já enviados</Label>
             <p className="text-muted-foreground mt-1 text-xs">
@@ -209,7 +209,7 @@ export function DialogoEnviarParciais({
           </p>
         )}
         {previa && (
-          <div className="flex flex-col gap-3 rounded-lg border p-3">
+          <div className="superficie-vidro flex flex-col gap-3 p-3">
             <p className="text-sm font-medium">
               {previa.novas} novos · {previa.atualizacoes} atualizações · {previa.existentes} já
               enviados

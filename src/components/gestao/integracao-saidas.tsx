@@ -252,7 +252,7 @@ export default function IntegracaoSaidas({
       <section
         data-secao="planilha-saidas"
         aria-label="Planilha de saídas"
-        className="bg-card flex flex-col gap-4 rounded-lg border p-4"
+        className="superficie-vidro flex flex-col gap-4 p-4"
       >
         <h2 className="font-medium">Planilha de saídas</h2>
         <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
@@ -416,7 +416,7 @@ export default function IntegracaoSaidas({
       </EtapaPlanilha>
 
       {(abaSelecionada || integracao?.esquema?.aba) && (
-        <div className="flex flex-col gap-2 rounded-lg border p-3">
+        <div className="superficie-vidro flex flex-col gap-2 p-3">
           <div>
             <OrganizarPlanilha
               rota="/api/planilha-saidas/organizar"
@@ -446,7 +446,7 @@ export default function IntegracaoSaidas({
             </Button>
           )}
         </div>
-        <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
+        <div className="superficie-vidro flex items-start justify-between gap-3 p-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">Enviar ao registrar</p>
             <p className="text-muted-foreground text-xs">

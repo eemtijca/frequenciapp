@@ -197,7 +197,7 @@ export default function PorAluno({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Mês anterior"
           onClick={() => onMes(mesSeguinte(mes, -1))}
         >
@@ -217,7 +217,7 @@ export default function PorAluno({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Mês seguinte"
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
@@ -266,13 +266,13 @@ export default function PorAluno({
       </div>
 
       {linhas.length === 0 ? (
-        <div className="bg-card flex min-h-52 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum aluno encontrado</p>
           <p className="text-muted-foreground text-sm">Ajuste a busca ou os filtros.</p>
         </div>
       ) : (
-        <ul className="bg-card divide-y overflow-hidden rounded-lg border">
+        <ul className="superficie-vidro divide-y overflow-hidden">
           {linhas.map(({ aluno, resumo: doAluno }) => {
             const acumulado = acumuladoDe(aluno.id);
             const aberto = expandido === aluno.id;

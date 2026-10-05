@@ -118,13 +118,13 @@ function BotaoAcao({ acao, secundaria }: { acao: AcaoEstado; secundaria?: boolea
   const variante = secundaria ? "outline" : "default";
   if (acao.href) {
     return (
-      <Button asChild variant={variante} className="h-11 rounded-lg">
+      <Button asChild variant={variante} className="h-11">
         <Link href={acao.href}>{acao.rotulo}</Link>
       </Button>
     );
   }
   return (
-    <Button variant={variante} className="h-11 rounded-lg" onClick={acao.onClick}>
+    <Button variant={variante} className="h-11" onClick={acao.onClick}>
       {acao.rotulo}
     </Button>
   );
@@ -168,13 +168,16 @@ export function TelaEstado({
   const conteudo = (
     <>
       <span
-        className={cn("flex size-14 items-center justify-center rounded-xl", TONS[preset.tom])}
+        className={cn(
+          "flex size-14 items-center justify-center rounded-2xl ring-1 ring-current/10 ring-inset",
+          TONS[preset.tom],
+        )}
         aria-hidden="true"
       >
         <Icone size={26} strokeWidth={1.9} />
       </span>
       {codigo ? (
-        <span className="text-muted-foreground mt-3 rounded-md border px-2 py-0.5 font-mono text-[11px] font-semibold">
+        <span className="controle-vidro text-muted-foreground numerais-tabulares mt-3 px-2.5 py-1 text-[11px] font-semibold">
           Erro {codigo}
         </span>
       ) : null}
@@ -203,9 +206,8 @@ export function TelaEstado({
     </>
   );
 
-  const classes = incorporado
-    ? "mx-auto flex max-w-xl flex-col items-center px-4 py-10 text-center"
-    : "flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center";
+  const classes =
+    "superficie-vidro mx-auto flex w-full max-w-xl flex-col items-center px-6 py-10 text-center sm:px-8";
 
   if (incorporado) {
     return (
@@ -215,8 +217,8 @@ export function TelaEstado({
     );
   }
   return (
-    <main className={classes} role={papel}>
-      {conteudo}
+    <main className="flex min-h-dvh items-center justify-center px-4 py-16 sm:px-6" role={papel}>
+      <div className={classes}>{conteudo}</div>
     </main>
   );
 }
@@ -249,7 +251,7 @@ export function AvisoCompacto({
       <div
         role={papel}
         className={cn(
-          "flex items-start gap-2.5 rounded-lg px-3 py-2 text-sm",
+          "flex items-start gap-2.5 rounded-2xl border border-current/10 px-3 py-2 text-sm",
           TONS[preset.tom],
           className,
         )}
@@ -261,16 +263,11 @@ export function AvisoCompacto({
           {acao ? (
             <span className="mt-2 flex">
               {acao.href ? (
-                <Button asChild variant="outline" size="sm" className="h-8 rounded-md">
+                <Button asChild variant="outline" size="sm" className="h-9">
                   <Link href={acao.href}>{acao.rotulo}</Link>
                 </Button>
               ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-md"
-                  onClick={acao.onClick}
-                >
+                <Button variant="outline" size="sm" className="h-9" onClick={acao.onClick}>
                   {acao.rotulo}
                 </Button>
               )}
@@ -282,10 +279,10 @@ export function AvisoCompacto({
   }
 
   return (
-    <div role={papel} className={cn("bg-card rounded-lg border p-5 text-center", className)}>
+    <div role={papel} className={cn("superficie-vidro p-5 text-center", className)}>
       <span
         className={cn(
-          "mx-auto flex size-10 items-center justify-center rounded-lg",
+          "mx-auto flex size-10 items-center justify-center rounded-2xl",
           TONS[preset.tom],
         )}
         aria-hidden="true"

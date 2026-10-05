@@ -215,7 +215,7 @@ export default function ResumoRelatorios({
               ["Justificadas", dados.total.justificadas],
               ["Infrequência", taxa],
             ].map(([rotulo, valor]) => (
-              <div key={rotulo} className="bg-card min-w-0 rounded-xl border p-3 sm:p-4">
+              <div key={rotulo} className="superficie-vidro min-w-0 p-3 sm:p-4">
                 <dt className="text-muted-foreground text-xs sm:text-sm">{rotulo}</dt>
                 <dd className="numerais-tabulares mt-1 text-lg font-semibold sm:text-2xl">
                   {valor}
@@ -237,7 +237,7 @@ export default function ResumoRelatorios({
                 aria-label={
                   compararPor === "series" ? "Infrequência por série" : "Infrequência por turma"
                 }
-                className="bg-card min-w-0 rounded-xl border p-4"
+                className="superficie-vidro min-w-0 p-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h3 className="font-semibold">Comparação</h3>
@@ -282,7 +282,7 @@ export default function ResumoRelatorios({
               </section>
               <section
                 aria-label="Evolução da infrequência"
-                className="bg-card min-w-0 rounded-xl border p-4"
+                className="superficie-vidro min-w-0 p-4"
               >
                 <h3 className="font-semibold">Evolução no mês</h3>
                 <div
@@ -366,7 +366,7 @@ export default function ResumoRelatorios({
               </section>
               <section
                 aria-label="Alunos com mais faltas"
-                className="bg-card min-w-0 rounded-xl border p-4 xl:col-span-2"
+                className="superficie-vidro min-w-0 p-4 xl:col-span-2"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="font-semibold">Alunos com mais faltas</h3>

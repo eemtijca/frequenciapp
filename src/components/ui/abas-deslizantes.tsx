@@ -91,7 +91,7 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`bg-secondary/60 grid gap-1 rounded-lg p-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          className={`superficie-vidro grid gap-1 p-1 ${acao ? "min-w-0 flex-1" : ""}`}
           style={{ gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))` }}
         >
           {abas.map((item, indice) => {
@@ -111,15 +111,15 @@ export default function AbasDeslizantes<T extends string>({
                 aria-controls={`painel-${item.valor}`}
                 tabIndex={ativo ? 0 : -1}
                 onClick={() => trocarAba(item.valor)}
-                className="pressionavel relative flex min-h-10 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[11px] font-medium transition-colors sm:flex-row sm:gap-1.5 sm:text-xs"
+                className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:text-xs"
               >
                 {ativo &&
                   (semMovimento ? (
-                    <span className="bg-background absolute inset-0 rounded-md shadow-sm" />
+                    <span className="vidro-selecionado absolute inset-0" />
                   ) : (
                     <motion.span
                       layoutId={chaveIndicador}
-                      className="bg-background absolute inset-0 rounded-md shadow-sm"
+                      className="vidro-selecionado absolute inset-0"
                       transition={{ type: "spring", stiffness: 500, damping: 40 }}
                     />
                   ))}

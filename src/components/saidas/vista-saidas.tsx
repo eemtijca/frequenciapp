@@ -338,7 +338,7 @@ export default function VistaSaidas({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia anterior"
           onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
         >
@@ -359,7 +359,7 @@ export default function VistaSaidas({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
           aria-label="Dia seguinte"
           disabled={dia >= diaCorrente}
           onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
@@ -369,7 +369,7 @@ export default function VistaSaidas({
       </div>
 
       <form
-        className="bg-card flex flex-col gap-3 rounded-lg border p-4"
+        className="superficie-vidro flex flex-col gap-3 p-4"
         onSubmit={(evento) => {
           evento.preventDefault();
           void registrar();
@@ -444,7 +444,7 @@ export default function VistaSaidas({
                 setJustificativa("");
                 setObservacao("");
               }}
-              className="aria-[checked=true]:border-primary aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+              className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
             >
               Escrever em poucas palavras
             </button>
@@ -456,7 +456,7 @@ export default function VistaSaidas({
                 setFormaJustificativa("catalogo");
                 setTexto("");
               }}
-              className="aria-[checked=true]:border-primary aria-[checked=true]:bg-primary aria-[checked=true]:text-primary-foreground pressionavel flex h-11 items-center rounded-lg border px-4 text-sm font-medium transition-colors"
+              className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
             >
               Tipos de justificativa
             </button>
@@ -548,7 +548,7 @@ export default function VistaSaidas({
         <Button
           type="submit"
           size="lg"
-          className="h-11 w-full rounded-lg px-6 sm:w-auto"
+          className="h-11 w-full px-6 sm:w-auto"
           disabled={enviando || opcoesLiberador.length === 0}
         >
           {enviando && <LoaderCircle size={16} className="animate-spin" />}
@@ -556,7 +556,7 @@ export default function VistaSaidas({
         </Button>
       </form>
 
-      <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+      <div className="superficie-vidro flex flex-col gap-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-medium">Saídas por turma</h2>
           <span className="text-muted-foreground text-xs">
@@ -608,7 +608,7 @@ export default function VistaSaidas({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="text-falta-texto h-9 shrink-0 rounded-lg px-2"
+                              className="text-falta-texto h-9 shrink-0 px-2"
                               onClick={() => void remover(saida)}
                               disabled={removendoId === saida.id}
                             >
@@ -626,7 +626,7 @@ export default function VistaSaidas({
         )}
       </div>
 
-      <div className="bg-card flex flex-col gap-3 rounded-lg border p-4">
+      <div className="superficie-vidro flex flex-col gap-3 p-4">
         <button
           type="button"
           aria-expanded={relatorioAberto}
@@ -680,7 +680,7 @@ export default function VistaSaidas({
                   valor={buscaRelatorio}
                   onValor={setBuscaRelatorio}
                   placeholder="Digite o nome"
-                  className="rounded-lg border-0 px-0 py-0"
+                  className="border-0 px-0 py-0"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -702,7 +702,7 @@ export default function VistaSaidas({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-lg"
+                className="h-11"
                 onClick={() => void carregarRelatorio()}
                 disabled={carregandoRelatorio}
               >
@@ -776,7 +776,7 @@ export default function VistaSaidas({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-falta text-falta-foreground hover:bg-falta/90"
+              variant="destructive"
               onClick={confirmarRemocao}
               disabled={saidaRemover !== null && removendoId === saidaRemover.id}
             >

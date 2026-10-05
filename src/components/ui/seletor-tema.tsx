@@ -42,7 +42,7 @@ export function SeletorTema({ className }: { className?: string }) {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-44">
-        <div role="radiogroup" aria-label="Tema do aplicativo" className="flex flex-col">
+        <div role="radiogroup" aria-label="Tema do aplicativo" className="flex flex-col gap-1">
           {OPCOES.map(({ valor, rotulo, Icone }) => {
             const ativo = montado ? theme === valor : valor === "system";
             return (
@@ -52,7 +52,10 @@ export function SeletorTema({ className }: { className?: string }) {
                 role="radio"
                 aria-checked={ativo}
                 onClick={() => setTheme(valor)}
-                className="hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                className={cn(
+                  "pressionavel focus-visible:ring-ring/50 flex min-h-11 items-center gap-2 px-2.5 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+                  ativo ? "vidro-selecionado" : "vidro-discreto",
+                )}
               >
                 <Icone size={16} aria-hidden="true" />
                 {rotulo}

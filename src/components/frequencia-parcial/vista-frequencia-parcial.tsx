@@ -368,7 +368,7 @@ export default function VistaFrequenciaParcial({
           variant="outline"
           onClick={() => setEnvioAberto(true)}
           disabled={!estadoPlanilha?.podeEnviar || ocupado || sujo}
-          className="h-11 rounded-lg"
+          className="h-11"
         >
           <FileSpreadsheet size={16} />
           Enviar para planilha
@@ -393,7 +393,7 @@ export default function VistaFrequenciaParcial({
           aria-label="Dia anterior da chamada parcial"
           onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
           disabled={ocupado || editorAberto}
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
         >
           <ChevronLeft size={18} />
         </Button>
@@ -417,7 +417,7 @@ export default function VistaFrequenciaParcial({
           aria-label="Dia seguinte da chamada parcial"
           onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
           disabled={ocupado || editorAberto || dia >= diaInicial}
-          className="size-11 shrink-0 rounded-lg"
+          className="size-11 shrink-0"
         >
           <ChevronRight size={18} />
         </Button>
@@ -432,7 +432,7 @@ export default function VistaFrequenciaParcial({
           valor={busca}
           onValor={setBusca}
           placeholder="Buscar aluno"
-          className="min-w-0 flex-1 rounded-lg"
+          className="min-w-0 flex-1"
         />
         <div className="sm:w-48">
           <Selecionar
@@ -465,7 +465,7 @@ export default function VistaFrequenciaParcial({
           Carregando chamada parcial...
         </p>
       ) : (
-        <div className="bg-card overflow-hidden rounded-lg border">
+        <div className="superficie-vidro overflow-hidden">
           <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
             <span className="numerais-tabulares">
               {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
@@ -546,7 +546,7 @@ export default function VistaFrequenciaParcial({
                         onClick={() => abrirEditor(registro ?? null, aluno.id)}
                         aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
                         disabled={ocupado || editorAberto || (!registro && aluno.desistente)}
-                        className="h-11 rounded-lg"
+                        className="h-11"
                       >
                         {registro ? <Pencil size={15} /> : <Plus size={15} />}
                         {registro ? "Editar" : "Registrar"}
@@ -558,7 +558,7 @@ export default function VistaFrequenciaParcial({
                           onClick={() => setRegistroRemover(registro)}
                           aria-label={`Remover frequência parcial de ${aluno.nome}`}
                           disabled={ocupado || editorAberto}
-                          className="text-falta-texto h-11 rounded-lg"
+                          className="text-falta-texto h-11"
                         >
                           <Trash2 size={15} />
                           Remover
@@ -642,7 +642,7 @@ export default function VistaFrequenciaParcial({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={removendo}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-falta text-falta-foreground hover:bg-falta/90"
+              variant="destructive"
               disabled={removendo}
               onClick={(evento) => {
                 evento.preventDefault();

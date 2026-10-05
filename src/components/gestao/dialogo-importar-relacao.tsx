@@ -210,7 +210,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
               type="button"
               variant="outline"
               size="sm"
-              className="h-9 rounded-lg"
+              className="h-9"
               onClick={() => seletor.current?.click()}
             >
               <FileUp size={16} />
@@ -236,7 +236,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
             spellCheck={false}
             aria-invalid={foraDoPadrao || undefined}
             aria-describedby="situacao-relacao"
-            className="border-input bg-background focus-visible:ring-ring/50 focus-visible:border-ring aria-[invalid=true]:border-falta min-h-36 w-full rounded-lg border px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
+            className="controle-vidro focus-visible:ring-ring/50 focus-visible:border-ring aria-[invalid=true]:border-falta min-h-36 w-full px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
             placeholder={`${CABECALHO_RELACAO}\n3º ano A;1;Nome do aluno;3º ano B`}
           />
           <div id="situacao-relacao">
@@ -275,7 +275,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
             )}
             <ul className="grid gap-2 sm:grid-cols-3" aria-label="Alunos por turma">
               {plano.turmas.map((turma) => (
-                <li key={turma.turmaId} className="bg-card rounded-lg border px-3 py-2">
+                <li key={turma.turmaId} className="superficie-vidro px-3 py-2">
                   <p className="text-sm font-medium">{turma.rotulo}</p>
                   <p className="text-muted-foreground numerais-tabulares text-xs">
                     {plural(turma.alunos, "aluno", "alunos")}
@@ -283,7 +283,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
                 </li>
               ))}
             </ul>
-            <div className="divide-y rounded-lg border">
+            <div className="superficie-vidro divide-y overflow-hidden">
               {grupos.map((grupo) => (
                 <details key={grupo.titulo} className="px-3 py-2">
                   <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
