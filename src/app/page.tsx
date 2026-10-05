@@ -1,3 +1,4 @@
+// Página autenticada: carrega o escopo e encaminha o retorno da conexão Google.
 import { identidadeAtual } from "@/application/sessao";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -20,7 +21,12 @@ export const dynamic = "force-dynamic";
 export default async function Pagina({
   searchParams,
 }: {
-  searchParams: Promise<{ visao?: string; google?: string; aba?: string }>;
+  searchParams: Promise<{
+    visao?: string;
+    google?: string;
+    googleFinalidade?: string;
+    aba?: string;
+  }>;
 }) {
   const usuario = await identidadeAtual(ambiente.authSecret);
   if (!usuario) return <TelaLogin />;
@@ -65,6 +71,13 @@ export default async function Pagina({
       visaoInicial={parametros.visao}
       abaMovimentacaoInicial={parametros.aba === "entradas" ? "entradas" : "saidas"}
       abaGestaoInicial={parametros.google ? "configuracoes" : undefined}
+      planilhaInicial={
+        parametros.google
+          ? parametros.googleFinalidade === "SAIDAS" || parametros.googleFinalidade === "PARCIAL"
+            ? parametros.googleFinalidade
+            : "FREQUENCIA"
+          : undefined
+      }
       seriesIniciais={series}
       turmasIniciais={turmas}
       alunosIniciais={alunos}

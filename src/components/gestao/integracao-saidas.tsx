@@ -57,10 +57,16 @@ interface IntegracaoSaidasAdmin {
 
 const NOME_ABA_PADRAO = "Saiu mais cedo";
 
-export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: () => void }) {
+export default function IntegracaoSaidas({
+  onAbrirSaidas,
+  abertoInicial = false,
+}: {
+  onAbrirSaidas?: () => void;
+  abertoInicial?: boolean;
+}) {
   const [integracao, setIntegracao] = useState<IntegracaoSaidasAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [aberto, setAberto] = useState<boolean | null>(null);
+  const [aberto, setAberto] = useState(abertoInicial);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
@@ -80,7 +86,6 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     try {
       const dados = await pedir<{ integracao: IntegracaoSaidasAdmin }>("/api/planilha-saidas");
       setIntegracao(dados.integracao);
-      setAberto((atual) => atual ?? !dados.integracao.esquema);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
@@ -99,7 +104,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível ler a integração.");
       setErroVariante(estadoDeErro(excecao));
-      setAberto((atual) => atual ?? true);
+      setAberto(true);
     } finally {
       setCarregando(false);
     }
@@ -242,7 +247,7 @@ export default function IntegracaoSaidas({ onAbrirSaidas }: { onAbrirSaidas?: ()
     });
   }
 
-  if (carregando || aberto === null) {
+  if (carregando) {
     return (
       <section
         data-secao="planilha-saidas"

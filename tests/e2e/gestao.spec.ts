@@ -1,16 +1,77 @@
-// Abas da Gestão: seleção por toque e teclado.
+// Navegação da Gestão e das configurações, com preservação de rascunhos e retorno do Google.
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("abas da Gestão", () => {
-  test("retorno do OAuth abre diretamente as configurações", async ({ page }) => {
-    await page.goto("/?visao=gestao&google=conectado");
+  const retornosGoogle = [
+    { finalidade: "FREQUENCIA", secao: "planilha-frequencia" },
+    { finalidade: "SAIDAS", secao: "planilha-saidas" },
+    { finalidade: "PARCIAL", secao: "planilha-parcial" },
+    { finalidade: "", secao: "planilha-frequencia" },
+  ];
+
+  for (const retorno of retornosGoogle) {
+    test(`retorno do Google ${retorno.finalidade || "antigo"} abre a planilha correspondente`, async ({
+      page,
+    }) => {
+      const finalidade = retorno.finalidade ? `&googleFinalidade=${retorno.finalidade}` : "";
+      await page.goto(`/?visao=gestao&google=conectado${finalidade}`);
+      await aguardarHidratacao(page);
+      await expect(page.getByRole("tab", { name: "Configurações" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await expect(page.getByText("Conta Google conectada. Escolha a planilha.")).toBeVisible();
+      await expect(
+        page
+          .getByRole("navigation", { name: "Categorias de configurações" })
+          .getByRole("button", { name: "Planilhas", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      for (const secao of ["planilha-frequencia", "planilha-saidas", "planilha-parcial"]) {
+        const cartao = page.locator(`[data-secao="${secao}"]`);
+        await expect(cartao).toBeVisible();
+        await expect(cartao.getByRole("button", { name: /^Planilha de/ })).toHaveAttribute(
+          "aria-expanded",
+          secao === retorno.secao ? "true" : "false",
+        );
+      }
+    });
+  }
+
+  test("as configurações mostram uma categoria por vez e preservam um rascunho", async ({
+    page,
+  }) => {
+    await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.getByRole("tab", { name: "Configurações" })).toHaveAttribute(
-      "aria-selected",
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: "Configurações" }).click();
+    const categorias = page.getByRole("navigation", { name: "Categorias de configurações" });
+    const justificativas = page.locator('[data-secao="config-justificativas"]');
+    const copia = page.locator('[data-secao="config-copia"]');
+    await expect(categorias.getByRole("button", { name: "Escola", exact: true })).toHaveAttribute(
+      "aria-pressed",
       "true",
     );
-    await expect(page.getByText("Conta Google conectada. Escolha a planilha.")).toBeVisible();
+    await expect(justificativas).toBeVisible();
+    await expect(copia).toBeHidden();
+    await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
+    await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
+
+    await justificativas.getByRole("button", { name: /^Justificativas/ }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("E2E");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Rascunho preservado");
+    await categorias.getByRole("button", { name: "Dados", exact: true }).click();
+    await expect(copia).toBeVisible();
+    await expect(justificativas).toBeHidden();
+    await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
+    await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
+
+    await categorias.getByRole("button", { name: "Escola", exact: true }).click();
+    await expect(copia).toBeHidden();
+    await expect(justificativas.getByLabel("Código", { exact: true })).toHaveValue("E2E");
+    await expect(justificativas.getByLabel("Rótulo", { exact: true })).toHaveValue(
+      "E2E Rascunho preservado",
+    );
   });
 
   test("sincroniza toque e teclado", async ({ page }) => {
