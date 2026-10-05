@@ -14,6 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Conexão PostgreSQL respeita o parâmetro `schema` no Prisma, nas consultas SQL diretas, nos scripts administrativos e no migrador Docker. O Preview pode usar seu próprio schema no mesmo database, sem recorrer às tabelas de `public` quando o destino explícito está ausente; a documentação separa a seleção de schema da autenticação no pooler.
+
 - Chamada Parcial exibe a lista da turma na ordem da chamada normal, com registro por aluno, busca e filtros. A chave da Seduc fica bloqueada até salvar; remover a frequência parcial mantém o aluno na lista.
 
 - Avisos no celular e tablet ficam abaixo do cabeçalho, respeitando a área segura e mantendo o novo botão Gestão acessível durante as mensagens.

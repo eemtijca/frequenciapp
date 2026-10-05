@@ -50,13 +50,17 @@ A aplicação avisa no log na partida. Sem TLS, o tráfego fica em texto puro (s
 Exemplo de produção:
 
 ```text
-DATABASE_URL=postgresql://prisma.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require
-DIRECT_URL=postgresql://prisma.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require
+DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require
 ```
 
 O host, o usuário e a senha devem ser copiados do painel do Supabase. A senha precisa estar codificada para URL. A Transaction pooler é usada pelo runtime serverless. A Session pooler é usada pelo CLI e por operações que preservam estado de conexão.
 
 A conexão do runtime também pode usar uma conexão direta ou o pooler de sessão em ambientes persistentes. O Supabase em Vercel deve usar a Transaction pooler.
+
+O parâmetro `schema` da URL seleciona o schema PostgreSQL; sem ele, o padrão é `public`. Para o Preview no mesmo database, acrescente `&schema=preview` às duas URLs, somente no escopo Preview da Vercel. O nome `preview` é um exemplo: use o schema provisionado para o ambiente. O runtime informa esse schema ao adaptador Prisma e qualifica as consultas SQL diretas; os scripts administrativos usam o mesmo destino pela `DIRECT_URL`, com fallback para `DATABASE_URL`.
+
+O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhido. O schema não substitui o usuário nem cria uma conta de acesso. Preparação, migrações e diagnóstico estão em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 
 ## Variáveis de script
 
@@ -119,4 +123,4 @@ A URL do host e a URL interna do contêiner têm hosts diferentes. O `.env` do h
 curl -s http://localhost:3000/api/saude
 ```
 
-Responde `{"ok":true}` quando o processo está de pé. A validação de ambiente acontece antes: sem `DATABASE_URL` válida ou sem `AUTH_SECRET`, o processo não inicia.
+Responde com `"ok":true` quando a conexão responde a `select 1`. Essa consulta não comprova acesso às tabelas nem o isolamento do schema; confirme também o login com uma conta do ambiente. A validação de ambiente acontece antes: sem `DATABASE_URL` válida ou sem `AUTH_SECRET`, o processo não inicia.

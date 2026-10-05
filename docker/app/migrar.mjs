@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { schemaDaConexao, selecionarSchema } from "../../src/infra/schema-postgres.mjs";
 
 const TIMEOUT_CONEXAO_MS = 5000;
 
@@ -38,7 +39,11 @@ function orientacaoDoErro(codigo) {
     case "3D000":
       return "O banco informado não existe. Confira o nome do banco na connection string.";
     case "42P01":
-      return "O schema esperado não existe. Aplique as migrations ou corrija o schema configurado.";
+      return "A tabela esperada não existe. Confira as migrações do schema configurado.";
+    case "3F000":
+      return "Confira o schema de DIRECT_URL ou DATABASE_URL antes de aplicar migrações.";
+    case "42501":
+      return "Confira as permissões da conexão no schema configurado.";
     default:
       return "Verifique as credenciais, o banco e a rede entre os contêineres.";
   }
@@ -57,6 +62,12 @@ const pasta = path.join(raiz, "prisma", "migrations");
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!url) {
   console.error("[migrar] DIRECT_URL ou DATABASE_URL não definida.");
+  process.exit(1);
+}
+try {
+  schemaDaConexao(url);
+} catch (erro) {
+  console.error(`[migrar] ${erro.message}`);
   process.exit(1);
 }
 
@@ -84,6 +95,7 @@ async function listar() {
 
 async function main() {
   await conectar();
+  await selecionarSchema(cliente, url);
   await cliente.query("select pg_advisory_lock($1)", [CHAVE_TRAVA]);
 
   await cliente.query(
@@ -159,4 +171,8 @@ async function main() {
   await cliente.end();
 }
 
-main();
+main().catch(async (erro) => {
+  console.error(`[migrar] Não foi possível preparar as migrações (${descreverErro(erro)})`);
+  await cliente.end().catch(() => undefined);
+  process.exitCode = 3;
+});

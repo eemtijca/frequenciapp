@@ -3,6 +3,7 @@
 // Idempotente por entidade e sem dados reais, conforme a LGPD.
 import pg from "pg";
 import "dotenv/config";
+import { schemaDaConexao, selecionarSchema } from "../src/infra/schema-postgres.mjs";
 
 const email = process.env.CONTA_EMAIL?.trim().toLowerCase();
 const totalPorTurma = Number(process.env.SEED_ALUNOS ?? 12);
@@ -24,8 +25,10 @@ if (!Number.isInteger(totalDeDias) || totalDeDias < 1 || totalDeDias > 30) {
 }
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-if (!url || !(url.startsWith("postgresql://") || url.startsWith("postgres://"))) {
-  console.error("DIRECT_URL ou DATABASE_URL deve ser uma connection string PostgreSQL.");
+try {
+  schemaDaConexao(url);
+} catch (erro) {
+  console.error(erro.message);
   process.exit(1);
 }
 
@@ -102,6 +105,7 @@ const cliente = new pg.Client({ connectionString: url });
 
 try {
   await cliente.connect();
+  await selecionarSchema(cliente, url);
 
   const coordenacao = await cliente.query(
     "select id from usuarios where lower(email) = $1 and papel = 'COORDENACAO'",

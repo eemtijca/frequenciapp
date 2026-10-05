@@ -39,6 +39,7 @@ COPY --from=compilacao /app/prisma ./prisma
 COPY --from=compilacao /app/generated ./generated
 COPY --from=compilacao /app/docker ./docker
 COPY --from=compilacao /app/scripts ./scripts
+COPY --from=compilacao /app/src/infra/schema-postgres.mjs ./src/infra/schema-postgres.mjs
 # Fecho de dependências do migrador e dos scripts administrativos, que
 # rodam fora da árvore do standalone: pg e transitivas, mais dotenv.
 COPY --from=dependencias /app/node_modules/dotenv ./node_modules/dotenv

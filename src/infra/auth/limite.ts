@@ -1,7 +1,7 @@
 // Limitador de tentativas por chave, guardado no banco para valer entre
 // instâncias (Vercel e várias réplicas). A contagem e a janela avançam num
 // único upsert atômico; linhas vencidas são expurgadas de tempos em tempos.
-import { banco } from "@/infra/banco";
+import { banco, objetoDoBanco } from "@/infra/banco";
 
 /** Janela usada pelos limites operacionais que não têm parâmetro próprio. */
 const JANELA_PADRAO_MS = 15 * 60 * 1000;
@@ -21,18 +21,18 @@ export async function limiteDeTentativas(
 ): Promise<boolean> {
   const segundos = janelaMs / 1000;
   const linhas = await banco().$queryRaw<{ contagem: number }[]>`
-    INSERT INTO "tentativas_entrada" ("chave", "contagem", "janela_inicio")
+    INSERT INTO ${objetoDoBanco("tentativas_entrada")} AS tentativa ("chave", "contagem", "janela_inicio")
     VALUES (${chave.slice(0, 300)}, 1, now())
     ON CONFLICT ("chave") DO UPDATE SET
       "contagem" = CASE
-        WHEN "tentativas_entrada"."janela_inicio" < now() - make_interval(secs => ${segundos}::double precision)
+        WHEN tentativa."janela_inicio" < now() - make_interval(secs => ${segundos}::double precision)
           THEN 1
-        ELSE "tentativas_entrada"."contagem" + 1
+        ELSE tentativa."contagem" + 1
       END,
       "janela_inicio" = CASE
-        WHEN "tentativas_entrada"."janela_inicio" < now() - make_interval(secs => ${segundos}::double precision)
+        WHEN tentativa."janela_inicio" < now() - make_interval(secs => ${segundos}::double precision)
           THEN now()
-        ELSE "tentativas_entrada"."janela_inicio"
+        ELSE tentativa."janela_inicio"
       END
     RETURNING "contagem"`;
   if (Math.random() < CHANCE_DE_EXPURGO) await expurgarTentativas();
