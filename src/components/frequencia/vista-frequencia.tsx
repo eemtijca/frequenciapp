@@ -3,9 +3,10 @@
 // Chamada diária: todos presentes por padrão; toque no aluno para marcar
 // falta e de novo para voltar. A falta pode receber uma justificativa do
 // catálogo (FJ). Rascunho local e proteção de conflito.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CloudCheck,
@@ -148,6 +149,7 @@ export default function VistaFrequencia({
   const [observacoes, setObservacoes] = useState<Map<string, string>>(new Map());
   const [aulasAbertas, setAulasAbertas] = useState<string | null>(null);
   const [resumoAberto, setResumoAberto] = useState(false);
+  const idResumo = useId();
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [confirmacoesSeduc, setConfirmacoesSeduc] = useState<ConfirmacaoSeducAluno[]>([]);
   const { chaveAtiva: confirmandoSeduc, executar: executarSeduc } = useAcoesPorChave();
@@ -601,6 +603,7 @@ export default function VistaFrequencia({
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
+  const tituloResumo = dia === diaCorrente ? "Resumo de hoje" : "Resumo do dia";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
 
   const tituloEstado = carregando
@@ -764,43 +767,6 @@ export default function VistaFrequencia({
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-2" aria-label="Resumo da chamada">
-            <button
-              type="button"
-              aria-pressed={filtro === "faltas"}
-              onClick={() => setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))}
-              className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
-            >
-              <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-                {carregando ? "" : contagemFaltas}
-              </span>
-              <span className="text-muted-foreground text-xs font-medium">Faltas</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={filtro === "justificadas"}
-              onClick={() =>
-                setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
-              }
-              className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
-            >
-              <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
-                {carregando ? "" : contagemJustificadas}
-              </span>
-              <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={filtro === "presentes"}
-              onClick={() => setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))}
-              className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
-            >
-              <span className="numerais-tabulares text-primary text-2xl font-semibold">
-                {carregando ? "" : contagemPresencas}
-              </span>
-              <span className="text-muted-foreground text-xs font-medium">Presentes</span>
-            </button>
-          </div>
           {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
               <span>Aulas do dia:</span>
@@ -822,14 +788,20 @@ export default function VistaFrequencia({
             </p>
           )}
 
-          <button
+          <Button
             type="button"
+            variant="outline"
             aria-expanded={resumoAberto}
+            aria-controls={idResumo}
             onClick={() => setResumoAberto((atual) => !atual)}
-            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
+            className="text-primary border-primary/25 bg-primary/5 hover:bg-primary/10 hover:text-primary dark:border-primary/25 dark:bg-primary/5 dark:hover:bg-primary/10 self-start rounded-full px-4"
           >
-            {resumoAberto ? "Ocultar resumo de faltas" : "Ver resumo de faltas"}
-          </button>
+            {tituloResumo}
+            <ChevronDown
+              aria-hidden="true"
+              className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
+            />
+          </Button>
 
           {(erro || conflito) &&
             (conflito ? (
@@ -857,75 +829,130 @@ export default function VistaFrequencia({
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 xl:order-1">
-          {resumoAberto && (
-            <div className="bg-card overflow-hidden rounded-lg border">
-              <div className="bg-secondary/50 border-b px-4 py-2.5">
-                <h2 className="font-medium">Resumo de faltas</h2>
-              </div>
-              {(() => {
-                const ausentes = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id));
-                if (ausentes.length === 0) {
+          <section
+            id={idResumo}
+            aria-label={tituloResumo}
+            hidden={!resumoAberto}
+            className="bg-card overflow-hidden rounded-lg border"
+          >
+            {resumoAberto && (
+              <>
+                <div className="bg-secondary/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <h2 className="font-medium">{tituloResumo}</h2>
+                  <span className="text-muted-foreground numerais-tabulares text-xs">
+                    {rotuloDia}
+                  </span>
+                </div>
+                <div className="border-b p-3">
+                  <div className="grid grid-cols-3 gap-2" aria-label="Resumo da chamada">
+                    <button
+                      type="button"
+                      aria-pressed={filtro === "faltas"}
+                      onClick={() =>
+                        setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
+                      }
+                      className="bg-card aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                    >
+                      <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
+                        {carregando ? "" : contagemFaltas}
+                      </span>
+                      <span className="text-muted-foreground text-xs font-medium">Faltas</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={filtro === "justificadas"}
+                      onClick={() =>
+                        setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
+                      }
+                      className="bg-card aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                    >
+                      <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
+                        {carregando ? "" : contagemJustificadas}
+                      </span>
+                      <span className="text-muted-foreground text-xs font-medium">
+                        Justificadas
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={filtro === "presentes"}
+                      onClick={() =>
+                        setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))
+                      }
+                      className="bg-card aria-[pressed=true]:border-primary aria-[pressed=true]:bg-accent pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-lg border px-2 py-2 transition-colors"
+                    >
+                      <span className="numerais-tabulares text-primary text-2xl font-semibold">
+                        {carregando ? "" : contagemPresencas}
+                      </span>
+                      <span className="text-muted-foreground text-xs font-medium">Presentes</span>
+                    </button>
+                  </div>
+                </div>
+                {(() => {
+                  const ausentes = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id));
+                  if (ausentes.length === 0) {
+                    return (
+                      <p className="text-muted-foreground px-4 py-3 text-sm">
+                        Nenhuma falta nesta chamada.
+                      </p>
+                    );
+                  }
                   return (
-                    <p className="text-muted-foreground px-4 py-3 text-sm">
-                      Nenhuma falta nesta chamada.
-                    </p>
-                  );
-                }
-                return (
-                  <ul className="divide-y">
-                    {ausentes.map((aluno) => {
-                      const acumulado = acumuladoDe(aluno.id);
-                      const codigo = justificativas.get(aluno.id);
-                      return (
-                        <li
-                          key={aluno.id}
-                          className="flex items-start gap-3 px-4 py-2.5 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium">
-                              {nomeNaChamada(
-                                aluno.nome,
-                                mostrarOrigem,
-                                aluno.turmaOriginalId !== turmaId,
-                              )}
-                              {codigo && (
-                                <span className="text-primary ml-2 text-xs font-semibold">
-                                  {codigo}
+                    <ul className="divide-y">
+                      {ausentes.map((aluno) => {
+                        const acumulado = acumuladoDe(aluno.id);
+                        const codigo = justificativas.get(aluno.id);
+                        return (
+                          <li
+                            key={aluno.id}
+                            className="flex items-start gap-3 px-4 py-2.5 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {nomeNaChamada(
+                                  aluno.nome,
+                                  mostrarOrigem,
+                                  aluno.turmaOriginalId !== turmaId,
+                                )}
+                                {codigo && (
+                                  <span className="text-primary ml-2 text-xs font-semibold">
+                                    {codigo}
+                                  </span>
+                                )}
+                              </span>
+                              {(mostrarOrigem || codigo) && (
+                                <span className="text-muted-foreground block truncate text-xs">
+                                  {mostrarOrigem
+                                    ? `Origem ${rotuloOrigemDe(aluno.turmaOriginalId)}`
+                                    : ""}
+                                  {codigo
+                                    ? `${mostrarOrigem ? " · " : ""}${rotuloJustificativa(codigo, catalogoJustificativas)}`
+                                    : ""}
                                 </span>
                               )}
                             </span>
-                            {(mostrarOrigem || codigo) && (
-                              <span className="text-muted-foreground block truncate text-xs">
-                                {mostrarOrigem
-                                  ? `Origem ${rotuloOrigemDe(aluno.turmaOriginalId)}`
-                                  : ""}
-                                {codigo
-                                  ? `${mostrarOrigem ? " · " : ""}${rotuloJustificativa(codigo, catalogoJustificativas)}`
-                                  : ""}
-                              </span>
-                            )}
-                          </span>
-                          <span className="flex shrink-0 flex-col items-end gap-1">
-                            {acumulado ? (
-                              <>
-                                <CirculosAcumulado
-                                  faltas={acumulado.faltas}
-                                  justificadas={acumulado.faltasJustificadas}
-                                />
-                                <span className="text-muted-foreground text-xs">acumulado</span>
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">sem acumulado</span>
-                            )}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                );
-              })()}
-            </div>
-          )}
+                            <span className="flex shrink-0 flex-col items-end gap-1">
+                              {acumulado ? (
+                                <>
+                                  <CirculosAcumulado
+                                    faltas={acumulado.faltas}
+                                    justificadas={acumulado.faltasJustificadas}
+                                  />
+                                  <span className="text-muted-foreground text-xs">acumulado</span>
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">sem acumulado</span>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  );
+                })()}
+              </>
+            )}
+          </section>
 
           <div className="bg-card overflow-hidden rounded-lg border">
             <BarraBusca
@@ -1019,115 +1046,122 @@ export default function VistaFrequencia({
                       key={aluno.id}
                       className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
                     >
-                      <div className={`flex items-stretch ${faltando ? "bg-falta-fraca" : ""}`}>
-                        <button
-                          type="button"
-                          aria-pressed={faltando}
-                          disabled={bloqueado || desistente}
-                          aria-label={`${nomeExibido}${
-                            mostrarOrigem
-                              ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
-                              : ""
-                          }: ${
-                            desistente
-                              ? "desistente. Marcação bloqueada."
-                              : faltando
-                                ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
-                                : "presente. Toque para marcar falta."
-                          }${
-                            temAcumulado && acumulado
-                              ? ` ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
-                              : ""
-                          }`}
-                          onClick={() => alternarFalta(aluno.id)}
-                          className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
-                            faltando ? "" : "hover:bg-secondary/60"
-                          }`}
-                        >
-                          <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                            {String(aluno.ordem).padStart(2, "0")}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="flex min-w-0 items-center gap-2">
-                              <span
-                                className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
-                              >
-                                {nomeExibido}
-                              </span>
-                              {desistente && (
-                                <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
-                                  DESISTENTE
-                                </span>
-                              )}
-                              {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
-                                <CirculoValor
-                                  texto={rotuloCurtoDe(aluno.turmaOriginalId)}
-                                  rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
-                                />
-                              )}
-                            </span>
-                            {parcial ? (
-                              <span className="text-falta-texto block truncate text-xs">
-                                saiu em parte das aulas
-                              </span>
-                            ) : temAcumulado && acumulado ? (
-                              <span className="mt-0.5 flex flex-wrap items-center gap-1">
-                                <span className="text-muted-foreground text-xs">Acumulado</span>
-                                <CirculosAcumulado
-                                  faltas={acumulado.faltas}
-                                  justificadas={acumulado.faltasJustificadas}
-                                />
-                              </span>
-                            ) : null}
-                          </span>
-                          <motion.span
-                            key={desistente ? "D" : faltando ? codigo || "F" : "P"}
-                            initial={semMovimento ? false : MARCAS.escondido}
-                            animate={MARCAS.visivel}
-                            transition={
-                              semMovimento
-                                ? { duration: 0 }
-                                : { type: "spring", stiffness: 500, damping: 28 }
-                            }
-                            className={
+                      <div className={faltando ? "bg-falta-fraca" : ""}>
+                        <div className="flex items-stretch">
+                          <button
+                            type="button"
+                            aria-pressed={faltando}
+                            disabled={bloqueado || desistente}
+                            aria-label={`${nomeExibido}${
+                              mostrarOrigem
+                                ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
+                                : ""
+                            }: ${
                               desistente
-                                ? "bg-secondary text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                ? "desistente. Marcação bloqueada."
                                 : faltando
-                                  ? codigo
-                                    ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                                    : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                                  : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
-                            }
+                                  ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                                  : "presente. Toque para marcar falta."
+                            }${
+                              temAcumulado && acumulado
+                                ? ` ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
+                                : ""
+                            }`}
+                            onClick={() => alternarFalta(aluno.id)}
+                            className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
+                              faltando ? "" : "hover:bg-secondary/60"
+                            }`}
                           >
-                            {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
-                          </motion.span>
-                        </button>
-                        <div className="flex shrink-0 flex-col items-end justify-center gap-1.5 py-2 pr-4">
-                          <Label htmlFor={`chamada-seduc-${aluno.id}`} className="text-xs">
-                            Seduc
+                            <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+                              {String(aluno.ordem).padStart(2, "0")}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span
+                                  className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                                >
+                                  {nomeExibido}
+                                </span>
+                                {desistente && (
+                                  <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
+                                    DESISTENTE
+                                  </span>
+                                )}
+                                {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
+                                  <CirculoValor
+                                    texto={rotuloCurtoDe(aluno.turmaOriginalId)}
+                                    rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
+                                  />
+                                )}
+                              </span>
+                              {parcial ? (
+                                <span className="text-falta-texto block truncate text-xs">
+                                  saiu em parte das aulas
+                                </span>
+                              ) : temAcumulado && acumulado ? (
+                                <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                  <span className="text-muted-foreground text-xs">Acumulado</span>
+                                  <CirculosAcumulado
+                                    faltas={acumulado.faltas}
+                                    justificadas={acumulado.faltasJustificadas}
+                                  />
+                                </span>
+                              ) : null}
+                            </span>
+                            <motion.span
+                              key={desistente ? "D" : faltando ? codigo || "F" : "P"}
+                              initial={semMovimento ? false : MARCAS.escondido}
+                              animate={MARCAS.visivel}
+                              transition={
+                                semMovimento
+                                  ? { duration: 0 }
+                                  : { type: "spring", stiffness: 500, damping: 28 }
+                              }
+                              className={
+                                desistente
+                                  ? "bg-secondary text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                  : faltando
+                                    ? codigo
+                                      ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
+                                      : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
+                                    : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
+                              }
+                            >
+                              {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
+                            </motion.span>
+                          </button>
+                          {faltando && configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
+                            <button
+                              type="button"
+                              aria-expanded={aulasAbertas === aluno.id}
+                              aria-label={`Aulas em que ${nomeExibido} faltou`}
+                              disabled={bloqueado}
+                              onClick={() =>
+                                setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
+                              }
+                              className="text-muted-foreground hover:bg-secondary border-border pressionavel my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
+                            >
+                              Aulas
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 pr-4 pb-1 pl-14">
+                          <Label
+                            htmlFor={`chamada-seduc-${aluno.id}`}
+                            className="min-h-11 text-xs"
+                            title="Registrado na Seduc"
+                          >
+                            RS
                           </Label>
                           <Switch
                             id={`chamada-seduc-${aluno.id}`}
-                            aria-label={`Registrado na Seduc: ${nomeExibido}`}
+                            aria-label={`RS, Registrado na Seduc: ${nomeExibido}`}
+                            title="Registrado na Seduc"
                             checked={confirmacaoSeduc?.registradoSeduc ?? false}
                             disabled={ocupado || sujo || !chamadaBloqueada || !confirmacaoSeduc}
                             onCheckedChange={(valor) => confirmarSeduc(aluno.id, valor)}
                           />
                         </div>
-                        {faltando && configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
-                          <button
-                            type="button"
-                            aria-expanded={aulasAbertas === aluno.id}
-                            aria-label={`Aulas em que ${nomeExibido} faltou`}
-                            disabled={bloqueado}
-                            onClick={() =>
-                              setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
-                            }
-                            className="text-muted-foreground hover:bg-secondary border-border pressionavel my-2 mr-2 h-9 shrink-0 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50"
-                          >
-                            Aulas
-                          </button>
-                        )}
                       </div>
                       {confirmacaoSeduc?.registradoSeduc && (
                         <p className="text-muted-foreground px-4 pb-2 text-xs break-words">

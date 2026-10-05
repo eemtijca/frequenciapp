@@ -1,0 +1,164 @@
+/* Vidro dos seletores da Chamada: reflexos suaves, seleção verde e texto opaco.
+   O acabamento fica restrito ao componente e tem alternativas sem transparência. */
+.seletor {
+  --vidro-reflexo: rgb(255 255 255 / 78%);
+  --vidro-brilho: rgb(255 255 255 / 46%);
+  --vidro-sombra: rgb(24 34 29 / 7%);
+}
+
+:global(.dark) .seletor {
+  --vidro-reflexo: rgb(255 255 255 / 19%);
+  --vidro-brilho: rgb(255 255 255 / 6%);
+  --vidro-sombra: rgb(0 0 0 / 22%);
+}
+
+.faixa,
+.turma {
+  background-color: var(--card);
+  background-image: linear-gradient(145deg, var(--vidro-brilho), transparent 62%);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--vidro-reflexo),
+    0 4px 14px var(--vidro-sombra);
+}
+
+.faixa {
+  border-radius: calc(var(--radius) + 12px);
+  padding: 5px;
+}
+
+.serie,
+.turma {
+  position: relative;
+  height: auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  white-space: normal;
+  color: var(--foreground);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    scale 180ms ease;
+}
+
+.serie {
+  min-height: 56px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius) + 7px);
+  padding: 10px 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.serie:where([aria-pressed="true"]),
+.turma:where([aria-pressed="true"]) {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background-color: color-mix(in oklab, var(--primary) 12%, var(--card));
+  background-image: linear-gradient(145deg, var(--vidro-brilho), transparent 68%);
+  box-shadow:
+    inset 0 1px 0 var(--vidro-reflexo),
+    inset 0 -1px 0 color-mix(in oklab, var(--primary) 14%, transparent),
+    0 3px 10px var(--vidro-sombra);
+}
+
+.serie:where([aria-pressed="true"]) {
+  color: var(--primary);
+}
+
+.turma {
+  min-height: 68px;
+  align-items: flex-start;
+  border-radius: calc(var(--radius) + 8px);
+  padding: 12px;
+  text-align: left;
+}
+
+.confirmacao {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.serie:focus-visible,
+.turma:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .faixa,
+  .turma {
+    background-color: color-mix(in oklab, var(--card) 78%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(1.15);
+    backdrop-filter: blur(12px) saturate(1.15);
+  }
+
+  .turma:where([aria-pressed="true"]) {
+    background-color: color-mix(in oklab, var(--primary) 12%, var(--card) 84%);
+  }
+}
+
+@media (hover: hover) {
+  .serie:where(:not(:disabled):hover),
+  .turma:where(:not(:disabled):hover) {
+    background-color: color-mix(in oklab, var(--primary) 7%, var(--card));
+    border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  }
+
+  .serie:where([aria-pressed="true"]:hover),
+  .turma:where([aria-pressed="true"]:hover) {
+    background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .faixa,
+  .serie,
+  .turma {
+    background-color: var(--card);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .serie:where([aria-pressed="true"]),
+  .turma:where([aria-pressed="true"]) {
+    background-color: var(--accent);
+  }
+}
+
+@media (forced-colors: active) {
+  .faixa,
+  .serie,
+  .turma {
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .serie:where([aria-pressed="true"]),
+  .turma:where([aria-pressed="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  .serie:focus-visible,
+  .turma:focus-visible {
+    outline-offset: 3px;
+  }
+
+  .confirmacao {
+    background: Highlight;
+    color: HighlightText;
+  }
+}

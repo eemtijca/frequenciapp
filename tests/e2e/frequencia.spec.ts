@@ -54,6 +54,7 @@ test.describe("chamada com saída por aula", () => {
     await page.keyboard.press("ArrowLeft");
     await page.keyboard.press("Enter");
     await expect(painelDia).toBeHidden();
+    await expect(painel.getByRole("button", { name: "Resumo do dia" })).toBeVisible();
     await expect(painel.getByRole("button", { name: "Voltar para hoje" })).toBeVisible();
     await painel.getByRole("button", { name: "Voltar para hoje" }).click();
     await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
@@ -93,6 +94,32 @@ test.describe("chamada com saída por aula", () => {
     await expect(painel.getByText("saiu em parte das aulas").first()).toBeVisible({
       timeout: 15_000,
     });
+
+    // Recolher o resumo preserva o filtro, com uma saída acessível junto da lista.
+    const botaoResumo = painel.getByRole("button", { name: "Resumo de hoje" });
+    const resumo = painel.getByRole("region", { name: "Resumo de hoje" });
+    const alunoPresente = painel.getByRole("button", { name: /^E2E Aluno Dois:/ });
+    await expect(botaoResumo).toHaveAttribute("aria-expanded", "false");
+    await expect(resumo).toBeHidden();
+    if (isMobile) await botaoResumo.click();
+    else {
+      await botaoResumo.focus();
+      await page.keyboard.press("Enter");
+    }
+    await expect(botaoResumo).toHaveAttribute("aria-expanded", "true");
+    const faltas = resumo.getByRole("button", { name: /Faltas/ });
+    await expect(resumo.getByRole("button", { name: /Justificadas/ })).toBeVisible();
+    await expect(resumo.getByRole("button", { name: /Presentes/ })).toBeVisible();
+    await faltas.click();
+    await expect(alunoPresente).toBeHidden();
+    await botaoResumo.click();
+    await expect(resumo).toBeHidden();
+    await expect(alunoPresente).toBeHidden();
+    await botaoResumo.click();
+    await expect(faltas).toHaveAttribute("aria-pressed", "true");
+    await botaoResumo.click();
+    await painel.getByRole("button", { name: "Ver todos", exact: true }).click();
+    await expect(alunoPresente).toBeVisible();
 
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Histórico" }).click();
