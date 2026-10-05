@@ -3,6 +3,9 @@
 // Faixa de gráficos com rolagem nativa, encaixe por cartão e navegação por teclado.
 // Mantém formulários montados e limita o foco ao cartão em exibição.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Selecionar } from "@/components/ui/selecionar";
 
 interface Cartao {
   id: string;
@@ -18,6 +21,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const [altura, setAltura] = useState<number>();
   const ajudaId = useId();
   const posicaoId = useId();
+  const faixaId = useId();
   const atual = Math.min(indice, cartoes.length - 1);
   const identidade = cartoes[atual]?.id;
 
@@ -85,10 +89,49 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
       aria-roledescription="carrossel"
       className="min-w-0 space-y-2"
     >
-      <p id={ajudaId} className="text-muted-foreground text-xs">
+      <div
+        role="group"
+        aria-label="Navegação dos gráficos"
+        className="hidden items-center justify-between gap-3 lg:flex"
+      >
+        <span className="text-sm font-medium">Gráficos</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <Selecionar
+            ariaLabel="Gráfico em exibição"
+            value={cartoes[atual]?.id ?? ""}
+            onValueChange={(id) => irPara(cartoes.findIndex((cartao) => cartao.id === id))}
+            opcoes={cartoes.map((cartao) => ({ valor: cartao.id, rotulo: cartao.nome }))}
+            className="w-56"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Gráfico anterior"
+            aria-controls={faixaId}
+            disabled={atual <= 0}
+            onClick={() => irPara(atual - 1)}
+          >
+            <ChevronLeft aria-hidden="true" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Próximo gráfico"
+            aria-controls={faixaId}
+            disabled={atual >= cartoes.length - 1}
+            onClick={() => irPara(atual + 1)}
+          >
+            <ChevronRight aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+      <p id={ajudaId} className="text-muted-foreground text-xs lg:sr-only">
         Deslize para os lados para ver os gráficos. Com o teclado, use as setas esquerda e direita.
       </p>
       <div
+        id={faixaId}
         ref={faixa}
         role="group"
         aria-label="Cartões de gráficos"

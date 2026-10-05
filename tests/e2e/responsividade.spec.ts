@@ -1,5 +1,5 @@
-// Responsividade: navegação inferior no celular, barra lateral no desktop e
-// diálogo como folha inferior em telas pequenas.
+// Responsividade: navegação, largura de leitura no desktop e formulários
+// centralizados em telas pequenas.
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
@@ -65,6 +65,32 @@ test.describe("responsividade", () => {
     const aside = await page.locator("aside").boundingBox();
     const principal = await page.locator("main").boundingBox();
     expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
+  });
+
+  test("em monitor largo, o conteúdo fica centralizado com largura de leitura", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    for (const [rotulo, visao, largura] of [
+      ["Painel", "painel", 1024],
+      ["Chamada", "chamada", 1152],
+      ["Chamada Parcial", "chamada-parcial", 896],
+      ["Relatórios", "relatorios", 1280],
+      ["Gestão", "gestao", 1152],
+    ] as const) {
+      await trocarVisao(page, rotulo, visao);
+      const painel = page.locator("main > div > section:not([hidden])");
+      const caixaPainel = await painel.boundingBox();
+      const conteudo = await painel.locator(":scope > div").boundingBox();
+      expect(conteudo).not.toBeNull();
+      expect(conteudo?.width ?? Infinity).toBeLessThanOrEqual(largura);
+      expect(conteudo?.width ?? 0).toBeGreaterThan(700);
+      const centroPainel = (caixaPainel?.x ?? 0) + (caixaPainel?.width ?? 0) / 2;
+      const centroConteudo = (conteudo?.x ?? 0) + (conteudo?.width ?? 0) / 2;
+      expect(Math.abs(centroPainel - centroConteudo)).toBeLessThanOrEqual(1);
+    }
   });
 
   test("no celular os campos do login têm margem confortável", async ({ page }) => {

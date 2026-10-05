@@ -30,11 +30,17 @@ interface IntegracaoParcialAdmin {
   podeEnviar: boolean;
 }
 
-export default function IntegracaoParcial({ onAbrirParcial }: { onAbrirParcial?: () => void }) {
+export default function IntegracaoParcial({
+  onAbrirParcial,
+  abertoInicial = false,
+}: {
+  onAbrirParcial?: () => void;
+  abertoInicial?: boolean;
+}) {
   const [integracao, setIntegracao] = useState<IntegracaoParcialAdmin | null>(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(abertoInicial);
   const [confirmacao, setConfirmacao] = useState(false);
   const { chaveAtiva, executar } = useAcoesPorChave();
   const ocupado = chaveAtiva !== null;

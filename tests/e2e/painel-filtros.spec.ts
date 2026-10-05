@@ -137,6 +137,41 @@ test("a faixa aceita teclado e mantém o cartão ao mudar a largura", async ({ p
   await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
 });
 
+test("no computador, setas e seletor alternam os gráficos e respeitam os limites", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, "Controles visíveis na largura de computador.");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel");
+  const controles = page.getByRole("group", { name: "Navegação dos gráficos" });
+  const anterior = controles.getByRole("button", { name: "Gráfico anterior" });
+  const proximo = controles.getByRole("button", { name: "Próximo gráfico" });
+  const seletor = controles.getByRole("combobox", { name: "Gráfico em exibição" });
+  await expect(controles).toBeVisible();
+  await expect(anterior).toBeDisabled();
+  await expect(seletor).toContainText("Toda a escola");
+  await proximo.click();
+  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
+  await expect(anterior).toBeEnabled();
+  await anterior.click();
+  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toBeInViewport();
+  await expect(anterior).toBeDisabled();
+  await seletor.click();
+  await page.getByRole("option", { name: "Desistentes", exact: true }).click();
+  await expect(page.getByRole("article", { name: /: Desistentes$/ })).toBeInViewport();
+  await expect(proximo).toBeDisabled();
+  await expect(seletor).toBeFocused();
+  await anterior.click();
+  await expect(page.getByRole("article", { name: /: Personalizado$/ })).toBeInViewport();
+  await expect(seletor).toContainText("Personalizado");
+  await page.getByRole("group", { name: "Cartões de gráficos" }).press("Home");
+  await expect(seletor).toContainText("Toda a escola");
+  await expect(anterior).toBeDisabled();
+});
+
 test("no celular, a faixa rola sem alargar a página e ajusta a altura", async ({
   page,
   browserName,
@@ -145,6 +180,7 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
+  await expect(page.getByRole("group", { name: "Navegação dos gráficos" })).toHaveCount(0);
   await rolarAteGrafico(page, "Personalizado");
   await rolarAteGrafico(page, "Desistentes");
   await expect

@@ -22,6 +22,11 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Navegação dos gráficos no desktop com seleção direta e botões anterior e próximo, mantendo deslize e teclado.
+- Resumo visual em Relatórios com filtros de mês, série e turma, comparação de infrequência entre séries ou turmas, evolução diária com tabela acessível e ranking de alunos por faltas. Dias sem chamada ficam sem taxa; carregamento e falhas não apresentam valores antigos.
+- Configurações organizadas nas categorias Escola, Planilhas, Acesso e avisos, e Dados, preservando formulários e retorno do Google para a planilha correspondente.
+- Largura máxima por tela no desktop, mantendo o conteúdo centralizado e evitando formulários e listas excessivamente esticados.
+
 - Seletores de ano e turma da Chamada com hierarquia visual mais clara, contagens identificadas e acessíveis, áreas de toque maiores e seleção indicada por borda, fundo suave e ícone.
 
 - Implantação em AWS, Azure e GCP com Terraform, com módulos em `infra/terraform/`, modo local nos emuladores do Floci, workflow `infra.yml` e documentação em `docs/implantacao-nuvem.md` (ADR-036).
