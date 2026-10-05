@@ -229,13 +229,13 @@ Toda mudança passa por revisão e pelos workflows do GitHub Actions:
 | `codeql.yml`     | Análise de segurança de JavaScript e TypeScript em push, pull request e agenda semanal.                 |
 | `publicacao.yml` | Publicação da imagem no GHCR ao publicar um release estável.                                            |
 
-A `main` é protegida por rulesets: pull request obrigatório, checks verdes, conversas resolvidas e merge commit como único método. A autoaprovação não existe no GitHub; donos da organização podem mesclar os próprios pull requests com o bypass da regra de revisão, mas continuam sujeitos aos checks de qualidade.
+A `main` é protegida por rulesets: pull request obrigatório, checks verdes, conversas resolvidas e squash como único método. Todo pull request precisa da aprovação de um mantenedor do [CODEOWNERS](.github/CODEOWNERS); depois da aprovação, quem abriu pode mesclar. A autoaprovação não existe no GitHub; donos da organização podem mesclar com o bypass da regra de revisão, mas continuam sujeitos aos checks de qualidade.
 
 Corrija as falhas antes de pedir nova revisão. Pull requests sem verificações verdes não são mesclados. O check `validar` volta a rodar quando o título ou as etiquetas mudam; se faltar etiqueta, aplique com `gh pr edit --add-label`. Evite force-push depois que a revisão começar; se precisar reescrever a história, explique o motivo na conversa.
 
 ### Estratégia de merge
 
-Mescle por merge commit, preservando os commits da branch e o contexto da revisão. Apague a branch após o merge. Não faça force-push em `main` nem reescreva o histórico já mesclado.
+Mescle por squash, em um único commit por pull request. Apague a branch após o merge. Não faça force-push em `main` nem reescreva o histórico já mesclado.
 
 ## Padrões de código
 
