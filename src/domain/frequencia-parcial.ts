@@ -1,6 +1,6 @@
-// Presença parcial por turno ou aulas, separada das faltas da chamada regular.
+// Presença por dia inteiro, turno ou aulas, separada das faltas da chamada regular.
 // A confirmação manual na Seduc identifica a revisão que já foi lançada.
-export type TipoFrequenciaParcial = "TURNO" | "AULAS";
+export type TipoFrequenciaParcial = "TURNO" | "AULAS" | "DIA_INTEIRO";
 export type TurnoParcial = "MANHA" | "TARDE";
 export const LIMITE_OBSERVACAO_PARCIAL = 300;
 export const LIMITE_AULAS_PARCIAL = 30;
@@ -33,6 +33,7 @@ export function normalizarAulas(aulas: readonly number[]): number[] {
 export function rotuloFrequenciaParcial(
   registro: Pick<FrequenciaParcial, "tipo" | "turno" | "aulas">,
 ): string {
+  if (registro.tipo === "DIA_INTEIRO") return "Dia inteiro";
   if (registro.tipo === "TURNO") return registro.turno === "MANHA" ? "Manhã" : "Tarde";
   const aulas = normalizarAulas(registro.aulas);
   if (aulas.length === 1) return `${aulas[0]}ª aula`;

@@ -14,8 +14,6 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
-- Conexão PostgreSQL respeita o schema informado por `DATABASE_SCHEMA` ou pelo parâmetro `schema` da URL, no Prisma, nas consultas SQL diretas, nos scripts administrativos e no migrador Docker. O Preview pode usar seu próprio schema no mesmo database, sem recorrer às tabelas de `public` quando o destino explícito está ausente; a documentação separa a seleção de schema da autenticação no pooler. O migrador compartilha a trava consultiva do Prisma CLI para não aplicar migrações em paralelo com uma execução manual.
-
 - Chamada Parcial exibe a lista da turma na ordem da chamada normal, com registro por aluno, busca e filtros. A chave da Seduc fica bloqueada até salvar; remover a frequência parcial mantém o aluno na lista.
 
 - Avisos no celular e tablet ficam abaixo do cabeçalho, respeitando a área segura e mantendo o novo botão Gestão acessível durante as mensagens.
@@ -23,8 +21,6 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Leitura dos marcadores nativos de linha e coluna da Sheets API, preservando identificação do aluno e das dimensões criadas pela integração.
 
 ### Adicionado
-
-- Abas de frequência por turma e mês, preparadas em conjunto na Gestão com alunos e datas completas. Envios manuais e automáticos respeitam o mês; o histórico distingue cada destino e preserva abas anteriores (ADR-037).
 
 - Navegação dos gráficos no desktop com seleção direta e botões anterior e próximo, mantendo deslize e teclado.
 - Resumo visual em Relatórios com filtros de mês, série e turma, comparação de infrequência entre séries ou turmas, evolução diária com tabela acessível e ranking de alunos por faltas. Dias sem chamada ficam sem taxa; carregamento e falhas não apresentam valores antigos.
@@ -40,7 +36,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Catálogo de etiquetas em `.github/labels.json` e script `npm run etiquetas:sync` para sincronizá-las pelo GitHub CLI.
 - Workflow `etiquetas.yml`, que aplica etiquetas de área pelos caminhos e de tipo pelo título e valida título e etiquetas em pull requests.
 - Templates de issue ampliados (Bug, Melhoria e Tarefa) e template de pull request com etiquetas, commits atômicos, ciclo de rascunho e uso de IA.
-- Confirmação manual "Registrado na Seduc" por aluno e dia na Chamada normal, disponível após salvar, com data e responsável. Correções desmarcam apenas os alunos afetados; confirmações são preservadas na cópia JSON (ADR-035).
+- Confirmação manual "Registrado na Seduc" por aluno e dia da chamada diária salva, com data e responsável, agora operada na Chamada Parcial. Correções desmarcam apenas os alunos afetados; confirmações são preservadas na cópia JSON (ADR-035).
 
 - Chamada Parcial separada da chamada diária, com presença por turno ou aulas, revisão concorrente e confirmação manual "Registrado na Seduc". Correções reabrem a pendência; nomes históricos e confirmação entram na cópia JSON sem invalidar arquivos antigos (ADR-034).
 - Terceira planilha Google para chamadas parciais, com aba própria, prévia obrigatória e atualização explícita somente de linhas identificadas pela integração.
@@ -109,7 +105,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Acabamento dos seletores da Chamada estendido à interface: cartões, controles, menus, diálogos, navegação e entrada compartilham reflexos discretos, bordas arredondadas e seleção verde suave. A tipografia Plus Jakarta Sans também passa a ser aplicada ao corpo e aos números tabulares. Transparência reduzida, alto contraste e cores de frequência são preservados.
 
-- Confirmação da Seduc na Chamada com rótulo RS, abaixo do acumulado e alinhada ao nome, liberando espaço para identificar os alunos no celular. A descrição acessível mantém o significado completo.
+- Chamada Parcial passa a reunir a chamada diária salva e os ajustes por dia inteiro, turno ou aulas, com confirmação RS concentrada nessa tela. Presentes aparecem como Dia inteiro; faltas preservam a situação da Chamada, sem alterar os registros da coordenação. A terceira planilha usa a mesma lista e mantém uma linha por aluno e dia, reconhecendo códigos antigos.
+
+- Confirmação da Seduc com rótulo RS e descrição acessível completa, agora concentrada na Chamada Parcial para liberar a lista da Chamada diária.
 
 - Indicadores de faltas, justificadas e presentes ficam dentro do resumo recolhível da Chamada, aberto pelo botão arredondado Resumo de hoje, com filtros preservados e identificação da data consultada.
 

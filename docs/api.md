@@ -344,9 +344,9 @@ Permissão: administração ou coordenação, com origem válida. Corpo: `{ dia,
 
 - 200 `{ confirmacao: { alunoId, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisaoSeduc } }`.
 - 400 em corpo inválido ou aluno fora da lista; 401 sem sessão e 403 sem capacidade de operação ou com outra origem.
-- 409 quando a chamada ainda não foi salva, a frequência foi corrigida ou a confirmação mudou. A interface recarrega antes de permitir outra tentativa.
+- 409 quando a chamada ainda não foi salva, a frequência ou a confirmação mudou, outra chamada passou a ser a base do aluno no dia ou já existe uma personalização. A interface recarrega antes de permitir outra tentativa.
 
-A confirmação registra manualmente o lançamento externo, com data e autoria da sessão. Não altera faltas, revisão ou horário de salvamento da chamada, e não envia ao Google. Correções efetivas da chamada invalidam apenas confirmações dos alunos afetados; salvamento sem mudança preserva as confirmações. A revisão própria impede que uma tela antiga refaça uma confirmação desmarcada.
+A Chamada Parcial usa esta rota para confirmar alunos cuja origem ainda é a chamada diária salva. A confirmação registra manualmente o lançamento externo, com data e autoria da sessão. Não altera faltas, revisão ou horário de salvamento da chamada, e não envia ao Google. Correções efetivas da chamada invalidam apenas confirmações dos alunos afetados; salvamento sem mudança preserva as confirmações. A revisão própria impede que uma tela antiga refaça uma confirmação desmarcada.
 
 ### GET /api/frequencias/resumo?ate=YYYY-MM-DD
 
@@ -357,11 +357,26 @@ Acumulado desde a primeira chamada salva até a data informada.
 
 Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta simples ou parcial conta em `faltas`.
 
-## Frequências parciais
+## Frequências personalizadas e parciais
 
-As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. A Chamada Parcial não cria nem altera frequências regulares, faltas, saídas ou entradas.
+As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. A Chamada Parcial não cria nem altera frequências regulares, faltas, saídas ou entradas. A confirmação manual usa o registro efetivo, seja a base diária ou a personalização.
+
+### GET /api/frequencias-personalizadas
+
+Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` opcional. Sem datas, consulta o dia corrente da escola. Períodos aceitam até 92 dias.
+
+- 200 `{ "registros": RegistroPersonalizado[] }`, em ordem de dia, nome e identificador. Cada item é uma `FrequenciaParcial` ou uma `FrequenciaDaChamada`.
+- 400 datas inválidas, período incompleto ou invertido, uso simultâneo de dia e período ou turma inválida.
+
+FrequenciaDaChamada: `{ tipo: "CHAMADA", id, alunoId, dia, turmaId, alunoNome, turmaNome, marca, descricao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, revisaoSeduc, criadoEm, atualizadoEm }`. O identificador é `chamada:<alunoId>:<dia>`. `revisao` pertence à chamada; `revisaoSeduc` pertence à confirmação individual. `marca` preserva P, F, FJ ou S; P tem descrição Dia inteiro. Saídas e entradas não inferem aulas frequentadas.
+
+A consulta combina chamadas salvas com personalizações sem copiar nem gravar dados. A personalização prevalece por aluno e dia antes do filtro de turma. Se o aluno integrou mais de uma chamada no dia, vale a mais recentemente atualizada, com desempate pelo identificador. A lista histórica da chamada define os alunos da base, usando seus nomes e os nomes da turma na consulta; sem chamada salva nem personalização, não há registro de presença. Nomes e turma de personalizações existentes continuam históricos.
+
+Para confirmar itens `CHAMADA`, usar `/api/frequencias/seduc` com ambas as revisões. Para personalizações, usar `/api/frequencias-parciais/{id}/seduc`.
 
 ### GET /api/frequencias-parciais
+
+Contrato preservado: lista somente as personalizações gravadas, sem incluir a base diária.
 
 Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` histórico opcional. Sem datas, consulta o dia corrente da escola. Períodos aceitam até 92 dias.
 
@@ -372,14 +387,16 @@ FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, tur
 
 ### POST /api/frequencias-parciais
 
-Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "TURNO" | "AULAS", turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number }`.
+Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "DIA_INTEIRO" | "TURNO" | "AULAS", turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number, baseChamada?: { turmaId: uuid, revisao: number } }`.
 
-`TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres. Registro novo exige aluno ativo e não desistente na data; data futura é recusada. `turmaId`, quando informado, protege contra transferência concorrente. As aulas são números da presença parcial, independentes da configuração de chamada por aula.
+`DIA_INTEIRO` exige turno nulo ou ausente e lista de aulas vazia; `TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres; data futura é recusada. As aulas são números da presença personalizada, independentes da configuração de chamada por aula.
+
+Ao criar a partir da base, `baseChamada` confere a revisão, a participação do aluno e a vigência da chamada usada como base e preserva sua turma, inclusive após transferência ou desativação. Se informado, `turmaId` deve corresponder à turma da base. Sem `baseChamada`, registro novo exige aluno ativo e não desistente na data; `turmaId` protege contra transferência concorrente. A personalização guarda nome do aluno e rótulo da turma no momento da criação.
 
 - 200 `{ "registro": FrequenciaParcial }`.
 - Para criar, a revisão pode ser omitida ou zero. Para corrigir um registro já existente por aluno e dia, é obrigatória a revisão vigente.
 - Correção efetiva incrementa revisão e limpa a confirmação da Seduc. Repetir o mesmo conteúdo não altera a confirmação nem a revisão. Nome e turma históricos continuam preservados.
-- 400 conteúdo inválido ou dia futuro; 404 aluno inexistente; 409 revisão obsoleta, transferência concorrente ou aluno desativado/desistente em registro novo.
+- 400 conteúdo inválido ou dia futuro; 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
 
 ### POST /api/frequencias-parciais/{id}/seduc
 
@@ -394,7 +411,7 @@ A chave confirma manualmente que a revisão corrente foi lançada no sistema da 
 
 Corpo: `{ "revisao": number }`.
 
-- 200 `{ "ok": true }`, com auditoria e sem alterar outros registros.
+- 200 `{ "ok": true }`, com auditoria. Remove a personalização e limpa as confirmações da base desse aluno no dia, incrementando todas as revisões `revisaoSeduc` correspondentes, mesmo quando a chave já estava desligada. A próxima consulta volta à chamada salva, quando disponível; as faltas diárias permanecem intactas.
 - 400 corpo ou identificador inválido; 404 inexistente; 409 revisão obsoleta.
 
 ## Saídas antecipadas
@@ -699,7 +716,7 @@ Apenas administração. Corpo `{ "confirmacao": true }`. Cria a aba `Chamada Par
 
 Sessão da equipe. Corpo estrito `{ de, ate, turmaId?, atualizarExistentes?: boolean, planoHash? }`, com datas `YYYY-MM-DD` e período inclusivo de até 92 dias. `turmaId` filtra a turma histórica. A simulação devolve a prévia e o `planoHash`; o envio exige o hash corrente e relê dados locais, valores, fórmulas e marcadores externos antes de escrever.
 
-Por padrão, o plano acrescenta somente registros novos e reconhece o UUID da coluna Código para evitar repetição. `atualizarExistentes: true` autoriza explicitamente correções e confirmações já enviadas, somente nas nove colunas de linhas criadas e marcadas pela integração, com código único e sem fórmula. Divergências sem essa autorização, fórmulas ou códigos repetidos bloqueiam a escrita e exigem conferência. Linhas manuais sem código, com mesmo nome e data, são preservadas e aparecem como pendência.
+O plano usa os registros efetivos de `/api/frequencias-personalizadas`, com no máximo uma linha por aluno e dia. Novas linhas usam `chamada:<alunoId>:<dia>` na coluna Código, tanto para a base como para personalizações. UUIDs de personalizações enviados anteriormente são reconhecidos e preservados ao atualizar; encontrar tanto o código canônico como o UUID bloqueia a escrita. Uma linha de personalização removida sem correspondência segura exige conferência, sem acrescentar outra para o mesmo nome e dia. Por padrão, o plano acrescenta somente registros novos. `atualizarExistentes: true` autoriza explicitamente correções e confirmações já enviadas, somente nas nove colunas de linhas criadas e marcadas pela integração, com código único e sem fórmula. Divergências sem essa autorização, fórmulas ou códigos repetidos bloqueiam a escrita e exigem conferência. Linhas manuais sem código, com mesmo nome e data, são preservadas e aparecem como pendência.
 
 Alterar dados, conexão, arquivo, estrutura ou conteúdo após a prévia exige nova simulação. Escrita enviada sem resposta exige conferência manual; não é repetida automaticamente. Remover um registro local não apaga sua linha na planilha.
 
@@ -726,7 +743,7 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 - As frequências da cópia JSON podem incluir `confirmacoesSeduc`, com autoria, data e revisão por aluno. Cópias anteriores sem esse campo continuam válidas. A mesclagem preserva confirmações divergentes existentes e relata conflito, sem sobrescrever.
 - `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
 - A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
-- Tipo, turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
+- Tipo (`DIA_INTEIRO`, `TURNO` ou `AULAS`), turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.
 
 ### POST /api/exportacoes/registro

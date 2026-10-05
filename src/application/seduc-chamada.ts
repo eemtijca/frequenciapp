@@ -33,9 +33,28 @@ export async function confirmarSeducChamada(
     if (!chamada) throw new ErroHttp("Salve a chamada antes de confirmar na Seduc.", 409);
     if (chamada.revisao !== revisao)
       throw new ErroHttp("A chamada mudou. Recarregue e confira antes de confirmar na Seduc.", 409);
+    const personalizacao = await tx.frequenciaParcial.findUnique({
+      where: { alunoId_dia: { alunoId, dia: new Date(`${dia}T12:00:00Z`) } },
+      select: { id: true },
+    });
+    if (personalizacao)
+      throw new ErroHttp(
+        "Este aluno tem uma frequência personalizada. Recarregue a Chamada Parcial antes de confirmar na Seduc.",
+        409,
+      );
     const where = { frequenciaId_alunoId: { frequenciaId: chamada.id, alunoId } };
     const aluno = await tx.alunoDaChamada.findUnique({ where });
     if (!aluno) throw new ErroHttp("O aluno não faz parte desta chamada salva.", 400);
+    const baseVigente = await tx.frequencia.findFirst({
+      where: { dia: new Date(`${dia}T12:00:00Z`), alunos: { some: { alunoId } } },
+      orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+      select: { id: true },
+    });
+    if (baseVigente?.id !== chamada.id)
+      throw new ErroHttp(
+        "A chamada usada como base mudou. Recarregue a Chamada Parcial antes de confirmar na Seduc.",
+        409,
+      );
     if (aluno.revisaoSeduc !== revisaoSeduc)
       throw new ErroHttp(
         "A confirmação mudou. Recarregue a chamada antes de marcar novamente.",

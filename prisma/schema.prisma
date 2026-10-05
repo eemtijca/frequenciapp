@@ -49,10 +49,11 @@ enum FinalidadeIntegracao {
   @@map("finalidade_integracao")
 }
 
-// Forma de representar a presença parcial sem alterar a chamada regular.
+// Forma de representar a presença personalizada sem alterar a chamada regular.
 enum TipoFrequenciaParcial {
   TURNO
   AULAS
+  DIA_INTEIRO
 
   @@map("tipo_frequencia_parcial")
 }
@@ -308,7 +309,7 @@ model Frequencia {
   @@map("frequencias")
 }
 
-// Presença parcial por aluno e dia, com retrato da turma e confirmação manual
+// Presença personalizada por aluno e dia, com retrato da turma e confirmação manual
 // de lançamento na Seduc. Revisão protege correções e confirmações concorrentes.
 model FrequenciaParcial {
   id                     String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

@@ -1,10 +1,10 @@
 "use client";
 
-// Edição da presença por turno ou aulas exatas, separada da chamada diária.
+// Edição da presença por dia, turno ou aulas exatas, sem alterar a chamada diária.
 import { useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
-import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
+import type { FrequenciaParcial, TipoFrequenciaParcial } from "@/domain/frequencia-parcial";
 import {
   LIMITE_AULAS_PARCIAL,
   LIMITE_OBSERVACAO_PARCIAL,
@@ -26,7 +26,7 @@ import { AvisoCompacto } from "@/components/ui/tela-estado";
 
 export interface EdicaoParcial {
   alunoId: string;
-  tipo: "TURNO" | "AULAS";
+  tipo: TipoFrequenciaParcial;
   turno: "MANHA" | "TARDE";
   aulas: number[];
   observacao: string;
@@ -142,9 +142,14 @@ export function DialogoFrequenciaParcial({
           </div>
           <fieldset disabled={salvando} className="flex flex-col gap-2">
             <legend className="mb-2 text-sm font-medium">Presença registrada</legend>
-            <div role="radiogroup" aria-label="Forma da frequência parcial" className="flex gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Forma da frequência parcial"
+              className="grid grid-cols-3 gap-2"
+            >
               {(
                 [
+                  ["DIA_INTEIRO", "Dia inteiro"],
                   ["TURNO", "Turno inteiro"],
                   ["AULAS", "Por aulas"],
                 ] as const
@@ -178,7 +183,7 @@ export function DialogoFrequenciaParcial({
                 disabled={salvando}
               />
             </div>
-          ) : (
+          ) : edicao.tipo === "AULAS" ? (
             <fieldset disabled={salvando} className="flex flex-col gap-3">
               <legend className="mb-2 text-sm font-medium">Aulas frequentadas</legend>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
@@ -247,6 +252,8 @@ export function DialogoFrequenciaParcial({
                   : `${edicao.aulas.length} ${edicao.aulas.length === 1 ? "aula selecionada" : "aulas selecionadas"}.`}
               </p>
             </fieldset>
+          ) : (
+            <p className="text-muted-foreground text-sm">Presença em todas as aulas do dia.</p>
           )}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="parcial-observacao">Observação</Label>

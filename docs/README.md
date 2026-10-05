@@ -33,6 +33,6 @@
 A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](adr/033-integracao-exclusiva-com-google-planilhas.md).
 
 - [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md): presença parcial independente, confirmação manual da Seduc, terceira planilha Google e cópia JSON compatível.
-- [ADR-035](adr/035-seduc-na-chamada-normal.md): confirmação manual por aluno na chamada normal, revisão independente e preservação da cópia JSON.
+- [ADR-035](adr/035-seduc-na-chamada-normal.md): confirmação manual da base diária, revisão independente e preservação da cópia JSON; o adendo concentra a conferência na Chamada Parcial.
 - [ADR-036](adr/036-implantacao-multinuvem.md): implantação em AWS, Azure e GCP com Terraform, com modo local nos emuladores do Floci.
 - [ADR-037](adr/037-frequencia-mensal-no-google.md): preparo de abas por turma e mês, preservação do histórico e confirmação por destino.

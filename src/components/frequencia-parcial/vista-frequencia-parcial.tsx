@@ -1,6 +1,6 @@
 "use client";
 
-// Chamada parcial independente, com confirmação manual da frequência na Seduc.
+// Conferência personalizada da chamada salva, com ajustes por aluno e confirmação na Seduc.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
@@ -12,7 +12,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import type { Aluno, Serie, Turma } from "@/domain/frequencia";
+import type { Aluno, ConfirmacaoSeducAluno, Serie, Turma } from "@/domain/frequencia";
 import {
   alunoDesistenteNoDia,
   diaSeguinte,
@@ -20,7 +20,11 @@ import {
   rotuloDiaSemana,
 } from "@/domain/frequencia";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
-import { rotuloFrequenciaParcial } from "@/domain/frequencia-parcial";
+import {
+  rotuloFrequenciaPersonalizada,
+  type RegistroPersonalizado,
+  type FrequenciaDaChamada,
+} from "@/domain/frequencia-personalizada";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -67,14 +71,14 @@ interface EstadoPlanilha {
 
 interface CargaParcial {
   chave: string;
-  registros: FrequenciaParcial[];
+  registros: RegistroPersonalizado[];
   erro: string;
   variante: VarianteEstado;
 }
 
-const REGISTROS_VAZIOS: FrequenciaParcial[] = [];
+const REGISTROS_VAZIOS: RegistroPersonalizado[] = [];
 
-function momentoDaConfirmacao(registro: FrequenciaParcial, fuso: string): string {
+function momentoDaConfirmacao(registro: RegistroPersonalizado, fuso: string): string {
   if (!registro.registradoSeducEm) return "";
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -111,6 +115,7 @@ export default function VistaFrequenciaParcial({
   const carregando = turmaId !== "" && carga.chave !== chaveCarga;
   const erro = carga.chave === chaveCarga ? carga.erro : "";
   const [editorAberto, setEditorAberto] = useState(false);
+  const [baseEdicao, setBaseEdicao] = useState<FrequenciaDaChamada | null>(null);
   const [registroEditado, setRegistroEditado] = useState<FrequenciaParcial | null>(null);
   const [edicao, setEdicao] = useState<EdicaoParcial>(edicaoDoRegistro());
   const [assinaturaInicial, setAssinaturaInicial] = useState(
@@ -156,17 +161,18 @@ export default function VistaFrequenciaParcial({
         (a.ordem ?? Infinity) - (b.ordem ?? Infinity) || a.nome.localeCompare(b.nome, "pt-BR"),
     );
   }, [alunos, registros, turmaId, dia]);
-  const alunosDaEdicao = registroEditado
+  const origemEdicao = registroEditado ?? baseEdicao;
+  const alunosDaEdicao = origemEdicao
     ? [
         {
-          ...(alunos.find((aluno) => aluno.id === registroEditado.alunoId) ?? {
-            turmaId: registroEditado.turmaId,
-            turmaOriginalId: registroEditado.turmaId,
+          ...(alunos.find((aluno) => aluno.id === origemEdicao.alunoId) ?? {
+            turmaId: origemEdicao.turmaId,
+            turmaOriginalId: origemEdicao.turmaId,
             ordem: 0,
             ativo: false,
           }),
-          id: registroEditado.alunoId,
-          nome: registroEditado.alunoNome,
+          id: origemEdicao.alunoId,
+          nome: origemEdicao.alunoNome,
         },
       ]
     : alunos.filter((aluno) => aluno.id === edicao.alunoId);
@@ -195,8 +201,8 @@ export default function VistaFrequenciaParcial({
   useEffect(() => {
     if (!ativa || !dia || !turmaId) return;
     let atual = true;
-    pedir<{ registros: FrequenciaParcial[] }>(
-      `/api/frequencias-parciais?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
+    pedir<{ registros: RegistroPersonalizado[] }>(
+      `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
     )
       .then((dados) => {
         if (atual)
@@ -236,16 +242,20 @@ export default function VistaFrequenciaParcial({
     };
   }, [ativa]);
 
-  const atualizarRegistro = useCallback((registro: FrequenciaParcial) => {
+  const atualizarRegistro = useCallback((registro: RegistroPersonalizado) => {
     setCarga((atual) => ({
       ...atual,
-      registros: [...atual.registros.filter((item) => item.id !== registro.id), registro],
+      registros: [...atual.registros.filter((item) => item.alunoId !== registro.alunoId), registro],
     }));
   }, []);
 
-  function abrirEditor(registro: FrequenciaParcial | null, alunoId: string) {
-    const inicial = { ...edicaoDoRegistro(registro ?? undefined), alunoId };
-    setRegistroEditado(registro);
+  function abrirEditor(registro: RegistroPersonalizado | null, alunoId: string) {
+    const base = registro?.tipo === "CHAMADA" ? registro : null;
+    const personalizado = registro?.tipo === "CHAMADA" ? null : registro;
+    const inicial: EdicaoParcial = { ...edicaoDoRegistro(personalizado ?? undefined), alunoId };
+    if (base) inicial.tipo = base.marca === "P" ? "DIA_INTEIRO" : "AULAS";
+    setBaseEdicao(base);
+    setRegistroEditado(personalizado);
     setEdicao(inicial);
     setAssinaturaInicial(assinaturaDaEdicao(inicial));
     setErroEdicao("");
@@ -273,6 +283,9 @@ export default function VistaFrequenciaParcial({
           aulas: edicao.tipo === "AULAS" ? edicao.aulas : [],
           observacao: edicao.observacao.trim() || null,
           revisao: registroEditado?.revisao ?? 0,
+          ...(baseEdicao
+            ? { baseChamada: { turmaId: baseEdicao.turmaId, revisao: baseEdicao.revisao } }
+            : {}),
         }),
       );
       atualizarRegistro(dados.registro);
@@ -286,8 +299,8 @@ export default function VistaFrequenciaParcial({
 
   const { executando: recarregandoEdicao, executar: recarregarEdicao } = useAcaoUnica(async () => {
     try {
-      const dados = await pedir<{ registros: FrequenciaParcial[] }>(
-        `/api/frequencias-parciais?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
+      const dados = await pedir<{ registros: RegistroPersonalizado[] }>(
+        `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
       );
       setCarga({
         chave: chaveCarga,
@@ -299,6 +312,7 @@ export default function VistaFrequenciaParcial({
       if (vigente) abrirEditor(vigente, vigente.alunoId);
       else {
         setRegistroEditado(null);
+        setBaseEdicao(null);
         setConflito(false);
         setErroEdicao("O registro foi removido. Confira os dados antes de criar novamente.");
       }
@@ -308,14 +322,29 @@ export default function VistaFrequenciaParcial({
   });
 
   const { chaveAtiva, executar: alterarPorChave } = useAcoesPorChave();
-  function confirmarSeduc(registro: FrequenciaParcial, registrado: boolean) {
+  function confirmarSeduc(registro: RegistroPersonalizado, registrado: boolean) {
     void alterarPorChave(registro.id, async () => {
       try {
-        const dados = await pedir<{ registro: FrequenciaParcial }>(
-          `/api/frequencias-parciais/${registro.id}/seduc`,
-          corpoJson({ registrado, revisao: registro.revisao }),
-        );
-        atualizarRegistro(dados.registro);
+        if (registro.tipo === "CHAMADA") {
+          const dados = await pedir<{ confirmacao: ConfirmacaoSeducAluno }>(
+            "/api/frequencias/seduc",
+            corpoJson({
+              dia: registro.dia,
+              turmaId: registro.turmaId,
+              alunoId: registro.alunoId,
+              registrado,
+              revisao: registro.revisao,
+              revisaoSeduc: registro.revisaoSeduc,
+            }),
+          );
+          atualizarRegistro({ ...registro, ...dados.confirmacao });
+        } else {
+          const dados = await pedir<{ registro: FrequenciaParcial }>(
+            `/api/frequencias-parciais/${registro.id}/seduc`,
+            corpoJson({ registrado, revisao: registro.revisao }),
+          );
+          atualizarRegistro(dados.registro);
+        }
         avisarSucesso(
           registrado ? "Registro na Seduc confirmado." : "Registro marcado como pendente na Seduc.",
         );
@@ -334,10 +363,7 @@ export default function VistaFrequenciaParcial({
         ...corpoJson({ revisao: registroRemover.revisao }),
         method: "DELETE",
       });
-      setCarga((atual) => ({
-        ...atual,
-        registros: atual.registros.filter((registro) => registro.id !== registroRemover.id),
-      }));
+      setRecarregar((valor) => valor + 1);
       setRegistroRemover(null);
       avisarSucesso("Frequência parcial removida.");
     } catch (excecao) {
@@ -360,7 +386,7 @@ export default function VistaFrequenciaParcial({
         <div>
           <h1 className="text-xl font-semibold">Chamada Parcial</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Presença por turno ou aulas, independente da chamada diária.
+            A Chamada preenche a base. Ajuste dias, turnos e aulas para a Seduc.
           </p>
         </div>
         <Button
@@ -442,7 +468,7 @@ export default function VistaFrequenciaParcial({
             onValueChange={setFiltro}
             opcoes={[
               { valor: "todos", rotulo: "Todos os alunos" },
-              { valor: "sem-registro", rotulo: "Sem frequência parcial" },
+              { valor: "sem-registro", rotulo: "Sem registro" },
               { valor: "pendentes", rotulo: "Pendentes na Seduc" },
               { valor: "registrados", rotulo: "Registrados na Seduc" },
             ]}
@@ -508,22 +534,34 @@ export default function VistaFrequenciaParcial({
                         {aluno.desistente && (
                           <span className="text-muted-foreground text-xs">DESISTENTE</span>
                         )}
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          {registro ? rotuloFrequenciaParcial(registro) : "Sem frequência parcial"}
+                        <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
+                          <span>
+                            {registro ? rotuloFrequenciaPersonalizada(registro) : "Sem registro"}
+                          </span>
+                          {registro && (
+                            <span className="rounded-full border px-2 py-0.5 text-[10px]">
+                              {registro.tipo === "CHAMADA" ? "Chamada" : "Personalizada"}
+                            </span>
+                          )}
                         </p>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <Label htmlFor={`parcial-seduc-${aluno.id}`} className="text-xs">
-                          Registrado na Seduc
-                        </Label>
-                        <Switch
-                          id={`parcial-seduc-${aluno.id}`}
-                          aria-label={`Registrado na Seduc: ${aluno.nome}`}
-                          checked={registro?.registradoSeduc ?? false}
-                          disabled={!registro || ocupado || editorAberto}
-                          onCheckedChange={(valor) => registro && confirmarSeduc(registro, valor)}
-                        />
-                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 pl-10">
+                      <Label
+                        htmlFor={`parcial-seduc-${aluno.id}`}
+                        className="min-h-11 text-xs"
+                        title="Registrado na Seduc"
+                      >
+                        RS
+                      </Label>
+                      <Switch
+                        id={`parcial-seduc-${aluno.id}`}
+                        aria-label={`RS, Registrado na Seduc: ${aluno.nome}`}
+                        title="Registrado na Seduc"
+                        checked={registro?.registradoSeduc ?? false}
+                        disabled={!registro || ocupado || editorAberto}
+                        onCheckedChange={(valor) => registro && confirmarSeduc(registro, valor)}
+                      />
                     </div>
                     {registro && (
                       <>
@@ -532,7 +570,7 @@ export default function VistaFrequenciaParcial({
                             ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, fuso)}` : ""}`
                             : "Pendente de lançamento na Seduc"}
                         </p>
-                        {registro.observacao && (
+                        {registro.tipo !== "CHAMADA" && registro.observacao && (
                           <p className="text-muted-foreground mt-2 text-sm break-words">
                             {registro.observacao}
                           </p>
@@ -551,7 +589,7 @@ export default function VistaFrequenciaParcial({
                         {registro ? <Pencil size={15} /> : <Plus size={15} />}
                         {registro ? "Editar" : "Registrar"}
                       </Button>
-                      {registro && (
+                      {registro && registro.tipo !== "CHAMADA" && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -635,8 +673,8 @@ export default function VistaFrequenciaParcial({
             <AlertDialogTitle>Remover a frequência parcial?</AlertDialogTitle>
             <AlertDialogDescription>
               O registro de {registroRemover?.alunoNome} em {dia.split("-").reverse().join("/")}{" "}
-              será removido do aplicativo. Confira também os lançamentos já feitos na Seduc e na
-              planilha.
+              será removido. A base da Chamada, quando disponível, voltará a aparecer com RS
+              pendente. Confira também os lançamentos na Seduc e na planilha.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

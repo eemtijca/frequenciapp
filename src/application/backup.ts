@@ -48,7 +48,7 @@ const esquemaParcial = z
     dia,
     alunoNome: z.string().trim().min(2).max(200),
     turmaNome: z.string().trim().min(1).max(200),
-    tipo: z.enum(["TURNO", "AULAS"]),
+    tipo: z.enum(["DIA_INTEIRO", "TURNO", "AULAS"]),
     turno: z.enum(["MANHA", "TARDE"]).nullish(),
     aulas: z.array(z.number().int().min(1).max(30)).max(30),
     observacao: z.string().trim().max(300).nullish(),
@@ -62,13 +62,11 @@ const esquemaParcial = z
     criadoEm: instante.optional(),
     atualizadoEm: instante.optional(),
   })
-  .refine(
-    (item) =>
-      item.tipo === "TURNO"
-        ? item.turno != null && item.aulas.length === 0
-        : item.turno == null && item.aulas.length > 0,
-    "A presença parcial deve informar um turno ou as aulas frequentadas.",
-  )
+  .refine((item) => {
+    if (item.tipo === "DIA_INTEIRO") return item.turno == null && item.aulas.length === 0;
+    if (item.tipo === "TURNO") return item.turno != null && item.aulas.length === 0;
+    return item.turno == null && item.aulas.length > 0;
+  }, "A presença deve informar o dia inteiro, um turno ou as aulas frequentadas.")
   .refine(
     (item) =>
       item.aulas.every((aula, indice) => indice === 0 || aula > (item.aulas[indice - 1] ?? 0)),
