@@ -313,6 +313,29 @@ export function distribuicaoDoPeriodo(
   return acumulado;
 }
 
+/** Taxa diária dos alunos ativos; dias sem chamada ficam sem taxa, em vez de zero. */
+export function evolucaoDoPeriodo(
+  alunos: Aluno[],
+  turmas: Turma[],
+  frequencias: Frequencia[],
+  dias: string[],
+) {
+  const porDia = indexarPorDia(frequencias);
+  const horarios = turmas.flatMap((turma) => turma.horarios);
+  return dias.map((dia) => {
+    const ativos = alunos.filter((aluno) => aluno.ativo && !alunoDesistenteNoDia(aluno, dia));
+    const contagem = contagemDeMarcas(
+      marcasDoDia(ativos, dia, porDia.get(dia) ?? [], horarios),
+      ativos.length,
+    );
+    return {
+      dia,
+      ...contagem,
+      taxa: contagem.registrados > 0 ? infrequencia(contagem) : null,
+    };
+  });
+}
+
 /** Resumo de um aluno em um período. */
 export interface ResumoAlunoPeriodo {
   diasComRegistro: number;
@@ -348,6 +371,30 @@ export function resumoPorAluno(
     parciais,
     saidas: saidas.filter((saida) => saida.alunoId === aluno.id && dias.includes(saida.dia)).length,
   };
+}
+
+/** Alunos ativos com F ou FJ no período, ordenados pelo total e pelo nome no empate. */
+export function alunosPorFaltas(
+  alunos: Aluno[],
+  turmas: Turma[],
+  frequencias: Frequencia[],
+  dias: string[],
+) {
+  const porDia = indexarPorDia(frequencias);
+  const horarios = turmas.flatMap((turma) => turma.horarios);
+  return alunos
+    .filter((aluno) => aluno.ativo)
+    .map((aluno) => {
+      const resumo = resumoPorAluno(aluno, dias, porDia, [], horarios);
+      return { aluno, ...resumo, totalFaltas: resumo.faltas + resumo.justificadas };
+    })
+    .filter((item) => item.totalFaltas > 0)
+    .sort(
+      (a, b) =>
+        b.totalFaltas - a.totalFaltas ||
+        a.aluno.nome.localeCompare(b.aluno.nome, "pt-BR", { sensitivity: "base" }) ||
+        a.aluno.id.localeCompare(b.aluno.id),
+    );
 }
 
 /** Saídas de um aluno em um período, do mais recente para o mais antigo. */

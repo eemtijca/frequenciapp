@@ -2,11 +2,13 @@
 // resumo por aluno e saídas.
 import { describe, expect, it } from "vitest";
 import {
+  alunosPorFaltas,
   coberturaDoDia,
   desistenciasNoDia,
   distribuicaoDoDia,
   distribuicaoDoPeriodo,
   distribuicaoPorOrigem,
+  evolucaoDoPeriodo,
   infrequencia,
   indexarPorDia,
   marcasDoDia,
@@ -402,5 +404,125 @@ describe("distribuicaoDoPeriodo", () => {
       "2026-09-10",
     );
     expect(comPresenca[0]).toMatchObject({ registrados: 1, presentes: 1, faltas: 0 });
+  });
+});
+
+describe("evolucaoDoPeriodo", () => {
+  it("distingue dia sem chamada, presença registrada e falta justificada", () => {
+    const dados = evolucaoDoPeriodo(
+      [aluno(), aluno({ id: "aluno-novo" })],
+      [turma()],
+      [
+        frequencia({ dia: "2026-09-02", alunos: ["aluno-a"] }),
+        frequencia({
+          dia: "2026-09-03",
+          alunos: ["aluno-a"],
+          faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"], justificativa: "D" }],
+        }),
+      ],
+      ["2026-09-01", "2026-09-02", "2026-09-03"],
+    );
+    expect(dados.map((dia) => [dia.registrados, dia.justificadas, dia.taxa])).toEqual([
+      [0, 0, null],
+      [1, 0, 0],
+      [1, 1, 1],
+    ]);
+  });
+
+  it("preserva presença histórica após transferência e respeita a data da desistência", () => {
+    const dados = evolucaoDoPeriodo(
+      [
+        aluno({ turmaId: "turma-b", desistenteEm: "2026-09-02" }),
+        aluno({ id: "inativo", ativo: false }),
+      ],
+      [turma(), turma({ id: "turma-b" })],
+      ["2026-09-01", "2026-09-02"].map((dia) =>
+        frequencia({ dia, alunos: ["aluno-a", "inativo"] }),
+      ),
+      ["2026-09-01", "2026-09-02"],
+    );
+    expect(dados.map((dia) => [dia.registrados, dia.taxa])).toEqual([
+      [1, 0],
+      [0, null],
+    ]);
+  });
+});
+
+describe("alunosPorFaltas", () => {
+  it("soma F e FJ pela lista histórica e desempata por nome e identificador", () => {
+    const alunos = [
+      aluno({ id: "b", nome: "Bruno" }),
+      aluno({ id: "d", nome: "Ana" }),
+      aluno({ id: "c", nome: "Ana" }),
+      aluno({ id: "a", nome: "Zeca", turmaId: "turma-b", turmaOriginalId: "turma-a" }),
+    ];
+    const chamadas = [
+      frequencia({
+        dia: "2026-09-01",
+        alunos: alunos.map((item) => item.id),
+        faltas: alunos.map((item) => ({ alunoId: item.id, horarios: ["aula-1"] })),
+      }),
+      frequencia({
+        dia: "2026-09-02",
+        alunos: ["a"],
+        faltas: [{ alunoId: "a", horarios: ["aula-1"], justificativa: "D" }],
+      }),
+    ];
+    const resultado = alunosPorFaltas(alunos, [turma(), turma({ id: "turma-b" })], chamadas, [
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+    ]);
+    expect(resultado.map((item) => item.aluno.id)).toEqual(["a", "c", "d", "b"]);
+    expect(resultado[0]).toMatchObject({
+      totalFaltas: 2,
+      faltas: 1,
+      justificadas: 1,
+      diasComRegistro: 2,
+    });
+    expect(resultado[1]).toMatchObject({ totalFaltas: 1, diasComRegistro: 1 });
+  });
+
+  it("exclui inativos, presenças e faltas parciais, respeitando a data da desistência", () => {
+    const alunos = [
+      aluno({ id: "a", desistenteEm: "2026-09-02" }),
+      aluno({ id: "parcial" }),
+      aluno({ id: "presente" }),
+      aluno({ id: "inativo", ativo: false }),
+      aluno({ id: "novo" }),
+    ];
+    const horarios = [1, 2].map((ordem) => ({
+      id: `aula-${ordem}`,
+      turmaId: "turma-a",
+      ordem,
+      inicio: "07:00",
+      fim: "08:00",
+      diasSemana: [1, 2, 3, 4, 5, 6, 7],
+      ativo: true,
+    }));
+    const chamadas = ["2026-09-01", "2026-09-02"].map((dia) =>
+      frequencia({
+        dia,
+        alunos: ["a", "parcial", "presente", "inativo"],
+        faltas: [
+          { alunoId: "a", horarios: ["aula-1", "aula-2"], justificativa: "D" },
+          { alunoId: "parcial", horarios: ["aula-1"] },
+          { alunoId: "inativo", horarios: ["aula-1", "aula-2"] },
+        ],
+      }),
+    );
+    const resultado = alunosPorFaltas(alunos, [turma({ horarios })], chamadas, [
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+    ]);
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0]).toMatchObject({
+      aluno: { id: "a" },
+      totalFaltas: 1,
+      justificadas: 1,
+      diasComRegistro: 1,
+    });
+    expect(alunosPorFaltas(alunos, [turma({ horarios })], chamadas, ["2026-09-03"])).toEqual([]);
   });
 });

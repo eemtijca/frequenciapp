@@ -50,7 +50,12 @@ test.describe("Google Planilhas de saídas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await page
+      .getByRole("navigation", { name: "Categorias de configurações" })
+      .getByRole("button", { name: "Planilhas", exact: true })
+      .click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
+    await cartao.getByRole("button", { name: /Planilha de saídas/ }).click();
     await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
@@ -59,6 +64,11 @@ test.describe("Google Planilhas de saídas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await page
+      .getByRole("navigation", { name: "Categorias de configurações" })
+      .getByRole("button", { name: "Planilhas", exact: true })
+      .click();
+    await cartao.getByRole("button", { name: /Planilha de saídas/ }).click();
     await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
 
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();

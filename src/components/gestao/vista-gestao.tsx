@@ -23,6 +23,7 @@ export type Aba = "series" | "turmas" | "alunos" | "equipe" | "diretores" | "con
 
 interface Props {
   abaInicial?: Aba;
+  planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   usuarioId: string;
   series: Serie[];
   turmas: Turma[];
@@ -52,6 +53,7 @@ const ABAS: AbaItem<Aba>[] = [
 
 export default function VistaGestao({
   abaInicial = "series",
+  planilhaInicial,
   usuarioId,
   series,
   turmas,
@@ -93,6 +95,7 @@ export default function VistaGestao({
             {aba === "diretores" && <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} />}
             {aba === "configuracoes" && (
               <AbaConfiguracoes
+                planilhaInicial={planilhaInicial}
                 configuracoes={configuracoes}
                 series={series}
                 justificativas={justificativas}

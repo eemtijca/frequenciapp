@@ -64,7 +64,12 @@ test.describe("Google Planilhas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await page
+      .getByRole("navigation", { name: "Categorias de configurações" })
+      .getByRole("button", { name: "Planilhas", exact: true })
+      .click();
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
+    await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
@@ -73,6 +78,11 @@ test.describe("Google Planilhas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await page
+      .getByRole("navigation", { name: "Categorias de configurações" })
+      .getByRole("button", { name: "Planilhas", exact: true })
+      .click();
+    await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
@@ -234,6 +244,10 @@ test.describe("Google Planilhas", () => {
     // Desconexão, na zona de risco.
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
+    await page
+      .getByRole("navigation", { name: "Categorias de configurações" })
+      .getByRole("button", { name: "Planilhas", exact: true })
+      .click();
     await cartao.getByRole("button", { name: "Zona de risco" }).click();
     await cartao.getByRole("button", { name: "Desconectar" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Desconectar" }).click();

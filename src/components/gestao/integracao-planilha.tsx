@@ -70,13 +70,15 @@ interface MapaAba {
 export default function IntegracaoPlanilha({
   turmas,
   diaCorrente,
+  abertoInicial = false,
 }: {
   turmas: { id: string; rotulo: string }[];
   diaCorrente: string;
+  abertoInicial?: boolean;
 }) {
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const [aberto, setAberto] = useState<boolean | null>(null);
+  const [aberto, setAberto] = useState(abertoInicial);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
@@ -103,7 +105,6 @@ export default function IntegracaoPlanilha({
     try {
       const dados = await pedir<{ integracao: IntegracaoAdmin }>("/api/planilha");
       setIntegracao(dados.integracao);
-      setAberto((atual) => atual ?? !dados.integracao.esquema);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
@@ -126,7 +127,7 @@ export default function IntegracaoPlanilha({
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível ler a integração.");
       setErroVariante(estadoDeErro(excecao));
-      setAberto((atual) => atual ?? true);
+      setAberto(true);
     } finally {
       setCarregando(false);
     }
@@ -279,7 +280,7 @@ export default function IntegracaoPlanilha({
     });
   }
 
-  if (carregando || aberto === null) {
+  if (carregando) {
     return (
       <section
         data-secao="planilha-frequencia"

@@ -34,6 +34,10 @@ async function abrir(page: Page, comMapa = true) {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
+  await page
+    .getByRole("navigation", { name: "Categorias de configurações" })
+    .getByRole("button", { name: "Planilhas", exact: true })
+    .click();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
