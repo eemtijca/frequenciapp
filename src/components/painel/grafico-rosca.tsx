@@ -2,6 +2,7 @@
 
 // Rosca de distribuição de faltas com a paleta do app e legenda acessível.
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { useId, type CSSProperties } from "react";
 import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 export interface FatiaGrafico {
@@ -31,6 +32,7 @@ export default function GraficoRosca({
   unidadePlural = "faltas",
   vazio = "Nenhuma falta registrada",
 }: Props) {
+  const identidade = useId();
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
   const percentual = new Intl.NumberFormat("pt-BR", {
@@ -40,50 +42,68 @@ export default function GraficoRosca({
 
   if (total === 0) {
     return (
-      <div className="text-muted-foreground flex min-h-40 items-center justify-center rounded-lg border border-dashed px-4 text-center text-sm">
+      <div className="superficie-vidro text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
         {vazio}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-      <div className="relative size-40 shrink-0" role="img" aria-label={titulo}>
+    <div className="grafico-vidro flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+      <div className="relative size-44 shrink-0" role="img" aria-label={titulo}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
+            <defs>
+              {CORES.map((cor, indice) => (
+                <linearGradient
+                  key={cor}
+                  id={`${identidade}-fatia-${indice}`}
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor={`color-mix(in oklab, ${cor} 76%, white)`} />
+                  <stop offset="45%" stopColor={cor} />
+                  <stop offset="100%" stopColor={`color-mix(in oklab, ${cor} 90%, black)`} />
+                </linearGradient>
+              ))}
+            </defs>
             <Pie
               data={visiveis}
               dataKey="valor"
               nameKey="nome"
               innerRadius="62%"
-              outerRadius="100%"
+              outerRadius="96%"
               paddingAngle={2}
-              strokeWidth={0}
+              stroke="var(--vidro-reflexo)"
+              strokeWidth={1}
               isAnimationActive={false}
             >
               {visiveis.map((fatia, indice) => (
-                <Cell key={fatia.nome} fill={CORES[indice % CORES.length]} />
+                <Cell
+                  key={fatia.nome}
+                  className="grafico-vidro-fatia"
+                  fill={`url(#${identidade}-fatia-${indice % CORES.length})`}
+                  style={{ "--cor-fatia": CORES[indice % CORES.length] } as CSSProperties}
+                />
               ))}
             </Pie>
             <Tooltip
-              formatter={(valor: unknown, nome: unknown) => {
-                const total = Number(valor) || 0;
-                return [
-                  `${total} ${total === 1 ? unidadeSingular : unidadePlural}`,
-                  String(nome ?? ""),
-                ];
-              }}
-              contentStyle={{
-                background: "var(--popover)",
-                backgroundColor: "var(--popover)",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
-                color: "var(--popover-foreground)",
-                fontSize: "0.75rem",
-                opacity: 1,
-              }}
+              content={({ active, payload }) =>
+                active && payload?.length ? (
+                  <div className="superficie-vidro text-foreground max-w-44 px-3 py-2 text-xs break-words whitespace-normal">
+                    {payload.map((item) => (
+                      <p key={String(item.name)} className="numerais-tabulares">
+                        {String(item.name)}: {Number(item.value) || 0}{" "}
+                        {Number(item.value) === 1 ? unidadeSingular : unidadePlural}
+                      </p>
+                    ))}
+                  </div>
+                ) : null
+              }
               wrapperStyle={{ opacity: 1, zIndex: 30, pointerEvents: "none" }}
-              allowEscapeViewBox={{ x: true, y: true }}
+              allowEscapeViewBox={{ x: false, y: true }}
               offset={12}
               isAnimationActive={false}
             />
@@ -91,7 +111,7 @@ export default function GraficoRosca({
         </ResponsiveContainer>
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"
+          className="superficie-vidro pointer-events-none absolute inset-[24%] flex flex-col items-center justify-center rounded-full"
         >
           <strong className="numerais-tabulares text-2xl font-semibold">{total}</strong>
           <span className="text-muted-foreground text-[11px]">{rotuloTotal}</span>
@@ -99,18 +119,21 @@ export default function GraficoRosca({
       </div>
       <ul className="w-full min-w-0 flex-1 space-y-1.5">
         {visiveis.map((fatia, indice) => (
-          <li key={fatia.nome} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <li
+            key={fatia.nome}
+            className="vidro-reflexo flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--vidro-borda)] p-2.5 text-sm"
+          >
             {/* Sem espaço para o nome, os círculos descem para a linha de baixo. */}
             <span className="flex min-w-24 flex-1 items-center gap-2">
               <span
                 aria-hidden="true"
-                className="size-2.5 shrink-0 rounded-full"
+                className="vidro-reflexo size-2.5 shrink-0 rounded-full"
                 style={{ background: CORES[indice % CORES.length] }}
               />
-              <span className="min-w-0 flex-1 truncate">
+              <span className="min-w-0 flex-1 break-words">
                 {fatia.nome}
                 {fatia.detalhe && (
-                  <span className="text-muted-foreground ml-1 text-xs">{fatia.detalhe}</span>
+                  <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>
                 )}
               </span>
             </span>
