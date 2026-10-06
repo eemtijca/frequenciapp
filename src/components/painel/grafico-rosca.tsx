@@ -2,7 +2,7 @@
 
 // Rosca de distribuição de faltas com a paleta do app e legenda acessível.
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { useId, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 export interface FatiaGrafico {
@@ -32,7 +32,6 @@ export default function GraficoRosca({
   unidadePlural = "faltas",
   vazio = "Nenhuma falta registrada",
 }: Props) {
-  const identidade = useId();
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
   const percentual = new Intl.NumberFormat("pt-BR", {
@@ -49,26 +48,10 @@ export default function GraficoRosca({
   }
 
   return (
-    <div className="grafico-vidro flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
       <div className="relative size-44 shrink-0" role="img" aria-label={titulo}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <defs>
-              {CORES.map((cor, indice) => (
-                <linearGradient
-                  key={cor}
-                  id={`${identidade}-fatia-${indice}`}
-                  x1="0"
-                  y1="0"
-                  x2="1"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor={`color-mix(in oklab, ${cor} 76%, white)`} />
-                  <stop offset="45%" stopColor={cor} />
-                  <stop offset="100%" stopColor={`color-mix(in oklab, ${cor} 90%, black)`} />
-                </linearGradient>
-              ))}
-            </defs>
             <Pie
               data={visiveis}
               dataKey="valor"
@@ -84,7 +67,7 @@ export default function GraficoRosca({
                 <Cell
                   key={fatia.nome}
                   className="grafico-vidro-fatia"
-                  fill={`url(#${identidade}-fatia-${indice % CORES.length})`}
+                  fill={CORES[indice % CORES.length]}
                   style={{ "--cor-fatia": CORES[indice % CORES.length] } as CSSProperties}
                 />
               ))}
