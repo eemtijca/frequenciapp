@@ -81,6 +81,8 @@ Para uma role dedicada, crie um usuário PostgreSQL com permissões no schema es
 
 O `.env` local contém exemplos completos em [`.env.example`](../.env.example). O `prisma.config.ts` prioriza `DIRECT_URL` para o CLI, com fallback local para permitir geração do cliente durante o build.
 
+Com `pg` 8.16 ou superior, `sslmode=require` passou a verificar o certificado e o pooler do Supabase pode responder `SELF_SIGNED_CERT_IN_CHAIN` nos scripts administrativos e no migrador. Nesse caso, acrescente `uselibpqcompat=true` à URL usada pelo comando, ou use `sslmode=no-verify`, para manter a criptografia sem verificação de certificado.
+
 ## Vercel
 
 A Vercel usa a integração nativa de Git para publicar a `main`. O arquivo `vercel.json` define:
