@@ -125,10 +125,12 @@ DATABASE_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pg
 DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require&schema=preview
 ```
 
-As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis com permissões diferentes. `USUARIO.PROJECT_REF` representa o usuário completo do pooler: copie o valor correspondente à role existente no projeto Supabase. Criar um schema não cria um usuário PostgreSQL. Sem o parâmetro `schema`, o destino padrão é `public`.
+As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis com permissões diferentes. `USUARIO.PROJECT_REF` representa o usuário completo do pooler: copie o valor correspondente à role existente no projeto Supabase. Criar um schema não cria um usuário PostgreSQL. Sem `schema` na URL e sem `DATABASE_SCHEMA`, o destino padrão é `public`.
+
+Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABASE_SCHEMA=preview` como variável de configuração: ela vence o parâmetro da URL e vale para o runtime, os scripts e o migrador. Use uma única forma de seleção por ambiente para evitar divergência.
 
 1. Crie o schema de Preview com uma conta administrativa do banco e conceda os privilégios necessários às roles de migração e runtime. Limite essas permissões ao ambiente correspondente.
-2. Em um terminal com as variáveis do Preview, aplique `npx prisma migrate deploy` e confira `npx prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida.
+2. Em um terminal com as variáveis do Preview, aplique `npx prisma migrate deploy` e confira `npx prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.
 3. Configure `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` para uma conta de teste e execute `npm run criar-admin` com a mesma conexão de Preview. As contas da produção não são copiadas.
 4. Publique novamente o Preview após salvar as variáveis na Vercel. Confirme o login e um salvamento com dados sintéticos no schema esperado.
 

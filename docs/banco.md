@@ -94,9 +94,9 @@ No Supabase, `DATABASE_URL` deve apontar para a Transaction pooler na porta 6543
 
 O `prisma.config.ts` prioriza `DIRECT_URL`, com fallback para `DATABASE_URL` e uma URL local para permitir `prisma generate` durante o build. O migrador Docker usa a mesma preferência.
 
-O parâmetro `schema` seleciona o schema nas duas URLs, com padrão `public` quando ausente. O runtime passa o schema explicitamente ao `PrismaPg` e qualifica tabelas nas consultas SQL diretas, sem depender do estado de sessão da Transaction pooler. O migrador Docker e os scripts administrativos configuram `search_path` apenas para o schema selecionado e recusam um schema inexistente; não recorrem a `public` quando um destino explícito está ausente.
+O schema é escolhido por `DATABASE_SCHEMA`, que vence, ou pelo parâmetro `schema` das URLs, com padrão `public` quando os dois estão ausentes. O runtime passa o schema explicitamente ao `PrismaPg` e qualifica tabelas nas consultas SQL diretas, sem depender do estado de sessão da Transaction pooler. O migrador Docker e os scripts administrativos configuram `search_path` apenas para o schema selecionado e recusam um schema inexistente; não recorrem a `public` quando um destino explícito está ausente.
 
-O parâmetro `schema` é recusado quando está vazio ou repetido, contém caracteres de controle ou aspas duplas, tem o valor especial `$user` ou ultrapassa 63 bytes.
+O nome escolhido, pela variável ou pela URL, é recusado quando está vazio ou repetido, contém caracteres de controle ou aspas duplas, tem o valor especial `$user` ou ultrapassa 63 bytes.
 
 Produção e Preview podem usar schemas distintos no mesmo database. Cada schema mantém tabelas, contas e histórico `_prisma_migrations` próprios. As credenciais PostgreSQL são independentes do nome do schema e precisam das permissões adequadas. O preparo do Preview está em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 

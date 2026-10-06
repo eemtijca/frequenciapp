@@ -58,7 +58,7 @@ O host, o usuário e a senha devem ser copiados do painel do Supabase. A senha p
 
 A conexão do runtime também pode usar uma conexão direta ou o pooler de sessão em ambientes persistentes. O Supabase em Vercel deve usar a Transaction pooler.
 
-O parâmetro `schema` da URL seleciona o schema PostgreSQL; sem ele, o padrão é `public`. Para o Preview no mesmo database, acrescente `&schema=preview` às duas URLs, somente no escopo Preview da Vercel. O nome `preview` é um exemplo: use o schema provisionado para o ambiente. O runtime informa esse schema ao adaptador Prisma e qualifica as consultas SQL diretas; os scripts administrativos usam o mesmo destino pela `DIRECT_URL`, com fallback para `DATABASE_URL`.
+O schema PostgreSQL é escolhido por `DATABASE_SCHEMA`, que vence, ou pelo parâmetro `schema` da URL; sem nenhum dos dois, o padrão é `public`. `DATABASE_SCHEMA` permite que a plataforma de deploy aponte o schema do ambiente sem reescrever a connection string. Para o Preview no mesmo database, use um schema provisionado para o ambiente, como `preview`. O runtime informa o schema ao adaptador Prisma e qualifica as consultas SQL diretas; os scripts administrativos usam o mesmo destino pela `DIRECT_URL`, com fallback para `DATABASE_URL`.
 
 O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhido. O schema não substitui o usuário nem cria uma conta de acesso. Preparação, migrações e diagnóstico estão em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 
