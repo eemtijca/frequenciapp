@@ -99,7 +99,7 @@ Configure no projeto Vercel, para produção e previews:
 - `DIRECT_URL` com a Session pooler, necessária durante o build e para operações de CLI;
 - `AUTH_SECRET` com pelo menos 32 caracteres;
 - `TZ_APP`, opcionalmente `America/Fortaleza`;
-- `POOL_MAX_CONEXOES=1` para uma conexão por instância serverless.
+- `POOL_MAX_CONEXOES=3` (de 3 a 5) para o pool por instância serverless; hosts persistentes usam o padrão 10.
 
 Não defina a senha do Supabase no repositório. Use as configurações de ambiente da Vercel.
 
