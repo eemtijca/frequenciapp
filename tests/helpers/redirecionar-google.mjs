@@ -18,7 +18,8 @@ globalThis.fetch = async (entrada, opcoes) => {
   let origem = null;
   if (url.origin === "https://oauth2.googleapis.com" && url.pathname === "/token") {
     const corpo = opcoes?.body ?? (requisicao ? await requisicao.clone().text() : "");
-    origem = origemDoTeste(new URLSearchParams(String(corpo)).get("refresh_token"));
+    const parametros = new URLSearchParams(String(corpo));
+    origem = origemDoTeste(parametros.get("refresh_token") ?? parametros.get("code"));
   } else if (url.origin === "https://sheets.googleapis.com") {
     const headers = new Headers(opcoes?.headers ?? requisicao?.headers);
     origem = origemDoTeste(headers.get("Authorization")?.replace(/^Bearer /, ""));

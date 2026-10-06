@@ -1,4 +1,4 @@
-// Confere a planilha escolhida no Picker e invalida o mapa anterior.
+// Confere a planilha escolhida no Picker; trocar de arquivo invalida o mapa anterior.
 import { z } from "zod";
 import { Prisma } from "../../../../../../generated/prisma/client";
 import { banco } from "@/infra/banco";
@@ -36,6 +36,20 @@ export async function POST(requisicao: Request): Promise<Response> {
     const planilha = await lerPlanilhaEscolhida(dados.data.id, await renovarAcesso(token));
     const id = idDaIntegracao(dados.data.finalidade);
     await comTransacao(async (tx) => {
+      const atual = await tx.integracaoPlanilha.findUnique({ where: { id } });
+      const origem =
+        id === "principal" || especifica?.googleRefreshToken
+          ? atual
+          : await tx.integracaoPlanilha.findUnique({ where: { id: "principal" } });
+      const anterior = id === "principal" ? principal : especifica;
+      if (
+        origem?.googleRefreshToken !== token ||
+        (atual?.googleRefreshToken ?? null) !== (anterior?.googleRefreshToken ?? null) ||
+        (atual?.googlePlanilhaId ?? null) !== (anterior?.googlePlanilhaId ?? null)
+      ) {
+        throw new ErroHttp("A conexão Google mudou. Escolha a planilha novamente.", 409);
+      }
+      const mesmoArquivo = atual?.googlePlanilhaId === planilha.spreadsheetId;
       const conflito = await tx.integracaoPlanilha.findFirst({
         where: {
           id: { not: id },
@@ -55,10 +69,14 @@ export async function POST(requisicao: Request): Promise<Response> {
           googleRefreshToken: token,
           googlePlanilhaId: planilha.spreadsheetId,
           googlePlanilhaNome: planilha.properties.title,
-          ativa: false,
-          esquema: Prisma.DbNull,
-          assinaturaEsquema: null,
-          esquemaEm: null,
+          ...(!mesmoArquivo
+            ? {
+                ativa: false,
+                esquema: Prisma.DbNull,
+                assinaturaEsquema: null,
+                esquemaEm: null,
+              }
+            : {}),
           atualizadoPorId: sessao.usuario.id,
         },
         create: {

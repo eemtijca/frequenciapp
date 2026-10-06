@@ -1,7 +1,7 @@
 // Preparo mensal pela Gestão contra o Google sintético: confirmação, reuso,
 // vínculos fixos e prévia de envio para as abas do mês.
-import { expect, test } from "@playwright/test";
-import { diaLocal, rotuloMes } from "../../src/domain/frequencia";
+import { expect, test, type Page } from "@playwright/test";
+import { diaLocal, mesSeguinte, nomeDoMes, rotuloMes } from "../../src/domain/frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
@@ -13,7 +13,7 @@ const mes = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza").slic
 const turmas = ["E2E Ano A", "E2E Ano B"];
 const abasMensais = turmas.map((turma) => `${turma} · ${mes.slice(5)}-${mes.slice(0, 4)}`);
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   google = await criarGoogleFalso();
   google.definirAba("E2E Ano A", [
     ["Aluno", "29/09/2026"],
@@ -43,7 +43,7 @@ test.beforeAll(async () => {
   });
 });
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   await comBanco(async (cliente) => {
     await cliente.query("delete from sincronizacoes_planilha");
     await cliente.query(
@@ -57,6 +57,20 @@ test.afterAll(async () => {
   await google.fechar();
 });
 
+async function abrirPlanilha(page: Page) {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Gestão", "gestao");
+  await page.getByRole("tab", { name: "Configurações" }).click();
+  await page
+    .getByRole("navigation", { name: "Categorias de configurações" })
+    .getByRole("button", { name: "Planilhas", exact: true })
+    .click();
+  const cartao = page.locator('[data-secao="planilha-frequencia"]');
+  await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  return cartao;
+}
+
 test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico antigo", async ({
   page,
 }, testInfo) => {
@@ -68,16 +82,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
     if (pedido.url().endsWith("/api/planilha/mensal")) preparos.push(pedido.postDataJSON());
     if (pedido.url().endsWith("/api/planilha/mapa")) mapas.push(pedido.postDataJSON());
   });
-  await page.goto("/");
-  await aguardarHidratacao(page);
-  await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
-  const cartao = page.locator('[data-secao="planilha-frequencia"]');
-  await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  const cartao = await abrirPlanilha(page);
   await cartao.getByRole("button", { name: "Conferir estrutura", exact: true }).click();
   await cartao.getByRole("button", { name: "Salvar estrutura", exact: true }).click();
   await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
@@ -176,4 +181,122 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   await previa.getByRole("button", { name: "Cancelar", exact: true }).click();
   expect(google.valor("E2E Ano A", 2, 2)).toBe("F");
   expect(google.valor(abaA, 2, 3)).toBe("FJ");
+});
+
+test("interrompe a autorização recusada e recupera o mês após reconectar sem envio automático", async ({
+  page,
+}, testInfo) => {
+  const preparos: { turmaOriginalId: string; mes: string }[] = [];
+  const reconexoes: unknown[] = [];
+  const mesAnterior = mesSeguinte(mes, -1);
+  page.on("request", (pedido) => {
+    if (pedido.url().endsWith("/api/planilha/mensal")) preparos.push(pedido.postDataJSON());
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      document.documentElement.dataset.sessoesExpiradas = "0";
+    });
+    window.addEventListener("sessao-expirada", () => {
+      document.documentElement.dataset.sessoesExpiradas = "1";
+    });
+  });
+  google.recusarAutorizacao(true);
+  const cartao = await abrirPlanilha(page);
+  await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog");
+  await dialogo.getByRole("button", { name: /Mês das novas abas/ }).click();
+  const calendario = page.getByRole("dialog", { name: "Mês das novas abas", exact: true });
+  if (mesAnterior.slice(0, 4) !== mes.slice(0, 4)) {
+    await calendario.getByRole("button", { name: "Ano anterior", exact: true }).click();
+  }
+  await calendario.getByRole("button", { name: nomeDoMes(mesAnterior), exact: true }).click();
+  const escritasAntes = google.chamadas().filter((acao) => acao === "gravar").length;
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(
+    dialogo.getByRole("button", { name: "Tentar pendentes", exact: true }),
+  ).toBeEnabled();
+  await expect(dialogo.getByText(/0 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByRole("alert")).toHaveCount(1);
+  await expect(dialogo.getByText("Não preparada", { exact: true })).toHaveCount(2);
+  await expect(page.locator("html")).toHaveAttribute("data-sessoes-expiradas", "0");
+  expect(preparos).toHaveLength(1);
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritasAntes);
+  await dialogo.screenshot({ path: testInfo.outputPath("planilha-mensal-reconectar.png") });
+
+  // O contrato de API cobre o OAuth real; aqui o retorno confere navegação e consentimento.
+  await page.route("**/api/planilha/google/iniciar", async (rota) => {
+    reconexoes.push(rota.request().postDataJSON());
+    google.recusarAutorizacao(false);
+    const retorno = new URL("/", page.url());
+    retorno.searchParams.set("visao", "gestao");
+    retorno.searchParams.set("google", "reconectado");
+    retorno.searchParams.set("googleFinalidade", "FREQUENCIA");
+    retorno.searchParams.set("googleMes", mesAnterior);
+    await rota.fulfill({ json: { url: retorno.toString() } });
+  });
+  await dialogo
+    .getByRole("button", { name: "Reconectar conta Google", exact: true })
+    .evaluate((elemento) => {
+      (elemento as HTMLButtonElement).click();
+      (elemento as HTMLButtonElement).click();
+    });
+  await expect(page.getByText("Conta Google reconectada.", { exact: true })).toBeVisible();
+  await expect(cartao.getByRole("button", { name: /Mês do envio para a planilha/ })).toContainText(
+    rotuloMes(mesAnterior),
+  );
+  await expect(dialogo).toHaveCount(0);
+  expect(reconexoes).toEqual([{ finalidade: "FREQUENCIA", reconectar: true, mes: mesAnterior }]);
+  expect(preparos).toHaveLength(1);
+  expect(new URL(page.url()).searchParams.has("googleMes")).toBe(false);
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritasAntes);
+
+  await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
+  await expect(dialogo.getByRole("button", { name: /Mês das novas abas/ })).toContainText(
+    rotuloMes(mesAnterior),
+  );
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  expect(preparos).toHaveLength(3);
+  expect(preparos.every((pedido) => pedido.mes === mesAnterior)).toBe(true);
+});
+
+test("repete somente turmas pendentes e preserva a aba concluída no toque duplo", async ({
+  page,
+}) => {
+  const preparos: { turmaOriginalId: string; mes: string }[] = [];
+  await page.route("**/api/planilha/mensal", async (rota) => {
+    preparos.push(rota.request().postDataJSON());
+    if (preparos.length === 2) google.recusarAutorizacao(true);
+    await rota.continue();
+  });
+  const cartao = await abrirPlanilha(page);
+  await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog");
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(
+    dialogo.getByRole("button", { name: "Tentar pendentes", exact: true }),
+  ).toBeEnabled();
+  await expect(dialogo.getByText(/1 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByText("Não preparada", { exact: true })).toHaveCount(1);
+  expect(preparos).toHaveLength(2);
+  const primeiraAba = abasMensais[0] ?? "";
+  google.definirValor(primeiraAba, 2, 3, "FJ");
+  google.recusarAutorizacao(false);
+  await dialogo
+    .getByRole("button", { name: "Tentar pendentes", exact: true })
+    .evaluate((elemento) => {
+      (elemento as HTMLButtonElement).click();
+      (elemento as HTMLButtonElement).click();
+    });
+  await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  await expect(dialogo.getByRole("alert")).toHaveCount(0);
+  await expect(dialogo.getByRole("button", { name: "Tentar pendentes", exact: true })).toHaveCount(
+    0,
+  );
+  expect(preparos).toHaveLength(3);
+  expect(preparos[2]).toEqual(preparos[1]);
+  expect(google.valor(primeiraAba, 2, 3)).toBe("FJ");
+  expect(google.abas().sort()).toEqual(["E2E Ano A", ...abasMensais].sort());
 });

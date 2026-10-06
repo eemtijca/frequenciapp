@@ -86,11 +86,13 @@ export function SeletorPlanilhaGoogle({
   finalidade = "FREQUENCIA",
   conectado,
   planilha,
+  mes,
   onAtualizar,
 }: {
   finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   conectado: boolean;
   planilha: { id: string; nome: string | null } | null;
+  mes?: string;
   onAtualizar: () => Promise<void> | void;
 }) {
   const [ocupado, setOcupado] = useState(false);
@@ -106,19 +108,22 @@ export function SeletorPlanilhaGoogle({
     url.searchParams.delete("googleFinalidade");
     window.history.replaceState(null, "", url);
     if (estado === "conectado") toast.success("Conta Google conectada. Escolha a planilha.");
+    else if (estado === "reconectado") toast.success("Conta Google reconectada.");
+    else if (estado === "erro_reconexao")
+      toast.error("Não foi possível reconectar. Confira a conta e o acesso à planilha.");
     else if (estado === "cancelado") toast.info("Conexão Google cancelada.");
     else if (estado === "sessao") toast.error("Entre novamente para conectar a conta Google.");
     else toast.error("Não foi possível conectar a conta Google.");
   }, [finalidade]);
 
-  async function conectar() {
+  async function conectar(reconectar = false) {
     if (emAndamento.current) return;
     emAndamento.current = true;
     setOcupado(true);
     try {
       const dados = await pedir<{ url: string }>(
         "/api/planilha/google/iniciar",
-        corpoJson({ finalidade }),
+        corpoJson({ finalidade, reconectar, ...(reconectar && mes ? { mes } : {}) }),
       );
       window.location.assign(dados.url);
     } catch (erro) {
@@ -194,6 +199,17 @@ export function SeletorPlanilhaGoogle({
       </p>
       {planilha && <p className="text-xs">Planilha escolhida: {planilha.nome ?? planilha.id}</p>}
       <div className="flex flex-wrap gap-2">
+        {conectado && planilha && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void conectar(true)}
+            disabled={ocupado}
+          >
+            {ocupado && <LoaderCircle size={14} className="animate-spin" />}
+            Reconectar conta Google
+          </Button>
+        )}
         <Button type="button" variant="outline" onClick={() => void conectar()} disabled={ocupado}>
           {ocupado && <LoaderCircle size={14} className="animate-spin" />}
           {conectado ? "Trocar conta Google" : "Conectar conta Google"}

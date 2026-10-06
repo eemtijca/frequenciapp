@@ -30,8 +30,10 @@ function coluna(letra: string) {
 
 export interface GoogleFalso {
   conectar(banco: pg.Client, finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL"): Promise<void>;
+  codigoAutorizacao(): string;
   definirFuso(valor: string): void;
   recusarAutorizacao(valor: boolean): void;
+  recusarLeituras(valor: boolean): void;
   recusarGravacoes(valor: boolean): void;
   perderProximaResposta(): void;
   definirAba(
@@ -60,6 +62,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
   let proximoMetadado = 1;
   let fuso = "America/Fortaleza";
   let recusarAutorizacao = false;
+  let recusarLeituras = false;
   let recusarGravacoes = false;
   let perderResposta = false;
   let credencial = "";
@@ -362,14 +365,24 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       try {
         const url = new URL(req.url ?? "/", "http://127.0.0.1");
         if (url.pathname === "/token") {
+          const autorizacao = new URLSearchParams(corpo).get("grant_type") === "authorization_code";
           responder(
-            recusarAutorizacao ? { error: "invalid_grant" } : { access_token: credencial },
+            recusarAutorizacao
+              ? { error: "invalid_grant" }
+              : {
+                  access_token: credencial,
+                  ...(autorizacao ? { refresh_token: credencial } : {}),
+                },
             recusarAutorizacao ? 400 : 200,
           );
           return;
         }
         if (req.headers.authorization !== `Bearer ${credencial}`) {
           responder({ error: { message: "Credencial sintética inválida." } }, 401);
+          return;
+        }
+        if (recusarLeituras && req.method === "GET") {
+          responder({ error: { message: "Acesso sintético ao arquivo recusado." } }, 403);
           return;
         }
         if (url.pathname.endsWith(":batchUpdate")) {
@@ -436,6 +449,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
   if (!endereco || typeof endereco === "string") throw new Error("Servidor sintético sem porta.");
   credencial = `frequenciapp-teste:${Buffer.from(`http://127.0.0.1:${endereco.port}`).toString("base64url")}`;
   return {
+    codigoAutorizacao: () => credencial,
     conectar: async (banco, finalidade = "FREQUENCIA") => {
       const id =
         finalidade === "PARCIAL" ? "parcial" : finalidade === "SAIDAS" ? "saidas" : "principal";
@@ -454,6 +468,9 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     },
     recusarAutorizacao: (valor) => {
       recusarAutorizacao = valor;
+    },
+    recusarLeituras: (valor) => {
+      recusarLeituras = valor;
     },
     recusarGravacoes: (valor) => {
       recusarGravacoes = valor;

@@ -21,6 +21,10 @@ Integração opcional da administração com a planilha da escola. A frequência
 
 O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As três finalidades mantêm seleção e estrutura próprias. A conta da frequência pode ser usada para selecionar os arquivos de saídas e chamada parcial sem uma segunda autorização.
 
+Para renovar uma autorização vencida, usar **Reconectar conta Google** e autorizar a conta que tem acesso à planilha existente. A reconexão confere esse acesso antes de atualizar o token e preserva arquivo, mapa, integração ativa e envio automático. Cancelamento, falha ou alteração da conexão durante a autorização mantêm a configuração anterior. **Trocar conta Google** continua exigindo escolher o arquivo e conferir o mapa; escolher novamente o mesmo arquivo no Picker preserva sua estrutura.
+
+Falhas do Google não encerram a sessão do aplicativo. Autorização expirada ou revogada pede reconexão; falha temporária pede nova tentativa; configuração OAuth inválida pede ajuste no servidor. O log de autorização registra apenas status HTTP e categoria conhecida, sem tokens nem descrições externas. Se a expiração se repetir após sete dias, conferir o modo de publicação do aplicativo no Google Auth Platform.
+
 O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças de desistência no nome não criam abas de backup. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
 Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
@@ -30,6 +34,8 @@ Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `s
 Em Gestão, Configurações, Planilhas, Planilha de frequência, usar **Preparar mês**. Escolher o mês e confirmar a preparação das turmas. Cada turma de origem recebe uma aba como `1º A · 10-2026`, com Aluno, Turma atual e todos os dias em `dd/mm/aaaa`. A lista de alunos ativos e os vínculos são preparados; as marcações ficam vazias até o envio. A interface acompanha uma turma por requisição e informa abas criadas, reutilizadas e pendências. Cancelar antes de confirmar não grava nada.
 
 Repetir o preparo reaproveita a aba identificada pelo aplicativo, inclusive se o nome foi alterado. Aba manual com nome igual exige conferência. Criação, cabeçalho, lista e marcadores pertencem ao mesmo lote atômico do Google. Uma resposta perdida permite somente releitura para conferir o resultado, sem repetir a gravação. Nenhuma aba antiga é apagada, dividida ou usada como backup.
+
+Falha comum de conexão interrompe o lote e mantém as turmas restantes como não preparadas. **Tentar pendentes** retoma apenas as turmas sem sucesso enquanto o diálogo está aberto. **Reconectar conta Google** devolve a Gestão ao mês selecionado; depois do retorno, abrir **Preparar mês** e confirmar novamente. As abas já criadas são reutilizadas. Não há preparação nem envio automático após a autorização.
 
 Depois de preparar o primeiro mês de uma turma, os envios dela usam apenas as abas mensais. **Prévia do envio** permite enviar as chamadas do mês, inclusive períodos antigos do aplicativo; confirmações anteriores na aba antiga não fazem a nova aba parecer preenchida. Conteúdo manual e alunos que só existem na planilha antiga continuam nessa aba, sem migração automática. O envio mantém as regras da Grade do aplicativo.
 

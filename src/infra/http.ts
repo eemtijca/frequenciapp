@@ -29,7 +29,8 @@ export async function executarRota(manipulador: () => Promise<Response>): Promis
     return await manipulador();
   } catch (erro) {
     const { mensagem, status } = traduzirErro(erro);
-    return erroApi(mensagem, status);
+    const extra = erro instanceof ErroHttp && erro.codigo ? { codigo: erro.codigo } : undefined;
+    return erroApi(mensagem, status, extra);
   }
 }
 

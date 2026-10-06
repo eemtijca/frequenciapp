@@ -61,6 +61,28 @@ const documento = {
 };
 
 describe("leitura pela Sheets API", () => {
+  it.each([
+    [401, 409, "GOOGLE_RECONECTAR", "Reconecte a conta Google."],
+    [403, 403, "GOOGLE_ACESSO", "A conta Google não tem acesso à planilha escolhida."],
+    [404, 403, "GOOGLE_ACESSO", "A conta Google não tem acesso à planilha escolhida."],
+  ] as const)(
+    "identifica a recusa HTTP %i do Google sem confundir com sessão expirada",
+    async (httpGoogle, status, codigo, message) => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const chamada = vi.fn(async () => Response.json({}, { status: httpGoogle }));
+      vi.stubGlobal("fetch", chamada);
+      try {
+        await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
+          status,
+          codigo,
+          message,
+        });
+      } finally {
+        log.mockRestore();
+      }
+    },
+  );
+
   it("identifica o limite temporário de leituras sem confundir com falta de acesso", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal(
