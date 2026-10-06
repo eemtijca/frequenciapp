@@ -22,6 +22,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Automação do schema de preview por pull request: o workflow cria, migra e remove `preview_pr_<n>`, mantém o fallback `preview` na `main`, oferece faxina semanal e, com token da Vercel, aponta a branch para o schema do pull request.
+
 - Navegação dos gráficos no desktop com seleção direta e botões anterior e próximo, mantendo deslize e teclado.
 - Resumo visual em Relatórios com filtros de mês, série e turma, comparação de infrequência entre séries ou turmas, evolução diária com tabela acessível e ranking de alunos por faltas. Dias sem chamada ficam sem taxa; carregamento e falhas não apresentam valores antigos.
 - Configurações organizadas nas categorias Escola, Planilhas, Acesso e avisos, e Dados, preservando formulários e retorno do Google para a planilha correspondente.

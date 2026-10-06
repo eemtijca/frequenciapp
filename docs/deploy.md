@@ -151,18 +151,31 @@ A API trata essa falha `P2039` com a assinatura `EAUTHQUERY` como indisponibilid
 
 No escopo Preview, mantenha as cinco variáveis `GOOGLE_*` fora do ambiente. Sem elas, o servidor recusa a integração com HTTP 503 antes de qualquer chamada de rede, e o preview não alcança nenhuma planilha real. Os URIs autorizados no Google Cloud devem apontar apenas para o domínio de produção.
 
+### Automação por pull request
+
+O workflow `schema-preview.yml` automatiza o ciclo do preview. Para pull requests do próprio repositório que mudam `prisma/**`, ele cria e migra `preview_pr_<número>`, concede os default privileges e cria a conta `preview-pr-<número>@escola.exemplo` com `ADMIN_SENHA_PREVIEW`. No fechamento, remove o schema; uma faxina semanal derruba órfãos; e um job em cada push na `main` mantém o schema de fallback `preview`.
+
+Configure no GitHub, no environment `preview`:
+
+- segredo `DIRECT_URL_PREVIEW`: Session pooler com `preview_migrador`, sem `schema`;
+- segredo `ADMIN_SENHA_PREVIEW`: senha da conta sintética de cada preview;
+- opcional para o apontamento automático: segredo `VERCEL_TOKEN` e variáveis `VERCEL_PROJECT_ID` e `VERCEL_TEAM_ID`. Sem eles, o schema é criado e migrado, mas a branch continua no fallback até o ajuste manual de `DATABASE_SCHEMA`.
+
+Pull requests sem mudança de banco, do Dependabot e de forks usam o fallback `preview`; o workflow não roda em forks, que não recebem segredos.
+
 ## GitHub Actions
 
 Os workflows ficam em `.github/workflows/`:
 
-| Workflow         | Responsabilidade                                             |
-| ---------------- | ------------------------------------------------------------ |
-| `qualidade.yml`  | Formatação, lint, tipos e testes unitários                   |
-| `build.yml`      | Build de produção do Next.js                                 |
-| `testes.yml`     | Compose, migração, contas de teste e contratos de API        |
-| `migracoes.yml`  | `prisma migrate deploy` na `main` e no ambiente `production` |
-| `codeql.yml`     | Análise de segurança de JavaScript e TypeScript              |
-| `publicacao.yml` | Publicação da imagem no GHCR                                 |
+| Workflow             | Responsabilidade                                                              |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `qualidade.yml`      | Formatação, lint, tipos e testes unitários                                    |
+| `build.yml`          | Build de produção do Next.js                                                  |
+| `testes.yml`         | Compose, migração, contas de teste e contratos de API                         |
+| `migracoes.yml`      | `prisma migrate deploy` na `main` e no ambiente `production`                  |
+| `schema-preview.yml` | Schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal |
+| `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                               |
+| `publicacao.yml`     | Publicação da imagem no GHCR                                                  |
 
 Para acompanhar e operar workflows e releases pelo terminal, use o GitHub CLI (`gh`): confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Depois use `gh run list`, `gh run watch`, `gh run view --log-failed`, `gh pr checks --watch` e `gh release create`. Nunca inclua segredos em comandos.
 

@@ -36,3 +36,4 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 - [ADR-035](adr/035-seduc-na-chamada-normal.md): confirmação manual da base diária, revisão independente e preservação da cópia JSON; o adendo concentra a conferência na Chamada Parcial.
 - [ADR-036](adr/036-implantacao-multinuvem.md): implantação em AWS, Azure e GCP com Terraform, com modo local nos emuladores do Floci.
 - [ADR-037](adr/037-frequencia-mensal-no-google.md): preparo de abas por turma e mês, preservação do histórico e confirmação por destino.
+- [ADR-038](adr/038-automacao-do-schema-de-preview.md): schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal.

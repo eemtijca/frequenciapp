@@ -221,15 +221,16 @@ Preencha o checklist do template de pull request. Ao alterar comportamento, atua
 
 Toda mudança passa por revisão e pelos workflows do GitHub Actions:
 
-| Workflow         | Etapas                                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| `qualidade.yml`  | `format:check`, `lint`, `tsc` e `test:unit` em pull requests.                                           |
-| `etiquetas.yml`  | Aplica etiquetas de área e de tipo e valida o título e as etiquetas em pull requests fora de rascunho.  |
-| `build.yml`      | `next build` em pull requests, com variáveis fictícias.                                                 |
-| `testes.yml`     | Sobe o Compose, aplica migrações, cria as contas de teste e roda contratos de API, ponta a ponta e PWA. |
-| `migracoes.yml`  | `prisma migrate deploy` na `main` e no ambiente `production`.                                           |
-| `codeql.yml`     | Análise de segurança de JavaScript e TypeScript em push, pull request e agenda semanal.                 |
-| `publicacao.yml` | Publicação da imagem no GHCR ao publicar um release estável.                                            |
+| Workflow             | Etapas                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `qualidade.yml`      | `format:check`, `lint`, `tsc` e `test:unit` em pull requests.                                           |
+| `etiquetas.yml`      | Aplica etiquetas de área e de tipo e valida o título e as etiquetas em pull requests fora de rascunho.  |
+| `build.yml`          | `next build` em pull requests, com variáveis fictícias.                                                 |
+| `testes.yml`         | Sobe o Compose, aplica migrações, cria as contas de teste e roda contratos de API, ponta a ponta e PWA. |
+| `migracoes.yml`      | `prisma migrate deploy` na `main` e no ambiente `production`.                                           |
+| `schema-preview.yml` | Cria e migra `preview_pr_<n>` por pull request, mantém o fallback e faxina os órfãos.                   |
+| `codeql.yml`         | Análise de segurança de JavaScript e TypeScript em push, pull request e agenda semanal.                 |
+| `publicacao.yml`     | Publicação da imagem no GHCR ao publicar um release estável.                                            |
 
 A `main` é protegida por rulesets: pull request obrigatório, checks verdes, conversas resolvidas e squash como único método. Todo pull request precisa da aprovação de um mantenedor do [CODEOWNERS](.github/CODEOWNERS); depois da aprovação, quem abriu pode mesclar. A autoaprovação não existe no GitHub; donos da organização podem mesclar com o bypass da regra de revisão, mas continuam sujeitos aos checks de qualidade.
 
