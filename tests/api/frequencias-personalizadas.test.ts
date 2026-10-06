@@ -11,10 +11,13 @@ const dia = "2026-06-15";
 const alunos: string[] = [];
 const horarios: string[] = [];
 const parciaisCriadas = new Set<string>();
+const codigoJustificativa = "QAPARC";
+const codigoOutraJustificativa = "QAPARC2";
+const rotuloJustificativa = "QA Motivo personalizado";
+const rotuloOutraJustificativa = "QA Outro motivo";
 let cookie = "";
 let turmaId = "";
 let outraTurmaId = "";
-let codigoJustificativa = "";
 
 async function chamar(caminho: string, metodo = "GET", corpo?: unknown, sessao = cookie) {
   return fetch(`${url}${caminho}`, {
@@ -89,6 +92,9 @@ async function limpar() {
     [prefixo],
   );
   await cliente.query("delete from series where nome = $1", [prefixo]);
+  await cliente.query("delete from justificativas where codigo = any($1::text[])", [
+    [codigoJustificativa, codigoOutraJustificativa],
+  ]);
 }
 
 beforeAll(async () => {
@@ -138,13 +144,12 @@ beforeAll(async () => {
     if (!id) throw new Error("Horário sintético não preparado.");
     horarios.push(id);
   }
-  codigoJustificativa =
-    (
-      await cliente.query<{ codigo: string }>(
-        "select codigo from justificativas order by codigo limit 1",
-      )
-    ).rows[0]?.codigo ?? "";
-  expect(codigoJustificativa).not.toBe("");
+  await cliente.query("insert into justificativas (codigo, rotulo) values ($1, $2), ($3, $4)", [
+    codigoJustificativa,
+    rotuloJustificativa,
+    codigoOutraJustificativa,
+    rotuloOutraJustificativa,
+  ]);
 });
 
 beforeEach(async () => {
@@ -154,6 +159,9 @@ beforeEach(async () => {
     alunos,
   ]);
   await cliente.query("update horarios set ativo = true where id = any($1::uuid[])", [horarios]);
+  await cliente.query("update justificativas set ativo = true where codigo = any($1::text[])", [
+    [codigoJustificativa, codigoOutraJustificativa],
+  ]);
 });
 
 afterAll(async () => {
@@ -185,6 +193,7 @@ it("não supõe presença sem chamada salva nem inclui alunos fora da lista hist
   expect(registros[0]).toMatchObject({
     id: `chamada:${alunoDe(0)}:${dia}`,
     descricao: "Dia inteiro",
+    justificativas: [],
     revisao: 3,
     revisaoSeduc: 0,
   });
@@ -213,7 +222,62 @@ it("preserva P, F, FJ e aulas parcialmente ausentes sem inferir presença a part
     "FJ",
     "S",
   ]);
+  expect(registros[0]).toMatchObject({ justificativas: [] });
+  expect(registros[1]).toMatchObject({ justificativas: [] });
+  expect(registros[2]).toMatchObject({ justificativas: [rotuloJustificativa] });
   expect(registros[3]).toMatchObject({ descricao: "Falta na 2ª aula da Chamada" });
+});
+
+it("exibe motivos distintos do catálogo mesmo depois de desativados, sem repetir por aula", async () => {
+  const frequenciaId = await salvarBase();
+  await cliente.query("update justificativas set ativo = false where codigo = $1", [
+    codigoJustificativa,
+  ]);
+  for (const [indice, horarioId] of horarios.entries()) {
+    await cliente.query(
+      "insert into faltas (frequencia_id, aluno_id, horario_id, justificativa, observacao) values ($1, $2, $3, $4, 'QA observação fora de Outros')",
+      [
+        frequenciaId,
+        alunoDe(0),
+        horarioId,
+        indice === 1 ? codigoOutraJustificativa : codigoJustificativa,
+      ],
+    );
+  }
+  expect((await listar())[0]).toMatchObject({
+    marca: "FJ",
+    descricao: "Falta justificada na Chamada",
+    justificativas: [rotuloJustificativa, rotuloOutraJustificativa],
+  });
+});
+
+it("inclui a observação de Outros e mantém o código de justificativas históricas sem catálogo", async () => {
+  const frequenciaId = await salvarBase();
+  const outros = await cliente.query<{ rotulo: string }>(
+    "select rotulo from justificativas where codigo = 'O'",
+  );
+  const rotuloOutros = outros.rows[0]?.rotulo;
+  expect(rotuloOutros).toBeTruthy();
+  for (const horarioId of horarios) {
+    await cliente.query(
+      "insert into faltas (frequencia_id, aluno_id, horario_id, justificativa, observacao) values ($1, $2, $3, 'O', '  QA Compromisso familiar  ')",
+      [frequenciaId, alunoDe(0), horarioId],
+    );
+  }
+  await cliente.query(
+    "insert into faltas (frequencia_id, aluno_id, horario_id, justificativa) values ($1, $2, $3, 'QASEMMOT')",
+    [frequenciaId, alunoDe(1), horarios[0]],
+  );
+  const registros = await listar();
+  expect(registros[0]).toMatchObject({
+    marca: "FJ",
+    justificativas: [`${rotuloOutros}: QA Compromisso familiar`],
+  });
+  expect(registros[1]).toMatchObject({
+    marca: "S",
+    descricao: "Falta na 1ª aula da Chamada",
+    justificativas: ["QASEMMOT"],
+  });
 });
 
 it("mantém a falta registrada mesmo quando a aula deixa a grade atual", async () => {
@@ -227,7 +291,11 @@ it("mantém a falta registrada mesmo quando a aula deixa a grade atual", async (
 });
 
 it("preserva a confirmação antiga, mas recusa confirmar a base após uma personalização", async () => {
-  await salvarBase();
+  const frequenciaId = await salvarBase();
+  await cliente.query(
+    "insert into faltas (frequencia_id, aluno_id, horario_id, justificativa) values ($1, $2, $3, $4)",
+    [frequenciaId, alunoDe(0), horarios[0], codigoJustificativa],
+  );
   const confirmacao = {
     alunoId: alunoDe(0),
     turmaId,

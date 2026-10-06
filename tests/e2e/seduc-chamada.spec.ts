@@ -104,6 +104,39 @@ async function chamadaSalva(page: Page) {
   };
 }
 
+test("mostra presença e motivo completo sob o nome, sem selo da origem e sem corte no celular", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const motivo =
+    "Comparecimento a compromisso familiar informado pela pessoa responsável, com retorno previsto para o próximo dia letivo.";
+  const resposta = await page.request.post("/api/frequencias", {
+    data: {
+      dia: diaAtual(),
+      turmaId,
+      revisao: 0,
+      faltas: [{ alunoId, justificativa: "O", observacao: motivo }],
+    },
+  });
+  expect(resposta.ok()).toBe(true);
+  const secao = await abrirParcial(page);
+  const justificada = secao.getByTestId(`parcial-aluno-${alunoId}`);
+  const presente = secao.getByTestId(`parcial-aluno-${segundoAlunoId}`);
+  await expect(justificada.getByText(`Outros: ${motivo}`, { exact: true })).toBeVisible();
+  await expect(presente.getByText("Presente", { exact: true })).toBeVisible();
+  await expect(secao.getByText("Chamada", { exact: true })).toHaveCount(0);
+  await expect(secao.getByText("Personalizada", { exact: true })).toHaveCount(0);
+  for (const tema of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: tema });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await justificada.screenshot({
+      path: testInfo.outputPath(`justificativa-parcial-${tema}.png`),
+    });
+  }
+});
+
 test("retira RS da Chamada e confirma a frequência diária na Parcial, preservando os demais ao corrigir", async ({
   page,
 }) => {
@@ -123,11 +156,9 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
     name: `RS, Registrado na Seduc: ${prefixo} Dois`,
     exact: true,
   });
+  await expect(secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Presente")).toBeVisible();
   await expect(
-    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Dia inteiro"),
-  ).toBeVisible();
-  await expect(
-    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Dia inteiro"),
+    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Presente"),
   ).toBeVisible();
   await expect(primeiro).toBeEnabled();
   await expect(segundo).toBeEnabled();
@@ -159,7 +190,7 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await expect(chamada.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
   await abrirParcial(page);
   await expect(
-    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta na Chamada", { exact: true }),
+    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta", { exact: true }),
   ).toBeVisible();
   await expect(primeiro).toBeEnabled();
   await expect(primeiro).not.toBeChecked();
@@ -205,7 +236,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   await expect(primeiro).toBeEnabled();
   await expect(primeiro).not.toBeChecked();
   await expect(
-    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta na Chamada", { exact: true }),
+    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta", { exact: true }),
   ).toBeVisible();
   await primeiro.click();
   await expect(primeiro).toBeChecked();
@@ -223,7 +254,7 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
     name: `RS, Registrado na Seduc: ${prefixo} Um`,
     exact: true,
   });
-  await expect(linha.getByText("Dia inteiro", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente", { exact: true })).toBeVisible();
   await confirmacao.click();
   await expect(confirmacao).toBeChecked();
   const antes = await chamadaSalva(page);
@@ -238,14 +269,14 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
   await page.getByRole("option", { name: "Tarde", exact: true }).click();
   await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(dialogo).toBeHidden();
-  await expect(linha.getByText("Tarde", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
   await expect(confirmacao).not.toBeChecked();
   await confirmacao.click();
   await expect(confirmacao).toBeChecked();
   expect(await chamadaSalva(page)).toEqual(antes);
 
   await abrirParcial(page);
-  await expect(linha.getByText("Tarde", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
   await expect(confirmacao).toBeChecked();
   const resposta = await page.request.get(
     `/api/frequencias-parciais?dia=${diaAtual()}&turmaId=${turmaId}`,
@@ -276,7 +307,7 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
     ]),
   );
   await expect(
-    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Dia inteiro", { exact: true }),
+    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Presente", { exact: true }),
   ).toBeVisible();
   await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);

@@ -212,7 +212,7 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
   await page.getByRole("option", { name: "Tarde", exact: true }).click();
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
-  await expect(linha.getByText("Tarde", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
   const dados = await registrosDoDia(page);
   const parcial = dados.registros[0];
   expect(parcial?.tipo).toBe("TURNO");
@@ -246,7 +246,7 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
   ).toBeVisible();
   await editar.getByRole("button", { name: "Salvar frequência parcial" }).click();
   await expect(linha.getByRole("switch")).not.toBeChecked();
-  await expect(linha.getByText("Aulas 3, 4, 6", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente · Aulas 3, 4, 6", { exact: true })).toBeVisible();
   const corrigido = (await registrosDoDia(page)).registros[0];
   expect(corrigido?.aulas).toEqual([3, 4, 6]);
   expect(corrigido?.turno).toBeNull();
@@ -265,7 +265,7 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(dialogo).toBeHidden();
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
-  await expect(linha.getByText("Dia inteiro", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente", { exact: true })).toBeVisible();
   const salvo = (await registrosDoDia(page)).registros[0];
   expect(salvo).toMatchObject({
     tipo: "DIA_INTEIRO",
@@ -285,7 +285,7 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   await confirmacao.click();
   await expect(confirmacao).toBeChecked();
   await abrirParcial(page);
-  await expect(linha.getByText("Dia inteiro", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente", { exact: true })).toBeVisible();
   await expect(confirmacao).toBeChecked();
   await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
   const editar = page.getByRole("dialog", { name: "Editar frequência parcial", exact: true });
@@ -298,7 +298,7 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   ).toBeVisible();
   await editar.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(editar).toBeHidden();
-  await expect(linha.getByText("2ª à 3ª aula", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Presente · 2ª à 3ª aula", { exact: true })).toBeVisible();
   await expect(confirmacao).not.toBeChecked();
   expect((await registrosDoDia(page)).registros[0]).toMatchObject({
     tipo: "AULAS",
@@ -326,7 +326,7 @@ test("marca um intervalo e permite retirar aulas específicas antes de salvar", 
   await dialogo.getByRole("checkbox", { name: "4ª aula frequentada", exact: true }).click();
   await dialogo.locator("#parcial-observacao").fill("Presença nas aulas informadas");
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  await expect(secao.getByText("Aulas 3, 5", { exact: true })).toBeVisible();
+  await expect(secao.getByText("Presente · Aulas 3, 5", { exact: true })).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.aulas).toEqual([3, 5]);
   await page.reload();
   await abrirParcial(page);
