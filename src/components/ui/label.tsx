@@ -1,5 +1,6 @@
 "use client";
 
+// Rótulo acessível de campos com tipografia compartilhada dos formulários.
 import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
 

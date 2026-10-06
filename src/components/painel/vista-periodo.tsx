@@ -101,10 +101,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
   });
 
   return (
-    <section
-      aria-label="Infrequência personalizada"
-      className="bg-card space-y-5 rounded-lg border p-4"
-    >
+    <section aria-label="Infrequência personalizada" className="superficie-vidro space-y-5 p-4">
       <header>
         <h2 className="font-medium">Infrequência por período</h2>
         <p className="text-muted-foreground mt-1 text-sm">

@@ -186,7 +186,7 @@ export function SeletorPlanilhaGoogle({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-3">
+    <div className="superficie-vidro flex flex-col gap-3 p-3">
       <p className="text-sm font-medium">Conta Google</p>
       <p className="text-muted-foreground text-xs">
         Autorize a conta da escola e escolha a planilha. O acesso é limitado aos arquivos

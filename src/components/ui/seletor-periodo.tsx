@@ -148,11 +148,11 @@ export function SeletorPeriodo({
 
   function classeCelula(selecionado: boolean, futuro: boolean, corrente: boolean) {
     return cn(
-      "pressionavel flex items-center justify-center rounded-md text-sm transition-colors",
+      "pressionavel focus-visible:ring-ring/50 flex items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
       futuro && "text-muted-foreground/40 cursor-not-allowed",
-      selecionado && "bg-primary text-primary-foreground font-semibold",
-      !selecionado && !futuro && corrente && "border-primary/40 text-primary border font-semibold",
-      !selecionado && !futuro && !corrente && "hover:bg-secondary",
+      selecionado && "vidro-selecionado font-semibold",
+      !selecionado && corrente && "controle-vidro text-primary font-semibold",
+      !selecionado && !corrente && "vidro-discreto",
     );
   }
 
@@ -163,7 +163,7 @@ export function SeletorPeriodo({
           type="button"
           aria-label={modo === "dia" ? "Mês anterior" : "Ano anterior"}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
-          className="hover:bg-secondary focus-visible:ring-ring pressionavel flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="controle-vidro focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronLeft size={18} />
         </button>
@@ -175,7 +175,7 @@ export function SeletorPeriodo({
           aria-label={modo === "dia" ? "Mês seguinte" : "Ano seguinte"}
           disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
-          className="hover:bg-secondary focus-visible:ring-ring pressionavel flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          className="controle-vidro focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight size={18} />
         </button>
@@ -268,14 +268,14 @@ export function SeletorPeriodo({
           type="button"
           disabled={valor === max}
           onClick={() => escolher(max)}
-          className="text-primary disabled:text-muted-foreground pressionavel text-sm font-medium hover:underline disabled:no-underline"
+          className="vidro-discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
         >
           {modo === "dia" ? "Hoje" : "Este mês"}
         </button>
         <button
           type="button"
           onClick={() => setAberto(false)}
-          className="text-muted-foreground hover:text-foreground pressionavel text-sm font-medium"
+          className="vidro-discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
         >
           Fechar
         </button>
@@ -292,16 +292,23 @@ export function SeletorPeriodo({
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${rotulo}${selo ? `, ${selo}` : ""}`}
       onClick={() => aoAbrir(!aberto)}
-      className="border-input bg-background focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="controle-vidro focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <CalendarDays size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-      <span className="numerais-tabulares truncate font-semibold">{rotulo}</span>
+      <span
+        className={cn(
+          "numerais-tabulares font-semibold",
+          modo === "dia" ? "shrink-0 whitespace-nowrap" : "min-w-0 truncate",
+        )}
+      >
+        {rotulo}
+      </span>
       {detalhe && (
         // No painel estreito do desktop o dia da semana já aparece no cabeçalho.
-        <span className="text-muted-foreground truncate xl:hidden">{detalhe}</span>
+        <span className="text-muted-foreground min-w-0 truncate xl:hidden">{detalhe}</span>
       )}
       {selo && (
-        <span className="bg-primary/15 text-primary shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold">
+        <span className="bg-primary/15 text-primary shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
           {selo}
         </span>
       )}

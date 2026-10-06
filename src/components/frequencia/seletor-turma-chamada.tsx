@@ -56,12 +56,13 @@ export function SeletorTurmaChamada({ turmas, alunos, turmaId, travado, onEscolh
   }
 
   return (
-    <div
-      role="group"
-      aria-label="Turma atual"
-      className={cn("flex flex-col gap-3 font-sans", estilos.seletor)}
-    >
-      <div className={cn("grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1", estilos.faixa)}>
+    <div role="group" aria-label="Turma atual" className="flex flex-col gap-3">
+      <div
+        className={cn(
+          "superficie-vidro grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1",
+          estilos.faixa,
+        )}
+      >
         {series.map((grupo) => {
           const ehAtiva = grupo.id === ativa?.id;
           const total = grupo.turmas.reduce(
@@ -80,7 +81,7 @@ export function SeletorTurmaChamada({ turmas, alunos, turmaId, travado, onEscolh
               aria-controls={ehAtiva ? `${id}-turmas` : undefined}
               disabled={travado && !ehAtiva}
               onClick={() => aoTocarSerie(grupo.id)}
-              className={estilos.serie}
+              className={cn(estilos.serie, ehAtiva && "vidro-selecionado")}
             >
               <span className="flex w-full min-w-0 items-center justify-center gap-1">
                 <span className="truncate font-semibold" title={grupo.nome}>

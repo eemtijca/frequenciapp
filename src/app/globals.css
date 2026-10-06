@@ -1,5 +1,7 @@
+/* Paleta, tipografia e utilitários globais da interface. */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./vidro.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -148,7 +150,9 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    --font-sans: var(--font-jakarta);
+    --font-mono: var(--font-jetbrains-mono);
     font-feature-settings: "tnum" off;
   }
   ::selection {
@@ -159,7 +163,7 @@
 /* Alvos de toque confortáveis e números tabulares onde contam. */
 @layer utilities {
   .numerais-tabulares {
-    font-family: var(--font-mono);
+    font-family: var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
   .faixa-toque {

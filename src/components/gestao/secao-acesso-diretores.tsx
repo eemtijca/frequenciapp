@@ -150,7 +150,7 @@ export default function SecaoAcessoDiretores() {
                         atual ? { ...atual, [campo]: evento.target.value } : atual,
                       )
                     }
-                    className="h-11 rounded-lg"
+                    className="h-11"
                   />
                   <p className="text-muted-foreground text-xs">
                     {faixa.unidade}, de {faixa.minimo} a {faixa.maximo}
@@ -181,7 +181,7 @@ export default function SecaoAcessoDiretores() {
           </fieldset>
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
           <div>
-            <Button type="submit" className="h-11 rounded-lg" disabled={salvando}>
+            <Button type="submit" className="h-11" disabled={salvando}>
               {salvando && <LoaderCircle size={16} className="animate-spin" />}
               Salvar parâmetros
             </Button>

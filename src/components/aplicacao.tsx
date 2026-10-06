@@ -36,6 +36,7 @@ import type {
 import { diasDoMes } from "@/domain/frequencia";
 import { primeiroNome, rotuloDePapel, temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,7 +158,10 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
       type="button"
       aria-current={ativo ? "page" : undefined}
       onClick={() => onTrocar(item.visao)}
-      className="text-muted-foreground hover:text-foreground aria-[current=page]:text-primary pressionavel relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium transition-colors lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:rounded-lg lg:px-3 lg:text-sm"
+      className={cn(
+        "pressionavel relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[11px] font-medium transition-colors lg:min-h-11 lg:w-full lg:flex-row lg:justify-start lg:gap-2.5 lg:px-3 lg:text-sm",
+        ativo ? "vidro-selecionado" : "vidro-discreto text-muted-foreground",
+      )}
     >
       {ativo &&
         indicador &&
@@ -654,13 +658,12 @@ export default function Aplicacao({
           Pular para o conteúdo
         </a>
 
-        <aside className="border-border bg-card/40 hidden w-60 shrink-0 flex-col border-r lg:flex">
-          {" "}
+        <aside className="superficie-vidro hidden w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
           <div className="px-4 py-5">
             <p className="text-lg font-semibold tracking-tight">FrequenciApp</p>
             <p className="text-muted-foreground text-xs">Registro de frequência escolar</p>
           </div>
-          <nav aria-label="Seções do aplicativo" className="flex flex-1 flex-col gap-1 px-2">
+          <nav aria-label="Seções do aplicativo" className="flex flex-1 flex-col gap-1.5 px-3">
             {itens.map((item) => (
               <ItemNavegacao
                 key={item.visao}
@@ -674,7 +677,7 @@ export default function Aplicacao({
           </nav>
           <div className="border-border mt-4 border-t p-3">
             <div className="flex items-center gap-2 px-1">
-              <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full">
+              <span className="vidro-selecionado flex size-9 shrink-0 items-center justify-center rounded-full">
                 <UserRound size={16} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
@@ -720,7 +723,7 @@ export default function Aplicacao({
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header
-            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 shrink-0 border-b backdrop-blur lg:hidden"
+            className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
             style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
             <div className="flex items-center justify-between gap-1 px-3 py-2.5 sm:gap-3 sm:px-6">
@@ -735,7 +738,10 @@ export default function Aplicacao({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="aria-[current=page]:bg-primary/10 aria-[current=page]:text-primary size-11 rounded-full"
+                    className={cn(
+                      "size-11 rounded-full",
+                      visao === "gestao" && "vidro-selecionado",
+                    )}
                     aria-label="Gestão"
                     title="Gestão"
                     aria-current={visao === "gestao" ? "page" : undefined}
@@ -778,7 +784,7 @@ export default function Aplicacao({
                       <button
                         type="button"
                         onClick={() => setSenhaAberta(true)}
-                        className="hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors"
+                        className="vidro-discreto pressionavel flex min-h-11 items-center gap-2 rounded-2xl px-2.5 text-sm font-medium transition-colors"
                       >
                         <KeyRound size={16} aria-hidden="true" />
                         Trocar minha senha
@@ -787,7 +793,7 @@ export default function Aplicacao({
                         type="button"
                         onClick={() => void sair()}
                         disabled={saindo}
-                        className="text-falta-texto hover:bg-accent active:bg-accent/80 pressionavel flex min-h-11 items-center gap-2 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                        className="vidro-discreto text-falta-texto pressionavel flex min-h-11 items-center gap-2 rounded-2xl px-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                       >
                         <LogOut size={16} aria-hidden="true" />
                         Sair da conta
@@ -840,7 +846,7 @@ export default function Aplicacao({
 
           <nav
             aria-label="Seções do aplicativo"
-            className="bg-background/95 supports-[backdrop-filter]:bg-background/85 shrink-0 border-t backdrop-blur lg:hidden"
+            className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-t lg:hidden"
             style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
           >
             <div className="relative">
@@ -858,7 +864,7 @@ export default function Aplicacao({
                 </span>
               )}
               <div
-                className="grid"
+                className="grid gap-1 px-2 py-1.5"
                 style={{
                   gridTemplateColumns: `repeat(${itensInferiores.length}, minmax(0, 1fr))`,
                 }}

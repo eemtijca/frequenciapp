@@ -290,7 +290,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
                   : "diretores ativos"
               }`}
         </p>
-        <Button size="lg" className="h-11 rounded-lg" onClick={abrirNovo}>
+        <Button size="lg" className="h-11" onClick={abrirNovo}>
           <Plus size={16} />
           Novo diretor
         </Button>
@@ -302,7 +302,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
           Carregando diretores...
         </div>
       ) : (diretores ?? []).length === 0 ? (
-        <div className="bg-card flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRoundCheck size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum diretor de turma cadastrado</p>
           <p className="text-muted-foreground text-sm">
@@ -322,7 +322,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
             placeholder="Buscar por nome, identificador ou turma"
           />
           {filtrados.length === 0 ? (
-            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhum diretor encontrado</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
@@ -334,7 +334,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
                   initial={semMovimento ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
-                  className={`bg-card overflow-hidden rounded-lg border ${diretor.ativo ? "" : "opacity-60"}`}
+                  className={`superficie-vidro overflow-hidden ${diretor.ativo ? "" : "opacity-60"}`}
                   data-diretor={diretor.identificador}
                 >
                   <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
@@ -365,7 +365,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
                     <div className="flex shrink-0 flex-wrap items-center gap-1">
                       <Button
                         variant="outline"
-                        className="h-11 rounded-lg"
+                        className="h-11"
                         disabled={!diretor.ativo || chaveAtiva === `emitir-${diretor.id}`}
                         onClick={() =>
                           diretor.estado === "sem_palavra"
@@ -451,7 +451,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
                   setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
                 }
                 placeholder="Nome do professor"
-                className="h-11 rounded-lg"
+                className="h-11"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -471,7 +471,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
                   setFormulario((atual) => ({ ...atual, identificador: evento.target.value }))
                 }
                 placeholder="ex.: 3a-maria"
-                className="h-11 rounded-lg"
+                className="h-11"
               />
               <p id="dica-identificador" className="text-muted-foreground text-xs">
                 {emEdicao
@@ -632,13 +632,13 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
               autoComplete="off"
               onChange={(evento) => setMotivo(evento.target.value)}
               placeholder="ex.: deixou a direção da turma"
-              className="h-11 rounded-lg"
+              className="h-11"
             />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-falta text-falta-foreground hover:bg-falta/90"
+              variant="destructive"
               disabled={motivo.trim().length < 3 || chaveAtiva === `revogar-${revogarAlvo?.id}`}
               onClick={(evento) => {
                 // Mantém o diálogo aberto até a resposta, para mostrar erro se houver.

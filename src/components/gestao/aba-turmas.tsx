@@ -157,19 +157,14 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
             ? "As turmas recebem os alunos"
             : `${turmas.length} ${turmas.length === 1 ? "turma" : "turmas"}`}
         </p>
-        <Button
-          size="lg"
-          className="h-11 rounded-lg"
-          onClick={abrirNovo}
-          disabled={series.length === 0}
-        >
+        <Button size="lg" className="h-11" onClick={abrirNovo} disabled={series.length === 0}>
           <Plus size={16} />
           Nova turma
         </Button>
       </div>
 
       {series.length === 0 ? (
-        <div className="bg-card flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Crie uma série primeiro</p>
           <p className="text-muted-foreground text-sm">
@@ -177,7 +172,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
           </p>
         </div>
       ) : turmas.length === 0 ? (
-        <div className="bg-card flex min-h-44 flex-col items-center justify-center gap-2 rounded-lg border px-6 text-center">
+        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma turma cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -197,7 +192,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
             placeholder="Buscar turma"
           />
           {gruposFiltrados.length === 0 ? (
-            <div className="bg-card flex min-h-40 flex-col items-center justify-center gap-1 rounded-lg border px-6 text-center">
+            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhuma turma encontrada</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
@@ -210,7 +205,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                 transition={
                   semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
                 }
-                className="bg-card overflow-hidden rounded-lg border"
+                className="superficie-vidro overflow-hidden"
               >
                 <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
                   <h2 className="font-medium">{grupo.serie?.nome ?? "Série"}</h2>
@@ -275,7 +270,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancelar</AlertDialogCancel>
                               <AlertDialogAction
-                                className="bg-falta text-falta-foreground hover:bg-falta/90"
+                                variant="destructive"
                                 onClick={() => excluir(turma)}
                                 disabled={chaveAtiva === turma.id}
                               >
@@ -328,7 +323,7 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
                   setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
                 }
                 placeholder="Por exemplo: A"
-                className="h-11 rounded-lg"
+                className="h-11"
               />
               <p className="text-muted-foreground text-xs">
                 O rótulo completo aparece como série + turma, por exemplo 1º ano A.
