@@ -21,6 +21,8 @@ A primeira release será a `v1.0.0`. A partir dela:
 3. o workflow de implantação roda no ambiente `release`: valida a versão, aplica migrações, publica a imagem no GHCR e faz o deploy na Vercel;
 4. o deploy de produção acontece somente por tag; os previews continuam por pull request.
 
+As entradas do changelog vêm dos títulos dos pull requests, escritos no presente do indicativo e lidos como afirmações sobre a mudança; o merge por squash usa o título como commit na `main`.
+
 ## Etiquetas de versão
 
 - `versao: maior`, `versao: menor` e `versao: correcao` são aplicadas pelo workflow de etiquetas conforme o título do pull request.

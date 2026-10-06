@@ -130,7 +130,7 @@ Branches criadas por agentes de IA seguem esta mesma convenção de tipo, confor
 
 ### Commits
 
-Siga o [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/), em português, no imperativo e descrevendo o efeito da mudança:
+Siga o [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/), em português, no presente do indicativo (3ª pessoa), descrevendo o efeito da mudança:
 
 ```text
 <tipo>(<escopo opcional>): <descrição>
@@ -179,11 +179,13 @@ docs: descreve a grade por turma de origem
 test(unit): cobre o desempate de datas na grade
 ```
 
+O sujeito da descrição é a mudança: leia `fix(api): corrige ...` como o commit que corrige o problema. Use o presente do indicativo, não o imperativo, que soa como ordem a quem lê. Prefira `corrige`, `adiciona` e `estende`; evite `corrija`, `adicione` e `estenda`.
+
 ### Pull requests
 
 Um pull request resolve um assunto e reúne todos os commits dele. Se a mudança misturar refatoração e comportamento, separe em pull requests menores. Refatorações grandes andam em pull request próprio, sem misturar com correção ou funcionalidade. Se o trabalho virar dois assuntos independentes, combine a divisão e abra pull requests separados.
 
-Abra o pull request somente quando o trabalho estiver finalizado: verificações locais passando, título em Conventional Commits, documentação e CHANGELOG atualizados, etiquetas definidas e revisão do próprio diff feita. Não use `gh pr create --fill`, porque o corpo deve vir do template.
+Abra o pull request somente quando o trabalho estiver finalizado: verificações locais passando, título em Conventional Commits no presente do indicativo, documentação e CHANGELOG atualizados, etiquetas definidas e revisão do próprio diff feita. Não use `gh pr create --fill`, porque o corpo deve vir do template.
 
 Se o CI falhar ou surgir algo novo depois da abertura, converta o pull request para rascunho com `gh pr ready --undo`, faça os commits atômicos e rode as verificações de novo. Marque como pronto com `gh pr ready` somente com tudo verde. Enquanto o pull request estiver em rascunho, não peça revisão. Depois que a revisão começar, prefira commits novos que respondem ao feedback; se precisar reescrever a história, use `git push --force-with-lease` e explique o motivo na conversa.
 
