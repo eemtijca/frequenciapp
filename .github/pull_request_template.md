@@ -26,7 +26,7 @@ Aplique ao menos uma etiqueta de tipo e uma de área com `gh pr edit --add-label
 - [ ] Cada commit é uma mudança lógica completa e revisável, sem trabalho em andamento.
 - [ ] O histórico exposto passou por `git rebase -i --autosquash` e está limpo.
 - [ ] Todos os commits do assunto estão neste único pull request.
-- [ ] O título segue Conventional Commits, no formato `tipo(escopo): descrição`.
+- [ ] O título segue Conventional Commits, no formato `tipo(escopo): descrição`, no presente do indicativo; com o merge por squash, o título é o commit que entra na `main`.
 
 ## Como validar
 
