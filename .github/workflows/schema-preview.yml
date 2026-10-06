@@ -1,0 +1,151 @@
+# Automação do schema de preview: prepara o schema de cada pull request que
+# mexe no banco, limpa no fechamento, mantém o fallback e fiscaliza órfãos.
+name: Schema do preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+    paths:
+      - prisma/**
+  push:
+    branches:
+      - main
+    paths:
+      - prisma/**
+  schedule:
+    - cron: "40 6 * * 1"
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: Ação manual
+        type: choice
+        options:
+          - fallback
+          - faxina
+        default: fallback
+
+concurrency:
+  group: schema-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  preparar:
+    name: Preparar schema do preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Criar, migrar e apontar o schema do pull request
+        env:
+          DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
+          ADMIN_SENHA_PREVIEW: ${{ secrets.ADMIN_SENHA_PREVIEW }}
+          PREVIEW_BRANCH: ${{ github.event.pull_request.head.ref }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+        run: node scripts/preview-schema.mjs preparar --pr ${{ github.event.pull_request.number }}
+
+  limpar:
+    name: Limpar schema do preview
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Remover o schema do pull request
+        env:
+          DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
+        run: node scripts/preview-schema.mjs limpar --pr ${{ github.event.pull_request.number }}
+
+  fallback:
+    name: Atualizar schema de fallback
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'fallback')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Aplicar migrações no schema de fallback
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL_PREVIEW }}
+          DATABASE_SCHEMA: preview
+        run: node docker/app/migrar.mjs
+
+  faxina:
+    name: Faxina dos schemas de preview
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'faxina')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Remover schemas órfãos
+        env:
+          DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/preview-schema.mjs faxina
