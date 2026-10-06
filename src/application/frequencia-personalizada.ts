@@ -3,7 +3,13 @@
 import { z } from "zod";
 import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { esquemaFiltrosParciais } from "./frequencia-parcial";
-import { diaLocal, horariosDoDia, type Horario, type Marca } from "@/domain/frequencia";
+import {
+  diaLocal,
+  horariosDoDia,
+  JUSTIFICATIVA_OUTROS,
+  type Horario,
+  type Marca,
+} from "@/domain/frequencia";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
 import type { RegistroPersonalizado } from "@/domain/frequencia-personalizada";
 import { ambiente } from "@/infra/ambiente";
@@ -56,6 +62,20 @@ function descreverChamada(
     : { marca: "F", descricao: "Falta na Chamada" };
 }
 
+function motivosDasFaltas(
+  faltas: { justificativa: string | null; observacao: string | null }[],
+  catalogo: ReadonlyMap<string, string>,
+): string[] {
+  const motivos = faltas.flatMap((falta) => {
+    if (!falta.justificativa) return [];
+    const rotulo = catalogo.get(falta.justificativa) ?? falta.justificativa;
+    const observacao =
+      falta.justificativa === JUSTIFICATIVA_OUTROS ? falta.observacao?.trim() : null;
+    return [observacao ? `${rotulo}: ${observacao}` : rotulo];
+  });
+  return [...new Set(motivos)].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
 export async function listarFrequenciasPersonalizadas(
   entrada: z.input<typeof esquemaFiltrosParciais>,
 ): Promise<RegistroPersonalizado[]> {
@@ -73,12 +93,20 @@ export async function listarFrequenciasPersonalizadas(
       where: { dia: periodo },
       include: {
         turma: { include: { serie: true, horarios: true } },
-        faltas: { select: { alunoId: true, horarioId: true, justificativa: true } },
+        faltas: {
+          select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
+        },
         alunos: { include: { aluno: { select: { nome: true } } } },
       },
       // Se o aluno integrou mais de uma lista no dia, a chamada mais recente é a base.
       orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
     });
+    const catalogo = new Map(
+      (await tx.justificativa.findMany({ select: { codigo: true, rotulo: true } })).map((item) => [
+        item.codigo,
+        item.rotulo,
+      ]),
+    );
     const porAlunoDia = new Map<string, RegistroPersonalizado>();
     for (const personalizada of personalizadas) {
       const registro = apresentarPersonalizacao(personalizada);
@@ -99,6 +127,7 @@ export async function listarFrequenciasPersonalizadas(
           alunoNome: aluno.aluno.nome,
           turmaNome: `${chamada.turma.serie.nome} ${chamada.turma.nome}`,
           ...descreverChamada(faltas, chamada.turma.horarios, dia),
+          justificativas: motivosDasFaltas(faltas, catalogo),
           registradoSeduc: aluno.registradoSeduc,
           registradoSeducEm: aluno.registradoSeducEm?.toISOString() ?? null,
           registradoSeducPorNome: aluno.registradoSeducPorNome,

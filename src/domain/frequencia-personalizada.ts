@@ -12,6 +12,7 @@ export interface FrequenciaDaChamada {
   turmaNome: string;
   marca: Marca;
   descricao: string;
+  justificativas: string[];
   registradoSeduc: boolean;
   registradoSeducEm: string | null;
   registradoSeducPorNome: string | null;

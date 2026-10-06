@@ -17,6 +17,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - Leituras da Sheets API com limite (429), falha do Google (5xx) ou sem resposta passam a responder `GOOGLE_TEMPORARIO` (502/503), e o Preparar mês interrompe o lote uma vez e oferece "Tentar pendentes", em vez de repetir a falha em cada turma.
+- Chamada Parcial mostra presença ou motivo da justificativa sob o nome, em retângulo arredondado, sem a indicação de origem Chamada ou Personalizada. O texto inclui o complemento de Outros e preserva a identificação de turnos e aulas personalizados.
 
 - Reconexão Google preserva arquivo, mapa mensal e preferências, após conferir o acesso à planilha existente. Preparar mês interrompe falhas comuns de autorização, permite retomar turmas pendentes e recupera o mês após o retorno do Google. Falhas externas não encerram a sessão do aplicativo.
 

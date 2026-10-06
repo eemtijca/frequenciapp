@@ -29,6 +29,7 @@ import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
@@ -77,6 +78,21 @@ interface CargaParcial {
 }
 
 const REGISTROS_VAZIOS: RegistroPersonalizado[] = [];
+
+function resumoDoRegistro(registro: RegistroPersonalizado | undefined): string {
+  if (!registro) return "Sem registro";
+  if (registro.tipo !== "CHAMADA") {
+    return registro.tipo === "DIA_INTEIRO"
+      ? "Presente"
+      : `Presente · ${rotuloFrequenciaPersonalizada(registro)}`;
+  }
+  if (registro.marca === "P") return "Presente";
+  const motivos = registro.justificativas.join(" · ");
+  if (registro.marca === "FJ") return motivos || "Falta justificada";
+  return [registro.marca === "F" ? "Falta" : registro.descricao, motivos]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 function momentoDaConfirmacao(registro: RegistroPersonalizado, fuso: string): string {
   if (!registro.registradoSeducEm) return "";
@@ -534,15 +550,19 @@ export default function VistaFrequenciaParcial({
                         {aluno.desistente && (
                           <span className="text-muted-foreground text-xs">DESISTENTE</span>
                         )}
-                        <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-                          <span>
-                            {registro ? rotuloFrequenciaPersonalizada(registro) : "Sem registro"}
-                          </span>
-                          {registro && (
-                            <span className="rounded-full border px-2 py-0.5 text-[10px]">
-                              {registro.tipo === "CHAMADA" ? "Chamada" : "Personalizada"}
-                            </span>
+                        <p
+                          className={cn(
+                            "mt-2 w-fit max-w-full rounded-xl border px-3 py-1.5 text-xs leading-relaxed font-medium wrap-anywhere",
+                            !registro
+                              ? "bg-muted/30 text-muted-foreground"
+                              : registro.tipo !== "CHAMADA" || registro.marca === "P"
+                                ? "border-primary/25 bg-primary/10 text-primary"
+                                : registro.marca === "FJ"
+                                  ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                  : "border-falta/25 bg-falta-fraca text-falta-texto",
                           )}
+                        >
+                          {resumoDoRegistro(registro)}
                         </p>
                       </div>
                     </div>

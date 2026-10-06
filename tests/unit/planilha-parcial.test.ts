@@ -55,6 +55,7 @@ function chamada(alteracoes: Partial<FrequenciaDaChamada> = {}): FrequenciaDaCha
     turmaNome: frequencia.turmaNome,
     marca: "P",
     descricao: "Dia inteiro",
+    justificativas: [],
     registradoSeduc: false,
     registradoSeducEm: null,
     registradoSeducPorNome: null,
