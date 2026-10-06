@@ -68,6 +68,16 @@ describe("schema da conexão PostgreSQL", () => {
       expect(() => schemaDaConexao(url)).toThrow("A URL de conexão PostgreSQL é inválida.");
     },
   );
+
+  it.each([
+    "postgresql://qa:senha@localhost:5432/qa&schema=preview",
+    "postgresql://qa:senha@localhost:5432/qa&sslmode=require",
+    "postgresql://qa:senha@localhost:5432/qa=x",
+  ])("rejeita parâmetros colados no caminho sem o separador ?: %j", (url) => {
+    expect(() => schemaDaConexao(url)).toThrow(
+      "A URL de conexão PostgreSQL tem parâmetros sem o separador ?.",
+    );
+  });
 });
 
 describe("resolução do schema efetivo", () => {
@@ -92,6 +102,12 @@ describe("resolução do schema efetivo", () => {
     expect(() =>
       resolverSchema({ url: "credencial-invalida", schemaExplicito: "preview" }),
     ).toThrow("A URL de conexão PostgreSQL é inválida.");
+  });
+
+  it("recusa parâmetros sem separador antes de resolver o schema", () => {
+    expect(() =>
+      resolverSchema({ url: "postgresql://qa:senha@localhost:5432/qa&schema=preview" }),
+    ).toThrow("A URL de conexão PostgreSQL tem parâmetros sem o separador ?.");
   });
 });
 

@@ -18,15 +18,21 @@ function validarSchema(nome) {
 }
 
 function enderecoDaConexao(url) {
+  let endereco;
   try {
-    const endereco = new URL(url);
-    if (!["postgres:", "postgresql:"].includes(endereco.protocol) || !endereco.hostname) {
-      throw new Error();
-    }
-    return endereco;
+    endereco = new URL(url);
   } catch {
     throw new Error("A URL de conexão PostgreSQL é inválida.");
   }
+  if (!["postgres:", "postgresql:"].includes(endereco.protocol) || !endereco.hostname) {
+    throw new Error("A URL de conexão PostgreSQL é inválida.");
+  }
+  // Parâmetros colados no caminho sem o separador ? fariam o banco ser lido
+  // com o sufixo inteiro, como em postgres&schema=preview.
+  if (endereco.pathname.includes("&") || endereco.pathname.includes("=")) {
+    throw new Error("A URL de conexão PostgreSQL tem parâmetros sem o separador ?.");
+  }
+  return endereco;
 }
 
 function schemaDaUrl(endereco) {

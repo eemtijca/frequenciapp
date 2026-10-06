@@ -67,6 +67,12 @@ describe("traduzirErro", () => {
     expect(resultado.status).toBe(503);
   });
 
+  it("traduz banco inexistente (P1003)", () => {
+    const resultado = traduzirErro(erroConhecido("P1003"));
+    expect(resultado.status).toBe(503);
+    expect(resultado.mensagem).toContain("banco de dados");
+  });
+
   it("traduz conflito de serialização (P2034)", () => {
     const resultado = traduzirErro(erroConhecido("P2034"));
     expect(resultado.status).toBe(409);

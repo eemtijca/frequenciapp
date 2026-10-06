@@ -87,6 +87,11 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
         mensagem: "Registro não encontrado. Talvez tenha sido removido por outra pessoa.",
         status: 404,
       };
+    case "P1003":
+      return {
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      };
     case "P2021":
       return {
         mensagem: "O banco de dados está incompleto. Contate o suporte técnico.",
