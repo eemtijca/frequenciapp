@@ -92,6 +92,11 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
         mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
         status: 503,
       };
+    case "P1011":
+      return {
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      };
     case "P2021":
       return {
         mensagem: "O banco de dados está incompleto. Contate o suporte técnico.",
@@ -146,6 +151,12 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
   if (erro instanceof ErroHttp) return { mensagem: erro.message, status: erro.status };
 
   if (erro instanceof PrismaClientKnownRequestError) {
+    if (erro.code === "P1011") {
+      // A falha de TLS vem da configuração da URL; o diagnóstico usa texto fixo.
+      console.error(
+        "[banco] falha de TLS na conexão. Conferir o sslmode e o uselibpqcompat da URL no ambiente afetado.",
+      );
+    }
     if (ehUsuarioAusenteNoPooler(erro)) {
       // A exceção do adaptador pode conter credenciais; o diagnóstico usa texto fixo.
       console.error(

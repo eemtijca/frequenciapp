@@ -73,6 +73,19 @@ describe("traduzirErro", () => {
     expect(resultado.mensagem).toContain("banco de dados");
   });
 
+  it("traduz falha de TLS (P1011) com aviso operacional fixo", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const resultado = traduzirErro(erroConhecido("P1011"));
+      expect(resultado.status).toBe(503);
+      expect(log).toHaveBeenCalledExactlyOnceWith(
+        "[banco] falha de TLS na conexão. Conferir o sslmode e o uselibpqcompat da URL no ambiente afetado.",
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("traduz conflito de serialização (P2034)", () => {
     const resultado = traduzirErro(erroConhecido("P2034"));
     expect(resultado.status).toBe(409);
