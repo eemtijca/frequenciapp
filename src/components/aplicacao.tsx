@@ -587,6 +587,7 @@ export default function Aplicacao({
         )}
         {alvoVisao === "relatorios" && (
           <VistaRelatorios
+            ativo={ativo}
             carregando={carregandoFrequencias}
             erro={erroFrequencias}
             abaInicial={abaRelatoriosInicial}

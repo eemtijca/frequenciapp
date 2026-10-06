@@ -441,6 +441,16 @@ Remove a saída para correção.
 
 - 200 `{"ok": true}`; 404 inexistente.
 
+## Relatórios
+
+### GET /api/relatorios/movimentacoes?de=YYYY-MM-DD&ate=YYYY-MM-DD&turmaId=uuid
+
+Exige capacidade `operar` (administração ou coordenação). Consulta somente os dados locais, sem escrever registros ou acessar o Google. `de` e `ate` são obrigatórios, inclusivos e aceitam fins de semana. O intervalo deve conter datas válidas, em ordem, até o dia corrente do fuso da aplicação e no máximo 366 dias. `turmaId` é opcional e deve ser UUID.
+
+Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo traz `turmaId`, `turmaRotulo`, `saidas`, `entradas`, `total` e `movimentacoes`. Cada movimentação traz `id`, `tipo` (`SAIDA` ou `ENTRADA`), `alunoId`, `alunoNome`, `dia`, `horario`, `momento`, `motivo` e `responsavel`; horário, momento e responsável podem ser nulos. Motivos incluem complementos e os rótulos dos catálogos, mesmo desativados. Entradas usam o responsável pelo registro, com fallback para a autoria legada; saídas usam o nome do liberador, com fallback para o usuário que liberou.
+
+Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma atual do aluno. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
+
 ## Configurações
 
 ### GET /api/configuracoes
@@ -550,14 +560,14 @@ Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOrigin
 
 ### POST /api/planilha/mensal
 
-Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e origem confiável. Prepara uma turma por requisição, com cabeçalho, dias, alunos e vínculos, preservando abas existentes. Repetição reutiliza o destino identificado; aba manual com o mesmo nome responde 409.
+Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e origem confiável. Prepara uma turma por requisição, com Aluno, datas de segunda a sexta, alunos e vínculos. O título usa o mês por extenso, como `1º A · Outubro`; em colisão com a mesma turma e mês de outro ano, acrescenta o ano. Em uma aba mensal existente, renomeia e remove somente colunas próprias reconhecidas de Turma atual e fim de semana, preservando linhas, demais células e destino. Repetição reutiliza o destino já ajustado. Aba manual com o mesmo nome, estrutura inesperada ou outra atualização em andamento responde 409.
 
-- 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada" }`; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
+- 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira apenas quando a aba existente foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
 - Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
 
 ### POST /api/planilha/simular
 
-Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por destino mapeado. Abas mensais recebem apenas os dias de seu mês e retornam `mes` e `aba`; um intervalo entre meses gera vários planos para a mesma turma. O hash inclui a aba e sua identidade. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
+Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por destino mapeado. Abas mensais recebem apenas segunda a sexta de seu mês e retornam `mes` e `aba`; um intervalo entre meses gera vários planos para a mesma turma. O hash inclui a aba e sua identidade. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro, também sem fins de semana nas abas mensais. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
 
 - 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 

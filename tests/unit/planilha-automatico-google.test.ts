@@ -10,6 +10,7 @@ const dubl = vi.hoisted(() => ({
   atualizarIntegracao: vi.fn(),
   frequencia: vi.fn(),
   frequenciasBanco: vi.fn(),
+  situacoesPendentes: vi.fn(),
   ultimoEnvio: vi.fn(),
   envios: vi.fn(),
   criarEnvio: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("@/infra/banco", () => ({
       update: dubl.atualizarIntegracao,
     },
     frequencia: { findFirst: dubl.frequencia, findMany: dubl.frequenciasBanco },
+    aluno: { count: dubl.situacoesPendentes },
     sincronizacaoPlanilha: {
       findFirst: dubl.ultimoEnvio,
       findMany: dubl.envios,
@@ -40,8 +42,12 @@ vi.mock("@/infra/google-oauth", () => ({ renovarAcesso: dubl.acesso }));
 vi.mock("@/application/alunos", () => ({ listarTodosAlunos: dubl.alunos }));
 vi.mock("@/application/turmas", () => ({ listarTodasTurmas: dubl.turmas }));
 vi.mock("@/application/frequencias", () => ({ listarFrequenciasDoPeriodo: dubl.frequencias }));
+vi.mock("@/infra/trava-planilha-frequencia", () => ({
+  comTravaPlanilhaFrequencia: <T>(tarefa: () => Promise<T>) => tarefa(),
+  controleTravaPlanilhaFrequencia: () => undefined,
+}));
 
-import { enviarAposSalvar } from "@/application/planilha";
+import { enviarAposSalvar, simularEnvio } from "@/application/planilha";
 
 const turmaId = "00000000-0000-4000-8000-000000000101";
 const alunoId = "00000000-0000-4000-8000-000000000102";
@@ -110,6 +116,25 @@ let respostaPerdida: boolean;
 let antesDaReleitura: (() => void) | null;
 let registros: Registro[];
 let lotes: Pedido[][];
+let mensal: boolean;
+
+const identidadeMensal = {
+  mes: "2026-10",
+  turmaOriginalId: turmaId,
+  destino: "planilha-google-sintetica:7:00000000-0000-4000-8000-000000000105",
+};
+
+function usarAbaMensal() {
+  mensal = true;
+  const estrutura = detectarEsquema(
+    { nome: nomeAba, valores: [cabecalho, [aluno.nome, ""]], formulas: [], linhas: 2, colunas: 2 },
+    2026,
+  );
+  linha.esquema = {
+    abas: [{ ...estrutura, mensal: identidadeMensal }],
+    mapa: [{ aba: nomeAba, ...identidadeMensal }],
+  };
+}
 
 function colunaDoIntervalo(letra: string): number {
   return [...letra].reduce((total, caractere) => total * 26 + caractere.charCodeAt(0) - 64, 0) - 1;
@@ -172,16 +197,31 @@ async function responderGoogle(entrada: URL | string, opcoes?: RequestInit): Pro
           title: nomeAba,
           gridProperties: { rowCount: 100, columnCount: 26 },
         },
-        developerMetadata: vinculada
-          ? [
-              {
-                metadataId: 12,
-                metadataKey: "frequenciapp.aluno",
-                metadataValue: alunoId,
-                location: { dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 } },
-              },
-            ]
-          : [],
+        developerMetadata: [
+          ...(vinculada
+            ? [
+                {
+                  metadataId: 12,
+                  metadataKey: "frequenciapp.aluno",
+                  metadataValue: alunoId,
+                  location: { dimensionRange: { sheetId: 7, startRowIndex: 1, endRowIndex: 2 } },
+                },
+              ]
+            : []),
+          ...(mensal
+            ? [
+                ["frequenciapp.aba", "1"],
+                ["frequenciapp.turma", turmaId],
+                ["frequenciapp.mes", identidadeMensal.mes],
+                ["frequenciapp.geracao", "00000000-0000-4000-8000-000000000105"],
+              ].map(([metadataKey, metadataValue], indice) => ({
+                metadataId: 20 + indice,
+                metadataKey,
+                metadataValue,
+                location: { sheetId: 7 },
+              }))
+            : []),
+        ],
       },
     ],
   });
@@ -197,6 +237,7 @@ beforeEach(() => {
   antesDaReleitura = null;
   registros = [];
   lotes = [];
+  mensal = false;
   const esquema = detectarEsquema(
     { nome: nomeAba, valores: [cabecalho, [aluno.nome, ""]], formulas: [], linhas: 2, colunas: 2 },
     2026,
@@ -222,6 +263,7 @@ beforeEach(() => {
   dubl.acesso.mockResolvedValue("acesso-sintetico");
   dubl.frequencia.mockResolvedValue({ alunos: [{ aluno: { turmaOriginalId: turmaId } }] });
   dubl.frequenciasBanco.mockResolvedValue([]);
+  dubl.situacoesPendentes.mockResolvedValue(0);
   dubl.alunos.mockResolvedValue([aluno]);
   dubl.turmas.mockResolvedValue([turma]);
   dubl.frequencias.mockResolvedValue([frequencia]);
@@ -333,5 +375,64 @@ describe("enviar ao salvar com a conta Google", () => {
     expect(reenvio.get(turmaId)).toBe("sem_confirmacao");
     expect(lotes).toHaveLength(1);
     expect(registros).toHaveLength(1);
+  });
+});
+
+describe("envio mensal sem colunas de fim de semana", () => {
+  it.each(["2026-10-03", "2026-10-04"])(
+    "não tenta enviar automaticamente a chamada mensal de %s",
+    async (dia) => {
+      usarAbaMensal();
+      const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
+      expect(situacoes.get(turmaId)).toBe("desligado");
+      expect(fetch).not.toHaveBeenCalled();
+      expect(dubl.criarEnvio).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    "mantém apenas dias de segunda a sexta na prévia com envio incremental %s",
+    async (somenteAlteradas) => {
+      usarAbaMensal();
+      const dias = ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"];
+      dubl.frequencias.mockResolvedValue(dias.map((dia) => ({ ...frequencia, dia })));
+      dubl.frequenciasBanco.mockResolvedValue(
+        dias.map((dia) => ({
+          dia: new Date(`${dia}T12:00:00Z`),
+          atualizadoEm: new Date("2026-10-05T12:00:00Z"),
+        })),
+      );
+      const previa = await simularEnvio(
+        { id: "coordenacao-sintetica" },
+        { turmaOriginalId: turmaId, de: "2026-10-02", ate: "2026-10-05", somenteAlteradas },
+      );
+      expect(previa.planos).toHaveLength(1);
+      expect(previa.planos[0]?.dias).toEqual(["2026-10-02", "2026-10-05"]);
+      expect(previa.planos[0]?.novasColunas.map((coluna) => coluna.dia)).toEqual(["2026-10-05"]);
+      expect(previa.planos[0]?.amostra.every((celula) => celula.dia !== "2026-10-03")).toBe(true);
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("não envia nem lê células quando o período mensal contém apenas sábado e domingo", async () => {
+    usarAbaMensal();
+    const previa = await simularEnvio(
+      { id: "coordenacao-sintetica" },
+      { turmaOriginalId: turmaId, de: "2026-10-03", ate: "2026-10-04", somenteAlteradas: false },
+    );
+    expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true, novasColunas: [] }]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dubl.frequencias).not.toHaveBeenCalled();
+    expect(dubl.criarEnvio).not.toHaveBeenCalled();
+  });
+
+  it("mantém o envio de fim de semana nas abas legadas", async () => {
+    dubl.frequencias.mockResolvedValue([{ ...frequencia, dia: "2026-10-03" }]);
+    const previa = await simularEnvio(
+      { id: "coordenacao-sintetica" },
+      { turmaOriginalId: turmaId, de: "2026-10-03", ate: "2026-10-03", somenteAlteradas: false },
+    );
+    expect(previa.planos[0]?.dias).toEqual(["2026-10-03"]);
+    expect(previa.planos[0]?.novasColunas.map((coluna) => coluna.dia)).toEqual(["2026-10-03"]);
   });
 });

@@ -35,6 +35,21 @@ test.describe("chamada com saída por aula", () => {
     // O seletor próprio mostra o rótulo amigável e abre o painel no clique.
     await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
     const gatilhoDia = painel.locator("#dia-frequencia");
+    // A coluna lateral do desktop preserva a data e o selo sem sobreposição.
+    expect(
+      await gatilhoDia.evaluate((botao) => {
+        const data = botao.querySelector(".numerais-tabulares")?.getBoundingClientRect();
+        const selo = botao.querySelector(".rounded-full")?.getBoundingClientRect();
+        const caixa = botao.getBoundingClientRect();
+        return Boolean(
+          data &&
+          selo &&
+          data.left >= caixa.left &&
+          data.right <= selo.left &&
+          selo.right <= caixa.right,
+        );
+      }),
+    ).toBe(true);
     await expect(gatilhoDia).toHaveAttribute("aria-haspopup", "dialog");
     await gatilhoDia.click();
     const painelDia = page.getByRole("dialog", { name: "Data da chamada" });
