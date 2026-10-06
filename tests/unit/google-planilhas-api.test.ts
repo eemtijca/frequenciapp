@@ -93,8 +93,65 @@ describe("leitura pela Sheets API", () => {
     );
     try {
       await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
-        status: 429,
+        status: 503,
+        codigo: "GOOGLE_TEMPORARIO",
         message: "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente.",
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it.each([500, 502, 503, 504] as const)(
+    "classifica a falha %i do Google como temporária",
+    async (httpGoogle) => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => Response.json({}, { status: httpGoogle })),
+      );
+      try {
+        await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
+          status: 502,
+          codigo: "GOOGLE_TEMPORARIO",
+          message:
+            "O Google não respondeu à leitura da planilha agora. Tente novamente em instantes.",
+        });
+      } finally {
+        log.mockRestore();
+      }
+    },
+  );
+
+  it("classifica a falta de resposta do Google como temporária", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    try {
+      await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
+        status: 502,
+        codigo: "GOOGLE_TEMPORARIO",
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("mantém sem código a recusa de requisição inválida", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({}, { status: 400 })),
+    );
+    try {
+      await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
+        status: 502,
+        codigo: undefined,
+        message: "O Google recusou a leitura da planilha.",
       });
     } finally {
       log.mockRestore();

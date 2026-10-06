@@ -257,11 +257,19 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
   } catch (erro) {
     const detalhe = `sem resposta do Google (${erro instanceof Error ? erro.name : "erro"})`;
     console.error(`Sheets API leitura: ${detalhe}`);
-    throw new ErroLeituraGoogle("Não foi possível falar com a planilha agora.", detalhe);
+    throw new ErroLeituraGoogle(
+      "Não foi possível falar com a planilha agora.",
+      detalhe,
+      502,
+      "GOOGLE_TEMPORARIO",
+    );
   }
   if (!resposta.ok) {
     const detalhe = await motivoDoGoogle(resposta);
     console.error(`Sheets API leitura: ${detalhe}`);
+    // Limite de leituras (429) e falhas do Google (5xx) são temporários: o código
+    // permite parar um lote uma vez e oferecer nova tentativa.
+    const temporario = resposta.status === 429 || resposta.status >= 500;
     const mensagem =
       resposta.status === 401
         ? "Reconecte a conta Google."
@@ -269,7 +277,9 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
           ? "A conta Google não tem acesso à planilha escolhida."
           : resposta.status === 429
             ? "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente."
-            : "O Google recusou a leitura da planilha.";
+            : temporario
+              ? "O Google não respondeu à leitura da planilha agora. Tente novamente em instantes."
+              : "O Google recusou a leitura da planilha.";
     throw new ErroLeituraGoogle(
       mensagem,
       detalhe,
@@ -278,13 +288,15 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
         : resposta.status === 403 || resposta.status === 404
           ? 403
           : resposta.status === 429
-            ? 429
+            ? 503
             : 502,
       resposta.status === 401
         ? "GOOGLE_RECONECTAR"
         : resposta.status === 403 || resposta.status === 404
           ? "GOOGLE_ACESSO"
-          : undefined,
+          : temporario
+            ? "GOOGLE_TEMPORARIO"
+            : undefined,
     );
   }
   try {
