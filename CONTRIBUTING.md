@@ -96,12 +96,12 @@ Relacione a issue ao pull request com `Closes #123` quando a mudança encerrar o
 
 Toda issue e todo pull request recebe ao menos uma etiqueta de tipo e uma de área. A prioridade é definida na triagem, e a etiqueta `triagem` sai quando o tipo, a área e a prioridade estiverem confirmados. Pull requests do Dependabot recebem `dependencies` automaticamente e dispensam as demais.
 
-| Grupo      | Etiquetas                                                                                     | Uso                                                |
-| ---------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Tipo       | `bug`, `enhancement`, `documentation`, `refactor`, `testes`, `ci`, `desempenho`, `manutencao` | Natureza da mudança.                               |
-| Área       | `area: chamada`, `area: planilhas`, `area: gestao`, `area: notificacoes`, `area: infra`       | Parte do sistema afetada.                          |
-| Prioridade | `prioridade: alta`, `prioridade: media`, `prioridade: baixa`                                  | Urgência definida na triagem.                      |
-| Triagem    | `triagem`                                                                                     | Aguardando confirmação de tipo, área e prioridade. |
+| Grupo      | Etiquetas                                                                                                  | Uso                                                |
+| ---------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Tipo       | `bug`, `enhancement`, `documentation`, `refactor`, `testes`, `ci`, `desempenho`, `manutencao`              | Natureza da mudança.                               |
+| Área       | `area: chamada`, `area: planilhas`, `area: gestao`, `area: notificacoes`, `area: infra`, `area: interface` | Parte do sistema afetada.                          |
+| Prioridade | `prioridade: alta`, `prioridade: media`, `prioridade: baixa`                                               | Urgência definida na triagem.                      |
+| Triagem    | `triagem`                                                                                                  | Aguardando confirmação de tipo, área e prioridade. |
 
 O catálogo fica em [.github/labels.json](../.github/labels.json) e é aplicado com `npm run etiquetas:sync`, que cria ou atualiza as etiquetas pelo GitHub CLI. O workflow `etiquetas.yml` aplica `area:` pelos caminhos alterados e o tipo pelo prefixo do título, e o check `validar` reprova pull requests sem etiqueta obrigatória ou com título fora do padrão Conventional Commits. Pull requests do tipo `docs` dispensam etiqueta de área.
 

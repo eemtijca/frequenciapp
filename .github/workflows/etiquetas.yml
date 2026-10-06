@@ -115,7 +115,7 @@ jobs:
                 problemas.push('Falta uma etiqueta de tipo: bug, enhancement, documentation, refactor, testes, ci, desempenho ou manutencao.');
               }
               if (!ehDocumentacao && !etiquetas.some((etiqueta) => etiqueta.startsWith('area: '))) {
-                problemas.push('Falta uma etiqueta de área: area: chamada, area: planilhas, area: gestao, area: notificacoes ou area: infra.');
+                problemas.push('Falta uma etiqueta de área: area: chamada, area: planilhas, area: gestao, area: notificacoes, area: infra ou area: interface.');
               }
               const etiquetasVersao = etiquetas.filter((etiqueta) => etiqueta.startsWith('versao: '));
               const versaoEsperada = quebra

@@ -71,6 +71,11 @@
       "descricao": "Infraestrutura, workflows, banco e ambiente."
     },
     {
+      "nome": "area: interface",
+      "cor": "d4c5f9",
+      "descricao": "Componentes de interface, temas e acabamento visual."
+    },
+    {
       "nome": "prioridade: alta",
       "cor": "b60205",
       "descricao": "Deve ser tratada em seguida."
