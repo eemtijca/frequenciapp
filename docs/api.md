@@ -441,6 +441,16 @@ Remove a saída para correção.
 
 - 200 `{"ok": true}`; 404 inexistente.
 
+## Relatórios
+
+### GET /api/relatorios/movimentacoes?de=YYYY-MM-DD&ate=YYYY-MM-DD&turmaId=uuid
+
+Exige capacidade `operar` (administração ou coordenação). Consulta somente os dados locais, sem escrever registros ou acessar o Google. `de` e `ate` são obrigatórios, inclusivos e aceitam fins de semana. O intervalo deve conter datas válidas, em ordem, até o dia corrente do fuso da aplicação e no máximo 366 dias. `turmaId` é opcional e deve ser UUID.
+
+Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo traz `turmaId`, `turmaRotulo`, `saidas`, `entradas`, `total` e `movimentacoes`. Cada movimentação traz `id`, `tipo` (`SAIDA` ou `ENTRADA`), `alunoId`, `alunoNome`, `dia`, `horario`, `momento`, `motivo` e `responsavel`; horário, momento e responsável podem ser nulos. Motivos incluem complementos e os rótulos dos catálogos, mesmo desativados. Entradas usam o responsável pelo registro, com fallback para a autoria legada; saídas usam o nome do liberador, com fallback para o usuário que liberou.
+
+Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma atual do aluno. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
+
 ## Configurações
 
 ### GET /api/configuracoes
@@ -524,7 +534,7 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 - `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS|PARCIAL`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar os arquivos de saídas e chamadas parciais.
 - `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API e guarda a planilha da finalidade. Trocar de arquivo desliga essa integração e invalida o mapa anterior; selecionar o mesmo arquivo preserva a estrutura. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
 
-Erros externos de autorização usam `{ "error": string, "codigo": string }`: `GOOGLE_RECONECTAR` (409), `GOOGLE_CONFIGURACAO` (503) ou `GOOGLE_TEMPORARIO` (502/503). A leitura de planilhas também identifica `GOOGLE_ACESSO` (403). O status 401 permanece reservado à sessão do aplicativo.
+Erros externos de autorização usam `{ "error": string, "codigo": string }`: `GOOGLE_RECONECTAR` (409), `GOOGLE_CONFIGURACAO` (503) ou `GOOGLE_TEMPORARIO` (502/503). A leitura de planilhas também identifica `GOOGLE_ACESSO` (403) e classifica como `GOOGLE_TEMPORARIO` o limite de leituras (429 do Google, respondido como 503), as falhas 5xx e a falta de resposta do Google (502). Assim o preparo mensal interrompe o lote uma vez, mantém as turmas restantes como não preparadas e oferece "Tentar pendentes". Respostas de leitura que antes saíam como 429 ou sem código passam a sair com esse código. O status 401 permanece reservado à sessão do aplicativo.
 
 ### GET /api/planilha/estado
 

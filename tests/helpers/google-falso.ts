@@ -34,6 +34,8 @@ export interface GoogleFalso {
   definirFuso(valor: string): void;
   recusarAutorizacao(valor: boolean): void;
   recusarLeituras(valor: boolean): void;
+  /** Responde as leituras (GET) com este status temporário; null volta ao normal. */
+  falharLeituras(status: number | null): void;
   recusarGravacoes(valor: boolean): void;
   perderProximaResposta(): void;
   definirAba(
@@ -72,6 +74,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
   let fuso = "America/Fortaleza";
   let recusarAutorizacao = false;
   let recusarLeituras = false;
+  let falhaDeLeitura: number | null = null;
   let recusarGravacoes = false;
   let perderResposta = false;
   let credencial = "";
@@ -397,6 +400,13 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
           responder({ error: { message: "Acesso sintético ao arquivo recusado." } }, 403);
           return;
         }
+        if (falhaDeLeitura !== null && req.method === "GET") {
+          responder(
+            { error: { message: "Falha sintética temporária do Google." } },
+            falhaDeLeitura,
+          );
+          return;
+        }
         if (url.pathname.endsWith(":batchUpdate")) {
           chamadas.push("gravar");
           if (recusarGravacoes) {
@@ -483,6 +493,9 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     },
     recusarLeituras: (valor) => {
       recusarLeituras = valor;
+    },
+    falharLeituras: (status) => {
+      falhaDeLeitura = status;
     },
     recusarGravacoes: (valor) => {
       recusarGravacoes = valor;

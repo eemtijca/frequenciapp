@@ -104,7 +104,10 @@ describe("pausas de leitura na organização", () => {
     const chamada = vi.fn(async () => limite());
     vi.stubGlobal("fetch", chamada);
     const leitura = comPausasDeLeituraGoogle(() => tamanhoUtilizado("arquivo", "acesso", "QA"));
-    const resultado = expect(leitura).rejects.toMatchObject({ status: 429 });
+    const resultado = expect(leitura).rejects.toMatchObject({
+      status: 503,
+      codigo: "GOOGLE_TEMPORARIO",
+    });
     await vi.runAllTimersAsync();
     await resultado;
     expect(chamada).toHaveBeenCalledTimes(3);
@@ -115,7 +118,7 @@ describe("pausas de leitura na organização", () => {
     vi.stubGlobal("fetch", chamada);
     await expect(
       comPausasDeLeituraGoogle(() => tamanhoUtilizado("arquivo", "acesso", "QA")),
-    ).rejects.toMatchObject({ status: 429 });
+    ).rejects.toMatchObject({ status: 503, codigo: "GOOGLE_TEMPORARIO" });
     expect(chamada).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -126,10 +129,14 @@ describe("pausas de leitura na organização", () => {
       vi.fn(async () => limite()),
     );
     const organizacao = comPausasDeLeituraGoogle(() => tamanhoUtilizado("arquivo", "acesso", "QA"));
-    const resultado = expect(organizacao).rejects.toMatchObject({ status: 429 });
+    const resultado = expect(organizacao).rejects.toMatchObject({
+      status: 503,
+      codigo: "GOOGLE_TEMPORARIO",
+    });
     await vi.advanceTimersByTimeAsync(0);
     await expect(tamanhoUtilizado("arquivo", "acesso", "QA")).rejects.toMatchObject({
-      status: 429,
+      status: 503,
+      codigo: "GOOGLE_TEMPORARIO",
     });
     await vi.runAllTimersAsync();
     await resultado;

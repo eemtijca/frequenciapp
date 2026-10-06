@@ -12,8 +12,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).
 
+- Gradientes da interface (superfícies, controles, botões, estado selecionado e fatias das roscas): o acabamento de vidro segue o mesmo, com preenchimentos sólidos e brilho suave por sombra interna, e a classe sem uso `grafico-vidro` saiu da rosca do Painel.
+
 ### Corrigido
 
+- Seletor de data mantém o selo Hoje na coluna lateral da Chamada no desktop e prioriza a data e o selo antes do ícone nas larguras compactas.
+- Leituras da Sheets API com limite (429), falha do Google (5xx) ou sem resposta passam a responder `GOOGLE_TEMPORARIO` (502/503), e o Preparar mês interrompe o lote uma vez e oferece "Tentar pendentes", em vez de repetir a falha em cada turma.
 - Chamada Parcial mostra presença ou motivo da justificativa sob o nome, em retângulo arredondado, sem a indicação de origem Chamada ou Personalizada. O texto inclui o complemento de Outros e preserva a identificação de turnos e aulas personalizados.
 
 - Reconexão Google preserva arquivo, mapa mensal e preferências, após conferir o acesso à planilha existente. Preparar mês interrompe falhas comuns de autorização, permite retomar turmas pendentes e recupera o mês após o retorno do Google. Falhas externas não encerram a sessão do aplicativo.
@@ -27,6 +31,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Adicionado
 
 - Abas mensais de frequência com nome do mês por extenso, sem Turma atual nem colunas de sábado e domingo. Preparar mês atualiza abas existentes preservando registros dos dias úteis e vínculos; envios mensais não recriam fins de semana. Preparo e envio compartilham proteção contra alterações simultâneas.
+- Aba Saídas e entradas em Relatórios, com consultas por dia, semana de segunda a domingo e período personalizado, filtro por turma, totais e detalhes agrupados por turma. Preserva os registros de alunos inativos e a turma histórica das entradas.
 
 - Acabamento de vidro nas roscas do Painel, com reflexos discretos, centro circular, legendas legíveis e detalhes opacos, seguindo a tipografia e as cores da interface nos temas claro e escuro.
 

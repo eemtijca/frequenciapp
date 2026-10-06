@@ -1,7 +1,7 @@
 "use client";
 
-// Relatórios em sub-abas: Resumo, Histórico, Grade e Por aluno.
-import { ChartNoAxesCombined, History, Table2, UserRound } from "lucide-react";
+// Relatórios em sub-abas: frequência, acompanhamento individual e movimentações por turma.
+import { ArrowRightLeft, ChartNoAxesCombined, History, Table2, UserRound } from "lucide-react";
 import type {
   Aluno,
   Frequencia,
@@ -15,11 +15,13 @@ import VistaHistorico from "@/components/historico/vista-historico";
 import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
 import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
+import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 
-export type AbaRelatorio = "resumo" | "historico" | "grade" | "aluno";
+export type AbaRelatorio = "resumo" | "historico" | "grade" | "aluno" | "movimentacoes";
 
 interface Props {
   abaInicial?: AbaRelatorio;
+  ativo?: boolean;
   mes: string;
   mesCorrente: string;
   diaCorrente: string;
@@ -45,10 +47,12 @@ const ABAS: AbaItem<AbaRelatorio>[] = [
   { valor: "historico", rotulo: "Histórico", icone: History },
   { valor: "grade", rotulo: "Grade", icone: Table2 },
   { valor: "aluno", rotulo: "Por aluno", icone: UserRound },
+  { valor: "movimentacoes", rotulo: "Saídas e entradas", icone: ArrowRightLeft },
 ];
 
 export default function VistaRelatorios({
   abaInicial,
+  ativo = true,
   mes,
   mesCorrente,
   diaCorrente,
@@ -77,7 +81,7 @@ export default function VistaRelatorios({
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Relatórios</h1>
         <p className="text-muted-foreground text-sm">
-          Indicadores do mês, histórico, grade e acompanhamento por aluno.
+          Frequência, acompanhamento por aluno e movimentações por turma.
         </p>
       </div>
 
@@ -151,6 +155,9 @@ export default function VistaRelatorios({
                 onMes={onMes}
                 onRecarregar={onRecarregar}
               />
+            )}
+            {aba === "movimentacoes" && (
+              <VistaMovimentacoes hoje={diaCorrente} turmas={turmas} ativa={ativo && ativa} />
             )}
           </>
         )}
