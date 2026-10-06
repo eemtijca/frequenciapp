@@ -12,7 +12,6 @@ import {
   infrequencia,
   indexarPorDia,
   marcasDoDia,
-  relatorioSaidas,
   resumoDoDia,
   resumoPorAluno,
 } from "@/domain/relatorios";
@@ -212,21 +211,6 @@ describe("resumoPorAluno", () => {
     expect(resumo.justificadas).toBe(1);
     expect(resumo.faltas).toBe(0);
     expect(resumo.saidas).toBe(1);
-  });
-});
-
-describe("relatorioSaidas", () => {
-  it("agrupa por aluno e filtra duas ou mais", () => {
-    const saidas = [
-      saida({ id: "s1", alunoId: "aluno-a", dia: "2026-09-10" }),
-      saida({ id: "s2", alunoId: "aluno-a", dia: "2026-09-11" }),
-      saida({ id: "s3", alunoId: "aluno-b", dia: "2026-09-10" }),
-    ];
-    expect(relatorioSaidas(saidas)).toHaveLength(2);
-    const repetidas = relatorioSaidas(saidas, "repetidas");
-    expect(repetidas).toHaveLength(1);
-    expect(repetidas[0]?.alunoId).toBe("aluno-a");
-    expect(repetidas[0]?.saidas).toHaveLength(2);
   });
 });
 

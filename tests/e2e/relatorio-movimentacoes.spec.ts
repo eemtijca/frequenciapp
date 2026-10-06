@@ -372,3 +372,76 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
     liberar();
   }
 });
+
+test("agrupa por aluno com saídas e entradas, busca por nome e filtra duas ou mais", async ({
+  page,
+}) => {
+  const turmas = await turmasDoTeste(page);
+  const registro = (extra: Partial<MovimentacaoRelatorio>): MovimentacaoRelatorio => ({
+    id: "e2e-m",
+    tipo: "SAIDA",
+    alunoId: "e2e-ana",
+    alunoNome: "E2E Ana Souza",
+    dia: "2026-10-05",
+    horario: "09:00",
+    momento: "aula_3",
+    motivo: "Consulta de acompanhamento",
+    responsavel: "E2E Coordenação",
+    ...extra,
+  });
+  const movimentosA = [
+    registro({ id: "e2e-m1" }),
+    registro({ id: "e2e-m2", tipo: "ENTRADA", dia: "2026-10-06", motivo: "Atraso do ônibus" }),
+    registro({ id: "e2e-m3", alunoId: "e2e-bruno", alunoNome: "E2E Bruno Lima" }),
+  ];
+  await page.route(ENDERECO, (rota) =>
+    rota.fulfill({
+      json: {
+        de: "2026-10-05",
+        ate: "2026-10-06",
+        totais: { saidas: 2, entradas: 1, total: 3 },
+        turmas: [
+          {
+            turmaId: turmas[0]?.id ?? "",
+            turmaRotulo: "E2E Ano A",
+            saidas: 2,
+            entradas: 1,
+            total: 3,
+            movimentacoes: movimentosA,
+          },
+        ],
+      } satisfies RelatorioMovimentacoes,
+    }),
+  );
+  const painel = await abrir(page);
+  await expect(painel.getByRole("region", { name: "Turma E2E Ano A", exact: true })).toBeVisible();
+
+  const porAluno = painel.getByRole("button", { name: "Por aluno", exact: true });
+  await porAluno.click();
+  await expect(porAluno).toHaveAttribute("aria-pressed", "true");
+  const ana = painel.getByRole("region", { name: "Aluno E2E Ana Souza", exact: true });
+  const bruno = painel.getByRole("region", { name: "Aluno E2E Bruno Lima", exact: true });
+  await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
+  await expect(ana).toContainText("1 saída · 1 entrada");
+  await expect(ana.getByRole("listitem")).toHaveCount(2);
+  await expect(ana).toContainText("Atraso do ônibus");
+  await expect(bruno).toContainText("1 saída · 0 entradas");
+  await page.setViewportSize({ width: 360, height: 780 });
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+
+  await painel.getByRole("searchbox", { name: "Buscar aluno no relatório" }).fill("bruno");
+  await expect(ana).toHaveCount(0);
+  await expect(bruno).toBeVisible();
+  await painel.getByRole("searchbox", { name: "Buscar aluno no relatório" }).fill("");
+
+  await painel.getByRole("combobox", { name: "Filtro de alunos do relatório" }).click();
+  await page.getByRole("option", { name: "Duas ou mais no período", exact: true }).click();
+  await expect(ana).toBeVisible();
+  await expect(bruno).toHaveCount(0);
+
+  await painel.getByRole("button", { name: "Por turma", exact: true }).click();
+  await expect(painel.getByRole("region", { name: "Turma E2E Ano A", exact: true })).toBeVisible();
+  await expect(painel.getByRole("region", { name: /^Aluno / })).toHaveCount(0);
+});
