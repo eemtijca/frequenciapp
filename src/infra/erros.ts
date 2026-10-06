@@ -144,7 +144,7 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
     if (ehUsuarioAusenteNoPooler(erro)) {
       // A exceção do adaptador pode conter credenciais; o diagnóstico usa texto fixo.
       console.error(
-        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado, inclusive no escopo Preview da Vercel.",
+        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado.",
       );
       return {
         mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",

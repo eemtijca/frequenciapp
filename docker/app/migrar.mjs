@@ -5,13 +5,16 @@ import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
-import { schemaDaConexao, selecionarSchema } from "../../src/infra/schema-postgres.mjs";
+import { resolverSchema, selecionarSchema } from "../../src/infra/schema-postgres.mjs";
 
 const TIMEOUT_CONEXAO_MS = 5000;
 
-// Chave fixa da trava consultiva: dois contêineres subindo ao mesmo tempo
+// Trava própria do migrador: dois contêineres subindo ao mesmo tempo
 // serializam as migrações em vez de tentar aplicar a mesma em paralelo.
 const CHAVE_TRAVA = 727001;
+// Trava que o Prisma CLI usa internamente em `prisma migrate deploy`. Tomá-la
+// também serializa este migrador com execuções manuais do CLI no mesmo schema.
+const CHAVE_TRAVA_PRISMA = 72707369;
 
 function codigoDoErro(erro) {
   if (erro && typeof erro === "object" && "code" in erro && typeof erro.code === "string") {
@@ -65,7 +68,7 @@ if (!url) {
   process.exit(1);
 }
 try {
-  schemaDaConexao(url);
+  resolverSchema({ url, schemaExplicito: process.env.DATABASE_SCHEMA });
 } catch (erro) {
   console.error(`[migrar] ${erro.message}`);
   process.exit(1);
@@ -96,6 +99,8 @@ async function listar() {
 async function main() {
   await conectar();
   await selecionarSchema(cliente, url);
+  // A ordem fixa das travas evita deadlock com o CLI do Prisma.
+  await cliente.query("select pg_advisory_lock($1)", [CHAVE_TRAVA_PRISMA]);
   await cliente.query("select pg_advisory_lock($1)", [CHAVE_TRAVA]);
 
   await cliente.query(
@@ -168,6 +173,7 @@ async function main() {
     console.log("[migrar] Banco já está na última revisão.");
   }
   await cliente.query("select pg_advisory_unlock($1)", [CHAVE_TRAVA]);
+  await cliente.query("select pg_advisory_unlock($1)", [CHAVE_TRAVA_PRISMA]);
   await cliente.end();
 }
 

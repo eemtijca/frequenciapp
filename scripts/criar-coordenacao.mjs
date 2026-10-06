@@ -3,7 +3,7 @@
 import pg from "pg";
 import "dotenv/config";
 import { hashear, senhaValida } from "./senha.mjs";
-import { schemaDaConexao, selecionarSchema } from "../src/infra/schema-postgres.mjs";
+import { resolverSchema, selecionarSchema } from "../src/infra/schema-postgres.mjs";
 
 const email = process.env.CONTA_EMAIL?.trim().toLowerCase();
 const senha = process.env.CONTA_SENHA;
@@ -23,7 +23,7 @@ if (!senhaValida(senha)) {
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 try {
-  schemaDaConexao(url);
+  resolverSchema({ url, schemaExplicito: process.env.DATABASE_SCHEMA });
 } catch (erro) {
   console.error(erro.message);
   process.exit(1);

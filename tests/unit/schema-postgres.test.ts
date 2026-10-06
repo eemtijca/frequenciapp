@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   identificadorPostgres,
+  resolverSchema,
   schemaDaConexao,
   selecionarSchema,
 } from "@/infra/schema-postgres.mjs";
@@ -69,6 +70,31 @@ describe("schema da conexão PostgreSQL", () => {
   );
 });
 
+describe("resolução do schema efetivo", () => {
+  it("prefere a variável explícita, cai na URL e usa public como padrão", () => {
+    expect(
+      resolverSchema({ url: conexaoComSchema("preview"), schemaExplicito: "preview_pr_12" }),
+    ).toBe("preview_pr_12");
+    expect(resolverSchema({ url: conexaoComSchema("preview") })).toBe("preview");
+    expect(resolverSchema({ url: URL_LOCAL, schemaExplicito: "" })).toBe("public");
+    expect(resolverSchema({ url: URL_LOCAL })).toBe("public");
+  });
+
+  it("valida a variável explícita com as mesmas regras da URL", () => {
+    for (const schema of ["$user", 'QA "Prévia"', "a".repeat(64), "qa\npreview"]) {
+      expect(() => resolverSchema({ url: URL_LOCAL, schemaExplicito: schema })).toThrow(
+        "O schema da conexão PostgreSQL é inválido.",
+      );
+    }
+  });
+
+  it("valida a URL mesmo quando o schema explícito está definido", () => {
+    expect(() =>
+      resolverSchema({ url: "credencial-invalida", schemaExplicito: "preview" }),
+    ).toThrow("A URL de conexão PostgreSQL é inválida.");
+  });
+});
+
 describe("identificador PostgreSQL", () => {
   it("delimita o nome completo e escapa aspas sem criar outro identificador", () => {
     expect(identificadorPostgres("preview")).toBe('"preview"');
@@ -98,6 +124,20 @@ describe("seleção de schema para scripts", () => {
     expect(query.mock.calls[1]).toEqual([
       "select pg_catalog.set_config('search_path', $1, false)",
       ['"QA, public; --"'],
+    ]);
+  });
+
+  it("usa o schema explícito da plataforma quando informado", async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ uso: true }] })
+      .mockResolvedValue({ rows: [] });
+
+    await selecionarSchema({ query }, conexaoComSchema("preview"), "preview_pr_12");
+
+    expect(query.mock.calls[1]).toEqual([
+      "select pg_catalog.set_config('search_path', $1, false)",
+      ['"preview_pr_12"'],
     ]);
   });
 

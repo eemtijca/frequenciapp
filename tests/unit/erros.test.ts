@@ -108,7 +108,7 @@ describe("traduzirErro", () => {
         status: 503,
       });
       expect(log).toHaveBeenCalledExactlyOnceWith(
-        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado, inclusive no escopo Preview da Vercel.",
+        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado.",
       );
       const saida = JSON.stringify({ resultado, logs: log.mock.calls });
       for (const detalhe of [conexao, "qa_usuario", "qa_senha", "banco.exemplo", "qa_preview"]) {

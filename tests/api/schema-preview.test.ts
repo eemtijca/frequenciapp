@@ -193,4 +193,21 @@ describe("Preview em schema do mesmo banco", () => {
     );
     await expect(limiteDeTentativas("QA schema ausente")).rejects.toMatchObject({ code: "P2010" });
   });
+
+  it("dá precedência à variável DATABASE_SCHEMA sobre o schema da URL", () => {
+    selecionarRuntime(schemaPreview);
+    const anterior = process.env.DATABASE_SCHEMA;
+    process.env.DATABASE_SCHEMA = schemaControle;
+    try {
+      expect(objetoDoBanco("tentativas_entrada").sql).toBe(
+        `${identificador(schemaControle)}."tentativas_entrada"`,
+      );
+    } finally {
+      if (anterior === undefined) delete process.env.DATABASE_SCHEMA;
+      else process.env.DATABASE_SCHEMA = anterior;
+    }
+    expect(objetoDoBanco("tentativas_entrada").sql).toBe(
+      `${identificador(schemaPreview)}."tentativas_entrada"`,
+    );
+  });
 });

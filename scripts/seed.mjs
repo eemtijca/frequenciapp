@@ -3,7 +3,7 @@
 // Idempotente por entidade e sem dados reais, conforme a LGPD.
 import pg from "pg";
 import "dotenv/config";
-import { schemaDaConexao, selecionarSchema } from "../src/infra/schema-postgres.mjs";
+import { resolverSchema, selecionarSchema } from "../src/infra/schema-postgres.mjs";
 
 const email = process.env.CONTA_EMAIL?.trim().toLowerCase();
 const totalPorTurma = Number(process.env.SEED_ALUNOS ?? 12);
@@ -26,7 +26,7 @@ if (!Number.isInteger(totalDeDias) || totalDeDias < 1 || totalDeDias > 30) {
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 try {
-  schemaDaConexao(url);
+  resolverSchema({ url, schemaExplicito: process.env.DATABASE_SCHEMA });
 } catch (erro) {
   console.error(erro.message);
   process.exit(1);

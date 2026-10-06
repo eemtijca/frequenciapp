@@ -8,22 +8,8 @@ function validarIdentificador(nome) {
   return nome;
 }
 
-export function schemaDaConexao(url) {
-  let endereco;
-  try {
-    endereco = new URL(url);
-    if (!["postgres:", "postgresql:"].includes(endereco.protocol) || !endereco.hostname) {
-      throw new Error();
-    }
-  } catch {
-    throw new Error("A URL de conexão PostgreSQL é inválida.");
-  }
-
-  const schemas = endereco.searchParams.getAll("schema");
-  if (schemas.length > 1) {
-    throw new Error("O schema da conexão PostgreSQL deve ser informado apenas uma vez.");
-  }
-  const schema = validarIdentificador(schemas[0] ?? "public");
+function validarSchema(nome) {
+  const schema = validarIdentificador(nome);
   // O compiler Prisma não escapa aspas no schema; search_path expande $user.
   if (schema === "$user" || schema.includes('"') || /\p{Cc}/u.test(schema)) {
     throw new Error("O schema da conexão PostgreSQL é inválido.");
@@ -31,13 +17,54 @@ export function schemaDaConexao(url) {
   return schema;
 }
 
+function enderecoDaConexao(url) {
+  try {
+    const endereco = new URL(url);
+    if (!["postgres:", "postgresql:"].includes(endereco.protocol) || !endereco.hostname) {
+      throw new Error();
+    }
+    return endereco;
+  } catch {
+    throw new Error("A URL de conexão PostgreSQL é inválida.");
+  }
+}
+
+function schemaDaUrl(endereco) {
+  const schemas = endereco.searchParams.getAll("schema");
+  if (schemas.length > 1) {
+    throw new Error("O schema da conexão PostgreSQL deve ser informado apenas uma vez.");
+  }
+  return validarSchema(schemas[0] ?? "public");
+}
+
+export function schemaDaConexao(url) {
+  return schemaDaUrl(enderecoDaConexao(url));
+}
+
+/**
+ * Resolve o schema efetivo. A variável DATABASE_SCHEMA, quando definida, vence
+ * o parâmetro schema da URL, para a plataforma de deploy escolher o schema do
+ * ambiente sem reescrever a connection string; sem as duas, o padrão é public.
+ */
+export function resolverSchema({ url, schemaExplicito } = {}) {
+  const endereco = enderecoDaConexao(url);
+  if (schemaExplicito !== undefined && schemaExplicito !== null && schemaExplicito !== "") {
+    return validarSchema(schemaExplicito);
+  }
+  return schemaDaUrl(endereco);
+}
+
 export function identificadorPostgres(nome) {
   return `"${validarIdentificador(nome).replaceAll('"', '""')}"`;
 }
 
 // Exclusivo para conexão direta ou pooler de sessão. O runtime qualifica seu SQL.
-export async function selecionarSchema(cliente, url) {
-  const schema = schemaDaConexao(url);
+export async function selecionarSchema(
+  cliente,
+  url,
+  schemaExplicito = process.env.DATABASE_SCHEMA,
+) {
+  const schema = resolverSchema({ url, schemaExplicito });
   const resultado = await cliente.query(
     `select pg_catalog.has_schema_privilege(oid, 'USAGE') as uso
        from pg_catalog.pg_namespace where nspname = $1`,
