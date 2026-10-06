@@ -145,7 +145,7 @@ test("revê a aba e o envio em confirmação própria", async ({ page }) => {
                 criar: [{ nome: "E2E Aluno", linha: 2 }],
               }
             : acao === "preparar"
-              ? { criada: true }
+              ? { criada: true, organizada: true, sheet1: "removida" }
               : { linhasCriadas: 1 },
     });
   });
@@ -173,7 +173,7 @@ test("revê a aba e o envio em confirmação própria", async ({ page }) => {
   await page.getByRole("button", { name: "Preparar aba Entradas" }).click();
   expect(preparou).toBe(0);
   await page.getByRole("button", { name: "Preparar aba", exact: true }).click();
-  await expect(page.getByText("Aba Entradas criada.")).toBeVisible();
+  await expect(page.getByText("Aba Entradas criada e organizada. Sheet1 removida.")).toBeVisible();
   expect(preparou).toBe(1);
   await page.getByRole("button", { name: "Prévia das entradas" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("1 linha nova");
