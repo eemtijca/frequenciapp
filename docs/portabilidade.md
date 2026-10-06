@@ -15,7 +15,7 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 
 ## Schema de Preview
 
-- O Preview pode compartilhar o database PostgreSQL com a produção, usando um schema próprio. Selecione o schema do ambiente com `DATABASE_SCHEMA`, que vence o parâmetro `schema` das URLs, ou com `schema` em `DATABASE_URL` e `DIRECT_URL`, por exemplo `schema=preview`. Na Vercel, o ajuste fica no escopo Preview.
+- O Preview pode compartilhar o database PostgreSQL com a produção, usando um schema próprio. Selecione o schema do ambiente com `DATABASE_SCHEMA`, que vence o parâmetro `schema` das URLs, ou com `schema` em `DATABASE_URL` e `DIRECT_URL`, por exemplo `schema=preview`. Na Vercel, o ajuste fica no escopo Preview. O workflow `schema-preview.yml` cria e migra `preview_pr_<n>` por pull request e mantém o fallback `preview`, conforme [deploy.md](deploy.md).
 - Preserve as URLs de produção e o segredo `DIRECT_URL_PROD`. As migrações de produção não preparam o Preview; aplique as migrações e crie uma conta administrativa no schema de Preview antes de publicar, conforme [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 - O schema separa os objetos, mas as permissões da role PostgreSQL definem os limites de acesso. Use credenciais com os privilégios necessários apenas ao ambiente correspondente.
 
