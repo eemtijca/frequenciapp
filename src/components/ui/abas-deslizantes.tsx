@@ -91,7 +91,7 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`superficie-vidro grid gap-1 p-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          className={`superficie-vidro grid gap-0.5 p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
           style={{ gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))` }}
         >
           {abas.map((item, indice) => {
@@ -111,7 +111,7 @@ export default function AbasDeslizantes<T extends string>({
                 aria-controls={`painel-${item.valor}`}
                 tabIndex={ativo ? 0 : -1}
                 onClick={() => trocarAba(item.valor)}
-                className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:text-xs"
+                className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-0 text-[11px] font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs"
               >
                 {ativo &&
                   (semMovimento ? (
@@ -129,7 +129,7 @@ export default function AbasDeslizantes<T extends string>({
                   aria-hidden="true"
                 />
                 <span
-                  className={`relative z-10 ${ativo ? "text-foreground" : "text-muted-foreground"}`}
+                  className={`relative z-10 text-center ${ativo ? "text-foreground" : "text-muted-foreground"}`}
                 >
                   {item.rotuloCurto ? (
                     <>

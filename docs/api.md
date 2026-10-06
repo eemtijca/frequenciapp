@@ -441,6 +441,16 @@ Remove a saída para correção.
 
 - 200 `{"ok": true}`; 404 inexistente.
 
+## Relatórios
+
+### GET /api/relatorios/movimentacoes?de=YYYY-MM-DD&ate=YYYY-MM-DD&turmaId=uuid
+
+Exige capacidade `operar` (administração ou coordenação). Consulta somente os dados locais, sem escrever registros ou acessar o Google. `de` e `ate` são obrigatórios, inclusivos e aceitam fins de semana. O intervalo deve conter datas válidas, em ordem, até o dia corrente do fuso da aplicação e no máximo 366 dias. `turmaId` é opcional e deve ser UUID.
+
+Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo traz `turmaId`, `turmaRotulo`, `saidas`, `entradas`, `total` e `movimentacoes`. Cada movimentação traz `id`, `tipo` (`SAIDA` ou `ENTRADA`), `alunoId`, `alunoNome`, `dia`, `horario`, `momento`, `motivo` e `responsavel`; horário, momento e responsável podem ser nulos. Motivos incluem complementos e os rótulos dos catálogos, mesmo desativados. Entradas usam o responsável pelo registro, com fallback para a autoria legada; saídas usam o nome do liberador, com fallback para o usuário que liberou.
+
+Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma atual do aluno. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
+
 ## Configurações
 
 ### GET /api/configuracoes
