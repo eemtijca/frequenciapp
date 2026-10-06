@@ -129,6 +129,8 @@ As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis
 
 Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABASE_SCHEMA=preview` como variável de configuração: ela vence o parâmetro da URL e vale para o runtime, os scripts e o migrador. Use uma única forma de seleção por ambiente para evitar divergência.
 
+O provisionamento das roles, do schema e dos default privileges está em [`scripts/provisionar-preview.sql`](../scripts/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
+
 1. Crie o schema de Preview com uma conta administrativa do banco e conceda os privilégios necessários às roles de migração e runtime. Limite essas permissões ao ambiente correspondente.
 2. Em um terminal com as variáveis do Preview, aplique `npx prisma migrate deploy` e confira `npx prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.
 3. Configure `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` para uma conta de teste e execute `npm run criar-admin` com a mesma conexão de Preview. As contas da produção não são copiadas.
@@ -141,6 +143,8 @@ Se o log apresentar `(EAUTHQUERY) user not found in the database`, confira o usu
 A API trata essa falha `P2039` com a assinatura `EAUTHQUERY` como indisponibilidade: responde HTTP 503 com mensagem genérica e registra um aviso operacional estático no tratamento de erros. A conexão externa ainda precisa ser corrigida.
 
 `/api/saude` executa `select 1`: o sucesso comprova conexão, mas não o acesso às tabelas do schema. A verificação inclui o login com a conta criada no Preview.
+
+No escopo Preview, mantenha as cinco variáveis `GOOGLE_*` fora do ambiente. Sem elas, o servidor recusa a integração com HTTP 503 antes de qualquer chamada de rede, e o preview não alcança nenhuma planilha real. Os URIs autorizados no Google Cloud devem apontar apenas para o domínio de produção.
 
 ## GitHub Actions
 
