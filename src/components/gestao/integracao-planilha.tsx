@@ -348,6 +348,7 @@ export default function IntegracaoPlanilha({
         <SeletorPlanilhaGoogle
           conectado={integracao?.googleConectado ?? false}
           planilha={integracao?.googlePlanilha ?? null}
+          mes={mesEnvio}
           onAtualizar={carregar}
         />
       </EtapaPlanilha>

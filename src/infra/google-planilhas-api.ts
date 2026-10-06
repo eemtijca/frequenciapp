@@ -219,8 +219,9 @@ export class ErroLeituraGoogle extends ErroHttp {
     mensagem: string,
     public readonly detalhe: string,
     status = 502,
+    codigo?: string,
   ) {
-    super(mensagem, status);
+    super(mensagem, status, codigo);
     this.name = "ErroLeituraGoogle";
   }
 }
@@ -273,12 +274,17 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
       mensagem,
       detalhe,
       resposta.status === 401
-        ? 401
+        ? 409
         : resposta.status === 403 || resposta.status === 404
           ? 403
           : resposta.status === 429
             ? 429
             : 502,
+      resposta.status === 401
+        ? "GOOGLE_RECONECTAR"
+        : resposta.status === 403 || resposta.status === 404
+          ? "GOOGLE_ACESSO"
+          : undefined,
     );
   }
   try {

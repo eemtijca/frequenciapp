@@ -1,10 +1,11 @@
 "use client";
 
 // Prepara as abas mensais das turmas em sequência, com confirmação e resultado por turma.
-import { useState } from "react";
-import { CalendarPlus, LoaderCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarPlus, LoaderCircle, RotateCcw } from "lucide-react";
 import { rotuloMes } from "@/domain/frequencia";
-import { corpoJson, pedir } from "@/lib/api-cliente";
+import { mesValido } from "@/domain/planilha-mensal";
+import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Button } from "@/components/ui/button";
@@ -23,9 +24,35 @@ import {
 interface ResultadoTurma {
   turmaOriginalId: string;
   rotulo: string;
+  estado: "preparada" | "pendente" | "erro";
   aba?: string;
   criada?: boolean;
   erro?: string;
+}
+
+interface Interrupcao {
+  mensagem: string;
+  reconectar: boolean;
+}
+
+function interrupcaoDoPreparo(erro: unknown): Interrupcao | null {
+  if (!(erro instanceof ErroApi)) return null;
+  const corpo = erro.corpo;
+  const codigo =
+    typeof corpo === "object" && corpo !== null && "codigo" in corpo ? corpo.codigo : null;
+  if (
+    codigo === "GOOGLE_RECONECTAR" ||
+    codigo === "GOOGLE_ACESSO" ||
+    codigo === "GOOGLE_CONFIGURACAO" ||
+    codigo === "GOOGLE_TEMPORARIO" ||
+    erro.status === 401
+  ) {
+    return {
+      mensagem: erro.message,
+      reconectar: codigo === "GOOGLE_RECONECTAR" || codigo === "GOOGLE_ACESSO",
+    };
+  }
+  return null;
 }
 
 export function DialogoPrepararMes({
@@ -46,44 +73,92 @@ export function DialogoPrepararMes({
   const [aberto, setAberto] = useState(false);
   const [resultados, setResultados] = useState<ResultadoTurma[] | null>(null);
   const [turmaAtual, setTurmaAtual] = useState("");
-  const { executando, executar } = useAcaoUnica(async () => {
-    if (resultados !== null || turmas.length === 0) return;
-    const saida: ResultadoTurma[] = [];
-    setResultados([]);
+  const [interrupcao, setInterrupcao] = useState<Interrupcao | null>(null);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const mesDoRetorno = url.searchParams.get("googleMes");
+    if (!mesDoRetorno) return;
+    if (mesValido(mesDoRetorno) && mesDoRetorno <= mesMaximo) {
+      onMes(mesDoRetorno);
+    }
+    // O retorno recupera o mês, mas qualquer nova escrita depende de outro clique.
+    url.searchParams.delete("googleMes");
+    window.history.replaceState(null, "", url);
+  }, [mesMaximo, onMes]);
+
+  const reconexao = useAcaoUnica(async () => {
     try {
-      for (const turma of turmas) {
+      const dados = await pedir<{ url: string }>(
+        "/api/planilha/google/iniciar",
+        corpoJson({ finalidade: "FREQUENCIA", reconectar: true, mes }),
+      );
+      window.location.assign(dados.url);
+    } catch (erro) {
+      setInterrupcao({
+        mensagem: mensagemAmigavel(erro, "Não foi possível conectar ao Google. Tente novamente."),
+        reconectar: true,
+      });
+    }
+  });
+
+  const { executando, executar } = useAcaoUnica(async () => {
+    if (turmas.length === 0 || reconexao.executando) return;
+    const saida: ResultadoTurma[] = turmas.map((turma) => {
+      const anterior = resultados?.find((item) => item.turmaOriginalId === turma.id);
+      return anterior?.estado === "preparada"
+        ? anterior
+        : { turmaOriginalId: turma.id, rotulo: turma.rotulo, estado: "pendente" };
+    });
+    setResultados([...saida]);
+    setInterrupcao(null);
+    let interrompida = false;
+    try {
+      for (const [indice, turma] of turmas.entries()) {
+        if (saida[indice]?.estado === "preparada") continue;
         setTurmaAtual(turma.rotulo);
         try {
           const dados = await pedir<{ aba: string; mes: string; criada: boolean }>(
             "/api/planilha/mensal",
             corpoJson({ turmaOriginalId: turma.id, mes }),
           );
-          saida.push({
+          saida[indice] = {
             turmaOriginalId: turma.id,
             rotulo: turma.rotulo,
+            estado: "preparada",
             aba: dados.aba,
             criada: dados.criada,
-          });
+          };
         } catch (erro) {
-          saida.push({
+          const falhaComum = interrupcaoDoPreparo(erro);
+          if (falhaComum) {
+            // As demais turmas usam a mesma conexão; repetir só multiplicaria a falha.
+            setInterrupcao(falhaComum);
+            interrompida = true;
+            setResultados([...saida]);
+            break;
+          }
+          saida[indice] = {
             turmaOriginalId: turma.id,
             rotulo: turma.rotulo,
+            estado: "erro",
             erro: mensagemAmigavel(erro, "Não foi possível preparar a aba. Tente novamente."),
-          });
+          };
         }
         setResultados([...saida]);
       }
-      if (saida.every((item) => !item.erro)) {
+      if (saida.every((item) => item.estado === "preparada")) {
         avisarSucesso(`Abas de ${rotuloMes(mes).toLowerCase()} preparadas.`);
-      } else {
-        avisarInfo("Mês preparado com pendências.", "Confira o resultado de cada turma.");
+      } else if (!interrompida) {
+        avisarInfo("Há turmas pendentes.", "Confira o resultado de cada turma.");
       }
       await onAtualizar();
     } finally {
       setTurmaAtual("");
     }
   });
-  const concluidas = resultados?.filter((item) => !item.erro).length ?? 0;
+  const concluidas = resultados?.filter((item) => item.estado === "preparada").length ?? 0;
+  const ocupada = executando || reconexao.executando;
 
   return (
     <>
@@ -91,9 +166,10 @@ export function DialogoPrepararMes({
         type="button"
         variant="outline"
         className="h-10"
-        disabled={disabled || executando || turmas.length === 0}
+        disabled={disabled || ocupada || turmas.length === 0}
         onClick={() => {
           setResultados(null);
+          setInterrupcao(null);
           setAberto(true);
         }}
       >
@@ -103,7 +179,7 @@ export function DialogoPrepararMes({
       <AlertDialog
         open={aberto}
         onOpenChange={(valor) => {
-          if (!executando) setAberto(valor);
+          if (!ocupada) setAberto(valor);
         }}
       >
         <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
@@ -117,6 +193,27 @@ export function DialogoPrepararMes({
                 : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {interrupcao && (
+            <div role="alert" className="superficie-vidro flex flex-col gap-3 p-3 text-sm">
+              <p>{interrupcao.mensagem}</p>
+              {interrupcao.reconectar && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-start"
+                  disabled={ocupada}
+                  onClick={() => void reconexao.executar()}
+                >
+                  {reconexao.executando ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : (
+                    <RotateCcw size={16} />
+                  )}
+                  Reconectar conta Google
+                </Button>
+              )}
+            </div>
+          )}
           {resultados === null ? (
             <>
               <SeletorPeriodo
@@ -139,7 +236,9 @@ export function DialogoPrepararMes({
                 <li key={item.turmaOriginalId} className="rounded-lg border p-3">
                   <strong className="block">{item.aba ?? item.rotulo}</strong>
                   <p className={item.erro ? "text-falta-texto" : "text-muted-foreground"}>
-                    {item.erro ?? (item.criada ? "Criada" : "Reutilizada")}
+                    {item.estado === "pendente"
+                      ? "Não preparada"
+                      : (item.erro ?? (item.criada ? "Criada" : "Reutilizada"))}
                   </p>
                 </li>
               ))}
@@ -152,18 +251,18 @@ export function DialogoPrepararMes({
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>
+            <AlertDialogCancel disabled={ocupada}>
               {resultados === null ? "Cancelar" : "Fechar"}
             </AlertDialogCancel>
-            {resultados === null && (
+            {(resultados === null || concluidas < turmas.length) && (
               <AlertDialogAction
-                disabled={disabled || executando || turmas.length === 0}
+                disabled={disabled || ocupada || turmas.length === 0}
                 onClick={(evento) => {
                   evento.preventDefault();
                   void executar();
                 }}
               >
-                Preparar {turmas.length} turmas
+                {resultados === null ? `Preparar ${turmas.length} turmas` : "Tentar pendentes"}
               </AlertDialogAction>
             )}
           </AlertDialogFooter>

@@ -226,6 +226,27 @@ describe("frequência organizada por turma e mês", () => {
     expect((await simular(periodo)).planos[0]?.semEnvio).toBe(true);
   });
 
+  it("informa a autorização revogada sem perder a sessão, o mapa ou as frequências", async () => {
+    const esquema = await lerEsquema();
+    const abas = google.abas();
+    const chamadas = google.chamadas();
+    google.recusarAutorizacao(true);
+    try {
+      const resposta = await preparar("2026-09");
+      expect(await dados(resposta, 409)).toMatchObject({ codigo: "GOOGLE_RECONECTAR" });
+      expect(await lerEsquema()).toEqual(esquema);
+      expect(google.abas()).toEqual(abas);
+      expect(google.chamadas()).toEqual(chamadas);
+      expect(marca(LEGADA, "30/09/2026")).toBe("F");
+      const frequencias = await banco.query("select id from frequencias where turma_id = $1", [
+        turmas.A,
+      ]);
+      expect(frequencias.rows).toHaveLength(2);
+    } finally {
+      google.recusarAutorizacao(false);
+    }
+  });
+
   it("prepara os alunos e todos os dias do mês sem alterar a aba antiga", async () => {
     for (const [mes, dias] of [
       ["2026-09", 30],

@@ -11,11 +11,13 @@ import {
 /** Erro com mensagem amigável e status HTTP, controlado pela aplicação. */
 export class ErroHttp extends Error {
   status: number;
+  codigo?: string;
 
-  constructor(mensagem: string, status: number) {
+  constructor(mensagem: string, status: number, codigo?: string) {
     super(mensagem);
     this.name = "ErroHttp";
     this.status = status;
+    this.codigo = codigo;
   }
 }
 

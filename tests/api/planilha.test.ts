@@ -218,7 +218,8 @@ describe("integração com a planilha", () => {
     google?.recusarAutorizacao(true);
     const antes = google?.chamadas().filter((acao) => acao === "gravar").length;
     const leitura = await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" });
-    expect(leitura.status).toBe(401);
+    expect(leitura.status).toBe(409);
+    expect(await leitura.json()).toMatchObject({ codigo: "GOOGLE_RECONECTAR" });
     expect(google?.chamadas().filter((acao) => acao === "gravar").length).toBe(antes);
     google?.recusarAutorizacao(false);
   });

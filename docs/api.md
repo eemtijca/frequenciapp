@@ -519,10 +519,12 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 
 ### Conexão OAuth das três finalidades
 
-- `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração.
-- `GET /api/planilha/google/retorno`: recebe o código OAuth, confere estado e sessão, guarda o token de atualização cifrado e redireciona ao aplicativo.
+- `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL", "reconectar"?: boolean, "mes"?: "YYYY-MM" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração. Reconexão exige arquivo e autorização anteriores; o estado assinado vincula a configuração atual e o mês opcional.
+- `GET /api/planilha/google/retorno`: recebe o código OAuth, confere estado e sessão, guarda o token de atualização cifrado e redireciona ao aplicativo. Na reconexão, confirma acesso ao mesmo arquivo e recusa conexão alterada durante o OAuth; atualiza apenas a credencial, preservando mapa e preferências. Retorna `google=reconectado` ou `google=erro_reconexao`, com `googleFinalidade` e o `googleMes` assinado quando informado. Nenhuma escrita na planilha é disparada pelo retorno.
 - `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS|PARCIAL`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar os arquivos de saídas e chamadas parciais.
-- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API, guarda a planilha da finalidade, desliga essa integração e invalida o mapa anterior. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
+- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API e guarda a planilha da finalidade. Trocar de arquivo desliga essa integração e invalida o mapa anterior; selecionar o mesmo arquivo preserva a estrutura. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
+
+Erros externos de autorização usam `{ "error": string, "codigo": string }`: `GOOGLE_RECONECTAR` (409), `GOOGLE_CONFIGURACAO` (503) ou `GOOGLE_TEMPORARIO` (502/503). A leitura de planilhas também identifica `GOOGLE_ACESSO` (403). O status 401 permanece reservado à sessão do aplicativo.
 
 ### GET /api/planilha/estado
 
