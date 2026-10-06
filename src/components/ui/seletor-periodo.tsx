@@ -296,7 +296,7 @@ export function SeletorPeriodo({
     >
       <CalendarDays
         size={16}
-        className="text-muted-foreground hidden shrink-0 @min-[10rem]:block"
+        className="text-muted-foreground hidden shrink-0 @min-[11rem]:block"
         aria-hidden="true"
       />
       <span
@@ -312,7 +312,7 @@ export function SeletorPeriodo({
         <span className="text-muted-foreground min-w-0 truncate xl:hidden">{detalhe}</span>
       )}
       {selo && (
-        <span className="bg-primary/15 text-primary hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold @min-[13rem]:inline">
+        <span className="bg-primary/15 text-primary hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold @min-[9rem]:inline">
           {selo}
         </span>
       )}
