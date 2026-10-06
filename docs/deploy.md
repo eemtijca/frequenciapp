@@ -129,6 +129,8 @@ DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslm
 
 As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis com permissões diferentes. `USUARIO.PROJECT_REF` representa o usuário completo do pooler: copie o valor correspondente à role existente no projeto Supabase. Criar um schema não cria um usuário PostgreSQL. Sem `schema` na URL e sem `DATABASE_SCHEMA`, o destino padrão é `public`.
 
+O primeiro parâmetro da URL usa `?`; os seguintes usam `&`. Sem o `?`, o sufixo passa a fazer parte do nome do banco e a conexão falha com `P1003`.
+
 Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABASE_SCHEMA=preview` como variável de configuração: ela vence o parâmetro da URL e vale para o runtime, os scripts e o migrador. Use uma única forma de seleção por ambiente para evitar divergência.
 
 O provisionamento das roles, do schema e dos default privileges está em [`scripts/provisionar-preview.sql`](../scripts/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
