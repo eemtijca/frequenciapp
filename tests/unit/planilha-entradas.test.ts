@@ -59,6 +59,8 @@ beforeEach(() => {
     },
   ]);
   dubl.chamar.mockImplementation(async (_linha, corpo) => {
+    if (corpo.acao === "prepararEntradas")
+      return { criada: false, organizada: true, sheet1: "ausente" };
     if (corpo.acao === "estrutura") return { abas: [{ nome: "Entradas", mesclagens: [] }] };
     if (corpo.acao === "ler")
       return {
@@ -74,20 +76,37 @@ beforeEach(() => {
   });
 });
 describe("envio de entradas", () => {
-  it("a prévia não escreve e a preparação preserva aba existente", async () => {
+  it("a prévia não escreve e a preparação organiza a aba existente", async () => {
     await simularEntradas(usuario, periodo);
-    await prepararAbaEntradas(usuario);
     expect(
       dubl.chamar.mock.calls.some((args) => ["aplicar", "criarAba"].includes(args[1].acao)),
     ).toBe(false);
+    expect(await prepararAbaEntradas(usuario)).toEqual({
+      criada: false,
+      organizada: true,
+      sheet1: "ausente",
+    });
+    expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
+      acao: "prepararEntradas",
+      abaSaidas: "Saídas",
+    });
+    expect(dubl.auditar).toHaveBeenLastCalledWith(
+      {},
+      usuario.id,
+      "planilha.entradas.organizar",
+      "aba:Entradas;Sheet1:ausente",
+    );
   });
   it("cria explicitamente só a aba ausente com cabeçalho próprio", async () => {
-    dubl.chamar.mockResolvedValueOnce({ abas: [] }).mockResolvedValueOnce({});
-    expect(await prepararAbaEntradas(usuario)).toEqual({ criada: true });
+    dubl.chamar.mockResolvedValueOnce({ criada: true, organizada: true, sheet1: "removida" });
+    expect(await prepararAbaEntradas(usuario)).toEqual({
+      criada: true,
+      organizada: true,
+      sheet1: "removida",
+    });
     expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
-      acao: "criarAba",
-      nome: "Entradas",
-      cabecalho: CABECALHO_ENTRADAS,
+      acao: "prepararEntradas",
+      abaSaidas: "Saídas",
     });
   });
   it("exige prévia e envia somente criação conservadora sem repetir requisição", async () => {

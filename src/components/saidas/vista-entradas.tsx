@@ -532,9 +532,9 @@ export default function VistaEntradas({
           <AlertDialogHeader>
             <AlertDialogTitle>Preparar aba Entradas?</AlertDialogTitle>
             <AlertDialogDescription>
-              Será criada uma aba Entradas na planilha {estado?.planilhaNome}, com o cabeçalho do
-              registro. Se ela já existir, seu conteúdo será preservado. Nenhum registro de aluno
-              será enviado nesta etapa.
+              A aba Entradas da planilha {estado?.planilhaNome} receberá a mesma organização visual
+              de Saídas. Os registros serão preservados. A aba Sheet1 será removida somente se
+              estiver vazia e a aba de saídas estiver configurada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -544,13 +544,19 @@ export default function VistaEntradas({
               onClick={(e) => {
                 e.preventDefault();
                 void executar(async () => {
-                  const dados = await pedir<{ criada: boolean }>(
-                    "/api/planilha-entradas/preparar",
-                    { method: "POST" },
-                  );
+                  const dados = await pedir<{
+                    criada: boolean;
+                    sheet1: "ausente" | "removida" | "mantida";
+                  }>("/api/planilha-entradas/preparar", { method: "POST" });
                   setConfirmarAba(false);
                   avisarSucesso(
-                    dados.criada ? "Aba Entradas criada." : "A aba Entradas já existe.",
+                    `${dados.criada ? "Aba Entradas criada e organizada." : "Aba Entradas organizada."}${
+                      dados.sheet1 === "removida"
+                        ? " Sheet1 removida."
+                        : dados.sheet1 === "mantida"
+                          ? " Sheet1 mantida para conferência."
+                          : ""
+                    }`,
                   );
                 });
               }}

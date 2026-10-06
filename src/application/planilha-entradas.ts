@@ -11,7 +11,6 @@ import {
 import { listarEntradas, esquemaFiltroEntradas } from "./entradas";
 import {
   ABA_ENTRADAS,
-  CABECALHO_ENTRADAS,
   entradasEnviaveisSozinhas,
   planejarEntradas,
 } from "@/domain/planilha-entradas";
@@ -52,15 +51,22 @@ export async function estadoPlanilhaEntradas() {
 
 export async function prepararAbaEntradas(admin: { id: string }) {
   const linha = await conexao();
-  const estrutura = await chamarIntegracao<{ abas: AbaBruta[] }>(linha, { acao: "estrutura" });
-  if (estrutura.abas.some((aba) => aba.nome === ABA_ENTRADAS)) return { criada: false };
-  await chamarIntegracao(linha, {
-    acao: "criarAba",
-    nome: ABA_ENTRADAS,
-    cabecalho: CABECALHO_ENTRADAS,
+  const esquema = z.object({ aba: z.string().min(1).max(200) }).safeParse(linha.esquema);
+  const resultado = await chamarIntegracao<{
+    criada: boolean;
+    organizada: boolean;
+    sheet1: "ausente" | "removida" | "mantida";
+  }>(linha, {
+    acao: "prepararEntradas",
+    ...(esquema.success ? { abaSaidas: esquema.data.aba } : {}),
   });
-  await auditar(banco(), admin.id, "planilha.entradas.criarAba", "aba:Entradas");
-  return { criada: true };
+  await auditar(
+    banco(),
+    admin.id,
+    resultado.criada ? "planilha.entradas.criarAba" : "planilha.entradas.organizar",
+    `aba:Entradas;Sheet1:${resultado.sheet1}`,
+  );
+  return resultado;
 }
 
 async function montarPlano(usuario: { id: string }, entrada: unknown) {

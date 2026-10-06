@@ -787,13 +787,15 @@ As rotas exigem a capacidade `operar`; criar a aba exige `administrar`.
 | `POST /api/entradas`                   | `{ alunoId, dia, horario: "HH:mm", momento, responsavelRegistroCodigo, motivo? , justificativa?, observacao? }` | 201; 409 para aluno desativado, desistente na data ou entrada repetida |
 | `DELETE /api/entradas/:id`             | Identificador                                                                                                   | Remove com auditoria; preserva chamada e planilha                      |
 | `GET /api/planilha-entradas/estado`    | Nenhum                                                                                                          | Disponibilidade da conexão Google e nome da planilha, sem credenciais  |
-| `POST /api/planilha-entradas/preparar` | Nenhum                                                                                                          | Cria a aba Entradas se ausente, sem alterar aba existente              |
+| `POST /api/planilha-entradas/preparar` | Nenhum                                                                                                          | Cria ou organiza Entradas e remove somente Sheet1 vazia                |
 | `POST /api/planilha-entradas/simular`  | `{ de, ate, turmaId? }`                                                                                         | Prévia com hash, avisos e até 20 amostras; no máximo 92 dias           |
 | `POST /api/planilha-entradas/enviar`   | Período e `planoHash`                                                                                           | Recalcula a prévia e cria somente linhas novas; 409 se dados mudaram   |
 
 Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos.
 
 A integração usa a planilha Google selecionada para saídas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.
+
+Preparar Entradas exige administração e origem válida. Retorna `{ criada, organizada: true, sheet1 }`, sendo `sheet1` igual a `ausente`, `removida` ou `mantida`. A preparação conserva os títulos e registros existentes e reaplica a apresentação padrão. Cabeçalho incompatível, com fórmula ou mesclagens responde 409 antes de remover Sheet1. A remoção exige leitura completa de Sheet1 sem valores, fórmulas, notas ou gráficos, nem mesclagens ou marcadores da integração, com Entradas e a aba de saídas configurada presentes e visíveis. Se Sheet1 for a aba de saídas, será mantida. A auditoria registra criação ou organização de Entradas e a situação de Sheet1.
 
 ### POST /api/planilha/limpar-copias e /api/planilha-saidas/limpar-copias
 
