@@ -261,6 +261,40 @@ test("interrompe a autorização recusada e recupera o mês após reconectar sem
   expect(preparos.every((pedido) => pedido.mes === mesAnterior)).toBe(true);
 });
 
+test("interrompe o lote uma vez em falha temporária do Google e mantém as turmas pendentes", async ({
+  page,
+}) => {
+  const preparos: { turmaOriginalId: string; mes: string }[] = [];
+  await page.route("**/api/planilha/mensal", async (rota) => {
+    preparos.push(rota.request().postDataJSON());
+    await rota.continue();
+  });
+  const cartao = await abrirPlanilha(page);
+  await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog");
+  const escritasAntes = google.chamadas().filter((acao) => acao === "gravar").length;
+  google.falharLeituras(503);
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(
+    dialogo.getByRole("button", { name: "Tentar pendentes", exact: true }),
+  ).toBeEnabled();
+  await expect(dialogo.getByText(/0 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByRole("alert")).toHaveCount(1);
+  await expect(dialogo.getByText("Não preparada", { exact: true })).toHaveCount(2);
+  // O lote para na primeira falha, sem repetir o erro turma a turma, e não oferece reconexão.
+  expect(preparos).toHaveLength(1);
+  await expect(
+    dialogo.getByRole("button", { name: "Reconectar conta Google", exact: true }),
+  ).toHaveCount(0);
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritasAntes);
+
+  google.falharLeituras(null);
+  await dialogo.getByRole("button", { name: "Tentar pendentes", exact: true }).click();
+  await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  await expect(dialogo.getByRole("alert")).toHaveCount(0);
+  expect(preparos).toHaveLength(3);
+});
+
 test("repete somente turmas pendentes e preserva a aba concluída no toque duplo", async ({
   page,
 }) => {
