@@ -22,6 +22,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Abas de frequência por turma e mês, preparadas em conjunto na Gestão com alunos e datas completas. Envios manuais e automáticos respeitam o mês; o histórico distingue cada destino e preserva abas anteriores (ADR-037).
+
 - Navegação dos gráficos no desktop com seleção direta e botões anterior e próximo, mantendo deslize e teclado.
 - Resumo visual em Relatórios com filtros de mês, série e turma, comparação de infrequência entre séries ou turmas, evolução diária com tabela acessível e ranking de alunos por faltas. Dias sem chamada ficam sem taxa; carregamento e falhas não apresentam valores antigos.
 - Configurações organizadas nas categorias Escola, Planilhas, Acesso e avisos, e Dados, preservando formulários e retorno do Google para a planilha correspondente.

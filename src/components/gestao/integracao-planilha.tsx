@@ -3,6 +3,7 @@
 // Card da planilha de frequência: etapas de conexão, estrutura e envio, modo
 // completo e zona de risco. Restrito à administração.
 import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
+import { DialogoPrepararMes } from "@/components/gestao/dialogo-preparar-mes";
 import { useCallback, useEffect, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -27,6 +28,8 @@ import { SeletorPlanilhaGoogle } from "@/components/gestao/seletor-planilha-goog
 interface Sugestao {
   aba: string;
   turmaOriginalId: string | null;
+  mes?: string;
+  destino?: string;
   confianca: "alta" | "media" | "baixa";
 }
 
@@ -65,6 +68,8 @@ interface IntegracaoAdmin {
 interface MapaAba {
   aba: string;
   turmaOriginalId: string;
+  mes?: string;
+  destino?: string;
 }
 
 export default function IntegracaoPlanilha({
@@ -90,7 +95,7 @@ export default function IntegracaoPlanilha({
     url: string;
     fuso: string;
   } | null>(null);
-  const [mapa, setMapa] = useState<Record<string, string>>({});
+  const [mapa, setMapa] = useState<Record<string, MapaAba>>({});
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
@@ -113,9 +118,7 @@ export default function IntegracaoPlanilha({
         });
         setAbas(dados.integracao.esquema.abas ?? []);
         setMapa(
-          Object.fromEntries(
-            (dados.integracao.esquema.mapa ?? []).map((item) => [item.aba, item.turmaOriginalId]),
-          ),
+          Object.fromEntries((dados.integracao.esquema.mapa ?? []).map((item) => [item.aba, item])),
         );
       } else {
         setPlanilha(null);
@@ -145,8 +148,10 @@ export default function IntegracaoPlanilha({
   const podeEnviar = Boolean(integracao?.ativa && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
-  const temMapa = Object.values(mapa).some((turmaId) => turmaId !== "");
-  const turmasSemAba = turmas.filter((turma) => !Object.values(mapa).includes(turma.id));
+  const temMapa = Object.values(mapa).some((item) => item.turmaOriginalId !== "");
+  const turmasSemAba = turmas.filter(
+    (turma) => !Object.values(mapa).some((item) => item.turmaOriginalId === turma.id),
+  );
   const diasEnvio = diasDoMes(mesEnvio);
 
   async function alternarAtiva(valor: boolean) {
@@ -204,10 +209,22 @@ export default function IntegracaoPlanilha({
           const proximo = { ...atual };
           for (const sugestao of dados.sugestoes) {
             const atualDaAba = proximo[sugestao.aba];
-            const invalido = atualDaAba !== undefined && !idsValidos.has(atualDaAba);
-            if ((atualDaAba === undefined || invalido) && sugestao.turmaOriginalId) {
-              proximo[sugestao.aba] = sugestao.turmaOriginalId;
+            const invalido =
+              atualDaAba !== undefined && !idsValidos.has(atualDaAba.turmaOriginalId);
+            if (
+              (atualDaAba === undefined || invalido || sugestao.mes) &&
+              sugestao.turmaOriginalId
+            ) {
+              proximo[sugestao.aba] = {
+                aba: sugestao.aba,
+                turmaOriginalId: sugestao.turmaOriginalId,
+                ...(sugestao.mes ? { mes: sugestao.mes } : {}),
+                ...(sugestao.destino ? { destino: sugestao.destino } : {}),
+              };
             }
+          }
+          for (const aba of dados.abas) {
+            if (aba.mensal) proximo[aba.nome] = { aba: aba.nome, ...aba.mensal };
           }
           return proximo;
         });
@@ -231,9 +248,7 @@ export default function IntegracaoPlanilha({
 
   async function salvarMapa() {
     if (!planilha) return;
-    const itens: MapaAba[] = Object.entries(mapa)
-      .filter(([, turmaId]) => turmaId !== "")
-      .map(([aba, turmaOriginalId]) => ({ aba, turmaOriginalId }));
+    const itens = Object.values(mapa).filter((item) => item.turmaOriginalId !== "");
     if (itens.length === 0) {
       toast.error("Escolha ao menos uma aba.");
       return;
@@ -377,6 +392,17 @@ export default function IntegracaoPlanilha({
           )
         }
       >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <DialogoPrepararMes
+            turmas={turmas}
+            mes={mesEnvio}
+            onMes={setMesEnvio}
+            mesMaximo={diaCorrente.slice(0, 7)}
+            disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+            onAtualizar={carregar}
+          />
+          <span className="text-muted-foreground text-xs">Uma aba por turma e mês</span>
+        </div>
         {estruturaEmEdicao ? (
           <>
             {planilha && (
@@ -386,30 +412,49 @@ export default function IntegracaoPlanilha({
             )}
             {abas.length > 0 && (
               <div className="flex flex-col gap-2">
-                {abas.map((aba) => (
-                  <div
-                    key={aba.nome}
-                    className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
-                  >
-                    <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
-                    <span className="text-muted-foreground shrink-0 text-xs">
-                      cabeçalho {aba.cabecalho} ·{" "}
-                      {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
-                    </span>
-                    <div className="w-full sm:w-56">
-                      <Selecionar
-                        id={`mapa-${aba.nome}`}
-                        value={mapa[aba.nome] ?? ""}
-                        onValueChange={(valor) =>
-                          setMapa((atual) => ({ ...atual, [aba.nome]: valor }))
-                        }
-                        placeholder="Ignorar aba"
-                        ariaLabel={`Turma de origem da aba ${aba.nome}`}
-                        opcoes={turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
-                      />
+                {abas.map((aba) => {
+                  const vinculo = mapa[aba.nome];
+                  const mensal = aba.mensal ?? (vinculo?.mes ? vinculo : undefined);
+                  return (
+                    <div
+                      key={aba.nome}
+                      className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        cabeçalho {aba.cabecalho} ·{" "}
+                        {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
+                      </span>
+                      <div className="w-full sm:w-56">
+                        {mensal ? (
+                          <p className="text-muted-foreground text-sm">
+                            {turmas.find((turma) => turma.id === mensal.turmaOriginalId)?.rotulo ??
+                              "Turma de origem"}
+                            {" · "}
+                            {rotuloMes(mensal.mes ?? "")}
+                          </p>
+                        ) : (
+                          <Selecionar
+                            id={`mapa-${aba.nome}`}
+                            value={vinculo?.turmaOriginalId ?? ""}
+                            onValueChange={(valor) =>
+                              setMapa((atual) => ({
+                                ...atual,
+                                [aba.nome]: { aba: aba.nome, turmaOriginalId: valor },
+                              }))
+                            }
+                            placeholder="Ignorar aba"
+                            ariaLabel={`Turma de origem da aba ${aba.nome}`}
+                            opcoes={turmas.map((turma) => ({
+                              valor: turma.id,
+                              rotulo: turma.rotulo,
+                            }))}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <Button
                   type="button"
                   className="h-11 self-start"

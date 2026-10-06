@@ -219,6 +219,7 @@ export interface ColunaEsquema {
 }
 
 export interface AbaEsquema {
+  mensal?: { mes: string; turmaOriginalId: string; destino: string };
   nome: string;
   oculta: boolean;
   /** Verdadeiro quando a aba foi criada pela integração (marcador). */

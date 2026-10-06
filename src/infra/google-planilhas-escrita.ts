@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba } from "@/domain/planilha";
+import type { AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { ErroHttp } from "@/infra/erros";
 import type { ControleTravaParcial } from "./trava-planilha-parcial";
 import {
@@ -530,11 +531,30 @@ export async function enviarLotesGoogle(
   requests: PedidoGoogle[],
   controle?: ControleTravaParcial,
 ): Promise<void> {
+  return enviarPedidosGoogle(id, acesso, requests, 500, controle);
+}
+
+/** Uma preparação estrutural precisa criar a aba inteira ou não alterar nada. */
+export async function enviarLoteAtomicoGoogle(
+  id: string,
+  acesso: string,
+  requests: PedidoGoogle[],
+): Promise<void> {
+  return enviarPedidosGoogle(id, acesso, requests, Number.MAX_SAFE_INTEGER);
+}
+
+async function enviarPedidosGoogle(
+  id: string,
+  acesso: string,
+  requests: PedidoGoogle[],
+  tamanhoDoLote: number,
+  controle?: ControleTravaParcial,
+): Promise<void> {
   const compactadas = compactarAtualizacoesGoogle(requests);
-  for (let inicio = 0; inicio < compactadas.length; inicio += 500) {
+  for (let inicio = 0; inicio < compactadas.length; inicio += tamanhoDoLote) {
     controle?.conferir();
-    const parte = compactadas.slice(inicio, inicio + 500);
-    const posicao = `lote ${Math.floor(inicio / 500) + 1} de ${Math.ceil(compactadas.length / 500)}`;
+    const parte = compactadas.slice(inicio, inicio + tamanhoDoLote);
+    const posicao = `lote ${Math.floor(inicio / tamanhoDoLote) + 1} de ${Math.ceil(compactadas.length / tamanhoDoLote)}`;
     let resposta: Response;
     try {
       resposta = await fetch(
@@ -576,12 +596,20 @@ export async function aplicarGoogle(
   assinatura: string,
   operacoes: unknown,
   modoCompleto: boolean,
+  mensal?: Omit<AbaMensalPlanilha, "aba">,
 ) {
   let doc: DocumentoGoogle;
   let leitura: Awaited<ReturnType<typeof lerGoogle>>;
   try {
     doc = await lerDocumentoGoogle(id, acesso);
     leitura = await lerGoogle(id, acesso, nome, undefined, undefined, doc);
+    if (
+      mensal &&
+      (leitura.mensal?.mes !== mensal.mes ||
+        leitura.mensal.turmaOriginalId !== mensal.turmaOriginalId ||
+        leitura.mensal.destino !== mensal.destino)
+    )
+      throw new ErroHttp("O destino mensal mudou. Confira a estrutura antes de enviar.", 409);
   } catch (erro) {
     if (erro instanceof ErroLeituraGoogle) {
       throw new ErroGoogle(erro.message, true, erro.detalhe);

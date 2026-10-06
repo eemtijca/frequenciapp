@@ -525,19 +525,26 @@ Lê o esquema de todas as abas e sugere o mapa por turma de origem.
 
 ### POST /api/planilha/mapa
 
-Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOriginalId"}] }`. Salva o esquema e a assinatura.
+Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOriginalId", "mes"?, "destino"?}] }`. Salva o esquema e a assinatura.
 
 - 200 `{"integracao": {...}}`; 400 ou 404 para aba ou turma inválida.
 
+### POST /api/planilha/mensal
+
+Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e origem confiável. Prepara uma turma por requisição, com cabeçalho, dias, alunos e vínculos, preservando abas existentes. Repetição reutiliza o destino identificado; aba manual com o mesmo nome responde 409.
+
+- 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada" }`; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
+- Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
+
 ### POST /api/planilha/simular
 
-Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por turma mapeada. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
+Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por destino mapeado. Abas mensais recebem apenas os dias de seu mês e retornam `mes` e `aba`; um intervalo entre meses gera vários planos para a mesma turma. O hash inclui a aba e sua identidade. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
 
 - 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 
 ### POST /api/planilha/aplicar
 
-Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao Google e vira `SUCESSO` com a resposta; o envio nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
+Uma turma por requisição: `turmaOriginalId` obrigatório, `todas` recusado. Mesmo corpo da simulação mais `planoHashGeral`, que é o `planoHashTurma` da prévia. Informar `aba` para aplicar apenas o destino correspondente ao `planoHashTurma`, mantendo o período original da prévia. Recalcula o plano, exige o mesmo hash e envia. Operações destrutivas exigem o modo completo. O registro nasce `PARCIAL` antes da chamada ao Google e vira `SUCESSO` com a resposta; o envio nunca é repetido automaticamente. Depois de criar coluna ou linha, a estrutura da aba é relida e salva.
 
 - 200 `{"resultados", "resumo"}`; cada resultado é `sucesso`, `parcial` (sem confirmação: timeout ou queda depois de enviar, com a mensagem para conferir a aba), `falha` (recusa antes da escrita) ou `sem_envio`.
 - 400 sem prévia ou com `todas`; 409 quando os dados mudaram; 429 envios em excesso.

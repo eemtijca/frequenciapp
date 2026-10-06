@@ -115,3 +115,7 @@ A cobertura protege o essencial do domínio (derivação de marcas e grade), a s
 `tests/api/seduc-chamada.test.ts` cria turma, alunos e aulas sintéticos. Cobre confirmação e reabertura, autoria e auditoria, preservação da frequência e do horário, salvamento sem mudanças, invalidação individual, aulas e justificativas, confirmação concorrente e revisão antiga, sessão e origem, aluno fora da lista e cópia JSON. A cópia preserva confirmações, recusa incoerências e duplicatas e aceita arquivos antigos.
 
 `tests/e2e/seduc-chamada.spec.ts` confere a chave desabilitada antes de salvar e durante a edição, marcação por aluno na chamada bloqueada, recarga, reconfirmação depois de corrigir e recusa de revisão antiga, incluindo tela de 360 pixels. Os testes existentes da chamada e da Chamada Parcial permanecem aplicáveis.
+
+## Frequência mensal no Google
+
+`google-planilhas-mensal.test.ts` cobre identidade, calendário, criação atômica, colisões e resposta perdida. `planilha-mensal.test.ts` cobre autorização, preparo, reenvio do histórico, concorrência no mapa, divisão entre meses e envio ao salvar. `planilha-mensal.spec.ts` valida confirmação, cancelamento, reutilização, vínculo fixo e prévia por aba. As suítes usam apenas dados sintéticos e o transporte Google simulado.

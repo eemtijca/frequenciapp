@@ -1,0 +1,461 @@
+// Contratos das abas mensais de frequência: destino por mês, histórico legado,
+// preparação idempotente e envio automático contra a Sheets API sintética.
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
+import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
+
+const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
+const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
+const LEGADA = "QA Mensal A";
+const PERIODO = { de: "2026-09-30", ate: "2026-10-01" };
+const daSerie =
+  "select id from turmas where serie_id in (select id from series where nome = 'QA Mensal')";
+
+interface Mensal {
+  aba: string;
+  mes: string;
+  turmaOriginalId: string;
+  destino: string;
+  criada: boolean;
+}
+
+interface Plano {
+  aba: string;
+  turmaOriginalId: string;
+  dias: string[];
+  semEnvio: boolean;
+  planoHashTurma: string;
+}
+
+interface Esquema {
+  planilha: unknown;
+  abas: unknown[];
+  mapa: { aba: string; turmaOriginalId: string; mes?: string; destino?: string }[];
+}
+
+let banco: pg.Client;
+let google: GoogleFalso;
+let cookieAdmin = "";
+let cookieCoordenacao = "";
+const turmas = { A: "", B: "" };
+const alunos = { A: "", B: "" };
+const mensais: Record<string, Mensal> = {};
+
+function chamar(
+  caminho: string,
+  metodo: "GET" | "POST" | "PATCH" = "POST",
+  corpo?: unknown,
+  cookie = cookieAdmin,
+) {
+  return fetch(`${APP_URL}${caminho}`, {
+    method: metodo,
+    headers: {
+      Origin: APP_URL,
+      Cookie: cookie,
+      ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
+    },
+    ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+  });
+}
+
+async function dados<T>(resposta: Response, status = 200): Promise<T> {
+  expect(resposta.status).toBe(status);
+  return (await resposta.json()) as T;
+}
+
+async function limpar() {
+  await banco.query(`delete from sincronizacoes_planilha where turma_original_id in (${daSerie})`);
+  await banco.query(
+    `update integracoes_planilha set ativa = false, google_refresh_token = null,
+       google_planilha_id = null, google_planilha_nome = null, esquema = null,
+       assinatura_esquema = null, esquema_em = null, modo = 'CONSERVADOR',
+       modo_completo_ate = null, envio_automatico = false where id = 'principal'`,
+  );
+  await banco.query(`delete from frequencias where turma_id in (${daSerie})`);
+  await banco.query(`delete from alunos where turma_id in (${daSerie})`);
+  await banco.query(`delete from turmas where id in (${daSerie})`);
+  await banco.query("delete from series where nome = 'QA Mensal'");
+}
+
+function cabecalho(aba: string) {
+  return Array.from({ length: 36 }, (_, indice) => google.valor(aba, 1, indice + 1));
+}
+
+function marca(aba: string, data: string) {
+  const coluna = cabecalho(aba).indexOf(data) + 1;
+  expect(coluna).toBeGreaterThan(0);
+  return google.valor(aba, 2, coluna);
+}
+
+function preparar(mes: string, turmaOriginalId = turmas.A) {
+  return chamar("/api/planilha/mensal", "POST", { turmaOriginalId, mes });
+}
+
+async function simular(periodo = PERIODO) {
+  return dados<{ planos: Plano[] }>(
+    await chamar("/api/planilha/simular", "POST", {
+      turmaOriginalId: turmas.A,
+      ...periodo,
+    }),
+  );
+}
+
+async function lerEsquema() {
+  const { integracao } = await dados<{ integracao: { esquema: Esquema } }>(
+    await chamar("/api/planilha", "GET"),
+  );
+  return integracao.esquema;
+}
+
+async function aplicar(plano: Plano, periodo = PERIODO) {
+  return dados<{ resultados: { aba: string; resultado: string }[] }>(
+    await chamar("/api/planilha/aplicar", "POST", {
+      turmaOriginalId: turmas.A,
+      aba: plano.aba,
+      ...periodo,
+      planoHashGeral: plano.planoHashTurma,
+    }),
+  );
+}
+
+function planoDaAba(planos: Plano[], aba: string) {
+  const plano = planos.find((item) => item.aba === aba);
+  expect(plano).toBeDefined();
+  if (!plano) throw new Error("Prévia mensal ausente.");
+  return plano;
+}
+
+async function salvar(dia: string, faltas: string[]) {
+  expect(
+    (
+      await chamar("/api/frequencias", "POST", {
+        turmaId: turmas.A,
+        dia,
+        faltas,
+        revisao: 0,
+      })
+    ).status,
+  ).toBe(200);
+}
+
+beforeAll(async () => {
+  banco = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await banco.connect();
+  await limpar();
+  google = await criarGoogleFalso();
+  for (const perfil of ["admin", "coordenacao"]) {
+    const entrada = await chamar("/api/auth/entrar", "POST", {
+      login: perfil === "admin" ? EMAIL_ADMIN : "demo@escola.exemplo",
+      senha: perfil === "admin" ? SENHA_ADMIN : "DemoFrequencia2026",
+      lembrar: false,
+    });
+    expect(entrada.status).toBe(200);
+    const cookie = entrada.headers.get("set-cookie")?.split(";")[0] ?? "";
+    if (perfil === "admin") cookieAdmin = cookie;
+    else cookieCoordenacao = cookie;
+  }
+  const { serie } = await dados<{ serie: { id: string } }>(
+    await chamar("/api/series", "POST", { nome: "QA Mensal", ordem: 99 }),
+    201,
+  );
+  for (const nome of ["A", "B"] as const) {
+    const { turma } = await dados<{ turma: { id: string } }>(
+      await chamar("/api/turmas", "POST", { serieId: serie.id, nome }),
+      201,
+    );
+    turmas[nome] = turma.id;
+    const { aluno } = await dados<{ aluno: { id: string } }>(
+      await chamar("/api/alunos", "POST", {
+        turmaId: turma.id,
+        nome: `QA Mensal Aluno ${nome}`,
+      }),
+      201,
+    );
+    alunos[nome] = aluno.id;
+  }
+  google.definirAba(
+    LEGADA,
+    [
+      ["Aluno", "Turma atual", "30/09/2026", "Total"],
+      ["QA Mensal Aluno A", LEGADA, "", ""],
+    ],
+    { formulas: { D2: '=COUNTIF(C2:C2;"F")' } },
+  );
+  await google.conectar(banco);
+  const estrutura = await dados<{ planilha: unknown; abas: unknown[] }>(
+    await chamar("/api/planilha/estrutura", "POST", {}),
+  );
+  await dados(
+    await chamar("/api/planilha/mapa", "POST", {
+      ...estrutura,
+      mapa: [{ aba: LEGADA, turmaOriginalId: turmas.A }],
+    }),
+  );
+  await salvar("2026-09-30", [alunos.A]);
+  await salvar("2026-10-01", []);
+});
+
+afterAll(async () => {
+  if (banco) {
+    await limpar();
+    await banco.end();
+  }
+  if (google) await google.fechar();
+});
+
+describe("frequência organizada por turma e mês", () => {
+  it("exige administração e valida o mês sem criar abas", async () => {
+    const corpo = { turmaOriginalId: turmas.A, mes: "2026-09" };
+    expect((await chamar("/api/planilha/mensal", "POST", corpo, "")).status).toBe(401);
+    expect((await chamar("/api/planilha/mensal", "POST", corpo, cookieCoordenacao)).status).toBe(
+      403,
+    );
+    for (const mes of ["2026-00", "2026-13", "2026-9", "setembro"]) {
+      expect((await preparar(mes)).status).toBe(400);
+    }
+    expect(google.abas()).toEqual([LEGADA]);
+  });
+
+  it("confirma o envio legado antes da preparação mensal", async () => {
+    const periodo = { de: "2026-09-30", ate: "2026-09-30" };
+    const previa = await simular(periodo);
+    const resultado = await aplicar(planoDaAba(previa.planos, LEGADA), periodo);
+    expect(resultado.resultados).toMatchObject([{ aba: LEGADA, resultado: "sucesso" }]);
+    expect(marca(LEGADA, "30/09/2026")).toBe("F");
+    expect((await simular(periodo)).planos[0]?.semEnvio).toBe(true);
+  });
+
+  it("prepara os alunos e todos os dias do mês sem alterar a aba antiga", async () => {
+    for (const [mes, dias] of [
+      ["2026-09", 30],
+      ["2026-10", 31],
+    ] as const) {
+      const mensal = await dados<Mensal>(await preparar(mes));
+      mensais[mes] = mensal;
+      expect(mensal).toMatchObject({ mes, turmaOriginalId: turmas.A, criada: true });
+      expect(mensal.destino).toBeTruthy();
+      const sufixo = `${mes.slice(5)}/${mes.slice(0, 4)}`;
+      expect(cabecalho(mensal.aba).filter((valor) => /^\d{2}\//.test(valor))).toEqual(
+        Array.from(
+          { length: dias },
+          (_, indice) => `${String(indice + 1).padStart(2, "0")}/${sufixo}`,
+        ),
+      );
+      expect(google.valor(mensal.aba, 2, 1)).toBe("QA Mensal Aluno A");
+      expect(google.vinculos(mensal.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+    }
+    expect(cabecalho(LEGADA).filter(Boolean)).toEqual([
+      "Aluno",
+      "Turma atual",
+      "30/09/2026",
+      "Total",
+    ]);
+    expect(marca(LEGADA, "30/09/2026")).toBe("F");
+    expect(google.formulaDe(LEGADA, 2, 4)).toBe('=COUNTIF(C2:C2;"F")');
+  });
+
+  it("reutiliza o destino preparado e não duplica abas ou alunos", async () => {
+    const antes = google.abas();
+    const repetida = await dados<Mensal>(await preparar("2026-09"));
+    expect(repetida).toEqual({ ...mensais["2026-09"], criada: false });
+    expect(google.abas()).toEqual(antes);
+    expect(google.vinculos(repetida.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+  });
+
+  it("salva a mesma turma em meses distintos e recusa duplicidade do mesmo período", async () => {
+    const esquema = await lerEsquema();
+    const setembro = esquema.mapa.find((item) => item.mes === "2026-09");
+    const outubro = esquema.mapa.find((item) => item.mes === "2026-10");
+    expect(setembro?.turmaOriginalId).toBe(turmas.A);
+    expect(outubro?.turmaOriginalId).toBe(turmas.A);
+    expect((await chamar("/api/planilha/mapa", "POST", esquema)).status).toBe(200);
+    expect(
+      (
+        await chamar("/api/planilha/mapa", "POST", {
+          ...esquema,
+          mapa: [...esquema.mapa, setembro],
+        })
+      ).status,
+    ).toBe(400);
+  });
+
+  it("mantém uma única aba ao preparar o mesmo mês simultaneamente", async () => {
+    const estruturaAnterior = await lerEsquema();
+    const respostas = await Promise.all([
+      preparar("2026-10", turmas.B),
+      preparar("2026-10", turmas.B),
+    ]);
+    expect(respostas.some((resposta) => resposta.status === 200)).toBe(true);
+    const repetida = await dados<Mensal>(await preparar("2026-10", turmas.B));
+    expect(repetida).toMatchObject({ criada: false, turmaOriginalId: turmas.B, mes: "2026-10" });
+    expect(google.abas().filter((nome) => nome === repetida.aba)).toHaveLength(1);
+    expect(google.vinculos(repetida.aba)).toEqual([{ linha: 2, alunoId: alunos.B }]);
+    // Outra sessão ainda pode salvar a estrutura conferida antes do preparo.
+    expect((await chamar("/api/planilha/mapa", "POST", estruturaAnterior)).status).toBe(200);
+    const preservado = await lerEsquema();
+    expect(preservado.mapa).toContainEqual({
+      aba: repetida.aba,
+      turmaOriginalId: turmas.B,
+      mes: "2026-10",
+      destino: repetida.destino,
+    });
+    expect(preservado.abas).toContainEqual(expect.objectContaining({ nome: repetida.aba }));
+  });
+
+  it("separa 30/09 e 01/10 e envia o mês novo mesmo com sucesso no legado", async () => {
+    const setembro = mensais["2026-09"];
+    const outubro = mensais["2026-10"];
+    if (!setembro || !outubro) throw new Error("Abas mensais ausentes.");
+    const previa = await simular();
+    expect(previa.planos).toHaveLength(2);
+    const planoSetembro = planoDaAba(previa.planos, setembro.aba);
+    const planoOutubro = planoDaAba(previa.planos, outubro.aba);
+    expect(planoSetembro.dias).toEqual(["2026-09-30"]);
+    expect(planoOutubro.dias).toEqual(["2026-10-01"]);
+    expect(planoSetembro.semEnvio).toBe(false);
+    expect(planoOutubro.semEnvio).toBe(false);
+    expect(
+      (
+        await chamar("/api/planilha/aplicar", "POST", {
+          turmaOriginalId: turmas.A,
+          aba: outubro.aba,
+          ...PERIODO,
+          planoHashGeral: planoSetembro.planoHashTurma,
+        })
+      ).status,
+    ).toBe(409);
+    expect((await aplicar(planoSetembro)).resultados).toMatchObject([
+      { aba: setembro.aba, resultado: "sucesso" },
+    ]);
+    expect(marca(setembro.aba, "30/09/2026")).toBe("F");
+    expect(marca(outubro.aba, "01/10/2026")).toBe("");
+    expect((await aplicar(planoOutubro)).resultados).toMatchObject([
+      { aba: outubro.aba, resultado: "sucesso" },
+    ]);
+    expect(marca(outubro.aba, "01/10/2026")).toBe("P");
+    expect(cabecalho(setembro.aba)).not.toContain("01/10/2026");
+    expect(cabecalho(outubro.aba)).not.toContain("30/09/2026");
+    expect((await simular()).planos.every((plano) => plano.semEnvio)).toBe(true);
+    const historico = await banco.query<{ destino: string | null }>(
+      "select destino from sincronizacoes_planilha where turma_original_id = $1 and resultado = 'SUCESSO'",
+      [turmas.A],
+    );
+    expect(historico.rows.map((item) => item.destino)).toEqual(
+      expect.arrayContaining([null, setembro.destino, outubro.destino]),
+    );
+  });
+
+  it("recusa mês sem aba preparada em vez de enviar para o legado", async () => {
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    const resposta = await chamar("/api/planilha/simular", "POST", {
+      turmaOriginalId: turmas.A,
+      de: "2026-11-01",
+      ate: "2026-11-30",
+      somenteAlteradas: false,
+    });
+    expect(resposta.status).toBe(400);
+    expect((await resposta.json()) as { error: string }).toMatchObject({
+      error: expect.stringMatching(/prepar/i),
+    });
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+    expect(cabecalho(LEGADA)).not.toContain("01/11/2026");
+  });
+
+  it("preserva uma aba manual com o nome mensal em vez de assumir sua autoria", async () => {
+    const nome = "QA Mensal A · 11-2026";
+    google.definirAba(nome, [["Anotações da escola"], ["Conteúdo manual"]]);
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    expect((await preparar("2026-11")).status).toBe(409);
+    expect(google.valor(nome, 2, 1)).toBe("Conteúdo manual");
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+  });
+
+  it("bloqueia uma aba mensal com data de outro mês sem escrever", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    const ultimaColuna = cabecalho(outubro.aba).indexOf("31/10/2026") + 1;
+    expect(ultimaColuna).toBeGreaterThan(0);
+    google.definirValor(outubro.aba, 1, ultimaColuna, "30/09/2026");
+    try {
+      const resposta = await chamar("/api/planilha/simular", "POST", {
+        turmaOriginalId: turmas.A,
+        de: "2026-10-01",
+        ate: "2026-10-01",
+        somenteAlteradas: false,
+      });
+      expect(resposta.status).toBe(409);
+      expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+      expect(marca(outubro.aba, "01/10/2026")).toBe("P");
+    } finally {
+      google.definirValor(outubro.aba, 1, ultimaColuna, "31/10/2026");
+    }
+    // A próxima conferência recupera o esquema após a correção manual.
+    await dados(
+      await chamar("/api/planilha/simular", "POST", {
+        turmaOriginalId: turmas.A,
+        de: "2026-10-01",
+        ate: "2026-10-01",
+        somenteAlteradas: false,
+      }),
+    );
+  });
+
+  it("envia a chamada de outubro somente à aba de outubro", async () => {
+    const outubro = mensais["2026-10"];
+    const setembro = mensais["2026-09"];
+    if (!outubro || !setembro) throw new Error("Abas mensais ausentes.");
+    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: true }));
+    await salvar("2026-10-02", [alunos.A]);
+    await expect
+      .poll(
+        async () => {
+          const registro = await banco.query<{ resultado: string }>(
+            `select resultado from sincronizacoes_planilha where turma_original_id = $1
+           and destino = $2 and de = '2026-10-02'::date order by criado_em desc limit 1`,
+            [turmas.A, outubro.destino],
+          );
+          return registro.rows[0]?.resultado;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe("SUCESSO");
+    expect(marca(outubro.aba, "02/10/2026")).toBe("F");
+    expect(cabecalho(setembro.aba)).not.toContain("02/10/2026");
+    expect(cabecalho(LEGADA)).not.toContain("02/10/2026");
+    expect(marca(setembro.aba, "30/09/2026")).toBe("F");
+  });
+
+  it("reenvia o histórico ao preparar novamente uma aba mensal excluída", async () => {
+    const anterior = mensais["2026-09"];
+    if (!anterior) throw new Error("Aba mensal ausente.");
+    const periodo = { de: "2026-09-30", ate: "2026-09-30" };
+    expect((await simular(periodo)).planos[0]?.semEnvio).toBe(true);
+    expect(marca(anterior.aba, "30/09/2026")).toBe("F");
+
+    google.removerAba(anterior.aba);
+    const recriada = await dados<Mensal>(await preparar("2026-09"));
+    mensais["2026-09"] = recriada;
+    expect(recriada).toMatchObject({ aba: anterior.aba, criada: true });
+    expect(recriada.destino).not.toBe(anterior.destino);
+    expect(marca(recriada.aba, "30/09/2026")).toBe("");
+    const previa = await simular(periodo);
+    const plano = planoDaAba(previa.planos, recriada.aba);
+    expect(plano.semEnvio).toBe(false);
+    expect(plano.dias).toEqual(["2026-09-30"]);
+    expect((await aplicar(plano, periodo)).resultados).toMatchObject([
+      { aba: recriada.aba, resultado: "sucesso" },
+    ]);
+    expect(marca(recriada.aba, "30/09/2026")).toBe("F");
+    expect((await simular(periodo)).planos[0]?.semEnvio).toBe(true);
+    const historico = await banco.query<{ destino: string }>(
+      `select destino from sincronizacoes_planilha where turma_original_id = $1
+         and resultado = 'SUCESSO' and de = '2026-09-30'::date`,
+      [turmas.A],
+    );
+    expect(historico.rows.map((item) => item.destino)).toEqual(
+      expect.arrayContaining([anterior.destino, recriada.destino]),
+    );
+  });
+});

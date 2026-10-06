@@ -40,6 +40,7 @@ export interface GoogleFalso {
     opcoes?: { formulas?: Record<string, string>; mesclagens?: string[] },
   ): void;
   renomearAba(nome: string, novo: string): void;
+  removerAba(nome: string): void;
   valor(nome: string, linha: number, coluna: number): string;
   definirValor(nome: string, linha: number, coluna: number, valor: string): void;
   formulaDe(nome: string, linha: number, coluna: number): string;
@@ -78,6 +79,9 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     return celula;
   }
   function nova(nome: string, id = proximoId++): Aba {
+    if (abas.some((item) => item.nome === nome || item.id === id)) {
+      throw new Error("Nome ou identificador de aba sintética já existente.");
+    }
     const item: Aba = {
       id,
       nome,
@@ -375,7 +379,18 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
             return;
           }
           const requests = lista(objeto(JSON.parse(corpo)).requests);
-          for (const request of requests) escrever(objeto(request));
+          const anteriores = structuredClone(abas);
+          const idAnterior = proximoId;
+          const metadadoAnterior = proximoMetadado;
+          try {
+            for (const request of requests) escrever(objeto(request));
+          } catch (erro) {
+            // A Sheets API rejeita o lote inteiro quando um pedido é inválido.
+            abas.splice(0, abas.length, ...anteriores);
+            proximoId = idAnterior;
+            proximoMetadado = metadadoAnterior;
+            throw erro;
+          }
           if (perderResposta) {
             perderResposta = false;
             req.socket.destroy();
@@ -473,6 +488,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     renomearAba: (nome, novo) => {
       const item = aba(nome);
       if (item) item.nome = novo;
+    },
+    removerAba: (nome) => {
+      const item = aba(nome);
+      if (item) abas.splice(abas.indexOf(item), 1);
     },
     valor: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.valor ?? "",
     definirValor: (nome, linha, indice, valor) => {

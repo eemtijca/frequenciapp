@@ -25,6 +25,18 @@ O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatu
 
 Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
 
+## Frequência por turma e mês
+
+Em Gestão, Configurações, Planilhas, Planilha de frequência, usar **Preparar mês**. Escolher o mês e confirmar a preparação das turmas. Cada turma de origem recebe uma aba como `1º A · 10-2026`, com Aluno, Turma atual e todos os dias em `dd/mm/aaaa`. A lista de alunos ativos e os vínculos são preparados; as marcações ficam vazias até o envio. A interface acompanha uma turma por requisição e informa abas criadas, reutilizadas e pendências. Cancelar antes de confirmar não grava nada.
+
+Repetir o preparo reaproveita a aba identificada pelo aplicativo, inclusive se o nome foi alterado. Aba manual com nome igual exige conferência. Criação, cabeçalho, lista e marcadores pertencem ao mesmo lote atômico do Google. Uma resposta perdida permite somente releitura para conferir o resultado, sem repetir a gravação. Nenhuma aba antiga é apagada, dividida ou usada como backup.
+
+Depois de preparar o primeiro mês de uma turma, os envios dela usam apenas as abas mensais. **Prévia do envio** permite enviar as chamadas do mês, inclusive períodos antigos do aplicativo; confirmações anteriores na aba antiga não fazem a nova aba parecer preenchida. Conteúdo manual e alunos que só existem na planilha antiga continuam nessa aba, sem migração automática. O envio mantém as regras da Grade do aplicativo.
+
+Preparar cada mês antes de iniciar seus envios. **Enviar ao salvar** usa o mês da data da chamada e a turma de origem do aluno. Mês ainda não preparado fica pendente para a Gestão; não recebe escrita na aba antiga nem em outro mês. Um período que atravessa meses gera planos separados, com resultados por aba. Abas antigas continuam disponíveis para consulta e organização visual.
+
+A identificação mensal usa metadados de turma, mês e geração, além do identificador estável da aba. O histórico de sincronização registra `destino` para distinguir cada arquivo, aba e recriação; registros antigos mantêm esse campo nulo. A conferência da estrutura reutiliza o esquema salvo dos meses conhecidos e consulta seu catálogo, enquanto cada envio relê assinatura, identidade e conteúdo atuais. A migração `20261005145103_destino_mensal_planilha` deve ser aplicada antes de executar esta versão (ADR-037).
+
 ## Organização visual e cabeçalhos
 
 Abas novas recebem cabeçalho verde com texto branco e negrito, altura de 44 pixels e congelamento até o cabeçalho. Colunas de aluno têm 260 pixels; turma, 140; dias da frequência com ano completo, 110. Datas e totais ficam centralizados; observações e motivos recebem espaço e quebra de texto. As linhas alternam branco e verde claro por faixas nativas, que acompanham a planilha. Novas colunas de dia também recebem largura e alinhamento próprios.
