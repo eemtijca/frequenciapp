@@ -8,6 +8,14 @@
           - "src/app/api/frequencias/**"
           - "src/app/api/frequencias-parciais/**"
 
+"area: interface":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/components/ui/**"
+          - "src/components/painel/**"
+          - "src/app/vidro.css"
+          - "src/app/globals.css"
+
 "area: planilhas":
   - changed-files:
       - any-glob-to-any-file:

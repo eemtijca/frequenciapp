@@ -19,7 +19,7 @@ Closes #
 Aplique ao menos uma etiqueta de tipo e uma de área com `gh pr edit --add-label`. Pull requests do Dependabot recebem `dependencies` e dispensam as demais.
 
 - Tipo: `bug`, `enhancement`, `documentation`, `refactor`, `testes`, `ci`, `desempenho` ou `manutencao`
-- Área: `area: chamada`, `area: planilhas`, `area: gestao`, `area: notificacoes` ou `area: infra`
+- Área: `area: chamada`, `area: planilhas`, `area: gestao`, `area: notificacoes`, `area: infra` ou `area: interface`
 
 ## Commits
 
