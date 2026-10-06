@@ -14,6 +14,23 @@ const registro = {
 };
 
 describe("frequência parcial", () => {
+  it("identifica o dia inteiro sem presumir turnos ou quantidade de aulas", () => {
+    expect(rotuloFrequenciaParcial({ tipo: "DIA_INTEIRO", turno: null, aulas: [] })).toBe(
+      "Dia inteiro",
+    );
+    expect(
+      esquemaRegistroParcial.parse({
+        alunoId: registro.alunoId,
+        dia: registro.dia,
+        tipo: "DIA_INTEIRO",
+      }),
+    ).toMatchObject({ tipo: "DIA_INTEIRO", aulas: [] });
+    expect(
+      esquemaRegistroParcial.safeParse({ ...registro, tipo: "DIA_INTEIRO", turno: null, aulas: [] })
+        .success,
+    ).toBe(true);
+  });
+
   it("mantém aulas avulsas e identifica intervalos sem preencher lacunas", () => {
     expect(normalizarAulas([4, 2, 4])).toEqual([2, 4]);
     expect(rotuloFrequenciaParcial({ tipo: "AULAS", turno: null, aulas: [4, 2] })).toBe(
@@ -43,10 +60,15 @@ describe("frequência parcial", () => {
     { turno: "TARDE" },
     { tipo: "TURNO", turno: "MANHA" },
     { tipo: "TURNO", turno: null, aulas: [] },
+    { tipo: "DIA_INTEIRO", turno: "MANHA", aulas: [] },
+    { tipo: "DIA_INTEIRO", turno: null, aulas: [1] },
     { dia: "2026-02-30" },
     { revisao: -1 },
     { observacao: "A".repeat(301) },
     { registradoSeduc: true },
+    { baseChamada: { turmaId: registro.alunoId, revisao: 0 } },
+    { baseChamada: { turmaId: "inválida", revisao: 1 } },
+    { baseChamada: { turmaId: registro.alunoId, revisao: 1, registradoSeduc: true } },
   ])("recusa a seleção incoerente %j", (mudanca) => {
     expect(esquemaRegistroParcial.safeParse({ ...registro, ...mudanca }).success).toBe(false);
   });
@@ -59,6 +81,15 @@ describe("frequência parcial", () => {
     });
     expect(dados.observacao).toBe("Transporte");
     expect(dados.aulas).toEqual([1, 30]);
+  });
+
+  it("aceita a revisão explícita da chamada usada para personalizar", () => {
+    expect(
+      esquemaRegistroParcial.parse({
+        ...registro,
+        baseChamada: { turmaId: registro.alunoId, revisao: 2 },
+      }).baseChamada,
+    ).toEqual({ turmaId: registro.alunoId, revisao: 2 });
   });
 
   it("aceita um dia ou um período completo de até 92 dias", () => {

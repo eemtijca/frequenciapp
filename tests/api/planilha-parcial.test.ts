@@ -29,6 +29,9 @@ async function entrar(email: string, senha: string) {
 async function limpar() {
   await banco.query("delete from alunos where nome like 'QA Planilha Parcial %'");
   await banco.query(
+    "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'QA Planilha Parcial'))",
+  );
+  await banco.query(
     "delete from turmas where serie_id in (select id from series where nome = 'QA Planilha Parcial')",
   );
   await banco.query("delete from series where nome = 'QA Planilha Parcial'");
@@ -220,7 +223,7 @@ describe("planilha de chamada parcial", () => {
       linhasCriadas: 1,
       linhasAtualizadas: 0,
     });
-    expect(google.valor("Chamada Parcial", 2, 8)).toBe(registro);
+    expect(google.valor("Chamada Parcial", 2, 8)).toBe(`chamada:${aluno}:${dia}`);
     expect(google.valor("Chamada Parcial", 2, 1)).toBe("15/06/2026");
     const normal = await banco.query<{ total: number }>(
       "select count(*)::int as total from frequencias where turma_id=$1",
@@ -262,7 +265,7 @@ describe("planilha de chamada parcial", () => {
       linhasAtualizadas: 1,
     });
     expect(google.valor("Chamada Parcial", 2, 5)).toBe("Sim");
-    expect(google.valor("Chamada Parcial", 2, 8)).toBe(registro);
+    expect(google.valor("Chamada Parcial", 2, 8)).toBe(`chamada:${aluno}:${dia}`);
   });
   it("invalida prévia após alteração manual e preserva a célula", async () => {
     const plano = await previa();
@@ -312,6 +315,85 @@ describe("planilha de chamada parcial", () => {
     ).toBe(409);
     expect(await previa(outroPeriodo)).toMatchObject({ novas: 0, existentes: 1, bloqueado: false });
     expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes + 1);
+  });
+  it("exporta a base e mantém a mesma linha ao personalizar e restaurar o dia", async () => {
+    const diaBase = "2026-06-17";
+    const periodoBase = { de: diaBase, ate: diaBase, turmaId: turma };
+    const frequencias = await banco.query<{ id: string }>(
+      "insert into frequencias (turma_id, dia, atualizado_em) values ($1, $2, now()) returning id",
+      [turma, diaBase],
+    );
+    const frequenciaId = frequencias.rows[0]?.id;
+    await banco.query("insert into alunos_chamada (frequencia_id, aluno_id) values ($1, $2)", [
+      frequenciaId,
+      aluno,
+    ]);
+    const enviar = async (planoHash: string, atualizarExistentes = false) => {
+      const resposta = await chamar(
+        "/api/planilha-parcial/enviar",
+        "POST",
+        { ...periodoBase, planoHash, atualizarExistentes },
+        cookie,
+      );
+      expect(resposta.status).toBe(200);
+      return resposta.json();
+    };
+    const inicial = await previa(periodoBase);
+    expect(inicial).toMatchObject({ novas: 1, existentes: 0, bloqueado: false });
+    expect(await enviar(inicial.planoHash)).toMatchObject({
+      linhasCriadas: 1,
+      linhasAtualizadas: 0,
+    });
+    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro");
+    expect(google.valor("Chamada Parcial", 4, 8)).toBe(`chamada:${aluno}:${diaBase}`);
+    expect(google.valor("Chamada Parcial", 4, 9)).toBe("chamada:1:seduc:0");
+    await banco.query(
+      "insert into frequencias_parciais (aluno_id, dia, turma_id, aluno_nome, turma_nome, tipo, aulas, atualizado_em) values ($1, $2, $3, 'QA Planilha Parcial Um', 'QA Planilha Parcial A', 'AULAS', '{3,4}', now())",
+      [aluno, diaBase, turma],
+    );
+    expect((await previa(periodoBase)).bloqueado).toBe(true);
+    const personalizada = await previa({ ...periodoBase, atualizarExistentes: true });
+    expect(personalizada).toMatchObject({
+      novas: 0,
+      existentes: 1,
+      atualizacoes: 1,
+      bloqueado: false,
+    });
+    expect(await enviar(personalizada.planoHash, true)).toMatchObject({
+      linhasCriadas: 0,
+      linhasAtualizadas: 1,
+    });
+    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Aulas 3, 4");
+    expect(google.valor("Chamada Parcial", 4, 8)).toBe(`chamada:${aluno}:${diaBase}`);
+    await banco.query("delete from frequencias_parciais where aluno_id=$1 and dia=$2", [
+      aluno,
+      diaBase,
+    ]);
+    await banco.query(
+      "update alunos_chamada set registrado_seduc=true, registrado_seduc_em=now(), revisao_seduc=1 where frequencia_id=$1 and aluno_id=$2",
+      [frequenciaId, aluno],
+    );
+    const restaurada = await previa({ ...periodoBase, atualizarExistentes: true });
+    expect(restaurada).toMatchObject({
+      novas: 0,
+      existentes: 1,
+      atualizacoes: 1,
+      bloqueado: false,
+    });
+    expect(await enviar(restaurada.planoHash, true)).toMatchObject({
+      linhasCriadas: 0,
+      linhasAtualizadas: 1,
+    });
+    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro");
+    expect(google.valor("Chamada Parcial", 4, 5)).toBe("Sim");
+    expect(google.valor("Chamada Parcial", 4, 8)).toBe(`chamada:${aluno}:${diaBase}`);
+    expect(google.valor("Chamada Parcial", 4, 9)).toBe("chamada:1:seduc:1");
+    expect(await previa(periodoBase)).toMatchObject({ novas: 0, existentes: 1, bloqueado: false });
+    const preservada = await banco.query<{ revisao: number }>(
+      "select revisao from frequencias where id=$1",
+      [frequenciaId],
+    );
+    expect(preservada.rows[0]?.revisao).toBe(1);
   });
   it("recusa fórmulas existentes e desconecta sem apagar as células Google", async () => {
     const valores = [

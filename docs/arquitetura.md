@@ -56,9 +56,13 @@ O cliente mantém rascunho em sessionStorage enquanto houver marcações não sa
 
 ## Chamada Parcial e confirmação manual
 
-`frequencia-parcial.ts` define a presença por turno ou aulas. O caso de uso correspondente guarda uma linha por aluno e dia, com nomes históricos e revisão otimista. Salvamento, confirmação manual da Seduc e exclusão rodam em transação serializável; revisão obsoleta responde 409. A revisão aumenta quando o conteúdo ou a confirmação muda. Corrigir conteúdo limpa data, responsável e chave da confirmação. Nenhuma operação escreve na chamada normal ou altera seus indicadores.
+`frequencia-parcial.ts` define a presença personalizada por dia inteiro, turno ou aulas. O caso de uso correspondente guarda uma linha por aluno e dia, com nomes históricos e revisão otimista. Salvamento, confirmação manual da Seduc e exclusão rodam em transação serializável; revisão obsoleta responde 409. A revisão aumenta quando o conteúdo ou a confirmação muda. Corrigir conteúdo limpa data, responsável e chave da confirmação.
 
-A confirmação representa o lançamento feito pela equipe no sistema externo. Não há chamada à API da Seduc. A terceira integração Google, finalidade `PARCIAL`, recebe uma aba própria em arquivo distinto dos arquivos de frequência e saídas. A prévia vincula dados locais e estrutura externa; envio manual acrescenta registros novos. A opção explícita de atualizar existentes restringe alterações a linhas identificadas e marcadas pela integração, com nova conferência de valores e fórmulas.
+`frequencia-personalizada.ts` compõe a lista efetiva da Chamada Parcial sem escrever dados. Personalizações têm prioridade por aluno e dia; os demais registros vêm da lista histórica da chamada salva. Se houver mais de uma chamada do aluno no dia, a mais recentemente atualizada define a base. O filtro de turma é aplicado depois da composição, evitando reapresentar a base de um aluno já personalizado em outra turma. P corresponde a Dia inteiro e F, FJ e S preservam a situação diária. Sem chamada salva, nenhuma presença é presumida.
+
+A confirmação da base usa as revisões da chamada e de `alunos_chamada`; personalizações usam a própria revisão. A API recusa confirmar a base quando já existe ajuste ou outra chamada passou a defini-la. Ao criar um ajuste com `baseChamada`, confere revisão e participação do aluno e conserva a turma de origem do registro, inclusive após transferência. Remover o ajuste limpa as confirmações da base do aluno naquele dia antes de voltar a apresentá-la. As faltas, a revisão e os indicadores da chamada normal permanecem independentes.
+
+A confirmação representa o lançamento feito pela equipe no sistema externo. Não há chamada à API da Seduc. A terceira integração Google, finalidade `PARCIAL`, recebe uma aba própria em arquivo distinto dos arquivos de frequência e saídas. A prévia vincula dados locais e estrutura externa; envio manual usa a lista efetiva e acrescenta registros novos. O código `chamada:<alunoId>:<dia>` mantém a identidade ao personalizar ou retornar à base; UUIDs antigos reconhecidos são preservados. A opção explícita de atualizar existentes restringe alterações a linhas identificadas e marcadas pela integração, com nova conferência de valores e fórmulas.
 
 O envio da planilha parcial usa exclusão distribuída por `pg_try_advisory_xact_lock` em uma conexão dedicada ao PostgreSQL de runtime (`DATABASE_URL`). A trava é obtida antes de remontar o plano e cobre releitura e escrita. Se estiver ocupada, a operação responde 409; perder a conexão da trava cancela a requisição HTTP e retorna 502, pedindo conferência do resultado. A operação com efeito externo não entra na retentativa automática de transações. Essa trava não torna PostgreSQL e Google atômicos nem desfaz um lote já aceito. Frequência, saídas e entradas mantêm sua fila de envio em memória; a exclusão distribuída desta etapa atende somente a planilha parcial.
 
@@ -82,7 +86,8 @@ src/
       horarios/             aulas da turma: listagem, criação, edição e exclusão
       usuarios/             gestão de contas pelo administrador
       responsaveis/         equipe ativa que pode liberar saídas
-      frequencias-parciais/ presença independente, revisão e confirmação manual da Seduc
+      frequencias-personalizadas/ base diária e personalizações efetivas para a Seduc
+      frequencias-parciais/ personalizações, revisão e confirmação manual da Seduc
       planilha-parcial/     terceira planilha: configuração, preparação, prévia e envio
       frequencias/          consulta por dia, período ou mês, salvamento e resumo acumulado
       saidas/               registro, consulta e remoção de saídas antecipadas
@@ -112,7 +117,8 @@ src/
     pwa/                    registro do service worker e avisos
     ui/                     conjunto shadcn/ui personalizado
   domain/
-    frequencia-parcial.ts   tipos e rótulos da presença parcial
+    frequencia-parcial.ts   tipos e rótulos da presença personalizada
+    frequencia-personalizada.ts   contrato da base diária e dos ajustes
     planilha-parcial.ts     planejamento da terceira planilha
     frequencia.ts           regras puras de frequência, justificativas e saídas
     relatorios.ts           indicadores e relatórios derivados
@@ -120,6 +126,7 @@ src/
     usuarios.ts             política de senha, papéis e rótulos
   application/
     frequencia-parcial.ts   salvar, consultar, confirmar e remover com revisão
+    frequencia-personalizada.ts   compor a base diária com os ajustes existentes
     planilha-parcial.ts     preparar a aba, simular e enviar registros parciais
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas

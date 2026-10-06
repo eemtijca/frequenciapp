@@ -15,7 +15,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
 | `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
-| `frequencias_parciais`        | Presença parcial por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.        |
+| `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.  |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
 | `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
 | `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.       |
@@ -80,11 +80,13 @@ A migração `20260930005502_entradas_atrasadas` cria apenas a tabela `entradas_
 
 `frequencias_parciais` tem unicidade de (aluno, dia), independente de `frequencias` e `faltas`. O aluno usa exclusão em cascata; a turma histórica usa `ON DELETE RESTRICT`. Nome do aluno e rótulo da turma são guardados no registro e não mudam depois de transferência ou renomeação. Autoria e responsável pela confirmação usam `ON DELETE SET NULL`, preservando nomes históricos.
 
-`tipo` aceita `TURNO` ou `AULAS`. Um turno exige `MANHA` ou `TARDE` e lista de aulas vazia; aulas específicas exigem turno nulo e inteiros distintos entre 1 e 30, em ordem crescente. Observações têm até 300 caracteres. A aplicação valida calendário e data futura; revisão positiva protege salvamento, confirmação e exclusão concorrentes. Corrigir conteúdo incrementa a revisão e limpa a confirmação da Seduc. Confirmar ou reabrir também incrementa a revisão.
+`tipo` aceita `DIA_INTEIRO`, `TURNO` ou `AULAS`. Dia inteiro exige turno nulo e lista de aulas vazia; um turno exige `MANHA` ou `TARDE` e lista de aulas vazia; aulas específicas exigem turno nulo e inteiros distintos entre 1 e 30, em ordem crescente. Observações têm até 300 caracteres. A aplicação valida calendário e data futura; revisão positiva protege salvamento, confirmação e exclusão concorrentes. Corrigir conteúdo incrementa a revisão e limpa a confirmação da Seduc. Confirmar ou reabrir também incrementa a revisão.
 
 A migração acrescenta somente o modelo e a finalidade `PARCIAL`, sem reescrever chamadas normais. A cópia JSON versão 1 inclui o campo opcional `frequenciasParciais`: preserva identidade, nomes históricos, revisão, datas e confirmação. Cópias anteriores continuam válidas. Na importação, qualquer identidade ou par (aluno, dia) já existente impede sobrescrita; divergências e referências ausentes entram na contagem de conflitos. Contas históricas inexistentes ficam nulas e seus nomes são preservados. Conexões OAuth continuam fora da cópia.
 
-Detalhes na [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md).
+A migração `20261005202238_presenca_dia_inteiro` acrescenta somente `DIA_INTEIRO` ao enum existente, sem copiar dados nem remover confirmações. A consulta da Chamada Parcial combina `frequencias`, `alunos_chamada` e `frequencias_parciais`: a personalização prevalece por aluno e dia. A base diária continua nas tabelas originais e não ganha uma linha parcial. Remover a personalização limpa as confirmações do aluno no dia em `alunos_chamada`, exigindo reconferência sem alterar faltas ou revisão da chamada. A cópia JSON versão 1 aceita o novo tipo e continua aceitando arquivos anteriores.
+
+Detalhes na [ADR-034](adr/034-chamada-parcial-e-confirmacao-seduc.md) e no [adendo da ADR-035](adr/035-seduc-na-chamada-normal.md#adendo-2026-10-05).
 
 ## Conexões
 
@@ -171,4 +173,4 @@ A migração `saida_horario` acrescenta `saidas_antecipadas.horario` (`VARCHAR(5
 
 A migração `20261003011539_confirmacao_seduc_chamada` acrescenta confirmação, data, nome e referência do responsável e revisão própria a `alunos_chamada`. As chamadas existentes começam sem confirmação. A chave composta de frequência e aluno mantém a confirmação vinculada à lista histórica, independente da presença ou falta. Remover a conta preserva o nome do responsável, com a referência anulada.
 
-A operação usa transação serializável e confere tanto a revisão da frequência como `revisao_seduc`. Corrigir a frequência invalida apenas os alunos afetados. A revisão e o horário da chamada não mudam ao confirmar a Seduc. Detalhes na [ADR-035](adr/035-seduc-na-chamada-normal.md).
+A operação usa transação serializável e confere tanto a revisão da frequência como `revisao_seduc`. Corrigir a frequência invalida apenas os alunos afetados. A revisão e o horário da chamada não mudam ao confirmar a Seduc. A interface de confirmação fica na Chamada Parcial; os dados existentes continuam nesta tabela quando não há personalização. Uma personalização ou outra chamada mais recente usada como base impede confirmar a versão diária anterior. Detalhes na [ADR-035](adr/035-seduc-na-chamada-normal.md).

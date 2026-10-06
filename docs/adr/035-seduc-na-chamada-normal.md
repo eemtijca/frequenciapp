@@ -22,3 +22,11 @@ Um estado apenas no navegador não sobreviveria à troca de dispositivo. Usar a 
 ## Consequências
 
 A migração é aditiva: alunos de chamadas antigas começam sem confirmação. Administração e coordenação podem confirmar; diretores mantêm suas permissões de consulta. Correções exigem conferência somente dos alunos afetados. A exclusão da conta responsável anula a referência, preservando nome e data históricos.
+
+## Adendo 2026-10-05
+
+A conferência da Seduc passa a ficar somente na Chamada Parcial. A decisão de exibir a chave na Chamada normal fica substituída; armazenamento, autoria, revisão própria e cópias existentes permanecem compatíveis.
+
+A lista efetiva combina a chamada salva com personalizações por aluno e dia. Presentes da base aparecem como Dia inteiro; F, FJ e S preservam a situação registrada, sem presumir presença em dias não salvos. Um ajuste por dia inteiro, turno ou aulas prevalece antes do filtro de turma e exige confirmação própria. Ao personalizar a partir da base, a revisão da chamada protege a criação concorrente e sua turma é preservada. Remover o ajuste volta à base disponível com RS pendente. Faltas e indicadores da coordenação não são alterados.
+
+A terceira planilha usa essa lista e o código estável `chamada:<alunoId>:<dia>`, reconhecendo UUIDs antigos sem duplicar linhas. A migração acrescenta apenas `DIA_INTEIRO` ao enum; não copia frequências nem apaga confirmações anteriores. A consulta antiga de parciais continua retornando somente os ajustes gravados.

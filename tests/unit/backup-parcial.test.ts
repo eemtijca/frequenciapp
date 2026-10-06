@@ -80,9 +80,37 @@ function copia() {
 beforeEach(() => {
   vi.clearAllMocks();
   dados.parcial.dia = new Date("2026-06-15T00:00:00Z");
+  dados.parcial.tipo = "AULAS";
+  dados.parcial.aulas = [2, 3];
 });
 
 describe("restauração idêntica da chamada parcial", () => {
+  it("reconhece dia inteiro e preserva a confirmação na cópia", async () => {
+    dados.parcial.tipo = "DIA_INTEIRO";
+    dados.parcial.aulas = [];
+    await expect(importarCopia({ id: dados.serie.id }, copia())).resolves.toEqual({
+      adicionadas: 0,
+      identicas: 4,
+      conflitos: 0,
+    });
+    expect(transacao.frequenciaParcial.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { turno: "MANHA", aulas: [] },
+    { turno: null, aulas: [1] },
+  ])("recusa dia inteiro combinado com turno ou aulas: %j", async (mudanca) => {
+    const invalida = copia();
+    const registro = invalida.frequenciasParciais[0];
+    if (!registro) throw new Error("Registro sintético ausente.");
+    Object.assign(registro, { tipo: "DIA_INTEIRO", ...mudanca });
+    await expect(importarCopia({ id: dados.serie.id }, invalida)).rejects.toThrow(
+      "A cópia não está no formato do FrequenciApp.",
+    );
+    expect(transacao.frequenciaParcial.findMany).not.toHaveBeenCalled();
+    expect(transacao.frequenciaParcial.create).not.toHaveBeenCalled();
+  });
+
   it("reconhece o mesmo dia civil retornado como meia-noite pelo banco", async () => {
     await expect(importarCopia({ id: dados.serie.id }, copia())).resolves.toEqual({
       adicionadas: 0,

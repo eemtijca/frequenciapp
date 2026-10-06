@@ -1,6 +1,7 @@
 // Planejamento da chamada parcial com conflitos e células preservadas.
 import { describe, expect, it } from "vitest";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
+import type { FrequenciaDaChamada, RegistroPersonalizado } from "@/domain/frequencia-personalizada";
 import { assinarAba, type LeituraAba } from "@/domain/planilha";
 import { ABA_PARCIAL, CABECALHO_PARCIAL, planejarParciais } from "@/domain/planilha-parcial";
 
@@ -33,14 +34,40 @@ function leitura(valores: string[][] = [CABECALHO_PARCIAL], formula: boolean[][]
   };
 }
 
-function valoresExportados(registro: FrequenciaParcial = frequencia): string[] {
+function codigo(registro: RegistroPersonalizado = frequencia): string {
+  return `chamada:${registro.alunoId}:${registro.dia}`;
+}
+
+function valoresExportados(registro: RegistroPersonalizado = frequencia): string[] {
   return (
     planejarParciais([registro], leitura(), []).criar[0]?.celulas.map((item) => item.valor) ?? []
   );
 }
 
+function chamada(alteracoes: Partial<FrequenciaDaChamada> = {}): FrequenciaDaChamada {
+  return {
+    id: codigo(),
+    tipo: "CHAMADA",
+    alunoId: frequencia.alunoId,
+    dia: frequencia.dia,
+    turmaId: frequencia.turmaId,
+    alunoNome: frequencia.alunoNome,
+    turmaNome: frequencia.turmaNome,
+    marca: "P",
+    descricao: "Dia inteiro",
+    registradoSeduc: false,
+    registradoSeducEm: null,
+    registradoSeducPorNome: null,
+    revisao: 3,
+    revisaoSeduc: 1,
+    criadoEm: frequencia.criadoEm,
+    atualizadoEm: frequencia.atualizadoEm,
+    ...alteracoes,
+  };
+}
+
 describe("planilha da chamada parcial", () => {
-  it("propõe registro completo com data brasileira e código independente do aluno", () => {
+  it("propõe registro completo com data brasileira e código estável por aluno e dia", () => {
     const plano = planejarParciais([frequencia], leitura(), []);
     expect(plano.bloqueado).toBe(false);
     expect(plano.aba).toBe("Chamada Parcial");
@@ -48,17 +75,9 @@ describe("planilha da chamada parcial", () => {
       {
         linha: 2,
         nome: "QA Aluno",
-        celulas: [
-          "02/10/2026",
-          "QA Aluno",
-          "QA Ano A",
-          "Manhã",
-          "Não",
-          "",
-          "",
-          frequencia.id,
-          "1",
-        ].map((valor, indice) => ({ coluna: indice + 1, valor })),
+        celulas: ["02/10/2026", "QA Aluno", "QA Ano A", "Manhã", "Não", "", "", codigo(), "1"].map(
+          (valor, indice) => ({ coluna: indice + 1, valor }),
+        ),
       },
     ]);
     expect(plano.existentes).toBe(0);
@@ -82,7 +101,7 @@ describe("planilha da chamada parcial", () => {
       "Sim",
       "2026-10-02T18:30:00.000Z",
       "Presença apenas no segundo turno",
-      frequencia.id,
+      codigo(),
       "2",
     ]);
   });
@@ -93,8 +112,24 @@ describe("planilha da chamada parcial", () => {
     expect(registro.aulas).toEqual([5, 3, 4]);
   });
 
-  it("não confunde alunos homônimos ou registros distintos do mesmo aluno", () => {
-    const segundo = { ...frequencia, id: "00000000-0000-4000-8000-000000000004" };
+  it("exporta dia inteiro sem presumir aulas e reconhece o reenvio idêntico", () => {
+    const registro = { ...frequencia, tipo: "DIA_INTEIRO" as const, turno: null, aulas: [] };
+    const valores = valoresExportados(registro);
+    expect(valores[3]).toBe("Dia inteiro");
+    const plano = planejarParciais([registro], leitura([CABECALHO_PARCIAL, valores]), []);
+    expect(plano.bloqueado).toBe(false);
+    expect(plano.existentes).toBe(1);
+    expect(plano.divergentes).toBe(0);
+    expect(plano.criar).toEqual([]);
+    expect(plano.atualizar).toEqual([]);
+  });
+
+  it("não confunde alunos homônimos com identificadores diferentes", () => {
+    const segundo = {
+      ...frequencia,
+      id: "00000000-0000-4000-8000-000000000004",
+      alunoId: "00000000-0000-4000-8000-000000000004",
+    };
     const terceiro = {
       ...frequencia,
       id: "00000000-0000-4000-8000-000000000005",
@@ -103,9 +138,9 @@ describe("planilha da chamada parcial", () => {
     const plano = planejarParciais([terceiro, segundo, frequencia], leitura(), []);
     expect(plano.criar).toHaveLength(3);
     expect(plano.criar.map((linha) => linha.celulas[7]?.valor)).toEqual([
-      frequencia.id,
-      segundo.id,
-      terceiro.id,
+      codigo(),
+      codigo(segundo),
+      codigo(terceiro),
     ]);
   });
 
@@ -144,6 +179,178 @@ describe("planilha da chamada parcial", () => {
     expect(plano.atualizar).toEqual([]);
   });
 
+  it("exporta presença e faltas da Chamada com a revisão da origem e da confirmação", () => {
+    for (const registro of [
+      chamada(),
+      chamada({ marca: "F", descricao: "Falta na Chamada" }),
+      chamada({ marca: "FJ", descricao: "Falta justificada na Chamada" }),
+      chamada({ marca: "S", descricao: "Falta na 4ª aula da Chamada" }),
+    ]) {
+      const valores = valoresExportados(registro);
+      expect(valores[3]).toBe(registro.descricao);
+      expect(valores[7]).toBe(codigo());
+      expect(valores[8]).toBe("chamada:3:seduc:1");
+      expect(planejarParciais([registro], leitura([CABECALHO_PARCIAL, valores]), [])).toMatchObject(
+        { bloqueado: false, existentes: 1, criar: [], atualizar: [] },
+      );
+    }
+  });
+
+  it("substitui a base pela personalização e volta à base na mesma linha", () => {
+    const dados = {
+      ...leitura([CABECALHO_PARCIAL, valoresExportados(chamada())]),
+      linhasCriadas: [2],
+    };
+    expect(planejarParciais([frequencia], dados, []).bloqueado).toBe(true);
+    const personalizada = planejarParciais([frequencia], dados, [], true);
+    expect(personalizada).toMatchObject({ bloqueado: false, existentes: 1, criar: [] });
+    expect(personalizada.atualizar).toHaveLength(1);
+    expect(personalizada.atualizar[0]?.codigo).toBe(codigo());
+    expect(personalizada.atualizar[0]?.celulas).toContainEqual({ coluna: 4, valor: "Manhã" });
+    const restaurada = planejarParciais(
+      [chamada()],
+      { ...dados, valores: [CABECALHO_PARCIAL, valoresExportados()] },
+      [],
+      true,
+    );
+    expect(restaurada).toMatchObject({ bloqueado: false, existentes: 1, criar: [] });
+    expect(restaurada.atualizar[0]?.celulas).toContainEqual({ coluna: 4, valor: "Dia inteiro" });
+  });
+
+  it("reconhece UUID legado e preserva seu código ao atualizar a personalização", () => {
+    const legado = valoresExportados();
+    legado[7] = frequencia.id;
+    const dados = { ...leitura([CABECALHO_PARCIAL, legado]), linhasCriadas: [2] };
+    expect(planejarParciais([frequencia], dados, [])).toMatchObject({
+      bloqueado: false,
+      existentes: 1,
+      criar: [],
+      atualizar: [],
+    });
+    const plano = planejarParciais(
+      [{ ...frequencia, registradoSeduc: true, revisao: 2 }],
+      dados,
+      [],
+      true,
+    );
+    expect(plano.atualizar[0]?.codigo).toBe(frequencia.id);
+    expect(plano.atualizar[0]?.celulas.some((celula) => celula.coluna === 8)).toBe(false);
+    expect(plano.criar).toEqual([]);
+  });
+
+  it("bloqueia duplicata entre código canônico e UUID legado", () => {
+    const legado = valoresExportados();
+    legado[7] = frequencia.id;
+    const plano = planejarParciais(
+      [frequencia],
+      { ...leitura([CABECALHO_PARCIAL, valoresExportados(), legado]), linhasCriadas: [2, 3] },
+      [],
+      true,
+    );
+    expect(plano).toMatchObject({ bloqueado: true, divergentes: 1, criar: [], atualizar: [] });
+  });
+
+  it("preserva o UUID de ajuste excluído sem duplicar a base pelo nome e data", () => {
+    const legado = valoresExportados();
+    legado[7] = frequencia.id;
+    const dados = { ...leitura([CABECALHO_PARCIAL, legado]), linhasCriadas: [2] };
+    const anterior = structuredClone(dados);
+    expect(planejarParciais([chamada()], dados, [], true)).toMatchObject({
+      bloqueado: false,
+      pendentesManuais: 1,
+      criar: [],
+      atualizar: [],
+    });
+    expect(dados).toEqual(anterior);
+  });
+
+  it("não duplica ajuste legado excluído quando o nome do aluno mudou", () => {
+    const legado = valoresExportados();
+    legado[7] = frequencia.id;
+    const dados = { ...leitura([CABECALHO_PARCIAL, legado]), linhasCriadas: [2] };
+    const anterior = structuredClone(dados);
+    const plano = planejarParciais([chamada({ alunoNome: "QA Nome atualizado" })], dados, [], true);
+    expect(plano).toMatchObject({
+      bloqueado: false,
+      pendentesManuais: 1,
+      criar: [],
+      atualizar: [],
+    });
+    expect(plano.avisos[0]).toContain("registro antigo sem correspondência");
+    expect(dados).toEqual(anterior);
+  });
+
+  it("reserva apenas turma e dia do UUID órfão e mantém atualizações reconhecidas", () => {
+    const legado = valoresExportados();
+    legado[7] = frequencia.id;
+    const outro = {
+      ...frequencia,
+      id: "00000000-0000-4000-8000-000000000004",
+      alunoId: "00000000-0000-4000-8000-000000000005",
+      alunoNome: "QA Outro aluno",
+    };
+    const dados = {
+      ...leitura([CABECALHO_PARCIAL, legado, valoresExportados(outro)]),
+      linhasCriadas: [2, 3],
+    };
+    const outraTurma = chamada({
+      id: "chamada:00000000-0000-4000-8000-000000000006:2026-10-02",
+      alunoId: "00000000-0000-4000-8000-000000000006",
+      alunoNome: "QA Outro aluno de outra turma",
+      turmaNome: "QA Ano B",
+    });
+    const outroDia = chamada({
+      id: "chamada:00000000-0000-4000-8000-000000000002:2026-10-03",
+      dia: "2026-10-03",
+      alunoNome: "QA Nome atualizado",
+    });
+    const plano = planejarParciais(
+      [
+        chamada({ alunoNome: "QA Nome atualizado" }),
+        { ...outro, registradoSeduc: true, revisao: 2 },
+        outraTurma,
+        outroDia,
+      ],
+      dados,
+      [],
+      true,
+    );
+    expect(plano).toMatchObject({ bloqueado: false, pendentesManuais: 1, existentes: 1 });
+    expect(plano.criar).toHaveLength(2);
+    expect(plano.criar.map((linha) => linha.celulas[7]?.valor)).toEqual([
+      codigo(outraTurma),
+      codigo(outroDia),
+    ]);
+    expect(plano.atualizar).toHaveLength(1);
+    expect(plano.atualizar[0]?.linha).toBe(3);
+    expect(plano.atualizar[0]?.celulas).toContainEqual({ coluna: 5, valor: "Sim" });
+  });
+
+  it("invalida a prévia e exige confirmação quando somente a revisão Seduc da base muda", () => {
+    const registro = chamada();
+    const alterado = chamada({ revisaoSeduc: 2 });
+    const dados = {
+      ...leitura([CABECALHO_PARCIAL, valoresExportados(registro)]),
+      linhasCriadas: [2],
+    };
+    expect(planejarParciais([registro], dados, []).planoHash).not.toBe(
+      planejarParciais([alterado], dados, []).planoHash,
+    );
+    expect(planejarParciais([alterado], dados, []).bloqueado).toBe(true);
+    expect(planejarParciais([alterado], dados, [], true).atualizar[0]?.celulas).toEqual([
+      { coluna: 9, valor: "chamada:3:seduc:2" },
+    ]);
+  });
+
+  it("bloqueia base e personalização repetidas para o mesmo aluno e dia", () => {
+    expect(planejarParciais([chamada(), frequencia], leitura(), [])).toMatchObject({
+      bloqueado: true,
+      divergentes: 2,
+      criar: [],
+      atualizar: [],
+    });
+  });
+
   it("bloqueia todo envio quando confirmação ou revisão diverge, preservando a linha", () => {
     const valores = [CABECALHO_PARCIAL, valoresExportados()];
     const anterior = structuredClone(valores);
@@ -154,7 +361,14 @@ describe("planilha da chamada parcial", () => {
       revisao: 2,
     };
     const plano = planejarParciais(
-      [alterada, { ...frequencia, id: "00000000-0000-4000-8000-000000000004" }],
+      [
+        alterada,
+        {
+          ...frequencia,
+          id: "00000000-0000-4000-8000-000000000004",
+          alunoId: "00000000-0000-4000-8000-000000000004",
+        },
+      ],
       leitura(valores),
       [],
     );
@@ -196,7 +410,7 @@ describe("planilha da chamada parcial", () => {
       {
         linha: 2,
         nome: frequencia.alunoNome,
-        codigo: frequencia.id,
+        codigo: codigo(),
         anteriores: valoresExportados(),
         celulas: [
           { coluna: 5, valor: "Sim" },
@@ -247,7 +461,11 @@ describe("planilha da chamada parcial", () => {
   });
 
   it("descarta atualizações autorizadas se outro registro tem conflito inseguro", () => {
-    const segundo = { ...frequencia, id: "00000000-0000-4000-8000-000000000004" };
+    const segundo = {
+      ...frequencia,
+      id: "00000000-0000-4000-8000-000000000004",
+      alunoId: "00000000-0000-4000-8000-000000000004",
+    };
     const dados = {
       ...leitura([CABECALHO_PARCIAL, valoresExportados(), valoresExportados(segundo)]),
       linhasCriadas: [2],
@@ -256,7 +474,11 @@ describe("planilha da chamada parcial", () => {
       [
         { ...frequencia, registradoSeduc: true, revisao: 2 },
         { ...segundo, registradoSeduc: true, revisao: 2 },
-        { ...frequencia, id: "00000000-0000-4000-8000-000000000005" },
+        {
+          ...frequencia,
+          id: "00000000-0000-4000-8000-000000000005",
+          alunoId: "00000000-0000-4000-8000-000000000005",
+        },
       ],
       dados,
       [],
@@ -302,7 +524,14 @@ describe("planilha da chamada parcial", () => {
 
   it("preserva fórmula extra de registro existente sem impedir outras linhas", () => {
     const plano = planejarParciais(
-      [frequencia, { ...frequencia, id: "00000000-0000-4000-8000-000000000004" }],
+      [
+        frequencia,
+        {
+          ...frequencia,
+          id: "00000000-0000-4000-8000-000000000004",
+          alunoId: "00000000-0000-4000-8000-000000000004",
+        },
+      ],
       leitura(
         [CABECALHO_PARCIAL, valoresExportados()],
         [[], [...Array<boolean>(9).fill(false), true]],
@@ -324,6 +553,7 @@ describe("planilha da chamada parcial", () => {
           {
             ...frequencia,
             id: "00000000-0000-4000-8000-000000000004",
+            alunoId: "00000000-0000-4000-8000-000000000004",
             alunoNome: "QA Outro aluno",
           },
         ],

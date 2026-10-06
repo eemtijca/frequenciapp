@@ -118,6 +118,10 @@ beforeAll(async () => {
     "Desistente",
     "Isolamento",
     "Remocao",
+    "Dia inteiro",
+    "Base diária",
+    "Base transferido",
+    "Fora da base",
   ].entries()) {
     const resultado = await banco.query<{ id: string }>(
       "insert into alunos (nome, turma_id, turma_original_id, ordem) values ($1, $2, $2, $3) returning id",
@@ -177,6 +181,8 @@ describe("frequências parciais", () => {
       { tipo: "AULAS", aulas: [1] },
       { tipo: "AULAS", turno: null, aulas: [0] },
       { tipo: "AULAS", turno: null, aulas: [31] },
+      { tipo: "DIA_INTEIRO" },
+      { tipo: "DIA_INTEIRO", turno: null, aulas: [1] },
       { observacao: "a".repeat(301) },
       { revisao: -1 },
       { registradoSeduc: true },
@@ -255,6 +261,220 @@ describe("frequências parciais", () => {
       ).status,
     ).toBe(409);
   });
+
+  it("persiste dia inteiro, confirma na Seduc e invalida a confirmação após mudar a presença", async () => {
+    const dados = {
+      alunoId: alunoDe("Dia inteiro"),
+      turmaId: turma,
+      dia: "2026-06-19",
+      tipo: "DIA_INTEIRO",
+    };
+    const criada = await salvar(dados);
+    expect(criada).toMatchObject({ tipo: "DIA_INTEIRO", turno: null, aulas: [], revisao: 1 });
+    expect(await listar(`dia=${dados.dia}&turmaId=${turma}`)).toEqual([criada]);
+    const confirmada = await confirmar(criada, true);
+    expect(confirmada.registradoSeduc).toBe(true);
+    expect(await salvar({ ...dados, revisao: confirmada.revisao })).toEqual(confirmada);
+    const parcial = await salvar({
+      ...dados,
+      tipo: "AULAS",
+      aulas: [2, 3],
+      revisao: confirmada.revisao,
+    });
+    expect(parcial).toMatchObject({
+      tipo: "AULAS",
+      aulas: [2, 3],
+      registradoSeduc: false,
+      registradoSeducEm: null,
+      registradoSeducPorNome: null,
+      revisao: 3,
+    });
+    expect(
+      (await chamar("/api/frequencias-parciais", "POST", { ...dados, revisao: confirmada.revisao }))
+        .status,
+    ).toBe(409);
+    const parcialConfirmada = await confirmar(parcial, true);
+    const integral = await salvar({ ...dados, revisao: parcialConfirmada.revisao });
+    expect(integral).toMatchObject({
+      tipo: "DIA_INTEIRO",
+      turno: null,
+      aulas: [],
+      registradoSeduc: false,
+      registradoSeducEm: null,
+      registradoSeducPorNome: null,
+      revisao: 5,
+    });
+    expect(
+      (
+        await banco.query("select id from frequencias where turma_id = $1 and dia = $2::date", [
+          turma,
+          dados.dia,
+        ])
+      ).rows,
+    ).toHaveLength(0);
+  });
+
+  it("confere a base antes de personalizar e pede nova confirmação ao retornar à chamada", async () => {
+    const dia = "2026-06-20";
+    const { rows } = await banco.query<{ id: string; atualizado_em: Date }>(
+      "insert into frequencias (turma_id, dia, revisao, atualizado_em) values ($1, $2, 2, now()) returning id, atualizado_em",
+      [turma, dia],
+    );
+    const base = rows[0];
+    if (!base) throw new Error("Chamada sintética ausente.");
+    await banco.query(
+      "insert into alunos_chamada (frequencia_id, aluno_id, registrado_seduc, registrado_seduc_em, registrado_seduc_por_nome, revisao_seduc) select $1, unnest($2::uuid[]), true, now(), 'QA Conferência anterior', 7",
+      [base.id, [alunoDe("Base diária"), alunoDe("Base transferido")]],
+    );
+    const dados = {
+      alunoId: alunoDe("Base diária"),
+      turmaId: turma,
+      dia,
+      tipo: "AULAS",
+      aulas: [2, 3],
+      baseChamada: { turmaId: turma, revisao: 2 },
+    };
+    for (const mudanca of [
+      { baseChamada: { turmaId: turma, revisao: 1 } },
+      { baseChamada: { turmaId: outraTurma, revisao: 2 } },
+      { turmaId: outraTurma },
+      { dia: "2026-06-21" },
+      { alunoId: alunoDe("Fora da base") },
+    ])
+      expect(
+        (await chamar("/api/frequencias-parciais", "POST", { ...dados, ...mudanca })).status,
+      ).toBe(409);
+    const criada = await salvar(dados);
+    const confirmada = await confirmar(criada, true);
+    expect(
+      (
+        await banco.query(
+          "select registrado_seduc, revisao_seduc from alunos_chamada where frequencia_id = $1 and aluno_id = $2",
+          [base.id, dados.alunoId],
+        )
+      ).rows,
+    ).toEqual([{ registrado_seduc: true, revisao_seduc: 7 }]);
+    expect(
+      (
+        await chamar(`/api/frequencias-parciais/${confirmada.id}`, "DELETE", {
+          revisao: confirmada.revisao,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await banco.query(
+          "select registrado_seduc, registrado_seduc_em, registrado_seduc_por_nome, revisao_seduc from alunos_chamada where frequencia_id = $1 and aluno_id = $2",
+          [base.id, dados.alunoId],
+        )
+      ).rows,
+    ).toEqual([
+      {
+        registrado_seduc: false,
+        registrado_seduc_em: null,
+        registrado_seduc_por_nome: null,
+        revisao_seduc: 8,
+      },
+    ]);
+    expect(
+      (await banco.query("select revisao, atualizado_em from frequencias where id = $1", [base.id]))
+        .rows,
+    ).toEqual([{ revisao: 2, atualizado_em: base.atualizado_em }]);
+
+    const transferido = alunoDe("Base transferido");
+    await banco.query(
+      "update alunos set turma_id = $1, ativo = false, desistente_em = '2026-06-20' where id = $2",
+      [outraTurma, transferido],
+    );
+    expect(await salvar({ ...dados, alunoId: transferido })).toMatchObject({
+      turmaId: turma,
+      turmaNome: `${prefixo} A`,
+      alunoNome: `${prefixo} Base transferido`,
+      aulas: [2, 3],
+    });
+    expect(
+      (
+        await chamar("/api/frequencias-parciais", "POST", {
+          alunoId: transferido,
+          turmaId: outraTurma,
+          dia: "2026-06-21",
+          tipo: "DIA_INTEIRO",
+        })
+      ).status,
+    ).toBe(409);
+  });
+
+  it.each([
+    { dia: "2026-06-22", empate: false },
+    { dia: "2026-06-23", empate: true },
+  ])(
+    "recusa base superada e invalida revisão Seduc mesmo sem confirmação: %j",
+    async ({ dia, empate }) => {
+      const alunoId = alunoDe("Base diária");
+      const [vigenteId, anteriorId] = [randomUUID(), randomUUID()].sort();
+      if (!vigenteId || !anteriorId) throw new Error("Identificadores sintéticos ausentes.");
+      await banco.query(
+        "insert into frequencias (id, turma_id, dia, revisao, atualizado_em) values ($1, $2, $3, 1, $4), ($5, $6, $3, 1, '2026-06-23T12:00:00Z')",
+        [
+          anteriorId,
+          turma,
+          dia,
+          empate ? "2026-06-23T12:00:00Z" : "2026-06-23T11:00:00Z",
+          vigenteId,
+          outraTurma,
+        ],
+      );
+      await banco.query(
+        "insert into alunos_chamada (frequencia_id, aluno_id) select unnest($1::uuid[]), $2",
+        [[anteriorId, vigenteId], alunoId],
+      );
+      const dados = {
+        alunoId,
+        turmaId: turma,
+        dia,
+        tipo: "AULAS",
+        aulas: [2, 3],
+        baseChamada: { turmaId: turma, revisao: 1 },
+      };
+      expect((await chamar("/api/frequencias-parciais", "POST", dados)).status).toBe(409);
+      const personalizada = await salvar({
+        ...dados,
+        turmaId: outraTurma,
+        baseChamada: { turmaId: outraTurma, revisao: 1 },
+      });
+      expect(personalizada.turmaId).toBe(outraTurma);
+      expect(
+        (
+          await chamar(`/api/frequencias-parciais/${personalizada.id}`, "DELETE", {
+            revisao: personalizada.revisao,
+          })
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await banco.query(
+            "select frequencia_id, registrado_seduc, revisao_seduc from alunos_chamada where aluno_id = $1 and frequencia_id = any($2::uuid[]) order by frequencia_id",
+            [alunoId, [anteriorId, vigenteId]],
+          )
+        ).rows,
+      ).toEqual([
+        { frequencia_id: vigenteId, registrado_seduc: false, revisao_seduc: 1 },
+        { frequencia_id: anteriorId, registrado_seduc: false, revisao_seduc: 1 },
+      ]);
+      expect(
+        (
+          await chamar("/api/frequencias/seduc", "POST", {
+            dia,
+            turmaId: outraTurma,
+            alunoId,
+            registrado: true,
+            revisao: 1,
+            revisaoSeduc: 0,
+          })
+        ).status,
+      ).toBe(409);
+    },
+  );
 
   it("confirma manualmente na Seduc, preserva autoria em no-op e permite reabrir", async () => {
     const dados = {

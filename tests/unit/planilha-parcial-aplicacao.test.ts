@@ -19,7 +19,9 @@ vi.mock("@/application/planilha-comum", () => ({
   chamarIntegracao: dubl.chamar,
   emSequencia: async (tarefa: () => Promise<unknown>) => tarefa(),
 }));
-vi.mock("@/application/frequencia-parcial", () => ({ listarFrequenciasParciais: dubl.listar }));
+vi.mock("@/application/frequencia-personalizada", () => ({
+  listarFrequenciasPersonalizadas: dubl.listar,
+}));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
     integracaoPlanilha: {
@@ -53,6 +55,7 @@ let arquivo = "arquivo-parcial";
 let valores: string[][] = [];
 let registros: {
   id: string;
+  alunoId: string;
   dia: string;
   alunoNome: string;
   turmaNome: string;
@@ -71,6 +74,7 @@ beforeEach(() => {
   registros = [
     {
       id: "00000000-0000-4000-8000-000000000001",
+      alunoId: "00000000-0000-4000-8000-000000000002",
       dia: periodo.de,
       alunoNome: "QA Aluno",
       turmaNome: "QA Ano A",

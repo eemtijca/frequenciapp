@@ -1,4 +1,4 @@
-// Registro independente de presenças parciais, com revisão otimista e
+// Registro independente de presenças personalizadas, com revisão otimista e
 // confirmação manual do lançamento na Seduc invalidada após uma correção.
 import { z } from "zod";
 import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
@@ -21,7 +21,10 @@ export const esquemaRegistroParcial = z
     alunoId: z.uuid("Aluno inválido."),
     turmaId: z.uuid("Turma inválida.").optional(),
     dia: z.string().refine(ehDiaValido, "Data inválida."),
-    tipo: z.enum(["TURNO", "AULAS"], "Escolha o turno ou as aulas frequentadas."),
+    tipo: z.enum(
+      ["DIA_INTEIRO", "TURNO", "AULAS"],
+      "Escolha o dia inteiro, turno ou as aulas frequentadas.",
+    ),
     turno: z.enum(["MANHA", "TARDE"]).nullable().optional(),
     aulas: z
       .array(z.number().int().min(1).max(LIMITE_AULAS_PARCIAL))
@@ -29,9 +32,18 @@ export const esquemaRegistroParcial = z
       .default([]),
     observacao: z.string().trim().max(LIMITE_OBSERVACAO_PARCIAL).nullable().optional(),
     revisao: z.number().int().min(0).optional(),
+    baseChamada: z
+      .object({ turmaId: z.uuid("Turma inválida."), revisao: z.number().int().min(1) })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((dados, ctx) => {
+    if (dados.tipo === "DIA_INTEIRO" && (dados.turno || dados.aulas.length))
+      ctx.addIssue({
+        code: "custom",
+        message: "Escolha o dia inteiro, sem combinar com turno ou aulas.",
+      });
     if (dados.tipo === "TURNO" && (!dados.turno || dados.aulas.length))
       ctx.addIssue({
         code: "custom",
@@ -151,29 +163,63 @@ export async function salvarFrequenciaParcial(
       }
       if (dados.data.revisao !== undefined && dados.data.revisao !== 0)
         throw new ErroHttp("O registro foi removido. Recarregue a lista antes de salvar.", 409);
+      const base = dados.data.baseChamada
+        ? await tx.frequencia.findUnique({
+            where: { turmaId_dia: { turmaId: dados.data.baseChamada.turmaId, dia } },
+            include: {
+              turma: { include: { serie: true } },
+              alunos: { where: { alunoId: dados.data.alunoId }, select: { alunoId: true } },
+            },
+          })
+        : null;
+      if (
+        dados.data.baseChamada &&
+        (!base ||
+          base.revisao !== dados.data.baseChamada.revisao ||
+          base.alunos.length !== 1 ||
+          (dados.data.turmaId && dados.data.turmaId !== base.turmaId))
+      )
+        throw new ErroHttp(
+          "A chamada do dia mudou. Recarregue a lista antes de personalizar.",
+          409,
+        );
+      if (base) {
+        const vigente = await tx.frequencia.findFirst({
+          where: { dia, alunos: { some: { alunoId: dados.data.alunoId } } },
+          orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+          select: { id: true },
+        });
+        if (vigente?.id !== base.id)
+          throw new ErroHttp(
+            "A chamada usada como base mudou. Recarregue a lista antes de personalizar.",
+            409,
+          );
+      }
       const aluno = await tx.aluno.findUnique({
         where: { id: dados.data.alunoId },
         include: { turma: { include: { serie: true } } },
       });
       if (!aluno) throw new ErroHttp("Aluno não encontrado.", 404);
       if (
-        !aluno.ativo ||
-        (aluno.desistenteEm && aluno.desistenteEm.toISOString().slice(0, 10) <= dados.data.dia)
+        !base &&
+        (!aluno.ativo ||
+          (aluno.desistenteEm && aluno.desistenteEm.toISOString().slice(0, 10) <= dados.data.dia))
       )
         throw new ErroHttp("Este aluno está desativado ou desistente nesta data.", 409);
-      if (dados.data.turmaId && dados.data.turmaId !== aluno.turmaId)
+      if (!base && dados.data.turmaId && dados.data.turmaId !== aluno.turmaId)
         throw new ErroHttp(
           "Este aluno mudou de turma. Recarregue a lista antes de registrar.",
           409,
         );
+      const turma = base?.turma ?? aluno.turma;
       const criada = await tx.frequenciaParcial.create({
         data: {
           ...valores,
           alunoId: aluno.id,
           dia,
-          turmaId: aluno.turmaId,
+          turmaId: turma.id,
           alunoNome: aluno.nome,
-          turmaNome: `${aluno.turma.serie.nome} ${aluno.turma.nome}`,
+          turmaNome: `${turma.serie.nome} ${turma.nome}`,
           criadoPorId: identidade.id,
           atualizadoPorId: identidade.id,
         },
@@ -249,6 +295,20 @@ export async function removerFrequenciaParcial(
     if (existente.revisao !== dados.data.revisao)
       throw new ErroHttp("Este registro mudou. Recarregue a lista antes de remover.", 409);
     await tx.frequenciaParcial.delete({ where: { id, revisao: existente.revisao } });
+    // Voltar à presença da chamada exige nova conferência do lançamento na Seduc.
+    await tx.alunoDaChamada.updateMany({
+      where: {
+        alunoId: existente.alunoId,
+        frequencia: { dia: existente.dia },
+      },
+      data: {
+        registradoSeduc: false,
+        registradoSeducEm: null,
+        registradoSeducPorId: null,
+        registradoSeducPorNome: null,
+        revisaoSeduc: { increment: 1 },
+      },
+    });
     await auditar(tx, identidade.id, "parcial.remover", `parcial:${id}`);
   });
 }

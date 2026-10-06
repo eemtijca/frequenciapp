@@ -155,6 +155,8 @@ describe("cópia JSON da chamada parcial", () => {
       { tipo: "TURNO", turno: null, aulas: [] },
       { tipo: "TURNO", turno: "MANHA", aulas: [1] },
       { tipo: "AULAS", turno: "TARDE" },
+      { tipo: "DIA_INTEIRO", turno: "MANHA", aulas: [] },
+      { tipo: "DIA_INTEIRO", turno: null, aulas: [1] },
       { aulas: [] },
       { aulas: [1, 1] },
       { aulas: [3, 2] },
@@ -207,5 +209,38 @@ describe("cópia JSON da chamada parcial", () => {
         atualizado_por_id: null,
       },
     ]);
+  });
+
+  it("restaura e exporta dia inteiro sem criar aulas ou chamada regular", async () => {
+    const dados = novaCopia();
+    const registro = dados.frequenciasParciais?.[0];
+    if (!registro) throw new Error("Registro sintético ausente.");
+    const integralId = randomUUID();
+    Object.assign(registro, {
+      id: integralId,
+      dia: "2026-06-17",
+      tipo: "DIA_INTEIRO",
+      turno: null,
+      aulas: [],
+    });
+    expect((await restaurar(dados)).adicionadas).toBe(1);
+    expect((await restaurar(dados)).conflitos).toBe(0);
+    const exportacao = await chamar("/api/backup/exportar", {
+      senha: process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026",
+    });
+    expect(exportacao.status).toBe(200);
+    const completa = (await exportacao.json()) as CopiaFrequenciapp;
+    expect(completa.frequenciasParciais?.find((item) => item.id === integralId)).toMatchObject({
+      id: integralId,
+      dia: "2026-06-17",
+      tipo: "DIA_INTEIRO",
+      turno: null,
+      aulas: [],
+      registradoSeduc: true,
+      registradoSeducPorNome: "QA Responsável histórico",
+    });
+    expect(
+      (await banco.query("select id from frequencias where turma_id = $1", [turmaId])).rows,
+    ).toHaveLength(0);
   });
 });

@@ -134,6 +134,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await expect(linhas.nth(1).getByText("02", { exact: true })).toBeVisible();
   const primeiro = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const segundo = secao.getByTestId(`parcial-aluno-${segundoAlunoId}`);
+  await expect(primeiro.getByText("Sem registro", { exact: true })).toBeVisible();
   await expect(primeiro.getByRole("switch")).toBeDisabled();
   await expect(segundo.getByRole("switch")).toBeDisabled();
   await expect(
@@ -167,7 +168,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   expect((await registrosDoDia(page)).registros).toHaveLength(1);
 
   await secao.locator("#parcial-filtro").click();
-  await page.getByRole("option", { name: "Sem frequência parcial", exact: true }).click();
+  await page.getByRole("option", { name: "Sem registro", exact: true }).click();
   await expect(primeiro).toBeHidden();
   await expect(segundo).toBeVisible();
   await secao.locator("#parcial-filtro").click();
@@ -227,7 +228,7 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
   const antes = await (
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
   ).json();
-  await linha.getByRole("switch", { name: "Registrado na Seduc: E2E Parcial Um" }).click();
+  await linha.getByRole("switch", { name: "RS, Registrado na Seduc: E2E Parcial Um" }).click();
   await expect(linha.getByRole("switch")).toBeChecked();
   await expect(linha.getByText(/Confirmado por/)).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.registradoSeducEm).not.toBeNull();
@@ -254,6 +255,61 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
   ).json();
   expect(depois).toEqual(antes);
+});
+
+test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajustar para aulas", async ({
+  page,
+}) => {
+  const { secao, dialogo } = await abrirRegistro(page);
+  await dialogo.getByRole("radio", { name: "Dia inteiro", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
+  await expect(linha.getByText("Dia inteiro", { exact: true })).toBeVisible();
+  const salvo = (await registrosDoDia(page)).registros[0];
+  expect(salvo).toMatchObject({
+    tipo: "DIA_INTEIRO",
+    turno: null,
+    aulas: [],
+    registradoSeduc: false,
+  });
+  const dia = salvo?.dia ?? "";
+  const diariaAntes = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
+  expect(diariaAntes.ok()).toBe(true);
+  expect(await diariaAntes.json()).toEqual({ frequencia: null });
+
+  const confirmacao = linha.getByRole("switch", {
+    name: "RS, Registrado na Seduc: E2E Parcial Um",
+    exact: true,
+  });
+  await confirmacao.click();
+  await expect(confirmacao).toBeChecked();
+  await abrirParcial(page);
+  await expect(linha.getByText("Dia inteiro", { exact: true })).toBeVisible();
+  await expect(confirmacao).toBeChecked();
+  await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
+  const editar = page.getByRole("dialog", { name: "Editar frequência parcial", exact: true });
+  await expect(editar.getByRole("radio", { name: "Dia inteiro", exact: true })).toBeChecked();
+  await editar.getByRole("radio", { name: "Por aulas", exact: true }).click();
+  for (const aula of [2, 3])
+    await editar.getByRole("checkbox", { name: `${aula}ª aula frequentada`, exact: true }).click();
+  await expect(
+    editar.getByText("A alteração deixará este registro pendente de conferência na Seduc."),
+  ).toBeVisible();
+  await editar.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
+  await expect(editar).toBeHidden();
+  await expect(linha.getByText("2ª à 3ª aula", { exact: true })).toBeVisible();
+  await expect(confirmacao).not.toBeChecked();
+  expect((await registrosDoDia(page)).registros[0]).toMatchObject({
+    tipo: "AULAS",
+    turno: null,
+    aulas: [2, 3],
+    registradoSeduc: false,
+    registradoSeducEm: null,
+  });
+  const diariaDepois = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
+  expect(diariaDepois.ok()).toBe(true);
+  expect(await diariaDepois.json()).toEqual({ frequencia: null });
 });
 
 test("marca um intervalo e permite retirar aulas específicas antes de salvar", async ({ page }) => {

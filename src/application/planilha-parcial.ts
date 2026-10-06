@@ -1,6 +1,6 @@
 // Terceira planilha Google: prévia e acréscimo conservador das chamadas parciais.
 import { z } from "zod";
-import { listarFrequenciasParciais } from "./frequencia-parcial";
+import { listarFrequenciasPersonalizadas } from "./frequencia-personalizada";
 import {
   chamarIntegracao,
   desconectar,
@@ -174,7 +174,7 @@ async function montarPlano(usuario: { id: string }, entrada: unknown) {
     aba: ABA_PARCIAL,
     cabecalhoLinha: 1,
   });
-  const registros = await listarFrequenciasParciais({
+  const registros = await listarFrequenciasPersonalizadas({
     de: dados.data.de,
     ate: dados.data.ate,
     turmaId: dados.data.turmaId,
