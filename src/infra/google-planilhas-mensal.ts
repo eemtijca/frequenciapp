@@ -1,13 +1,21 @@
 // Abas mensais identificadas por turma e mês, com preparação atômica e idempotente.
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { diasDoMes, rotuloData } from "@/domain/frequencia";
+import { diaDaSemanaIso, diasDoMes, rotuloData } from "@/domain/frequencia";
 import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
-import { mesValido, nomeAbaMensal, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
+import {
+  diasDaPlanilhaMensal,
+  mesValido,
+  nomeAbaMensal,
+  type AbaMensalPlanilha,
+} from "@/domain/planilha-mensal";
 import { ErroHttp } from "./erros";
 import {
   lerDocumentoGoogle,
+  lerBlocosGoogle,
+  metadadosDaAba,
   mensalDaAbaGoogle,
+  type AbaGoogle,
   type DocumentoGoogle,
 } from "./google-planilhas-api";
 import { pedidosDeApresentacao } from "./google-planilhas-apresentacao";
@@ -33,7 +41,7 @@ export const esquemaPreparacaoMensalGoogle = z.object({
 });
 
 type PreparacaoMensal = z.infer<typeof esquemaPreparacaoMensalGoogle>;
-type ResultadoPreparacao = AbaMensalPlanilha & { criada: boolean };
+type ResultadoPreparacao = AbaMensalPlanilha & { criada: boolean; atualizada: boolean };
 
 function abasDoDocumento(doc: DocumentoGoogle): AbaMensalPlanilha[] {
   const abas = doc.sheets.flatMap((aba) => {
@@ -78,9 +86,9 @@ function pedidosDePreparacao(
   geracao: string,
   entrada: PreparacaoMensal,
 ) {
-  const cabecalho = ["Aluno", "Turma atual", ...diasDoMes(entrada.mes).map(rotuloData)];
+  const cabecalho = ["Aluno", ...diasDaPlanilhaMensal(entrada.mes).map(rotuloData)];
   const linhas = Math.max(1000, entrada.alunos.length + 1);
-  const valores = [cabecalho, ...entrada.alunos.map((aluno) => [aluno.nome, aluno.turmaAtual])];
+  const valores = [cabecalho, ...entrada.alunos.map((aluno) => [aluno.nome])];
   return [
     {
       addSheet: {
@@ -143,7 +151,155 @@ function pedidosDePreparacao(
   ];
 }
 
-/** Cria a lista e o calendário juntos; uma nova tentativa preserva o conteúdo existente. */
+function nomeDisponivel(doc: DocumentoGoogle, entrada: PreparacaoMensal, sheetId?: number): string {
+  const nome = nomeAbaMensal(entrada.rotulo, entrada.mes);
+  const ocupante = doc.sheets.find(
+    (aba) => aba.properties.title === nome && aba.properties.sheetId !== sheetId,
+  );
+  if (!ocupante) return nome;
+  const mensal = mensalDaAbaGoogle(doc, ocupante);
+  if (
+    mensal?.turmaOriginalId === entrada.turmaOriginalId &&
+    mensal.mes.slice(5) === entrada.mes.slice(5) &&
+    mensal.mes.slice(0, 4) !== entrada.mes.slice(0, 4)
+  ) {
+    const comAno = nomeAbaMensal(entrada.rotulo, entrada.mes, true);
+    if (
+      !doc.sheets.some(
+        (aba) => aba.properties.title === comAno && aba.properties.sheetId !== sheetId,
+      )
+    )
+      return comAno;
+  }
+  throw new ErroHttp(
+    "Já existe uma aba que impede a preparação deste mês. Confira a planilha.",
+    409,
+  );
+}
+
+function estruturaMensalInesperada(): never {
+  throw new ErroHttp(
+    "Confira o cabeçalho e as colunas da aba mensal antes de preparar novamente.",
+    409,
+  );
+}
+
+/** Reconhece somente as colunas criadas pela integração, sem ler os dados dos alunos. */
+async function colunasParaRemover(
+  id: string,
+  acesso: string,
+  doc: DocumentoGoogle,
+  aba: AbaGoogle,
+  mes: string,
+): Promise<number[]> {
+  const marcadores = metadadosDaAba(doc, aba).filter(
+    (item) => item.metadataKey === "frequenciapp.coluna",
+  );
+  const indices = marcadores.map((marcador) => {
+    const local = marcador.location.dimensionRange;
+    if (
+      marcador.metadataValue !== "1" ||
+      local?.startColumnIndex === undefined ||
+      local.endColumnIndex !== local.startColumnIndex + 1 ||
+      local.startColumnIndex < 0 ||
+      local.startColumnIndex >= 400
+    )
+      return estruturaMensalInesperada();
+    return local.startColumnIndex;
+  });
+  if (!indices.includes(0) || new Set(indices).size !== indices.length)
+    return estruturaMensalInesperada();
+  const [bloco] = await lerBlocosGoogle(id, acesso, aba.properties.title, 1, [
+    { coluna: 1, colunas: Math.max(...indices) + 1 },
+  ]);
+  const cabecalho = bloco?.valores[0] ?? [];
+  const formulas = bloco?.formula[0] ?? [];
+  const calendario = new Map(diasDoMes(mes).map((dia) => [rotuloData(dia), dia]));
+  const encontrados = new Set<string>();
+  const remover: number[] = [];
+  for (const indice of indices) {
+    const rotulo = cabecalho[indice] ?? "";
+    if (formulas[indice] || encontrados.has(rotulo)) return estruturaMensalInesperada();
+    encontrados.add(rotulo);
+    if (indice === 0) {
+      if (rotulo !== "Aluno") return estruturaMensalInesperada();
+      continue;
+    }
+    if (rotulo === "Turma atual") {
+      remover.push(indice);
+      continue;
+    }
+    const dia = calendario.get(rotulo);
+    if (!dia) return estruturaMensalInesperada();
+    if (diaDaSemanaIso(dia) > 5) remover.push(indice);
+  }
+  if (diasDaPlanilhaMensal(mes).some((dia) => !encontrados.has(rotuloData(dia))))
+    return estruturaMensalInesperada();
+  if (
+    (aba.merges ?? []).some((mesclagem) =>
+      remover.some(
+        (indice) =>
+          indice >= (mesclagem.startColumnIndex ?? 0) &&
+          indice < (mesclagem.endColumnIndex ?? Number.POSITIVE_INFINITY),
+      ),
+    )
+  )
+    return estruturaMensalInesperada();
+  return remover.sort((a, b) => b - a);
+}
+
+async function atualizarAbaExistente(
+  id: string,
+  acesso: string,
+  doc: DocumentoGoogle,
+  existente: AbaMensalPlanilha,
+  entrada: PreparacaoMensal,
+): Promise<ResultadoPreparacao> {
+  const aba = doc.sheets.find((item) => item.properties.title === existente.aba);
+  if (!aba) return estruturaMensalInesperada();
+  const sheetId = aba.properties.sheetId;
+  const nome = nomeDisponivel(doc, entrada, sheetId);
+  const remover = await colunasParaRemover(id, acesso, doc, aba, entrada.mes);
+  const pedidos: Record<string, unknown>[] = remover.map((indice) => ({
+    deleteDimension: {
+      range: { sheetId, dimension: "COLUMNS", startIndex: indice, endIndex: indice + 1 },
+    },
+  }));
+  if (nome !== existente.aba)
+    pedidos.push({
+      updateSheetProperties: { properties: { sheetId, title: nome }, fields: "title" },
+    });
+  if (!pedidos.length) return { ...existente, criada: false, atualizada: false };
+  try {
+    await enviarLoteAtomicoGoogle(id, acesso, pedidos);
+  } catch (erro) {
+    if (!(erro instanceof ErroGoogle)) throw erro;
+    // A existência da aba antiga não confirma uma atualização cuja resposta foi perdida.
+    try {
+      const conferido = await lerDocumentoGoogle(id, acesso);
+      const identidade = abasDoDocumento(conferido).find(
+        (item) =>
+          item.destino === existente.destino &&
+          item.mes === existente.mes &&
+          item.turmaOriginalId === existente.turmaOriginalId &&
+          item.aba === nome,
+      );
+      const abaConferida = conferido.sheets.find((item) => item.properties.sheetId === sheetId);
+      if (
+        identidade &&
+        abaConferida &&
+        !(await colunasParaRemover(id, acesso, conferido, abaConferida, entrada.mes)).length
+      )
+        return { ...identidade, criada: false, atualizada: true };
+    } catch {
+      // Preserva o erro original e não repete uma escrita possivelmente concluída.
+    }
+    throw erro;
+  }
+  return { ...existente, aba: nome, criada: false, atualizada: true };
+}
+
+/** Cria o mês ou simplifica suas colunas sem reconstruir a lista e os registros existentes. */
 export async function prepararAbaMensalGoogle(
   id: string,
   acesso: string,
@@ -156,8 +312,8 @@ export async function prepararAbaMensalGoogle(
   const existente = abasDoDocumento(doc).find(
     (aba) => aba.turmaOriginalId === turmaOriginalId && aba.mes === mes,
   );
-  if (existente) return { ...existente, criada: false };
-  const nome = nomeAbaMensal(dados.data.rotulo, mes);
+  if (existente) return atualizarAbaExistente(id, acesso, doc, existente, dados.data);
+  const nome = nomeDisponivel(doc, dados.data);
   // O identificador independe do título: criações concorrentes disputam a mesma aba.
   const sheetId =
     createHash("sha256")
@@ -188,11 +344,11 @@ export async function prepararAbaMensalGoogle(
           aba.mes === mes &&
           aba.destino.startsWith(`${doc.spreadsheetId}:${sheetId}:`),
       );
-      if (conferido) return { ...conferido, criada: false };
+      if (conferido) return { ...conferido, criada: false, atualizada: false };
     } catch {
       // Mantém o resultado incerto do envio, sem repetir a escrita.
     }
     throw erro;
   }
-  return { aba: nome, mes, turmaOriginalId, destino, criada: true };
+  return { aba: nome, mes, turmaOriginalId, destino, criada: true, atualizada: false };
 }

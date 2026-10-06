@@ -4,6 +4,7 @@ import { z } from "zod";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba } from "@/domain/planilha";
 import type { AbaMensalPlanilha } from "@/domain/planilha-mensal";
+import { controleTravaPlanilhaFrequencia } from "./trava-planilha-frequencia";
 import { ErroHttp } from "@/infra/erros";
 import type { ControleTravaParcial } from "./trava-planilha-parcial";
 import {
@@ -550,6 +551,7 @@ async function enviarPedidosGoogle(
   tamanhoDoLote: number,
   controle?: ControleTravaParcial,
 ): Promise<void> {
+  controle ??= controleTravaPlanilhaFrequencia();
   const compactadas = compactarAtualizacoesGoogle(requests);
   for (let inicio = 0; inicio < compactadas.length; inicio += tamanhoDoLote) {
     controle?.conferir();

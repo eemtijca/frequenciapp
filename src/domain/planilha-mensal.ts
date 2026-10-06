@@ -1,4 +1,20 @@
 // Identificação dos meses e nomes das abas mensais da frequência.
+import { diaDaSemanaIso, diasDoMes } from "./frequencia";
+
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
 
 export interface AbaMensalPlanilha {
   aba: string;
@@ -13,9 +29,9 @@ export function mesValido(mes: string): boolean {
 }
 
 /** Mantém o mês visível e respeita os caracteres e o limite do Google. */
-export function nomeAbaMensal(rotulo: string, mes: string): string {
+export function nomeAbaMensal(rotulo: string, mes: string, incluirAno = false): string {
   if (!mesValido(mes)) throw new Error("Informe um mês válido.");
-  const sufixo = ` · ${mes.slice(5, 7)}-${mes.slice(0, 4)}`;
+  const sufixo = ` · ${MESES[Number(mes.slice(5, 7)) - 1]}${incluirAno ? ` ${mes.slice(0, 4)}` : ""}`;
   const turma = rotulo
     .normalize("NFC")
     .replace(/[\\/:*?[\]]/g, " ")
@@ -24,4 +40,10 @@ export function nomeAbaMensal(rotulo: string, mes: string): string {
     .trim()
     .replace(/^'+|'+$/g, "");
   return `${(turma || "Turma").slice(0, 100 - sufixo.length).trim()}${sufixo}`;
+}
+
+/** A planilha mensal contém somente as datas de segunda a sexta-feira. */
+export function diasDaPlanilhaMensal(mes: string): string[] {
+  if (!mesValido(mes)) throw new Error("Informe um mês válido.");
+  return diasDoMes(mes).filter((dia) => diaDaSemanaIso(dia) <= 5);
 }

@@ -2,6 +2,7 @@
 // preparação idempotente e envio automático contra a Sheets API sintética.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { CHAVE_TRAVA_FREQUENCIA } from "../../src/infra/trava-planilha-frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
@@ -18,6 +19,7 @@ interface Mensal {
   turmaOriginalId: string;
   destino: string;
   criada: boolean;
+  atualizada: boolean;
 }
 
 interface Plano {
@@ -108,13 +110,14 @@ async function lerEsquema() {
   return integracao.esquema;
 }
 
-async function aplicar(plano: Plano, periodo = PERIODO) {
+async function aplicar(plano: Plano, periodo = PERIODO, somenteAlteradas?: boolean) {
   return dados<{ resultados: { aba: string; resultado: string }[] }>(
     await chamar("/api/planilha/aplicar", "POST", {
       turmaOriginalId: turmas.A,
       aba: plano.aba,
       ...periodo,
       planoHashGeral: plano.planoHashTurma,
+      ...(somenteAlteradas === undefined ? {} : { somenteAlteradas }),
     }),
   );
 }
@@ -126,17 +129,60 @@ function planoDaAba(planos: Plano[], aba: string) {
   return plano;
 }
 
-async function salvar(dia: string, faltas: string[]) {
+async function salvar(dia: string, faltas: string[], turmaId = turmas.A) {
   expect(
     (
       await chamar("/api/frequencias", "POST", {
-        turmaId: turmas.A,
+        turmaId,
         dia,
         faltas,
         revisao: 0,
       })
     ).status,
   ).toBe(200);
+}
+
+async function restaurarFormatoAntigo(mensal: Mensal) {
+  const datas = Array.from(
+    { length: 31 },
+    (_, indice) => `${String(indice + 1).padStart(2, "0")}/10/2026`,
+  );
+  const anterior = cabecalho(mensal.aba);
+  const vinculos = google.vinculos(mensal.aba);
+  const valores = [
+    ["Aluno", "Turma atual", ...datas],
+    ...vinculos.map(({ linha }) => [
+      google.valor(mensal.aba, linha, 1),
+      LEGADA,
+      ...datas.map((dia) => {
+        const coluna = anterior.indexOf(dia) + 1;
+        return coluna ? google.valor(mensal.aba, linha, coluna) : "";
+      }),
+    ]),
+  ];
+  google.definirAba(mensal.aba, valores, {
+    mensal: {
+      turmaOriginalId: mensal.turmaOriginalId,
+      mes: mensal.mes,
+      geracao: mensal.destino.split(":")[2] ?? "",
+      vinculos,
+    },
+  });
+  const antiga = `${LEGADA} · 10-2026`;
+  google.renomearAba(mensal.aba, antiga);
+  const estrutura = await dados<{ planilha: unknown; abas: unknown[] }>(
+    await chamar("/api/planilha/estrutura", "POST", {}),
+  );
+  const esquema = await lerEsquema();
+  await dados(
+    await chamar("/api/planilha/mapa", "POST", {
+      ...estrutura,
+      mapa: esquema.mapa.map((item) =>
+        item.destino === mensal.destino ? { ...item, aba: antiga } : item,
+      ),
+    }),
+  );
+  return antiga;
 }
 
 beforeAll(async () => {
@@ -217,6 +263,22 @@ describe("frequência organizada por turma e mês", () => {
     expect(google.abas()).toEqual([LEGADA]);
   });
 
+  it("impede reorganização durante outro envio da frequência", async () => {
+    const antes = google.chamadas();
+    await banco.query("begin");
+    try {
+      await banco.query("select pg_advisory_xact_lock($1::int, $2::int)", [
+        CHAVE_TRAVA_FREQUENCIA.namespace,
+        CHAVE_TRAVA_FREQUENCIA.recurso,
+      ]);
+      expect((await preparar("2026-09")).status).toBe(409);
+      expect(google.chamadas()).toEqual(antes);
+    } finally {
+      await banco.query("rollback");
+    }
+    // Os preparos posteriores prosseguem normalmente após liberar a trava.
+  });
+
   it("confirma o envio legado antes da preparação mensal", async () => {
     const periodo = { de: "2026-09-30", ate: "2026-09-30" };
     const previa = await simular(periodo);
@@ -247,22 +309,26 @@ describe("frequência organizada por turma e mês", () => {
     }
   });
 
-  it("prepara os alunos e todos os dias do mês sem alterar a aba antiga", async () => {
-    for (const [mes, dias] of [
-      ["2026-09", 30],
-      ["2026-10", 31],
+  it("prepara nomes de mês e dias úteis sem turma atual nem alteração da aba antiga", async () => {
+    for (const [mes, nome, uteis] of [
+      ["2026-09", "Setembro", "01 02 03 04 07 08 09 10 11 14 15 16 17 18 21 22 23 24 25 28 29 30"],
+      ["2026-10", "Outubro", "01 02 05 06 07 08 09 12 13 14 15 16 19 20 21 22 23 26 27 28 29 30"],
     ] as const) {
       const mensal = await dados<Mensal>(await preparar(mes));
       mensais[mes] = mensal;
-      expect(mensal).toMatchObject({ mes, turmaOriginalId: turmas.A, criada: true });
+      expect(mensal).toMatchObject({
+        aba: `${LEGADA} · ${nome}`,
+        mes,
+        turmaOriginalId: turmas.A,
+        criada: true,
+        atualizada: false,
+      });
       expect(mensal.destino).toBeTruthy();
       const sufixo = `${mes.slice(5)}/${mes.slice(0, 4)}`;
-      expect(cabecalho(mensal.aba).filter((valor) => /^\d{2}\//.test(valor))).toEqual(
-        Array.from(
-          { length: dias },
-          (_, indice) => `${String(indice + 1).padStart(2, "0")}/${sufixo}`,
-        ),
-      );
+      expect(cabecalho(mensal.aba).filter(Boolean)).toEqual([
+        "Aluno",
+        ...uteis.split(" ").map((dia) => `${dia}/${sufixo}`),
+      ]);
       expect(google.valor(mensal.aba, 2, 1)).toBe("QA Mensal Aluno A");
       expect(google.vinculos(mensal.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
     }
@@ -384,7 +450,7 @@ describe("frequência organizada por turma e mês", () => {
   });
 
   it("preserva uma aba manual com o nome mensal em vez de assumir sua autoria", async () => {
-    const nome = "QA Mensal A · 11-2026";
+    const nome = "QA Mensal A · Novembro";
     google.definirAba(nome, [["Anotações da escola"], ["Conteúdo manual"]]);
     const antes = google.chamadas().filter((acao) => acao === "gravar").length;
     expect((await preparar("2026-11")).status).toBe(409);
@@ -396,7 +462,7 @@ describe("frequência organizada por turma e mês", () => {
     const outubro = mensais["2026-10"];
     if (!outubro) throw new Error("Aba mensal ausente.");
     const antes = google.chamadas().filter((acao) => acao === "gravar").length;
-    const ultimaColuna = cabecalho(outubro.aba).indexOf("31/10/2026") + 1;
+    const ultimaColuna = cabecalho(outubro.aba).indexOf("30/10/2026") + 1;
     expect(ultimaColuna).toBeGreaterThan(0);
     google.definirValor(outubro.aba, 1, ultimaColuna, "30/09/2026");
     try {
@@ -410,7 +476,7 @@ describe("frequência organizada por turma e mês", () => {
       expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
       expect(marca(outubro.aba, "01/10/2026")).toBe("P");
     } finally {
-      google.definirValor(outubro.aba, 1, ultimaColuna, "31/10/2026");
+      google.definirValor(outubro.aba, 1, ultimaColuna, "30/10/2026");
     }
     // A próxima conferência recupera o esquema após a correção manual.
     await dados(
@@ -448,6 +514,105 @@ describe("frequência organizada por turma e mês", () => {
     expect(marca(setembro.aba, "30/09/2026")).toBe("F");
   });
 
+  it("atualiza a aba antiga com dados e histórico de envio, preservando seu destino", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    const antiga = await restaurarFormatoAntigo(outubro);
+    expect((await lerEsquema()).mapa).toContainEqual(expect.objectContaining({ aba: antiga }));
+    expect(marca(antiga, "01/10/2026")).toBe("P");
+    expect(marca(antiga, "02/10/2026")).toBe("F");
+    // O descarte pedido das colunas de fim de semana não altera as datas úteis.
+    google.definirValor(antiga, 2, cabecalho(antiga).indexOf("03/10/2026") + 1, "FJ");
+    const atualizada = await dados<Mensal>(await preparar("2026-10"));
+    mensais["2026-10"] = atualizada;
+    expect(atualizada).toEqual({ ...outubro, criada: false, atualizada: true });
+    expect(google.abas()).not.toContain(antiga);
+    expect(marca(atualizada.aba, "01/10/2026")).toBe("P");
+    expect(marca(atualizada.aba, "02/10/2026")).toBe("F");
+    expect(cabecalho(atualizada.aba)).not.toContain("Turma atual");
+    expect(cabecalho(atualizada.aba)).not.toContain("03/10/2026");
+    expect(cabecalho(atualizada.aba)).not.toContain("04/10/2026");
+    expect(google.vinculos(atualizada.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+    const esquema = await lerEsquema();
+    expect(esquema.mapa.filter((item) => item.destino === outubro.destino)).toEqual([
+      { aba: outubro.aba, mes: "2026-10", turmaOriginalId: turmas.A, destino: outubro.destino },
+    ]);
+    expect(esquema.abas).not.toContainEqual(expect.objectContaining({ nome: antiga }));
+    const periodo = { de: "2026-10-01", ate: "2026-10-02" };
+    expect((await simular(periodo)).planos.every((plano) => plano.semEnvio)).toBe(true);
+    const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+    expect(await dados<Mensal>(await preparar("2026-10"))).toEqual({
+      ...atualizada,
+      atualizada: false,
+    });
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas);
+  });
+
+  it("não informa sucesso ao recusar atualização e confere uma resposta perdida", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    const antiga = await restaurarFormatoAntigo(outubro);
+    const esquema = await lerEsquema();
+    google.recusarGravacoes(true);
+    try {
+      expect((await preparar("2026-10")).ok).toBe(false);
+      expect(google.abas()).toContain(antiga);
+      expect(cabecalho(antiga)).toContain("Turma atual");
+      expect(await lerEsquema()).toEqual(esquema);
+    } finally {
+      google.recusarGravacoes(false);
+    }
+    google.perderProximaResposta();
+    const confirmada = await dados<Mensal>(await preparar("2026-10"));
+    expect(confirmada).toMatchObject({
+      aba: outubro.aba,
+      destino: outubro.destino,
+      criada: false,
+      atualizada: true,
+    });
+    expect(google.abas()).not.toContain(antiga);
+    expect(cabecalho(confirmada.aba)).not.toContain("Turma atual");
+    expect(marca(confirmada.aba, "02/10/2026")).toBe("F");
+  });
+
+  it("conserva chamadas de sábado e domingo no app sem recriar suas colunas", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
+    const antes = await dados<{ estado: { alteradasDepois: number } }>(
+      await chamar("/api/planilha/estado", "GET"),
+    );
+    await salvar("2026-10-03", [alunos.A]);
+    await salvar("2026-10-04", []);
+    const periodo = { de: "2026-10-01", ate: "2026-10-04" };
+    const previa = await dados<{ planos: Plano[] }>(
+      await chamar("/api/planilha/simular", "POST", {
+        turmaOriginalId: turmas.A,
+        ...periodo,
+        somenteAlteradas: false,
+      }),
+    );
+    const plano = planoDaAba(previa.planos, outubro.aba);
+    expect(plano.dias).toEqual(["2026-10-01", "2026-10-02"]);
+    expect((await aplicar(plano, periodo, false)).resultados).toMatchObject([
+      { aba: outubro.aba, resultado: "sucesso" },
+    ]);
+    expect(cabecalho(outubro.aba)).not.toContain("03/10/2026");
+    expect(cabecalho(outubro.aba)).not.toContain("04/10/2026");
+    expect(cabecalho(outubro.aba)).not.toContain("Turma atual");
+    const chamadas = await banco.query(
+      "select dia from frequencias where turma_id = $1 and dia between '2026-10-03' and '2026-10-04'",
+      [turmas.A],
+    );
+    expect(chamadas.rows).toHaveLength(2);
+    const fimDeSemana = await simular({ de: "2026-10-03", ate: "2026-10-04" });
+    expect(fimDeSemana.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+    const depois = await dados<{ estado: { alteradasDepois: number } }>(
+      await chamar("/api/planilha/estado", "GET"),
+    );
+    expect(depois.estado.alteradasDepois).toBe(antes.estado.alteradasDepois);
+  });
+
   it("reenvia o histórico ao preparar novamente uma aba mensal excluída", async () => {
     const anterior = mensais["2026-09"];
     if (!anterior) throw new Error("Aba mensal ausente.");
@@ -478,5 +643,25 @@ describe("frequência organizada por turma e mês", () => {
     expect(historico.rows.map((item) => item.destino)).toEqual(
       expect.arrayContaining([anterior.destino, recriada.destino]),
     );
+  });
+  it("mantém aluno transferido na aba de origem sem recriar turma atual", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    await dados(await chamar(`/api/alunos/${alunos.A}`, "PATCH", { turmaId: turmas.B }));
+    await salvar("2026-10-05", [alunos.A], turmas.B);
+    const periodo = { de: "2026-10-05", ate: "2026-10-05" };
+    const plano = planoDaAba((await simular(periodo)).planos, outubro.aba);
+    expect((await aplicar(plano, periodo)).resultados).toMatchObject([
+      { aba: outubro.aba, resultado: "sucesso" },
+    ]);
+    expect(marca(outubro.aba, "05/10/2026")).toBe("F");
+    expect(google.vinculos(outubro.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+    expect(cabecalho(outubro.aba)).not.toContain("Turma atual");
+    expect(await dados<Mensal>(await preparar("2026-10"))).toMatchObject({
+      aba: outubro.aba,
+      destino: outubro.destino,
+      criada: false,
+      atualizada: false,
+    });
   });
 });

@@ -41,7 +41,16 @@ export interface GoogleFalso {
   definirAba(
     nome: string,
     valores: string[][],
-    opcoes?: { formulas?: Record<string, string>; mesclagens?: string[] },
+    opcoes?: {
+      formulas?: Record<string, string>;
+      mesclagens?: string[];
+      mensal?: {
+        turmaOriginalId: string;
+        mes: string;
+        geracao: string;
+        vinculos: { linha: number; alunoId: string }[];
+      };
+    },
   ): void;
   renomearAba(nome: string, novo: string): void;
   removerAba(nome: string): void;
@@ -269,6 +278,9 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       const inicio = numero(faixa.startIndex);
       const quantidade = numero(faixa.endIndex) - inicio;
       deslocarMetadados(item, texto(faixa.dimension), inicio, quantidade, apagar);
+      const propriedade = faixa.dimension === "ROWS" ? "rowCount" : "columnCount";
+      item.propriedades[propriedade] =
+        numero(item.propriedades[propriedade]) + (apagar ? -quantidade : quantidade);
       if (faixa.dimension === "ROWS") {
         item.celulas.splice(
           inicio,
@@ -500,6 +512,38 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
           garantir(item, l + 1, c + 1).valor = valor;
         }),
       );
+      item.propriedades.columnCount = Math.max(
+        numero(item.propriedades.columnCount),
+        ...valores.map((fileira) => fileira.length),
+      );
+      if (opcoes?.mensal) {
+        const mensal = opcoes.mensal;
+        marcar(item, "frequenciapp.aba", { sheetId: item.id });
+        marcar(item, "frequenciapp.turma", { sheetId: item.id }, mensal.turmaOriginalId);
+        marcar(item, "frequenciapp.mes", { sheetId: item.id }, mensal.mes);
+        marcar(item, "frequenciapp.geracao", { sheetId: item.id }, mensal.geracao);
+        for (const vinculo of mensal.vinculos) {
+          const local = {
+            dimensionRange: {
+              sheetId: item.id,
+              dimension: "ROWS",
+              startIndex: vinculo.linha - 1,
+              endIndex: vinculo.linha,
+            },
+          };
+          marcar(item, "frequenciapp.linha", local);
+          marcar(item, "frequenciapp.aluno", local, vinculo.alunoId);
+        }
+        for (let indice = 0; indice < (valores[0]?.length ?? 0); indice++)
+          marcar(item, "frequenciapp.coluna", {
+            dimensionRange: {
+              sheetId: item.id,
+              dimension: "COLUMNS",
+              startIndex: indice,
+              endIndex: indice + 1,
+            },
+          });
+      }
       for (const [a1, formula] of Object.entries(opcoes?.formulas ?? {})) {
         const match = /^([A-Z]+)(\d+)$/.exec(a1);
         if (match) garantir(item, Number(match[2]), coluna(match[1] ?? "A")).formula = formula;
