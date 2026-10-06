@@ -103,6 +103,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Modificado
 
+- Pool de conexões do runtime configurável por `POOL_MAX_CONEXOES` (padrão 10), sem depender de variável de plataforma; `/api/saude` prefere `COMMIT_SHA` e mantém os fallbacks existentes.
+
 - Acabamento dos seletores da Chamada estendido à interface: cartões, controles, menus, diálogos, navegação e entrada compartilham reflexos discretos, bordas arredondadas e seleção verde suave. A tipografia Plus Jakarta Sans também passa a ser aplicada ao corpo e aos números tabulares. Transparência reduzida, alto contraste e cores de frequência são preservados.
 
 - Chamada Parcial passa a reunir a chamada diária salva e os ajustes por dia inteiro, turno ou aulas, com confirmação RS concentrada nessa tela. Presentes aparecem como Dia inteiro; faltas preservam a situação da Chamada, sem alterar os registros da coordenação. A terceira planilha usa a mesma lista e mantém uma linha por aluno e dia, reconhecendo códigos antigos.

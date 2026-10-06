@@ -19,11 +19,10 @@ function schemaDoBanco(): string {
 }
 
 function criarCliente(): PrismaClient {
-  // O Supabase usa pool de transações no runtime. Instâncias serverless
-  // começam com uma conexão e podem ser ajustadas após observar a demanda.
-  const max = process.env.VERCEL ? 1 : 10;
+  // Instâncias serverless usam pool de uma conexão (POOL_MAX_CONEXOES=1);
+  // ambientes persistentes podem ampliar conforme a demanda observada.
   const adaptador = new PrismaPg(
-    { connectionString: ambiente.databaseUrl, max },
+    { connectionString: ambiente.databaseUrl, max: ambiente.poolMaxConexoes },
     { schema: schemaDoBanco() },
   );
   return new PrismaClient({ adapter: adaptador, log: ["warn", "error"] });

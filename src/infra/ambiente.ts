@@ -15,6 +15,16 @@ const esquema = z.object({
       "DATABASE_URL deve ser uma connection string PostgreSQL (postgresql://usuario:senha@host:porta/banco).",
     ),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET deve ter pelo menos 32 caracteres."),
+  // Tamanho do pool de conexões do runtime. Instâncias serverless usam 1.
+  POOL_MAX_CONEXOES: z.preprocess(
+    ausenteSeVazio,
+    z.coerce
+      .number()
+      .refine((valor) => Number.isInteger(valor) && valor >= 1 && valor <= 100, {
+        message: "POOL_MAX_CONEXOES deve ser um inteiro entre 1 e 100.",
+      })
+      .default(10),
+  ),
   PUSH_VAPID_PUBLIC_KEY: z.preprocess(
     ausenteSeVazio,
     z
@@ -116,6 +126,7 @@ if (ehProducao && permitirHttp) {
 export const ambiente = {
   databaseUrl: resultado.data.DATABASE_URL,
   authSecret: resultado.data.AUTH_SECRET,
+  poolMaxConexoes: resultado.data.POOL_MAX_CONEXOES,
   push: {
     ...configuracaoPushDe({
       segredo: resultado.data.AUTH_SECRET,
