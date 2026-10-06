@@ -292,9 +292,13 @@ export function SeletorPeriodo({
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${rotulo}${selo ? `, ${selo}` : ""}`}
       onClick={() => aoAbrir(!aberto)}
-      className="controle-vidro focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="controle-vidro focus-visible:ring-ring pressionavel @container flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
-      <CalendarDays size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
+      <CalendarDays
+        size={16}
+        className="text-muted-foreground hidden shrink-0 @min-[10rem]:block"
+        aria-hidden="true"
+      />
       <span
         className={cn(
           "numerais-tabulares font-semibold",
@@ -308,7 +312,7 @@ export function SeletorPeriodo({
         <span className="text-muted-foreground min-w-0 truncate xl:hidden">{detalhe}</span>
       )}
       {selo && (
-        <span className="bg-primary/15 text-primary shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
+        <span className="bg-primary/15 text-primary hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold @min-[13rem]:inline">
           {selo}
         </span>
       )}
