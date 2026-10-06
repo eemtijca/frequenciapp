@@ -131,6 +131,11 @@
 
 /* Sistemas sem transparência mantêm a mesma hierarquia com preenchimentos sólidos. */
 @media (prefers-reduced-transparency: reduce) {
+  .grafico-vidro-fatia {
+    fill: var(--cor-fatia);
+    stroke: var(--card);
+  }
+
   .superficie-vidro,
   .controle-vidro,
   .vidro-flutuante,
@@ -152,6 +157,11 @@
 }
 
 @media (forced-colors: active) {
+  .grafico-vidro-fatia {
+    fill: CanvasText;
+    stroke: Canvas;
+  }
+
   .superficie-vidro,
   .controle-vidro,
   .vidro-discreto,

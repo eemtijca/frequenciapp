@@ -217,7 +217,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
             ].map(([rotulo, valor]) => (
               <div
                 key={rotulo}
-                className="flex flex-col items-center gap-1 rounded-lg border p-3 text-center"
+                className="superficie-vidro flex flex-col items-center gap-1 p-3 text-center"
               >
                 <strong className="numerais-tabulares text-xl font-semibold">{valor}</strong>
                 <span className="text-muted-foreground text-xs">{rotulo}</span>

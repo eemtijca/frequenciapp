@@ -431,7 +431,27 @@ test.describe("gráfico personalizado por período", () => {
       });
     });
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
-    await expect(painel.getByRole("img", { name: "Faltas do período por série" })).toBeVisible();
+    const grafico = painel.getByRole("img", { name: "Faltas do período por série" });
+    await expect(grafico).toBeVisible();
+    const aplicacao = grafico.getByRole("application");
+    await aplicacao.focus();
+    await aplicacao.press("ArrowRight");
+    const detalhe = grafico.locator(".recharts-tooltip-wrapper");
+    await expect(detalhe).toBeVisible();
+    await expect(detalhe).toHaveText("E2E Painel Dois: 1 falta");
+    // A dica deve caber no gráfico mesmo quando o cartão é estreito.
+    await expect
+      .poll(async () => {
+        const caixa = await grafico.boundingBox();
+        const dica = await detalhe.boundingBox();
+        return Boolean(
+          caixa &&
+          dica &&
+          dica.x >= caixa.x - 1 &&
+          dica.x + dica.width <= caixa.x + caixa.width + 1,
+        );
+      })
+      .toBe(true);
     const semCorte = await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     );
