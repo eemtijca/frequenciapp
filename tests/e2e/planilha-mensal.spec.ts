@@ -1,7 +1,16 @@
 // Preparo mensal pela Gestão contra o Google sintético: confirmação, reuso,
 // vínculos fixos e prévia de envio para as abas do mês.
+import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
-import { diaLocal, mesSeguinte, nomeDoMes, rotuloMes } from "../../src/domain/frequencia";
+import {
+  diaDaSemanaIso,
+  diaLocal,
+  diasDoMes,
+  mesSeguinte,
+  nomeDoMes,
+  rotuloData,
+  rotuloMes,
+} from "../../src/domain/frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
@@ -11,7 +20,10 @@ test.use({ serviceWorkers: "block" });
 let google: GoogleFalso;
 const mes = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza").slice(0, 7);
 const turmas = ["E2E Ano A", "E2E Ano B"];
-const abasMensais = turmas.map((turma) => `${turma} · ${mes.slice(5)}-${mes.slice(0, 4)}`);
+const abasMensais = turmas.map((turma) => `${turma} · ${nomeDoMes(mes)}`);
+const diasUteis = diasDoMes(mes)
+  .filter((dia) => diaDaSemanaIso(dia) <= 5)
+  .map(rotuloData);
 
 test.beforeEach(async () => {
   google = await criarGoogleFalso();
@@ -90,7 +102,9 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   const preparar = cartao.getByRole("button", { name: "Preparar mês", exact: true });
   await preparar.click();
   const dialogo = page.getByRole("alertdialog");
-  await expect(dialogo.getByText(/o histórico antigo é preservado/)).toBeVisible();
+  await expect(
+    dialogo.getByText(/retira Turma atual e as colunas de sábado e domingo/),
+  ).toBeVisible();
   await expect(dialogo.getByRole("button", { name: /Mês das novas abas/ })).toContainText(
     rotuloMes(mes),
   );
@@ -115,7 +129,9 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   for (const aba of abasMensais) {
     await expect(resultado.getByRole("listitem").filter({ hasText: aba })).toContainText("Criada");
     expect(google.valor(aba, 1, 1)).toBe("Aluno");
-    expect(google.valor(aba, 1, 3)).toBe(`01/${mes.slice(5)}/${mes.slice(0, 4)}`);
+    expect(
+      Array.from({ length: diasUteis.length + 1 }, (_, indice) => google.valor(aba, 1, indice + 1)),
+    ).toEqual(["Aluno", ...diasUteis]);
   }
   expect(preparos).toHaveLength(2);
   expect(new Set(preparos.map((item) => item.turmaOriginalId)).size).toBe(2);
@@ -299,4 +315,70 @@ test("repete somente turmas pendentes e preserva a aba concluída no toque duplo
   expect(preparos[2]).toEqual(preparos[1]);
   expect(google.valor(primeiraAba, 2, 3)).toBe("FJ");
   expect(google.abas().sort()).toEqual(["E2E Ano A", ...abasMensais].sort());
+});
+
+test("atualiza abas antigas pelo preparo do mês e preserva marcas úteis e vínculos", async ({
+  page,
+}) => {
+  const antiga = `E2E Ano A · ${mes.slice(5)}-${mes.slice(0, 4)}`;
+  const datas = diasDoMes(mes).map(rotuloData);
+  const primeiroUtil = diasUteis[0] ?? "";
+  const primeiroFimDeSemana = diasDoMes(mes).find((dia) => diaDaSemanaIso(dia) > 5) ?? "";
+  let alunoId = "";
+  await comBanco(async (cliente) => {
+    const alunos = await cliente.query<{ id: string; turma_id: string }>(
+      "select id, turma_id from alunos where nome = 'E2E Aluno Um'",
+    );
+    const aluno = alunos.rows[0];
+    if (!aluno) throw new Error("Aluno sintético ausente.");
+    alunoId = aluno.id;
+    google.definirAba(
+      antiga,
+      [
+        ["Aluno", "Turma atual", ...datas],
+        [
+          "E2E Aluno Um",
+          "E2E Ano A",
+          ...datas.map((dia) =>
+            dia === primeiroUtil ? "FJ" : dia === rotuloData(primeiroFimDeSemana) ? "F" : "",
+          ),
+        ],
+      ],
+      {
+        mensal: {
+          turmaOriginalId: aluno.turma_id,
+          mes,
+          geracao: randomUUID(),
+          vinculos: [{ linha: 2, alunoId: aluno.id }],
+        },
+      },
+    );
+  });
+  const cartao = await abrirPlanilha(page);
+  const preparar = cartao.getByRole("button", { name: "Preparar mês", exact: true });
+  await preparar.click();
+  const dialogo = page.getByRole("alertdialog");
+  await expect(
+    dialogo.getByText(/retira Turma atual e as colunas de sábado e domingo/),
+  ).toBeVisible();
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  const nova = abasMensais[0] ?? "";
+  const resultado = dialogo.getByRole("list", { name: "Resultado da preparação por turma" });
+  await expect(resultado.getByRole("listitem").filter({ hasText: nova })).toContainText(
+    "Atualizada",
+  );
+  expect(google.abas()).not.toContain(antiga);
+  expect(
+    Array.from({ length: 36 }, (_, indice) => google.valor(nova, 1, indice + 1)).filter(Boolean),
+  ).toEqual(["Aluno", ...diasUteis]);
+  expect(google.valor(nova, 2, 2)).toBe("FJ");
+  expect(google.vinculos(nova)).toEqual([{ linha: 2, alunoId }]);
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await preparar.click();
+  await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  await expect(resultado.getByText("Reutilizada", { exact: true })).toHaveCount(2);
+  expect(google.valor(nova, 2, 2)).toBe("FJ");
+  expect(google.vinculos(nova)).toEqual([{ linha: 2, alunoId }]);
 });

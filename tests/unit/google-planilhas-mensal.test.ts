@@ -1,7 +1,8 @@
 // Preparação mensal com Google simulado, sem sobrescrever abas ou dividir a criação.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { mesValido, nomeAbaMensal } from "@/domain/planilha-mensal";
+import { diasDoMes, rotuloData } from "@/domain/frequencia";
+import { diasDaPlanilhaMensal, mesValido, nomeAbaMensal } from "@/domain/planilha-mensal";
 import { assinarAba } from "@/domain/planilha";
 import {
   catalogoFrequenciaGoogle,
@@ -22,7 +23,9 @@ const entrada = {
 };
 
 type Pedido = Record<string, unknown>;
-function simularGoogle(modo?: "recusar" | "resposta_perdida" | "concorrente") {
+function simularGoogle(
+  modo?: "recusar" | "resposta_perdida" | "resposta_perdida_antes" | "concorrente",
+) {
   const documento: DocumentoGoogle = {
     spreadsheetId: "arquivo",
     properties: { title: "QA Frequência", timeZone: "America/Fortaleza" },
@@ -31,6 +34,8 @@ function simularGoogle(modo?: "recusar" | "resposta_perdida" | "concorrente") {
   };
   const lotes: Pedido[][] = [];
   const requisicoes: string[] = [];
+  const celulas = new Map<number, string[][]>();
+  const controle = { modo };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: URL | string, opcoes?: RequestInit) => {
@@ -40,7 +45,8 @@ function simularGoogle(modo?: "recusar" | "resposta_perdida" | "concorrente") {
       if (String(url).endsWith(":batchUpdate")) {
         const corpo = JSON.parse(String(opcoes?.body)) as { requests: Pedido[] };
         lotes.push(corpo.requests);
-        if (modo === "recusar")
+        if (controle.modo === "resposta_perdida_antes") throw new TypeError("Resposta perdida");
+        if (controle.modo === "recusar")
           return Response.json({ error: { message: "Recusado" } }, { status: 400 });
         for (const pedido of corpo.requests) {
           if (!pedido.addSheet) continue;
@@ -71,17 +77,127 @@ function simularGoogle(modo?: "recusar" | "resposta_perdida" | "concorrente") {
               metadataId: (documento.developerMetadata?.length ?? 0) + 1,
             });
           }
+          if (pedido.updateCells) {
+            const atualizacao = pedido.updateCells as {
+              range: { sheetId: number };
+              rows: { values: { userEnteredValue: { stringValue: string } }[] }[];
+            };
+            celulas.set(
+              atualizacao.range.sheetId,
+              atualizacao.rows.map((linha) =>
+                linha.values.map((celula) => celula.userEnteredValue.stringValue),
+              ),
+            );
+          }
+          if (pedido.updateSheetProperties) {
+            const atualizacao = pedido.updateSheetProperties as {
+              properties: { sheetId: number; title: string };
+            };
+            const aba = documento.sheets.find(
+              (item) => item.properties.sheetId === atualizacao.properties.sheetId,
+            );
+            if (aba && atualizacao.properties.title)
+              aba.properties.title = atualizacao.properties.title;
+          }
+          if (pedido.deleteDimension) {
+            const exclusao = pedido.deleteDimension as {
+              range: { sheetId: number; startIndex: number; endIndex: number };
+            };
+            const { sheetId, startIndex, endIndex } = exclusao.range;
+            for (const linha of celulas.get(sheetId) ?? [])
+              linha.splice(startIndex, endIndex - startIndex);
+            documento.developerMetadata = documento.developerMetadata?.filter((item) => {
+              const local = item.location.dimensionRange as
+                | {
+                    sheetId?: number;
+                    dimension?: string;
+                    startIndex?: number;
+                    endIndex?: number;
+                    startColumnIndex?: number;
+                    endColumnIndex?: number;
+                  }
+                | undefined;
+              if (!local || local.sheetId !== sheetId) return true;
+              const indice =
+                local.dimension === "COLUMNS" ? local.startIndex : local.startColumnIndex;
+              if (indice === undefined) return true;
+              if (indice >= startIndex && indice < endIndex) return false;
+              if (indice >= endIndex) {
+                if (local.dimension === "COLUMNS") {
+                  local.startIndex = indice - (endIndex - startIndex);
+                  local.endIndex = local.startIndex + 1;
+                } else {
+                  local.startColumnIndex = indice - (endIndex - startIndex);
+                  local.endColumnIndex = local.startColumnIndex + 1;
+                }
+              }
+              return true;
+            });
+          }
         }
-        if (modo === "resposta_perdida") throw new TypeError("Resposta perdida");
-        if (modo === "concorrente")
+        if (controle.modo === "resposta_perdida") throw new TypeError("Resposta perdida");
+        if (controle.modo === "concorrente")
           return Response.json({ error: { message: "Aba existente" } }, { status: 400 });
         return Response.json({ replies: [] });
+      }
+      const endereco = new URL(String(url));
+      if (endereco.searchParams.get("includeGridData") === "true") {
+        const faixa = endereco.searchParams.get("ranges") ?? "";
+        const nome = /^'((?:[^']|'')*)'!/.exec(faixa)?.[1]?.replaceAll("''", "'");
+        const aba = documento.sheets.find((item) => item.properties.title === nome);
+        const valores = aba ? (celulas.get(aba.properties.sheetId) ?? []) : [];
+        return Response.json({
+          sheets: [
+            {
+              data: [
+                {
+                  rowData: valores.map((linha) => ({
+                    values: linha.map((formattedValue) => ({ formattedValue })),
+                  })),
+                },
+              ],
+            },
+          ],
+        });
       }
       if (String(url).includes("/values/")) throw new Error("O catálogo não deve ler células.");
       return Response.json(documento);
     }),
   );
-  return { documento, lotes, requisicoes };
+  return { documento, lotes, requisicoes, celulas, controle };
+}
+
+function inserirLegada(documento: DocumentoGoogle, celulas: Map<number, string[][]>) {
+  const sheetId = 2;
+  marcarMensal(documento, sheetId);
+  const aba = documento.sheets.find((item) => item.properties.sheetId === sheetId);
+  if (!aba) throw new Error("Aba de teste ausente.");
+  aba.properties.title = "1º A · 10-2026";
+  const cabecalho = ["Aluno", "Turma atual", ...diasDoMes(entrada.mes).map(rotuloData)];
+  celulas.set(sheetId, [
+    cabecalho,
+    [
+      "QA Nome preservado",
+      "QA Turma anterior",
+      ...diasDoMes(entrada.mes).map((_, indice) => (indice % 2 ? "F" : "P")),
+    ],
+  ]);
+  for (const indice of cabecalho.keys())
+    documento.developerMetadata?.push({
+      metadataId: (documento.developerMetadata?.length ?? 0) + 1,
+      metadataKey: "frequenciapp.coluna",
+      metadataValue: "1",
+      location: {
+        dimensionRange: { sheetId, startColumnIndex: indice, endColumnIndex: indice + 1 },
+      },
+    });
+  documento.developerMetadata?.push({
+    metadataId: (documento.developerMetadata?.length ?? 0) + 1,
+    metadataKey: "frequenciapp.aluno",
+    metadataValue: ALUNO,
+    location: { dimensionRange: { sheetId, startRowIndex: 1, endRowIndex: 2 } },
+  });
+  return sheetId;
 }
 
 function marcarMensal(documento: DocumentoGoogle, id: number, mes = entrada.mes) {
@@ -114,24 +230,36 @@ describe("identificação do mês da planilha", () => {
     "recusa mês inválido %s",
     (mes) => expect(mesValido(mes)).toBe(false),
   );
-  it("preserva mês e ano em nomes longos e remove caracteres proibidos", () => {
+  it("usa o mês por extenso em nomes longos e remove caracteres proibidos", () => {
     const nome = nomeAbaMensal("'QA [A]/B:C?D*E\\F\n".repeat(20), "2026-10");
     expect(nome.length).toBeLessThanOrEqual(100);
-    expect(nome).toMatch(/ · 10-2026$/);
+    expect(nome).toMatch(/ · Outubro$/);
     expect(nome).not.toMatch(/[\\/:*?[\]]/);
     expect(nome.startsWith("'")).toBe(false);
-    expect(nomeAbaMensal("1º A", "2026-10")).toBe("1º A · 10-2026");
+    expect(nomeAbaMensal("1º A", "2026-10")).toBe("1º A · Outubro");
+    expect(nomeAbaMensal("1º A", "2027-10", true)).toBe("1º A · Outubro 2027");
     expect(() => nomeAbaMensal("QA", "2026-13")).toThrow("mês válido");
+  });
+
+  it("seleciona somente datas úteis nos limites e no ano bissexto", () => {
+    const outubro = diasDaPlanilhaMensal("2026-10");
+    expect(outubro).toHaveLength(22);
+    expect(outubro[0]).toBe("2026-10-01");
+    expect(outubro.at(-1)).toBe("2026-10-30");
+    expect(outubro).not.toContain("2026-10-03");
+    expect(outubro).not.toContain("2026-10-04");
+    expect(diasDaPlanilhaMensal("2024-02")).toContain("2024-02-29");
+    expect(() => diasDaPlanilhaMensal("2026-13")).toThrow("mês válido");
   });
 });
 
 describe("preparação das abas mensais", () => {
-  it("cria calendário completo, lista e vínculos em um lote, preservando a aba antiga", async () => {
+  it("cria dias úteis, lista e vínculos em um lote, preservando a aba antiga", async () => {
     const { documento, lotes } = simularGoogle();
     const anterior = structuredClone(documento.sheets[0]);
     const resultado = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
     expect(resultado).toMatchObject({
-      aba: "1º A · 10-2026",
+      aba: "1º A · Outubro",
       criada: true,
       mes: "2026-10",
       turmaOriginalId: TURMA,
@@ -146,14 +274,11 @@ describe("preparação das abas mensais", () => {
               values: expect.arrayContaining([
                 { userEnteredValue: { stringValue: "Aluno" } },
                 { userEnteredValue: { stringValue: "01/10/2026" } },
-                { userEnteredValue: { stringValue: "31/10/2026" } },
+                { userEnteredValue: { stringValue: "30/10/2026" } },
               ]),
             },
             {
-              values: [
-                { userEnteredValue: { stringValue: "QA Aluno" } },
-                { userEnteredValue: { stringValue: "1º B" } },
-              ],
+              values: [{ userEnteredValue: { stringValue: "QA Aluno" } }],
             },
           ],
         }),
@@ -168,7 +293,7 @@ describe("preparação das abas mensais", () => {
     );
     expect(
       documento.developerMetadata?.filter((item) => item.metadataKey === "frequenciapp.coluna"),
-    ).toHaveLength(33);
+    ).toHaveLength(23);
     expect(await listarAbasMensaisGoogle("arquivo", "acesso")).toEqual({
       abas: [
         {
@@ -182,9 +307,9 @@ describe("preparação das abas mensais", () => {
   });
 
   it.each([
-    ["2024-02", 31],
-    ["2026-02", 30],
-    ["2100-02", 30],
+    ["2024-02", 22],
+    ["2026-02", 21],
+    ["2100-02", 21],
   ])("prepara fevereiro de %s com o número correto de colunas", async (mes, total) => {
     const { documento } = simularGoogle();
     await prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, mes });
@@ -207,7 +332,7 @@ describe("preparação das abas mensais", () => {
     expect(lotes[0]?.length).toBeGreaterThan(500);
   });
 
-  it("reprepara sem reescrever, mesmo depois de renomear a turma ou a aba", async () => {
+  it("atualiza somente o título depois de renomear a turma ou a aba", async () => {
     const { documento, lotes } = simularGoogle();
     const criado = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
     const mensal = documento.sheets.find((aba) => aba.properties.title === criado.aba);
@@ -218,8 +343,160 @@ describe("preparação das abas mensais", () => {
       rotulo: "QA Turma renomeada",
       alunos: [{ alunoId: ALUNO, nome: "QA Nome atualizado", turmaAtual: "QA C" }],
     });
-    expect(nova).toEqual({ ...criado, aba: "QA Outubro renomeado", criada: false });
+    expect(nova).toEqual({
+      ...criado,
+      aba: "QA Turma renomeada · Outubro",
+      criada: false,
+      atualizada: true,
+    });
+    expect(lotes).toHaveLength(2);
+    expect(lotes[1]).toEqual([
+      {
+        updateSheetProperties: {
+          properties: { sheetId: mensal.properties.sheetId, title: nova.aba },
+          fields: "title",
+        },
+      },
+    ]);
+  });
+
+  it("simplifica a aba antiga sem reconstruir alunos, frequências úteis ou o destino", async () => {
+    const { documento, celulas, lotes } = simularGoogle();
+    const sheetId = inserirLegada(documento, celulas);
+    const linhas = celulas.get(sheetId);
+    if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+    linhas[0].push("Observação manual");
+    linhas[1].push("=SUM(C2:D2)");
+    const antes = structuredClone(linhas);
+    const marcadorAluno = structuredClone(
+      documento.developerMetadata?.find((item) => item.metadataKey === "frequenciapp.aluno"),
+    );
+    const resultado = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    expect(resultado).toEqual({
+      aba: "1º A · Outubro",
+      mes: entrada.mes,
+      turmaOriginalId: TURMA,
+      destino: `arquivo:${sheetId}:${GERACAO}`,
+      criada: false,
+      atualizada: true,
+    });
+    const dias = diasDaPlanilhaMensal(entrada.mes).map(rotuloData);
+    expect(celulas.get(sheetId)?.[0]).toEqual(["Aluno", ...dias, "Observação manual"]);
+    expect(celulas.get(sheetId)?.[1]).toEqual([
+      "QA Nome preservado",
+      ...dias.map((dia) => antes[1]?.[antes[0]?.indexOf(dia) ?? -1]),
+      "=SUM(C2:D2)",
+    ]);
+    expect(
+      documento.developerMetadata?.find((item) => item.metadataKey === "frequenciapp.aluno"),
+    ).toEqual(marcadorAluno);
     expect(lotes).toHaveLength(1);
+    expect(lotes[0]).toHaveLength(11);
+    expect(
+      lotes[0]?.every((pedido) => pedido.deleteDimension || pedido.updateSheetProperties),
+    ).toBe(true);
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toEqual({
+      ...resultado,
+      atualizada: false,
+    });
+    expect(lotes).toHaveLength(1);
+  });
+
+  it("mantém intacta uma coluna manual com o mesmo título de fim de semana", async () => {
+    const { documento, celulas } = simularGoogle();
+    const sheetId = inserirLegada(documento, celulas);
+    documento.developerMetadata = documento.developerMetadata?.filter(
+      (item) => item.location.dimensionRange?.startColumnIndex !== 4,
+    );
+    await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    expect(celulas.get(sheetId)?.[0]).toContain("03/10/2026");
+  });
+
+  it("confirma atualização após resposta perdida apenas quando título e colunas já mudaram", async () => {
+    const { documento, celulas, lotes } = simularGoogle("resposta_perdida");
+    inserirLegada(documento, celulas);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toMatchObject({
+      aba: "1º A · Outubro",
+      criada: false,
+      atualizada: true,
+    });
+    expect(lotes).toHaveLength(1);
+  });
+
+  it.each(["recusar", "resposta_perdida_antes"] as const)(
+    "não confunde a aba antiga com uma atualização concluída após %s",
+    async (modo) => {
+      const { documento, celulas, lotes } = simularGoogle(modo);
+      const sheetId = inserirLegada(documento, celulas);
+      const antes = structuredClone(celulas.get(sheetId));
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).rejects.toThrow();
+      expect(celulas.get(sheetId)).toEqual(antes);
+      expect(
+        documento.sheets.find((item) => item.properties.sheetId === sheetId)?.properties.title,
+      ).toBe("1º A · 10-2026");
+      expect(lotes).toHaveLength(1);
+    },
+  );
+
+  it.each(["cabeçalho", "metadado", "mês", "dia útil", "mesclagem"])(
+    "recusa exclusão se houver mudança inesperada de %s",
+    async (alteracao) => {
+      const { documento, celulas, lotes } = simularGoogle();
+      const sheetId = inserirLegada(documento, celulas);
+      const cabecalho = celulas.get(sheetId)?.[0];
+      if (!cabecalho) throw new Error("Cabeçalho de teste ausente.");
+      if (alteracao === "cabeçalho") cabecalho[1] = "Notas manuais";
+      if (alteracao === "mês") cabecalho[4] = "03/11/2026";
+      if (alteracao === "dia útil") cabecalho[2] = "";
+      if (alteracao === "metadado")
+        documento.developerMetadata = documento.developerMetadata?.filter(
+          (item) => item.location.dimensionRange?.startColumnIndex !== 0,
+        );
+      if (alteracao === "mesclagem") {
+        const aba = documento.sheets.find((item) => item.properties.sheetId === sheetId);
+        if (aba)
+          aba.merges = [
+            { startColumnIndex: 1, endColumnIndex: 3, startRowIndex: 1, endRowIndex: 2 },
+          ];
+      }
+      await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).rejects.toThrow(
+        "Confira o cabeçalho",
+      );
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("acrescenta o ano somente para distinguir o mesmo mês da mesma turma em outro ano", async () => {
+    const { documento } = simularGoogle();
+    await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    const segundoAno = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2027-10",
+    });
+    expect(segundoAno.aba).toBe("1º A · Outubro 2027");
+    expect(documento.sheets.some((aba) => aba.properties.title === "1º A · Outubro")).toBe(true);
+    expect(
+      (await prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, mes: "2027-10" }))
+        .atualizada,
+    ).toBe(false);
+  });
+
+  it("recusa título sem ano ocupado por outra turma e mantém a aba mensal anterior", async () => {
+    const { documento, celulas, lotes } = simularGoogle();
+    inserirLegada(documento, celulas);
+    marcarMensal(documento, 3, "2027-10");
+    const ocupante = documento.sheets.find((aba) => aba.properties.sheetId === 3);
+    if (ocupante) ocupante.properties.title = "1º A · Outubro";
+    const turma = documento.developerMetadata?.find(
+      (item) => item.location.sheetId === 3 && item.metadataKey === "frequenciapp.turma",
+    );
+    if (turma) turma.metadataValue = ALUNO;
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).rejects.toThrow(
+      "impede a preparação",
+    );
+    expect(lotes).toHaveLength(0);
   });
 
   it("atribui outra geração ao recriar uma aba apagada, mesmo com o identificador igual", async () => {

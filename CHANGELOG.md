@@ -26,6 +26,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Abas mensais de frequência com nome do mês por extenso, sem Turma atual nem colunas de sábado e domingo. Preparar mês atualiza abas existentes preservando registros dos dias úteis e vínculos; envios mensais não recriam fins de semana. Preparo e envio compartilham proteção contra alterações simultâneas.
+
 - Acabamento de vidro nas roscas do Painel, com reflexos discretos, centro circular, legendas legíveis e detalhes opacos, seguindo a tipografia e as cores da interface nos temas claro e escuro.
 
 - Automação do schema de preview por pull request: o workflow cria, migra e remove `preview_pr_<n>`, mantém o fallback `preview` na `main`, oferece faxina semanal e, com token da Vercel, aponta a branch para o schema do pull request.

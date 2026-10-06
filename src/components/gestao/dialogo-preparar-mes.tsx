@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { CalendarPlus, LoaderCircle, RotateCcw } from "lucide-react";
 import { rotuloMes } from "@/domain/frequencia";
-import { mesValido } from "@/domain/planilha-mensal";
+import { mesValido, nomeAbaMensal } from "@/domain/planilha-mensal";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -27,6 +27,7 @@ interface ResultadoTurma {
   estado: "preparada" | "pendente" | "erro";
   aba?: string;
   criada?: boolean;
+  atualizada?: boolean;
   erro?: string;
 }
 
@@ -118,16 +119,19 @@ export function DialogoPrepararMes({
         if (saida[indice]?.estado === "preparada") continue;
         setTurmaAtual(turma.rotulo);
         try {
-          const dados = await pedir<{ aba: string; mes: string; criada: boolean }>(
-            "/api/planilha/mensal",
-            corpoJson({ turmaOriginalId: turma.id, mes }),
-          );
+          const dados = await pedir<{
+            aba: string;
+            mes: string;
+            criada: boolean;
+            atualizada: boolean;
+          }>("/api/planilha/mensal", corpoJson({ turmaOriginalId: turma.id, mes }));
           saida[indice] = {
             turmaOriginalId: turma.id,
             rotulo: turma.rotulo,
             estado: "preparada",
             aba: dados.aba,
             criada: dados.criada,
+            atualizada: dados.atualizada,
           };
         } catch (erro) {
           const falhaComum = interrupcaoDoPreparo(erro);
@@ -189,7 +193,7 @@ export function DialogoPrepararMes({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {resultados === null
-                ? "Cria uma aba por turma, com alunos e dias do mês. Abas já preparadas são reutilizadas e o histórico antigo é preservado."
+                ? "Cria ou atualiza uma aba por turma, com o nome do mês e datas de segunda a sexta. Nas abas existentes, retira Turma atual e as colunas de sábado e domingo, mantendo os demais registros."
                 : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -226,8 +230,8 @@ export function DialogoPrepararMes({
                 onValor={onMes}
               />
               <p className="text-muted-foreground text-sm">
-                Exemplo: {turmas[0]?.rotulo ?? "1º A"} · {mes.slice(5)}-{mes.slice(0, 4)}. Para
-                incluir chamadas já salvas, use o envio com prévia.
+                Exemplo: {nomeAbaMensal(turmas[0]?.rotulo ?? "1º A", mes)}. Para incluir chamadas já
+                salvas, use o envio com prévia.
               </p>
             </>
           ) : (
@@ -238,7 +242,8 @@ export function DialogoPrepararMes({
                   <p className={item.erro ? "text-falta-texto" : "text-muted-foreground"}>
                     {item.estado === "pendente"
                       ? "Não preparada"
-                      : (item.erro ?? (item.criada ? "Criada" : "Reutilizada"))}
+                      : (item.erro ??
+                        (item.criada ? "Criada" : item.atualizada ? "Atualizada" : "Reutilizada"))}
                   </p>
                 </li>
               ))}

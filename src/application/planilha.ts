@@ -43,8 +43,9 @@ import {
 } from "@/domain/planilha";
 import { diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
 import { diasSemEnvioConfirmado } from "@/domain/planilha-envios";
-import { mesValido } from "@/domain/planilha-mensal";
+import { diasDaPlanilhaMensal, mesValido } from "@/domain/planilha-mensal";
 import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comTravaPlanilhaFrequencia } from "@/infra/trava-planilha-frequencia";
 
 const FINALIDADE = "FREQUENCIA" as const;
 const LIMITE_DIAS_ENVIO = 92;
@@ -133,6 +134,13 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
       FROM ${objetoDoBanco("alunos_chamada")} AS chamada
       JOIN ${objetoDoBanco("alunos")} AS aluno ON aluno.id = chamada.aluno_id
       WHERE chamada.frequencia_id = frequencia.id
+        AND (
+          EXTRACT(ISODOW FROM frequencia.dia) <= 5
+          OR NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(${mensais}::jsonb) AS mensal
+            WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
+          )
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM ${objetoDoBanco("sincronizacoes_planilha")} AS envio
@@ -710,22 +718,28 @@ async function montarSimulacao(
   }
   const diasPorAba = new Map<string, { dias: string[]; incremental: boolean }>();
   for (const par of pares) {
-    const diasDoDestino = par.mes
-      ? periodo.filter((dia) => dia.startsWith(par.mes ?? ""))
-      : periodo;
-    diasPorAba.set(
-      par.aba,
-      await diasDoEnvio(
-        par.turmaOriginalId,
-        {
-          ...entrada,
-          de: diasDoDestino[0] ?? entrada.de,
-          ate: diasDoDestino.at(-1) ?? entrada.ate,
-        },
-        true,
-        par.destino,
-      ),
+    const diasMensais = par.mes ? new Set(diasDaPlanilhaMensal(par.mes)) : null;
+    const diasDoDestino = diasMensais ? periodo.filter((dia) => diasMensais.has(dia)) : periodo;
+    if (diasDoDestino.length === 0) {
+      diasPorAba.set(par.aba, { dias: [], incremental: entrada.somenteAlteradas !== false });
+      continue;
+    }
+    const envio = await diasDoEnvio(
+      par.turmaOriginalId,
+      {
+        ...entrada,
+        de: diasDoDestino[0] ?? entrada.de,
+        ate: diasDoDestino.at(-1) ?? entrada.ate,
+      },
+      true,
+      par.destino,
     );
+    // Chamadas de fim de semana continuam no aplicativo, mas não recriam
+    // colunas removidas das abas mensais, inclusive no envio incremental.
+    diasPorAba.set(par.aba, {
+      ...envio,
+      dias: diasMensais ? envio.dias.filter((dia) => diasMensais.has(dia)) : envio.dias,
+    });
   }
   const todosOsDias = [...diasPorAba.values()].flatMap((item) => item.dias).sort();
   const [turmas, alunos, frequencias] = await Promise.all([
@@ -870,6 +884,10 @@ export async function enviarAposSalvar(
     for (const origem of origens) {
       const vinculos = salvo?.mapa.filter((par) => par.turmaOriginalId === origem) ?? [];
       const mensais = vinculos.filter((par) => par.mes);
+      if (mensais.length > 0 && !diasDaPlanilhaMensal(dia.slice(0, 7)).includes(dia)) {
+        situacoes.set(origem, "desligado");
+        continue;
+      }
       if (
         vinculos.length === 0 ||
         (mensais.length > 0 && !mensais.some((par) => par.mes === dia.slice(0, 7)))
@@ -1031,6 +1049,10 @@ interface ResultadoTurma {
  * resposta: se a função for interrompida, fica a verdade, sem confirmação.
  */
 export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
+  return comTravaPlanilhaFrequencia(() => aplicarEnvioProtegido(usuario, entrada));
+}
+
+async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) {
   const inicio = Date.now();
   const dados = esquemaEnvio.safeParse(entrada);
   if (!dados.success) {
