@@ -81,7 +81,7 @@ Para uma role dedicada, crie um usuário PostgreSQL com permissões no schema es
 
 O `.env` local contém exemplos completos em [`.env.example`](../.env.example). O `prisma.config.ts` prioriza `DIRECT_URL` para o CLI, com fallback local para permitir geração do cliente durante o build.
 
-Com `pg` 8.16 ou superior, `sslmode=require` passou a verificar o certificado e o pooler do Supabase pode responder `SELF_SIGNED_CERT_IN_CHAIN` nos scripts administrativos e no migrador. Nesse caso, acrescente `uselibpqcompat=true` à URL usada pelo comando, ou use `sslmode=no-verify`, para manter a criptografia sem verificação de certificado.
+Com `pg` 8.16 ou superior, `sslmode=require` passou a verificar o certificado e o pooler do Supabase pode falhar com `SELF_SIGNED_CERT_IN_CHAIN` no runtime, nos scripts administrativos e no migrador. Nesse caso, acrescente `uselibpqcompat=true` à URL do ambiente afetado, ou use `sslmode=no-verify`, para manter a criptografia sem verificação de certificado; o runtime registra a falha `P1011` como indisponibilidade amigável.
 
 ## Vercel
 
@@ -123,8 +123,8 @@ O build da Vercel não executa migrations. O workflow de CD usa `DIRECT_URL_PROD
 O Preview pode usar um schema separado no mesmo database da produção. O exemplo abaixo usa `preview`; substitua pelo nome provisionado e mantenha as variáveis no escopo **Preview** da Vercel:
 
 ```text
-DATABASE_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require&schema=preview
-DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require&schema=preview
+DATABASE_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require&uselibpqcompat=true&schema=preview
+DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require&uselibpqcompat=true&schema=preview
 ```
 
 As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis com permissões diferentes. `USUARIO.PROJECT_REF` representa o usuário completo do pooler: copie o valor correspondente à role existente no projeto Supabase. Criar um schema não cria um usuário PostgreSQL. Sem `schema` na URL e sem `DATABASE_SCHEMA`, o destino padrão é `public`.
