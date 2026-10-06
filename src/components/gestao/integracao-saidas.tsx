@@ -1,7 +1,7 @@
 "use client";
 
-// Card da planilha de saídas: etapas de conexão, aba do registro e envio,
-// modo completo e zona de risco. Restrito à administração.
+// Card da planilha de entradas e saídas: etapas de conexão, aba do registro e envio,
+// preparo das duas abas, modo completo e zona de risco. Restrito à administração.
 import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
 import { DoorOpen, LoaderCircle, RotateCcw } from "lucide-react";
@@ -10,6 +10,16 @@ import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { CABECALHO_SAIDAS, type AbaSaidaEsquema } from "@/domain/planilha-saidas";
 import { rotuloInstante, rotuloUltimoEnvio } from "@/domain/planilha";
@@ -80,6 +90,7 @@ export default function IntegracaoSaidas({
   const [abaSelecionada, setAbaSelecionada] = useState("");
   const [novaAba, setNovaAba] = useState(NOME_ABA_PADRAO);
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
+  const [confirmarEntradas, setConfirmarEntradas] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
   const carregar = useCallback(async () => {
@@ -247,14 +258,49 @@ export default function IntegracaoSaidas({
     });
   }
 
+  async function prepararEntradas() {
+    await executarPorChave("preparar-entradas", async () => {
+      try {
+        const resultado = await pedir<{
+          criada: boolean;
+          realinhada: boolean;
+          sheet1: "ausente" | "removida" | "mantida";
+        }>("/api/planilha-entradas/preparar", { method: "POST" });
+        setConfirmarEntradas(false);
+        avisarSucesso(
+          `${
+            resultado.criada
+              ? "Aba Entradas criada e organizada."
+              : resultado.realinhada
+                ? "Aba Entradas atualizada e organizada."
+                : "Aba Entradas organizada."
+          }${
+            resultado.sheet1 === "removida"
+              ? " Sheet1 removida."
+              : resultado.sheet1 === "mantida"
+                ? " Sheet1 mantida para conferência."
+                : ""
+          }`,
+        );
+      } catch (excecao) {
+        setConfirmarEntradas(false);
+        toast.error(
+          excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível preparar a aba Entradas.",
+        );
+      }
+    });
+  }
+
   if (carregando) {
     return (
       <section
         data-secao="planilha-saidas"
-        aria-label="Planilha de saídas"
+        aria-label="Planilha de entradas e saídas"
         className="superficie-vidro flex flex-col gap-4 p-4"
       >
-        <h2 className="font-medium">Planilha de saídas</h2>
+        <h2 className="font-medium">Planilha de entradas e saídas</h2>
         <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
       </section>
     );
@@ -263,7 +309,7 @@ export default function IntegracaoSaidas({
   return (
     <SecaoRecolhivel
       dataSecao="planilha-saidas"
-      titulo="Planilha de saídas"
+      titulo="Planilha de entradas e saídas"
       icone={DoorOpen}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -292,7 +338,7 @@ export default function IntegracaoSaidas({
           checked={integracao?.ativa ?? false}
           disabled={salvando || !conectada}
           onCheckedChange={(valor) => void alternarAtiva(valor)}
-          aria-label="Integração de saídas ativa"
+          aria-label="Integração de entradas e saídas ativa"
         />
       }
     >
@@ -427,6 +473,33 @@ export default function IntegracaoSaidas({
         </div>
       )}
 
+      {conectada && (
+        <div
+          data-secao="planilha-entradas-preparo"
+          className="superficie-vidro flex flex-col gap-2 p-3"
+        >
+          <p className="text-muted-foreground text-xs">
+            A aba Entradas tem as mesmas colunas da aba de saídas.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              disabled={!podeEnviar || chaveAtiva === "preparar-entradas"}
+              onClick={() => setConfirmarEntradas(true)}
+            >
+              Preparar aba Entradas
+            </Button>
+            <OrganizarPlanilha
+              rota="/api/planilha-entradas/organizar"
+              aba="Entradas"
+              disabled={!podeEnviar}
+            />
+          </div>
+        </div>
+      )}
+
       <EtapaPlanilha
         numero={3}
         titulo="Envio pela vista Saídas"
@@ -505,6 +578,35 @@ export default function IntegracaoSaidas({
       />
 
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+      <AlertDialog open={confirmarEntradas} onOpenChange={setConfirmarEntradas}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Preparar aba Entradas?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A aba Entradas da planilha {planilha?.nome ?? "conectada"} terá as mesmas colunas e a
+              mesma organização visual da aba de saídas. Se ela já existir no formato anterior, o
+              cabeçalho é atualizado: o responsável passa para a coluna Responsável, Observação fica
+              vazia e a coluna Código é descartada, mantendo as linhas já enviadas. A aba Sheet1
+              será removida somente se estiver vazia e a aba de saídas estiver configurada. Nenhum
+              registro de aluno será enviado nesta etapa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={chaveAtiva === "preparar-entradas"}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={chaveAtiva === "preparar-entradas"}
+              onClick={(evento) => {
+                evento.preventDefault();
+                void prepararEntradas();
+              }}
+            >
+              Preparar aba
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SecaoRecolhivel>
   );
 }

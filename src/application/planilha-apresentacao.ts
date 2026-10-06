@@ -9,7 +9,7 @@ import { auditar } from "@/infra/auditoria";
 import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
 import { detectarEsquema, assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { detectarEsquemaSaida } from "@/domain/planilha-saidas";
-import { ABA_ENTRADAS, CABECALHO_ENTRADAS } from "@/domain/planilha-entradas";
+import { ABA_ENTRADAS, formatoCabecalhoEntradas } from "@/domain/planilha-entradas";
 import {
   colunasDeApresentacao,
   planejarAjusteCabecalho,
@@ -94,11 +94,11 @@ async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entra
       : detectarEsquemaSaida(bruta);
   const cabecalhoLinha = tipo === "ENTRADAS" ? 1 : esquema.cabecalho;
   const cabecalho = aba.amostra[cabecalhoLinha - 1] ?? [];
-  if (
-    tipo === "ENTRADAS" &&
-    CABECALHO_ENTRADAS.some((rotulo, indice) => cabecalho[indice] !== rotulo)
-  )
-    throw new ErroHttp("Confira o cabeçalho padrão da aba Entradas antes de organizar.", 409);
+  if (tipo === "ENTRADAS" && formatoCabecalhoEntradas(cabecalho) !== "atual")
+    throw new ErroHttp(
+      "Prepare a aba Entradas para atualizar o cabeçalho padrão antes de organizar.",
+      409,
+    );
   let ajusteCabecalho: AjusteCabecalho | undefined;
   if (dados.data.ajustarCabecalho) {
     try {

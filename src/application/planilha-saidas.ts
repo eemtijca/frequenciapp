@@ -346,7 +346,10 @@ async function montarSimulacaoSaidas(
 ): Promise<SimulacaoSaidas> {
   const salvo = esquemaSaidasSalvo(linha);
   if (!salvo) {
-    throw new ErroHttp("Confira a estrutura da planilha de saídas antes de enviar.", 400);
+    throw new ErroHttp(
+      "Confira a estrutura da planilha de entradas e saídas antes de enviar.",
+      400,
+    );
   }
   const dias = diasEntre(entrada.de, entrada.ate);
   if (dias.length === 0 || dias.length > LIMITE_DIAS_ENVIO) {

@@ -3,7 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
-import { CABECALHO_ENTRADAS } from "@/domain/planilha-entradas";
+import { CABECALHO_ENTRADAS, CABECALHO_ENTRADAS_ANTERIOR } from "@/domain/planilha-entradas";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -271,6 +271,42 @@ describe("planilha de saídas", () => {
     expect(google.valor("Entradas", 2, 1)).toBe("QA Conteúdo preservado");
     google.definirAba("Entradas", [CABECALHO_ENTRADAS]);
     google.removerAba("Sheet1");
+  });
+
+  it("realinha a aba Entradas do formato anterior e preserva as linhas já enviadas", async () => {
+    if (!google) throw new Error("Google sintético indisponível.");
+    google.definirAba("Entradas", [
+      CABECALHO_ENTRADAS_ANTERIOR,
+      [
+        "15/06/2026",
+        "QS Ana",
+        "QS Ano A",
+        "08:00 · 1ª aula",
+        "Transporte",
+        "QA Coordenação",
+        "aluno:2026-06-15",
+      ],
+    ]);
+    const resposta = await autenticado("/api/planilha-entradas/preparar", { method: "POST" });
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toMatchObject({ criada: false, realinhada: true });
+    expect(CABECALHO_ENTRADAS.map((_, indice) => google?.valor("Entradas", 1, indice + 1))).toEqual(
+      CABECALHO_ENTRADAS,
+    );
+    expect([1, 2, 3, 4, 5, 6, 7].map((coluna) => google?.valor("Entradas", 2, coluna))).toEqual([
+      "15/06/2026",
+      "QS Ana",
+      "QS Ano A",
+      "08:00 · 1ª aula",
+      "Transporte",
+      "",
+      "QA Coordenação",
+    ]);
+    // Preparar de novo reconhece o formato atual e não mexe nas linhas.
+    const repetida = await autenticado("/api/planilha-entradas/preparar", { method: "POST" });
+    expect(await repetida.json()).toMatchObject({ realinhada: false });
+    expect(google.valor("Entradas", 2, 7)).toBe("QA Coordenação");
+    google.definirAba("Entradas", [CABECALHO_ENTRADAS]);
   });
 
   it("simula e aplica as saídas novas, sem tocar na linha manual", async () => {

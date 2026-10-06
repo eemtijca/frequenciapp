@@ -572,7 +572,6 @@ export default function Aplicacao({
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaMovimentacoes
             abaInicial={abaMovimentacaoInicial}
-            podePrepararPlanilha={ehAdmin}
             diaCorrente={diaCorrente}
             fuso={fuso}
             mes={mes}

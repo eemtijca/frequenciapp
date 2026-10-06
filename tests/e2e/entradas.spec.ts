@@ -117,12 +117,10 @@ test("registra justificativa do catálogo com observação e responsável escolh
   await expect(lista).toContainText("Nenhuma entrada registrada neste recorte.");
 });
 
-test("revê a aba e o envio em confirmação própria", async ({ page }) => {
-  let preparou = 0;
+test("revê o envio em confirmação própria", async ({ page }) => {
   let enviou = 0;
   await page.route("**/api/planilha-entradas/**", async (route) => {
     const acao = new URL(route.request().url()).pathname.split("/").at(-1);
-    if (acao === "preparar") preparou++;
     if (acao === "enviar") {
       enviou++;
       expect(route.request().postDataJSON()).toMatchObject({
@@ -144,9 +142,7 @@ test("revê a aba e o envio em confirmação própria", async ({ page }) => {
                 avisos: [],
                 criar: [{ nome: "E2E Aluno", linha: 2 }],
               }
-            : acao === "preparar"
-              ? { criada: true, organizada: true, sheet1: "removida" }
-              : { linhasCriadas: 1 },
+            : { linhasCriadas: 1 },
     });
   });
   await page.route("**/api/entradas?**", (route) =>
@@ -170,11 +166,9 @@ test("revê a aba e o envio em confirmação própria", async ({ page }) => {
   await trocarVisao(page, "Saídas e entradas", "saidas");
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
-  await page.getByRole("button", { name: "Preparar aba Entradas" }).click();
-  expect(preparou).toBe(0);
-  await page.getByRole("button", { name: "Preparar aba", exact: true }).click();
-  await expect(page.getByText("Aba Entradas criada e organizada. Sheet1 removida.")).toBeVisible();
-  expect(preparou).toBe(1);
+  // O preparo e a organização da aba Entradas ficam em Gestão, Configurações, Planilhas.
+  await expect(page.getByRole("button", { name: "Preparar aba Entradas" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Organizar apresentação/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Prévia das entradas" }).click();
   await expect(page.getByRole("alertdialog")).toContainText("1 linha nova");
   expect(enviou).toBe(0);

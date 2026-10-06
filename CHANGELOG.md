@@ -8,6 +8,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+### Alterado
+
+- Planilha de saídas passa a se chamar "Planilha de entradas e saídas" na Gestão, e a aba Entradas tem as mesmas sete colunas de Saídas (sem Código, com Responsável no lugar de Liberado por). Preparar e organizar a aba Entradas saíram da área Saídas e entradas e ficam nessa seção; preparar realinha a aba no formato anterior, preservando os registros.
+
 ### Removido
 
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).
