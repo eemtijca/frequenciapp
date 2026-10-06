@@ -98,7 +98,6 @@ test("registra a saída com o horário escolhido e mostra na lista", async ({ pa
   await page.getByRole("option", { name: "Diretor E2E" }).click();
   await page.getByRole("button", { name: "Registrar saída" }).click();
   await expect(page.getByText("Saída registrada.")).toBeVisible();
-  await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
   await expect(page.getByText(/09:20 · 1ª aula/).first()).toBeVisible();
 });
 
