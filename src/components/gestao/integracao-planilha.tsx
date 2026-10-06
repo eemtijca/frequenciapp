@@ -3,6 +3,7 @@
 // Card da planilha de frequência: etapas de conexão, estrutura e envio, modo
 // completo e zona de risco. Restrito à administração.
 import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
+import { DialogoMostrarMes } from "@/components/gestao/dialogo-mostrar-mes";
 import { DialogoPrepararMes } from "@/components/gestao/dialogo-preparar-mes";
 import { useCallback, useEffect, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
@@ -402,7 +403,11 @@ export default function IntegracaoPlanilha({
             disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
             onAtualizar={carregar}
           />
-          <span className="text-muted-foreground text-xs">Uma aba por turma e mês</span>
+          <DialogoMostrarMes
+            mesAtual={diaCorrente.slice(0, 7)}
+            disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+            onAtualizar={carregar}
+          />
         </div>
         {estruturaEmEdicao ? (
           <>

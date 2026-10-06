@@ -9,7 +9,11 @@ import {
   executarAcaoGoogle,
   type DocumentoGoogle,
 } from "@/infra/google-planilhas-api";
-import { listarAbasMensaisGoogle, prepararAbaMensalGoogle } from "@/infra/google-planilhas-mensal";
+import {
+  listarAbasMensaisGoogle,
+  mostrarMesGoogle,
+  prepararAbaMensalGoogle,
+} from "@/infra/google-planilhas-mensal";
 import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
 
 const TURMA = "10000000-0000-4000-8000-000000000001";
@@ -91,13 +95,15 @@ function simularGoogle(
           }
           if (pedido.updateSheetProperties) {
             const atualizacao = pedido.updateSheetProperties as {
-              properties: { sheetId: number; title: string };
+              properties: { sheetId: number; title?: string; hidden?: boolean };
             };
             const aba = documento.sheets.find(
               (item) => item.properties.sheetId === atualizacao.properties.sheetId,
             );
             if (aba && atualizacao.properties.title)
               aba.properties.title = atualizacao.properties.title;
+            if (aba && atualizacao.properties.hidden !== undefined)
+              aba.properties.hidden = atualizacao.properties.hidden;
           }
           if (pedido.deleteDimension) {
             const exclusao = pedido.deleteDimension as {
@@ -705,4 +711,103 @@ describe("conferência mensal antes da escrita", () => {
       }
     },
   );
+});
+
+describe("visibilidade mensal", () => {
+  it("revela o mês antes de ocultar outros destinos e preserva abas sem vínculo", async () => {
+    const google = simularGoogle();
+    const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-09",
+    });
+    google.documento.sheets.push({ properties: { sheetId: 42, title: "Notas manuais" } });
+    const resultado = await mostrarMesGoogle("arquivo", "acesso", "2026-09", [
+      { aba: "1º A", turmaOriginalId: TURMA },
+    ]);
+    expect(resultado).toMatchObject({ visiveis: [setembro.aba], ocultadas: ["1º A", outubro.aba] });
+    expect(
+      google.documento.sheets
+        .filter((aba) => !aba.properties.hidden)
+        .map((aba) => aba.properties.title),
+    ).toEqual([setembro.aba, "Notas manuais"]);
+    const lotesAntes = google.lotes.length;
+    await mostrarMesGoogle("arquivo", "acesso", "2026-09", [
+      { aba: "1º A", turmaOriginalId: TURMA },
+    ]);
+    expect(google.lotes).toHaveLength(lotesAntes);
+    await mostrarMesGoogle("arquivo", "acesso", "2026-10", [
+      { aba: "1º A", turmaOriginalId: TURMA },
+    ]);
+    expect(google.lotes.at(-1)).toEqual([
+      {
+        updateSheetProperties: {
+          properties: { sheetId: Number(outubro.destino.split(":")[1]), hidden: false },
+          fields: "hidden",
+        },
+      },
+      {
+        updateSheetProperties: {
+          properties: { sheetId: Number(setembro.destino.split(":")[1]), hidden: true },
+          fields: "hidden",
+        },
+      },
+    ]);
+    expect(await listarAbasMensaisGoogle("arquivo", "acesso")).toMatchObject({
+      abas: [outubro, setembro].map((aba) => ({
+        aba: aba.aba,
+        mes: aba.mes,
+        turmaOriginalId: aba.turmaOriginalId,
+        destino: aba.destino,
+      })),
+    });
+  });
+
+  it("distingue anos e preserva o legado de uma turma sem o mês escolhido", async () => {
+    const google = simularGoogle();
+    const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    const outroAno = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2027-10",
+    });
+    google.documento.sheets.push({ properties: { sheetId: 51, title: "2º A" } });
+    const copia = { properties: { sheetId: 52, title: "_frequenciapp_backup_1º A", hidden: true } };
+    google.documento.sheets.push(copia);
+    await mostrarMesGoogle("arquivo", "acesso", "2026-10", [
+      { aba: "1º A", turmaOriginalId: TURMA },
+      { aba: "2º A", turmaOriginalId: ALUNO },
+    ]);
+    expect(
+      google.documento.sheets
+        .filter((aba) => !aba.properties.hidden)
+        .map((aba) => aba.properties.title),
+    ).toEqual([outubro.aba, "2º A"]);
+    expect(
+      google.documento.sheets.find((aba) => aba.properties.title === outroAno.aba)?.properties
+        .hidden,
+    ).toBe(true);
+    expect(copia.properties.hidden).toBe(true);
+  });
+
+  it("não oculta nenhuma aba quando o mês está ausente ou inválido", async () => {
+    const google = simularGoogle();
+    await expect(mostrarMesGoogle("arquivo", "acesso", "2026-10", [])).rejects.toMatchObject({
+      status: 409,
+    });
+    await expect(mostrarMesGoogle("arquivo", "acesso", "2026-13", [])).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(google.lotes).toHaveLength(0);
+  });
+
+  it("propaga uma resposta perdida sem repetir o lote de visibilidade", async () => {
+    const google = simularGoogle();
+    await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    google.controle.modo = "resposta_perdida";
+    const antes = google.lotes.length;
+    await expect(
+      mostrarMesGoogle("arquivo", "acesso", "2026-10", [{ aba: "1º A", turmaOriginalId: TURMA }]),
+    ).rejects.toThrow();
+    expect(google.lotes).toHaveLength(antes + 1);
+  });
 });

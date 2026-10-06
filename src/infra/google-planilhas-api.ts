@@ -652,6 +652,17 @@ export async function executarAcaoGoogle(
     const { listarAbasMensaisGoogle } = await import("./google-planilhas-mensal");
     return listarAbasMensaisGoogle(id, acesso);
   }
+  if (corpo.acao === "mostrarMes") {
+    const dados = z
+      .object({
+        mes: z.string().refine(mesValido),
+        legadas: z.array(z.object({ aba: z.string().min(1), turmaOriginalId: z.string().uuid() })),
+      })
+      .safeParse(corpo);
+    if (!dados.success) throw new ErroHttp("Informe um mês válido.", 400);
+    const { mostrarMesGoogle } = await import("./google-planilhas-mensal");
+    return mostrarMesGoogle(id, acesso, dados.data.mes, dados.data.legadas);
+  }
   if (corpo.acao === "prepararMes") {
     const { prepararAbaMensalGoogle, esquemaPreparacaoMensalGoogle } =
       await import("./google-planilhas-mensal");
