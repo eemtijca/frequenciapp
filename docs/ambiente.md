@@ -60,7 +60,7 @@ A conexão do runtime também pode usar uma conexão direta ou o pooler de sess�
 
 O schema PostgreSQL é escolhido por `DATABASE_SCHEMA`, que vence, ou pelo parâmetro `schema` da URL; sem nenhum dos dois, o padrão é `public`. `DATABASE_SCHEMA` permite que a plataforma de deploy aponte o schema do ambiente sem reescrever a connection string. Para o Preview no mesmo database, use um schema provisionado para o ambiente, como `preview`. O runtime informa o schema ao adaptador Prisma e qualifica as consultas SQL diretas; os scripts administrativos usam o mesmo destino pela `DIRECT_URL`, com fallback para `DATABASE_URL`.
 
-O pool do runtime é configurado por `POOL_MAX_CONEXOES`, com padrão 10; em ambientes serverless, use 1. A revisão implantada em `/api/saude` prefere `COMMIT_SHA` e aceita `VERCEL_GIT_COMMIT_SHA` e `GIT_COMMIT` como alternativas.
+O pool do runtime é configurado por `POOL_MAX_CONEXOES`, com padrão 10; em ambientes serverless, use de 3 a 5, porque a instância atende requisições concorrentes e o pool de 1 serializa as consultas. A revisão implantada em `/api/saude` prefere `COMMIT_SHA` e aceita `VERCEL_GIT_COMMIT_SHA` e `GIT_COMMIT` como alternativas.
 
 O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhido. O schema não substitui o usuário nem cria uma conta de acesso. Preparação, migrações e diagnóstico estão em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 
