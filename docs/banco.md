@@ -94,6 +94,12 @@ No Supabase, `DATABASE_URL` deve apontar para a Transaction pooler na porta 6543
 
 O `prisma.config.ts` prioriza `DIRECT_URL`, com fallback para `DATABASE_URL` e uma URL local para permitir `prisma generate` durante o build. O migrador Docker usa a mesma preferência.
 
+O schema é escolhido por `DATABASE_SCHEMA`, que vence, ou pelo parâmetro `schema` das URLs, com padrão `public` quando os dois estão ausentes. O runtime passa o schema explicitamente ao `PrismaPg` e qualifica tabelas nas consultas SQL diretas, sem depender do estado de sessão da Transaction pooler. O migrador Docker e os scripts administrativos configuram `search_path` apenas para o schema selecionado e recusam um schema inexistente; não recorrem a `public` quando um destino explícito está ausente.
+
+O nome escolhido, pela variável ou pela URL, é recusado quando está vazio ou repetido, contém caracteres de controle ou aspas duplas, tem o valor especial `$user` ou ultrapassa 63 bytes.
+
+Produção e Preview podem usar schemas distintos no mesmo database. Cada schema mantém tabelas, contas e histórico `_prisma_migrations` próprios. As credenciais PostgreSQL são independentes do nome do schema e precisam das permissões adequadas. O preparo do Preview está em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
+
 ## Migrações
 
 Dia a dia em desenvolvimento:
@@ -123,6 +129,8 @@ O `postinstall` do npm executa a regeneração. O código gerado fica em `genera
 As datas civis trafegam como texto `YYYY-MM-DD` e são gravadas como `date` a partir do meio-dia UTC, imunes a deslocamentos de fuso na gravação. O dia corrente é resolvido com `TZ_APP` ([ambiente.md](ambiente.md)).
 
 ## Manutenção
+
+Nas consultas SQL manuais, selecione explicitamente o schema do ambiente ou qualifique o nome das tabelas. O parâmetro `schema` das URLs do Prisma não configura clientes como `psql`.
 
 Sessões vencidas acumulam poucas linhas por conta:
 
@@ -154,6 +162,8 @@ pg_restore --clean --if-exists -d "$DIRECT_URL" frequenciapp.dump
 ```
 
 O teste de restauração recomendado é restaurar em um banco vazio e conferir contagens de `alunos` e `frequencias`. A rotina completa está em [operacao.md](operacao.md).
+
+Se a URL contiver o parâmetro `schema`, retire esse parâmetro da conexão usada pelo `pg_dump` e pelo `pg_restore`, que não o reconhecem. Para copiar apenas o Preview de um database compartilhado, use `pg_dump --schema=preview` com o nome correspondente; um dump sem filtro inclui os demais schemas. Teste a restauração em outro banco vazio.
 
 A migração `saida_horario` acrescenta `saidas_antecipadas.horario` (`VARCHAR(5)`, `HH:MM`) como coluna anulável. Saídas anteriores ficam sem horário; novas saídas exigem um horário válido. Cópias JSON antigas continuam aceitas sem o campo.
 

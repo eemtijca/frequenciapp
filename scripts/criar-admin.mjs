@@ -4,6 +4,7 @@ import pg from "pg";
 import "dotenv/config";
 import { deveGravarAdmin } from "./decisao-admin.mjs";
 import { hashear, senhaValida } from "./senha.mjs";
+import { resolverSchema, selecionarSchema } from "../src/infra/schema-postgres.mjs";
 
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
 const senha = process.env.ADMIN_SENHA;
@@ -23,8 +24,10 @@ if (!senhaValida(senha)) {
 }
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-if (!url || !(url.startsWith("postgresql://") || url.startsWith("postgres://"))) {
-  console.error("DIRECT_URL ou DATABASE_URL deve ser uma connection string PostgreSQL.");
+try {
+  resolverSchema({ url, schemaExplicito: process.env.DATABASE_SCHEMA });
+} catch (erro) {
+  console.error(erro.message);
   process.exit(1);
 }
 
@@ -32,6 +35,7 @@ const cliente = new pg.Client({ connectionString: url });
 
 try {
   await cliente.connect();
+  await selecionarSchema(cliente, url);
 
   let jaExiste = false;
   if (somenteCriar) {

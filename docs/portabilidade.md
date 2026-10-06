@@ -13,10 +13,11 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 - `publicacao.yml` publica `ghcr.io/<repo>:<versão>` e `:<major>.<minor>` em releases estáveis; `latest` só em versão estável.
 - Os rótulos OCI registram versão, revisão e origem da imagem.
 
-## Banco de preview
+## Schema de Preview
 
-- O preview usa um banco isolado, com `DATABASE_URL` e `DIRECT_URL` no escopo Preview da Vercel.
-- Nunca aponte o preview para o banco de produção: as migrações de release rodam apenas no ambiente de produção.
+- O Preview pode compartilhar o database PostgreSQL com a produção, usando um schema próprio. Selecione o schema do ambiente com `DATABASE_SCHEMA`, que vence o parâmetro `schema` das URLs, ou com `schema` em `DATABASE_URL` e `DIRECT_URL`, por exemplo `schema=preview`. Na Vercel, o ajuste fica no escopo Preview.
+- Preserve as URLs de produção e o segredo `DIRECT_URL_PROD`. As migrações de produção não preparam o Preview; aplique as migrações e crie uma conta administrativa no schema de Preview antes de publicar, conforme [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
+- O schema separa os objetos, mas as permissões da role PostgreSQL definem os limites de acesso. Use credenciais com os privilégios necessários apenas ao ambiente correspondente.
 
 ## Agenda e integração
 
@@ -34,5 +35,5 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 ## Ensaio local
 
 1. Gerar a imagem pela `publicacao.yml` (dispatch manual) ou com `docker build`.
-2. Executar o contêiner apontando para o banco de preview e conferir `/api/saude`.
+2. Executar o contêiner apontando para o schema de Preview e conferir `/api/saude` e o login.
 3. Rodar `npm run infra:floci` para exercitar o Terraform nos emuladores.

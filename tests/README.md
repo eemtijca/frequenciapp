@@ -39,6 +39,8 @@ Roda em qualquer ambiente, sem banco e sem rede:
 
 ## Contratos de API
 
+O contrato `schema-preview.test.ts` cria schemas descartáveis no mesmo banco para verificar o isolamento do Prisma e das consultas SQL diretas. A conexão de testes precisa de permissão `CREATE` no database; cada execução remove apenas os schemas que criou.
+
 A suíte aponta para o aplicativo em execução. O banco de testes precisa estar acessível para a limpeza da massa; exporte a connection string no comando porque ambientes locais podem ter outro valor de `DATABASE_URL` no shell. Os scripts administrativos preferem `DIRECT_URL` quando a variável está definida:
 
 ```bash

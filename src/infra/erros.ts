@@ -87,6 +87,16 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
         mensagem: "Registro não encontrado. Talvez tenha sido removido por outra pessoa.",
         status: 404,
       };
+    case "P1003":
+      return {
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      };
+    case "P1011":
+      return {
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      };
     case "P2021":
       return {
         mensagem: "O banco de dados está incompleto. Contate o suporte técnico.",
@@ -107,6 +117,31 @@ function traduzirConhecido(erro: ErroConhecido): { mensagem: string; status: num
   }
 }
 
+function ehUsuarioAusenteNoPooler(erro: PrismaClientKnownRequestError): boolean {
+  if (erro.code !== "P2039") return false;
+
+  const pendentes: unknown[] = [erro, erro.meta?.driverAdapterError];
+  const visitados = new Set<object>();
+  while (pendentes.length > 0) {
+    const candidato = pendentes.pop();
+    if (typeof candidato !== "object" || candidato === null || visitados.has(candidato)) {
+      continue;
+    }
+    visitados.add(candidato);
+    const detalhe = candidato as Record<string, unknown>;
+    for (const mensagem of [detalhe.message, detalhe.originalMessage]) {
+      if (
+        typeof mensagem === "string" &&
+        /\(EAUTHQUERY\)\s+user not found in the database\b/i.test(mensagem)
+      ) {
+        return true;
+      }
+    }
+    pendentes.push(detalhe.cause);
+  }
+  return false;
+}
+
 /**
  * Converte qualquer exceção em mensagem amigável e status HTTP.
  * Erros desconhecidos viram mensagem genérica: detalhes ficam no log
@@ -116,6 +151,22 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
   if (erro instanceof ErroHttp) return { mensagem: erro.message, status: erro.status };
 
   if (erro instanceof PrismaClientKnownRequestError) {
+    if (erro.code === "P1011") {
+      // A falha de TLS vem da configuração da URL; o diagnóstico usa texto fixo.
+      console.error(
+        "[banco] falha de TLS na conexão. Conferir o sslmode e o uselibpqcompat da URL no ambiente afetado.",
+      );
+    }
+    if (ehUsuarioAusenteNoPooler(erro)) {
+      // A exceção do adaptador pode conter credenciais; o diagnóstico usa texto fixo.
+      console.error(
+        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado.",
+      );
+      return {
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      };
+    }
     const traduzido = traduzirConhecido({
       code: erro.code,
       meta: erro.meta as Record<string, unknown> | undefined,

@@ -1,6 +1,6 @@
 // Tradução de erros: cada falha conhecida vira mensagem em português
 // com status adequado. Nada técnico vaza para o usuário.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PrismaClientInitializationError,
   PrismaClientKnownRequestError,
@@ -67,6 +67,25 @@ describe("traduzirErro", () => {
     expect(resultado.status).toBe(503);
   });
 
+  it("traduz banco inexistente (P1003)", () => {
+    const resultado = traduzirErro(erroConhecido("P1003"));
+    expect(resultado.status).toBe(503);
+    expect(resultado.mensagem).toContain("banco de dados");
+  });
+
+  it("traduz falha de TLS (P1011) com aviso operacional fixo", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const resultado = traduzirErro(erroConhecido("P1011"));
+      expect(resultado.status).toBe(503);
+      expect(log).toHaveBeenCalledExactlyOnceWith(
+        "[banco] falha de TLS na conexão. Conferir o sslmode e o uselibpqcompat da URL no ambiente afetado.",
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("traduz conflito de serialização (P2034)", () => {
     const resultado = traduzirErro(erroConhecido("P2034"));
     expect(resultado.status).toBe(409);
@@ -86,6 +105,85 @@ describe("traduzirErro", () => {
     );
     expect(resultado.status).toBe(503);
     expect(resultado.mensagem).toContain("banco de dados");
+  });
+
+  it("traduz EAUTHQUERY do adaptador sem vazar a conexão na resposta ou no log", () => {
+    const conexao = "postgresql://qa_usuario:qa_senha@banco.exemplo/postgres?schema=qa_preview";
+    const mensagem = `(EAUTHQUERY) user not found in the database: ${conexao}`;
+    const adaptador = new Error(mensagem, {
+      cause: { kind: "postgres", code: "XX000", originalMessage: mensagem },
+    });
+    adaptador.name = "DriverAdapterError";
+    const erro = new PrismaClientKnownRequestError(mensagem, {
+      code: "P2039",
+      clientVersion: "7.10.0",
+      meta: { modelName: "ParametrosAcesso", driverAdapterError: adaptador },
+    });
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const resultado = traduzirErro(erro);
+      expect(resultado).toEqual({
+        mensagem: "Não foi possível falar com o banco de dados. Contate o suporte técnico.",
+        status: 503,
+      });
+      expect(log).toHaveBeenCalledExactlyOnceWith(
+        "[banco] EAUTHQUERY: usuário de conexão não encontrado. Conferir o usuário de DATABASE_URL e o pooler no ambiente afetado.",
+      );
+      const saida = JSON.stringify({ resultado, logs: log.mock.calls });
+      for (const detalhe of [conexao, "qa_usuario", "qa_senha", "banco.exemplo", "qa_preview"]) {
+        expect(saida).not.toContain(detalhe);
+      }
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it.each([
+    new Error("(EAUTHQUERY) user not found in the database"),
+    new Error("Falha do adaptador", {
+      cause: {
+        code: "XX000",
+        originalMessage: "(EAUTHQUERY) user not found in the database",
+      },
+    }),
+  ])("reconhece EAUTHQUERY restrito aos detalhes do adaptador: %s", (driverAdapterError) => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(traduzirErro(erroConhecido("P2039", { driverAdapterError })).status).toBe(503);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it.each([
+    { code: "XX000", originalMessage: "Erro interno do banco" },
+    { code: "XX000", originalMessage: "user not found in the database" },
+    { code: "XX000", originalMessage: "(EAUTHQUERY) outra falha" },
+    undefined,
+  ])("preserva P2039 sem a assinatura de usuário ausente como erro inesperado", (cause) => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const driverAdapterError = new Error("Falha do adaptador", { cause });
+      expect(traduzirErro(erroConhecido("P2039", { driverAdapterError })).status).toBe(500);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("preserva conflitos mesmo quando o detalhe contém a assinatura de EAUTHQUERY", () => {
+    const driverAdapterError = new Error("(EAUTHQUERY) user not found in the database");
+    expect(traduzirErro(erroConhecido("P2034", { driverAdapterError })).status).toBe(409);
+  });
+
+  it("encerra a inspeção de causas circulares sem classificar outro P2039 como autenticação", () => {
+    const driverAdapterError = new Error("Falha do adaptador");
+    driverAdapterError.cause = driverAdapterError;
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      expect(traduzirErro(erroConhecido("P2039", { driverAdapterError })).status).toBe(500);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("traduz erro desconhecido sem vazar detalhes", () => {

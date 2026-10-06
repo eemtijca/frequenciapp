@@ -1,7 +1,7 @@
 // Google Planilhas: casos de uso da integração da frequência. Leitura do
 // esquema, planejamento conservador, envio manual e modo completo.
 import { z } from "zod";
-import { banco } from "@/infra/banco";
+import { banco, objetoDoBanco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
@@ -127,16 +127,16 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
   const mensais = JSON.stringify((esquemaSalvo(linha)?.mapa ?? []).filter((item) => item.mes));
   const contagem = await banco().$queryRaw<{ total: bigint }[]>`
     SELECT COUNT(*) AS total
-    FROM frequencias AS frequencia
+    FROM ${objetoDoBanco("frequencias")} AS frequencia
     WHERE EXISTS (
       SELECT 1
-      FROM alunos_chamada AS chamada
-      JOIN alunos AS aluno ON aluno.id = chamada.aluno_id
+      FROM ${objetoDoBanco("alunos_chamada")} AS chamada
+      JOIN ${objetoDoBanco("alunos")} AS aluno ON aluno.id = chamada.aluno_id
       WHERE chamada.frequencia_id = frequencia.id
         AND NOT EXISTS (
           SELECT 1
-          FROM sincronizacoes_planilha AS envio
-          WHERE envio.finalidade = ${FINALIDADE}::finalidade_integracao
+          FROM ${objetoDoBanco("sincronizacoes_planilha")} AS envio
+          WHERE envio.finalidade = ${FINALIDADE}::${objetoDoBanco("finalidade_integracao")}
             AND envio.turma_original_id = aluno.turma_original_id
             AND envio.resultado = 'SUCESSO'
             AND envio.puladas_ocupadas = 0
