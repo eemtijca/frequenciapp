@@ -396,31 +396,3 @@ export function alunosPorFaltas(
         a.aluno.id.localeCompare(b.aluno.id),
     );
 }
-
-/** Saídas de um aluno em um período, do mais recente para o mais antigo. */
-export interface RelatorioSaidaAluno {
-  alunoId: string;
-  saidas: SaidaAntecipada[];
-}
-
-/** Agrupa saídas por aluno, com o filtro de duas ou mais. */
-export function relatorioSaidas(
-  saidas: SaidaAntecipada[],
-  filtro: "todas" | "repetidas" = "todas",
-): RelatorioSaidaAluno[] {
-  const porAluno = new Map<string, SaidaAntecipada[]>();
-  for (const saida of saidas) {
-    const lista = porAluno.get(saida.alunoId) ?? [];
-    lista.push(saida);
-    porAluno.set(saida.alunoId, lista);
-  }
-  return [...porAluno.entries()]
-    .map(([alunoId, lista]) => ({
-      alunoId,
-      saidas: lista
-        .slice()
-        .sort((a, b) => b.dia.localeCompare(a.dia) || b.criadoEm.localeCompare(a.criadoEm)),
-    }))
-    .filter((item) => filtro === "todas" || item.saidas.length >= 2)
-    .sort((a, b) => b.saidas.length - a.saidas.length || a.alunoId.localeCompare(b.alunoId));
-}

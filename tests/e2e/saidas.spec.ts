@@ -36,9 +36,12 @@ test.describe("saída durante a aula", () => {
     await expect(page.getByText("23/100")).toBeVisible();
     await page.getByRole("button", { name: "Registrar saída" }).click();
     await expect(page.getByText("Saída registrada.")).toBeVisible();
-    await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
-    await expect(page.getByText("Saiu para a coordenação").first()).toBeVisible();
-    await expect(page.getByText("Liberado por Diretor E2E").first()).toBeVisible();
+    const lista = page.getByRole("list", { name: /^Saídas de / });
+    await expect(lista.getByText("Saiu para a coordenação").first()).toBeVisible();
+    await expect(lista.getByText("Liberado por Diretor E2E").first()).toBeVisible();
+    // O resumo por turma e o relatório por aluno saíram da aba; o relatório fica em Relatórios.
+    await expect(page.getByRole("heading", { name: "Saídas por turma" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Relatório por aluno" })).toHaveCount(0);
   });
 
   test("registra a justificativa escrita e a coordenadora que liberou", async ({ page }) => {
@@ -58,8 +61,21 @@ test.describe("saída durante a aula", () => {
     await page.getByRole("option", { name: "Coordenadora E2E" }).click();
     await page.getByRole("button", { name: "Registrar saída" }).click();
     await expect(page.getByText("Saída registrada.")).toBeVisible();
-    await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
-    await expect(page.getByText("Foi buscar o irmão").first()).toBeVisible();
-    await expect(page.getByText("Liberado por Coordenadora E2E").first()).toBeVisible();
+    const lista = page.getByRole("list", { name: /^Saídas de / });
+    await expect(lista.getByText("Foi buscar o irmão").first()).toBeVisible();
+    await expect(lista.getByText("Liberado por Coordenadora E2E").first()).toBeVisible();
+  });
+
+  test("remove uma saída pela lista do dia para corrigir o registro", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Saídas e entradas", "saidas");
+    const lista = page.getByRole("list", { name: /^Saídas de / });
+    await expect(lista.getByText("Foi buscar o irmão")).toBeVisible();
+    await lista.getByRole("button", { name: "Remover saída de E2E Aluno Dois" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Remover" }).click();
+    await expect(page.getByText("Saída removida.")).toBeVisible();
+    await expect(lista.getByText("Foi buscar o irmão")).toHaveCount(0);
+    await expect(lista.getByText("Saiu para a coordenação").first()).toBeVisible();
   });
 });
