@@ -1,7 +1,7 @@
 // Consulta e registro de entradas atrasadas pela equipe escolar.
 import { after } from "next/server";
 import { criarEntrada, esquemaFiltroEntradas, listarEntradas } from "@/application/entradas";
-import { enviarEntradasAposRegistro } from "@/application/planilha-entradas";
+import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
 import {
   corpoJson,
   erroApi,
@@ -33,7 +33,9 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!sessao.ok) return sessao.resposta;
     const entrada = await criarEntrada(sessao.usuario, await corpoJson(requisicao));
     // A resposta sai antes; o envio à planilha nunca atrasa nem derruba o registro.
-    after(() => enviarEntradasAposRegistro(sessao.usuario, entrada.dia));
+    if (await enfileirarSeLigado("ENTRADAS", { autorId: sessao.usuario.id, dia: entrada.dia })) {
+      after(() => processarFila());
+    }
     return json({ ok: true }, 201);
   });
 }

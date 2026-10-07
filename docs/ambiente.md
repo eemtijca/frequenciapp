@@ -28,7 +28,7 @@ O segredo de atualização da conta Google é cifrado com uma chave derivada de 
 
 O cadastro Web Push funciona sem configuração manual: o servidor deriva um par VAPID estável de `AUTH_SECRET`, com contexto criptográfico exclusivo para notificações. A chave privada fica somente no servidor. Um par já configurado em `PUSH_VAPID_PUBLIC_KEY` e `PUSH_VAPID_PRIVATE_KEY` tem prioridade; as duas chaves precisam estar presentes juntas. `PUSH_VAPID_SUBJECT` permite informar um contato em `mailto:` ou HTTPS, inclusive sem definir chaves próprias.
 
-Trocar `AUTH_SECRET` quando o par é automático exige reativar as notificações nos dispositivos. `CRON_SECRET`, com pelo menos 32 caracteres, autoriza a agenda automática e não é necessário para ativar um dispositivo. No plano Vercel Hobby, o workflow de Actions consulta periodicamente a agenda com o mesmo segredo cadastrado no GitHub. A Gestão define tipos e horários; cada conta escolhe seus avisos. Preparação e compatibilidade estão em [notificacoes.md](notificacoes.md).
+Trocar `AUTH_SECRET` quando o par é automático exige reativar as notificações nos dispositivos. `CRON_SECRET`, com pelo menos 32 caracteres, autoriza a agenda automática e não é necessário para ativar um dispositivo. No plano Vercel Hobby, o workflow de Actions consulta periodicamente a agenda com o mesmo segredo cadastrado no GitHub. A Gestão define tipos e horários; cada conta escolhe seus avisos. Preparação e compatibilidade estão em [notificacoes.md](notificacoes.md). O mesmo segredo autoriza `GET /api/planilha/fila/agenda`, que o workflow `fila-planilha.yml` consulta a cada cinco minutos para esvaziar a fila de envios às planilhas ([ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md)).
 
 ## HTTP sem TLS
 

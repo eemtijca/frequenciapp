@@ -2,7 +2,7 @@
 // direção ou coordenação.
 import { after } from "next/server";
 import { criarSaida, listarSaidas } from "@/application/saidas";
-import { enviarSaidasAposRegistro } from "@/application/planilha-saidas";
+import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
 import {
   corpoJson,
   ehUuid,
@@ -63,7 +63,9 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!sessao.ok) return sessao.resposta;
     const saida = await criarSaida(sessao.usuario, await corpoJson(requisicao));
     // A resposta sai antes; o envio à planilha nunca atrasa nem derruba o registro.
-    after(() => enviarSaidasAposRegistro(sessao.usuario, saida.dia));
+    if (await enfileirarSeLigado("SAIDAS", { autorId: sessao.usuario.id, dia: saida.dia })) {
+      after(() => processarFila());
+    }
     return json({ saida }, 201);
   });
 }

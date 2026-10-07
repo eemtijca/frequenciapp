@@ -26,6 +26,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `liberadores`                 | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.          |
 | `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA`, `SAIDAS` e `PARCIAL`) com token, esquema e modo.         |
 | `sincronizacoes_planilha`     | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                 |
+| `fila_planilha`               | Fila FIFO dos envios automáticos às planilhas: ordem, estado, tentativas e reserva (ADR-039).    |
 | `auditoria`                   | Trilha de ações administrativas: quem, o quê e quando.                                           |
 | `vinculos_diretor`            | Turmas de origem de cada diretor, com início e fim; o fim fica no histórico.                     |
 | `credenciais_diretor`         | Ciclo de vida da palavra-chave do diretor: emissão, validade, primeiro uso e revogação.          |
@@ -51,6 +52,7 @@ Restrições de integridade relevantes:
 - `frequencias.criado_por_id` e `frequencias.atualizado_por_id` usam `ON DELETE SET NULL`: excluir uma conta preserva o histórico da escola.
 - Unicidade de e-mail, nome de série e nome de turma por série é feita por índices funcionais em `lower()`, mantidos no SQL das migrations.
 - Checks de positividade em `frequencias.revisao`, `alunos.ordem`, `series.ordem` e `horarios.ordem` independem da aplicação.
+- `fila_planilha` guarda só identificadores e o dia de cada envio automático, sem nome de aluno nem dado de planilha; a coluna `sequencia` define a ordem de saída, e `estado`, `proxima_tentativa_em` e `reservado_ate` controlam retentativas e o consumidor único. Itens concluídos saem depois de sete dias; falhos e descartados, depois de trinta.
 - `integracoes_planilha` e `sincronizacoes_planilha` separam frequência, saídas e chamadas parciais pela coluna `finalidade`; cada finalidade tem a própria linha de token, esquema e modo completo.
 - `vinculos_diretor` tem índice único parcial em (`usuario_id`, `turma_id`) com `fim` nulo, check de fim maior ou igual ao início, exclusão em cascata com a conta e `ON DELETE RESTRICT` na turma.
 - `credenciais_diretor` tem um registro por conta, com check de validade posterior à emissão.

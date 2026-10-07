@@ -20,7 +20,7 @@ O [ADR-036](adr/036-implantacao-multinuvem.md) registra a decisão.
 
 O banco é sempre PostgreSQL gerenciado e o dono do schema é a própria conexão de runtime: `DATABASE_URL` e `DIRECT_URL` usam o mesmo usuário administrador em cada nuvem. Não existe papel de runtime separado, cache externo nem armazenamento de anexos.
 
-O agendador continua sendo o GitHub Actions. O workflow `notificacoes.yml` chama `GET /api/notificacoes/agenda` a cada cinco minutos com `Authorization: Bearer CRON_SECRET`; nenhuma nuvem cria EventBridge Scheduler, jobs do Container Apps ou Cloud Scheduler para isso.
+O agendador continua sendo o GitHub Actions. O workflow `notificacoes.yml` chama `GET /api/notificacoes/agenda` a cada cinco minutos com `Authorization: Bearer CRON_SECRET`, e `fila-planilha.yml` faz o mesmo em `GET /api/planilha/fila/agenda` para esvaziar a fila de envios às planilhas; nenhuma nuvem cria EventBridge Scheduler, jobs do Container Apps ou Cloud Scheduler para isso.
 
 ## Pré-requisitos
 
