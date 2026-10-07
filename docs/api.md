@@ -155,6 +155,14 @@ Corpo: `{ "serieId": string, "nome": string }`. Apenas administração. A turma 
 
 - 201 `{"turma": Turma}`; 404 série inexistente; 409 turma repetida na série.
 
+### POST /api/turmas/ordenar
+
+Corpo: `{ "confirmar": true }`. Apenas administração, com origem confiável. Reorganiza os alunos de todas as turmas atuais em uma única transação, ordenando os ativos por nome em português e renumerando de 1 em diante. Os inativos ficam após os ativos, também pelo nome. Homônimos mantêm a posição relativa; números iguais têm desempate pelo código do aluno.
+
+- 200 `{ "turmas", "alunos", "atualizados" }`, contando turmas com alunos, alunos incluídos e números alterados. A repetição sem mudanças retorna `atualizados: 0`.
+- 400 confirmação ausente ou inválida; 401 sem sessão; 403 sem autorização ou com origem inválida.
+- Altera somente a numeração, preservando códigos, nomes, turmas atual e original, situação e histórico. Não modifica as linhas das planilhas Google existentes. Novos cadastros continuam entrando no final da turma até outra reorganização.
+
 ### PATCH /api/turmas/{id}
 
 Corpo parcial: `{ nome?, serieId? }`.

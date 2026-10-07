@@ -16,6 +16,7 @@ import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { DialogoOrdenarTurmas } from "@/components/gestao/dialogo-ordenar-turmas";
 import DialogoAulas from "@/components/gestao/dialogo-aulas";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -42,6 +43,7 @@ interface Props {
   series: Serie[];
   turmas: Turma[];
   onMudanca: () => Promise<void>;
+  onOrdenacao: () => Promise<void>;
 }
 
 interface Formulario {
@@ -49,7 +51,7 @@ interface Formulario {
   nome: string;
 }
 
-export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
+export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Turma | null>(null);
@@ -151,16 +153,22 @@ export default function AbaTurmas({ series, turmas, onMudanca }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-sm">
           {turmas.length === 0
             ? "As turmas recebem os alunos"
             : `${turmas.length} ${turmas.length === 1 ? "turma" : "turmas"}`}
         </p>
-        <Button size="lg" className="h-11" onClick={abrirNovo} disabled={series.length === 0}>
-          <Plus size={16} />
-          Nova turma
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <DialogoOrdenarTurmas
+            disabled={turmas.length === 0 || enviando || chaveAtiva !== null}
+            onMudanca={onOrdenacao}
+          />
+          <Button size="lg" className="h-11" onClick={abrirNovo} disabled={series.length === 0}>
+            <Plus size={16} />
+            Nova turma
+          </Button>
+        </div>
       </div>
 
       {series.length === 0 ? (
