@@ -113,3 +113,32 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
     }),
   );
 }
+
+/** Mostra o mês escolhido e oculta somente os destinos reconhecidos da frequência. */
+export async function mostrarMesDaFrequencia(admin: { id: string }, entrada: unknown) {
+  const dados = z
+    .object({ mes: z.string().refine(mesValido) })
+    .strict()
+    .safeParse(entrada);
+  if (!dados.success) throw new ErroHttp("Informe um mês válido.", 400);
+  if (!(await limiteDeTentativas(`planilha:mostrar_mes:${admin.id}`, 60)))
+    throw new ErroHttp("Muitas alterações em sequência. Aguarde alguns minutos.", 429);
+  return comTravaPlanilhaFrequencia(() =>
+    comPausasDeLeituraGoogle(async () => {
+      const linha = await lerLinha("FREQUENCIA");
+      const resultado = await chamarIntegracao<{
+        mes: string;
+        visiveis: string[];
+        ocultadas: string[];
+      }>(linha, {
+        acao: "mostrarMes",
+        mes: dados.data.mes,
+        legadas: (esquemaSalvo(linha)?.mapa ?? []).filter((aba) => !aba.mes),
+      });
+      await comTransacao(async (tx) => {
+        await auditar(tx, admin.id, "planilha.mostrar_mes", `mes:${dados.data.mes}`);
+      });
+      return resultado;
+    }),
+  );
+}

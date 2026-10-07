@@ -63,6 +63,7 @@ export interface GoogleFalso {
   marcarColuna(nome: string, coluna: number): void;
   criarCopiaAntiga(nome: string): string;
   abas(): string[];
+  abasVisiveis(): string[];
   chamadas(): string[];
   fechar(): Promise<void>;
 }
@@ -315,6 +316,8 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       const propriedades = objeto(objeto(pedido.updateSheetProperties).properties);
       const item = peloId(propriedades.sheetId);
       if (propriedades.title !== undefined) item.nome = texto(propriedades.title);
+      if (propriedades.hidden === true && !abas.some((outra) => outra !== item && !outra.oculta))
+        throw new Error("A planilha sintética precisa manter uma aba visível.");
       if (propriedades.hidden !== undefined) item.oculta = Boolean(propriedades.hidden);
       Object.assign(item.propriedades, objeto(propriedades.gridProperties));
     } else if (pedido.copyPaste) {
@@ -622,6 +625,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       return copia.nome;
     },
     abas: () => abas.map((item) => item.nome),
+    abasVisiveis: () => abas.filter((item) => !item.oculta).map((item) => item.nome),
     chamadas: () => chamadas.slice(),
     fechar: () => new Promise<void>((resolver) => servidor.close(() => resolver())),
   };

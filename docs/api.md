@@ -565,6 +565,14 @@ Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e 
 - 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira apenas quando a aba existente foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
 - Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
 
+### POST /api/planilha/mensal/visibilidade
+
+Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Mostra as abas mensais reconhecidas do mês escolhido, incluindo o ano, e oculta os outros meses e as abas legadas do mapa cuja turma já tem esse mês. Preserva conteúdo e abas sem vínculo. Usa a mesma trava do preparo e envio; não repete automaticamente uma escrita com resposta perdida.
+
+- 200 `{ "mes", "visiveis": string[], "ocultadas": string[] }`; `ocultadas` contém somente as abas que mudaram de visibilidade nesta operação.
+- 400 mês inválido; 409 mês sem abas preparadas ou alteração concorrente; 429 excesso de alterações. Falhas Google seguem os códigos de conexão e resultado incerto da integração.
+- O diálogo Preparar mês chama esta operação depois de concluir todas as turmas. Uma falha de visibilidade não desfaz o preparo e pode ser conferida pelo botão Mostrar mês na planilha.
+
 ### POST /api/planilha/simular
 
 Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por destino mapeado. Abas mensais recebem apenas segunda a sexta de seu mês e retornam `mes` e `aba`; um intervalo entre meses gera vários planos para a mesma turma. O hash inclui a aba e sua identidade. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro, também sem fins de semana nas abas mensais. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.

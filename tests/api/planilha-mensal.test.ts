@@ -664,4 +664,77 @@ describe("frequência organizada por turma e mês", () => {
       atualizada: false,
     });
   });
+  it("alterna o mês visível, preserva o legado e mantém o envio histórico disponível", async () => {
+    google.definirAba("QA Anotações", [["Anotações"], ["Preservar"]]);
+    for (const [corpo, cookie, status] of [
+      [{ mes: "2026-10" }, cookieCoordenacao, 403],
+      [{ mes: "2026-13" }, cookieAdmin, 400],
+      [{ mes: "2026-08" }, cookieAdmin, 409],
+    ] as const)
+      expect(
+        (await chamar("/api/planilha/mensal/visibilidade", "POST", corpo, cookie)).status,
+      ).toBe(status);
+    expect(
+      (await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }, "")).status,
+    ).toBe(401);
+    expect(
+      (
+        await fetch(`${APP_URL}/api/planilha/mensal/visibilidade`, {
+          method: "POST",
+          headers: {
+            Origin: "https://origem-invalida.exemplo",
+            Cookie: cookieAdmin,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ mes: "2026-10" }),
+        })
+      ).status,
+    ).toBe(403);
+    expect(google.abasVisiveis()).toContain(LEGADA);
+    const outubro = mensais["2026-10"]?.aba ?? "";
+    const setembro = mensais["2026-09"]?.aba ?? "";
+    await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
+    expect(google.abasVisiveis().sort()).toEqual(
+      [outubro, "QA Mensal B · Outubro", "QA Mensal A · Novembro", "QA Anotações"].sort(),
+    );
+    expect(marca(LEGADA, "30/09/2026")).toBe("F");
+    expect(google.formulaDe(LEGADA, 2, 4)).toBe('=COUNTIF(C2:C2;"F")');
+    const previa = await dados<{ planos: Plano[] }>(
+      await chamar("/api/planilha/simular", "POST", {
+        turmaOriginalId: turmas.A,
+        ...PERIODO,
+        somenteAlteradas: false,
+      }),
+    );
+    expect(previa.planos.map((plano) => plano.aba).sort()).toEqual([setembro, outubro].sort());
+    const periodo = { de: "2026-09-30", ate: "2026-09-30" };
+    expect(
+      (
+        await aplicar(
+          planoDaAba(
+            (
+              await dados<{ planos: Plano[] }>(
+                await chamar("/api/planilha/simular", "POST", {
+                  turmaOriginalId: turmas.A,
+                  ...periodo,
+                  somenteAlteradas: false,
+                }),
+              )
+            ).planos,
+            setembro,
+          ),
+          periodo,
+          false,
+        )
+      ).resultados,
+    ).toMatchObject([{ aba: setembro, resultado: "sucesso" }]);
+    expect(marca(setembro, "30/09/2026")).toBe("F");
+    expect(google.abasVisiveis()).not.toContain(setembro);
+    await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-09" }));
+    expect(google.abasVisiveis().sort()).toEqual(
+      [setembro, "QA Mensal A · Novembro", "QA Anotações"].sort(),
+    );
+    await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
+    google.removerAba("QA Anotações");
+  });
 });
