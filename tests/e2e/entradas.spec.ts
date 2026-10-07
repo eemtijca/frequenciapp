@@ -107,7 +107,9 @@ test("registra justificativa do catálogo com observação e responsável escolh
   await page.getByRole("option", { name: "Diretor E2E", exact: true }).click();
   await page.getByRole("button", { name: "Registrar entrada", exact: true }).click();
   const lista = page.getByRole("region", { name: "Entradas registradas" });
-  await expect(lista).toContainText("Transporte · Ônibus atrasou");
+  await expect(lista.getByText("Transporte", { exact: true })).toBeVisible();
+  await expect(lista.getByText("Ônibus atrasou", { exact: true })).toBeVisible();
+  await expect(lista).not.toContainText("Transporte ·");
   await expect(lista).toContainText("1º intervalo");
   await expect(lista).toContainText("Responsável pelo registro: Diretor E2E");
   await page

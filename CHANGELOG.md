@@ -10,6 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Saídas e entradas, Relatórios e Gestão: as informações de cada registro (por exemplo "Luto" e "O tio faleceu.", ou turma, horário e momento) aparecem em caixas arredondadas separadas, no lugar do ponto entre elas.
 - Relatórios, Saídas e entradas, agrupamento Por aluno: o campo de busca por nome virou um seletor com a relação dos alunos da turma escolhida (ou de todas as turmas), com a opção Todos os alunos e filtro por texto na lista.
 - Planilha de saídas passa a se chamar "Planilha de entradas e saídas" na Gestão, e a aba Entradas tem as mesmas sete colunas de Saídas (sem Código, com Responsável no lugar de Liberado por). Preparar e organizar a aba Entradas saíram da área Saídas e entradas e ficam nessa seção; preparar realinha a aba no formato anterior, preservando os registros.
 

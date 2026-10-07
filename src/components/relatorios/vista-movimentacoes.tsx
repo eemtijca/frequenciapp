@@ -14,6 +14,7 @@ import {
   diaDaSemanaIso,
   diaSeguinte,
   rotuloData,
+  partesDoMotivo,
   rotuloMomento,
   type Aluno,
   type Turma,
@@ -30,6 +31,7 @@ import { mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
@@ -56,6 +58,14 @@ const MODOS: { valor: Modo; rotulo: string }[] = [
   { valor: "semana", rotulo: "Semana" },
   { valor: "periodo", rotulo: "Período personalizado" },
 ];
+
+/** Totais de saídas e entradas, cada um na própria caixa. */
+function contagens(saidas: number, entradas: number): string[] {
+  return [
+    `${saidas} ${saidas === 1 ? "saída" : "saídas"}`,
+    `${entradas} ${entradas === 1 ? "entrada" : "entradas"}`,
+  ];
+}
 
 /** Uma saída ou entrada, com o aluno quando o grupo é a turma. */
 function LinhaMovimentacao({ item, comAluno }: { item: MovimentacaoRelatorio; comAluno: boolean }) {
@@ -91,7 +101,13 @@ function LinhaMovimentacao({ item, comAluno }: { item: MovimentacaoRelatorio; co
       <dl className="min-w-0 space-y-2 text-sm">
         <div>
           <dt className="text-muted-foreground text-xs">Motivo</dt>
-          <dd className="wrap-anywhere">{item.motivo || "Não informado"}</dd>
+          <dd className="wrap-anywhere">
+            {item.motivo ? (
+              <CaixasDeInfo partes={partesDoMotivo(item.motivo)} className="mt-1" />
+            ) : (
+              "Não informado"
+            )}
+          </dd>
         </div>
         <div>
           <dt className="text-muted-foreground text-xs">
@@ -442,10 +458,7 @@ export default function VistaMovimentacoes({
                           {aluno.turmas.join(" · ")}
                         </p>
                       </div>
-                      <p className="text-muted-foreground text-xs">
-                        {aluno.saidas} {aluno.saidas === 1 ? "saída" : "saídas"} · {aluno.entradas}{" "}
-                        {aluno.entradas === 1 ? "entrada" : "entradas"}
-                      </p>
+                      <CaixasDeInfo partes={contagens(aluno.saidas, aluno.entradas)} />
                     </header>
                     <ul className="divide-y">
                       {aluno.movimentacoes.map((item) => (
@@ -468,10 +481,7 @@ export default function VistaMovimentacoes({
                 >
                   <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                     <h3 className="font-semibold wrap-anywhere">{grupo.turmaRotulo}</h3>
-                    <p className="text-muted-foreground text-xs">
-                      {grupo.saidas} {grupo.saidas === 1 ? "saída" : "saídas"} · {grupo.entradas}{" "}
-                      {grupo.entradas === 1 ? "entrada" : "entradas"}
-                    </p>
+                    <CaixasDeInfo partes={contagens(grupo.saidas, grupo.entradas)} />
                   </header>
                   <ul className="divide-y">
                     {grupo.movimentacoes.map((item) => (

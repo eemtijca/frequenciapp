@@ -30,6 +30,7 @@ import {
 } from "@/domain/frequencia";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -168,12 +169,15 @@ export default function VistaSaidas({
       );
   }, [alunos, turmaFiltro, rotuloTurma]);
 
-  function textoDaSaida(saida: SaidaAntecipada): string {
+  function partesDaSaida(saida: SaidaAntecipada, turma: string): string[] {
     const partes = partesJustificativaSaida(saida, catalogoJustificativas);
-    const quando = saida.horario ? `${saida.horario} · ` : "";
-    return `${quando}${rotuloMomento(saida.momento)} · ${partes.motivo}${
-      partes.complemento ? ` · ${partes.complemento}` : ""
-    }`;
+    return [
+      turma,
+      saida.horario ?? "",
+      rotuloMomento(saida.momento),
+      partes.motivo,
+      partes.complemento ?? "",
+    ].filter(Boolean);
   }
 
   async function registrar() {
@@ -517,9 +521,10 @@ export default function VistaSaidas({
                 >
                   <div className="min-w-0">
                     <p className="font-semibold break-words">{nome}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {rotuloTurma(aluno?.turmaOriginalId ?? "")} · {textoDaSaida(saida)}
-                    </p>
+                    <CaixasDeInfo
+                      partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
+                      className="mt-1"
+                    />
                     <p className="text-muted-foreground mt-1 text-xs">
                       Liberado por {saida.liberadoPorNome ?? "registro anterior"}
                       {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}

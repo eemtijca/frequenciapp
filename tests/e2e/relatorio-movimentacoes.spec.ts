@@ -430,10 +430,12 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   const grupoAna = painel.getByRole("region", { name: `Aluno ${ana.nome}`, exact: true });
   const grupoBruno = painel.getByRole("region", { name: `Aluno ${bruno.nome}`, exact: true });
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
-  await expect(grupoAna).toContainText("1 saída · 1 entrada");
+  await expect(grupoAna.getByText("1 saída", { exact: true })).toBeVisible();
+  await expect(grupoAna.getByText("1 entrada", { exact: true })).toBeVisible();
   await expect(grupoAna.getByRole("listitem")).toHaveCount(2);
   await expect(grupoAna).toContainText("Atraso do ônibus");
-  await expect(grupoBruno).toContainText("1 saída · 0 entradas");
+  await expect(grupoBruno.getByText("1 saída", { exact: true })).toBeVisible();
+  await expect(grupoBruno.getByText("0 entradas", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 780 });
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
