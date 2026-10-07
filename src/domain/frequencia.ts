@@ -104,6 +104,14 @@ export function partesJustificativaSaida(
   return { motivo: saida.texto ?? "", complemento: null };
 }
 
+/** Separa o motivo gravado como "tipo · texto" nas partes que a interface mostra em caixas. */
+export function partesDoMotivo(motivo: string): string[] {
+  return motivo
+    .split(" · ")
+    .map((parte) => parte.trim())
+    .filter(Boolean);
+}
+
 /** Verdadeiro quando o código existe no catálogo de quem libera. */
 export function ehLiberadorValido(codigo: string, catalogo: readonly Liberador[]): boolean {
   return catalogo.some((item) => item.codigo === codigo);

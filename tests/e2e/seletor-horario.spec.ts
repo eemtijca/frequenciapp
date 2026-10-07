@@ -98,7 +98,9 @@ test("registra a saída com o horário escolhido e mostra na lista", async ({ pa
   await page.getByRole("option", { name: "Diretor E2E" }).click();
   await page.getByRole("button", { name: "Registrar saída" }).click();
   await expect(page.getByText("Saída registrada.")).toBeVisible();
-  await expect(page.getByText(/09:20 · 1ª aula/).first()).toBeVisible();
+  const itens = page.getByRole("list", { name: /^Saídas de / });
+  await expect(itens.getByText("09:20", { exact: true }).first()).toBeVisible();
+  await expect(itens.getByText("1ª aula", { exact: true }).first()).toBeVisible();
 });
 
 test("tocar em uma hora atualiza o campo na hora e mantém o painel nos minutos", async ({

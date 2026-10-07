@@ -27,6 +27,7 @@ import {
   nomeDoMes,
   nomeNaChamada,
   normalizar,
+  partesDoMotivo,
   partesJustificativaSaida,
   partesNoFuso,
   rotuloAula,
@@ -77,6 +78,14 @@ function horario(parcial: Partial<Horario> = {}): Horario {
     ativo: parcial.ativo ?? true,
   };
 }
+
+describe("partesDoMotivo", () => {
+  it("separa o tipo do texto e descarta partes vazias", () => {
+    expect(partesDoMotivo("Luto · O tio faleceu.")).toEqual(["Luto", "O tio faleceu."]);
+    expect(partesDoMotivo("Doente")).toEqual(["Doente"]);
+    expect(partesDoMotivo("")).toEqual([]);
+  });
+});
 
 describe("ehDiaValido", () => {
   it("aceita dias reais do calendário", () => {
