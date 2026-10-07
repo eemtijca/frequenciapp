@@ -13,6 +13,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).
 
 - Gradientes da interface (superfícies, controles, botões, estado selecionado e fatias das roscas): o acabamento de vidro segue o mesmo, com preenchimentos sólidos e brilho suave por sombra interna, e a classe sem uso `grafico-vidro` saiu da rosca do Painel.
+- Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
 
@@ -33,6 +34,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Abas mensais de frequência com nome do mês por extenso, sem Turma atual nem colunas de sábado e domingo. Preparar mês atualiza abas existentes preservando registros dos dias úteis e vínculos; envios mensais não recriam fins de semana. Preparo e envio compartilham proteção contra alterações simultâneas.
 - Aba Saídas e entradas em Relatórios, com consultas por dia, semana de segunda a domingo e período personalizado, filtro por turma, totais e detalhes agrupados por turma. Preserva os registros de alunos inativos e a turma histórica das entradas.
+- Agrupamento Por aluno em Relatórios, Saídas e entradas, com as saídas e as entradas de cada aluno no período, busca por nome e filtro de duas ou mais movimentações.
 
 - Acabamento de vidro nas roscas do Painel, com reflexos discretos, centro circular, legendas legíveis e detalhes opacos, seguindo a tipografia e as cores da interface nos temas claro e escuro.
 

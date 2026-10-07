@@ -48,7 +48,6 @@ test.describe("quem libera as saídas", () => {
     await page.getByRole("option", { name: "E2E Porteiro" }).click();
     await page.getByRole("button", { name: "Registrar saída" }).click();
     await expect(page.getByText("Saída registrada.")).toBeVisible();
-    await page.getByRole("button", { name: /E2E Ano A.*aluno/ }).click();
     await expect(page.getByText("Liberado por E2E Porteiro").first()).toBeVisible();
 
     await trocarVisao(page, "Gestão", "gestao");

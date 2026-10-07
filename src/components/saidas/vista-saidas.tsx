@@ -1,13 +1,14 @@
 "use client";
 
-// Saiu mais cedo: registro da saída antecipada, saídas do dia por turma e
-// relatório semanal por aluno. Separado da chamada.
+// Saiu mais cedo: registro da saída antecipada e lista das saídas do dia, com
+// remoção para corrigir um registro. Separado da chamada. O relatório por aluno
+// fica em Relatórios, Saídas e entradas.
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   Aluno,
@@ -17,19 +18,16 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import {
-  diaDaSemanaIso,
   diaSeguinte,
   ehMomentoDeAula,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
   LIMITE_TEXTO_SAIDA,
   MOMENTOS_SAIDA,
-  normalizar,
   partesJustificativaSaida,
   rotuloDiaSemana,
   rotuloMomento,
 } from "@/domain/frequencia";
-import { relatorioSaidas } from "@/domain/relatorios";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +42,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BarraBusca } from "@/components/ui/barra-busca";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
@@ -92,31 +89,7 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<SaidaAntecipada[] | null>(null);
   const [carregandoDia, setCarregandoDia] = useState(false);
   const [recarregarDia, setRecarregarDia] = useState(0);
-  const [turmaAberta, setTurmaAberta] = useState<string | null>(null);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
-
-  const [relatorioAberto, setRelatorioAberto] = useState(false);
-  const [diaRelatorio, setDiaRelatorio] = useState(diaCorrente);
-  const [turmaRelatorio, setTurmaRelatorio] = useState("");
-  const [buscaRelatorio, setBuscaRelatorio] = useState("");
-  const [filtroRelatorio, setFiltroRelatorio] = useState<"todas" | "repetidas">("todas");
-  const [saidasSemana, setSaidasSemana] = useState<SaidaAntecipada[] | null>(null);
-
-  const { executando: carregandoRelatorio, executar: carregarRelatorio } = useAcaoUnica(
-    async () => {
-      try {
-        const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-          `/api/saidas?de=${segundaRelatorio}&ate=${domingoRelatorio}`,
-        );
-        setSaidasSemana(dados.saidas);
-      } catch (excecao) {
-        toast.error(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar o relatório.",
-        );
-        setSaidasSemana([]);
-      }
-    },
-  );
 
   const { chaveAtiva: removendoId, executar: executarRemocao } = useAcoesPorChave();
 
@@ -195,34 +168,6 @@ export default function VistaSaidas({
       );
   }, [alunos, turmaFiltro, rotuloTurma]);
 
-  const gruposPorTurma = useMemo(() => {
-    const grupos = new Map<string, { rotulo: string; saidas: SaidaAntecipada[] }>();
-    for (const saida of saidasDoDia) {
-      const aluno = alunosPorId.get(saida.alunoId);
-      const chave = aluno?.turmaOriginalId ?? "sem-turma";
-      const grupo = grupos.get(chave) ?? { rotulo: rotuloTurma(chave), saidas: [] };
-      grupo.saidas.push(saida);
-      grupos.set(chave, grupo);
-    }
-    return [...grupos.entries()].sort((a, b) => b[1].saidas.length - a[1].saidas.length);
-  }, [alunosPorId, saidasDoDia, rotuloTurma]);
-
-  const segundaRelatorio = diaSeguinte(diaRelatorio, -(diaDaSemanaIso(diaRelatorio) - 1));
-  const domingoRelatorio = diaSeguinte(segundaRelatorio, 6);
-
-  const relatorio = useMemo(() => {
-    if (saidasSemana === null) return [];
-    const termo = normalizar(buscaRelatorio);
-    const termos = termo.split(" ").filter(Boolean);
-    return relatorioSaidas(saidasSemana, filtroRelatorio).filter((item) => {
-      const aluno = alunosPorId.get(item.alunoId);
-      if (turmaRelatorio && aluno?.turmaOriginalId !== turmaRelatorio) return false;
-      if (termos.length === 0) return true;
-      const alvo = normalizar(aluno?.nome ?? "");
-      return termos.every((parte) => alvo.includes(parte));
-    });
-  }, [saidasSemana, filtroRelatorio, buscaRelatorio, turmaRelatorio, alunosPorId]);
-
   function textoDaSaida(saida: SaidaAntecipada): string {
     const partes = partesJustificativaSaida(saida, catalogoJustificativas);
     const quando = saida.horario ? `${saida.horario} · ` : "";
@@ -288,7 +233,6 @@ export default function VistaSaidas({
       } else {
         setRecarregarDia((valor) => valor + 1);
       }
-      if (relatorioAberto) void carregarRelatorio();
     } catch (excecao) {
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
@@ -317,7 +261,6 @@ export default function VistaSaidas({
         } else {
           setRecarregarDia((valor) => valor + 1);
         }
-        if (relatorioAberto) void carregarRelatorio();
       } catch (excecao) {
         if (!(excecao instanceof ErroApi && excecao.status === 401)) {
           toast.error(
@@ -556,210 +499,47 @@ export default function VistaSaidas({
         </Button>
       </form>
 
-      <div className="superficie-vidro flex flex-col gap-3 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-medium">Saídas por turma</h2>
-          <span className="text-muted-foreground text-xs">
-            {saidasDoDia.length} {saidasDoDia.length === 1 ? "saída" : "saídas"} em {rotuloDia}
-          </span>
-        </div>
-        {carregandoDia ? (
-          <p className="text-muted-foreground flex items-center gap-2 text-sm">
-            <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-            Carregando saídas...
-          </p>
-        ) : gruposPorTurma.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhuma saída registrada neste dia.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {gruposPorTurma.map(([chave, grupo]) => {
-              const aberto = turmaAberta === chave;
+      {carregandoDia ? (
+        <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+          Carregando saídas...
+        </p>
+      ) : (
+        saidasDoDia.length > 0 && (
+          <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
+            {saidasDoDia.map((saida) => {
+              const aluno = alunosPorId.get(saida.alunoId);
+              const nome = aluno?.nome ?? "Aluno";
               return (
-                <li key={chave} className="overflow-hidden rounded-lg border">
-                  <button
-                    type="button"
-                    aria-expanded={aberto}
-                    onClick={() => setTurmaAberta((atual) => (atual === chave ? null : chave))}
-                    className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-12 w-full items-center gap-3 px-3 text-left text-sm transition-colors"
+                <li
+                  key={saida.id}
+                  className="superficie-vidro flex items-start justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold break-words">{nome}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {rotuloTurma(aluno?.turmaOriginalId ?? "")} · {textoDaSaida(saida)}
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Liberado por {saida.liberadoPorNome ?? "registro anterior"}
+                      {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remover saída de ${nome}`}
+                    disabled={removendoId === saida.id}
+                    onClick={() => remover(saida)}
                   >
-                    <span className="min-w-0 flex-1 truncate font-medium">{grupo.rotulo}</span>
-                    <span className="numerais-tabulares text-muted-foreground text-xs">
-                      {grupo.saidas.length} {grupo.saidas.length === 1 ? "aluno" : "alunos"}
-                    </span>
-                  </button>
-                  {aberto && (
-                    <ul className="divide-y border-t">
-                      {grupo.saidas.map((saida) => {
-                        const aluno = alunosPorId.get(saida.alunoId);
-                        return (
-                          <li key={saida.id} className="flex items-start gap-3 px-3 py-2.5">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium">
-                                {aluno?.nome ?? "Aluno"}
-                              </p>
-                              <p className="text-muted-foreground truncate text-xs">
-                                {textoDaSaida(saida)}
-                              </p>
-                              <p className="text-muted-foreground truncate text-xs">
-                                Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                                {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-falta-texto h-9 shrink-0 px-2"
-                              onClick={() => void remover(saida)}
-                              disabled={removendoId === saida.id}
-                            >
-                              Remover
-                            </Button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                    <Trash2 size={18} />
+                  </Button>
                 </li>
               );
             })}
           </ul>
-        )}
-      </div>
-
-      <div className="superficie-vidro flex flex-col gap-3 p-4">
-        <button
-          type="button"
-          aria-expanded={relatorioAberto}
-          onClick={() => {
-            const abrir = !relatorioAberto;
-            setRelatorioAberto(abrir);
-            if (abrir && saidasSemana === null) void carregarRelatorio();
-          }}
-          className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-11 items-center justify-between gap-2 rounded-md text-left font-medium transition-colors"
-        >
-          <span>Relatório por aluno</span>
-          <span className="text-muted-foreground text-xs">
-            {relatorioAberto ? "Fechar" : "Abrir"}
-          </span>
-        </button>
-        {relatorioAberto && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1.5">
-                <Label>Semana de</Label>
-                <SeletorPeriodo
-                  id="saida-relatorio-dia"
-                  modo="dia"
-                  valor={diaRelatorio}
-                  max={diaCorrente}
-                  rotuloAcessivel="Data da semana do relatório"
-                  rotulo={diaRelatorio.split("-").reverse().join("/")}
-                  onValor={(valor) => {
-                    setDiaRelatorio(valor);
-                    setSaidasSemana(null);
-                  }}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-relatorio-turma">Turma</Label>
-                <Selecionar
-                  id="saida-relatorio-turma"
-                  value={turmaRelatorio}
-                  onValueChange={setTurmaRelatorio}
-                  placeholder="Todas as turmas"
-                  opcoes={[
-                    { valor: "", rotulo: "Todas as turmas" },
-                    ...turmasComAlunos.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-                  ]}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-relatorio-busca">Buscar aluno</Label>
-                <BarraBusca
-                  id="saida-relatorio-busca"
-                  valor={buscaRelatorio}
-                  onValor={setBuscaRelatorio}
-                  placeholder="Digite o nome"
-                  className="border-0 px-0 py-0"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-relatorio-filtro">Mostrar</Label>
-                <Selecionar
-                  id="saida-relatorio-filtro"
-                  value={filtroRelatorio}
-                  onValueChange={(valor) =>
-                    setFiltroRelatorio(valor === "repetidas" ? "repetidas" : "todas")
-                  }
-                  opcoes={[
-                    { valor: "todas", rotulo: "Todos com saídas" },
-                    { valor: "repetidas", rotulo: "Duas ou mais na semana" },
-                  ]}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onClick={() => void carregarRelatorio()}
-                disabled={carregandoRelatorio}
-              >
-                {carregandoRelatorio ? (
-                  <LoaderCircle size={16} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={16} />
-                )}
-                Atualizar relatório
-              </Button>
-              <span className="text-muted-foreground numerais-tabulares text-xs">
-                {segundaRelatorio.split("-").reverse().join("/")} a{" "}
-                {domingoRelatorio.split("-").reverse().join("/")}
-              </span>
-            </div>
-            {saidasSemana === null ? (
-              <p className="text-muted-foreground text-sm">Carregando relatório...</p>
-            ) : relatorio.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                Nenhuma saída encontrada para esta semana e estes filtros.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {relatorio.map((item) => {
-                  const aluno = alunosPorId.get(item.alunoId);
-                  return (
-                    <li key={item.alunoId} className="overflow-hidden rounded-lg border">
-                      <div className="bg-secondary/40 flex items-center justify-between gap-2 px-3 py-2">
-                        <span className="min-w-0 truncate text-sm font-medium">
-                          {aluno?.nome ?? "Aluno"}
-                        </span>
-                        <span className="text-muted-foreground shrink-0 text-xs">
-                          {rotuloTurma(aluno?.turmaOriginalId ?? "")} · {item.saidas.length}{" "}
-                          {item.saidas.length === 1 ? "saída" : "saídas"}
-                        </span>
-                      </div>
-                      <ul className="divide-y">
-                        {item.saidas.map((saida) => (
-                          <li key={saida.id} className="px-3 py-2">
-                            <p className="numerais-tabulares text-sm font-medium">
-                              {saida.dia.split("-").reverse().join("/")}
-                            </p>
-                            <p className="text-muted-foreground text-xs">{textoDaSaida(saida)}</p>
-                            <p className="text-muted-foreground text-xs">
-                              Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                            </p>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
+        )
+      )}
       <AlertDialog
         open={saidaRemover !== null}
         onOpenChange={(aberto) => !aberto && setSaidaRemover(null)}
