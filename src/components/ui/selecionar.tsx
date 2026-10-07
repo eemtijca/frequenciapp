@@ -1,12 +1,9 @@
 "use client";
 
-// Seletor acessível sobre o Radix: teclado, indicador de seleção, rolagem
-// com botões e filtro opcional para listas longas. Substitui o select nativo.
-import { useMemo, useState } from "react";
+// Seletor acessível: listas simples sobre Radix Select e busca em painel próprio.
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { Check, ChevronDown, ChevronUp, Search } from "lucide-react";
-import { normalizar } from "@/domain/frequencia";
-import { Input } from "@/components/ui/input";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import { SelecionarBuscavel } from "@/components/ui/selecionar-buscavel";
 import { cn } from "@/lib/utils";
 
 interface Opcao {
@@ -14,7 +11,7 @@ interface Opcao {
   rotulo: string;
 }
 
-interface Props {
+export interface PropsSelecionar {
   id?: string;
   value: string;
   onValueChange: (valor: string) => void;
@@ -36,13 +33,20 @@ export function Selecionar({
   buscavel = false,
   className,
   ariaLabel,
-}: Props) {
-  const [termo, setTermo] = useState("");
-  const filtradas = useMemo(() => {
-    if (!buscavel || termo.trim() === "") return opcoes;
-    const alvo = normalizar(termo);
-    return opcoes.filter((opcao) => normalizar(opcao.rotulo).includes(alvo));
-  }, [buscavel, opcoes, termo]);
+}: PropsSelecionar) {
+  if (buscavel)
+    return (
+      <SelecionarBuscavel
+        id={id}
+        value={value}
+        onValueChange={onValueChange}
+        opcoes={opcoes}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={className}
+        ariaLabel={ariaLabel}
+      />
+    );
 
   return (
     <SelectPrimitive.Root value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -68,26 +72,13 @@ export function Selecionar({
           <SelectPrimitive.ScrollUpButton className="flex h-7 items-center justify-center">
             <ChevronUp size={14} aria-hidden="true" />
           </SelectPrimitive.ScrollUpButton>
-          {buscavel && (
-            <div className="flex items-center gap-2 border-b px-2.5 py-1">
-              <Search size={14} className="text-muted-foreground" aria-hidden="true" />
-              <Input
-                value={termo}
-                onChange={(evento) => setTermo(evento.target.value)}
-                onKeyDown={(evento) => evento.stopPropagation()}
-                placeholder="Filtrar"
-                aria-label="Filtrar opções"
-                className="campo-integrado h-8 px-0 focus-visible:ring-0"
-              />
-            </div>
-          )}
           <SelectPrimitive.Viewport className="p-1">
-            {filtradas.length === 0 ? (
+            {opcoes.length === 0 ? (
               <p className="text-muted-foreground px-2 py-3 text-center text-sm">
                 Nenhuma opção encontrada.
               </p>
             ) : (
-              filtradas.map((opcao) => (
+              opcoes.map((opcao) => (
                 <SelectPrimitive.Item
                   key={opcao.valor}
                   value={opcao.valor}

@@ -98,3 +98,7 @@ Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo
 - Em Gestão > Configurações, títulos e estados identificam as seções. Descrições curtas explicam apenas escolhas que precisam de contexto; instruções repetidas saem da tela. A conexão das planilhas usa Entrar com Google e o seletor de arquivos. Avisos sobre exclusão, restauração e acesso a dados sensíveis permanecem junto das ações e confirmações.
 - Números de contagem com singular e plural corretos ("1 falta", "2 faltas").
 - Sem travessão em qualquer texto da interface: ponto, vírgula ou parênteses cumprem o papel. O guarda editorial em `tests/unit/texto-editorial.test.ts` mantém a regra verificada por teste.
+
+## Seletores com busca
+
+As listas pesquisáveis usam um painel flutuante com campo de texto e opções próprias. Abrir o teclado ou mudar a altura disponível não fecha o painel nem tira o foco da busca. O filtro ignora diferenças de acentos e caixa. As setas percorrem as opções, Enter confirma, Escape cancela e o toque externo fecha; ao reabrir, a busca começa vazia. O acabamento de vidro é compartilhado com os demais controles. As listas sem busca conservam o seletor simples.
