@@ -152,6 +152,19 @@ export function DialogoPrepararMes({
         setResultados([...saida]);
       }
       if (saida.every((item) => item.estado === "preparada")) {
+        try {
+          await pedir("/api/planilha/mensal/visibilidade", corpoJson({ mes }));
+        } catch (erro) {
+          setInterrupcao({
+            mensagem: mensagemAmigavel(
+              erro,
+              "As abas estão preparadas, mas a exibição do mês não foi confirmada. Use Mostrar mês na planilha para conferir.",
+            ),
+            reconectar: interrupcaoDoPreparo(erro)?.reconectar ?? false,
+          });
+          await onAtualizar();
+          return;
+        }
         avisarSucesso(`Abas de ${rotuloMes(mes).toLowerCase()} preparadas.`);
       } else if (!interrompida) {
         avisarInfo("Há turmas pendentes.", "Confira o resultado de cada turma.");
@@ -193,7 +206,7 @@ export function DialogoPrepararMes({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {resultados === null
-                ? "Cria ou atualiza uma aba por turma, com o nome do mês e datas de segunda a sexta. Nas abas existentes, retira Turma atual e as colunas de sábado e domingo, mantendo os demais registros."
+                ? "Cria ou atualiza uma aba por turma, com o nome do mês e datas de segunda a sexta. Nas abas existentes, retira Turma atual e as colunas de sábado e domingo, mantendo os demais registros. Ao concluir todas as turmas, mostra apenas as abas deste mês e oculta o histórico vinculado."
                 : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

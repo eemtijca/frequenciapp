@@ -352,3 +352,54 @@ export async function prepararAbaMensalGoogle(
   }
   return { aba: nome, mes, turmaOriginalId, destino, criada: true, atualizada: false };
 }
+
+/** Alterna a navegação entre meses sem apagar nem reescrever células. */
+export async function mostrarMesGoogle(
+  id: string,
+  acesso: string,
+  mes: string,
+  legadas: { aba: string; turmaOriginalId: string }[],
+) {
+  if (!mesValido(mes)) throw new ErroHttp("Informe um mês válido.", 400);
+  const doc = await lerDocumentoGoogle(id, acesso);
+  const mensais = abasDoDocumento(doc);
+  const selecionadas = mensais.filter((aba) => aba.mes === mes);
+  if (!selecionadas.length)
+    throw new ErroHttp("Prepare as abas deste mês antes de mostrá-lo na planilha.", 409);
+  const turmas = new Set(selecionadas.map((aba) => aba.turmaOriginalId));
+  const ocultar = new Set([
+    ...mensais.filter((aba) => aba.mes !== mes).map((aba) => aba.aba),
+    ...legadas.filter((aba) => turmas.has(aba.turmaOriginalId)).map((aba) => aba.aba),
+  ]);
+  const mostrar = new Set(selecionadas.map((aba) => aba.aba));
+  const pedidos: Record<string, unknown>[] = [];
+  const visiveis: string[] = [];
+  const ocultadas: string[] = [];
+  // Primeiro revela o mês solicitado: a planilha nunca fica sem aba visível.
+  for (const [nomes, hidden] of [
+    [mostrar, false],
+    [ocultar, true],
+  ] as const) {
+    for (const aba of doc.sheets) {
+      const propriedades = aba.properties;
+      if (
+        !nomes.has(propriedades.title) ||
+        (hidden && mostrar.has(propriedades.title)) ||
+        propriedades.title.startsWith("_frequenciapp_backup_") ||
+        (propriedades.sheetType && propriedades.sheetType !== "GRID")
+      )
+        continue;
+      if (!hidden) visiveis.push(propriedades.title);
+      if (Boolean(propriedades.hidden) === hidden) continue;
+      if (hidden) ocultadas.push(propriedades.title);
+      pedidos.push({
+        updateSheetProperties: {
+          properties: { sheetId: propriedades.sheetId, hidden },
+          fields: "hidden",
+        },
+      });
+    }
+  }
+  if (pedidos.length) await enviarLoteAtomicoGoogle(id, acesso, pedidos);
+  return { mes, visiveis, ocultadas };
+}

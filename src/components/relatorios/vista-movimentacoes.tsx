@@ -1,7 +1,7 @@
 "use client";
 
-// Relatório conjunto de saídas e entradas, com consulta independente do mês e grupos por turma.
-import { useEffect, useState } from "react";
+// Relatório conjunto de saídas e entradas, com consulta independente do mês e grupos por turma ou por aluno.
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -19,12 +19,16 @@ import {
 } from "@/domain/frequencia";
 import {
   LIMITE_DIAS_RELATORIO_MOVIMENTACOES,
+  movimentacoesPorAluno,
+  type FiltroMovimentacoesPorAluno,
+  type MovimentacaoRelatorio,
   type RelatorioMovimentacoes,
 } from "@/domain/relatorio-movimentacoes";
 import { pedir } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { cn } from "@/lib/utils";
+import { BarraBusca } from "@/components/ui/barra-busca";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -32,6 +36,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 
 type Modo = "dia" | "semana" | "periodo";
+type Agrupamento = "turma" | "aluno";
 interface Carga {
   chave: string;
   dados: RelatorioMovimentacoes | null;
@@ -39,11 +44,63 @@ interface Carga {
   variante: VarianteEstado;
 }
 
+const AGRUPAMENTOS: { valor: Agrupamento; rotulo: string }[] = [
+  { valor: "turma", rotulo: "Por turma" },
+  { valor: "aluno", rotulo: "Por aluno" },
+];
+
 const MODOS: { valor: Modo; rotulo: string }[] = [
   { valor: "dia", rotulo: "Dia" },
   { valor: "semana", rotulo: "Semana" },
   { valor: "periodo", rotulo: "Período personalizado" },
 ];
+
+/** Uma saída ou entrada, com o aluno quando o grupo é a turma. */
+function LinhaMovimentacao({ item, comAluno }: { item: MovimentacaoRelatorio; comAluno: boolean }) {
+  return (
+    <li className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="min-w-0 space-y-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-lg border px-2 py-1 font-medium",
+              item.tipo === "ENTRADA"
+                ? "border-primary/25 bg-primary/10 text-primary"
+                : "bg-muted/40 text-foreground",
+            )}
+          >
+            {item.tipo === "ENTRADA" ? (
+              <ArrowDownLeft size={14} aria-hidden="true" />
+            ) : (
+              <ArrowUpRight size={14} aria-hidden="true" />
+            )}
+            {item.tipo === "ENTRADA" ? "Entrada" : "Saída"}
+          </span>
+          <time dateTime={item.dia} className="text-muted-foreground numerais-tabulares">
+            {rotuloData(item.dia)}
+          </time>
+          {item.horario && <span className="numerais-tabulares">{item.horario}</span>}
+        </div>
+        {comAluno && <p className="font-medium wrap-anywhere">{item.alunoNome}</p>}
+        {item.momento && (
+          <p className="text-muted-foreground text-xs">{rotuloMomento(item.momento)}</p>
+        )}
+      </div>
+      <dl className="min-w-0 space-y-2 text-sm">
+        <div>
+          <dt className="text-muted-foreground text-xs">Motivo</dt>
+          <dd className="wrap-anywhere">{item.motivo || "Não informado"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground text-xs">
+            {item.tipo === "SAIDA" ? "Liberado por" : "Responsável pelo registro"}
+          </dt>
+          <dd className="wrap-anywhere">{item.responsavel ?? "Não informado"}</dd>
+        </div>
+      </dl>
+    </li>
+  );
+}
 
 export default function VistaMovimentacoes({
   hoje,
@@ -59,6 +116,9 @@ export default function VistaMovimentacoes({
   const [inicio, setInicio] = useState(hoje);
   const [fim, setFim] = useState(hoje);
   const [turmaId, setTurmaId] = useState("todas");
+  const [agrupamento, setAgrupamento] = useState<Agrupamento>("turma");
+  const [buscaAluno, setBuscaAluno] = useState("");
+  const [filtroAluno, setFiltroAluno] = useState<FiltroMovimentacoesPorAluno>("todas");
   const [recarga, setRecarga] = useState(0);
   const [carga, setCarga] = useState<Carga | null>(null);
   const [atividadeAnterior, setAtividadeAnterior] = useState(ativa);
@@ -112,6 +172,10 @@ export default function VistaMovimentacoes({
     return () => controlador.abort();
   }, [ativa, chave, consulta, erroPeriodo]);
 
+  const porAluno = useMemo(
+    () => (dados ? movimentacoesPorAluno(dados.turmas, filtroAluno, buscaAluno) : []),
+    [dados, filtroAluno, buscaAluno],
+  );
   const nomePeriodo = modo === "semana" ? "Semana" : "Dia";
   const passo = modo === "semana" ? 7 : 1;
   const proximoInicio = diaSeguinte(modo === "semana" ? segunda : dia, passo);
@@ -148,6 +212,20 @@ export default function VistaMovimentacoes({
             variant={modo === item.valor ? "default" : "outline"}
             aria-pressed={modo === item.valor}
             onClick={() => setModo(item.valor)}
+            className="min-h-11"
+          >
+            {item.rotulo}
+          </Button>
+        ))}
+      </div>
+      <div role="group" aria-label="Agrupamento do relatório" className="flex flex-wrap gap-2">
+        {AGRUPAMENTOS.map((item) => (
+          <Button
+            key={item.valor}
+            type="button"
+            variant={agrupamento === item.valor ? "default" : "outline"}
+            aria-pressed={agrupamento === item.valor}
+            onClick={() => setAgrupamento(item.valor)}
             className="min-h-11"
           >
             {item.rotulo}
@@ -238,6 +316,36 @@ export default function VistaMovimentacoes({
             ]}
           />
         </div>
+        {agrupamento === "aluno" && (
+          <>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="movimentacoes-busca">Buscar aluno</Label>
+              <BarraBusca
+                id="movimentacoes-busca"
+                valor={buscaAluno}
+                onValor={setBuscaAluno}
+                placeholder="Digite o nome"
+                rotulo="Buscar aluno no relatório"
+                className="border-0 px-0 py-0"
+              />
+            </div>
+            <div className="min-w-0 space-y-2">
+              <Label htmlFor="movimentacoes-filtro">Mostrar</Label>
+              <Selecionar
+                id="movimentacoes-filtro"
+                ariaLabel="Filtro de alunos do relatório"
+                value={filtroAluno}
+                onValueChange={(valor) =>
+                  setFiltroAluno(valor === "repetidas" ? "repetidas" : "todas")
+                }
+                opcoes={[
+                  { valor: "todas", rotulo: "Todos com movimentações" },
+                  { valor: "repetidas", rotulo: "Duas ou mais no período" },
+                ]}
+              />
+            </div>
+          </>
+        )}
       </div>
       <p className="text-muted-foreground text-sm" aria-live="polite">
         {de === ate ? rotuloData(de) : `${rotuloData(de)} a ${rotuloData(ate)}`}
@@ -282,6 +390,42 @@ export default function VistaMovimentacoes({
               <p className="superficie-vidro text-muted-foreground p-6 text-center text-sm">
                 Nenhuma saída ou entrada neste período.
               </p>
+            ) : agrupamento === "aluno" ? (
+              porAluno.length === 0 ? (
+                <p className="superficie-vidro text-muted-foreground p-6 text-center text-sm">
+                  Nenhum aluno encontrado com estes filtros.
+                </p>
+              ) : (
+                porAluno.map((aluno) => (
+                  <section
+                    key={aluno.alunoId}
+                    aria-label={`Aluno ${aluno.alunoNome}`}
+                    className="superficie-vidro min-w-0 overflow-hidden"
+                  >
+                    <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold wrap-anywhere">{aluno.alunoNome}</h3>
+                        <p className="text-muted-foreground text-xs wrap-anywhere">
+                          {aluno.turmas.join(" · ")}
+                        </p>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        {aluno.saidas} {aluno.saidas === 1 ? "saída" : "saídas"} · {aluno.entradas}{" "}
+                        {aluno.entradas === 1 ? "entrada" : "entradas"}
+                      </p>
+                    </header>
+                    <ul className="divide-y">
+                      {aluno.movimentacoes.map((item) => (
+                        <LinhaMovimentacao
+                          key={`${item.tipo}:${item.id}`}
+                          item={item}
+                          comAluno={false}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))
+              )
             ) : (
               dados.turmas.map((grupo) => (
                 <section
@@ -298,64 +442,16 @@ export default function VistaMovimentacoes({
                   </header>
                   <ul className="divide-y">
                     {grupo.movimentacoes.map((item) => (
-                      <li
-                        key={`${item.tipo}:${item.id}`}
-                        className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-                      >
-                        <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-lg border px-2 py-1 font-medium",
-                                item.tipo === "ENTRADA"
-                                  ? "border-primary/25 bg-primary/10 text-primary"
-                                  : "bg-muted/40 text-foreground",
-                              )}
-                            >
-                              {item.tipo === "ENTRADA" ? (
-                                <ArrowDownLeft size={14} aria-hidden="true" />
-                              ) : (
-                                <ArrowUpRight size={14} aria-hidden="true" />
-                              )}
-                              {item.tipo === "ENTRADA" ? "Entrada" : "Saída"}
-                            </span>
-                            <time
-                              dateTime={item.dia}
-                              className="text-muted-foreground numerais-tabulares"
-                            >
-                              {rotuloData(item.dia)}
-                            </time>
-                            {item.horario && (
-                              <span className="numerais-tabulares">{item.horario}</span>
-                            )}
-                          </div>
-                          <p className="font-medium wrap-anywhere">{item.alunoNome}</p>
-                          {item.momento && (
-                            <p className="text-muted-foreground text-xs">
-                              {rotuloMomento(item.momento)}
-                            </p>
-                          )}
-                        </div>
-                        <dl className="min-w-0 space-y-2 text-sm">
-                          <div>
-                            <dt className="text-muted-foreground text-xs">Motivo</dt>
-                            <dd className="wrap-anywhere">{item.motivo || "Não informado"}</dd>
-                          </div>
-                          <div>
-                            <dt className="text-muted-foreground text-xs">
-                              {item.tipo === "SAIDA" ? "Liberado por" : "Responsável pelo registro"}
-                            </dt>
-                            <dd className="wrap-anywhere">{item.responsavel ?? "Não informado"}</dd>
-                          </div>
-                        </dl>
-                      </li>
+                      <LinhaMovimentacao key={`${item.tipo}:${item.id}`} item={item} comAluno />
                     ))}
                   </ul>
                 </section>
               ))
             )}
             <p className="text-muted-foreground text-xs">
-              Entradas agrupadas pela turma no registro; saídas pela turma atual do aluno.
+              {agrupamento === "aluno"
+                ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
+                : "Entradas agrupadas pela turma no registro; saídas pela turma atual do aluno."}
             </p>
           </>
         )
