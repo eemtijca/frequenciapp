@@ -29,7 +29,7 @@ async function conexao(): Promise<LinhaIntegracao> {
   const linha = await lerLinha("SAIDAS");
   if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId)
     throw new ErroHttp(
-      "Ative a conexão Google da planilha de saídas na Gestão para enviar as entradas.",
+      "Ative a conexão Google da planilha de entradas e saídas na Gestão para enviar as entradas.",
       400,
     );
   const esquema = linha.esquema as { aba?: unknown } | null;
@@ -55,6 +55,7 @@ export async function prepararAbaEntradas(admin: { id: string }) {
   const resultado = await chamarIntegracao<{
     criada: boolean;
     organizada: boolean;
+    realinhada: boolean;
     sheet1: "ausente" | "removida" | "mantida";
   }>(linha, {
     acao: "prepararEntradas",
@@ -64,7 +65,7 @@ export async function prepararAbaEntradas(admin: { id: string }) {
     banco(),
     admin.id,
     resultado.criada ? "planilha.entradas.criarAba" : "planilha.entradas.organizar",
-    `aba:Entradas;Sheet1:${resultado.sheet1}`,
+    `aba:Entradas;realinhada:${resultado.realinhada};Sheet1:${resultado.sheet1}`,
   );
   return resultado;
 }

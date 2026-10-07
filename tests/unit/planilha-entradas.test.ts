@@ -60,7 +60,7 @@ beforeEach(() => {
   ]);
   dubl.chamar.mockImplementation(async (_linha, corpo) => {
     if (corpo.acao === "prepararEntradas")
-      return { criada: false, organizada: true, sheet1: "ausente" };
+      return { criada: false, organizada: true, realinhada: false, sheet1: "ausente" };
     if (corpo.acao === "estrutura") return { abas: [{ nome: "Entradas", mesclagens: [] }] };
     if (corpo.acao === "ler")
       return {
@@ -84,6 +84,7 @@ describe("envio de entradas", () => {
     expect(await prepararAbaEntradas(usuario)).toEqual({
       criada: false,
       organizada: true,
+      realinhada: false,
       sheet1: "ausente",
     });
     expect(dubl.chamar).toHaveBeenLastCalledWith(expect.anything(), {
@@ -94,7 +95,7 @@ describe("envio de entradas", () => {
       {},
       usuario.id,
       "planilha.entradas.organizar",
-      "aba:Entradas;Sheet1:ausente",
+      "aba:Entradas;realinhada:false;Sheet1:ausente",
     );
   });
   it("cria explicitamente só a aba ausente com cabeçalho próprio", async () => {

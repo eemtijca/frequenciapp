@@ -1,10 +1,14 @@
-// Plano conservador da aba de entradas, identificado pelo código do registro.
+// Plano conservador da aba de entradas, com as mesmas colunas da aba de saídas.
 import type { EntradaAtrasada } from "./entradas";
 import { assinarAba, hashTexto, type LeituraAba } from "./planilha";
+import { CABECALHO_SAIDAS } from "./planilha-saidas";
 import { normalizar, rotuloData, rotuloMomento } from "./frequencia";
 
 export const ABA_ENTRADAS = "Entradas";
-export const CABECALHO_ENTRADAS = [
+/** As abas Entradas e de saídas têm as mesmas colunas e a mesma estrutura. */
+export const CABECALHO_ENTRADAS = CABECALHO_SAIDAS;
+/** Cabeçalho anterior da aba Entradas, realinhado ao preparar. */
+export const CABECALHO_ENTRADAS_ANTERIOR = [
   "Data",
   "Aluno",
   "Turma",
@@ -13,6 +17,34 @@ export const CABECALHO_ENTRADAS = [
   "Registrado por",
   "Código",
 ];
+
+function cabecalhoIgual(cabecalho: string[], padrao: string[]): boolean {
+  return padrao.every(
+    (rotulo, indice) => normalizar(cabecalho[indice] ?? "") === normalizar(rotulo),
+  );
+}
+
+/** Reconhece o cabeçalho atual, o anterior (com Código) ou nenhum dos dois. */
+export function formatoCabecalhoEntradas(cabecalho: string[]): "atual" | "anterior" | "outro" {
+  if (cabecalhoIgual(cabecalho, CABECALHO_ENTRADAS)) return "atual";
+  if (cabecalhoIgual(cabecalho, CABECALHO_ENTRADAS_ANTERIOR)) return "anterior";
+  return "outro";
+}
+
+/** Linha de uma entrada na aba, na ordem do cabeçalho comum. */
+export function valoresDaEntrada(entrada: EntradaAtrasada): string[] {
+  return [
+    rotuloData(entrada.dia),
+    entrada.nome,
+    entrada.turmaRotulo,
+    entrada.momento ? `${entrada.horario} · ${rotuloMomento(entrada.momento)}` : entrada.horario,
+    entrada.motivo,
+    "",
+    entrada.responsavelRegistroNome ?? entrada.registradoPorNome,
+  ];
+}
+
+const chaveLinha = (dia: string, nome: string) => `${dia}|${normalizar(nome)}`;
 
 export function planejarEntradas(
   entradas: EntradaAtrasada[],
@@ -27,65 +59,52 @@ export function planejarEntradas(
   const assinatura = assinarAba(ABA_ENTRADAS, cabecalho, mesclagens);
   const criar: { linha: number; nome: string; celulas: { coluna: number; valor: string }[] }[] = [];
   const avisos: string[] = [];
+  const formato = formatoCabecalhoEntradas(cabecalho);
   const bloqueado =
     leitura.nome !== ABA_ENTRADAS ||
     leitura.linhaInicial !== 1 ||
     leitura.colunaInicial !== 1 ||
     mesclagens.length > 0 ||
-    CABECALHO_ENTRADAS.some(
-      (rotulo, indice) => normalizar(cabecalho[indice] ?? "") !== normalizar(rotulo),
-    ) ||
+    formato !== "atual" ||
     leitura.formula[0]?.some(Boolean) === true;
   if (bloqueado)
     avisos.push(
-      "A aba Entradas precisa do cabeçalho padrão, sem fórmulas ou mesclagens. Confira a planilha antes de enviar.",
+      formato === "anterior"
+        ? "A aba Entradas está no formato anterior. Prepare a aba Entradas em Gestão, Configurações, Planilhas, para atualizar as colunas."
+        : "A aba Entradas precisa do cabeçalho padrão, sem fórmulas ou mesclagens. Confira a planilha antes de enviar.",
     );
   // A leitura abrange todas as colunas: conteúdo e fórmulas no fim da aba
   // também reservam linhas, mesmo quando não são registros de entrada.
   let ultimaLinha = 1;
-  const porCodigo = new Map<string, number[]>();
-  const porNomeDia = new Set<string>();
+  const existentesPorChave = new Map<string, string[][]>();
   leitura.valores.forEach((valores, indice) => {
     if (valores.some((valor) => valor !== "") || leitura.formula[indice]?.some(Boolean))
       ultimaLinha = indice + 1;
-    if (indice === 0) return;
-    const codigo = valores[6]?.trim();
-    if (codigo) porCodigo.set(codigo, [...(porCodigo.get(codigo) ?? []), indice]);
-    else if (valores[0] && valores[1]) porNomeDia.add(`${valores[0]}|${normalizar(valores[1])}`);
+    if (indice === 0 || !valores[0] || !valores[1]) return;
+    const chave = chaveLinha(valores[0], valores[1]);
+    existentesPorChave.set(chave, [...(existentesPorChave.get(chave) ?? []), valores]);
   });
   let existentes = 0;
-  if (!bloqueado)
+  if (!bloqueado) {
+    const usadas = new Map<string, number>();
     for (const entrada of [...entradas].sort(
       (a, b) =>
         a.dia.localeCompare(b.dia) ||
         a.horario.localeCompare(b.horario) ||
         a.id.localeCompare(b.id),
     )) {
-      const valores = [
-        rotuloData(entrada.dia),
-        entrada.nome,
-        entrada.turmaRotulo,
-        entrada.momento
-          ? `${entrada.horario} · ${rotuloMomento(entrada.momento)}`
-          : entrada.horario,
-        entrada.motivo,
-        entrada.responsavelRegistroNome ?? entrada.registradoPorNome,
-        `${entrada.alunoId}:${entrada.dia}`,
-      ];
-      const linhas = porCodigo.get(`${entrada.alunoId}:${entrada.dia}`);
-      if (linhas) {
+      const valores = valoresDaEntrada(entrada);
+      const chave = chaveLinha(valores[0] ?? "", entrada.nome);
+      // Cada linha da planilha cobre uma entrada; homônimos no mesmo dia usam uma linha cada.
+      const posicao = usadas.get(chave) ?? 0;
+      usadas.set(chave, posicao + 1);
+      const atual = existentesPorChave.get(chave)?.[posicao];
+      if (atual) {
         existentes += 1;
-        const atual = leitura.valores[linhas[0] ?? -1];
-        if (linhas.length > 1 || valores.some((valor, indice) => atual?.[indice] !== valor))
+        if (valores.some((valor, indice) => valor !== "" && (atual[indice] ?? "") !== valor))
           avisos.push(
-            "Há um registro já enviado com dados diferentes ou código repetido. O conteúdo existente foi preservado.",
+            "Há um registro já enviado com dados diferentes. O conteúdo existente foi preservado.",
           );
-        continue;
-      }
-      if (porNomeDia.has(`${valores[0]}|${normalizar(entrada.nome)}`)) {
-        avisos.push(
-          "Há uma entrada manual com o mesmo nome e data, sem código. Confira esse registro antes de enviar; nenhuma linha foi acrescentada para ele.",
-        );
         continue;
       }
       criar.push({
@@ -94,6 +113,7 @@ export function planejarEntradas(
         celulas: valores.map((valor, indice) => ({ coluna: indice + 1, valor })),
       });
     }
+  }
   return {
     aba: ABA_ENTRADAS,
     assinatura,

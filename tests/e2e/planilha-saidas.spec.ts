@@ -55,7 +55,7 @@ test.describe("Google Planilhas de saídas", () => {
       .getByRole("button", { name: "Planilhas", exact: true })
       .click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
-    await cartao.getByRole("button", { name: /Planilha de saídas/ }).click();
+    await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
     await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
@@ -68,13 +68,31 @@ test.describe("Google Planilhas de saídas", () => {
       .getByRole("navigation", { name: "Categorias de configurações" })
       .getByRole("button", { name: "Planilhas", exact: true })
       .click();
-    await cartao.getByRole("button", { name: /Planilha de saídas/ }).click();
+    await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
     await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
 
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
     await expect(cartao.getByText(ABA, { exact: true }).first()).toBeVisible();
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
+
+    // As duas abas são preparadas e organizadas no mesmo cartão, com as mesmas colunas.
+    const preparo = cartao.locator('[data-secao="planilha-entradas-preparo"]');
+    await expect(
+      preparo.getByRole("button", { name: "Organizar apresentação de Entradas", exact: true }),
+    ).toBeVisible();
+    await preparo.getByRole("button", { name: "Preparar aba Entradas", exact: true }).click();
+    await page.getByRole("button", { name: "Preparar aba", exact: true }).click();
+    await expect(page.getByText(/^Aba Entradas criada e organizada\./)).toBeVisible();
+    expect([1, 2, 3, 4, 5, 6, 7].map((coluna) => google.valor("Entradas", 1, coluna))).toEqual([
+      "Data",
+      "Aluno",
+      "Turma",
+      "Momento",
+      "Justificativa",
+      "Observação",
+      "Responsável",
+    ]);
 
     // Envio pela vista Saídas.
     await trocarVisao(page, "Saídas e entradas", "saidas");
@@ -86,8 +104,8 @@ test.describe("Google Planilhas de saídas", () => {
       .click();
     const dialogo = page.getByRole("dialog");
     await expect(dialogo.getByText(/1 linha nova/)).toBeVisible();
-    // As entradas participam do mesmo diálogo; aba ainda não preparada gera aviso.
-    await expect(dialogo.getByText(/^Entradas:/)).toBeVisible();
+    // As entradas participam do mesmo diálogo, agora com a aba Entradas já preparada.
+    await expect(dialogo.getByText("Aba Entradas", { exact: true })).toBeVisible();
     await dialogo.getByRole("button", { name: "Enviar" }).click();
     await expect(page.getByText(/1 linha criada/)).toBeVisible();
     await expect.poll(() => google.valor(ABA, 2, 2)).toBe("E2E Aluno Um");
@@ -96,7 +114,8 @@ test.describe("Google Planilhas de saídas", () => {
 
     // O segundo envio do mesmo mês não duplica linhas.
     await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
-    await expect(page.getByRole("dialog").getByText(/0 linhas novas/)).toBeVisible();
+    // Saídas e Entradas (já preparada) mostram, cada uma, zero linhas novas.
+    await expect(page.getByRole("dialog").getByText(/0 linhas novas/)).toHaveCount(2);
     await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
   });
 });

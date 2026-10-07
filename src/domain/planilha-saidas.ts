@@ -62,7 +62,10 @@ export interface AbaSaidaEsquema {
   assinatura: string;
 }
 
-/** Cabeçalho padrão da aba de saídas, usado ao criar a aba pelo aplicativo. */
+/**
+ * Cabeçalho padrão da aba de saídas, usado ao criar a aba pelo aplicativo e
+ * igual ao da aba Entradas. Abas antigas com "Liberado por" seguem reconhecidas.
+ */
 export const CABECALHO_SAIDAS = [
   "Data",
   "Aluno",
@@ -70,7 +73,7 @@ export const CABECALHO_SAIDAS = [
   "Momento",
   "Justificativa",
   "Observação",
-  "Liberado por",
+  "Responsável",
 ];
 
 /** Saída pronta para a planilha, com rótulos já resolvidos no aplicativo. */

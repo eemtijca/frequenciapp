@@ -15,7 +15,6 @@ import DialogoEnvioSaidas, {
 export type AbaMovimentacao = "saidas" | "entradas";
 
 type Props = ComponentProps<typeof VistaSaidas> & {
-  podePrepararPlanilha: boolean;
   abaInicial?: AbaMovimentacao;
 };
 
@@ -41,11 +40,7 @@ function refletirNaUrl(aba: AbaMovimentacao | null) {
   }
 }
 
-export default function VistaMovimentacoes({
-  podePrepararPlanilha,
-  abaInicial = "saidas",
-  ...props
-}: Props) {
+export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: Props) {
   const [aba, setAba] = useState<AbaMovimentacao>(abaInicial);
   const { ativo } = props;
 
@@ -86,7 +81,7 @@ export default function VistaMovimentacoes({
             title={
               estadoPlanilha?.podeEnviar
                 ? "Enviar as saídas e as entradas do mês para o Google Planilhas"
-                : "Conecte a planilha de saídas na Gestão"
+                : "Conecte a planilha de entradas e saídas na Gestão"
             }
             onClick={() => setEnvioAberto(true)}
           >
@@ -105,7 +100,6 @@ export default function VistaMovimentacoes({
               alunos={props.alunos}
               liberadores={props.liberadores}
               catalogoJustificativas={props.catalogoJustificativas}
-              podePrepararPlanilha={podePrepararPlanilha}
             />
           )
         }

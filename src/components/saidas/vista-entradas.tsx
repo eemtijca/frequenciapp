@@ -1,7 +1,6 @@
 "use client";
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
-import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import type {
@@ -46,7 +45,6 @@ interface Props {
   alunos: Aluno[];
   liberadores: LiberadorConfigurado[];
   catalogoJustificativas: JustificativaConfigurada[];
-  podePrepararPlanilha: boolean;
 }
 interface Previa {
   planoHash: string;
@@ -64,7 +62,6 @@ export default function VistaEntradas({
   alunos,
   liberadores,
   catalogoJustificativas,
-  podePrepararPlanilha,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turma, setTurma] = useState("");
@@ -85,7 +82,6 @@ export default function VistaEntradas({
     null,
   );
   const [previa, setPrevia] = useState<Previa | null>(null);
-  const [confirmarAba, setConfirmarAba] = useState(false);
   const mensagemErro = useCallback(
     (erro: unknown) =>
       erro instanceof ErroApi
@@ -138,7 +134,6 @@ export default function VistaEntradas({
         await acao();
       } catch (erro) {
         setRemover(null);
-        setConfirmarAba(false);
         setPrevia(null);
         setErro(mensagemErro(erro));
       }
@@ -447,27 +442,11 @@ export default function VistaEntradas({
           ))
         )}
       </section>
-      <section className="superficie-vidro space-y-3 p-4" aria-label="Planilha de entradas">
-        <h2 className="sr-only">Planilha de entradas</h2>
+      <section className="superficie-vidro space-y-3 p-4" aria-label="Prévia das entradas">
+        <h2 className="sr-only">Prévia das entradas</h2>
         {estado?.podeEnviar ? (
           <>
             <div className="flex flex-wrap gap-2">
-              {podePrepararPlanilha && (
-                <Button
-                  variant="outline"
-                  disabled={executando}
-                  onClick={() => setConfirmarAba(true)}
-                >
-                  Preparar aba Entradas
-                </Button>
-              )}
-              {podePrepararPlanilha && (
-                <OrganizarPlanilha
-                  rota="/api/planilha-entradas/organizar"
-                  aba="Entradas"
-                  disabled={executando}
-                />
-              )}
               <Button
                 variant="outline"
                 disabled={executando || carregando || entradas.length === 0}
@@ -489,7 +468,8 @@ export default function VistaEntradas({
           </>
         ) : (
           <p className="text-muted-foreground text-sm">
-            Ative a conexão Google da planilha de saídas na Gestão para enviar as entradas.
+            Ative a conexão Google da planilha de entradas e saídas na Gestão para enviar as
+            entradas.
           </p>
         )}
       </section>
@@ -523,45 +503,6 @@ export default function VistaEntradas({
               }}
             >
               Remover entrada
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={confirmarAba} onOpenChange={setConfirmarAba}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Preparar aba Entradas?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A aba Entradas da planilha {estado?.planilhaNome} receberá a mesma organização visual
-              de Saídas. Os registros serão preservados. A aba Sheet1 será removida somente se
-              estiver vazia e a aba de saídas estiver configurada.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={executando}
-              onClick={(e) => {
-                e.preventDefault();
-                void executar(async () => {
-                  const dados = await pedir<{
-                    criada: boolean;
-                    sheet1: "ausente" | "removida" | "mantida";
-                  }>("/api/planilha-entradas/preparar", { method: "POST" });
-                  setConfirmarAba(false);
-                  avisarSucesso(
-                    `${dados.criada ? "Aba Entradas criada e organizada." : "Aba Entradas organizada."}${
-                      dados.sheet1 === "removida"
-                        ? " Sheet1 removida."
-                        : dados.sheet1 === "mantida"
-                          ? " Sheet1 mantida para conferência."
-                          : ""
-                    }`,
-                  );
-                });
-              }}
-            >
-              Preparar aba
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,6 +1,7 @@
 // Prévia visual no desktop e celular, com dados fictícios e rede controlada.
 import { expect, test } from "@playwright/test";
 import { colunasDeApresentacao } from "../../src/domain/planilha-apresentacao";
+import { CABECALHO_ENTRADAS } from "../../src/domain/planilha-entradas";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 test.use({ serviceWorkers: "block" });
 
@@ -8,8 +9,33 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
   page,
 }, contexto) => {
   const confirmacoes: unknown[] = [];
-  await page.route("**/api/planilha-entradas/estado", (rota) =>
-    rota.fulfill({ json: { podeEnviar: true, planilhaNome: "QA Planilha" } }),
+  await page.route(/\/api\/planilha-saidas$/, (rota) =>
+    rota.fulfill({
+      json: {
+        integracao: {
+          ativa: true,
+          contaGoogle: true,
+          googlePlanilha: { id: "qa", nome: "QA Planilha" },
+          esquema: {
+            planilha: {
+              nome: "QA Planilha",
+              url: "https://exemplo.invalid/qa",
+              fuso: "America/Fortaleza",
+            },
+            abas: [],
+            aba: "Saiu mais cedo",
+          },
+          esquemaEm: "2026-10-01T12:00:00.000Z",
+          modo: "conservador",
+          modoCompletoAte: null,
+          envioAutomatico: false,
+          atualizadoEm: "2026-10-01T12:00:00.000Z",
+          fuso: "America/Fortaleza",
+          ultimoErro: null,
+          sincronizacoes: [],
+        },
+      },
+    }),
   );
   await page.route("**/api/planilha-entradas/organizar", async (rota) => {
     const corpo = rota.request().postDataJSON() as { planoHash?: string };
@@ -24,24 +50,22 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
             cabecalhoLinha: 1,
             assinatura: "qa",
             planoHash: "a".repeat(64),
-            colunas: colunasDeApresentacao([
-              "Data",
-              "Aluno",
-              "Turma",
-              "Horário",
-              "Motivo",
-              "Registrado por",
-              "Código",
-            ]),
+            colunas: colunasDeApresentacao([...CABECALHO_ENTRADAS]),
           },
         },
       });
   });
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
-  await page.getByRole("tab", { name: "Entradas", exact: true }).click();
-  const secao = page.getByRole("region", { name: "Planilha de entradas", exact: true });
+  await trocarVisao(page, "Gestão", "gestao");
+  await page.getByRole("tab", { name: "Configurações" }).click();
+  await page
+    .getByRole("navigation", { name: "Categorias de configurações" })
+    .getByRole("button", { name: "Planilhas", exact: true })
+    .click();
+  const cartao = page.locator('[data-secao="planilha-saidas"]');
+  await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
+  const secao = cartao.locator('[data-secao="planilha-entradas-preparo"]');
   await secao.screenshot({
     path: `docs/imagens/planilha-apresentacao-acesso-${contexto.project.name}.png`,
   });
@@ -63,7 +87,9 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
   await previa.evaluate((elemento) => {
     elemento.scrollLeft = elemento.scrollWidth;
   });
-  await expect(dialogo.getByRole("columnheader", { name: "Código", exact: true })).toBeInViewport();
+  await expect(
+    dialogo.getByRole("columnheader", { name: "Responsável", exact: true }),
+  ).toBeInViewport();
   await previa.evaluate((elemento) => {
     elemento.scrollLeft = 0;
   });
