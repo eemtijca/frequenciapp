@@ -86,7 +86,12 @@ export default function VistaGestao({
           <>
             {aba === "series" && <AbaSeries series={series} onMudanca={onSeriesMudaram} />}
             {aba === "turmas" && (
-              <AbaTurmas series={series} turmas={turmas} onMudanca={onTurmasMudaram} />
+              <AbaTurmas
+                series={series}
+                turmas={turmas}
+                onMudanca={onTurmasMudaram}
+                onOrdenacao={onAlunosMudaram}
+              />
             )}
             {aba === "alunos" && (
               <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />

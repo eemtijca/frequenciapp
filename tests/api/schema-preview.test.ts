@@ -18,6 +18,7 @@ vi.mock("@/infra/ambiente", () => ({ ambiente: configuracao }));
 import { banco, objetoDoBanco } from "@/infra/banco";
 import { lerParametrosAcesso } from "@/application/parametros-acesso";
 import { lerEstadoPlanilha } from "@/application/planilha";
+import { ordenarAlunosDasTurmas } from "@/application/ordenacao-turmas";
 import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
 
 const sufixo = randomUUID().replaceAll("-", "");
@@ -181,6 +182,28 @@ describe("Preview em schema do mesmo banco", () => {
     expect((await lerEstadoPlanilha()).alteradasDepois).toBe(2);
     selecionarRuntime(schemaPreview);
     expect((await lerEstadoPlanilha()).alteradasDepois).toBe(1);
+  });
+
+  it("reorganiza a chamada somente no schema do Preview, mesmo com search_path diferente", async () => {
+    const preview = selecionarRuntime(schemaPreview);
+    const admin = await preview.usuario.create({
+      data: {
+        email: "qa-ordem@escola.exemplo",
+        nome: "QA Administração",
+        senhaHash: "hash-sintetico-sem-login",
+        papel: "ADMIN",
+      },
+    });
+    await preview.aluno.updateMany({ data: { ordem: 10 } });
+    expect(await ordenarAlunosDasTurmas(admin, { confirmar: true })).toEqual({
+      turmas: 1,
+      alunos: 1,
+      atualizados: 1,
+    });
+    expect((await preview.aluno.findFirst())?.ordem).toBe(1);
+    const controle = selecionarRuntime(schemaControle);
+    expect((await controle.aluno.findFirst())?.ordem).toBe(1);
+    expect(await controle.auditoria.count({ where: { acao: "turma.ordenar_alunos" } })).toBe(0);
   });
 
   it("falha em schema inexistente sem recorrer às tabelas do schema padrão", async () => {
