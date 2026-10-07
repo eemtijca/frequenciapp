@@ -37,6 +37,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Botão único Reorganizar turmas em Gestão > Turmas: ordena os alunos ativos de todas as turmas por nome e renumera a chamada, com confirmação, preservação do histórico e inativos após os ativos.
+
 - Navegação da planilha de frequência por mês: o preparo concluído mostra o mês escolhido e oculta outros meses e abas legadas vinculadas. Mostrar mês na planilha permite consultar meses anteriores e voltar ao corrente, preservando células, fórmulas e envios para abas ocultas.
 
 - Abas mensais de frequência com nome do mês por extenso, sem Turma atual nem colunas de sábado e domingo. Preparar mês atualiza abas existentes preservando registros dos dias úteis e vínculos; envios mensais não recriam fins de semana. Preparo e envio compartilham proteção contra alterações simultâneas.
