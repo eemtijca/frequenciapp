@@ -22,6 +22,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Busca nos seletores permanece aberta e focada ao digitar e abrir o teclado no celular, incluindo a seleção de aluno nos Relatórios. Mantém filtro, seleção por toque e teclado, com limpeza da busca ao reabrir.
+
 - Preparar aba Entradas reaplica o padrão visual de Saídas nas abas existentes, preservando os registros, e remove Sheet1 somente quando estiver vazia e houver uma aba de saídas configurada no mesmo arquivo.
 - Seletor de data mantém o selo Hoje na coluna lateral da Chamada no desktop e prioriza a data e o selo antes do ícone nas larguras compactas.
 - Leituras da Sheets API com limite (429), falha do Google (5xx) ou sem resposta passam a responder `GOOGLE_TEMPORARIO` (502/503), e o Preparar mês interrompe o lote uma vez e oferece "Tentar pendentes", em vez de repetir a falha em cada turma.

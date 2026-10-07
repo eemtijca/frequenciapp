@@ -375,7 +375,8 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
 
 test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou mais", async ({
   page,
-}) => {
+  isMobile,
+}, testInfo) => {
   const turmas = await turmasDoTeste(page);
   const { alunos } = (await (await page.request.get("/api/alunos")).json()) as {
     alunos: Aluno[];
@@ -448,14 +449,47 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await expect(page.getByRole("option", { name: "Todos os alunos", exact: true })).toBeVisible();
   for (const aluno of doTeste)
     await expect(page.getByRole("option", { name: aluno.nome, exact: true })).toBeVisible();
+  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
+  if (isMobile) await busca.tap();
+  else await busca.click();
+  await expect(busca).toBeFocused();
+  // O navegador emulado não abre teclado virtual; a altura menor reproduz seu resize.
+  await page.setViewportSize({ width: 360, height: 500 });
+  await expect(busca).toBeVisible({ timeout: 2_000 });
+  await expect(busca).toBeFocused();
+  await busca.pressSequentially(bruno.nome);
+  await expect(busca).toHaveValue(bruno.nome);
+  await expect(busca).toBeFocused();
+  await expect(page.getByRole("option", { name: ana.nome, exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("busca-aberta.png") });
   await page.getByRole("option", { name: bruno.nome, exact: true }).click();
+  await page.setViewportSize({ width: 360, height: 780 });
   await expect(grupoAna).toHaveCount(0);
   await expect(grupoBruno).toBeVisible();
 
   await painel.getByRole("combobox", { name: "Turma do relatório de movimentações" }).click();
   await page.getByRole("option", { name: "Todas as turmas", exact: true }).click();
   await seletor.click();
-  await page.getByRole("option", { name: "Todos os alunos", exact: true }).click();
+  await expect(busca).toHaveValue("");
+  await busca.fill("E2E Nome inexistente");
+  await expect(page.getByText("Nenhuma opção encontrada.", { exact: true })).toBeVisible();
+  await busca.press("Enter");
+  await expect(busca).toBeVisible();
+  await busca.press("Escape");
+  await expect(busca).toHaveCount(0);
+  await expect(seletor).toBeFocused();
+  await expect(grupoBruno).toBeVisible();
+  await seletor.press("ArrowDown");
+  await expect(busca).toHaveValue("");
+  await busca.pressSequentially("Aluno");
+  const proximo = await page.getByRole("option").nth(1).innerText();
+  await busca.press("ArrowDown");
+  await busca.press("Enter");
+  await expect(seletor).toContainText(proximo);
+  await expect(seletor).toBeFocused();
+  await seletor.click();
+  await busca.pressSequentially("Todos os alunos");
+  await busca.press("Enter");
   await expect(grupoAna).toBeVisible();
 
   await painel.getByRole("combobox", { name: "Filtro de alunos do relatório" }).click();
