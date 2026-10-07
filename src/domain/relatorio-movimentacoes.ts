@@ -1,5 +1,5 @@
 // Contrato do relatório de saídas e entradas por período e turma.
-import { LIMITE_DIAS_PERIODO, normalizar } from "./frequencia";
+import { LIMITE_DIAS_PERIODO } from "./frequencia";
 
 export const LIMITE_DIAS_RELATORIO_MOVIMENTACOES = LIMITE_DIAS_PERIODO;
 
@@ -45,13 +45,14 @@ export interface MovimentacoesDoAluno extends TotaisMovimentacoes {
 
 /**
  * Reagrupa o relatório por aluno, somando saídas e entradas de todas as turmas.
- * O filtro "repetidas" mantém quem tem duas ou mais movimentações e a busca
- * compara o nome sem acento nem caixa. Mais movimentações primeiro, depois o nome.
+ * O filtro "repetidas" mantém quem tem duas ou mais movimentações e `alunoId`,
+ * quando informado, restringe o resultado a esse aluno. Mais movimentações
+ * primeiro, depois o nome.
  */
 export function movimentacoesPorAluno(
   turmas: TurmaRelatorioMovimentacoes[],
   filtro: FiltroMovimentacoesPorAluno = "todas",
-  busca = "",
+  alunoId = "",
 ): MovimentacoesDoAluno[] {
   const porAluno = new Map<string, MovimentacoesDoAluno>();
   for (const turma of turmas) {
@@ -73,13 +74,9 @@ export function movimentacoesPorAluno(
       porAluno.set(item.alunoId, atual);
     }
   }
-  const termos = normalizar(busca).split(" ").filter(Boolean);
   return [...porAluno.values()]
     .filter((aluno) => filtro === "todas" || aluno.total >= 2)
-    .filter((aluno) => {
-      const alvo = normalizar(aluno.alunoNome);
-      return termos.every((termo) => alvo.includes(termo));
-    })
+    .filter((aluno) => alunoId === "" || aluno.alunoId === alunoId)
     .map((aluno) => ({
       ...aluno,
       movimentacoes: aluno.movimentacoes
