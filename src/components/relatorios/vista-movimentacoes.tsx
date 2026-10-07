@@ -16,6 +16,7 @@ import {
   rotuloData,
   partesDoMotivo,
   rotuloMomento,
+  type Aluno,
   type Turma,
 } from "@/domain/frequencia";
 import {
@@ -29,7 +30,6 @@ import { pedir } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { cn } from "@/lib/utils";
-import { BarraBusca } from "@/components/ui/barra-busca";
 import { Button } from "@/components/ui/button";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,8 @@ const AGRUPAMENTOS: { valor: Agrupamento; rotulo: string }[] = [
   { valor: "turma", rotulo: "Por turma" },
   { valor: "aluno", rotulo: "Por aluno" },
 ];
+
+const TODOS_OS_ALUNOS = "todos";
 
 const MODOS: { valor: Modo; rotulo: string }[] = [
   { valor: "dia", rotulo: "Dia" },
@@ -121,10 +123,12 @@ function LinhaMovimentacao({ item, comAluno }: { item: MovimentacaoRelatorio; co
 export default function VistaMovimentacoes({
   hoje,
   turmas,
+  alunos,
   ativa,
 }: {
   hoje: string;
   turmas: Turma[];
+  alunos: Aluno[];
   ativa: boolean;
 }) {
   const [modo, setModo] = useState<Modo>("dia");
@@ -133,7 +137,7 @@ export default function VistaMovimentacoes({
   const [fim, setFim] = useState(hoje);
   const [turmaId, setTurmaId] = useState("todas");
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("turma");
-  const [buscaAluno, setBuscaAluno] = useState("");
+  const [alunoEscolhido, setAlunoEscolhido] = useState(TODOS_OS_ALUNOS);
   const [filtroAluno, setFiltroAluno] = useState<FiltroMovimentacoesPorAluno>("todas");
   const [recarga, setRecarga] = useState(0);
   const [carga, setCarga] = useState<Carga | null>(null);
@@ -188,9 +192,36 @@ export default function VistaMovimentacoes({
     return () => controlador.abort();
   }, [ativa, chave, consulta, erroPeriodo]);
 
+  // Relação dos alunos ativos da turma escolhida, ou de todas, na ordem das turmas e da chamada.
+  const opcoesAluno = useMemo(() => {
+    const ordemTurma = new Map(turmas.map((turma, indice) => [turma.id, indice]));
+    const rotulos = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
+    return alunos
+      .filter((aluno) => aluno.ativo && (turmaId === "todas" || aluno.turmaId === turmaId))
+      .sort(
+        (a, b) =>
+          (ordemTurma.get(a.turmaId) ?? 0) - (ordemTurma.get(b.turmaId) ?? 0) || a.ordem - b.ordem,
+      )
+      .map((aluno) => ({
+        valor: aluno.id,
+        rotulo:
+          turmaId === "todas" ? `${aluno.nome} · ${rotulos.get(aluno.turmaId) ?? ""}` : aluno.nome,
+      }));
+  }, [alunos, turmaId, turmas]);
+  // Uma escolha que saiu da lista, por troca de turma, volta a valer para todos.
+  const alunoId = opcoesAluno.some((opcao) => opcao.valor === alunoEscolhido)
+    ? alunoEscolhido
+    : TODOS_OS_ALUNOS;
   const porAluno = useMemo(
-    () => (dados ? movimentacoesPorAluno(dados.turmas, filtroAluno, buscaAluno) : []),
-    [dados, filtroAluno, buscaAluno],
+    () =>
+      dados
+        ? movimentacoesPorAluno(
+            dados.turmas,
+            filtroAluno,
+            alunoId === TODOS_OS_ALUNOS ? "" : alunoId,
+          )
+        : [],
+    [dados, filtroAluno, alunoId],
   );
   const nomePeriodo = modo === "semana" ? "Semana" : "Dia";
   const passo = modo === "semana" ? 7 : 1;
@@ -335,14 +366,14 @@ export default function VistaMovimentacoes({
         {agrupamento === "aluno" && (
           <>
             <div className="min-w-0 space-y-2">
-              <Label htmlFor="movimentacoes-busca">Buscar aluno</Label>
-              <BarraBusca
-                id="movimentacoes-busca"
-                valor={buscaAluno}
-                onValor={setBuscaAluno}
-                placeholder="Digite o nome"
-                rotulo="Buscar aluno no relatório"
-                className="border-0 px-0 py-0"
+              <Label htmlFor="movimentacoes-aluno">Aluno</Label>
+              <Selecionar
+                id="movimentacoes-aluno"
+                ariaLabel="Aluno do relatório de movimentações"
+                value={alunoId}
+                onValueChange={setAlunoEscolhido}
+                buscavel
+                opcoes={[{ valor: TODOS_OS_ALUNOS, rotulo: "Todos os alunos" }, ...opcoesAluno]}
               />
             </div>
             <div className="min-w-0 space-y-2">
@@ -409,7 +440,9 @@ export default function VistaMovimentacoes({
             ) : agrupamento === "aluno" ? (
               porAluno.length === 0 ? (
                 <p className="superficie-vidro text-muted-foreground p-6 text-center text-sm">
-                  Nenhum aluno encontrado com estes filtros.
+                  {alunoId === TODOS_OS_ALUNOS
+                    ? "Nenhum aluno encontrado com estes filtros."
+                    : "Este aluno não tem saídas nem entradas neste período."}
                 </p>
               ) : (
                 porAluno.map((aluno) => (

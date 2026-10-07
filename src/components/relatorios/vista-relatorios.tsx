@@ -157,7 +157,12 @@ export default function VistaRelatorios({
               />
             )}
             {aba === "movimentacoes" && (
-              <VistaMovimentacoes hoje={diaCorrente} turmas={turmas} ativa={ativo && ativa} />
+              <VistaMovimentacoes
+                hoje={diaCorrente}
+                turmas={turmas}
+                alunos={alunos}
+                ativa={ativo && ativa}
+              />
             )}
           </>
         )}
