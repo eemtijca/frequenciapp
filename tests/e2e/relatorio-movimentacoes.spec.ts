@@ -1,6 +1,6 @@
 // Relatório de saídas e entradas: turmas, períodos civis, recuperação de rede e navegação móvel.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { Turma } from "@/domain/frequencia";
+import type { Aluno, Turma } from "@/domain/frequencia";
 import type {
   MovimentacaoRelatorio,
   RelatorioMovimentacoes,
@@ -373,15 +373,23 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
   }
 });
 
-test("agrupa por aluno com saídas e entradas, busca por nome e filtra duas ou mais", async ({
+test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou mais", async ({
   page,
 }) => {
   const turmas = await turmasDoTeste(page);
+  const { alunos } = (await (await page.request.get("/api/alunos")).json()) as {
+    alunos: Aluno[];
+  };
+  const doTeste = alunos
+    .filter((aluno) => aluno.turmaId === turmas[0]?.id)
+    .sort((a, b) => a.ordem - b.ordem);
+  const [ana, bruno] = doTeste;
+  if (!ana || !bruno) throw new Error("Alunos do relatório não encontrados.");
   const registro = (extra: Partial<MovimentacaoRelatorio>): MovimentacaoRelatorio => ({
     id: "e2e-m",
     tipo: "SAIDA",
-    alunoId: "e2e-ana",
-    alunoNome: "E2E Ana Souza",
+    alunoId: ana.id,
+    alunoNome: ana.nome,
     dia: "2026-10-05",
     horario: "09:00",
     momento: "aula_3",
@@ -392,7 +400,7 @@ test("agrupa por aluno com saídas e entradas, busca por nome e filtra duas ou m
   const movimentosA = [
     registro({ id: "e2e-m1" }),
     registro({ id: "e2e-m2", tipo: "ENTRADA", dia: "2026-10-06", motivo: "Atraso do ônibus" }),
-    registro({ id: "e2e-m3", alunoId: "e2e-bruno", alunoNome: "E2E Bruno Lima" }),
+    registro({ id: "e2e-m3", alunoId: bruno.id, alunoNome: bruno.nome }),
   ];
   await page.route(ENDERECO, (rota) =>
     rota.fulfill({
@@ -419,27 +427,41 @@ test("agrupa por aluno com saídas e entradas, busca por nome e filtra duas ou m
   const porAluno = painel.getByRole("button", { name: "Por aluno", exact: true });
   await porAluno.click();
   await expect(porAluno).toHaveAttribute("aria-pressed", "true");
-  const ana = painel.getByRole("region", { name: "Aluno E2E Ana Souza", exact: true });
-  const bruno = painel.getByRole("region", { name: "Aluno E2E Bruno Lima", exact: true });
+  const grupoAna = painel.getByRole("region", { name: `Aluno ${ana.nome}`, exact: true });
+  const grupoBruno = painel.getByRole("region", { name: `Aluno ${bruno.nome}`, exact: true });
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
-  await expect(ana).toContainText("1 saída · 1 entrada");
-  await expect(ana.getByRole("listitem")).toHaveCount(2);
-  await expect(ana).toContainText("Atraso do ônibus");
-  await expect(bruno).toContainText("1 saída · 0 entradas");
+  await expect(grupoAna).toContainText("1 saída · 1 entrada");
+  await expect(grupoAna.getByRole("listitem")).toHaveCount(2);
+  await expect(grupoAna).toContainText("Atraso do ônibus");
+  await expect(grupoBruno).toContainText("1 saída · 0 entradas");
   await page.setViewportSize({ width: 360, height: 780 });
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true);
 
-  await painel.getByRole("searchbox", { name: "Buscar aluno no relatório" }).fill("bruno");
-  await expect(ana).toHaveCount(0);
-  await expect(bruno).toBeVisible();
-  await painel.getByRole("searchbox", { name: "Buscar aluno no relatório" }).fill("");
+  // O campo lista os alunos da turma escolhida, em vez de pedir o nome digitado.
+  await expect(painel.getByRole("searchbox")).toHaveCount(0);
+  const seletor = painel.getByRole("combobox", { name: "Aluno do relatório de movimentações" });
+  await painel.getByRole("combobox", { name: "Turma do relatório de movimentações" }).click();
+  await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
+  await seletor.click();
+  await expect(page.getByRole("option", { name: "Todos os alunos", exact: true })).toBeVisible();
+  for (const aluno of doTeste)
+    await expect(page.getByRole("option", { name: aluno.nome, exact: true })).toBeVisible();
+  await page.getByRole("option", { name: bruno.nome, exact: true }).click();
+  await expect(grupoAna).toHaveCount(0);
+  await expect(grupoBruno).toBeVisible();
+
+  await painel.getByRole("combobox", { name: "Turma do relatório de movimentações" }).click();
+  await page.getByRole("option", { name: "Todas as turmas", exact: true }).click();
+  await seletor.click();
+  await page.getByRole("option", { name: "Todos os alunos", exact: true }).click();
+  await expect(grupoAna).toBeVisible();
 
   await painel.getByRole("combobox", { name: "Filtro de alunos do relatório" }).click();
   await page.getByRole("option", { name: "Duas ou mais no período", exact: true }).click();
-  await expect(ana).toBeVisible();
-  await expect(bruno).toHaveCount(0);
+  await expect(grupoAna).toBeVisible();
+  await expect(grupoBruno).toHaveCount(0);
 
   await painel.getByRole("button", { name: "Por turma", exact: true }).click();
   await expect(painel.getByRole("region", { name: "Turma E2E Ano A", exact: true })).toBeVisible();

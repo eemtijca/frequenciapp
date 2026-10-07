@@ -1,4 +1,4 @@
-// Reagrupamento do relatório de saídas e entradas por aluno: contagens, filtro e busca.
+// Reagrupamento do relatório de saídas e entradas por aluno: contagens, filtro e aluno escolhido.
 import { describe, expect, it } from "vitest";
 import {
   movimentacoesPorAluno,
@@ -64,12 +64,12 @@ describe("movimentacoesPorAluno", () => {
     expect(repetidas.map((aluno) => aluno.alunoId)).toEqual(["aluno-a"]);
   });
 
-  it("busca o nome sem diferenciar acento nem caixa", () => {
-    expect(movimentacoesPorAluno(turmas, "todas", "alvaro").map((a) => a.alunoId)).toEqual([
+  it("restringe o resultado ao aluno escolhido", () => {
+    expect(movimentacoesPorAluno(turmas, "todas", "aluno-b").map((a) => a.alunoId)).toEqual([
       "aluno-b",
     ]);
-    expect(movimentacoesPorAluno(turmas, "todas", "ANA sou")).toHaveLength(1);
-    expect(movimentacoesPorAluno(turmas, "todas", "inexistente")).toEqual([]);
+    expect(movimentacoesPorAluno(turmas, "repetidas", "aluno-b")).toEqual([]);
+    expect(movimentacoesPorAluno(turmas, "todas", "sem-movimentacao")).toEqual([]);
   });
 
   it("devolve lista vazia sem movimentações", () => {
