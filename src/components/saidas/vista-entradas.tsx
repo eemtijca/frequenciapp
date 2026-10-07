@@ -15,6 +15,7 @@ import {
   rotuloDiaSemana,
   diaSeguinte,
   MOMENTOS_SAIDA,
+  partesDoMotivo,
   rotuloMomento,
 } from "@/domain/frequencia";
 import type { EntradaAtrasada } from "@/domain/entradas";
@@ -22,6 +23,7 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { avisarSucesso } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -419,11 +421,15 @@ export default function VistaEntradas({
             >
               <div className="min-w-0">
                 <h3 className="font-semibold break-words">{entrada.nome}</h3>
-                <p className="text-muted-foreground text-sm">
-                  {entrada.turmaRotulo} · {entrada.horario}
-                  {entrada.momento ? ` · ${rotuloMomento(entrada.momento)}` : ""}
-                </p>
-                <p className="mt-2 text-sm break-words">{entrada.motivo}</p>
+                <CaixasDeInfo
+                  partes={[
+                    entrada.turmaRotulo,
+                    entrada.horario,
+                    entrada.momento ? rotuloMomento(entrada.momento) : "",
+                  ]}
+                  className="mt-1"
+                />
+                <CaixasDeInfo partes={partesDoMotivo(entrada.motivo)} className="mt-2" />
                 <p className="text-muted-foreground mt-1 text-xs">
                   Responsável pelo registro:{" "}
                   {entrada.responsavelRegistroNome ?? entrada.registradoPorNome}

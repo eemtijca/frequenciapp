@@ -422,10 +422,12 @@ test("agrupa por aluno com saídas e entradas, busca por nome e filtra duas ou m
   const ana = painel.getByRole("region", { name: "Aluno E2E Ana Souza", exact: true });
   const bruno = painel.getByRole("region", { name: "Aluno E2E Bruno Lima", exact: true });
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
-  await expect(ana).toContainText("1 saída · 1 entrada");
+  await expect(ana.getByText("1 saída", { exact: true })).toBeVisible();
+  await expect(ana.getByText("1 entrada", { exact: true })).toBeVisible();
   await expect(ana.getByRole("listitem")).toHaveCount(2);
   await expect(ana).toContainText("Atraso do ônibus");
-  await expect(bruno).toContainText("1 saída · 0 entradas");
+  await expect(bruno.getByText("1 saída", { exact: true })).toBeVisible();
+  await expect(bruno.getByText("0 entradas", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 360, height: 780 });
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))

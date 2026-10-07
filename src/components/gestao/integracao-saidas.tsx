@@ -25,6 +25,7 @@ import { CABECALHO_SAIDAS, type AbaSaidaEsquema } from "@/domain/planilha-saidas
 import { rotuloInstante, rotuloUltimoEnvio } from "@/domain/planilha";
 import { rotuloData } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -414,13 +415,17 @@ export default function IntegracaoSaidas({
                 </div>
                 {abaEscolhida && (
                   <div className="text-muted-foreground flex flex-col gap-1 text-xs">
-                    <span>
-                      Colunas reconhecidas:{" "}
-                      {abaEscolhida.colunas
-                        .filter((coluna) => coluna.atributo)
-                        .map((coluna) => coluna.rotulo || coluna.letra)
-                        .join(" · ") || "nenhuma"}
-                    </span>
+                    <span>Colunas reconhecidas:</span>
+                    {abaEscolhida.colunas.some((coluna) => coluna.atributo) ? (
+                      <CaixasDeInfo
+                        rotulo="Colunas reconhecidas"
+                        partes={abaEscolhida.colunas
+                          .filter((coluna) => coluna.atributo)
+                          .map((coluna) => coluna.rotulo || coluna.letra)}
+                      />
+                    ) : (
+                      <span>nenhuma</span>
+                    )}
                     {abaEscolhida.bloqueio && (
                       <span className="text-falta-texto">{abaEscolhida.bloqueio}</span>
                     )}

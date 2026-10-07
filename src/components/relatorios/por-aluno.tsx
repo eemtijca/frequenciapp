@@ -25,6 +25,7 @@ import {
 import { CirculosAcumulado } from "@/components/ui/circulo-contagem";
 import { indexarPorDia, resumoPorAluno } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { avisarErro } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -89,14 +90,18 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
           {saidasDoAluno.map((saida) => {
             const partes = partesJustificativaSaida(saida);
             return (
-              <li key={saida.id} className="text-muted-foreground">
+              <li key={saida.id} className="text-muted-foreground flex flex-col gap-1">
                 <span className="numerais-tabulares text-foreground font-medium">
                   {saida.dia.split("-").reverse().join("/")}
                 </span>
-                {": "}
-                {rotuloMomento(saida.momento)} · {partes.motivo}
-                {partes.complemento ? ` · ${partes.complemento}` : ""}
-                {saida.liberadoPorNome ? ` · liberado por ${saida.liberadoPorNome}` : ""}
+                <CaixasDeInfo
+                  partes={[
+                    rotuloMomento(saida.momento),
+                    partes.motivo,
+                    partes.complemento,
+                    saida.liberadoPorNome ? `Liberado por ${saida.liberadoPorNome}` : "",
+                  ]}
+                />
               </li>
             );
           })}
