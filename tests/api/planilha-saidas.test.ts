@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
+import { CABECALHO_ENTRADAS } from "@/domain/planilha-entradas";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -211,6 +212,65 @@ describe("planilha de saídas", () => {
       body: JSON.stringify({ planilha: estrutura.planilha, abas: estrutura.abas, aba: ABA }),
     });
     expect(mapa.status).toBe(200);
+  });
+
+  it("prepara Entradas, remove Sheet1 vazia e reaplica a apresentação sem apagar registros", async () => {
+    if (!google) throw new Error("Google sintético indisponível.");
+    google.definirAba("Sheet1", []);
+    const preparar = () => autenticado("/api/planilha-entradas/preparar", { method: "POST" });
+    const criada = await preparar();
+    expect(criada.status).toBe(200);
+    expect(await criada.json()).toMatchObject({
+      criada: true,
+      organizada: true,
+      sheet1: "removida",
+    });
+    expect(google.abas()).toEqual([ABA, "Entradas"]);
+    expect(CABECALHO_ENTRADAS.map((_, indice) => google?.valor("Entradas", 1, indice + 1))).toEqual(
+      CABECALHO_ENTRADAS,
+    );
+    google.definirValor("Entradas", 2, 2, "QA Entrada manual preservada");
+    const repetida = await preparar();
+    expect(repetida.status).toBe(200);
+    expect(await repetida.json()).toMatchObject({
+      criada: false,
+      organizada: true,
+      sheet1: "ausente",
+    });
+    expect(google.valor("Entradas", 2, 2)).toBe("QA Entrada manual preservada");
+    expect(google.valor(ABA, 2, 2)).toBe("QS Bruno");
+    const apresentacao = google.apresentacao("Entradas");
+    expect(apresentacao.congeladasLinhas).toBe(1);
+    expect(apresentacao.faixas).toHaveLength(1);
+    expect(apresentacao.faixas[0]).toMatchObject({
+      rowProperties: {
+        headerColor: { red: 22 / 255, green: 101 / 255, blue: 52 / 255 },
+      },
+    });
+  });
+
+  it("preserva Sheet1 com conteúdo ou fórmula sem resultado", async () => {
+    if (!google) throw new Error("Google sintético indisponível.");
+    for (const formulas of [undefined, { Z100: '=IF(TRUE,"","")' }]) {
+      google.definirAba("Sheet1", formulas ? [] : [["QA Anotação manual"]], { formulas });
+      const resposta = await autenticado("/api/planilha-entradas/preparar", { method: "POST" });
+      expect(resposta.status).toBe(200);
+      expect(await resposta.json()).toMatchObject({ sheet1: "mantida" });
+      expect(google.abas()).toContain("Sheet1");
+    }
+    google.removerAba("Sheet1");
+  });
+
+  it("recusa cabeçalho incompatível sem remover Sheet1 nem substituir conteúdo", async () => {
+    if (!google) throw new Error("Google sintético indisponível.");
+    google.definirAba("Sheet1", []);
+    google.definirAba("Entradas", [["QA Cabeçalho da escola"], ["QA Conteúdo preservado"]]);
+    const resposta = await autenticado("/api/planilha-entradas/preparar", { method: "POST" });
+    expect(resposta.status).toBe(409);
+    expect(google.abas()).toContain("Sheet1");
+    expect(google.valor("Entradas", 2, 1)).toBe("QA Conteúdo preservado");
+    google.definirAba("Entradas", [CABECALHO_ENTRADAS]);
+    google.removerAba("Sheet1");
   });
 
   it("simula e aplica as saídas novas, sem tocar na linha manual", async () => {

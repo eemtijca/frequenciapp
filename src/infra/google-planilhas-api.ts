@@ -357,6 +357,66 @@ export async function tamanhoUtilizado(id: string, acesso: string, nome: string)
   return { linhas: linhas.length, colunas: Math.max(0, ...linhas.map((item) => item.length)) };
 }
 
+/** Confere a aba inteira, incluindo fórmulas sem resultado, notas e gráficos. */
+export async function abaVaziaGoogle(id: string, acesso: string, nome: string, sheetId: number) {
+  const url = new URL(`${BASE}/${encodeURIComponent(id)}`);
+  url.searchParams.set("includeGridData", "true");
+  url.searchParams.set("ranges", nomeNoA1(nome));
+  url.searchParams.set(
+    "fields",
+    "sheets(properties(sheetId,title),charts,data(rowData(values(userEnteredValue,note))))",
+  );
+  const lido = z
+    .object({
+      sheets: z.array(
+        z.object({
+          properties: z.object({ sheetId: z.number(), title: z.string() }),
+          charts: z.array(z.unknown()).optional(),
+          data: z
+            .array(
+              z.object({
+                rowData: z
+                  .array(
+                    z.object({
+                      values: z
+                        .array(
+                          z.object({
+                            userEnteredValue: z.object({}).passthrough().optional(),
+                            note: z.string().optional(),
+                          }),
+                        )
+                        .optional(),
+                    }),
+                  )
+                  .optional(),
+              }),
+            )
+            .optional(),
+        }),
+      ),
+    })
+    .safeParse(await requisitar(url, acesso));
+  const aba = lido.success ? lido.data.sheets[0] : undefined;
+  if (
+    !aba ||
+    !lido.success ||
+    lido.data.sheets.length !== 1 ||
+    aba.properties.sheetId !== sheetId ||
+    aba.properties.title !== nome
+  )
+    throw new ErroHttp("Não foi possível conferir a aba padrão da planilha.", 502);
+  return (
+    !aba.charts?.length &&
+    !(aba.data ?? []).some((grade) =>
+      (grade.rowData ?? []).some((linha) =>
+        (linha.values ?? []).some(
+          (celula) => Boolean(celula.note) || Object.keys(celula.userEnteredValue ?? {}).length > 0,
+        ),
+      ),
+    )
+  );
+}
+
 const celula = z.object({
   formattedValue: z.string().optional(),
   userEnteredValue: z.object({ formulaValue: z.string().optional() }).passthrough().optional(),
@@ -679,6 +739,14 @@ export async function executarAcaoGoogle(
     const cabecalho = z.array(z.string()).safeParse(corpo.cabecalho);
     const { criarAbaGoogle } = await import("@/infra/google-planilhas-abas");
     return criarAbaGoogle(id, acesso, corpo.nome, cabecalho.success ? cabecalho.data : undefined);
+  }
+  if (corpo.acao === "prepararEntradas") {
+    const { prepararEntradasGoogle } = await import("./google-planilhas-entradas");
+    return prepararEntradasGoogle(
+      id,
+      acesso,
+      typeof corpo.abaSaidas === "string" ? corpo.abaSaidas : undefined,
+    );
   }
   if (corpo.acao === "organizarAba") {
     const dados = z

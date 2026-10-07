@@ -57,6 +57,7 @@ export interface GoogleFalso {
   valor(nome: string, linha: number, coluna: number): string;
   definirValor(nome: string, linha: number, coluna: number, valor: string): void;
   formulaDe(nome: string, linha: number, coluna: number): string;
+  apresentacao(nome: string): { congeladasLinhas: number; faixas: Objeto[] };
   vinculos(nome: string): { linha: number; alunoId: string }[];
   marcarLinha(nome: string, linha: number): void;
   marcarColuna(nome: string, coluna: number): void;
@@ -573,6 +574,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       if (item) garantir(item, linha, indice).valor = valor;
     },
     formulaDe: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.formula ?? "",
+    apresentacao: (nome) => ({
+      congeladasLinhas: numero(aba(nome)?.propriedades.frozenRowCount),
+      faixas: structuredClone(aba(nome)?.faixas ?? []),
+    }),
     vinculos: (nome) =>
       (aba(nome)?.metadados ?? [])
         .filter((meta) => meta.metadataKey === "frequenciapp.aluno")
