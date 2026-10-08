@@ -299,6 +299,30 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
               : []),
           );
       }
+    } else if (pedido.moveDimension) {
+      const dados = objeto(pedido.moveDimension);
+      const origem = objeto(dados.source);
+      const item = peloId(origem.sheetId);
+      if (origem.dimension !== "ROWS") throw new Error("Movimento sintético exige linhas.");
+      const inicio = numero(origem.startIndex);
+      const quantidade = numero(origem.endIndex) - inicio;
+      const destinoOriginal = numero(dados.destinationIndex);
+      const destino = destinoOriginal > inicio ? destinoOriginal - quantidade : destinoOriginal;
+      const linhas = item.celulas.splice(inicio, quantidade);
+      item.celulas.splice(destino, 0, ...linhas);
+      for (const meta of item.metadados) {
+        const faixa = objeto(objeto(meta.location).dimensionRange);
+        if (faixa.dimension !== "ROWS") continue;
+        const indice = numero(faixa.startIndex);
+        if (indice >= inicio && indice < inicio + quantidade) {
+          faixa.startIndex = destino + indice - inicio;
+        } else {
+          const depoisDeRemover = indice >= inicio + quantidade ? indice - quantidade : indice;
+          faixa.startIndex =
+            depoisDeRemover >= destino ? depoisDeRemover + quantidade : depoisDeRemover;
+        }
+        faixa.endIndex = numero(faixa.startIndex) + 1;
+      }
     } else if (pedido.appendDimension) {
       const dados = objeto(pedido.appendDimension);
       const item = peloId(dados.sheetId);

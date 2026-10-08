@@ -28,6 +28,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Abas mensais novas recebem os alunos em ordem alfabética. Envios de frequência posicionam alunos novos e transferidos pelo nome, movendo a linha inteira com marcas, fórmulas e vínculo do aluno, e conservando as posições de cabeçalhos e linhas manuais sem identificação.
+
 - A prévia de envio é recalculada ao marcar remoções ou mudar opções, preserva as seleções durante a releitura e impede envio do plano anterior quando a leitura falha. No modo completo, confere o período inteiro para listar alunos transferidos mesmo sem chamadas pendentes. O modo conservador oferece o atalho Conferir linhas da turma e bloqueia a seleção de remoções; pedidos com a janela expirada são recusados.
 
 - Saídas e Entradas passam a proteger envios manuais e automáticos entre instâncias, registrar a tentativa antes da escrita e pausar a automação de destinos sem confirmação. A retomada exige conferência posterior do período, e a prévia de Saídas deixa de valer após trocar o arquivo Google. Contagens incompletas e perda da proteção não confirmam sucesso. Entradas permite registrar a conferência de uma prévia sem linhas novas pela própria tela.
