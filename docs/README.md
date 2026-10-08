@@ -38,3 +38,6 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 - [ADR-037](adr/037-frequencia-mensal-no-google.md): preparo de abas por turma e mês, preservação do histórico e confirmação por destino.
 - [ADR-038](adr/038-automacao-do-schema-de-preview.md): schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal.
 - [ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md): fila FIFO durável dos envios automáticos às planilhas, com retentativas e agenda.
+
+- [Painel externo no Looker Studio](looker-studio.md): preparação de fontes agregadas, relatório privado e atualização.
+- [ADR-040: indicadores para Looker Studio](adr/040-indicadores-looker-studio.md): minimização e substituição atômica.

@@ -8,6 +8,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+### Adicionado
+
+- Painel externo no Google Looker Studio: Gestão prepara uma planilha exclusiva com indicadores agregados de frequência, saídas e entradas, chamada parcial e RS, sem nomes ou textos livres; atualização manual e automática, recuperação de criação incerta e guia para conectar o relatório privado.
+
 ### Alterado
 
 - Gráficos do Painel, Relatórios e diretores carregam Recharts sob demanda quando próximos da área visível; cartões fora de exibição aguardam a visita, com espaço reservado e falhas de download isoladas do restante da tela.

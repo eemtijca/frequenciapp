@@ -241,3 +241,7 @@ Cada tentativa fica registrada como `PARCIAL` antes da escrita externa. Sem esse
 Para retomar após um envio sem confirmação, conferir a aba no Google, gerar uma nova prévia manual do período afetado e confirmar o envio. Um envio sem novidades também registra a conferência. Na tela de Entradas, a prévia sem linhas novas oferece **Confirmar conferência**; planos bloqueados continuam indisponíveis. O sucesso precisa ser posterior, abranger todo o período pendente e não conter células puladas; sucesso em outra aba, arquivo ou período não libera a pendência. O histórico original permanece intacto. Registros antigos sem identificação de destino são tratados conservadoramente como pendências de saídas e exigem conferência do período. Planos de saídas com nomes ambíguos precisam ser corrigidos antes do envio.
 
 Falha do envio nunca desfaz o registro. A consulta de saídas por período também foi corrigida: `de` e `até` agora valem juntos, e o envio de um dia não leva saídas de outros dias.
+
+## Fontes externas de indicadores
+
+Gestão, Configurações, Planilhas inclui a seção recolhida Painel externo (Looker Studio). Ela cria um arquivo separado usando a conta Google da frequência e agrega as contagens, sem nomes ou textos livres. As planilhas operacionais e seus mapas continuam independentes. Preparação, relatório restrito e automação estão em [looker-studio.md](looker-studio.md).
