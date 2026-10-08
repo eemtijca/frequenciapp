@@ -840,3 +840,16 @@ Preparar Entradas exige administração e origem válida. Retorna `{ criada, org
 ### POST /api/planilha/limpar-copias e /api/planilha-saidas/limpar-copias
 
 Apenas administração e origem válida. `{}` retorna `{ previa: { copias: string[], planoHash } }`, sem alterar a planilha. A confirmação envia `{ planoHash, senha, frase: "EDITAR PLANILHA" }` e retorna `{ removidas }`. Lista e conexão alteradas invalidam a prévia. A exclusão reconhece somente nomes de backup com carimbo e marcador da integração; não remove turmas ou abas manuais. A escrita não é repetida automaticamente.
+
+## Indicadores externos (administração)
+
+| Método e caminho                | Efeito                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| GET /api/indicadores            | Estado seguro do painel, sem token Google                                               |
+| PATCH /api/indicadores          | Opções ativa, ano (2000 a 2100 ou null) e urlRelatorio (HTTPS do Looker Studio ou null) |
+| POST /api/indicadores/preparar  | Cria um arquivo exclusivo se ainda não existir, e atualiza as fontes                    |
+| POST /api/indicadores/atualizar | Substitui as quatro fontes agregadas                                                    |
+| POST /api/indicadores/recuperar | Recupera criação pendente com endereco de arquivo marcado desta instalação              |
+| GET /api/indicadores/agenda     | Atualiza fontes ativas com Authorization: Bearer CRON_SECRET, sem criar arquivo         |
+
+As rotas administrativas exigem capacidade administrar; mutações verificam origem. Criação incerta bloqueia nova criação até recuperação. Operações concorrentes recebem 409. Erros não expõem dados pessoais ou credenciais. O último sucesso só avança após confirmação. Detalhes de fontes, atualização, compartilhamento e limites em [looker-studio.md](looker-studio.md).

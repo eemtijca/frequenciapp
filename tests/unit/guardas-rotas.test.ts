@@ -53,9 +53,10 @@ describe("guardas das rotas da API", () => {
       if (
         chave === "notificacoes/resumo GET" ||
         chave === "notificacoes/agenda GET" ||
-        chave === "planilha/fila/agenda GET"
+        chave === "planilha/fila/agenda GET" ||
+        chave === "indicadores/agenda GET"
       ) {
-        // As agendas usam Bearer independente do cookie, conforme a ADR-028 e a ADR-039.
+        // As agendas usam Bearer independente do cookie, conforme a ADR-028, a ADR-039 e a ADR-040.
         expect(item.corpo).toMatch(
           /segredoDaAgendaConfere\(requisicao\.headers\.get\("authorization"\)\)/,
         );

@@ -117,6 +117,7 @@ model Usuario {
   assinaturasPush          AssinaturaPush[]
   preferenciaNotificacoes  PreferenciaNotificacoes?
   notificacoesAtualizadas  ConfiguracaoNotificacoes[] @relation("NotificacoesAtualizadasPor")
+  paineisAtualizados       PainelIndicadores[]        @relation("PainelAtualizadoPor")
 
   @@index([papel])
   @@map("usuarios")
@@ -686,4 +687,23 @@ model FilaPlanilha {
   @@index([estado, sequencia])
   @@index([criadoEm])
   @@map("fila_planilha")
+}
+
+// Destino privado de indicadores agregados. A geração confirma a propriedade do arquivo.
+model PainelIndicadores {
+  id                String    @id @default("principal")
+  geracao           String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ativa             Boolean   @default(false)
+  ano               Int?
+  googlePlanilhaId  String?   @map("google_planilha_id") @db.VarChar(200)
+  criacaoIniciadaEm DateTime? @map("criacao_iniciada_em") @db.Timestamptz
+  urlRelatorio      String?   @map("url_relatorio") @db.VarChar(500)
+  ultimoEnvioEm     DateTime? @map("ultimo_envio_em") @db.Timestamptz
+  linhas            Int       @default(0)
+  erro              String?   @db.VarChar(300)
+  atualizadoEm      DateTime  @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId   String?   @map("atualizado_por_id") @db.Uuid
+  atualizadoPor     Usuario?  @relation("PainelAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("paineis_indicadores")
 }

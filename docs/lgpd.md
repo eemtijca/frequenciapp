@@ -82,3 +82,7 @@ Nome do aluno e turma são preservados para interpretar o registro depois de tra
 A cópia JSON inclui os registros parciais e seus dados históricos e segue a proteção dos demais downloads. Ela não contém credenciais Google. O terceiro arquivo escolhido pela Gestão recebe somente data, aluno, turma, presença parcial, estado e instante da confirmação, observação, UUID e revisão; não recebe senha, token nem identificadores internos de autoria. O nome da conta que confirmou permanece no aplicativo e na cópia JSON. Prévia e opção explícita controlam o envio e a atualização de linhas já enviadas. Desconectar a integração ou excluir registros locais não apaga conteúdo externo; a escola responde pelo acesso, guarda, retificação e descarte dessas planilhas e cópias.
 
 Observações devem conter apenas o necessário ao lançamento escolar. A confirmação manual não autentica nem automatiza o sistema da Seduc; o lançamento nesse sistema continua sendo feito pela equipe responsável.
+
+## Indicadores externos
+
+A integração Looker Studio exporta somente contagens agregadas para arquivo separado, sem nomes, identificadores pessoais, justificativas, motivos ou observações. Totais de grupos pequenos não equivalem a anonimização e precisam de acesso restrito. A gestão controla compartilhamento do arquivo, fontes e relatório. Exclusões no banco alcançam a fonte externa após atualização confirmada; cópias manuais e exportações do relatório seguem controle de retenção separado. Procedimento em [looker-studio.md](looker-studio.md).
