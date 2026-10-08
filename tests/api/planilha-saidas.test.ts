@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 import { CABECALHO_ENTRADAS, CABECALHO_ENTRADAS_ANTERIOR } from "@/domain/planilha-entradas";
+import { hashTexto } from "@/domain/planilha";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -381,6 +382,96 @@ describe("planilha de saídas", () => {
       body: JSON.stringify({ de: DE, ate: ATE }),
     });
     expect(resposta.status).toBe(400);
+  });
+
+  it("preserva a entrada após resposta perdida e retoma a automação após conferência manual", async () => {
+    const testeBanco = banco;
+    const testeGoogle = google;
+    if (!testeBanco || !testeGoogle) throw new Error("Ambiente sintético ausente.");
+    const arquivo = await testeBanco.query<{ google_planilha_id: string }>(
+      "select google_planilha_id from integracoes_planilha where id = 'saidas'",
+    );
+    const destino = `movimentacao:${hashTexto(JSON.stringify([arquivo.rows[0]?.google_planilha_id, "Entradas"]))}`;
+    const configurar = (envioAutomatico: boolean) =>
+      autenticado("/api/planilha-saidas", {
+        method: "PATCH",
+        body: JSON.stringify({ envioAutomatico }),
+      });
+    const gravacoes = () => testeGoogle.chamadas().filter((chamada) => chamada === "gravar").length;
+    const inicial = gravacoes();
+    testeGoogle.definirAba("Entradas", [CABECALHO_ENTRADAS]);
+    expect((await configurar(true)).status).toBe(200);
+    try {
+      testeGoogle.perderProximaResposta();
+      const registrar = (dia: string) =>
+        autenticado("/api/entradas", {
+          method: "POST",
+          body: JSON.stringify({
+            alunoId: alunoAnaId,
+            dia,
+            horario: "08:00",
+            momento: "aula_1",
+            responsavelRegistroCodigo: "QPS1",
+            motivo: "Transporte",
+          }),
+        });
+      // A gravação no app é confirmada mesmo quando o Google perde a resposta.
+      expect((await registrar(DIA)).status).toBe(201);
+      await expect
+        .poll(
+          async () => {
+            const resultado = await testeBanco.query<{ confirmada: boolean }>(
+              `select exists (
+             select 1 from sincronizacoes_planilha s join auditoria a
+               on a.alvo = 'plano:' || s.plano_hash and a.acao = 'planilha.entradas.parcial'
+             where s.destino = $1 and s.resultado = 'PARCIAL'
+           ) as confirmada`,
+              [destino],
+            );
+            return resultado.rows[0]?.confirmada;
+          },
+          { timeout: 10000 },
+        )
+        .toBe(true);
+      expect(testeGoogle.valor("Entradas", 2, 2)).toBe("QS Ana");
+      expect(gravacoes()).toBe(inicial + 1);
+      const previa = await json<{ planoHash: string; novas: number }>(
+        await autenticado("/api/planilha-entradas/simular", {
+          method: "POST",
+          body: JSON.stringify({ de: DIA, ate: DIA }),
+        }),
+      );
+      expect(previa.novas).toBe(0);
+      const conferencia = await autenticado("/api/planilha-entradas/enviar", {
+        method: "POST",
+        body: JSON.stringify({ de: DIA, ate: DIA, planoHash: previa.planoHash }),
+      });
+      expect(conferencia.status).toBe(200);
+      expect(await conferencia.json()).toMatchObject({ resultado: "sucesso", linhasCriadas: 0 });
+      expect(gravacoes()).toBe(inicial + 1);
+      const seguinte = "2026-08-11";
+      expect((await registrar(seguinte)).status).toBe(201);
+      await expect
+        .poll(
+          async () => {
+            const resultado = await testeBanco.query<{ resultado: string }>(
+              "select resultado from sincronizacoes_planilha where destino = $1 and de = $2::date order by criado_em desc limit 1",
+              [destino, seguinte],
+            );
+            return resultado.rows[0]?.resultado;
+          },
+          { timeout: 10000 },
+        )
+        .toBe("SUCESSO");
+      expect(testeGoogle.valor("Entradas", 3, 1)).toBe("11/08/2026");
+      expect(testeGoogle.valor("Entradas", 4, 1)).toBe("");
+      expect(gravacoes()).toBe(inicial + 2);
+    } finally {
+      testeGoogle.perderProximaResposta(false);
+      await configurar(false);
+      await testeBanco.query("delete from entradas_atrasadas where aluno_id = $1", [alunoAnaId]);
+      testeGoogle.definirAba("Entradas", [CABECALHO_ENTRADAS]);
+    }
   });
 
   it("corrige e remove linhas criadas pela integração no modo completo", async () => {

@@ -37,7 +37,7 @@ export interface GoogleFalso {
   /** Responde as leituras (GET) com este status temporário; null volta ao normal. */
   falharLeituras(status: number | null): void;
   recusarGravacoes(valor: boolean): void;
-  perderProximaResposta(): void;
+  perderProximaResposta(valor?: boolean): void;
   definirAba(
     nome: string,
     valores: string[][],
@@ -504,8 +504,8 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     recusarGravacoes: (valor) => {
       recusarGravacoes = valor;
     },
-    perderProximaResposta: () => {
-      perderResposta = true;
+    perderProximaResposta: (valor = true) => {
+      perderResposta = valor;
     },
     definirAba: (nome, valores, opcoes) => {
       const existente = aba(nome);
