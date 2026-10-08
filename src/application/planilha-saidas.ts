@@ -42,13 +42,29 @@ import {
   type PlanoSaidas,
   type SaidaPlanilha,
 } from "@/domain/planilha-saidas";
-import { erroVigente, resultadoDeFalha, type AbaBruta, type LeituraAba } from "@/domain/planilha";
+import {
+  erroVigente,
+  hashTexto,
+  resultadoDeFalha,
+  type AbaBruta,
+  type LeituraAba,
+} from "@/domain/planilha";
 import {
   diasEntre,
   ehDiaValido,
   partesJustificativaSaida,
   rotuloMomento,
 } from "@/domain/frequencia";
+
+import {
+  comTravaPlanilhaMovimentacoes,
+  controleTravaPlanilhaMovimentacoes,
+} from "@/infra/trava-planilha-movimentacoes";
+import {
+  haEnvioMovimentacaoSemConfirmacao,
+  iniciarEnvioMovimentacao,
+  concluirEnvioMovimentacao,
+} from "./planilha-movimentacoes-envios";
 
 const FINALIDADE = "SAIDAS" as const;
 const LIMITE_DIAS_ENVIO = 92;
@@ -165,7 +181,7 @@ export async function desconectarSaidas(admin: { id: string }) {
 
 /** Remove a aba de saídas criada pela integração, no modo completo e com senha. */
 export async function removerAbaSaidas(admin: { id: string }, entrada: unknown) {
-  return removerAbaComum(admin, FINALIDADE, entrada);
+  return comTravaPlanilhaMovimentacoes(() => removerAbaComum(admin, FINALIDADE, entrada));
 }
 
 /** Destrava o modo completo com frase, senha e duração. */
@@ -185,7 +201,7 @@ export async function listarCopiasSaidas(entrada: unknown) {
 
 /** Restaura uma cópia da aba de saídas; invalida o esquema salvo. */
 export async function restaurarCopiaSaidas(admin: { id: string }, entrada: unknown) {
-  return restaurarCopiaComum(admin, FINALIDADE, entrada);
+  return comTravaPlanilhaMovimentacoes(() => restaurarCopiaComum(admin, FINALIDADE, entrada));
 }
 
 /** Cria a aba de saídas com o cabeçalho padrão, se ela ainda não existir. */
@@ -418,6 +434,7 @@ async function montarSimulacaoSaidas(
     anoReferencia: new Date().getFullYear(),
     removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
   });
+  plano.planoHash = hashTexto(JSON.stringify([linha.googlePlanilhaId, plano.planoHash]));
   return { modalidade, plano, esquema: esquemaAtual };
 }
 
@@ -484,38 +501,12 @@ function temDestrutivaSaidas(plano: PlanoSaidas): boolean {
   return plano.substituir.length > 0 || plano.remover.length > 0;
 }
 
-async function registrarSincronizacaoSaidas(
-  usuarioId: string,
-  plano: PlanoSaidas,
-  modalidade: "conservador" | "completo",
-  contagens: Record<string, number>,
-  resultado: "SUCESSO" | "PARCIAL" | "FALHA",
-  de: string,
-  ate: string,
-  erro?: string,
-) {
-  await banco().sincronizacaoPlanilha.create({
-    data: {
-      finalidade: FINALIDADE,
-      de: new Date(`${de}T12:00:00Z`),
-      ate: new Date(`${ate}T12:00:00Z`),
-      modalidade: modalidade === "completo" ? "COMPLETO" : "CONSERVADOR",
-      preenchidas: contagens.preenchidas ?? plano.resumo.preencher,
-      substituidas: contagens.substituidas ?? plano.resumo.substituir,
-      linhasCriadas: contagens.linhasCriadas ?? plano.resumo.criar,
-      removidasLinhas: contagens.removidasLinhas ?? plano.resumo.remover,
-      puladasOcupadas: plano.resumo.puladasOcupadas,
-      puladasFormula: plano.resumo.puladasFormula,
-      planoHash: plano.planoHash,
-      resultado,
-      erro: erro?.slice(0, 300) ?? null,
-      autorId: usuarioId,
-    },
-  });
+/** Aplica o plano revisado. Recalcula tudo e exige o mesmo hash. */
+export function aplicarEnvioSaidas(usuario: { id: string }, entrada: unknown) {
+  return comTravaPlanilhaMovimentacoes(() => aplicarEnvioSaidasProtegido(usuario, entrada));
 }
 
-/** Aplica o plano revisado. Recalcula tudo e exige o mesmo hash. */
-export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unknown) {
+async function aplicarEnvioSaidasProtegido(usuario: { id: string }, entrada: unknown) {
   const dados = esquemaEnvioSaidas.safeParse(entrada);
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
@@ -531,8 +522,23 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
   if (dados.data.planoHash !== simulacao.plano.planoHash) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
   }
+  if (simulacao.plano.bloqueado || simulacao.plano.resumo.ambiguidades > 0)
+    throw new ErroHttp(simulacao.plano.avisos[0] ?? "Confira a aba de saídas.", 409);
   const operacoes = operacoesDoPlanoSaidas(simulacao.plano);
+  const registroId = await iniciarEnvioMovimentacao(
+    usuario.id,
+    linha,
+    simulacao.plano.aba,
+    dados.data,
+    simulacao.plano.planoHash,
+    simulacao.modalidade,
+  );
   if (operacoes.length === 0) {
+    controleTravaPlanilhaMovimentacoes()?.conferir();
+    await concluirEnvioMovimentacao(registroId, "SUCESSO", {
+      puladasOcupadas: simulacao.plano.resumo.puladasOcupadas,
+      puladasFormula: simulacao.plano.resumo.puladasFormula,
+    });
     return { resultado: "sucesso" as const, contagens: {} };
   }
   const destrutiva = temDestrutivaSaidas(simulacao.plano);
@@ -545,31 +551,29 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
       modoCompleto: destrutiva,
       operacoes,
     });
-    await registrarSincronizacaoSaidas(
-      usuario.id,
-      simulacao.plano,
-      simulacao.modalidade,
-      contagens,
-      "SUCESSO",
-      dados.data.de,
-      dados.data.ate,
-    );
+    controleTravaPlanilhaMovimentacoes()?.conferir();
+    const esperadas = simulacao.plano.resumo;
+    if (
+      [
+        [contagens.linhasCriadas, esperadas.criar],
+        [contagens.preenchidas, esperadas.preencher],
+        [contagens.substituidas, esperadas.substituir],
+        [contagens.removidasLinhas, esperadas.remover],
+      ].some(([confirmadas, esperado]) => (confirmadas ?? 0) !== esperado)
+    )
+      throw new ErroHttp("Parte das alterações não foi confirmada.", 502);
+    await concluirEnvioMovimentacao(registroId, "SUCESSO", {
+      ...contagens,
+      puladasOcupadas: esperadas.puladasOcupadas,
+      puladasFormula: esperadas.puladasFormula,
+    });
     return { resultado: "sucesso" as const, contagens };
   } catch (erro) {
     const mensagem = erro instanceof ErroHttp ? erro.message : "Falha ao enviar para a planilha.";
-    const registro = mensagemParaRegistro(erro, mensagem);
+    const registro = `Saídas: ${mensagemParaRegistro(erro, mensagem)}`;
     // Falha de rede pode ter aplicado parte do plano; recusa explícita, não.
-    const parcial = erro instanceof ErroGoogle && !erro.recusado;
-    await registrarSincronizacaoSaidas(
-      usuario.id,
-      simulacao.plano,
-      simulacao.modalidade,
-      {},
-      resultadoDeFalha(!parcial),
-      dados.data.de,
-      dados.data.ate,
-      registro,
-    );
+    const parcial = !(erro instanceof ErroGoogle && erro.recusado);
+    await concluirEnvioMovimentacao(registroId, resultadoDeFalha(!parcial), {}, registro);
     return { resultado: parcial ? ("parcial" as const) : ("falha" as const), erro: mensagem };
   }
 }
@@ -580,37 +584,40 @@ export async function aplicarEnvioSaidas(usuario: { id: string }, entrada: unkno
  * linhas e sem repetir depois de um envio sem confirmação. Nunca lança: o
  * registro já foi confirmado. O que pedir revisão fica para o envio manual.
  */
-export function enviarSaidasAposRegistro(
+export async function enviarSaidasAposRegistro(
   usuario: { id: string },
   dia: string,
 ): Promise<SituacaoEnvioMovimentacao> {
-  return emSequencia(async () => {
-    try {
-      const linha = await lerLinha(FINALIDADE);
-      if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
-      const ultimo = await banco().sincronizacaoPlanilha.findFirst({
-        where: { finalidade: FINALIDADE },
-        orderBy: { criadoEm: "desc" },
-        select: { resultado: true },
-      });
-      if (ultimo?.resultado === "PARCIAL") return "sem_confirmacao";
-      const periodo = { de: dia, ate: dia };
-      const simulacao = await montarSimulacaoSaidas(linha, periodo);
-      if (simulacao.modalidade !== "conservador" || !saidasEnviaveisSozinhas(simulacao.plano))
-        return "pendente_manual";
-      if (!saidasTemNovidade(simulacao.plano)) return "enviado";
-      const resposta = await aplicarEnvioSaidas(usuario, {
-        ...periodo,
-        planoHash: simulacao.plano.planoHash,
-      });
-      if (resposta.resultado === "sucesso") return "enviado";
-      return resposta.resultado === "parcial" ? "sem_confirmacao" : "falhou";
-    } catch (erro) {
-      console.error(
-        "Envio automático das saídas não concluído.",
-        erro instanceof Error ? erro.name : "",
-      );
-      return "falhou";
-    }
-  });
+  try {
+    const configuracao = await lerLinha(FINALIDADE);
+    if (!configuracao.ativa || !configuracao.envioAutomatico || modoCompletoAtivo(configuracao))
+      return "desligado";
+    return await emSequencia(() =>
+      comTravaPlanilhaMovimentacoes(async () => {
+        const linha = await lerLinha(FINALIDADE);
+        if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
+        const aba = esquemaSaidasSalvo(linha)?.aba;
+        if (!aba) return "pendente_manual";
+        if (await haEnvioMovimentacaoSemConfirmacao(linha, aba)) return "sem_confirmacao";
+        const periodo = { de: dia, ate: dia };
+        const simulacao = await montarSimulacaoSaidas(linha, periodo);
+        if (simulacao.modalidade !== "conservador" || !saidasEnviaveisSozinhas(simulacao.plano))
+          return "pendente_manual";
+        if (!saidasTemNovidade(simulacao.plano)) return "enviado";
+        const resposta = await aplicarEnvioSaidas(usuario, {
+          ...periodo,
+          planoHash: simulacao.plano.planoHash,
+        });
+        if (resposta.resultado === "sucesso") return "enviado";
+        return resposta.resultado === "parcial" ? "sem_confirmacao" : "falhou";
+      }),
+    );
+  } catch (erro) {
+    console.error(
+      "Envio automático das saídas não concluído.",
+      erro instanceof Error ? erro.name : "",
+    );
+    if (erro instanceof ErroHttp && erro.status === 409) return "pendente_manual";
+    return "falhou";
+  }
 }

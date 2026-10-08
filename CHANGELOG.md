@@ -23,6 +23,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Saídas e Entradas passam a proteger envios manuais e automáticos entre instâncias, registrar a tentativa antes da escrita e pausar a automação de destinos sem confirmação. A retomada exige conferência posterior do período, e a prévia de Saídas deixa de valer após trocar o arquivo Google. Contagens incompletas e perda da proteção não confirmam sucesso. Entradas permite registrar a conferência de uma prévia sem linhas novas pela própria tela.
+
 - Busca nos seletores permanece aberta e focada ao digitar e abrir o teclado no celular, incluindo a seleção de aluno nos Relatórios. Mantém filtro, seleção por toque e teclado, com limpeza da busca ao reabrir.
 
 - Preparar aba Entradas reaplica o padrão visual de Saídas nas abas existentes, preservando os registros, e remove Sheet1 somente quando estiver vazia e houver uma aba de saídas configurada no mesmo arquivo.

@@ -7,6 +7,7 @@ import { ErroHttp } from "@/infra/erros";
 import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
 import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comTravaPlanilhaMovimentacoes } from "@/infra/trava-planilha-movimentacoes";
 import { detectarEsquema, assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { detectarEsquemaSaida } from "@/domain/planilha-saidas";
 import { ABA_ENTRADAS, formatoCabecalhoEntradas } from "@/domain/planilha-entradas";
@@ -35,7 +36,8 @@ export async function organizarPlanilha(
   tipo: TipoApresentacao,
   entrada: unknown,
 ) {
-  return comPausasDeLeituraGoogle(() => organizarAba(admin, tipo, entrada));
+  const organizar = () => comPausasDeLeituraGoogle(() => organizarAba(admin, tipo, entrada));
+  return tipo === "FREQUENCIA" ? organizar() : comTravaPlanilhaMovimentacoes(organizar);
 }
 
 async function organizarAba(admin: { id: string }, tipo: TipoApresentacao, entrada: unknown) {

@@ -20,6 +20,16 @@ import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ErroGoogle } from "@/infra/google-planilhas-escrita";
+import {
+  comTravaPlanilhaMovimentacoes,
+  controleTravaPlanilhaMovimentacoes,
+} from "@/infra/trava-planilha-movimentacoes";
+import {
+  AVISO_ENVIO_MOVIMENTACAO,
+  haEnvioMovimentacaoSemConfirmacao,
+  iniciarEnvioMovimentacao,
+  concluirEnvioMovimentacao,
+} from "./planilha-movimentacoes-envios";
 
 const esquemaEnvio = esquemaFiltroEntradas.and(
   z.object({ planoHash: z.string().max(64).optional() }),
@@ -49,7 +59,11 @@ export async function estadoPlanilhaEntradas() {
   };
 }
 
-export async function prepararAbaEntradas(admin: { id: string }) {
+export function prepararAbaEntradas(admin: { id: string }) {
+  return comTravaPlanilhaMovimentacoes(() => prepararAbaEntradasProtegida(admin));
+}
+
+async function prepararAbaEntradasProtegida(admin: { id: string }) {
   const linha = await conexao();
   const esquema = z.object({ aba: z.string().min(1).max(200) }).safeParse(linha.esquema);
   const resultado = await chamarIntegracao<{
@@ -107,13 +121,32 @@ export async function simularEntradas(usuario: { id: string }, entrada: unknown)
   return { ...plano, criar: plano.criar.slice(0, 20), novas: plano.criar.length };
 }
 
-export async function enviarEntradas(usuario: { id: string }, entrada: unknown) {
+export function enviarEntradas(usuario: { id: string }, entrada: unknown) {
+  return comTravaPlanilhaMovimentacoes(() => enviarEntradasProtegido(usuario, entrada));
+}
+
+async function enviarEntradasProtegido(usuario: { id: string }, entrada: unknown) {
   const { linha, plano, dados } = await montarPlano(usuario, entrada);
   if (!dados.planoHash) throw new ErroHttp("Faça a prévia antes de enviar.", 400);
   if (plano.bloqueado) throw new ErroHttp(plano.avisos[0] ?? "Confira a aba Entradas.", 409);
   if (plano.planoHash !== dados.planoHash)
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
-  if (plano.criar.length === 0) return { resultado: "sucesso", linhasCriadas: 0 };
+  const registroId = await iniciarEnvioMovimentacao(
+    usuario.id,
+    linha,
+    ABA_ENTRADAS,
+    dados,
+    plano.planoHash,
+    "conservador",
+  );
+  if (plano.criar.length === 0) {
+    controleTravaPlanilhaMovimentacoes()?.conferir();
+    await concluirEnvioMovimentacao(registroId, "SUCESSO", {
+      linhasCriadas: 0,
+      puladasOcupadas: plano.avisos.length,
+    });
+    return { resultado: "sucesso", linhasCriadas: 0 };
+  }
   await auditar(banco(), usuario.id, "planilha.entradas.iniciar", `plano:${plano.planoHash}`);
   try {
     const contagens = await chamarIntegracao<{ linhasCriadas?: number }>(linha, {
@@ -131,6 +164,11 @@ export async function enviarEntradas(usuario: { id: string }, entrada: unknown) 
     });
     if (contagens.linhasCriadas !== plano.criar.length)
       throw new ErroHttp("Parte das linhas não foi confirmada.", 502);
+    controleTravaPlanilhaMovimentacoes()?.conferir();
+    await concluirEnvioMovimentacao(registroId, "SUCESSO", {
+      ...contagens,
+      puladasOcupadas: plano.avisos.length,
+    });
     await auditar(banco(), usuario.id, "planilha.entradas.sucesso", `plano:${plano.planoHash}`);
     return { resultado: "sucesso", linhasCriadas: contagens.linhasCriadas ?? 0 };
   } catch (erro) {
@@ -138,9 +176,16 @@ export async function enviarEntradas(usuario: { id: string }, entrada: unknown) 
       (erro instanceof ErroGoogle && erro.recusado) ||
       (erro instanceof ErroHttp && erro.status < 500)
     ) {
+      await concluirEnvioMovimentacao(registroId, "FALHA", {}, erro.message);
       await auditar(banco(), usuario.id, "planilha.entradas.falha", `plano:${plano.planoHash}`);
       throw erro;
     }
+    await concluirEnvioMovimentacao(
+      registroId,
+      "PARCIAL",
+      {},
+      `Entradas: ${AVISO_ENVIO_MOVIMENTACAO}`,
+    );
     await auditar(banco(), usuario.id, "planilha.entradas.parcial", `plano:${plano.planoHash}`);
     throw new ErroHttp(
       "Não foi possível confirmar o envio. Confira a aba Entradas e faça outra prévia antes de repetir.",
@@ -154,26 +199,33 @@ export async function enviarEntradas(usuario: { id: string }, entrada: unknown) 
  * já preparada. Usa a chave de envio automático da conexão de saídas, só
  * acrescenta linhas e nunca lança: o registro já foi confirmado.
  */
-export function enviarEntradasAposRegistro(
+export async function enviarEntradasAposRegistro(
   usuario: { id: string },
   dia: string,
 ): Promise<SituacaoEnvioMovimentacao> {
-  return emSequencia(async () => {
-    try {
-      const linha = await lerLinha("SAIDAS");
-      if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
-      const periodo = { de: dia, ate: dia };
-      const { plano } = await montarPlano(usuario, periodo);
-      if (!entradasEnviaveisSozinhas(plano)) return "pendente_manual";
-      await enviarEntradas(usuario, { ...periodo, planoHash: plano.planoHash });
-      return "enviado";
-    } catch (erro) {
-      const parcial = erro instanceof ErroHttp && erro.status === 502;
-      console.error(
-        "Envio automático das entradas não concluído.",
-        erro instanceof Error ? erro.name : "",
-      );
-      return parcial ? "sem_confirmacao" : "falhou";
-    }
-  });
+  try {
+    const configuracao = await lerLinha("SAIDAS");
+    if (!configuracao.ativa || !configuracao.envioAutomatico || modoCompletoAtivo(configuracao))
+      return "desligado";
+    return await emSequencia(() =>
+      comTravaPlanilhaMovimentacoes(async () => {
+        const linha = await lerLinha("SAIDAS");
+        if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
+        if (await haEnvioMovimentacaoSemConfirmacao(linha, ABA_ENTRADAS)) return "sem_confirmacao";
+        const periodo = { de: dia, ate: dia };
+        const { plano } = await montarPlano(usuario, periodo);
+        if (!entradasEnviaveisSozinhas(plano)) return "pendente_manual";
+        await enviarEntradas(usuario, { ...periodo, planoHash: plano.planoHash });
+        return "enviado";
+      }),
+    );
+  } catch (erro) {
+    const parcial = erro instanceof ErroHttp && erro.status === 502;
+    console.error(
+      "Envio automático das entradas não concluído.",
+      erro instanceof Error ? erro.name : "",
+    );
+    if (erro instanceof ErroHttp && erro.status === 409) return "pendente_manual";
+    return parcial ? "sem_confirmacao" : "falhou";
+  }
 }

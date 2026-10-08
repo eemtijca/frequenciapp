@@ -521,7 +521,11 @@ export default function VistaEntradas({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Enviar entradas para a planilha?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {previa?.novas === 0
+                ? "Confirmar conferência das entradas?"
+                : "Enviar entradas para a planilha?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {previa?.novas} {previa?.novas === 1 ? "linha nova" : "linhas novas"} na aba Entradas;{" "}
               {previa?.existentes}{" "}
@@ -542,7 +546,7 @@ export default function VistaEntradas({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              disabled={executando || previa?.bloqueado || !previa?.novas}
+              disabled={executando || !previa || previa.bloqueado}
               onClick={(e) => {
                 e.preventDefault();
                 if (previa)
@@ -556,12 +560,14 @@ export default function VistaEntradas({
                     );
                     setPrevia(null);
                     avisarSucesso(
-                      `Envio confirmado: ${resultado.linhasCriadas} ${resultado.linhasCriadas === 1 ? "linha criada" : "linhas criadas"}.`,
+                      resultado.linhasCriadas === 0
+                        ? "Conferência registrada."
+                        : `Envio confirmado: ${resultado.linhasCriadas} ${resultado.linhasCriadas === 1 ? "linha criada" : "linhas criadas"}.`,
                     );
                   });
               }}
             >
-              Enviar entradas
+              {previa?.novas === 0 ? "Confirmar conferência" : "Enviar entradas"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

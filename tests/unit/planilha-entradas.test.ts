@@ -8,6 +8,8 @@ const dubl = vi.hoisted(() => ({
   listar: vi.fn(),
   auditar: vi.fn(),
   limitar: vi.fn(),
+  iniciarEnvio: vi.fn(),
+  concluirEnvio: vi.fn(),
 }));
 vi.mock("@/application/planilha-comum", () => ({
   lerLinha: dubl.lerLinha,
@@ -18,6 +20,15 @@ vi.mock("@/application/entradas", async (original) => ({
   listarEntradas: dubl.listar,
 }));
 vi.mock("@/infra/banco", () => ({ banco: () => ({}) }));
+vi.mock("@/infra/trava-planilha-movimentacoes", () => ({
+  comTravaPlanilhaMovimentacoes: <T>(tarefa: () => Promise<T>) => tarefa(),
+  controleTravaPlanilhaMovimentacoes: () => undefined,
+}));
+vi.mock("@/application/planilha-movimentacoes-envios", () => ({
+  iniciarEnvioMovimentacao: dubl.iniciarEnvio,
+  concluirEnvioMovimentacao: dubl.concluirEnvio,
+  AVISO_ENVIO_MOVIMENTACAO: "Confira o envio.",
+}));
 vi.mock("@/infra/ambiente", () => ({ ambiente: { fuso: "America/Fortaleza" } }));
 vi.mock("@/infra/auditoria", () => ({ auditar: dubl.auditar }));
 vi.mock("@/infra/auth/limite", () => ({ limiteDeTentativas: dubl.limitar }));
@@ -36,6 +47,8 @@ beforeEach(() => {
   arquivo = "arquivo-qa";
   valores = [CABECALHO_ENTRADAS];
   falhaEnvio = false;
+  dubl.iniciarEnvio.mockResolvedValue("tentativa");
+  dubl.concluirEnvio.mockResolvedValue(undefined);
   dubl.limitar.mockResolvedValue(true);
   dubl.lerLinha.mockImplementation(async () => ({
     ativa: true,
@@ -177,6 +190,35 @@ describe("envio de entradas", () => {
       "planilha.entradas.parcial",
       expect.any(String),
     );
+  });
+  it("falha ao persistir a tentativa impede qualquer escrita no Google", async () => {
+    const previa = await simularEntradas(usuario, periodo);
+    dubl.iniciarEnvio.mockRejectedValue(new Error("Banco indisponível"));
+    await expect(
+      enviarEntradas(usuario, { ...periodo, planoHash: previa.planoHash }),
+    ).rejects.toThrow("Banco indisponível");
+    expect(dubl.chamar.mock.calls.some((args) => args[1].acao === "aplicar")).toBe(false);
+  });
+  it("uma conferência sem novas linhas registra sucesso para liberar a automação", async () => {
+    valores.push([
+      "15/06/2026",
+      "QA Aluno",
+      "QA Ano A",
+      "08:00",
+      "Transporte",
+      "",
+      "QA Coordenação",
+    ]);
+    const previa = await simularEntradas(usuario, periodo);
+    expect(await enviarEntradas(usuario, { ...periodo, planoHash: previa.planoHash })).toEqual({
+      resultado: "sucesso",
+      linhasCriadas: 0,
+    });
+    expect(dubl.concluirEnvio).toHaveBeenLastCalledWith("tentativa", "SUCESSO", {
+      linhasCriadas: 0,
+      puladasOcupadas: 0,
+    });
+    expect(dubl.chamar.mock.calls.some((args) => args[1].acao === "aplicar")).toBe(false);
   });
   it("distingue recusa explícita de falta de confirmação e detecta envio incompleto", async () => {
     const previa = await simularEntradas(usuario, periodo);

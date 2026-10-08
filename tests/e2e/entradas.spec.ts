@@ -119,6 +119,68 @@ test("registra justificativa do catálogo com observação e responsável escolh
   await expect(lista).toContainText("Nenhuma entrada registrada neste recorte.");
 });
 
+for (const bloqueado of [false, true]) {
+  test(`confere entradas sem novidades com plano bloqueado ${bloqueado}`, async ({ page }) => {
+    let enviou = 0;
+    await page.route("**/api/entradas?**", (route) =>
+      route.fulfill({
+        json: {
+          entradas: [
+            {
+              id: "qa-conferencia",
+              nome: "E2E Aluno",
+              turmaRotulo: "E2E Ano A",
+              horario: "08:00",
+              motivo: "Transporte",
+              registradoPorNome: "E2E Direção",
+            },
+          ],
+        },
+      }),
+    );
+    await page.route("**/api/planilha-entradas/**", async (route) => {
+      const acao = new URL(route.request().url()).pathname.split("/").at(-1);
+      if (acao === "enviar") {
+        enviou++;
+        expect(route.request().postDataJSON()).toMatchObject({
+          planoHash: "previa-conferencia-qa",
+        });
+      }
+      await route.fulfill({
+        json:
+          acao === "estado"
+            ? { podeEnviar: true }
+            : acao === "simular"
+              ? {
+                  planoHash: "previa-conferencia-qa",
+                  novas: 0,
+                  existentes: 1,
+                  bloqueado,
+                  avisos: bloqueado ? ["Confira o cabeçalho da aba."] : [],
+                  criar: [],
+                }
+              : { linhasCriadas: 0 },
+      });
+    });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await abrirAbaMovimentacao(page, "Entradas");
+    await page.getByRole("button", { name: "Prévia das entradas" }).click();
+    const confirmar = page.getByRole("button", { name: "Confirmar conferência", exact: true });
+    if (bloqueado) {
+      await expect(confirmar).toBeDisabled();
+      expect(enviou).toBe(0);
+    } else {
+      await expect(confirmar).toBeEnabled();
+      await confirmar.click();
+      await expect(page.getByText("Conferência registrada.", { exact: true })).toBeVisible();
+      await expect(page.getByRole("alertdialog")).toHaveCount(0);
+      expect(enviou).toBe(1);
+    }
+  });
+}
+
 test("revê o envio em confirmação própria", async ({ page }) => {
   let enviou = 0;
   await page.route("**/api/planilha-entradas/**", async (route) => {
