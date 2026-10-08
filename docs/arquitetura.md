@@ -89,6 +89,7 @@ src/
       frequencias-personalizadas/ base diária e personalizações efetivas para a Seduc
       frequencias-parciais/ personalizações, revisão e confirmação manual da Seduc
       planilha-parcial/     terceira planilha: configuração, preparação, prévia e envio
+      planilha/fila/       fila de envios automáticos: estado, processar, agenda, reenfileirar e descartar
       frequencias/          consulta por dia, período ou mês, salvamento e resumo acumulado
       saidas/               registro, consulta e remoção de saídas antecipadas
       configuracoes/        leitura e atualização dos recursos da escola
@@ -120,6 +121,7 @@ src/
     frequencia-parcial.ts   tipos e rótulos da presença personalizada
     frequencia-personalizada.ts   contrato da base diária e dos ajustes
     planilha-parcial.ts     planejamento da terceira planilha
+    fila-planilha.ts        regras puras da fila FIFO: ordem, esperas, reserva e desfecho
     frequencia.ts           regras puras de frequência, justificativas e saídas
     relatorios.ts           indicadores e relatórios derivados
     planilha.ts             dataframe, esquema da planilha, CSV e planejamento conservador
@@ -128,6 +130,7 @@ src/
     frequencia-parcial.ts   salvar, consultar, confirmar e remover com revisão
     frequencia-personalizada.ts   compor a base diária com os ajustes existentes
     planilha-parcial.ts     preparar a aba, simular e enviar registros parciais
+    fila-planilha.ts        fila FIFO durável dos envios automáticos às planilhas (ADR-039)
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas
     configuracoes.ts        ler e atualizar os recursos da escola

@@ -42,6 +42,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Fila FIFO durável dos envios automáticos às planilhas (ADR-039): chamada salva, saída e entrada registradas entram na tabela `fila_planilha` antes da resposta e são processadas na ordem de chegada, um consumidor por vez, com retentativas (até cinco, com espera crescente) para falhas confirmadas, sem repetir envio sem confirmação. Agenda de cinco minutos pelo GitHub Actions (`fila-planilha.yml`, com `CRON_SECRET`) e seção Fila de envios automáticos na Gestão, com Processar agora, Descartar e Reenfileirar. Exige aplicar a migração `fila_planilha`.
 - Botão único Reorganizar turmas em Gestão > Turmas: ordena os alunos ativos de todas as turmas por nome e renumera a chamada, com confirmação, preservação do histórico e inativos após os ativos.
 
 - Navegação da planilha de frequência por mês: o preparo concluído mostra o mês escolhido e oculta outros meses e abas legadas vinculadas. Mostrar mês na planilha permite consultar meses anteriores e voltar ao corrente, preservando células, fórmulas e envios para abas ocultas.

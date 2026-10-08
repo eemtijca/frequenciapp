@@ -21,7 +21,7 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 
 ## Agenda e integração
 
-- A agenda de notificações vive no GitHub Actions (`notificacoes.yml`) e usa `APP_URL` e `CRON_SECRET`.
+- A agenda de notificações vive no GitHub Actions (`notificacoes.yml`) e usa `APP_URL` e `CRON_SECRET`. A agenda da fila de envios às planilhas (`fila-planilha.yml`) usa os mesmos valores.
 - A integração com o Google Planilhas exige saída para `script.google.com` e `script.googleusercontent.com`.
 
 ## Saída da Vercel

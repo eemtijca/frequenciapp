@@ -122,6 +122,17 @@ O envio automático é mais estreito que o manual, porque ninguém revisa a pré
 - faz uma tentativa por salvamento e nunca repete depois de timeout, 504 ou queda: se o último registro da turma for `PARCIAL`, os salvamentos seguintes não enviam até a aba ser conferida e um envio manual concluir;
 - se as marcações já coincidem com a planilha, registra a confirmação da chamada sem repetir a escrita;
 - falha ou desistência não altera o salvamento, que já foi confirmado.
+- passa pela fila FIFO de envios (seção abaixo): o envio é enfileirado antes da resposta e processado na ordem de chegada.
+
+## Fila FIFO dos envios automáticos
+
+Todo envio automático (chamada salva, saída e entrada registradas) vira um item da tabela `fila_planilha` antes de a resposta sair, e só quando a integração está ativa, o envio automático ligado e o modo conservador em vigor. Itens iguais que aguardam a vez são fundidos, porque o envio lê o estado atual. O processamento começa logo depois da resposta e o item aberto de menor sequência é reservado por cinco minutos, de modo que só um consumidor trabalha por vez, mesmo com várias instâncias.
+
+- Falha confirmada tenta de novo depois de 30 segundos, 2, 10 e 30 minutos, até cinco tentativas; esgotadas, o item fica como `FALHOU` e a fila segue.
+- Enquanto o item da frente espera a nova tentativa, os de trás aguardam, para as linhas chegarem à planilha na ordem dos registros.
+- Envio sem confirmação (`PARCIAL`), plano que pede conferência manual, turma sem aba vinculada e integração desligada encerram o item sem repetir; a conferência manual retoma a automação.
+- Uma agenda de cinco minutos (`fila-planilha.yml`, com `CRON_SECRET`) recolhe o que sobrou. Em Gestão, Configurações, Planilhas, a seção Fila de envios automáticos mostra contagens e itens, e permite Processar agora, Descartar e Reenfileirar.
+- A fila não guarda nome de aluno nem dados da planilha, e não cobre os envios manuais com prévia.
 
 ## Modo completo
 
@@ -213,7 +224,7 @@ Como ninguém revisa a prévia, o envio automático é mais estreito que o manua
 - só acrescenta: cria a linha da saída (ou da entrada) e preenche células vazias; substituição, remoção, plano bloqueado ou modo completo ficam para o envio manual;
 - em Saídas e Entradas, um envio sem confirmação (`PARCIAL`) pausa a automação daquele arquivo e aba até a conferência manual do período;
 - nas entradas, a aba Entradas precisa estar preparada; sem ela, o registro fica para o envio manual;
-- a trava distribuída permanece durante a releitura, a escrita e a confirmação, impedindo envios simultâneos de instâncias diferentes. Se estiver ocupada, o registro permanece salvo no app e o envio fica para conferência manual. O plano continua preservando linhas existentes.
+- os envios automáticos seguem na fila FIFO (seção abaixo); a trava distribuída permanece durante a releitura, a escrita e a confirmação, impedindo envios simultâneos de instâncias diferentes. Se estiver ocupada, o registro permanece salvo no app e o envio fica para conferência manual. O plano continua preservando linhas existentes.
 
 Cada tentativa fica registrada como `PARCIAL` antes da escrita externa. Sem esse registro no banco, o Google não é chamado. Somente uma resposta completa, com as contagens esperadas e a proteção ainda vigente, permite confirmar `SUCESSO`. Interrupção do processo ou falha na confirmação preserva a pendência; não há repetição automática de escritas. A prévia de Saídas também inclui o arquivo escolhido, impedindo reutilizar um plano depois da troca de planilha.
 

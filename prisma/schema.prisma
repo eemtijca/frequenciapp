@@ -108,6 +108,7 @@ model Usuario {
   integracoesModo          IntegracaoPlanilha[]       @relation("IntegracaoModoPor")
   integracoesAtualizadas   IntegracaoPlanilha[]       @relation("IntegracaoAtualizadaPor")
   sincronizacoesPlanilha   SincronizacaoPlanilha[]    @relation("SincronizacaoCriadaPor")
+  filaPlanilha             FilaPlanilha[]             @relation("FilaCriadaPor")
   auditorias               Auditoria[]
   vinculosDiretor          VinculoDiretor[]           @relation("VinculoDoDiretor")
   vinculosCriados          VinculoDiretor[]           @relation("VinculoCriadoPor")
@@ -579,6 +580,28 @@ model Auditoria {
   @@map("auditoria")
 }
 
+// Tipo de envio automático à planilha que a fila processa.
+enum TipoEnvioFila {
+  FREQUENCIA
+  SAIDAS
+  ENTRADAS
+
+  @@map("tipo_envio_fila")
+}
+
+// Estado de um item da fila de envios: aguardando a vez, em andamento com
+// reserva, concluído (com a situação final), falho depois das retentativas
+// ou descartado pela administração.
+enum EstadoFila {
+  AGUARDANDO
+  EM_ANDAMENTO
+  CONCLUIDO
+  FALHOU
+  DESCARTADO
+
+  @@map("estado_fila")
+}
+
 // Integração com Google Planilhas por conta autorizada. Uma linha por finalidade,
 // com a credencial OAuth cifrada no servidor e fora da cópia JSON.
 model IntegracaoPlanilha {
@@ -637,4 +660,30 @@ model SincronizacaoPlanilha {
   @@index([criadoEm])
   @@index([finalidade, criadoEm])
   @@map("sincronizacoes_planilha")
+}
+
+// Fila FIFO durável dos envios automáticos à planilha. A sequência define a
+// ordem; a reserva com prazo garante um consumidor por vez entre instâncias.
+// Guarda só identificadores e o dia: nenhum nome de aluno nem dado da planilha.
+model FilaPlanilha {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sequencia          BigInt        @unique @default(autoincrement())
+  tipo               TipoEnvioFila
+  estado             EstadoFila    @default(AGUARDANDO)
+  turmaId            String?       @map("turma_id") @db.Uuid
+  dia                DateTime      @db.Date
+  autorId            String?       @map("autor_id") @db.Uuid
+  tentativas         Int           @default(0)
+  proximaTentativaEm DateTime?     @map("proxima_tentativa_em") @db.Timestamptz
+  reservadoAte       DateTime?     @map("reservado_ate") @db.Timestamptz
+  resultado          String?       @db.VarChar(40)
+  erro               String?       @db.VarChar(300)
+  criadoEm           DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm       DateTime      @updatedAt @map("atualizado_em") @db.Timestamptz
+  concluidoEm        DateTime?     @map("concluido_em") @db.Timestamptz
+  autor              Usuario?      @relation("FilaCriadaPor", fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@index([estado, sequencia])
+  @@index([criadoEm])
+  @@map("fila_planilha")
 }

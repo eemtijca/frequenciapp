@@ -720,6 +720,20 @@ Apaga a autorização OAuth e o esquema e desliga a integração de saídas. Ape
 
 - 200 `{"ok": true}`.
 
+## Fila de envios automáticos às planilhas
+
+Fila FIFO durável dos envios automáticos de frequência, saídas e entradas ([ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md)). Os registros enfileiram sozinhos; as rotas abaixo servem à Gestão e à agenda. Nenhuma devolve nome de aluno.
+
+| Método e rota                               | Quem                   | O que faz                                                                          |
+| ------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/planilha/fila`                    | Administração          | Contagens por estado e os 50 itens mais recentes.                                  |
+| `POST /api/planilha/fila/processar`         | Administração          | Processa até 20 itens agora e devolve o resumo.                                    |
+| `POST /api/planilha/fila/{id}/descartar`    | Administração          | Descarta um item que aguarda a vez; outro estado responde 409.                     |
+| `POST /api/planilha/fila/{id}/reenfileirar` | Administração          | Devolve ao fim da fila um item com falha ou descartado; outro estado responde 409. |
+| `GET /api/planilha/fila/agenda`             | `CRON_SECRET` (Bearer) | Processa até 50 itens; cookie, mesmo de administrador, não autoriza (403).         |
+
+O resumo do processamento traz `processados`, `concluidos`, `falhas`, `abertos` e `aguardandoAte` (próximo instante em que a fila volta a andar, quando há espera ou reserva). Descartar e reenfileirar entram na auditoria. Identificador que não é UUID responde 400, e item inexistente, 404.
+
 ## Planilha de chamada parcial
 
 Terceiro arquivo Google, finalidade `PARCIAL`, com configuração independente. Não há envio automático e o envio à planilha não muda a confirmação manual da Seduc.

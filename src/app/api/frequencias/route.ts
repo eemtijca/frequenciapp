@@ -1,7 +1,7 @@
 // Frequências: consulta por dia, turma, período ou mês, e salvamento
 // compartilhado com revisão, justificativa e proteção de duplicata.
 import { after } from "next/server";
-import { enviarAposSalvar } from "@/application/planilha";
+import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
 import {
   carregarFrequencia,
   diaValidoOuParametro,
@@ -94,7 +94,9 @@ export async function POST(requisicao: Request): Promise<Response> {
     }
     // A resposta sai antes; o envio à planilha nunca atrasa nem derruba o salvamento.
     const { turmaId, dia } = resultado.frequencia;
-    after(() => enviarAposSalvar(sessao.usuario, turmaId, dia));
+    if (await enfileirarSeLigado("FREQUENCIA", { autorId: sessao.usuario.id, turmaId, dia })) {
+      after(() => processarFila());
+    }
     return json({ frequencia: resultado.frequencia });
   });
 }
