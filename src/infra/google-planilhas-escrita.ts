@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba } from "@/domain/planilha";
+import { planejarOrdenacaoLinhasPlanilha } from "@/domain/ordenacao-planilha";
 import type { AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { controleTravaPlanilhaFrequencia } from "./trava-planilha-frequencia";
 import { controleTravaPlanilhaMovimentacoes } from "./trava-planilha-movimentacoes";
@@ -61,6 +62,7 @@ const operacao = z.discriminatedUnion("tipo", [
   }),
   z.object({ tipo: z.literal("removerColunas"), colunas: z.array(numero) }),
   z.object({ tipo: z.literal("removerLinhas"), linhas: z.array(numero) }),
+  z.object({ tipo: z.literal("ordenarAlunos"), coluna: numero }),
 ]);
 
 type PedidoGoogle = Record<string, unknown>;
@@ -275,6 +277,13 @@ export function planejarEscritaGoogle(
 ): PlanoDeEscritaGoogle {
   const lidas = z.array(operacao).max(10_000).safeParse(entrada);
   if (!lidas.success) throw new ErroHttp("Operações da planilha inválidas.", 400);
+  if (
+    lidas.data.some(
+      (item, indice) => item.tipo === "ordenarAlunos" && indice !== lidas.data.length - 1,
+    )
+  ) {
+    throw new ErroHttp("A ordenação deve concluir o envio da planilha.", 400);
+  }
   const aba = exigirAbaGoogle(doc, nome);
   const sheetId = aba.properties.sheetId;
   const valores = valoresOriginais.map((linha) => [...linha]);
@@ -311,6 +320,17 @@ export function planejarEscritaGoogle(
   const linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
   const colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
   const vinculos = metadados.filter((item) => item.metadataKey === "frequenciapp.aluno");
+  let linhasOrdenaveis = new Set([
+    ...linhasCriadas,
+    ...vinculos.flatMap((item) => {
+      const indice = item.location.dimensionRange?.startRowIndex;
+      return indice === undefined ? [] : [indice + 1];
+    }),
+  ]);
+  const posicoesColunas: (number | null)[] = Array.from(
+    { length: largura },
+    (_, indice) => indice + 1,
+  );
   const novosVinculos = new Set<string>();
   let capacidadeLinhas = aba.properties.gridProperties?.rowCount ?? 1000;
   let capacidadeColunas = aba.properties.gridProperties?.columnCount ?? 26;
@@ -333,6 +353,7 @@ export function planejarEscritaGoogle(
     capacidadeColunas = coluna;
   };
   const vincular = (linha: number, alunoId: string) => {
+    linhasOrdenaveis.add(linha);
     for (const item of vinculos) {
       if (
         item.location.dimensionRange?.startRowIndex === linha - 1 ||
@@ -398,6 +419,7 @@ export function planejarEscritaGoogle(
       for (const fileira of valores) fileira.splice(antes - 1, 0, ...item.rotulos.map(() => ""));
       for (const fileira of formulas)
         fileira.splice(antes - 1, 0, ...item.rotulos.map(() => false));
+      posicoesColunas.splice(antes - 1, 0, ...item.rotulos.map(() => null));
       for (const marcada of [...colunasCriadas]) {
         if (marcada >= antes) {
           colunasCriadas.delete(marcada);
@@ -429,6 +451,7 @@ export function planejarEscritaGoogle(
         requests.push(metadadoLinha(sheetId, nova.linha, "frequenciapp.linha", "1"));
         if (nova.alunoId) vincular(nova.linha, nova.alunoId);
         linhasCriadas.add(nova.linha);
+        linhasOrdenaveis.add(nova.linha);
         nova.celulas.forEach((celula) => {
           requests.push(escrever(sheetId, nova.linha, celula.coluna, celula.valor));
           atribuir(valores, nova.linha, celula.coluna, celula.valor);
@@ -501,6 +524,7 @@ export function planejarEscritaGoogle(
         });
         for (const fileira of valores) fileira.splice(coluna - 1, 1);
         for (const fileira of formulas) fileira.splice(coluna - 1, 1);
+        posicoesColunas.splice(coluna - 1, 1);
         colunasCriadas.delete(coluna);
         capacidadeColunas -= 1;
         contar("removidasColunas");
@@ -518,8 +542,49 @@ export function planejarEscritaGoogle(
         valores.splice(linha - 1, 1);
         formulas.splice(linha - 1, 1);
         linhasCriadas.delete(linha);
+        linhasOrdenaveis = new Set(
+          [...linhasOrdenaveis]
+            .filter((atual) => atual !== linha)
+            .map((atual) => (atual > linha ? atual - 1 : atual)),
+        );
         capacidadeLinhas -= 1;
         contar("removidasLinhas");
+      }
+    } else if (item.tipo === "ordenarAlunos") {
+      const coluna = posicoesColunas.indexOf(item.coluna) + 1;
+      if (coluna === 0) continue;
+      const movimentos = planejarOrdenacaoLinhasPlanilha(
+        [...linhasOrdenaveis]
+          .filter((linha) => linha > cabecalhoLinha && !temFormula(formulas, linha, coluna))
+          .map((linha) => ({ linha, nome: texto(celulaAtual(valores, linha, coluna)) }))
+          .filter((linha) => linha.nome !== ""),
+      );
+      if (
+        movimentos.length > 0 &&
+        aba.merges?.some((faixa) => {
+          const inicio = faixa.startRowIndex ?? 0;
+          const fim = faixa.endRowIndex ?? capacidadeLinhas;
+          return fim - inicio > 1 && fim > cabecalhoLinha;
+        })
+      ) {
+        throw new ErroHttp(
+          "Confira as células mescladas na tabela antes de ordenar os alunos.",
+          409,
+        );
+      }
+      for (const movimento of movimentos) {
+        requests.push({
+          moveDimension: {
+            source: {
+              sheetId,
+              dimension: "ROWS",
+              startIndex: movimento.origem - 1,
+              endIndex: movimento.origem,
+            },
+            destinationIndex:
+              movimento.destino < movimento.origem ? movimento.destino - 1 : movimento.destino,
+          },
+        });
       }
     }
   }

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { diaDaSemanaIso, diasDoMes, rotuloData } from "@/domain/frequencia";
 import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
+import { ordenarAlunosDaPlanilha } from "@/domain/ordenacao-planilha";
 import {
   diasDaPlanilhaMensal,
   mesValido,
@@ -88,7 +89,8 @@ function pedidosDePreparacao(
 ) {
   const cabecalho = ["Aluno", ...diasDaPlanilhaMensal(entrada.mes).map(rotuloData)];
   const linhas = Math.max(1000, entrada.alunos.length + 1);
-  const valores = [cabecalho, ...entrada.alunos.map((aluno) => [aluno.nome])];
+  const alunos = ordenarAlunosDaPlanilha(entrada.alunos);
+  const valores = [cabecalho, ...alunos.map((aluno) => [aluno.nome])];
   return [
     {
       addSheet: {
@@ -123,7 +125,7 @@ function pedidosDePreparacao(
         fields: "userEnteredValue",
       },
     },
-    ...entrada.alunos.flatMap((aluno, indice) => {
+    ...alunos.flatMap((aluno, indice) => {
       const local = {
         dimensionRange: {
           sheetId,
