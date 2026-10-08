@@ -105,7 +105,7 @@ A prévia mostra:
 - nomes de alunos que serão trocados por `DESISTENTE` ou restaurados pela Sheets API;
 - divergências existentes, apenas listadas no modo conservador.
 
-O diálogo de envio é enxuto: uma escolha entre "Só chamadas pendentes" e "O período inteiro", um bloco único por aba com os totais em caixas (só o que tem valor; zeros não aparecem e vários dias viram um intervalo), os avisos importantes à vista e, em recolhidos, "Ver detalhes da prévia" (dias novos, nomes e divergências) e "Opções do envio" (criar colunas, acrescentar alunos e, no modo completo, atualizar divergências). A remoção de colunas e linhas criadas pela integração só é oferecida no modo completo; as colunas aparecem como caixas marcáveis, apenas as de dia, com Marcar todas e Limpar.
+O diálogo de envio é enxuto: uma escolha entre "Só chamadas pendentes" e "O período inteiro", um bloco único por aba com os totais em caixas (só o que tem valor; zeros não aparecem e vários dias viram um intervalo), os avisos importantes à vista e, em recolhidos, "Ver detalhes da prévia" (dias novos, nomes e divergências) e "Opções do envio" (criar colunas, acrescentar alunos e, no modo completo, atualizar divergências). As candidatas à remoção de linhas e colunas ficam sempre à vista, fora do bloco recolhido, e só podem ser marcadas no modo completo; as colunas de dia aparecem como caixas marcáveis, com Marcar todas e Limpar.
 
 **Identificação do aluno.** Cada linha de aluno guarda, de forma invisível, o código do aluno no aplicativo. O envio acha a linha pelo código; o nome só é usado para vincular uma linha que ainda não tem código, e apenas quando ele é único na turma e na aba. A prévia informa quantas linhas ganham o código. Alunos com o mesmo nome na turma não são vinculados pelo nome: o aviso pede conferência para evitar associar marcas ao aluno errado. A leitura vai até a última linha com conteúdo da aba, e a linha de aluno novo entra depois dela. O mapa aceita uma aba por turma original.
 
@@ -137,6 +137,10 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 - A fila não guarda nome de aluno nem dados da planilha, e não cobre os envios manuais com prévia.
 
 ## Modo completo
+
+Na prévia de uma turma, o modo completo seleciona "O período inteiro" por padrão para conferir também as linhas de alunos que saíram da turma, mesmo sem chamadas pendentes. Ao marcar uma remoção ou mudar as opções, a prévia é recalculada e o envio aguarda a nova leitura; uma falha nessa leitura impede a confirmação do plano anterior. No modo conservador, "Conferir linhas da turma" abre essa conferência, mas a seleção de remoções permanece bloqueada até liberar o modo completo. Uma solicitação de remoção com a janela expirada é recusada, sem apresentar a exclusão como concluída.
+
+Depois de alterar a turma atual e a turma de origem em Gestão, Alunos, o envio passa a usar a nova origem. A linha antiga permanece até a remoção explícita: conferir o envio na aba de destino, liberar o modo completo, abrir Relatórios, Grade, selecionar a turma antiga e o mês, abrir "Enviar para a planilha", marcar "Remover" para a linha desejada e confirmar a prévia. Só linhas criadas pela integração são oferecidas; a exclusão inclui as frequências da linha. A alteração da origem reorganiza também o histórico no aplicativo, sem separar a transferência por data. Linhas manuais são conferidas diretamente no Google Planilhas.
 
 O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 

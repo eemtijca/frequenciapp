@@ -8,16 +8,16 @@ test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
 test.afterAll(limparMassaE2E);
 
-const COLUNAS = Array.from({ length: 12 }, (_, indice) => {
+// A API só oferece as colunas de dia criadas pela integração (a coluna Aluno nunca é candidata).
+const COLUNAS = Array.from({ length: 11 }, (_, posicao) => {
+  const indice = posicao + 1;
   const dia = String(indice + 1).padStart(2, "0");
-  return indice === 0
-    ? { coluna: 1, letra: "A", rotulo: "Aluno" }
-    : {
-        coluna: indice + 1,
-        letra: String.fromCharCode(65 + indice),
-        rotulo: `${dia}/10/2026`,
-        data: `2026-10-${dia}`,
-      };
+  return {
+    coluna: indice + 1,
+    letra: String.fromCharCode(65 + indice),
+    rotulo: `${dia}/10/2026`,
+    data: `2026-10-${dia}`,
+  };
 });
 
 function plano(turmaOriginalId: string) {
@@ -103,12 +103,13 @@ test("a prévia mostra só o que tem valor e recolhe as opções", async ({ page
   await expect(lista).not.toContainText("0 colunas");
   await expect(lista).not.toContainText("alunos novos");
   await expect(lista).not.toContainText("fórmulas protegidas");
-  // As opções ficam recolhidas e, no modo conservador, nunca oferecem remoção.
+  // As opções ficam recolhidas e, no modo conservador, a remoção aparece travada.
   await expect(dialogo.getByLabel("Criar colunas para dias sem coluna")).toBeHidden();
   await dialogo.getByText("Opções do envio", { exact: true }).click();
   await expect(dialogo.getByLabel("Criar colunas para dias sem coluna")).toBeChecked();
   await expect(dialogo.getByLabel("Acrescentar alunos sem linha")).toBeChecked();
-  await expect(dialogo.getByLabel(/^Remover coluna/)).toHaveCount(0);
+  await expect(dialogo.getByLabel(/^Remover coluna/).first()).toBeDisabled();
+  await expect(dialogo.getByText(/exige liberar o modo completo na Gestão/)).toBeVisible();
   await expect(dialogo.getByLabel(/Atualizar divergências/)).toHaveCount(0);
 });
 
@@ -122,10 +123,7 @@ test("no modo completo as colunas de dia cabem em caixas e vão marcadas no envi
   });
   const dialogo = await abrirEnvio(page, "completo");
   await expect(dialogo.getByText(/Modo completo ativo/)).toBeVisible();
-  await dialogo.getByText("Opções do envio", { exact: true }).click();
-  // A coluna Aluno não é candidata: só as onze colunas de dia aparecem.
   await expect(dialogo.getByLabel(/^Remover coluna/)).toHaveCount(11);
-  await expect(dialogo.getByLabel("Remover coluna Aluno (A)")).toHaveCount(0);
   await dialogo.getByRole("button", { name: "Marcar todas", exact: true }).click();
   await expect(dialogo.getByLabel(/^Remover coluna/).first()).toBeChecked();
   await dialogo.getByRole("button", { name: "Limpar", exact: true }).click();

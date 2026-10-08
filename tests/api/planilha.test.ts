@@ -836,6 +836,86 @@ describe("integração com a planilha", () => {
     expect(google?.abas()).toContain("QP Manual");
   });
 
+  it("remove a linha da origem anterior após a transferência, sem recriar no reenvio", async () => {
+    const criada = await json<{ aluno: { id: string } }>(
+      await autenticado("/api/alunos", {
+        method: "POST",
+        body: JSON.stringify({ nome: "QP Transferida", turmaId: turmaAId }),
+      }),
+    );
+    const destino = await json<{ turma: { id: string } }>(
+      await autenticado("/api/turmas", {
+        method: "POST",
+        body: JSON.stringify({ serieId, nome: "Destino" }),
+      }),
+    );
+    const entrada = {
+      turmaOriginalId: turmaAId,
+      de: "2026-09-25",
+      ate: "2026-09-25",
+      somenteAlteradas: false,
+    };
+    type Previa = {
+      planoHashGeral: string;
+      planos: {
+        semEnvio: boolean;
+        candidatosRemocaoLinhas: { linha: number; nome: string }[];
+        removerLinhas: { linha: number; nome: string }[];
+      }[];
+    };
+    const simular = async (corpo: object) => {
+      const resposta = await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify(corpo),
+      });
+      expect(resposta.status).toBe(200);
+      return json<Previa>(resposta);
+    };
+    const aplicar = (corpo: object, previa: Previa) =>
+      autenticado("/api/planilha/aplicar", {
+        method: "POST",
+        body: JSON.stringify({ ...corpo, planoHashGeral: previa.planoHashGeral }),
+      });
+    const antes = await simular(entrada);
+    expect((await aplicar(entrada, antes)).status).toBe(200);
+    const linhaAntiga = google
+      ?.vinculos("QP Ano A")
+      .find((item) => item.alunoId === criada.aluno.id);
+    if (!linhaAntiga) throw new Error("Linha da aluna sintética não foi criada.");
+    google?.definirValor("QP Ano A", linhaAntiga.linha, 3, "P");
+
+    expect(
+      (
+        await autenticado(`/api/alunos/${criada.aluno.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ turmaId: destino.turma.id, turmaOriginalId: destino.turma.id }),
+        })
+      ).status,
+    ).toBe(200);
+    const pendentes = await simular({ ...entrada, somenteAlteradas: true });
+    expect(pendentes.planos[0]?.semEnvio).toBe(true);
+    const completa = await simular(entrada);
+    expect(completa.planos[0]?.candidatosRemocaoLinhas).toContainEqual({
+      linha: linhaAntiga.linha,
+      nome: "QP Transferida",
+    });
+    expect(completa.planos[0]?.removerLinhas).toEqual([]);
+    expect(google?.valor("QP Ano A", linhaAntiga.linha, 3)).toBe("P");
+    const corpo = { ...entrada, removerLinhas: [linhaAntiga.linha] };
+    const confirmada = await simular(corpo);
+    expect((await aplicar(corpo, confirmada)).status).toBe(200);
+    expect(google?.vinculos("QP Ano A").some((item) => item.alunoId === criada.aluno.id)).toBe(
+      false,
+    );
+    expect(google?.valor("QP Ano A", linhaAntiga.linha, 1)).not.toBe("QP Transferida");
+    expect(google?.valor("QP Ano A", 2, 1)).toBe("QP Alice");
+    const outraPrevia = await simular(entrada);
+    expect((await aplicar(entrada, outraPrevia)).status).toBe(200);
+    expect(google?.vinculos("QP Ano A").some((item) => item.alunoId === criada.aluno.id)).toBe(
+      false,
+    );
+  });
+
   it("recusa operação destrutiva depois de a janela expirar", async () => {
     await banco?.query(
       "update integracoes_planilha set modo = 'COMPLETO', modo_completo_ate = now() - interval '1 minute' where id = 'principal'",
@@ -859,6 +939,19 @@ describe("integração com a planilha", () => {
     );
     expect(simulado.modalidade).toBe("conservador");
     expect(simulado.planos[0]?.resumo.substituir).toBe(0);
+
+    const escritasAntes = google?.chamadas().filter((acao) => acao === "gravar").length;
+    for (const remocao of [{ removerLinhas: [3] }, { removerColunas: [3] }]) {
+      const resposta = await autenticado("/api/planilha/simular", {
+        method: "POST",
+        body: JSON.stringify({ turmaOriginalId: turmaAId, de: DIA, ate: DIA, ...remocao }),
+      });
+      expect(resposta.status).toBe(409);
+      expect(await resposta.json()).toMatchObject({
+        error: "Libere o modo completo na Gestão antes de remover linhas ou colunas.",
+      });
+    }
+    expect(google?.chamadas().filter((acao) => acao === "gravar").length).toBe(escritasAntes);
 
     const remocao = await autenticado("/api/planilha/remover-aba", {
       method: "POST",

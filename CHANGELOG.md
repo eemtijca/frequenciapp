@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
-- Diálogo de envio à planilha (Relatórios, Grade, e Enviar todas as turmas na Gestão) mais enxuto: escolha de alcance em duas opções lado a lado, um único bloco por aba com os totais em caixas (sem zeros e com os dias resumidos), detalhes e opções recolhidos, e remoção de colunas e linhas só no modo completo, com as colunas de dia em caixas marcáveis (Marcar todas e Limpar) e sem a coluna Aluno como candidata.
+- Diálogo de envio à planilha (Relatórios, Grade, e Enviar todas as turmas na Gestão) mais enxuto: escolha de alcance em duas opções lado a lado, um único bloco por aba com os totais em caixas (sem zeros e com os dias resumidos), detalhes e opções recolhidos, e remoção de linhas e colunas sempre à vista (travada fora do modo completo), com as colunas de dia em caixas marcáveis (Marcar todas e Limpar).
 - Saídas e entradas, Relatórios e Gestão: as informações de cada registro (por exemplo "Luto" e "O tio faleceu.", ou turma, horário e momento) aparecem em caixas arredondadas separadas, no lugar do ponto entre elas.
 - Relatórios, Saídas e entradas, agrupamento Por aluno: o campo de busca por nome virou um seletor com a relação dos alunos da turma escolhida (ou de todas as turmas), com a opção Todos os alunos e filtro por texto na lista.
 - Planilha de saídas passa a se chamar "Planilha de entradas e saídas" na Gestão, e a aba Entradas tem as mesmas sete colunas de Saídas (sem Código, com Responsável no lugar de Liberado por). Preparar e organizar a aba Entradas saíram da área Saídas e entradas e ficam nessa seção; preparar realinha a aba no formato anterior, preservando os registros.
@@ -23,6 +23,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- A prévia de envio é recalculada ao marcar remoções ou mudar opções, preserva as seleções durante a releitura e impede envio do plano anterior quando a leitura falha. No modo completo, confere o período inteiro para listar alunos transferidos mesmo sem chamadas pendentes. O modo conservador oferece o atalho Conferir linhas da turma e bloqueia a seleção de remoções; pedidos com a janela expirada são recusados.
 
 - Saídas e Entradas passam a proteger envios manuais e automáticos entre instâncias, registrar a tentativa antes da escrita e pausar a automação de destinos sem confirmação. A retomada exige conferência posterior do período, e a prévia de Saídas deixa de valer após trocar o arquivo Google. Contagens incompletas e perda da proteção não confirmam sucesso. Entradas permite registrar a conferência de uma prévia sem linhas novas pela própria tela.
 

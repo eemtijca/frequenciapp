@@ -116,6 +116,9 @@ function chipsDoPlano(item: PlanoResumo, modoCompleto: boolean): string[] {
       ? `${r.vincular} ${r.vincular === 1 ? "linha ganha" : "linhas ganham"} o código do aluno`
       : "",
     modoCompleto && r.substituir > 0 ? plural(r.substituir, "substituição", "substituições") : "",
+    modoCompleto && (r.removerLinhas > 0 || r.removerColunas > 0)
+      ? `Excluir: ${plural(r.removerLinhas, "linha", "linhas")} e ${plural(r.removerColunas, "coluna", "colunas")}`
+      : "",
     r.puladasOcupadas > 0
       ? plural(r.puladasOcupadas, "célula ocupada ignorada", "células ocupadas ignoradas")
       : "",
@@ -162,7 +165,9 @@ export default function DialogoEnvio({
   const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
     {},
   );
-  const [somenteAlteradas, setSomenteAlteradas] = useState(true);
+  const [alcance, setAlcance] = useState<"pendentes" | "periodo" | null>(null);
+  // A correção manual precisa reler também linhas sem chamada pendente.
+  const somenteAlteradas = alcance ? alcance === "pendentes" : !(modoCompleto && !todas);
   const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
   const abaUnica = simulacao?.planos.length === 1 ? simulacao.planos[0]?.aba : undefined;
@@ -200,7 +205,6 @@ export default function DialogoEnvio({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
-    setSimulacao(null);
     setAndamento({});
     setDetalhes({});
     try {
@@ -212,9 +216,12 @@ export default function DialogoEnvio({
     }
   });
 
+  // A ação é estável; a chave acompanha as opções e as remoções selecionadas.
+  // Preserva a aba durante a releitura para manter o contexto dessas seleções.
+  const chaveDaPrevia = JSON.stringify(entradas());
   useEffect(() => {
     if (aberto) void simular();
-  }, [aberto, simular, somenteAlteradas]);
+  }, [aberto, simular, chaveDaPrevia]);
 
   // Uma requisição por aba: a falha de um mês não impede os demais envios.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
@@ -288,9 +295,9 @@ export default function DialogoEnvio({
   const nadaAEnviar = simulacao !== null && simulacao.planos.every((item) => item.semEnvio);
   const enviou = Object.keys(andamento).length > 0 && !enviando;
   const periodo = de === ate ? diaCurto(de) : `${diaCurto(de)} a ${diaCurto(ate)}`;
-  // Remover só vale no modo completo, e só as colunas de dia que a integração criou.
-  const podeRemover = modoCompleto && detalhado && !bloqueado;
-  const colunasRemoviveis = plano?.candidatosRemocaoColunas.filter((item) => item.data) ?? [];
+  // As candidatas aparecem sempre na prévia detalhada; marcar exige o modo completo.
+  const podeRemover = detalhado && !bloqueado;
+  const colunasRemoviveis = plano?.candidatosRemocaoColunas ?? [];
   const linhasRemoviveis = plano?.candidatosRemocaoLinhas ?? [];
   const temDetalhes =
     detalhado &&
@@ -330,7 +337,7 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando}>
+          <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
             <legend className="sr-only">O que enviar</legend>
             <div className="grid grid-cols-2 gap-2">
               <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
@@ -338,7 +345,7 @@ export default function DialogoEnvio({
                   type="radio"
                   name="alcance-envio"
                   checked={somenteAlteradas}
-                  onChange={() => setSomenteAlteradas(true)}
+                  onChange={() => setAlcance("pendentes")}
                   className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
                 />
                 <span>Só chamadas pendentes</span>
@@ -348,7 +355,7 @@ export default function DialogoEnvio({
                   type="radio"
                   name="alcance-envio"
                   checked={!somenteAlteradas}
-                  onChange={() => setSomenteAlteradas(false)}
+                  onChange={() => setAlcance("periodo")}
                   className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
                 />
                 <span>O período inteiro ({periodo})</span>
@@ -380,10 +387,17 @@ export default function DialogoEnvio({
           )}
 
           {simulacao && !carregando && nadaAEnviar && (
-            <p className="bg-secondary/40 rounded-lg px-3 py-2 text-sm">
-              Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
-              inteiro, escolha a segunda opção.
-            </p>
+            <div className="bg-secondary/40 flex flex-col items-start gap-2 rounded-lg px-3 py-2 text-sm">
+              <p>
+                Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
+                inteiro, escolha a segunda opção.
+              </p>
+              {!todas && somenteAlteradas && (
+                <Button type="button" variant="outline" onClick={() => setAlcance("periodo")}>
+                  Conferir linhas da turma
+                </Button>
+              )}
+            </div>
           )}
 
           {simulacao && !carregando && !bloqueado && !nadaAEnviar && (
@@ -521,91 +535,111 @@ export default function DialogoEnvio({
                   Atualizar divergências, nomes e turma atual
                 </label>
               )}
-              {podeRemover && linhasRemoviveis.length > 0 && (
-                <fieldset className="flex flex-col gap-1.5" disabled={enviando}>
-                  <legend className="text-muted-foreground mb-1 text-xs">
-                    Remover alunos que saíram da turma
-                  </legend>
-                  {linhasRemoviveis.map((item) => (
-                    <label key={item.linha} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={removerMarcadas?.includes(item.linha) ?? false}
-                        onChange={(evento) => {
-                          const marcado = evento.target.checked;
-                          alterarRemocoes((atual) => ({
-                            ...atual,
-                            linhas: marcado
-                              ? [...atual.linhas, item.linha]
-                              : atual.linhas.filter((linha) => linha !== item.linha),
-                          }));
-                        }}
-                        className="size-4 accent-[var(--primary)]"
-                      />
-                      Remover {item.nome} (linha {item.linha})
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-              {podeRemover && colunasRemoviveis.length > 0 && (
-                <fieldset className="flex flex-col gap-1.5" disabled={enviando}>
-                  <legend className="text-muted-foreground mb-1 text-xs">
-                    Remover colunas de dia criadas pela integração
-                  </legend>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        alterarRemocoes((atual) => ({
-                          ...atual,
-                          colunas: colunasRemoviveis.map((item) => item.coluna),
-                        }))
-                      }
-                    >
-                      Marcar todas
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => alterarRemocoes((atual) => ({ ...atual, colunas: [] }))}
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {colunasRemoviveis.map((item) => (
-                      <label
-                        key={`coluna-${item.coluna}`}
-                        className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs"
-                      >
-                        <input
-                          type="checkbox"
-                          aria-label={`Remover coluna ${item.rotulo} (${item.letra})`}
-                          checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
-                          onChange={(evento) => {
-                            const marcado = evento.target.checked;
-                            alterarRemocoes((atual) => ({
-                              ...atual,
-                              colunas: marcado
-                                ? [...atual.colunas, item.coluna]
-                                : atual.colunas.filter((coluna) => coluna !== item.coluna),
-                            }));
-                          }}
-                          className="size-3.5 accent-[var(--primary)]"
-                        />
-                        {item.data ? diaCurto(item.data) : item.rotulo} ({item.letra})
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
             </div>
           </details>
 
-          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+          {podeRemover && (linhasRemoviveis.length > 0 || colunasRemoviveis.length > 0) && (
+            <p className="text-muted-foreground text-xs">
+              {modoCompleto
+                ? "A exclusão de linhas remove também as frequências delas; confira primeiro a aba de destino."
+                : "A exclusão de linhas e colunas exige liberar o modo completo na Gestão."}
+            </p>
+          )}
+          {podeRemover && linhasRemoviveis.length > 0 && (
+            <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
+              <legend className="text-muted-foreground mb-1 text-xs">
+                Remover alunos que saíram da turma
+              </legend>
+              {linhasRemoviveis.map((item) => (
+                <label key={item.linha} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={removerMarcadas?.includes(item.linha) ?? false}
+                    onChange={(evento) => {
+                      const marcado = evento.target.checked;
+                      alterarRemocoes((atual) => ({
+                        ...atual,
+                        linhas: marcado
+                          ? [...atual.linhas, item.linha]
+                          : atual.linhas.filter((linha) => linha !== item.linha),
+                      }));
+                    }}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Remover {item.nome} (linha {item.linha})
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {podeRemover && colunasRemoviveis.length > 0 && (
+            <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
+              <legend className="text-muted-foreground mb-1 text-xs">
+                Remover colunas de dia criadas pela integração
+              </legend>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    alterarRemocoes((atual) => ({
+                      ...atual,
+                      colunas: colunasRemoviveis.map((item) => item.coluna),
+                    }))
+                  }
+                >
+                  Marcar todas
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => alterarRemocoes((atual) => ({ ...atual, colunas: [] }))}
+                >
+                  Limpar
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {colunasRemoviveis.map((item) => (
+                  <label
+                    key={`coluna-${item.coluna}`}
+                    className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs"
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Remover coluna ${item.rotulo} (${item.letra})`}
+                      checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
+                      onChange={(evento) => {
+                        const marcado = evento.target.checked;
+                        alterarRemocoes((atual) => ({
+                          ...atual,
+                          colunas: marcado
+                            ? [...atual.colunas, item.coluna]
+                            : atual.colunas.filter((coluna) => coluna !== item.coluna),
+                        }));
+                      }}
+                      className="size-3.5 accent-[var(--primary)]"
+                    />
+                    {item.data ? diaCurto(item.data) : item.rotulo} ({item.letra})
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {erro && (
+            <div className="flex flex-col items-start gap-2">
+              <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void simular()}
+                disabled={carregando || enviando}
+              >
+                Repetir prévia
+              </Button>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -624,6 +658,7 @@ export default function DialogoEnvio({
               enviando ||
               carregando ||
               !simulacao ||
+              Boolean(erro) ||
               bloqueado ||
               !online ||
               (nadaAEnviar && !enviou)
