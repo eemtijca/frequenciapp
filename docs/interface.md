@@ -103,3 +103,9 @@ Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo
 ## Seletores com busca
 
 As listas pesquisáveis usam um painel flutuante com campo de texto e opções próprias. Abrir o teclado ou mudar a altura disponível não fecha o painel nem tira o foco da busca. O filtro ignora diferenças de acentos e caixa. As setas percorrem as opções, Enter confirma, Escape cancela e o toque externo fecha; ao reabrir, a busca começa vazia. O acabamento de vidro é compartilhado com os demais controles. As listas sem busca conservam o seletor simples.
+
+## Carregamento dos gráficos
+
+As roscas do Painel, os gráficos dos diretores e a evolução dos Relatórios usam módulos separados, importados somente quando a visualização se aproxima da área visível (margem vertical de 160 px). O carrossel respeita o recorte horizontal: cartões fora de exibição aguardam a visita. O espaço reservado segue o formato do gráfico durante o download, e filtros, legendas textuais de comparação e tabelas continuam disponíveis.
+
+Após a primeira visita, o gráfico permanece montado e o módulo fica reutilizável, seguindo a preservação de estado das visões. Roscas sem dados exibem o estado vazio sem baixar Recharts. Navegadores sem IntersectionObserver carregam os gráficos após a hidratação. Uma falha no download fica restrita ao gráfico e não substitui a tela do aplicativo por uma página de erro.

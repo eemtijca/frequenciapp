@@ -123,3 +123,7 @@ A cobertura protege o essencial do domínio (derivação de marcas e grade), a s
 ## Frequência mensal no Google
 
 `google-planilhas-mensal.test.ts` cobre identidade, calendário, criação atômica, colisões e resposta perdida. `planilha-mensal.test.ts` cobre autorização, preparo, reenvio do histórico, concorrência no mapa, divisão entre meses e envio ao salvar. `planilha-mensal.spec.ts` valida confirmação, cancelamento, reutilização, vínculo fixo e prévia por aba. As suítes usam apenas dados sintéticos e o transporte Google simulado.
+
+## Carregamento sob demanda
+
+`tests/e2e/graficos-sob-demanda.spec.ts` inspeciona os arquivos JavaScript recebidos pelo navegador: a Chamada abre sem o arquivo de Recharts, que só é solicitado ao exibir um gráfico com dados. Verifica também montagem por cartão, reutilização, alternativa sem IntersectionObserver e falha de download isolada. Os testes de Painel, resumo de Relatórios e diretores cobrem filtros, tabelas e navegação após o carregamento. Toda a massa é sintética.

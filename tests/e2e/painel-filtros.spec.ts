@@ -314,6 +314,7 @@ test.describe("gráfico personalizado por período", () => {
     await escolherDia(page, "#periodo-painel-ate", "Setembro de 2026", "1 de setembro de 2026");
     await expect(painel.getByRole("combobox", { name: "Turma", exact: true })).toBeDisabled();
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
+    await painel.locator("[data-grafico-sob-demanda]").scrollIntoViewIfNeeded();
     await expect(painel.getByRole("img", { name: "Faltas do período por série" })).toBeVisible();
     await expect(painel.getByText("De 31/08/2026 a 01/09/2026", { exact: true })).toBeVisible();
     const resumo = painel.getByRole("group", { name: "Resumo do período" });
@@ -327,6 +328,7 @@ test.describe("gráfico personalizado por período", () => {
     await painel.getByRole("combobox", { name: "Turma", exact: true }).click();
     await page.getByRole("option", { name: "E2E Painel Um B", exact: true }).click();
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
+    await painel.locator("[data-grafico-sob-demanda]").scrollIntoViewIfNeeded();
     await expect(
       painel.getByRole("img", { name: "Faltas do período por turma da E2E Painel Um" }),
     ).toBeVisible();
@@ -431,6 +433,8 @@ test.describe("gráfico personalizado por período", () => {
       });
     });
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
+    // O gráfico abaixo dos controles só é montado quando chega perto da tela.
+    await painel.locator("[data-grafico-sob-demanda]").scrollIntoViewIfNeeded();
     const grafico = painel.getByRole("img", { name: "Faltas do período por série" });
     await expect(grafico).toBeVisible();
     const aplicacao = grafico.getByRole("application");
@@ -439,6 +443,7 @@ test.describe("gráfico personalizado por período", () => {
     const detalhe = grafico.locator(".recharts-tooltip-wrapper");
     await expect(detalhe).toBeVisible();
     await expect(detalhe).toHaveText("E2E Painel Dois: 1 falta");
+    await expect(page.getByRole("article", { name: /: Personalizado$/ })).toBeInViewport();
     // A dica deve caber no gráfico mesmo quando o cartão é estreito.
     await expect
       .poll(async () => {

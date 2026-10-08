@@ -17,7 +17,7 @@ import {
 } from "recharts";
 import { rotuloDataCurta } from "@/domain/frequencia";
 import type { EstatisticaSemana } from "@/domain/estatisticas-diretor";
-import { ESTILO_TOOLTIP, escalaPercentual } from "@/components/diretor/grafico-alunos";
+import { ESTILO_TOOLTIP, escalaPercentual } from "@/components/graficos/estilo-graficos";
 import { CirculoValor } from "@/components/ui/circulo-contagem";
 
 interface Props {
