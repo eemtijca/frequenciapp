@@ -11,6 +11,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
+import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import {
   Dialog,
   DialogContent,
@@ -48,7 +49,7 @@ interface PlanoResumo {
   substituir: { celula: string; valor: string; anterior: string; campo?: "nome" | "turma" }[];
   sinalizar: { celula: string; valor: string; anterior: string }[];
   candidatosRemocaoLinhas: { linha: number; nome: string }[];
-  candidatosRemocaoColunas: { coluna: number; letra: string; rotulo: string }[];
+  candidatosRemocaoColunas: { coluna: number; letra: string; rotulo: string; data?: string }[];
 }
 
 interface Simulacao {
@@ -87,6 +88,42 @@ const SEM_CONFIRMACAO =
 /** Dia AAAA-MM-DD como dd/mm, para a lista de dias do envio. */
 function diaCurto(dia: string): string {
   return `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+}
+
+function plural(valor: number, singular: string, pluralTexto: string): string {
+  return `${valor} ${valor === 1 ? singular : pluralTexto}`;
+}
+
+/** Até três dias por extenso; acima disso, o intervalo e a quantidade. */
+function resumirDias(dias: string[]): string {
+  const primeiro = dias[0];
+  const ultimo = dias[dias.length - 1];
+  if (!primeiro || !ultimo) return "";
+  if (dias.length <= 3) return dias.map(diaCurto).join(", ");
+  return `${diaCurto(primeiro)} a ${diaCurto(ultimo)} (${dias.length} dias)`;
+}
+
+/** Só o que tem valor: zeros não aparecem, para a prévia caber numa olhada. */
+function chipsDoPlano(item: PlanoResumo, modoCompleto: boolean): string[] {
+  const r = item.resumo;
+  const chips = [
+    r.preencher > 0 ? `${r.preencher} a preencher` : "",
+    item.dias.length > 0 ? `Dias ${resumirDias(item.dias)}` : "",
+    r.novasColunas > 0 ? plural(r.novasColunas, "coluna nova", "colunas novas") : "",
+    r.novosAlunos > 0 ? plural(r.novosAlunos, "aluno novo", "alunos novos") : "",
+    r.sinalizar > 0 ? plural(r.sinalizar, "situação de aluno", "situações de aluno") : "",
+    r.vincular > 0
+      ? `${r.vincular} ${r.vincular === 1 ? "linha ganha" : "linhas ganham"} o código do aluno`
+      : "",
+    modoCompleto && r.substituir > 0 ? plural(r.substituir, "substituição", "substituições") : "",
+    r.puladasOcupadas > 0
+      ? plural(r.puladasOcupadas, "célula ocupada ignorada", "células ocupadas ignoradas")
+      : "",
+    r.puladasFormula > 0
+      ? plural(r.puladasFormula, "fórmula protegida", "fórmulas protegidas")
+      : "",
+  ];
+  return chips.filter(Boolean);
 }
 
 function useOnline(): boolean {
@@ -250,15 +287,34 @@ export default function DialogoEnvio({
   const detalhado = !todas && simulacao?.planos.length === 1 && plano && !plano.semEnvio;
   const nadaAEnviar = simulacao !== null && simulacao.planos.every((item) => item.semEnvio);
   const enviou = Object.keys(andamento).length > 0 && !enviando;
+  const periodo = de === ate ? diaCurto(de) : `${diaCurto(de)} a ${diaCurto(ate)}`;
+  // Remover só vale no modo completo, e só as colunas de dia que a integração criou.
+  const podeRemover = modoCompleto && detalhado && !bloqueado;
+  const colunasRemoviveis = plano?.candidatosRemocaoColunas.filter((item) => item.data) ?? [];
+  const linhasRemoviveis = plano?.candidatosRemocaoLinhas ?? [];
+  const temDetalhes =
+    detalhado &&
+    !bloqueado &&
+    !!plano &&
+    (plano.sinalizar.length > 0 || plano.novasColunas.length > 0 || plano.substituir.length > 0);
+
+  function alterarRemocoes(
+    mudar: (atual: { linhas: number[]; colunas: number[] }) => {
+      linhas: number[];
+      colunas: number[];
+    },
+  ) {
+    setRemocoes((atuais) => ({
+      ...atuais,
+      [contextoRemocoes]: mudar(atuais[contextoRemocoes] ?? { linhas: [], colunas: [] }),
+    }));
+  }
 
   return (
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            Enviar {rotulo}
-            {somenteAlteradas ? " · o que mudou" : ` · ${de === ate ? de : `${de} a ${ate}`}`}
-          </DialogTitle>
+          <DialogTitle>Enviar {rotulo}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
@@ -274,125 +330,36 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          <fieldset className="flex flex-col gap-1.5 text-sm" disabled={enviando}>
+          <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando}>
             <legend className="sr-only">O que enviar</legend>
-            <label className="flex items-start gap-2">
-              <input
-                type="radio"
-                name="alcance-envio"
-                checked={somenteAlteradas}
-                onChange={() => setSomenteAlteradas(true)}
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-              />
-              <span>
-                Só chamadas pendentes
-                <span className="text-muted-foreground block text-xs">
-                  Dias com chamadas ainda não confirmadas na planilha para cada turma de origem.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-2">
-              <input
-                type="radio"
-                name="alcance-envio"
-                checked={!somenteAlteradas}
-                onChange={() => setSomenteAlteradas(false)}
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-              />
-              <span>
-                O período inteiro (
-                {de === ate ? diaCurto(de) : `${diaCurto(de)} a ${diaCurto(ate)}`})
-                <span className="text-muted-foreground block text-xs">
-                  Para conferência ou recuperação; no modo conservador, só preenche o que está
-                  vazio.
-                </span>
-              </span>
-            </label>
-          </fieldset>
-
-          <div className="flex flex-col gap-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={criarColunas}
-                onChange={(evento) => setCriarColunas(evento.target.checked)}
-                className="size-4 accent-[var(--primary)]"
-              />
-              Criar colunas para dias sem coluna
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={novosAlunos}
-                onChange={(evento) => setNovosAlunos(evento.target.checked)}
-                className="size-4 accent-[var(--primary)]"
-              />
-              Acrescentar alunos sem linha
-            </label>
-            {modoCompleto && (
-              <label className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
                 <input
-                  type="checkbox"
-                  checked={substituir}
-                  onChange={(evento) => setSubstituir(evento.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
+                  type="radio"
+                  name="alcance-envio"
+                  checked={somenteAlteradas}
+                  onChange={() => setSomenteAlteradas(true)}
+                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
                 />
-                Atualizar divergências, nomes e turma atual
+                <span>Só chamadas pendentes</span>
               </label>
-            )}
-            {detalhado &&
-              plano?.candidatosRemocaoLinhas.map((item) => (
-                <label key={item.linha} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={removerMarcadas?.includes(item.linha) ?? false}
-                    onChange={(evento) => {
-                      const marcado = evento.target.checked;
-                      setRemocoes((atuais) => {
-                        const anteriores = atuais[contextoRemocoes] ?? { linhas: [], colunas: [] };
-                        return {
-                          ...atuais,
-                          [contextoRemocoes]: {
-                            ...anteriores,
-                            linhas: marcado
-                              ? [...anteriores.linhas, item.linha]
-                              : anteriores.linhas.filter((linha) => linha !== item.linha),
-                          },
-                        };
-                      });
-                    }}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  Remover {item.nome} (linha {item.linha})
-                </label>
-              ))}
-            {detalhado &&
-              plano?.candidatosRemocaoColunas.map((item) => (
-                <label key={`coluna-${item.coluna}`} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
-                    onChange={(evento) => {
-                      const marcado = evento.target.checked;
-                      setRemocoes((atuais) => {
-                        const anteriores = atuais[contextoRemocoes] ?? { linhas: [], colunas: [] };
-                        return {
-                          ...atuais,
-                          [contextoRemocoes]: {
-                            ...anteriores,
-                            colunas: marcado
-                              ? [...anteriores.colunas, item.coluna]
-                              : anteriores.colunas.filter((coluna) => coluna !== item.coluna),
-                          },
-                        };
-                      });
-                    }}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  Remover coluna {item.rotulo} ({item.letra})
-                </label>
-              ))}
-          </div>
+              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                <input
+                  type="radio"
+                  name="alcance-envio"
+                  checked={!somenteAlteradas}
+                  onChange={() => setSomenteAlteradas(false)}
+                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                />
+                <span>O período inteiro ({periodo})</span>
+              </label>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {somenteAlteradas
+                ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
+                : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
+            </p>
+          </fieldset>
 
           {carregando && (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -419,113 +386,224 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          {simulacao && !carregando && !bloqueado && (!detalhado || enviou) && !nadaAEnviar && (
+          {simulacao && !carregando && !bloqueado && !nadaAEnviar && (
             <ul
-              className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs"
+              className="bg-secondary/40 flex flex-col gap-3 rounded-lg px-3 py-2.5 text-xs"
               aria-label="Turmas do envio"
               aria-live="polite"
             >
               {simulacao.planos.map((item) => {
                 const estado = andamento[item.aba];
                 return (
-                  <li key={item.aba} data-turma={item.rotulo} data-aba={item.aba}>
-                    <span className="font-medium">{item.aba}</span>
-                    {item.mes && (
-                      <span>
-                        {" "}
-                        · {item.mes.slice(5)}/{item.mes.slice(0, 4)}
-                      </span>
-                    )}
-                    {item.semEnvio ? (
-                      ": sem alterações"
-                    ) : (
-                      <>
-                        :{" "}
-                        {estado ? ROTULO_ANDAMENTO[estado] : `${item.resumo.preencher} a preencher`}
-                        {!estado &&
-                          ` · dias ${item.dias.map(diaCurto).join(", ")} · ${item.resumo.novasColunas} colunas`}
-                        {!estado && modoCompleto && item.resumo.substituir > 0
-                          ? ` · ${item.resumo.substituir} substituições`
-                          : ""}
-                        {!estado && item.resumo.sinalizar > 0
-                          ? ` · ${item.resumo.sinalizar} situações de aluno`
-                          : ""}
-                      </>
+                  <li
+                    key={item.aba}
+                    data-turma={item.rotulo}
+                    data-aba={item.aba}
+                    className="flex flex-col gap-1.5"
+                  >
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-medium">Aba {item.aba}</span>
+                      {item.mes && (
+                        <span className="text-muted-foreground">
+                          {item.mes.slice(5)}/{item.mes.slice(0, 4)}
+                        </span>
+                      )}
+                      {item.semEnvio && (
+                        <span className="text-muted-foreground">sem alterações</span>
+                      )}
+                      {!item.semEnvio && estado && <span>{ROTULO_ANDAMENTO[estado]}</span>}
+                    </span>
+                    {!item.semEnvio && !estado && (
+                      <CaixasDeInfo partes={chipsDoPlano(item, modoCompleto)} />
                     )}
                     {estado && detalhes[item.aba] && (
                       <span
-                        className={`block ${estado === "sem_confirmacao" ? "text-falta-texto" : "text-muted-foreground"}`}
+                        className={
+                          estado === "sem_confirmacao"
+                            ? "text-falta-texto"
+                            : "text-muted-foreground"
+                        }
                       >
                         {detalhes[item.aba]}
                       </span>
                     )}
+                    {!estado &&
+                      !item.semEnvio &&
+                      item.avisos.slice(0, 3).map((aviso) => (
+                        <span key={aviso} className="text-muted-foreground">
+                          {aviso}
+                        </span>
+                      ))}
                   </li>
                 );
               })}
             </ul>
           )}
 
-          {detalhado && !bloqueado && (
-            <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
-              <span className="font-medium">Aba {plano.aba}</span>
-              <span>Dias: {plano.dias.map(diaCurto).join(", ")}</span>
-              <span>
-                {plano.resumo.preencher} a preencher · {plano.resumo.puladasOcupadas} ocupadas
-                ignoradas · {plano.resumo.puladasFormula} fórmulas protegidas
-              </span>
-              <span>
-                {plano.resumo.novasColunas} colunas novas · {plano.resumo.novosAlunos} alunos novos
-                {plano.resumo.sinalizar > 0
-                  ? ` · ${plano.resumo.sinalizar} situações de aluno`
-                  : ""}
-                {plano.resumo.vincular > 0
-                  ? ` · ${plano.resumo.vincular} linhas ganham o código do aluno`
-                  : ""}
-                {modoCompleto && plano.resumo.substituir > 0
-                  ? ` · ${plano.resumo.substituir} substituições`
-                  : ""}
-              </span>
-              {plano.sinalizar.length > 0 && (
-                <span className="text-muted-foreground">
-                  Nome na planilha:{" "}
-                  {plano.sinalizar
-                    .slice(0, 5)
-                    .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
-                    .join(", ")}
-                  {plano.sinalizar.length > 5 ? " ..." : ""}
-                </span>
-              )}
-              {plano.novasColunas.length > 0 && (
-                <span className="text-muted-foreground">
-                  Dias novos: {plano.novasColunas.map((coluna) => coluna.dia).join(", ")}
-                </span>
-              )}
-              {plano.substituir.length > 0 && (
-                <span className="text-falta-texto">
-                  Divergências:{" "}
-                  {plano.substituir
-                    .slice(0, 5)
-                    .map(
-                      (item) =>
-                        `${item.celula} ${item.anterior || "vazia"} para ${item.valor}${
-                          item.campo === "nome"
-                            ? " (nome)"
-                            : item.campo === "turma"
-                              ? " (turma)"
-                              : ""
-                        }`,
-                    )
-                    .join(", ")}
-                  {plano.substituir.length > 5 ? " ..." : ""}
-                </span>
-              )}
-              {plano.avisos.slice(0, 3).map((aviso) => (
-                <span key={aviso} className="text-muted-foreground">
-                  {aviso}
-                </span>
-              ))}
-            </div>
+          {temDetalhes && !enviou && plano && (
+            <details className="text-xs">
+              <summary className="text-muted-foreground cursor-pointer py-1">
+                Ver detalhes da prévia
+              </summary>
+              <div className="bg-secondary/40 mt-1 flex flex-col gap-1 rounded-lg px-3 py-2">
+                {plano.novasColunas.length > 0 && (
+                  <span>
+                    Dias novos: {plano.novasColunas.map((coluna) => coluna.dia).join(", ")}
+                  </span>
+                )}
+                {plano.sinalizar.length > 0 && (
+                  <span>
+                    Nome na planilha:{" "}
+                    {plano.sinalizar
+                      .slice(0, 5)
+                      .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
+                      .join(", ")}
+                    {plano.sinalizar.length > 5 ? " ..." : ""}
+                  </span>
+                )}
+                {plano.substituir.length > 0 && (
+                  <span className="text-falta-texto">
+                    Divergências:{" "}
+                    {plano.substituir
+                      .slice(0, 5)
+                      .map(
+                        (item) =>
+                          `${item.celula} ${item.anterior || "vazia"} para ${item.valor}${
+                            item.campo === "nome"
+                              ? " (nome)"
+                              : item.campo === "turma"
+                                ? " (turma)"
+                                : ""
+                          }`,
+                      )
+                      .join(", ")}
+                    {plano.substituir.length > 5 ? " ..." : ""}
+                  </span>
+                )}
+              </div>
+            </details>
           )}
+
+          <details className="text-sm">
+            <summary className="text-muted-foreground cursor-pointer py-1 text-xs">
+              Opções do envio
+            </summary>
+            <div className="mt-1 flex flex-col gap-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={criarColunas}
+                  disabled={enviando}
+                  onChange={(evento) => setCriarColunas(evento.target.checked)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                Criar colunas para dias sem coluna
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={novosAlunos}
+                  disabled={enviando}
+                  onChange={(evento) => setNovosAlunos(evento.target.checked)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                Acrescentar alunos sem linha
+              </label>
+              {modoCompleto && (
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={substituir}
+                    disabled={enviando}
+                    onChange={(evento) => setSubstituir(evento.target.checked)}
+                    className="size-4 accent-[var(--primary)]"
+                  />
+                  Atualizar divergências, nomes e turma atual
+                </label>
+              )}
+              {podeRemover && linhasRemoviveis.length > 0 && (
+                <fieldset className="flex flex-col gap-1.5" disabled={enviando}>
+                  <legend className="text-muted-foreground mb-1 text-xs">
+                    Remover alunos que saíram da turma
+                  </legend>
+                  {linhasRemoviveis.map((item) => (
+                    <label key={item.linha} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={removerMarcadas?.includes(item.linha) ?? false}
+                        onChange={(evento) => {
+                          const marcado = evento.target.checked;
+                          alterarRemocoes((atual) => ({
+                            ...atual,
+                            linhas: marcado
+                              ? [...atual.linhas, item.linha]
+                              : atual.linhas.filter((linha) => linha !== item.linha),
+                          }));
+                        }}
+                        className="size-4 accent-[var(--primary)]"
+                      />
+                      Remover {item.nome} (linha {item.linha})
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {podeRemover && colunasRemoviveis.length > 0 && (
+                <fieldset className="flex flex-col gap-1.5" disabled={enviando}>
+                  <legend className="text-muted-foreground mb-1 text-xs">
+                    Remover colunas de dia criadas pela integração
+                  </legend>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        alterarRemocoes((atual) => ({
+                          ...atual,
+                          colunas: colunasRemoviveis.map((item) => item.coluna),
+                        }))
+                      }
+                    >
+                      Marcar todas
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => alterarRemocoes((atual) => ({ ...atual, colunas: [] }))}
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {colunasRemoviveis.map((item) => (
+                      <label
+                        key={`coluna-${item.coluna}`}
+                        className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Remover coluna ${item.rotulo} (${item.letra})`}
+                          checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
+                          onChange={(evento) => {
+                            const marcado = evento.target.checked;
+                            alterarRemocoes((atual) => ({
+                              ...atual,
+                              colunas: marcado
+                                ? [...atual.colunas, item.coluna]
+                                : atual.colunas.filter((coluna) => coluna !== item.coluna),
+                            }));
+                          }}
+                          className="size-3.5 accent-[var(--primary)]"
+                        />
+                        {item.data ? diaCurto(item.data) : item.rotulo} ({item.letra})
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+            </div>
+          </details>
 
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
         </div>
