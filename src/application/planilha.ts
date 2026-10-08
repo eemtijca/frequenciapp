@@ -752,6 +752,9 @@ async function montarSimulacao(
   const rotuloDaTurma = (id: string) => turmas.find((turma) => turma.id === id)?.rotulo ?? "";
   const horarios = turmas.flatMap((turma) => turma.horarios);
   const completo = modoCompletoAtivo(linha);
+  if (!completo && (entrada.removerLinhas?.length || entrada.removerColunas?.length)) {
+    throw new ErroHttp("Libere o modo completo na Gestão antes de remover linhas ou colunas.", 409);
+  }
   const modalidade = completo ? ("completo" as const) : ("conservador" as const);
   const opcoesBase = {
     modo: modalidade,

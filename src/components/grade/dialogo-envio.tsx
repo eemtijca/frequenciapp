@@ -125,7 +125,9 @@ export default function DialogoEnvio({
   const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
     {},
   );
-  const [somenteAlteradas, setSomenteAlteradas] = useState(true);
+  const [alcance, setAlcance] = useState<"pendentes" | "periodo" | null>(null);
+  // A correção manual precisa reler também linhas sem chamada pendente.
+  const somenteAlteradas = alcance ? alcance === "pendentes" : !(modoCompleto && !todas);
   const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
   const abaUnica = simulacao?.planos.length === 1 ? simulacao.planos[0]?.aba : undefined;
@@ -163,7 +165,6 @@ export default function DialogoEnvio({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
-    setSimulacao(null);
     setAndamento({});
     setDetalhes({});
     try {
@@ -175,9 +176,12 @@ export default function DialogoEnvio({
     }
   });
 
+  // A ação é estável; a chave acompanha as opções e as remoções selecionadas.
+  // Preserva a aba durante a releitura para manter o contexto dessas seleções.
+  const chaveDaPrevia = JSON.stringify(entradas());
   useEffect(() => {
     if (aberto) void simular();
-  }, [aberto, simular, somenteAlteradas]);
+  }, [aberto, simular, chaveDaPrevia]);
 
   // Uma requisição por aba: a falha de um mês não impede os demais envios.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
@@ -274,14 +278,14 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          <fieldset className="flex flex-col gap-1.5 text-sm" disabled={enviando}>
+          <fieldset className="flex flex-col gap-1.5 text-sm" disabled={enviando || carregando}>
             <legend className="sr-only">O que enviar</legend>
             <label className="flex items-start gap-2">
               <input
                 type="radio"
                 name="alcance-envio"
                 checked={somenteAlteradas}
-                onChange={() => setSomenteAlteradas(true)}
+                onChange={() => setAlcance("pendentes")}
                 className="mt-0.5 size-4 accent-[var(--primary)]"
               />
               <span>
@@ -296,7 +300,7 @@ export default function DialogoEnvio({
                 type="radio"
                 name="alcance-envio"
                 checked={!somenteAlteradas}
-                onChange={() => setSomenteAlteradas(false)}
+                onChange={() => setAlcance("periodo")}
                 className="mt-0.5 size-4 accent-[var(--primary)]"
               />
               <span>
@@ -340,12 +344,20 @@ export default function DialogoEnvio({
                 Atualizar divergências, nomes e turma atual
               </label>
             )}
+            {detalhado && plano.candidatosRemocaoLinhas.length > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {modoCompleto
+                  ? "Marque as linhas fora da turma para excluir. A exclusão remove também as frequências dessas linhas; confira primeiro a aba de destino."
+                  : "A exclusão de linhas exige liberar o modo completo na Gestão."}
+              </p>
+            )}
             {detalhado &&
               plano?.candidatosRemocaoLinhas.map((item) => (
                 <label key={item.linha} className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={removerMarcadas?.includes(item.linha) ?? false}
+                    disabled={!modoCompleto}
                     onChange={(evento) => {
                       const marcado = evento.target.checked;
                       setRemocoes((atuais) => {
@@ -372,6 +384,7 @@ export default function DialogoEnvio({
                   <input
                     type="checkbox"
                     checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
+                    disabled={!modoCompleto}
                     onChange={(evento) => {
                       const marcado = evento.target.checked;
                       setRemocoes((atuais) => {
@@ -413,10 +426,17 @@ export default function DialogoEnvio({
           )}
 
           {simulacao && !carregando && nadaAEnviar && (
-            <p className="bg-secondary/40 rounded-lg px-3 py-2 text-sm">
-              Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
-              inteiro, escolha a segunda opção.
-            </p>
+            <div className="bg-secondary/40 flex flex-col items-start gap-2 rounded-lg px-3 py-2 text-sm">
+              <p>
+                Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
+                inteiro, escolha a segunda opção.
+              </p>
+              {!todas && somenteAlteradas && (
+                <Button type="button" variant="outline" onClick={() => setAlcance("periodo")}>
+                  Conferir linhas da turma
+                </Button>
+              )}
+            </div>
           )}
 
           {simulacao && !carregando && !bloqueado && (!detalhado || enviou) && !nadaAEnviar && (
@@ -485,6 +505,15 @@ export default function DialogoEnvio({
                   ? ` · ${plano.resumo.substituir} substituições`
                   : ""}
               </span>
+              {modoCompleto &&
+                (plano.resumo.removerLinhas > 0 || plano.resumo.removerColunas > 0) && (
+                  <span className="text-falta-texto">
+                    Excluir: {plano.resumo.removerLinhas}{" "}
+                    {plano.resumo.removerLinhas === 1 ? "linha" : "linhas"} e{" "}
+                    {plano.resumo.removerColunas}{" "}
+                    {plano.resumo.removerColunas === 1 ? "coluna" : "colunas"}
+                  </span>
+                )}
               {plano.sinalizar.length > 0 && (
                 <span className="text-muted-foreground">
                   Nome na planilha:{" "}
@@ -527,7 +556,19 @@ export default function DialogoEnvio({
             </div>
           )}
 
-          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+          {erro && (
+            <div className="flex flex-col items-start gap-2">
+              <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void simular()}
+                disabled={carregando || enviando}
+              >
+                Repetir prévia
+              </Button>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
@@ -546,6 +587,7 @@ export default function DialogoEnvio({
               enviando ||
               carregando ||
               !simulacao ||
+              Boolean(erro) ||
               bloqueado ||
               !online ||
               (nadaAEnviar && !enviou)
