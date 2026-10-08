@@ -136,6 +136,10 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 
 ## Modo completo
 
+Na prévia de uma turma, o modo completo seleciona "O período inteiro" por padrão para conferir também as linhas de alunos que saíram da turma, mesmo sem chamadas pendentes. Ao marcar uma remoção ou mudar as opções, a prévia é recalculada e o envio aguarda a nova leitura; uma falha nessa leitura impede a confirmação do plano anterior. No modo conservador, "Conferir linhas da turma" abre essa conferência, mas a seleção de remoções permanece bloqueada até liberar o modo completo. Uma solicitação de remoção com a janela expirada é recusada, sem apresentar a exclusão como concluída.
+
+Depois de alterar a turma atual e a turma de origem em Gestão, Alunos, o envio passa a usar a nova origem. A linha antiga permanece até a remoção explícita: conferir o envio na aba de destino, liberar o modo completo, abrir Relatórios, Grade, selecionar a turma antiga e o mês, abrir "Enviar para a planilha", marcar "Remover" para a linha desejada e confirmar a prévia. Só linhas criadas pela integração são oferecidas; a exclusão inclui as frequências da linha. A alteração da origem reorganiza também o histórico no aplicativo, sem separar a transferência por data. Linhas manuais são conferidas diretamente no Google Planilhas.
+
 O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 
 - atualização de células divergentes, inclusive nome e turma atual do aluno encontrado pelo código da linha ou, antes do primeiro vínculo, pelo nome único;
