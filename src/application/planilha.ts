@@ -1240,6 +1240,8 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
       linhas: plano.removerLinhas.map((item) => item.linha).sort((a, b) => b - a),
     });
   }
+  // A ordenação é a última operação para preservar as coordenadas de escrita.
+  operacoes.push({ tipo: "ordenarAlunos", coluna: colunaAluno });
   return operacoes;
 }
 

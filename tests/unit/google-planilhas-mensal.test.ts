@@ -260,6 +260,35 @@ describe("identificação do mês da planilha", () => {
 });
 
 describe("preparação das abas mensais", () => {
+  it("ordena os nomes e grava o vínculo de cada aluno na mesma posição", async () => {
+    const { documento, celulas } = simularGoogle();
+    const alunos = [
+      { alunoId: ALUNO, nome: "QA Érica", turmaAtual: "1º A" },
+      { alunoId: "20000000-0000-4000-8000-000000000002", nome: "QA Ágata", turmaAtual: "1º A" },
+      { alunoId: "20000000-0000-4000-8000-000000000003", nome: "QA Bruna", turmaAtual: "1º A" },
+    ];
+    const resultado = await prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, alunos });
+    const aba = documento.sheets.find((item) => item.properties.title === resultado.aba);
+    if (!aba) throw new Error("Aba mensal ausente.");
+    expect(
+      celulas
+        .get(aba.properties.sheetId)
+        ?.slice(1)
+        .map((linha) => linha[0]),
+    ).toEqual(["QA Ágata", "QA Bruna", "QA Érica"]);
+    const vinculos = documento.developerMetadata?.filter(
+      (item) => item.metadataKey === "frequenciapp.aluno",
+    );
+    expect(vinculos).toHaveLength(3);
+    for (const [indice, aluno] of [alunos[1], alunos[2], alunos[0]].entries()) {
+      expect(vinculos?.[indice]).toMatchObject({
+        metadataValue: aluno?.alunoId,
+        location: { dimensionRange: { startIndex: indice + 1, endIndex: indice + 2 } },
+      });
+    }
+    expect(alunos[0]?.nome).toBe("QA Érica");
+  });
+
   it("cria dias úteis, lista e vínculos em um lote, preservando a aba antiga", async () => {
     const { documento, lotes } = simularGoogle();
     const anterior = structuredClone(documento.sheets[0]);
