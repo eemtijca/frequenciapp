@@ -187,9 +187,9 @@ export default function VistaPainel({
     const distribuicaoDaSerie = serieSelecionada
       ? (distribuicao.find((item) => item.serieId === serieSelecionada.id) ?? null)
       : null;
-    const turmasPendentes = serieSelecionada
-      ? cobertura.turmasPendentes.filter((turma) => turma.serieId === serieSelecionada.id)
-      : cobertura.turmasPendentes;
+    const coberturaTurmas = serieSelecionada
+      ? cobertura.turmas.filter((item) => item.turma.serieId === serieSelecionada.id)
+      : cobertura.turmas;
     // A turma original aparece somente nas séries indicadas em Origem na Chamada.
     const porOrigem =
       serieSelecionada &&
@@ -199,8 +199,6 @@ export default function VistaPainel({
       )
         ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
         : null;
-    const coberturaRegistrados = distribuicaoDaSerie?.registrados ?? cobertura.registrados;
-    const coberturaEsperados = distribuicaoDaSerie?.esperados ?? cobertura.esperados;
     return carregandoPainel ? (
       <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
         <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
@@ -269,11 +267,7 @@ export default function VistaPainel({
           </div>
         )}
 
-        <IndicadorCobertura
-          registrados={coberturaRegistrados}
-          esperados={coberturaEsperados}
-          turmasPendentes={turmasPendentes}
-        />
+        <IndicadorCobertura turmas={coberturaTurmas} />
       </>
     );
   }
