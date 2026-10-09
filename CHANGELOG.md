@@ -16,6 +16,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada: o botão Desbloquear (ou Bloquear) passa para a linha do Resumo, à direita dele, e o quadro com "Chamada bloqueada" e a frase de apoio deixa de aparecer. A lógica do bloqueio e o rótulo acessível do botão não mudam.
+
 - Resumo do Painel concentra a infrequência do dia em um cartão e mostra Sem dados quando não há chamadas salvas. Cabeçalhos dos gráficos da escola e das séries deixam de repetir a quantidade de faltas já exibida nas roscas.
 
 - Relatórios e Chamada Parcial deixam de repetir títulos e explicações na tela; os títulos permanecem acessíveis a leitores de tela. Chamada Parcial remove a contagem duplicada de registros e pendências e o rodapé de conexão da planilha. A posição na faixa de gráficos passa a ser anunciada somente por leitores de tela.

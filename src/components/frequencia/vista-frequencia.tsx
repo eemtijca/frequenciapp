@@ -682,41 +682,6 @@ export default function VistaFrequencia({
               Voltar para hoje
             </button>
           )}
-          {revisaoSalva > 0 && (
-            <div
-              className="superficie-vidro flex items-center justify-between gap-3 px-3 py-2.5"
-              role="group"
-              aria-label="Bloqueio da chamada"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  {chamadaBloqueada ? "Chamada bloqueada" : "Edição liberada"}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {chamadaBloqueada
-                    ? "Desbloqueie para corrigir a frequência."
-                    : sujo
-                      ? "Salve ou descarte antes de bloquear."
-                      : "Ao salvar, a chamada será bloqueada."}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 shrink-0"
-                aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}`}
-                disabled={ocupado || (edicaoLiberada && sujo)}
-                onClick={() => {
-                  if (ocupado || (edicaoLiberada && sujo)) return;
-                  setEdicaoLiberada((atual) => !atual);
-                  setAulasAbertas(null);
-                }}
-              >
-                {chamadaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
-                {chamadaBloqueada ? "Desbloquear" : "Bloquear"}
-              </Button>
-            </div>
-          )}
           {sujo && (
             <p className="text-muted-foreground text-xs">
               Salve ou descarte as alterações para mudar a data ou a turma.
@@ -744,20 +709,39 @@ export default function VistaFrequencia({
             </p>
           )}
 
-          <Button
-            type="button"
-            variant="outline"
-            aria-expanded={resumoAberto}
-            aria-controls={idResumo}
-            onClick={() => setResumoAberto((atual) => !atual)}
-            className="vidro-selecionado self-start rounded-full px-4"
-          >
-            {tituloResumo}
-            <ChevronDown
-              aria-hidden="true"
-              className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
-            />
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              aria-expanded={resumoAberto}
+              aria-controls={idResumo}
+              onClick={() => setResumoAberto((atual) => !atual)}
+              className="vidro-selecionado rounded-full px-4"
+            >
+              {tituloResumo}
+              <ChevronDown
+                aria-hidden="true"
+                className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
+              />
+            </Button>
+            {revisaoSalva > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full px-4"
+                aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}`}
+                disabled={ocupado || (edicaoLiberada && sujo)}
+                onClick={() => {
+                  if (ocupado || (edicaoLiberada && sujo)) return;
+                  setEdicaoLiberada((atual) => !atual);
+                  setAulasAbertas(null);
+                }}
+              >
+                {chamadaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
+                {chamadaBloqueada ? "Desbloquear" : "Bloquear"}
+              </Button>
+            )}
+          </div>
 
           {(erro || conflito) &&
             (conflito ? (
