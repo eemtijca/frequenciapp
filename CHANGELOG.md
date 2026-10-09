@@ -16,6 +16,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Relatórios e Chamada Parcial deixam de repetir títulos e explicações na tela; os títulos permanecem acessíveis a leitores de tela. Chamada Parcial remove a contagem duplicada de registros e pendências e o rodapé de conexão da planilha. A posição na faixa de gráficos passa a ser anunciada somente por leitores de tela.
+
 - Cobertura do dia no Painel passa a usar progresso circular, contagem compacta de alunos e status com ícones; turmas pendentes ficam recolhidas e podem ser consultadas por toque. A instrução de deslizar fica exclusiva para leitores de tela, e o aviso repetido de chamada bloqueada sai do fim da lista.
 
 - Gráficos do Painel, Relatórios e diretores carregam Recharts sob demanda quando próximos da área visível; cartões fora de exibição aguardam a visita, com espaço reservado e falhas de download isoladas do restante da tela.

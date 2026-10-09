@@ -206,7 +206,6 @@ export default function VistaFrequenciaParcial({
       ),
     [listaAlunos, busca, filtro],
   );
-  const pendentes = registros.filter((registro) => !registro.registradoSeduc).length;
 
   useEffect(() => {
     onPendencia?.(sujo);
@@ -399,12 +398,7 @@ export default function VistaFrequenciaParcial({
       className="flex flex-col gap-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Chamada Parcial</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            A Chamada preenche a base. Ajuste dias, turnos e aulas para a Seduc.
-          </p>
-        </div>
+        <h1 className="sr-only">Chamada Parcial</h1>
         <Button
           type="button"
           variant="outline"
@@ -464,10 +458,6 @@ export default function VistaFrequenciaParcial({
           <ChevronRight size={18} />
         </Button>
       </div>
-      <p className="text-muted-foreground text-sm">
-        {registros.length} {registros.length === 1 ? "registro" : "registros"} · {pendentes}{" "}
-        {pendentes === 1 ? "pendente na Seduc" : "pendentes na Seduc"}
-      </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <BarraBusca
           id="parcial-busca"
@@ -641,11 +631,6 @@ export default function VistaFrequenciaParcial({
           <RefreshCw size={16} />
           Atualizar lista
         </Button>
-      )}
-      {!estadoPlanilha?.podeEnviar && (
-        <p className="text-muted-foreground text-xs">
-          A terceira planilha é conectada em Gestão, Configurações, Chamada Parcial.
-        </p>
       )}
       <DialogoFrequenciaParcial
         aberto={ativa && editorAberto}
