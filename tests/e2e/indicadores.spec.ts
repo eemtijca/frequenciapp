@@ -34,21 +34,50 @@ test("prepara fonte privada, configura agenda e abre o relatório sem expor nome
     .getByRole("button", { name: "Planilhas", exact: true })
     .click();
   const secao = page.locator('[data-secao="indicadores"]');
-  await expect(
-    secao.getByRole("button", { name: "Painel externo (Looker Studio)" }),
-  ).toHaveAttribute("aria-expanded", "false");
-  await secao.getByRole("button", { name: "Painel externo (Looker Studio)" }).click();
+  await expect(secao.getByRole("button", { name: "Painel externo", exact: true })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await secao.getByRole("button", { name: "Painel externo", exact: true }).click();
   await secao.getByRole("button", { name: "Preparar indicadores", exact: true }).click();
   await expect(secao.getByRole("link", { name: "Abrir planilha" })).toBeVisible();
   expect(google.ids()).toHaveLength(1);
   await secao.getByLabel("Ano dos indicadores").fill("2026");
   await secao
-    .getByLabel("Endereço do relatório")
+    .getByLabel("Endereço do painel")
     .fill("https://lookerstudio.google.com/reporting/QA_relatorio");
   await secao.getByRole("button", { name: "Salvar opções" }).click();
   await expect(secao.getByRole("link", { name: "Abrir painel" })).toHaveAttribute(
     "href",
     "https://lookerstudio.google.com/reporting/QA_relatorio",
+  );
+  await secao
+    .getByLabel("Endereço do painel")
+    .fill("https://analytics.zoho.com/workspace/123456789");
+  const recusa = page.waitForResponse(
+    (r) => r.url().endsWith("/api/indicadores") && r.request().method() === "PATCH",
+  );
+  await secao.getByRole("button", { name: "Salvar opções" }).click();
+  expect((await recusa).status()).toBe(400);
+  await expect(secao.getByRole("link", { name: "Abrir painel" })).toHaveAttribute(
+    "href",
+    "https://lookerstudio.google.com/reporting/QA_relatorio",
+  );
+  // A ação recarrega as opções após a recusa; aguarda o campo antes de trocar o serviço.
+  await expect(secao.getByLabel("Endereço do painel")).toHaveValue(
+    "https://lookerstudio.google.com/reporting/QA_relatorio",
+  );
+  const zoho = "https://analytics.zoho.com/workspace/123456789/view/987654321";
+  await secao.getByLabel("Endereço do painel").fill(zoho);
+  await secao.getByRole("button", { name: "Salvar opções" }).click();
+  await expect(secao.getByRole("link", { name: "Abrir painel" })).toHaveAttribute("href", zoho);
+  await expect(secao.getByRole("link", { name: "Abrir painel" })).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+  await expect(secao.getByRole("link", { name: "Abrir painel" })).toHaveAttribute(
+    "rel",
+    "noopener noreferrer",
   );
   await secao.getByRole("switch", { name: "Atualização automática" }).click();
   await expect(secao.getByRole("switch", { name: "Atualização automática" })).toBeChecked();
@@ -58,15 +87,19 @@ test("prepara fonte privada, configura agenda e abre o relatório sem expor nome
   ).toBeEnabled();
   await expect(secao.getByText(/Último envio:/)).toBeVisible();
   expect(google.ids()).toHaveLength(1);
-  await secao.getByText("Criar painel no Looker Studio", { exact: true }).click();
+  await secao.getByText("Conectar painel externo", { exact: true }).click();
   await expect(secao.getByText(/Compartilhe apenas com contas autorizadas/)).toBeVisible();
+  await expect(secao.getByRole("link", { name: "Zoho Analytics", exact: true })).toHaveAttribute(
+    "href",
+    "https://www.zoho.com/analytics/",
+  );
   const largura = await secao.evaluate((elemento) => ({
     conteudo: elemento.scrollWidth,
     tela: document.documentElement.clientWidth,
   }));
   expect(largura.conteudo).toBeLessThanOrEqual(largura.tela);
   await page.screenshot({
-    path: `docs/imagens/locais/looker-${test.info().project.name}.png`,
+    path: `docs/imagens/locais/painel-externo-${test.info().project.name}.png`,
     fullPage: true,
   });
 });

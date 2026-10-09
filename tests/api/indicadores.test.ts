@@ -92,6 +92,39 @@ describe("Indicadores externos", () => {
       ).status,
     ).toBe(400);
   });
+  it("salva o painel privado do Zoho, preserva o Looker e permite remover o endereço", async () => {
+    for (const urlRelatorio of [
+      "https://lookerstudio.google.com/reporting/QA_relatorio",
+      "https://analytics.zoho.com/workspace/123456789/view/987654321",
+    ]) {
+      const resposta = await chamar("/api/indicadores", "PATCH", { urlRelatorio });
+      expect(resposta.status).toBe(200);
+      expect(await resposta.json()).toMatchObject({ urlRelatorio });
+      expect((await estado()).urlRelatorio).toBe(urlRelatorio);
+    }
+    expect(google.ids()).toHaveLength(0);
+    expect((await chamar("/api/indicadores", "PATCH", { urlRelatorio: null })).status).toBe(200);
+    expect((await estado()).urlRelatorio).toBeNull();
+  });
+  it("recusa destinos externos e um workspace sem painel, preservando o endereço salvo", async () => {
+    const urlRelatorio = "https://analytics.zoho.com/workspace/123456789/view/987654321";
+    expect((await chamar("/api/indicadores", "PATCH", { urlRelatorio })).status).toBe(200);
+    for (const invalido of [
+      "https://analytics.zoho.com/workspace/123456789",
+      "https://analytics.zoho.com.externo.exemplo/workspace/123456789/view/987654321",
+      "http://analytics.zoho.com/workspace/123456789/view/987654321",
+      "https://conta:senha@analytics.zoho.com/workspace/123456789/view/987654321",
+    ]) {
+      expect((await chamar("/api/indicadores", "PATCH", { urlRelatorio: invalido })).status).toBe(
+        400,
+      );
+      expect((await estado()).urlRelatorio).toBe(urlRelatorio);
+    }
+    expect(
+      (await chamar("/api/indicadores", "PATCH", { urlRelatorio: null }, coordenacao)).status,
+    ).toBe(403);
+    expect((await estado()).urlRelatorio).toBe(urlRelatorio);
+  });
   it("permite repetir uma criação recusada de forma confirmada", async () => {
     google.recusarCriacao(true);
     expect((await chamar("/api/indicadores/preparar", "POST", {})).status).toBe(409);

@@ -1,6 +1,6 @@
 "use client";
 
-// Configuração compacta das fontes agregadas e do acesso externo ao Looker Studio.
+// Configuração compacta das fontes agregadas e do acesso a painéis externos privados.
 import { useCallback, useEffect, useState } from "react";
 import { ChartNoAxesCombined, ExternalLink, LoaderCircle } from "lucide-react";
 import type { EstadoIndicadores } from "@/domain/indicadores";
@@ -71,7 +71,7 @@ export default function SecaoIndicadores() {
   return (
     <SecaoRecolhivel
       dataSecao="indicadores"
-      titulo="Painel externo (Looker Studio)"
+      titulo="Painel externo"
       icone={ChartNoAxesCombined}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -113,11 +113,11 @@ export default function SecaoIndicadores() {
               <p className="text-muted-foreground text-xs">Vazio acompanha o ano atual.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="indicadores-relatorio">Endereço do relatório</Label>
+              <Label htmlFor="indicadores-relatorio">Endereço do painel</Label>
               <Input
                 id="indicadores-relatorio"
                 type="url"
-                placeholder="https://lookerstudio.google.com/reporting/..."
+                placeholder="Cole o link do painel"
                 value={relatorio}
                 disabled={ocupado}
                 onChange={(evento) => setRelatorio(evento.target.value)}
@@ -229,10 +229,19 @@ export default function SecaoIndicadores() {
             )}
           </div>
           <details className="rounded-2xl border p-3 text-sm">
-            <summary className="cursor-pointer font-medium">Criar painel no Looker Studio</summary>
+            <summary className="cursor-pointer font-medium">Conectar painel externo</summary>
             <ol className="mt-3 list-decimal space-y-2 pl-5">
               <li>
-                Prepare os indicadores e crie um relatório em{" "}
+                Prepare os indicadores e crie um painel no{" "}
+                <a
+                  className="text-primary underline"
+                  href="https://www.zoho.com/analytics/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Zoho Analytics
+                </a>{" "}
+                ou no{" "}
                 <a
                   className="text-primary underline"
                   href="https://lookerstudio.google.com/"
@@ -244,19 +253,17 @@ export default function SecaoIndicadores() {
                 .
               </li>
               <li>
-                Conecte a planilha FrequenciApp - Indicadores pelo conector Google Planilhas.
-                Adicione uma fonte para cada aba: Frequencia, Movimentacoes, Parciais e
-                Aulas_parciais.
+                Conecte a planilha FrequenciApp - Indicadores pelo conector Google Planilhas ou
+                Google Drive. Importe as abas Frequencia, Movimentacoes, Parciais e Aulas_parciais.
               </li>
               <li>
                 Inclua gráficos e filtros de data, série e turma. Compartilhe apenas com contas
-                autorizadas da gestão e salve o endereço do relatório acima.
+                autorizadas da gestão e salve o link direto do painel acima.
               </li>
             </ol>
             <p className="text-muted-foreground mt-3">
-              A agenda busca atualizar a planilha a cada cinco minutos. O Looker Studio mantém seu
-              próprio intervalo de atualização. Totais de grupos pequenos também exigem acesso
-              restrito.
+              A agenda busca atualizar a planilha a cada cinco minutos. Configure a atualização da
+              fonte também no serviço escolhido. Totais de grupos pequenos exigem acesso restrito.
             </p>
           </details>
         </>
