@@ -1,7 +1,7 @@
 // Painel: rolagem lateral entre escola, séries, período personalizado e desistentes.
 // Confere os recortes, teclado, gesto no celular e preservação do formulário.
 import { expect, test, type Page } from "@playwright/test";
-import { diaLocal, type Aluno, type Frequencia } from "@/domain/frequencia";
+import { diaLocal, mesSeguinte, nomeDoMes, type Aluno, type Frequencia } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
@@ -284,8 +284,13 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
     .toBeLessThan(12);
   // O Playwright não oferece roda do mouse no WebKit móvel.
   if (browserName === "chromium") {
+    // O resumo compacto cabe em telas altas; uma janela menor garante conteúdo para rolar.
+    await page.setViewportSize({ width: 360, height: 480 });
     const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
     const pagina = page.getByRole("group", { name: "Painel", exact: true });
+    await expect
+      .poll(() => pagina.evaluate((elemento) => elemento.scrollHeight - elemento.clientHeight))
+      .toBeGreaterThan(0);
     await pagina.evaluate((elemento) => elemento.scrollTo({ top: 0 }));
     await faixa.hover();
     await page.mouse.wheel(0, 200);
@@ -318,6 +323,77 @@ test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserNa
   await sessao.detach();
   await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
   await expect(page.getByRole("article")).toBeInViewport();
+});
+
+test.describe("infrequência do dia", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("distingue ausência de chamadas de zero faltas e calcula a taxa sobre chamadas salvas", async ({
+    page,
+  }) => {
+    const { alunos } = (await (await page.request.get("/api/alunos")).json()) as {
+      alunos: Aluno[];
+    };
+    const nomes = ["E2E Painel Remanejado 1", "E2E Painel Aluno 2", "E2E Painel Remanejado 2"];
+    const chamados = alunos.filter((aluno) => nomes.includes(aluno.nome));
+    expect(chamados).toHaveLength(3);
+    let estado: "vazio" | "falta" | "presenca" = "vazio";
+    await page.route("**/api/frequencias?dia=**", async (rota) => {
+      const dia = new URL(rota.request().url()).searchParams.get("dia") ?? "";
+      const frequencias: Frequencia[] =
+        estado === "vazio"
+          ? []
+          : chamados.map((aluno, indice) => ({
+              dia,
+              turmaId: aluno.turmaId,
+              alunos: [aluno.id],
+              revisao: 1,
+              atualizadoEm: `${dia}T12:00:00Z`,
+              atualizadoPorNome: null,
+              faltas:
+                estado === "falta" && indice === 0
+                  ? [{ alunoId: aluno.id, horarios: ["aula-sintetica"] }]
+                  : [],
+            }));
+      await rota.fulfill({ json: { frequencias } });
+    });
+    await page.setViewportSize({ width: 320, height: 780 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Painel", "painel");
+    const anterior = mesSeguinte(
+      diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza").slice(0, 7),
+      -1,
+    );
+    await page.locator("#dia-painel").click();
+    const calendario = page.getByRole("dialog", { name: "Dia do painel", exact: true });
+    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
+    await calendario
+      .getByRole("button", {
+        name: `1 de ${nomeDoMes(anterior).toLowerCase()} de ${anterior.slice(0, 4)}`,
+        exact: true,
+      })
+      .click();
+    const resumo = page.getByRole("group", { name: "Resumo do dia" });
+    await expect(resumo).toHaveAttribute("aria-busy", "false");
+    await expect(resumo.getByText("Sem dados", { exact: true })).toBeVisible();
+    await expect(resumo.getByText("0%", { exact: true })).toHaveCount(0);
+
+    estado = "falta";
+    await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(resumo.getByText("33,3%", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("article", { name: /: Toda a escola$/ }).getByText(/faltas \(F \+ FJ\)/),
+    ).toHaveCount(0);
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+
+    estado = "presenca";
+    await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(resumo.getByText("0%", { exact: true })).toBeVisible();
+    await expect(resumo.getByText("Sem dados", { exact: true })).toHaveCount(0);
+  });
 });
 
 test.describe("gráfico personalizado por período", () => {
