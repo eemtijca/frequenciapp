@@ -1193,11 +1193,12 @@ export default function VistaFrequencia({
               </ul>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">
-            {chamadaBloqueada
-              ? "Chamada salva e bloqueada. Desbloqueie para corrigir as marcações."
-              : "Toque de novo em um aluno marcado para voltar a presente. Escolha a justificativa para registrar falta justificada (FJ)."}
-          </p>
+          {!chamadaBloqueada && (
+            <p className="text-muted-foreground text-xs">
+              Toque de novo em um aluno marcado para voltar a presente. Escolha a justificativa para
+              registrar falta justificada (FJ).
+            </p>
+          )}
 
           <div
             aria-label="Barra de salvamento"

@@ -127,7 +127,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
           </Button>
         </div>
       </div>
-      <p id={ajudaId} className="text-muted-foreground text-xs lg:sr-only">
+      <p id={ajudaId} className="sr-only">
         Deslize para os lados para ver os gráficos. Com o teclado, use as setas esquerda e direita.
       </p>
       <div

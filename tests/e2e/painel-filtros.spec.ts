@@ -1,13 +1,16 @@
 // Painel: rolagem lateral entre escola, séries, período personalizado e desistentes.
 // Confere os recortes, teclado, gesto no celular e preservação do formulário.
 import { expect, test, type Page } from "@playwright/test";
-import type { Aluno, Frequencia } from "@/domain/frequencia";
+import { diaLocal, type Aluno, type Frequencia } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
+    await cliente.query(
+      "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome like 'E2E Painel %'))",
+    );
     await cliente.query("delete from alunos where nome like 'E2E Painel %'");
     await cliente.query(
       "delete from turmas where serie_id in (select id from series where nome like 'E2E Painel %')",
@@ -23,6 +26,7 @@ test.beforeAll(async () => {
   origemOriginal = await lerOrigem();
   const serieUm: string[] = [];
   await comBanco(async (cliente) => {
+    await cliente.query("insert into series (nome, ordem) values ('E2E Painel Vazio', 92)");
     for (const [indice, nome] of ["E2E Painel Um", "E2E Painel Dois"].entries()) {
       const serie = await cliente.query<{ id: string }>(
         "insert into series (nome, ordem) values ($1, $2) returning id",
@@ -74,6 +78,8 @@ test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo"
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /^E2E Painel (Um|Dois)$/ })).toHaveCount(0);
+  const escola = page.getByRole("article", { name: /: Toda a escola$/ });
+  await escola.locator("summary").click();
   await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
   await rolarAteGrafico(page, "E2E Painel Um");
@@ -97,6 +103,88 @@ test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo"
   await expect(page.getByRole("img", { name: "Desistentes por série" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Cobertura do dia" })).toHaveCount(0);
+});
+
+test("cobertura distingue chamadas pendentes, parciais, completas e série vazia", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  async function abrirSerie() {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Painel", "painel");
+    await rolarAteGrafico(page, "E2E Painel Dois");
+  }
+  async function salvarChamada(turma: string) {
+    await comBanco(async (cliente) => {
+      const chamada = await cliente.query<{ id: string; turma_id: string }>(
+        "insert into frequencias (turma_id,dia,atualizado_em) select t.id,$1,now() from turmas t join series s on s.id=t.serie_id where s.nome='E2E Painel Dois' and t.nome=$2 returning id,turma_id",
+        [hoje, turma],
+      );
+      await cliente.query(
+        "insert into alunos_chamada (frequencia_id,aluno_id) select $1,id from alunos where turma_id=$2",
+        [chamada.rows[0]?.id, chamada.rows[0]?.turma_id],
+      );
+    });
+  }
+  const cartao = page.getByRole("article", { name: /: E2E Painel Dois$/ });
+  const progresso = cartao.getByRole("progressbar", { name: "Alunos com chamada salva" });
+  try {
+    await page.setViewportSize({ width: 320, height: 780 });
+    await abrirSerie();
+    await expect(progresso).toHaveAttribute("aria-valuenow", "0");
+    await expect(progresso).toHaveAttribute("aria-valuetext", "0 de 2 alunos com chamada salva");
+    await expect(cartao.locator("summary")).toHaveText("2 turmas pendentes");
+    await expect(cartao.locator("span.bg-falta-fraca").first()).toBeHidden();
+    if (isMobile) await cartao.locator("summary").click();
+    else {
+      await cartao.locator("summary").focus();
+      await cartao.locator("summary").press("Enter");
+    }
+    await expect(cartao.locator("span.bg-falta-fraca")).toHaveText([
+      "E2E Painel Dois A",
+      "E2E Painel Dois B",
+    ]);
+    await expect(cartao.locator("span.bg-falta-fraca").first()).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+      .toBe(true);
+
+    await salvarChamada("A");
+    await abrirSerie();
+    await expect(progresso).toHaveAttribute("aria-valuenow", "50");
+    await expect(progresso).toHaveAttribute("aria-valuetext", "1 de 2 alunos com chamada salva");
+    await expect(cartao.locator("summary")).toHaveText("1 turma pendente");
+    await cartao.locator("summary").click();
+    await expect(cartao.locator("span.bg-falta-fraca")).toHaveText("E2E Painel Dois B");
+
+    await salvarChamada("B");
+    await abrirSerie();
+    await expect(progresso).toHaveAttribute("aria-valuenow", "100");
+    await expect(cartao.getByText("Concluída", { exact: true })).toBeVisible();
+    await expect(cartao.locator("summary")).toHaveCount(0);
+    await testInfo.attach("Cobertura concluída", {
+      body: await cartao.screenshot(),
+      contentType: "image/png",
+    });
+
+    await rolarAteGrafico(page, "E2E Painel Vazio");
+    const vazio = page.getByRole("article", { name: /: E2E Painel Vazio$/ });
+    await expect(vazio.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
+    await expect(vazio.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuetext",
+      "Nenhum aluno ativo cadastrado",
+    );
+    await expect(vazio.getByText("Sem alunos", { exact: true })).toBeVisible();
+    await expect(vazio.getByText("Concluída", { exact: true })).toHaveCount(0);
+  } finally {
+    await comBanco(async (cliente) => {
+      await cliente.query(
+        "delete from frequencias where turma_id in (select t.id from turmas t join series s on s.id=t.serie_id where s.nome='E2E Painel Dois')",
+      );
+    });
+  }
 });
 
 test("a faixa aceita teclado e mantém o cartão ao mudar a largura", async ({ page }) => {

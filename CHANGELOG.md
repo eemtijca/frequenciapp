@@ -16,6 +16,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Cobertura do dia no Painel passa a usar progresso circular, contagem compacta de alunos e status com ícones; turmas pendentes ficam recolhidas e podem ser consultadas por toque. A instrução de deslizar fica exclusiva para leitores de tela, e o aviso repetido de chamada bloqueada sai do fim da lista.
+
 - Gráficos do Painel, Relatórios e diretores carregam Recharts sob demanda quando próximos da área visível; cartões fora de exibição aguardam a visita, com espaço reservado e falhas de download isoladas do restante da tela.
 
 - Diálogo de envio à planilha (Relatórios, Grade, e Enviar todas as turmas na Gestão) mais enxuto: escolha de alcance em duas opções lado a lado, um único bloco por aba com os totais em caixas (sem zeros e com os dias resumidos), detalhes e opções recolhidos, e remoção de linhas e colunas sempre à vista (travada fora do modo completo), com as colunas de dia em caixas marcáveis (Marcar todas e Limpar).
