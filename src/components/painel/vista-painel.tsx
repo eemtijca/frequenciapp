@@ -34,6 +34,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
+import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
 
 interface Props {
   ativo: boolean;
@@ -279,38 +280,11 @@ export default function VistaPainel({
           </div>
         )}
 
-        <div className="superficie-vidro flex flex-col gap-3 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-medium">Cobertura do dia</h2>
-            <span className="numerais-tabulares text-muted-foreground text-sm">
-              {coberturaRegistrados} de {coberturaEsperados} alunos com chamada salva
-            </span>
-          </div>
-          {turmasPendentes.length > 0 ? (
-            <>
-              <p className="text-muted-foreground text-sm">
-                Falta salvar a chamada de {turmasPendentes.length}{" "}
-                {turmasPendentes.length === 1 ? "turma" : "turmas"}:
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {turmasPendentes.map((turma) => (
-                  <span
-                    key={turma.id}
-                    className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
-                  >
-                    {turma.rotulo}
-                  </span>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              {coberturaEsperados === 0
-                ? "Nenhum aluno ativo cadastrado."
-                : "Todas as turmas com alunos têm chamada salva neste dia."}
-            </p>
-          )}
-        </div>
+        <IndicadorCobertura
+          registrados={coberturaRegistrados}
+          esperados={coberturaEsperados}
+          turmasPendentes={turmasPendentes}
+        />
       </>
     );
   }

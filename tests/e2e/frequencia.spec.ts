@@ -91,6 +91,12 @@ test.describe("chamada com saída por aula", () => {
     await chips.nth(total - 1).click();
     await painel.getByRole("button", { name: "Salvar" }).click();
     await expect(painel.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+    await expect(
+      painel.getByRole("button", { name: /^Desbloquear chamada de E2E Ano A/ }),
+    ).toBeVisible();
+    await expect(
+      painel.getByText("Chamada salva e bloqueada. Desbloqueie para corrigir as marcações."),
+    ).toHaveCount(0);
     await expect(painel.getByText("saiu em parte das aulas").first()).toBeVisible({
       timeout: 15_000,
     });
