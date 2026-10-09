@@ -192,3 +192,18 @@ export interface EstadoIndicadores {
   criacaoPendente: boolean;
   agendaDisponivel: boolean;
 }
+
+/** Aceita somente visualizações HTTPS dos serviços suportados, sem credenciais na URL. */
+export function enderecoPainelPermitido(endereco: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endereco);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.port || url.username || url.password) return false;
+  if (url.hostname === "lookerstudio.google.com") return url.pathname.startsWith("/reporting/");
+  return (
+    url.hostname === "analytics.zoho.com" && /^\/workspace\/\d+\/view\/\d+\/?$/.test(url.pathname)
+  );
+}
