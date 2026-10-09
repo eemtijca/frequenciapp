@@ -4,15 +4,6 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
   diasDoMes,
   mesSeguinte,
   rotuloDataCurta,
@@ -32,7 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { ESTILO_TOOLTIP } from "@/components/diretor/grafico-alunos";
+import { GraficoEvolucao } from "@/components/graficos/graficos-sob-demanda";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { avisarErro } from "@/lib/avisos";
 
@@ -52,7 +43,6 @@ interface Props {
 }
 
 const percentual = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
-const EIXO = { fontSize: 11, fill: "var(--muted-foreground)" };
 
 export default function ResumoRelatorios({
   mes,
@@ -285,52 +275,7 @@ export default function ResumoRelatorios({
                 className="superficie-vidro min-w-0 p-4"
               >
                 <h3 className="font-semibold">Evolução no mês</h3>
-                <div
-                  role="img"
-                  aria-label="Infrequência por dia, em porcentagem. Valores disponíveis em Ver dados diários."
-                  className="mt-4 h-64 min-w-0"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={dados.evolucao}
-                      margin={{ top: 12, right: 12, bottom: 0, left: -12 }}
-                    >
-                      <CartesianGrid vertical={false} stroke="var(--border)" />
-                      <XAxis
-                        dataKey="rotulo"
-                        tick={EIXO}
-                        minTickGap={24}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        domain={[0, 100]}
-                        tickFormatter={(valor: number) => `${valor}%`}
-                        tick={EIXO}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        {...ESTILO_TOOLTIP}
-                        formatter={(valor: unknown) => [
-                          `${Number(valor).toLocaleString("pt-BR")}%`,
-                          "Infrequência",
-                        ]}
-                      />
-                      <Line
-                        dataKey="valor"
-                        name="Infrequência"
-                        type="linear"
-                        connectNulls={false}
-                        stroke="var(--chart-3)"
-                        strokeWidth={2}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                        isAnimationActive={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+                <GraficoEvolucao evolucao={dados.evolucao} />
                 <details className="mt-3 text-xs">
                   <summary className="text-primary cursor-pointer py-2 font-medium">
                     Ver dados diários

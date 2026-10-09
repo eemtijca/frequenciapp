@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import GraficoRosca from "@/components/painel/grafico-rosca";
+import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 
 interface Props {
   diaCorrente: string;

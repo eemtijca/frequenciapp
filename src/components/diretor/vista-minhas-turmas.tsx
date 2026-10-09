@@ -17,8 +17,7 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Selo } from "@/components/ui/selo";
-import GraficoAlunos from "@/components/diretor/grafico-alunos";
-import GraficoSemanas from "@/components/diretor/grafico-semanas";
+import { GraficoAlunos, GraficoSemanas } from "@/components/graficos/graficos-sob-demanda";
 
 interface Props {
   contexto: ContextoDiretor;

@@ -31,7 +31,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import GraficoRosca from "@/components/painel/grafico-rosca";
+import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 
