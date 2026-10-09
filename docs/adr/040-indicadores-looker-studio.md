@@ -22,6 +22,8 @@ Uma etapa independente do workflow existente atualiza as fontes a cada cinco min
 
 O relatório Looker Studio é criado e compartilhado pela gestão usando o conector nativo Google Planilhas, uma fonte por aba. O aplicativo fornece o guia, salva um endereço HTTPS validado e abre o painel externo. Não cria relatório público nem promete atualização em tempo real.
 
+O mesmo arquivo agregado pode alimentar um painel privado do Zoho Analytics. O aplicativo também aceita o link direto de uma visualização em `analytics.zoho.com`; o conector, a sincronização, as licenças e as permissões no Zoho são configurados pela gestão. Essa alternativa reaproveita o envio ao Google e não acrescenta credenciais ou chamadas à API do Zoho.
+
 ## Consequências
 
 Há uma nova migração e uma configuração administrativa recolhida. O painel depende da autorização Google e da agenda existente; falhas não bloqueiam registros escolares. O Looker mantém cache próprio. Agregados de saídas seguem a turma atual porque o modelo não guarda a turma histórica; frequências usam a lista histórica das chamadas, e aulas parciais contam apenas seleções explícitas. Um ano ativo de cada vez limita o volume e o custo. Apagar dados no app exige um envio posterior para remover a cópia externa, e arquivos exportados precisam de política própria de retenção.

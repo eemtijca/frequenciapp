@@ -1,9 +1,42 @@
 // Verifica a lista histórica, os agregados e a ausência de dados pessoais nas fontes externas.
 import { describe, expect, it } from "vitest";
-import { montarIndicadores, type ChamadaIndicador } from "@/domain/indicadores";
+import {
+  enderecoPainelPermitido,
+  montarIndicadores,
+  type ChamadaIndicador,
+} from "@/domain/indicadores";
 import { loteIndicadores } from "@/infra/google-indicadores";
 
 const turma = { nome: "A", serie: { nome: "QA Ano" } };
+describe("Endereços do painel externo", () => {
+  it.each([
+    "https://lookerstudio.google.com/reporting/QA_relatorio",
+    "https://lookerstudio.google.com/reporting/QA_relatorio/page/pagina?filtro=QA",
+    "https://analytics.zoho.com/workspace/123456789/view/987654321",
+    "https://analytics.zoho.com/workspace/123456789/view/987654321/?filtro=QA",
+  ])("aceita uma visualização suportada: %s", (url) => {
+    expect(enderecoPainelPermitido(url)).toBe(true);
+  });
+  it.each([
+    "endereco-invalido",
+    "javascript:alert(1)",
+    "http://analytics.zoho.com/workspace/123456789/view/987654321",
+    "https://analytics.zoho.com:8443/workspace/123456789/view/987654321",
+    "https://conta@analytics.zoho.com/workspace/123456789/view/987654321",
+    "https://conta:senha@lookerstudio.google.com/reporting/QA_relatorio",
+    "https://analytics.zoho.com.externo.exemplo/workspace/123456789/view/987654321",
+    "https://analytics.zoho.com@externo.exemplo/workspace/123456789/view/987654321",
+    "https://externo.exemplo/workspace/123456789/view/987654321",
+    "https://analytics.zoho.com/workspace/123456789",
+    "https://analytics.zoho.com/workspace/123456789/view/",
+    "https://analytics.zoho.com/workspace/QA/view/987654321",
+    "https://analytics.zoho.com/workspace/123456789/view/987654321/outro",
+    "https://analytics.zoho.com/open-view/987654321",
+    "https://lookerstudio.google.com/external/QA_relatorio",
+  ])("recusa endereço sem visualização válida: %s", (url) => {
+    expect(enderecoPainelPermitido(url)).toBe(false);
+  });
+});
 function chamada(): ChamadaIndicador {
   return {
     dia: "2026-10-05",

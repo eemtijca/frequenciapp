@@ -11,7 +11,11 @@ import {
 } from "@/infra/google-indicadores";
 import { comTravaPlanilha, type ControleTravaPlanilha } from "@/infra/trava-planilha";
 import { diaLocal } from "@/domain/frequencia";
-import { montarIndicadores, type EstadoIndicadores } from "@/domain/indicadores";
+import {
+  enderecoPainelPermitido,
+  montarIndicadores,
+  type EstadoIndicadores,
+} from "@/domain/indicadores";
 
 const chave = { namespace: 0x494e4449, recurso: 1 };
 function comTrava<T>(tarefa: (controle: ControleTravaPlanilha) => Promise<T>) {
@@ -62,23 +66,8 @@ const esquemaPreferencias = z
 export async function configurarIndicadores(entrada: unknown, usuarioId: string) {
   const dados = esquemaPreferencias.safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Confira as opções do painel de indicadores.", 400);
-  if (dados.data.urlRelatorio) {
-    let url: URL;
-    try {
-      url = new URL(dados.data.urlRelatorio);
-    } catch {
-      throw new ErroHttp("Informe um endereço válido do Looker Studio.", 400);
-    }
-    if (
-      url.protocol !== "https:" ||
-      url.hostname !== "lookerstudio.google.com" ||
-      url.port ||
-      url.username ||
-      url.password ||
-      !url.pathname.startsWith("/reporting/")
-    )
-      throw new ErroHttp("Informe o endereço HTTPS de um relatório do Looker Studio.", 400);
-  }
+  if (dados.data.urlRelatorio && !enderecoPainelPermitido(dados.data.urlRelatorio))
+    throw new ErroHttp("Informe o link HTTPS do painel no Zoho Analytics ou Looker Studio.", 400);
   return comTrava(async () => {
     const painel = await linha();
     if (dados.data.ativa && !painel.googlePlanilhaId)
