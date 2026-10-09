@@ -86,10 +86,17 @@ export function resumoDoDia(
 }
 
 /** Cobertura do dia: quanto do total já tem chamada salva e o que falta. */
+export interface CoberturaTurmaDia {
+  turma: Turma;
+  esperados: number;
+  concluida: boolean;
+}
+
 export interface CoberturaDia {
   esperados: number;
   registrados: number;
   turmasPendentes: Turma[];
+  turmas: CoberturaTurmaDia[];
 }
 
 export function coberturaDoDia(
@@ -98,14 +105,19 @@ export function coberturaDoDia(
   frequenciasDoDia: Frequencia[],
 ): CoberturaDia {
   const ativos = alunos.filter((aluno) => aluno.ativo);
-  const turmasComAlunos = turmas.filter((turma) =>
-    ativos.some((aluno) => aluno.turmaId === turma.id),
-  );
   const salvas = new Set(frequenciasDoDia.map((frequencia) => frequencia.turmaId));
+  const coberturaTurmas = turmas
+    .map((turma) => ({
+      turma,
+      esperados: ativos.filter((aluno) => aluno.turmaId === turma.id).length,
+      concluida: salvas.has(turma.id),
+    }))
+    .filter((item) => item.esperados > 0);
   return {
     esperados: ativos.length,
     registrados: ativos.filter((aluno) => salvas.has(aluno.turmaId)).length,
-    turmasPendentes: turmasComAlunos.filter((turma) => !salvas.has(turma.id)),
+    turmasPendentes: coberturaTurmas.filter((item) => !item.concluida).map((item) => item.turma),
+    turmas: coberturaTurmas,
   };
 }
 
