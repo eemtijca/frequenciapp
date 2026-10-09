@@ -78,12 +78,7 @@ export default function VistaRelatorios({
 
   return (
     <section aria-label="Relatórios" className="flex flex-col gap-4 pb-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Relatórios</h1>
-        <p className="text-muted-foreground text-sm">
-          Frequência, acompanhamento por aluno e movimentações por turma.
-        </p>
-      </div>
+      <h1 className="sr-only">Relatórios</h1>
 
       <AbasDeslizantes
         rotuloAcessivel="Relatórios"

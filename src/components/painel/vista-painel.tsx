@@ -1,7 +1,7 @@
 "use client";
 
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
-// e resumo de faltas, justificadas e saídas.
+// e destaque para a infrequência do dia.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import type {
@@ -214,17 +214,6 @@ export default function VistaPainel({
               <ChartPie size={18} className="text-muted-foreground" aria-hidden="true" />
               {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
             </h2>
-            <span className="text-muted-foreground text-xs">
-              {serieSelecionada && distribuicaoDaSerie
-                ? `${distribuicaoDaSerie.faltas + distribuicaoDaSerie.justificadas} `
-                : `${resumo.ausencias} `}
-              {(serieSelecionada && distribuicaoDaSerie
-                ? distribuicaoDaSerie.faltas + distribuicaoDaSerie.justificadas
-                : resumo.ausencias) === 1
-                ? "falta"
-                : "faltas"}{" "}
-              (F + FJ)
-            </span>
           </div>
           <GraficoRosca
             titulo={
@@ -340,45 +329,24 @@ export default function VistaPainel({
 
       <div
         role="group"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6"
+        className="superficie-vidro flex min-h-24 items-center justify-between gap-4 px-5 py-4"
         aria-label="Resumo do dia"
+        aria-busy={carregandoPainel}
       >
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.esperados}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Alunos</span>
-        </div>
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-primary text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.presentes}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Presentes</span>
-        </div>
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.ausencias}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Faltas (F + FJ)</span>
-        </div>
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.justificadas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Justificadas</span>
-        </div>
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : percentual.format(resumo.infrequencia)}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Infrequência</span>
-        </div>
-        <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-0.5 px-3 py-2">
-          <span className="numerais-tabulares text-2xl font-semibold">
-            {carregandoPainel ? "" : resumo.saidas}
-          </span>
-          <span className="text-muted-foreground text-xs font-medium">Saídas</span>
-        </div>
+        <h2 className="min-w-0 font-medium">Infrequência do dia</h2>
+        <span
+          className={
+            resumo.registrados > 0
+              ? "numerais-tabulares shrink-0 text-3xl font-semibold sm:text-4xl"
+              : "text-muted-foreground shrink-0 text-sm"
+          }
+        >
+          {carregandoPainel
+            ? ""
+            : resumo.registrados > 0
+              ? percentual.format(resumo.infrequencia)
+              : "Sem dados"}
+        </span>
       </div>
 
       <FaixaGraficos

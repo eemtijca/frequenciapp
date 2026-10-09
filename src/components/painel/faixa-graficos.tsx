@@ -200,13 +200,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
           </article>
         ))}
       </div>
-      <p
-        id={posicaoId}
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-        className="text-muted-foreground numerais-tabulares text-center text-xs"
-      >
+      <p id={posicaoId} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {atual + 1} de {cartoes.length} · {cartoes[atual]?.nome}
       </p>
     </section>
