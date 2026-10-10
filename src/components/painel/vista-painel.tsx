@@ -214,6 +214,7 @@ export default function VistaPainel({
             </h2>
           </div>
           <GraficoRosca
+            tomValores="falta"
             titulo={
               serieSelecionada
                 ? `Faltas do dia por turma da ${serieSelecionada.nome}`
@@ -224,12 +225,14 @@ export default function VistaPainel({
                 ? distribuicaoDaSerie.turmas.map((turma) => ({
                     nome: turma.rotulo,
                     valor: turma.faltas + turma.justificadas,
-                    detalhe: `${turma.registrados} de ${turma.esperados} com chamada`,
+                    alunos: turma.esperados,
+                    detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
                   }))
                 : distribuicao.map((item) => ({
                     nome: item.nome,
                     valor: item.faltas + item.justificadas,
-                    detalhe: `${item.registrados} de ${item.esperados} alunos`,
+                    alunos: item.esperados,
+                    detalhe: `${item.registrados} de ${item.esperados} alunos com chamada`,
                   }))
             }
             vazio={
@@ -252,11 +255,13 @@ export default function VistaPainel({
               </span>
             </div>
             <GraficoRosca
+              tomValores="falta"
               titulo={`Faltas do dia por turma original da ${serieSelecionada.nome}`}
               fatias={porOrigem.map((turma) => ({
                 nome: turma.rotulo,
                 valor: turma.faltas + turma.justificadas,
-                detalhe: `${turma.registrados} de ${turma.esperados} com chamada`,
+                alunos: turma.esperados,
+                detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
               }))}
               vazio={
                 frequenciasDoDia.length === 0

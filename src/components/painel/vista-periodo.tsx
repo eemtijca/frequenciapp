@@ -225,6 +225,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
             ))}
           </div>
           <GraficoRosca
+            tomValores="falta"
             titulo={
               serie ? `Faltas do período por turma da ${serie.nome}` : "Faltas do período por série"
             }

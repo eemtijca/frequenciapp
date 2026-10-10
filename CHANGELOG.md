@@ -20,6 +20,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Chamada: o botão Desbloquear (ou Bloquear) passa para a linha do Resumo, à direita dele, e o quadro com "Chamada bloqueada" e a frase de apoio deixa de aparecer. A lógica do bloqueio e o rótulo acessível do botão não mudam.
 
+- Legendas dos gráficos diários mostram apenas o total de alunos em uma caixa com cantos arredondados; a cobertura completa permanece no nome acessível e no detalhe por apontamento. Círculos de quantidade e distribuição das faltas recebem fundo vermelho do tema, também no gráfico personalizado.
+
 - Anel de cobertura das chamadas mostra uma fatia por turma com alunos ativos, proporcional ao tamanho da turma: verde para chamada salva e vermelho para pendente. Ao concluir todas, o anel fica inteiramente verde, sem divisões; o estado de cada turma também fica disponível para leitores de tela.
 
 - Resumo do Painel concentra a infrequência do dia em um cartão e mostra Sem dados quando não há chamadas salvas. Cabeçalhos dos gráficos da escola e das séries deixam de repetir a quantidade de faltas já exibida nas roscas.
