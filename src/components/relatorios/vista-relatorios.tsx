@@ -128,7 +128,7 @@ export default function VistaRelatorios({
                 mes={mes}
                 mesCorrente={mesCorrente}
                 hoje={diaCorrente}
-                aberto={ativa}
+                aberto={ativo && ativa}
                 versao={versao}
                 origens={turmas}
                 onMes={onMes}

@@ -3,7 +3,7 @@
 // Grade de frequência por turma de origem: modos dia, semana de aula,
 // período personalizado e mês; células P, F e FJ, saída no dia e coluna
 // acumulada (F + FJ) de todo o histórico.
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   ChevronLeft,
@@ -119,6 +119,7 @@ export default function VistaGrade({
     if (modo === "mes" || !aberto) return;
     const primeiro = dias[0] ?? diaBase;
     const ultimo = dias[dias.length - 1] ?? diaBase;
+    const controlador = new AbortController();
     let viva = true;
     async function buscar() {
       setCarregandoPeriodo(true);
@@ -126,6 +127,7 @@ export default function VistaGrade({
       try {
         const dados = await pedir<{ frequencias: Frequencia[] }>(
           `/api/frequencias?de=${primeiro}&ate=${ultimo}`,
+          { signal: controlador.signal },
         );
         if (viva) setDoPeriodo(dados.frequencias);
       } catch (excecao) {
@@ -142,6 +144,7 @@ export default function VistaGrade({
     void buscar();
     return () => {
       viva = false;
+      controlador.abort();
     };
   }, [aberto, modo, dias, diaBase, versao, recarga]);
 
@@ -162,9 +165,15 @@ export default function VistaGrade({
     );
   }, [alunos, turmaEfetiva, frequenciasDoPeriodo, dias, origens]);
 
-  const termo = normalizar(busca);
-  const linhas = grade.linhas.filter(
-    (linha) => termo === "" || normalizar(linha.aluno.nome).includes(termo),
+  const nomes = useMemo(
+    () => new Map(grade.linhas.map((linha) => [linha.aluno.id, normalizar(linha.aluno.nome)])),
+    [grade.linhas],
+  );
+  const termo = useDeferredValue(normalizar(busca));
+  const linhas = useMemo(
+    () =>
+      grade.linhas.filter((linha) => termo === "" || nomes.get(linha.aluno.id)?.includes(termo)),
+    [grade.linhas, nomes, termo],
   );
 
   const acumuladoDe = useMemo(() => {
@@ -195,6 +204,113 @@ export default function VistaGrade({
   }, [origens]);
 
   const [downloadAberto, setDownloadAberto] = useState(false);
+
+  // As células não são reconstruídas enquanto o campo de busca recebe a digitação.
+  const tabela = useMemo(
+    () => (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <caption className="sr-only">
+            Frequência dos alunos da turma original {rotuloDe(turmaEfetiva)} no período
+          </caption>
+          <thead>
+            <tr className="border-b">
+              <th
+                scope="col"
+                className="coluna-fixa bg-card text-muted-foreground min-w-36 border-r px-3 py-2 text-left text-xs font-medium"
+              >
+                Aluno
+              </th>
+              {grade.dias.map((dia) => (
+                <th
+                  key={dia}
+                  scope="col"
+                  className={`numerais-tabulares w-8 border-l px-1 py-2 text-center text-[11px] font-medium ${
+                    dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  {mesmoMes(dia, grade.dias) ? dia.slice(8) : dataCurta(dia)}
+                </th>
+              ))}
+              <th
+                scope="col"
+                title="Faltas totais (F + FJ) de todo o histórico"
+                className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
+              >
+                Total
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map((linha) => (
+              <tr key={linha.aluno.id} className="border-b last:border-b-0">
+                <th
+                  scope="row"
+                  className="coluna-fixa bg-card max-w-44 truncate border-r px-3 py-1.5 text-left font-normal"
+                >
+                  <span className="block truncate text-sm">{linha.aluno.nome}</span>
+                  <span className="text-muted-foreground block truncate text-[10px]">
+                    atual {turmaAtualDe(linha.aluno.turmaId)}
+                  </span>
+                </th>
+                {grade.dias.map((dia) => {
+                  const marca = linha.marcas[dia];
+                  return (
+                    <td
+                      key={dia}
+                      className={`border-l px-1 py-1.5 text-center ${
+                        dia === hoje ? "bg-primary/5" : ""
+                      }`}
+                    >
+                      {marca === "F" || marca === "FJ" ? (
+                        <span
+                          className={
+                            marca === "FJ"
+                              ? "border-justificada text-justificada-texto inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
+                              : "bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
+                          }
+                          role="img"
+                          aria-label={`${linha.aluno.nome} com ${
+                            marca === "FJ" ? "falta justificada" : "falta"
+                          } em ${dia}`}
+                        >
+                          {marca}
+                        </span>
+                      ) : marca === "S" ? (
+                        <span
+                          className="border-falta text-falta-texto inline-flex size-5 items-center justify-center rounded-[4px] border text-[10px] font-bold"
+                          role="img"
+                          aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
+                        >
+                          S
+                        </span>
+                      ) : marca === "P" ? (
+                        <span
+                          className="bg-primary/60 inline-flex size-1.5 rounded-full"
+                          role="img"
+                          aria-label={`${linha.aluno.nome} presente em ${dia}`}
+                        />
+                      ) : (
+                        <span
+                          className="text-muted-foreground/50 text-[10px]"
+                          role="img"
+                          aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
+                  {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ),
+    [linhas, grade.dias, rotuloDe, turmaEfetiva, hoje, turmaAtualDe, acumuladoDe],
+  );
 
   // A busca da tela não interfere: a planilha leva todos os alunos ativos.
   function prepararPlanilha() {
@@ -412,106 +528,7 @@ export default function VistaGrade({
               Nenhum aluno encontrado para esta busca.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <caption className="sr-only">
-                  Frequência dos alunos da turma original {rotuloDe(turmaEfetiva)} no período
-                </caption>
-                <thead>
-                  <tr className="border-b">
-                    <th
-                      scope="col"
-                      className="coluna-fixa bg-card text-muted-foreground min-w-36 border-r px-3 py-2 text-left text-xs font-medium"
-                    >
-                      Aluno
-                    </th>
-                    {grade.dias.map((dia) => (
-                      <th
-                        key={dia}
-                        scope="col"
-                        className={`numerais-tabulares w-8 border-l px-1 py-2 text-center text-[11px] font-medium ${
-                          dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                        }`}
-                      >
-                        {mesmoMes(dia, grade.dias) ? dia.slice(8) : dataCurta(dia)}
-                      </th>
-                    ))}
-                    <th
-                      scope="col"
-                      title="Faltas totais (F + FJ) de todo o histórico"
-                      className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
-                    >
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linhas.map((linha) => (
-                    <tr key={linha.aluno.id} className="border-b last:border-b-0">
-                      <th
-                        scope="row"
-                        className="coluna-fixa bg-card max-w-44 truncate border-r px-3 py-1.5 text-left font-normal"
-                      >
-                        <span className="block truncate text-sm">{linha.aluno.nome}</span>
-                        <span className="text-muted-foreground block truncate text-[10px]">
-                          atual {turmaAtualDe(linha.aluno.turmaId)}
-                        </span>
-                      </th>
-                      {grade.dias.map((dia) => {
-                        const marca = linha.marcas[dia];
-                        return (
-                          <td
-                            key={dia}
-                            className={`border-l px-1 py-1.5 text-center ${
-                              dia === hoje ? "bg-primary/5" : ""
-                            }`}
-                          >
-                            {marca === "F" || marca === "FJ" ? (
-                              <span
-                                className={
-                                  marca === "FJ"
-                                    ? "border-justificada text-justificada-texto inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
-                                    : "bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
-                                }
-                                role="img"
-                                aria-label={`${linha.aluno.nome} com ${
-                                  marca === "FJ" ? "falta justificada" : "falta"
-                                } em ${dia}`}
-                              >
-                                {marca}
-                              </span>
-                            ) : marca === "S" ? (
-                              <span
-                                className="border-falta text-falta-texto inline-flex size-5 items-center justify-center rounded-[4px] border text-[10px] font-bold"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
-                              >
-                                S
-                              </span>
-                            ) : marca === "P" ? (
-                              <span
-                                className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} presente em ${dia}`}
-                              />
-                            ) : (
-                              <span
-                                className="text-muted-foreground/50 text-[10px]"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
-                              />
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
-                        {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            tabela
           )}
           <div className="text-muted-foreground flex flex-wrap items-center gap-4 border-t px-4 py-2.5 text-xs">
             <span className="flex items-center gap-1.5">

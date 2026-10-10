@@ -1,7 +1,7 @@
 "use client";
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import type {
   Aluno,
@@ -56,6 +56,8 @@ interface Previa {
   avisos: string[];
   criar: { nome: string; linha: number }[];
 }
+
+const OPCOES_MOMENTO = MOMENTOS_SAIDA.map((item) => ({ valor: item.codigo, rotulo: item.rotulo }));
 
 export default function VistaEntradas({
   diaCorrente,
@@ -141,9 +143,51 @@ export default function VistaEntradas({
       }
     });
   const dadosEnvio = { de: dia, ate: dia, ...(turma ? { turmaId: turma } : {}) };
-  const opcoesResponsavel = liberadores
-    .filter((item) => item.ativo)
-    .map((item) => ({ valor: item.codigo, rotulo: item.rotulo }));
+  const opcoesResponsavel = useMemo(
+    () =>
+      liberadores
+        .filter((item) => item.ativo)
+        .map((item) => ({ valor: item.codigo, rotulo: item.rotulo })),
+    [liberadores],
+  );
+  const opcoesJustificativa = useMemo(
+    () =>
+      catalogoJustificativas
+        .filter((item) => item.ativo)
+        .map((item) => ({
+          valor: item.codigo,
+          rotulo: `${item.codigo} · ${item.rotulo}`,
+        })),
+    [catalogoJustificativas],
+  );
+  const turmasPorId = useMemo(
+    () => new Map(turmas.map((item) => [item.id, item.rotulo])),
+    [turmas],
+  );
+  const opcoesTurma = useMemo(() => {
+    const comAlunos = new Set(alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaId));
+    return [
+      { valor: "todas", rotulo: "Todas as turmas" },
+      ...turmas
+        .filter((item) => comAlunos.has(item.id))
+        .map((item) => ({ valor: item.id, rotulo: item.rotulo })),
+    ];
+  }, [alunos, turmas]);
+  const opcoesAluno = useMemo(
+    () =>
+      alunos
+        .filter(
+          (item) =>
+            item.ativo &&
+            (!item.desistenteEm || item.desistenteEm > dia) &&
+            (!turma || item.turmaId === turma),
+        )
+        .map((item) => ({
+          valor: item.id,
+          rotulo: `${item.nome} · ${turmasPorId.get(item.turmaId) ?? ""}`,
+        })),
+    [alunos, dia, turma, turmasPorId],
+  );
   function escolherDia(valor: string) {
     setDia(valor);
     setPrevia(null);
@@ -231,12 +275,7 @@ export default function VistaEntradas({
               setErro("");
               setAlunoId("");
             }}
-            opcoes={[
-              { valor: "todas", rotulo: "Todas as turmas" },
-              ...turmas
-                .filter((item) => alunos.some((aluno) => aluno.ativo && aluno.turmaId === item.id))
-                .map((item) => ({ valor: item.id, rotulo: item.rotulo })),
-            ]}
+            opcoes={opcoesTurma}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -247,17 +286,7 @@ export default function VistaEntradas({
             onValueChange={setAlunoId}
             disabled={executando}
             buscavel
-            opcoes={alunos
-              .filter(
-                (item) =>
-                  item.ativo &&
-                  (!item.desistenteEm || item.desistenteEm > dia) &&
-                  (!turma || item.turmaId === turma),
-              )
-              .map((item) => ({
-                valor: item.id,
-                rotulo: `${item.nome} · ${turmas.find((t) => t.id === item.turmaId)?.rotulo ?? ""}`,
-              }))}
+            opcoes={opcoesAluno}
             placeholder="Selecione o aluno"
           />
         </div>
@@ -269,7 +298,7 @@ export default function VistaEntradas({
             disabled={executando}
             onValueChange={setMomento}
             placeholder="Selecione a aula ou pausa"
-            opcoes={MOMENTOS_SAIDA.map((item) => ({ valor: item.codigo, rotulo: item.rotulo }))}
+            opcoes={OPCOES_MOMENTO}
           />
         </div>
         <div className="flex flex-col gap-1.5 sm:max-w-xs">
@@ -340,12 +369,7 @@ export default function VistaEntradas({
                   disabled={executando}
                   onValueChange={setJustificativa}
                   placeholder="Selecione a justificativa"
-                  opcoes={catalogoJustificativas
-                    .filter((item) => item.ativo)
-                    .map((item) => ({
-                      valor: item.codigo,
-                      rotulo: `${item.codigo} · ${item.rotulo}`,
-                    }))}
+                  opcoes={opcoesJustificativa}
                 />
               </div>
               <div className="flex flex-col gap-1.5">

@@ -358,7 +358,10 @@ export default function VistaFrequencia({
       ),
     [ativosDaTurma, dia],
   );
-  const participantes = ativosDaTurma.filter((aluno) => !desistentesDaTurma.has(aluno.id));
+  const participantes = useMemo(
+    () => ativosDaTurma.filter((aluno) => !desistentesDaTurma.has(aluno.id)),
+    [ativosDaTurma, desistentesDaTurma],
+  );
 
   const mostrarOrigem = exibirOrigemNaChamada(configuracoes, turma);
   const rotuloCurtoDe = useMemo(() => {
@@ -392,22 +395,38 @@ export default function VistaFrequencia({
     [catalogoJustificativas],
   );
 
-  const contagemFaltas = participantes.filter((aluno) => ausencias.has(aluno.id)).length;
-  const contagemJustificadas = participantes.filter((aluno) => justificativas.has(aluno.id)).length;
+  const { contagemFaltas, contagemJustificadas, contagemParciais } = useMemo(() => {
+    let contagemFaltas = 0;
+    let contagemJustificadas = 0;
+    let contagemParciais = 0;
+    for (const aluno of participantes) {
+      if (ausencias.has(aluno.id)) contagemFaltas += 1;
+      if (justificativas.has(aluno.id)) contagemJustificadas += 1;
+      const marcadas = ausencias.get(aluno.id)?.size ?? 0;
+      if (marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length)
+        contagemParciais += 1;
+    }
+    return { contagemFaltas, contagemJustificadas, contagemParciais };
+  }, [participantes, ausencias, justificativas, aulasDoDia.length]);
   const contagemPresencas = participantes.length - contagemFaltas;
-  const contagemParciais = participantes.filter((aluno) => {
-    const marcadas = ausencias.get(aluno.id)?.size ?? 0;
-    return marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
-  }).length;
+
+  const nomesParaBusca = useMemo(
+    () => new Map(ativosDaTurma.map((aluno) => [aluno.id, normalizar(aluno.nome)])),
+    [ativosDaTurma],
+  );
+  const origensParaBusca = useMemo(
+    () => new Map(turmas.map((item) => [item.id, normalizar(item.rotulo)])),
+    [turmas],
+  );
 
   const visiveis = useMemo(() => {
     const termo = normalizar(busca);
     return ativosDaTurma.filter((aluno) => {
-      const origem = rotuloOrigemDe(aluno.turmaOriginalId);
+      const origem = origensParaBusca.get(aluno.turmaOriginalId) ?? "";
       const combinaBusca =
         termo === "" ||
-        normalizar(aluno.nome).includes(termo) ||
-        (origem !== "" && normalizar(origem).includes(termo));
+        (nomesParaBusca.get(aluno.id) ?? "").includes(termo) ||
+        (origem !== "" && origem.includes(termo));
       const combinaFiltro =
         filtro === "todos" ||
         (!desistentesDaTurma.has(aluno.id) &&
@@ -416,7 +435,16 @@ export default function VistaFrequencia({
             (filtro === "presentes" && !ausencias.has(aluno.id))));
       return combinaBusca && combinaFiltro;
     });
-  }, [ativosDaTurma, busca, filtro, ausencias, justificativas, rotuloOrigemDe, desistentesDaTurma]);
+  }, [
+    ativosDaTurma,
+    busca,
+    filtro,
+    ausencias,
+    justificativas,
+    nomesParaBusca,
+    origensParaBusca,
+    desistentesDaTurma,
+  ]);
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
   const ocupado = carregando || salvando || conflito;

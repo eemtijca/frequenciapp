@@ -152,11 +152,15 @@ export default function VistaSaidas({
     [compartilhado, dia, saidas, doDia],
   );
 
-  const turmasComAlunos = useMemo(
-    () =>
-      turmas.filter((turma) => alunos.some((aluno) => aluno.ativo && aluno.turmaId === turma.id)),
-    [alunos, turmas],
-  );
+  const opcoesTurma = useMemo(() => {
+    const comAlunos = new Set(alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaId));
+    return [
+      { valor: "", rotulo: "Todas as turmas" },
+      ...turmas
+        .filter((turma) => comAlunos.has(turma.id))
+        .map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
+    ];
+  }, [alunos, turmas]);
 
   const alunosFiltrados = useMemo(() => {
     return alunos
@@ -168,6 +172,14 @@ export default function VistaSaidas({
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
   }, [alunos, turmaFiltro, rotuloTurma]);
+  const opcoesAluno = useMemo(
+    () =>
+      alunosFiltrados.map((aluno) => ({
+        valor: aluno.id,
+        rotulo: `${aluno.nome} · ${rotuloTurma(aluno.turmaId)}`,
+      })),
+    [alunosFiltrados, rotuloTurma],
+  );
 
   function partesDaSaida(saida: SaidaAntecipada, turma: string): string[] {
     const partes = partesJustificativaSaida(saida, catalogoJustificativas);
@@ -331,10 +343,7 @@ export default function VistaSaidas({
             value={turmaFiltro}
             onValueChange={setTurmaFiltro}
             placeholder="Todas as turmas"
-            opcoes={[
-              { valor: "", rotulo: "Todas as turmas" },
-              ...turmasComAlunos.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-            ]}
+            opcoes={opcoesTurma}
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -345,10 +354,7 @@ export default function VistaSaidas({
             onValueChange={setAlunoId}
             buscavel
             placeholder="Selecione o aluno"
-            opcoes={alunosFiltrados.map((aluno) => ({
-              valor: aluno.id,
-              rotulo: `${aluno.nome} · ${rotuloTurma(aluno.turmaId)}`,
-            }))}
+            opcoes={opcoesAluno}
           />
         </div>
         <div className="flex flex-col gap-1.5 sm:max-w-xs">

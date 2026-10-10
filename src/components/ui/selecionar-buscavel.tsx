@@ -27,10 +27,16 @@ export function SelecionarBuscavel({
   const lista = useRef<HTMLDivElement>(null);
   const idPainel = useId();
   const idLista = `${idPainel}-opcoes`;
+  const opcoesNormalizadas = useMemo(
+    () => opcoes.map((opcao) => ({ opcao, texto: normalizar(opcao.rotulo) })),
+    [opcoes],
+  );
   const filtradas = useMemo(() => {
     const alvo = normalizar(termo.trim());
-    return alvo ? opcoes.filter((opcao) => normalizar(opcao.rotulo).includes(alvo)) : opcoes;
-  }, [opcoes, termo]);
+    return alvo
+      ? opcoesNormalizadas.filter(({ texto }) => texto.includes(alvo)).map(({ opcao }) => opcao)
+      : opcoes;
+  }, [opcoes, opcoesNormalizadas, termo]);
   const indice = Math.max(0, Math.min(indiceAtivo, filtradas.length - 1));
   const opcaoAtiva = filtradas[indice];
   const selecionada = opcoes.find((opcao) => opcao.valor === value);
@@ -60,12 +66,22 @@ export function SelecionarBuscavel({
   useEffect(() => {
     if (!aberto) return;
     // Mantém a âncora na área visível quando o teclado reduz a altura da tela.
-    const reposicionar = () => gatilho.current?.scrollIntoView({ block: "nearest" });
+    // Os dois eventos do teclado compartilham um único ajuste por quadro.
+    let quadro: number | undefined;
+    const areaVisivel = window.visualViewport;
+    const reposicionar = () => {
+      if (quadro !== undefined) return;
+      quadro = window.requestAnimationFrame(() => {
+        quadro = undefined;
+        gatilho.current?.scrollIntoView({ block: "nearest" });
+      });
+    };
     window.addEventListener("resize", reposicionar);
-    window.visualViewport?.addEventListener("resize", reposicionar);
+    areaVisivel?.addEventListener("resize", reposicionar);
     return () => {
+      if (quadro !== undefined) window.cancelAnimationFrame(quadro);
       window.removeEventListener("resize", reposicionar);
-      window.visualViewport?.removeEventListener("resize", reposicionar);
+      areaVisivel?.removeEventListener("resize", reposicionar);
     };
   }, [aberto]);
 
