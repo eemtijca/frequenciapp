@@ -32,6 +32,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `credenciais_diretor`         | Ciclo de vida da palavra-chave do diretor: emissão, validade, primeiro uso e revogação.          |
 | `parametros_acesso`           | Linha única com validade, sessão do diretor, limites de entrada, categorias e risco.             |
 | `tentativas_entrada`          | Contador de tentativas por chave, compartilhado entre instâncias.                                |
+| `feriados`                    | Calendário anual da escola: data, nome e origem manual ou importada.                             |
 
 Restrições de integridade relevantes:
 

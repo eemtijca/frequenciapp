@@ -70,6 +70,7 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 - O runtime usa somente `DATABASE_URL`; opcionais de script são consumidos pelos comandos operacionais.
 - `.env` fora do controle de versão; `.env.example` documenta sem valores.
 - A integração OAuth com Google Planilhas guarda o token de atualização cifrado no banco, fora da cópia JSON. O segredo do cliente OAuth fica no servidor; a chave pública do Picker é restrita a sites e à API no projeto Cloud. As três finalidades usam somente OAuth e Sheets API.
+- `FERIADOS_API_TOKEN` é opcional e fica somente no servidor. A sincronização envia o ano e, se configurados, a UF ou o código IBGE. Não envia alunos, frequências nem senhas, não segue redirecionamento e não registra o token. Repetir a gravação exige a senha do administrador e uma prova de dez minutos ligada à conta e ao ano.
 
 ## Integração com Google Planilhas
 
