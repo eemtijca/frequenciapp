@@ -6,6 +6,8 @@ O FrequenciApp é um processo Node único com página, rotas de API e service wo
 
 Antes de publicar a versão com feriados, aplicar `20261010124500_calendario_feriados` no banco ou schema do ambiente de destino, usando `npx prisma migrate deploy` com a `DIRECT_URL` já configurada. A migração cria a tabela do calendário, com data, nome e autoria, sem mudar chamadas existentes. Gerar o cliente Prisma ou concluir o build da Vercel não aplica essa migração. Na produção, conferir a execução do workflow de migrações antes de servir a nova versão; cada Preview também precisa estar migrado em seu próprio schema.
 
+A sincronização com a base de feriados exige também `20261010183000_origem_feriado`. Essa migração acrescenta a origem do feriado, com padrão manual, sem alterar chamadas nem datas já cadastradas. `FERIADOS_API_TOKEN` é opcional e fica somente no servidor. Sem o token, o botão de sincronização permanece desligado.
+
 ## Docker Compose local
 
 ```bash

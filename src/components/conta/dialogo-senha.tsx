@@ -25,6 +25,7 @@ import {
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
+  onDevolverFoco?: () => void;
   /** Troca a palavra-chave do diretor de turma, com os rótulos dela. */
   palavraChave?: boolean;
   /** Troca obrigatória: sem cancelar, e o diálogo não fecha sozinho. */
@@ -38,6 +39,7 @@ export default function DialogoSenha({
   palavraChave = false,
   obrigatoria = false,
   onTrocada,
+  onDevolverFoco,
 }: Props) {
   const termo = palavraChave ? "palavra-chave" : "senha";
   const Termo = palavraChave ? "Palavra-chave" : "Senha";
@@ -87,7 +89,18 @@ export default function DialogoSenha({
 
   return (
     <Dialog open={aberto} onOpenChange={fechar}>
-      <DialogContent className="max-w-sm" showCloseButton={!obrigatoria}>
+      <DialogContent
+        className="max-w-sm"
+        showCloseButton={!obrigatoria}
+        onCloseAutoFocus={
+          onDevolverFoco
+            ? (evento) => {
+                evento.preventDefault();
+                onDevolverFoco();
+              }
+            : undefined
+        }
+      >
         <DialogHeader>
           <DialogTitle>{obrigatoria ? `Crie sua ${termo}` : `Trocar minha ${termo}`}</DialogTitle>
           {obrigatoria && (

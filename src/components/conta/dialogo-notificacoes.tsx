@@ -27,6 +27,7 @@ import {
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
+  onDevolverFoco?: () => void;
 }
 interface Estado {
   configurada: boolean;
@@ -61,7 +62,7 @@ async function registroPronto(): Promise<ServiceWorkerRegistration> {
   }
 }
 
-export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
+export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }: Props) {
   const [suportado, setSuportado] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [estado, setEstado] = useState<Estado | null>(null);
@@ -205,7 +206,17 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
         if (!executando) onAbrir(valor);
       }}
     >
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto">
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto"
+        onCloseAutoFocus={
+          onDevolverFoco
+            ? (evento) => {
+                evento.preventDefault();
+                onDevolverFoco();
+              }
+            : undefined
+        }
+      >
         <DialogHeader>
           <DialogTitle>Notificações</DialogTitle>
           <DialogDescription className="sr-only">

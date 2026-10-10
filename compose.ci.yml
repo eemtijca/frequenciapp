@@ -25,6 +25,11 @@ services:
       GOOGLE_REDIRECT_URI: "http://localhost:3000/api/planilha/google/retorno"
       GOOGLE_PICKER_API_KEY: "picker-sintetico"
       GOOGLE_PROJECT_NUMBER: "123456789"
+      # A suíte não consulta a base real de feriados.
+      FERIADOS_API_URL: ${FERIADOS_API_URL:-}
+      FERIADOS_API_TOKEN: ${FERIADOS_API_TOKEN:-}
+      FERIADOS_UF: ${FERIADOS_UF:-}
+      FERIADOS_IBGE: ${FERIADOS_IBGE:-}
       # Na rede do host o banco é alcançado pela porta publicada.
       DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia

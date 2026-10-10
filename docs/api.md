@@ -493,6 +493,18 @@ As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A 
 
 Mutações registram auditoria, executam em transação serializável e compartilham a trava do preparo e do envio da frequência às planilhas. Não há alteração de aulas, alunos ou frequências; após excluir o feriado, a data volta a seguir a grade semanal. A administração não pode transformar em feriado uma data que já tenha frequência salva. A leitura permanece sem cache; 401 indica ausência de sessão e 403 indica papel ou origem não permitidos.
 
+### GET /api/calendario-letivo/sincronizacao
+
+Administração. 200 `{ sincronizado, configurado, abrangencia }`. `sincronizado` é verdadeiro quando existe ao menos um feriado importado, em qualquer ano. `configurado` indica se o token da base está no servidor. `abrangencia` é `nacionais`, `estaduais` ou `municipais`, conforme `FERIADOS_IBGE`, `FERIADOS_UF` ou o padrão nacional. A resposta não traz o token.
+
+### POST /api/calendario-letivo/sincronizar
+
+Administração e origem confiável. Corpo estrito `{ ano, prova? }`. 200 `{ gravados, atualizados, mantidos, ignorados, sincronizado }`. A consulta percorre todas as páginas do ano, sem pontos facultativos, e grava as datas ainda ausentes com origem importada. Nome de feriado importado pode ser atualizado; feriado cadastrado à mão na mesma data é preservado. Data com chamada regular ou parcial salva entra em `ignorados` e não vira feriado. Se já existe feriado importado, `prova` é obrigatória; sem ela a resposta é 409 e a base não é consultada. Prova inválida, de outro administrador, de outro ano ou expirada responde 400. Lista vazia responde 400, sem gravar. Base sem token ou credencial recusada responde 503. A gravação usa a mesma trava e a mesma transação serializável do cadastro manual.
+
+### POST /api/calendario-letivo/sincronizar/desbloqueio
+
+Administração e origem confiável. Corpo estrito `{ ano, senha }`. 200 `{ prova }`. A senha é a do administrador, com o mesmo limite de tentativas das outras confirmações. A prova vale dez minutos, só para aquele administrador e aquele ano, e não contém a senha. Senha incorreta responde 400; excesso de tentativas responde 429.
+
 ## Justificativas
 
 ### GET /api/justificativas
@@ -806,7 +818,7 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
 - As frequências da cópia JSON podem incluir `confirmacoesSeduc`, com autoria, data e revisão por aluno. Cópias anteriores sem esse campo continuam válidas. A mesclagem preserva confirmações divergentes existentes e relata conflito, sem sobrescrever.
 - `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
-- `configuracoes.feriados` é opcional na versão 1 e traz datas e nomes do calendário exportado. Ausência ou lista vazia preserva o calendário vigente. A restauração mescla por data: nome igual conta como idêntico e nome divergente conta como conflito, sem sobrescrita. Novo feriado com frequência regular ou parcial no banco ou na própria cópia conta como conflito; o histórico da cópia tem prioridade sobre esse novo feriado. Frequências da cópia em feriado já cadastrado também contam como conflitos. A restauração com feriados compartilha a trava das planilhas e a transação serializável, sem restaurar os demais recursos configuráveis.
+- `configuracoes.feriados` é opcional na versão 1 e traz datas e nomes do calendário exportado. Ausência ou lista vazia preserva o calendário vigente. A restauração mescla por data: nome igual conta como idêntico e nome divergente conta como conflito, sem sobrescrita. Novo feriado com frequência regular ou parcial no banco ou na própria cópia conta como conflito; o histórico da cópia tem prioridade sobre esse novo feriado. Frequências da cópia em feriado já cadastrado também contam como conflitos. A restauração com feriados compartilha a trava das planilhas e a transação serializável, sem restaurar os demais recursos configuráveis. Feriado importado entra na cópia só como data e nome; a restauração o grava como cadastro manual e não recria, sozinha, o bloqueio da sincronização.
 - A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
 - Tipo (`DIA_INTEIRO`, `TURNO` ou `AULAS`), turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.

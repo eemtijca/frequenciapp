@@ -82,9 +82,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
                 transform="rotate(-90 32 32)"
                 className={fatia.concluida ? "text-primary" : "text-falta-texto"}
               >
-                <title>
-                  {fatia.turma.rotulo}: {fatia.concluida ? "chamada concluída" : "chamada pendente"}
-                </title>
+                <title>{`${fatia.turma.rotulo}: ${fatia.concluida ? "chamada concluída" : "chamada pendente"}`}</title>
               </circle>
             ))
           )}

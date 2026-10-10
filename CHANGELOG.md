@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Sincronização dos feriados do ano em Gestão, Configurações, Escola, Calendário letivo. A consulta lê todas as páginas da base configurada e grava as datas no calendário. O botão fica bloqueado depois da gravação; uma nova sincronização exige a senha do administrador. Sem feriados importados, o botão permanece ativo. Datas com chamada salva e feriados cadastrados à mão são preservados.
+
 - Calendário letivo anual em Gestão, Configurações, Escola, com feriados por data e nome para todas as turmas. Feriados bloqueiam Chamada e Chamada Parcial, inclusive sábados liberados, deixam a cobertura neutra e suspendem avisos escolares. Datas com frequências salvas são recusadas sem alterar o histórico; a cópia JSON preserva o calendário por mesclagem. Abas mensais omitem feriados e só retiram colunas próprias após conferir ausência de valores, fórmulas e notas.
 
 - Chamada permite desbloquear um sábado letivo por turma e data com as aulas ativas, sem alterar a grade semanal. A liberação acompanha rascunhos e chamadas salvas, mantendo justificativas, frequência parcial e travas de revisão. Sábados com chamada salva são enviados e preservados nas abas mensais; domingos e sábados sem registros continuam fora.
@@ -23,6 +25,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Painel externo no Google Looker Studio: Gestão prepara uma planilha exclusiva com indicadores agregados de frequência, saídas e entradas, chamada parcial e RS, sem nomes ou textos livres; atualização manual e automática, recuperação de criação incerta e guia para conectar o relatório privado.
 
 ### Alterado
+
+- Navegação no celular passa da barra inferior para um menu lateral aberto pelo cabeçalho, com as mesmas seções, permissões e ações de conta da barra lateral do desktop. O menu reúne perfil, tema, senha, notificações e saída, fecha ao selecionar, usar Escape, tocar fora ou ampliar para desktop, e mantém foco, áreas seguras e rolagem própria. Chamada Parcial continua acessível somente pelo ícone da Chamada.
 
 - Chamada bloqueia todo sábado por padrão, também quando a turma tem aula no sábado na grade, e só o botão Sábado letivo libera a chamada daquela turma e data; chamada salva e rascunho recuperado mantêm a liberação. A regra é da interface: a API não muda.
 
@@ -59,6 +63,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - Domingo não tem aula nem chamada. A API recusa salvar Chamada e Chamada Parcial em domingo, o calendário e as setas de dia da Chamada, da Chamada Parcial e do Painel pulam o domingo (aos domingos abrem no sábado anterior), a grade padrão de uma turma nova vai de segunda a sábado, a Gestão e a API de aulas não aceitam domingo e os lembretes de chamada pendente não o contam. Chamadas de domingo já salvas continuam nos relatórios e no histórico.
+
+- Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
+
+- Os anéis de cobertura usam título em uma linha, para a hidratação não descartar a página e o primeiro toque na navegação não se perder.
+
+- A faixa de gráficos do Painel mantém o cartão em exibição quando a largura muda ou a visão é ocultada, inclusive ao passar do desktop para o celular e ao voltar de outra seção.
 
 - Falha de leitura da Chamada mantém marcações e salvamento bloqueados em qualquer dia, preservando o rascunho local até uma consulta confirmada. Navegação e nova tentativa continuam disponíveis.
 

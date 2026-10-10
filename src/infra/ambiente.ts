@@ -6,6 +6,20 @@ import { configuracaoPushDe } from "@/infra/configuracao-push";
 
 const ausenteSeVazio = (valor: unknown) => (valor === "" ? undefined : valor);
 
+/** Aceita a origem da base de feriados sem usuário, consulta ou caminho embutido. */
+function urlFeriadosValida(valor: string): boolean {
+  try {
+    const url = new URL(valor);
+    if (url.username || url.password || url.search || url.hash) return false;
+    if (url.pathname !== "/" && url.pathname !== "") return false;
+    if (url.protocol === "https:") return true;
+    const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    return url.protocol === "http:" && local;
+  } catch {
+    return false;
+  }
+}
+
 const esquema = z.object({
   DATABASE_URL: z
     .string()
@@ -60,6 +74,37 @@ const esquema = z.object({
   GOOGLE_REDIRECT_URI: z.preprocess(ausenteSeVazio, z.url().optional()),
   GOOGLE_PICKER_API_KEY: z.preprocess(ausenteSeVazio, z.string().optional()),
   GOOGLE_PROJECT_NUMBER: z.preprocess(ausenteSeVazio, z.string().regex(/^\d+$/).optional()),
+  // Base de feriados. O token fica só no servidor. Sem ele, a sincronização
+  // permanece desligada e o restante do aplicativo sobe normalmente.
+  FERIADOS_API_URL: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .refine(
+        urlFeriadosValida,
+        "FERIADOS_API_URL deve ser HTTPS sem caminho, usuário ou consulta. HTTP só é aceito em localhost.",
+      )
+      .optional(),
+  ),
+  FERIADOS_API_TOKEN: z.preprocess(ausenteSeVazio, z.string().min(1).max(500).optional()),
+  FERIADOS_UF: z.preprocess(
+    (valor) => {
+      if (typeof valor !== "string") return valor;
+      const texto = valor.trim().toUpperCase();
+      return texto === "" ? undefined : texto;
+    },
+    z
+      .string()
+      .regex(/^[A-Z]{2}$/, "FERIADOS_UF deve ter duas letras.")
+      .optional(),
+  ),
+  FERIADOS_IBGE: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .regex(/^\d{7}$/, "FERIADOS_IBGE deve ter 7 dígitos.")
+      .optional(),
+  ),
   TZ_APP: z
     .string()
     .min(1)
@@ -142,6 +187,12 @@ export const ambiente = {
     redirectUri: resultado.data.GOOGLE_REDIRECT_URI,
     pickerApiKey: resultado.data.GOOGLE_PICKER_API_KEY,
     projectNumber: resultado.data.GOOGLE_PROJECT_NUMBER,
+  },
+  feriados: {
+    url: resultado.data.FERIADOS_API_URL ?? "https://feriadosapi.com",
+    token: resultado.data.FERIADOS_API_TOKEN,
+    uf: resultado.data.FERIADOS_UF,
+    ibge: resultado.data.FERIADOS_IBGE,
   },
   fuso: resultado.data.TZ_APP,
   ehProducao,

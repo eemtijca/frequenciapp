@@ -43,6 +43,10 @@ services:
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       GOOGLE_PICKER_API_KEY: ${GOOGLE_PICKER_API_KEY:-}
       GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER:-}
+      FERIADOS_API_URL: ${FERIADOS_API_URL:-}
+      FERIADOS_API_TOKEN: ${FERIADOS_API_TOKEN:-}
+      FERIADOS_UF: ${FERIADOS_UF:-}
+      FERIADOS_IBGE: ${FERIADOS_IBGE:-}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
       # Implantação sem TLS em rede confiável (ver .env.example).
       PERMITIR_HTTP: ${PERMITIR_HTTP:-false}

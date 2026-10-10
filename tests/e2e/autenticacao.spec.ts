@@ -2,22 +2,15 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADMIN_E2E } from "./helpers/banco";
 import { entrar } from "./helpers/auth";
-import { aguardarHidratacao } from "./helpers/pagina";
+import { abrirNavegacao, aguardarHidratacao } from "./helpers/pagina";
 
 // Sem estado de sessão: este arquivo testa a tela de entrada.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/** Sai da conta pela barra lateral no desktop ou pelo menu de perfil no celular. */
+/** Sai da conta pela barra lateral do desktop ou pelo menu do celular. */
 async function sairDaConta(page: Page): Promise<void> {
-  const largura = page.viewportSize()?.width ?? 0;
-  if (largura >= 1024) {
-    await aguardarHidratacao(page, "aside button");
-    await page.getByRole("button", { name: "Sair da conta" }).click();
-  } else {
-    await aguardarHidratacao(page, `button[aria-label="Conta de ${ADMIN_E2E.nome}"]`);
-    await page.getByRole("button", { name: `Conta de ${ADMIN_E2E.nome}` }).click();
-    await page.getByRole("button", { name: "Sair da conta" }).click();
-  }
+  await abrirNavegacao(page);
+  await page.getByRole("button", { name: "Sair da conta", exact: true }).click();
   await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible({ timeout: 25_000 });
 }
 
@@ -96,15 +89,8 @@ test.describe("autenticação", () => {
 
     // Na troca de senha, os três campos também alternam.
     await entrar(page, ADMIN_E2E.email, ADMIN_E2E.senha);
-    const largura = page.viewportSize()?.width ?? 0;
-    if (largura >= 1024) {
-      await aguardarHidratacao(page, "aside button");
-      await page.getByRole("button", { name: "Trocar senha" }).click();
-    } else {
-      await aguardarHidratacao(page, `button[aria-label="Conta de ${ADMIN_E2E.nome}"]`);
-      await page.getByRole("button", { name: `Conta de ${ADMIN_E2E.nome}` }).click();
-      await page.getByRole("button", { name: "Trocar minha senha" }).click();
-    }
+    await abrirNavegacao(page);
+    await page.getByRole("button", { name: "Trocar senha", exact: true }).click();
     for (const id of ["senha-atual", "senha-nova", "senha-confirmacao"]) {
       const campo = page.locator(`#${id}`);
       await expect(campo).toHaveAttribute("type", "password");

@@ -2,7 +2,15 @@
 
 // Faixa de gráficos com rolagem nativa, encaixe por cartão e navegação por teclado.
 // Mantém formulários montados e limita o foco ao cartão em exibição.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -13,10 +21,27 @@ interface Cartao {
   conteudo: ReactNode;
 }
 
+function alvoInterativo(alvo: EventTarget | null): boolean {
+  return (
+    alvo instanceof Element &&
+    Boolean(
+      alvo.closest(
+        "a, button, input, select, textarea, label, [role='combobox'], [role='listbox'], [role='option']",
+      ),
+    )
+  );
+}
+
 export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; ativo: boolean }) {
   const faixa = useRef<HTMLDivElement>(null);
   const larguraFaixa = useRef(0);
   const indiceSalvo = useRef(0);
+  const idSalvo = useRef<string | undefined>(undefined);
+  const realinhando = useRef(false);
+  const intencional = useRef(false);
+  const animandoAte = useRef(0);
+  const acalmou = useRef(0);
+  const ticketAlinhar = useRef(0);
   const [indice, setIndice] = useState(0);
   const [altura, setAltura] = useState<number>();
   const ajudaId = useId();
@@ -25,33 +50,86 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const atual = Math.min(indice, cartoes.length - 1);
   const identidade = cartoes[atual]?.id;
 
+  const esquerdaDoSalvo = useCallback((elemento: HTMLElement): number | null => {
+    const primeiro = elemento.firstElementChild;
+    const id = idSalvo.current;
+    const cartao =
+      (id ? elemento.querySelector(`[data-cartao="${CSS.escape(id)}"]`) : null) ??
+      elemento.children.item(
+        Math.min(indiceSalvo.current, Math.max(elemento.childElementCount - 1, 0)),
+      );
+    if (!(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement)) return null;
+    return cartao.offsetLeft - primeiro.offsetLeft;
+  }, []);
+
+  const renovarIntencao = useCallback((elemento?: HTMLElement) => {
+    intencional.current = true;
+    animandoAte.current = 0;
+    realinhando.current = false;
+    ticketAlinhar.current += 1;
+    if (elemento) elemento.style.scrollSnapType = "";
+    window.clearTimeout(acalmou.current);
+    acalmou.current = window.setTimeout(() => {
+      intencional.current = false;
+    }, 200);
+  }, []);
+
+  // Recoloca o cartão salvo. O encaixe pode ficar suspenso para o navegador não puxar outra posição.
+  const alinhar = useCallback((elemento: HTMLElement, esquerda: number, manterSnap: boolean) => {
+    const ticket = ++ticketAlinhar.current;
+    intencional.current = false;
+    animandoAte.current = 0;
+    realinhando.current = true;
+    if (elemento.clientWidth > 0) larguraFaixa.current = elemento.clientWidth;
+    elemento.style.scrollBehavior = "auto";
+    elemento.style.scrollSnapType = "none";
+    // Um salto de um pixel interrompe a rolagem suave que o navegador ainda anima.
+    elemento.scrollTo({ left: esquerda + 1, behavior: "instant" });
+    elemento.scrollTo({ left: esquerda, behavior: "instant" });
+    window.requestAnimationFrame(() => {
+      if (ticketAlinhar.current !== ticket) return;
+      elemento.scrollTo({ left: esquerda, behavior: "instant" });
+      if (manterSnap) elemento.style.scrollSnapType = "";
+      elemento.style.scrollBehavior = "";
+      window.requestAnimationFrame(() => {
+        if (ticketAlinhar.current !== ticket) return;
+        if (manterSnap && Math.abs(elemento.scrollLeft - esquerda) > 1) {
+          elemento.style.scrollSnapType = "none";
+          elemento.scrollTo({ left: esquerda, behavior: "instant" });
+        }
+        realinhando.current = false;
+      });
+    });
+  }, []);
+
   useLayoutEffect(() => {
     const elemento = faixa.current;
-    const primeiro = elemento?.firstElementChild;
-    const cartao = elemento?.children.item(Math.min(indiceSalvo.current, cartoes.length - 1));
-    if (
-      !ativo ||
-      !elemento ||
-      !(primeiro instanceof HTMLElement) ||
-      !(cartao instanceof HTMLElement)
-    )
+    if (!ativo || !elemento) {
+      larguraFaixa.current = 0;
+      animandoAte.current = 0;
+      realinhando.current = false;
+      ticketAlinhar.current += 1;
       return;
-    // O Safari pode zerar scrollLeft ao ocultar a visão do Painel.
-    larguraFaixa.current = elemento.clientWidth;
-    elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
-  }, [ativo, cartoes.length]);
+    }
+    const esquerda = esquerdaDoSalvo(elemento);
+    if (esquerda === null) return;
+    // Ocultar a visão pode zerar a rolagem. O cartão salvo volta antes do próximo evento.
+    alinhar(elemento, esquerda, true);
+  }, [ativo, cartoes.length, alinhar, esquerdaDoSalvo]);
 
   function irPara(destino: number) {
     const elemento = faixa.current;
     const primeiro = elemento?.firstElementChild;
     const cartao = elemento?.children.item(destino);
     if (!elemento || !(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement)) return;
-    elemento.scrollTo({
-      left: cartao.offsetLeft - primeiro.offsetLeft,
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "instant"
-        : "smooth",
-    });
+    indiceSalvo.current = destino;
+    idSalvo.current = cartoes[destino]?.id;
+    setIndice(destino);
+    const esquerda = cartao.offsetLeft - primeiro.offsetLeft;
+    const reduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    animandoAte.current = reduzido ? 0 : window.performance.now() + 700;
+    intencional.current = false;
+    elemento.scrollTo({ left: esquerda, behavior: reduzido ? "instant" : "smooth" });
   }
 
   useEffect(() => {
@@ -66,6 +144,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
     )
       return;
     if (larguraFaixa.current === 0) larguraFaixa.current = elemento.clientWidth;
+    if (identidade) idSalvo.current = identidade;
     const observador = new ResizeObserver(() => {
       if (elemento.clientWidth === 0) {
         larguraFaixa.current = 0;
@@ -73,15 +152,24 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
       }
       const barra = elemento.offsetHeight - elemento.clientHeight;
       setAltura(Math.ceil(cartao.getBoundingClientRect().height) + barra + 8);
-      if (larguraFaixa.current !== elemento.clientWidth) {
-        larguraFaixa.current = elemento.clientWidth;
-        elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
-      }
+      if (larguraFaixa.current === elemento.clientWidth) return;
+      const esquerda = esquerdaDoSalvo(elemento);
+      if (esquerda === null) return;
+      alinhar(elemento, esquerda, true);
     });
     observador.observe(cartao);
     observador.observe(elemento);
-    return () => observador.disconnect();
-  }, [ativo, atual, identidade, cartoes.length]);
+    return () => {
+      observador.disconnect();
+    };
+  }, [ativo, atual, identidade, cartoes.length, alinhar, esquerdaDoSalvo]);
+
+  useEffect(() => {
+    return () => {
+      window.clearTimeout(acalmou.current);
+      ticketAlinhar.current += 1;
+    };
+  }, []);
 
   return (
     <section
@@ -139,12 +227,26 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
         tabIndex={0}
         style={altura === undefined ? undefined : { height: altura }}
         className="focus-visible:ring-ring flex min-w-0 snap-x snap-mandatory items-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-lg pb-2 focus-visible:ring-2 focus-visible:outline-none"
+        onPointerDown={(evento) => {
+          if (alvoInterativo(evento.target)) return;
+          renovarIntencao(evento.currentTarget);
+        }}
+        onWheel={(evento) => {
+          renovarIntencao(evento.currentTarget);
+        }}
         onScroll={(evento) => {
           const elemento = evento.currentTarget;
+          if (elemento.dataset.rolagemIntencional === "true") {
+            delete elemento.dataset.rolagemIntencional;
+            renovarIntencao(elemento);
+          }
           // A mudança de largura pode gerar scroll antes do ResizeObserver.
           // O observador realinha o cartão vigente antes de recalcular a posição.
-          if (!ativo || elemento.clientWidth === 0 || elemento.clientWidth !== larguraFaixa.current)
+          if (!ativo || elemento.clientWidth === 0) return;
+          const gesto = intencional.current;
+          if (!gesto && (realinhando.current || elemento.clientWidth !== larguraFaixa.current))
             return;
+          if (!gesto && window.performance.now() < animandoAte.current) return;
           const primeiro = elemento.firstElementChild;
           if (!(primeiro instanceof HTMLElement)) return;
           let proximo = 0;
@@ -159,10 +261,21 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
               proximo = posicao;
             }
           });
+          // Ocultar a visão e o encaixe do navegador não escolhem outro cartão.
+          if (!gesto) {
+            const esquerda = esquerdaDoSalvo(elemento);
+            if (esquerda !== null && Math.abs(elemento.scrollLeft - esquerda) > 1)
+              alinhar(elemento, esquerda, false);
+            return;
+          }
+          renovarIntencao(elemento);
+          // Posição no meio do caminho, sem encaixe, não troca o cartão vigente.
+          if (distancia > 16) return;
           if (proximo !== atual) {
             const anterior = elemento.children.item(atual);
             if (anterior?.contains(document.activeElement)) elemento.focus({ preventScroll: true });
             indiceSalvo.current = proximo;
+            idSalvo.current = cartoes[proximo]?.id;
             setIndice(proximo);
           }
         }}
@@ -190,6 +303,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
         {cartoes.map((cartao, posicao) => (
           <article
             key={cartao.id}
+            data-cartao={cartao.id}
             aria-label={`${posicao + 1} de ${cartoes.length}: ${cartao.nome}`}
             aria-roledescription="cartão"
             aria-hidden={posicao !== atual}

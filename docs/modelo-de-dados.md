@@ -213,6 +213,19 @@ Histórico de envios, uma linha por turma de origem: período, modalidade (conse
 
 O aplicativo lê o esquema de cada aba (linha de cabeçalho, coluna de aluno, colunas de dia com data, coluna de total inclusive por fórmula, mesclagens, congelamento e limites) e guarda o mapa aba por turma de origem. Uma assinatura do cabeçalho é revalidada antes de cada escrita. O dataframe da turma de origem, montado a partir da Grade, alimenta o CSV e o envio: alunos ativos, turma atual, P, F, FJ e S por dia e totais.
 
+## Feriado (feriado)
+
+| Campo        | Tipo  | Observação                                                               |
+| ------------ | ----- | ------------------------------------------------------------------------ |
+| dia          | data  | Chave primária. Dia civil, comum a todas as turmas, sem repetição anual. |
+| nome         | texto | Até 120 caracteres.                                                      |
+| origem       | enum  | `MANUAL` no cadastro da Gestão e na restauração; `API` na sincronização. |
+| criadoEm     | data  |                                                                          |
+| atualizadoEm | data  |                                                                          |
+| criadoPorId  | uuid  | Quem gravou; anulável.                                                   |
+
+A origem importada bloqueia nova sincronização até a senha do administrador. Remover todos os feriados importados deixa o botão ativo de novo. A data com chamada salva não pode ser criada como feriado.
+
 ## Auditoria (auditoria)
 
 | Campo     | Tipo  | Observação                                     |
