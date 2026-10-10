@@ -731,7 +731,7 @@ export default function Aplicacao({
                   {rotuloDePapel(usuario.papel)}
                 </span>
               </span>
-              <SeletorTema />
+              {!movel && <SeletorTema />}
             </div>
             <div className="mt-1 flex flex-col gap-0.5">
               <Button
@@ -836,6 +836,7 @@ export default function Aplicacao({
                 <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
                   FrequenciApp
                 </span>
+                <SeletorTema className="shrink-0 rounded-full" />
                 <Button
                   variant="ghost"
                   size="icon"

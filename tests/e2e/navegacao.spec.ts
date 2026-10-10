@@ -41,7 +41,7 @@ test.describe("navegação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
-    await abrirNavegacao(page);
+    // O seletor fica no cabeçalho no celular e no cartão da barra lateral no desktop.
     await aguardarHidratacao(page, 'button[aria-label*="tema" i]');
     const inicioEscuro = await page.locator("html").evaluate((el) => el.classList.contains("dark"));
     const alvo = inicioEscuro ? "Claro" : "Escuro";
