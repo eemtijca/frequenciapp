@@ -1,18 +1,31 @@
-/* Geometria dos seletores da Chamada; acabamento herdado das superfícies globais. */
+/* Seletores circulares de vidro com cor de situação e seleção independente do progresso. */
 .faixa {
-  border-radius: calc(var(--radius) + 12px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  justify-items: center;
+  gap: 12px;
   padding: 5px;
 }
 
 .serie,
 .turma {
   position: relative;
+  width: 100%;
   height: auto;
+  aspect-ratio: 1;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
   gap: 4px;
+  border-radius: 50%;
+  border-color: var(--vidro-borda);
+  padding: 12px 10px;
   white-space: normal;
   color: var(--foreground);
+  background-color: var(--card);
+  box-shadow: var(--vidro-elevacao);
+  text-align: center;
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
@@ -21,43 +34,102 @@
 }
 
 .serie {
-  min-height: 56px;
-  border-radius: calc(var(--radius) + 7px);
-  padding: 10px 6px;
+  max-width: 108px;
+  font-size: 13px;
 }
 
-.serie:where([aria-pressed="true"]) {
+.serie:where([data-situacao="concluida"]),
+.turma:where([data-situacao="concluida"]) {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background-color: color-mix(in oklab, var(--primary) 10%, var(--card));
   color: var(--primary);
 }
 
-.turma {
-  min-height: 68px;
-  align-items: flex-start;
-  border-radius: calc(var(--radius) + 8px);
-  padding: 12px;
-  text-align: left;
+.serie:where([data-situacao="pendente"]),
+.turma:where([data-situacao="pendente"]) {
+  border-color: color-mix(in oklab, var(--falta) 45%, var(--border));
+  background-color: color-mix(in oklab, var(--falta) 10%, var(--card));
+  color: var(--falta-texto);
 }
 
-.confirmacao {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+.serie:where([aria-pressed="true"]),
+.turma:where([aria-pressed="true"]) {
+  outline: 2px solid color-mix(in oklab, var(--foreground) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.serie:focus-visible,
+.turma:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 5px;
+}
+
+.turma {
+  max-width: 92px;
+}
+
+.nome,
+.nomeTurma {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  color: var(--primary-foreground);
-  background: var(--primary);
+  gap: 2px;
+  line-height: 16px;
+}
+
+.nomeTurma {
+  font-size: 20px;
+  line-height: 22px;
+}
+
+.contagem {
+  position: relative;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.situacao {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 14px;
+  font-size: 11px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .serie,
+  .turma {
+    transition: none;
+  }
 }
 
 @media (forced-colors: active) {
   .serie,
   .turma {
+    border-color: ButtonText;
+    background: Canvas;
     color: CanvasText;
+    box-shadow: none;
   }
 
-  .confirmacao {
-    background: Highlight;
-    color: HighlightText;
+  .serie:where([aria-pressed="true"]),
+  .turma:where([aria-pressed="true"]),
+  .serie:focus-visible,
+  .turma:focus-visible {
+    outline-color: Highlight;
+  }
+
+  .contagem {
+    color: CanvasText;
   }
 }

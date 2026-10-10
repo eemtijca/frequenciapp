@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Seletores circulares de séries e turmas na Chamada: pendência em vermelho, conclusão em verde e anel por série com fatias proporcionais aos alunos. O progresso acompanha a data consultada e o salvamento, trata rascunhos e conflitos como pendência e mantém estado neutro em falhas ou turmas sem participantes. Rótulos usuais de ano aparecem como série no seletor.
+
 - Resumo dos Relatórios: três botões escolhem o ranking de alunos com mais faltas no mês, Todas as faltas (F + FJ, o padrão), Sem justificativa (só F) e Justificadas (só FJ), com os filtros de mês, série e turma e o detalhe de F e FJ por aluno.
 
 - Painel externo aceita links privados do Zoho Analytics, além do Looker Studio, com rótulos neutros, guia de conexão à planilha de indicadores e validação restrita do endereço da visualização.

@@ -151,6 +151,10 @@ export default function VistaFrequencia({
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
   // Lista gravada da chamada; nula enquanto o dia não foi salvo.
   const [listaGravada, setListaGravada] = useState<string[] | null>(null);
+  const [frequenciasDoDia, setFrequenciasDoDia] = useState<{
+    chave: string;
+    frequencias: Frequencia[];
+  } | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -179,7 +183,7 @@ export default function VistaFrequencia({
   const turma = turmas.find((t) => t.id === turmaId);
   const chave = `${dia}|${turmaId}`;
 
-  // Carrega a frequência salva do dia e turma, e recupera rascunho local.
+  // Carrega as chamadas do dia, seleciona a turma e recupera o rascunho local.
   useEffect(() => {
     if (!dia || !turmaId) {
       setCarregando(false);
@@ -189,6 +193,7 @@ export default function VistaFrequencia({
     }
     let viva = true;
     setCarregando(true);
+    setFrequenciasDoDia(null);
     setErro("");
     setConflito(false);
     setSujo(false);
@@ -205,12 +210,12 @@ export default function VistaFrequencia({
     setAtualizadoEm("");
     chaveCarregada.current = chave;
 
-    pedir<{ frequencia: Frequencia | null }>(
-      `/api/frequencias?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
-    )
+    pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`)
       .then((dados) => {
         if (!viva) return;
-        const frequencia = dados.frequencia;
+        const frequencias = dados.frequencias.filter((item) => item.dia === dia);
+        const frequencia = frequencias.find((item) => item.turmaId === turmaId) ?? null;
+        setFrequenciasDoDia({ chave, frequencias });
         setAusencias(paraAusencias(frequencia?.faltas ?? []));
         setJustificativas(paraJustificativas(frequencia?.faltas ?? []));
         setObservacoes(paraObservacoes(frequencia?.faltas ?? []));
@@ -492,6 +497,16 @@ export default function VistaFrequencia({
           revisao: revisaoSalva,
         }),
       );
+      setFrequenciasDoDia((atual) => {
+        if (atual?.chave !== chave) return atual;
+        return {
+          chave,
+          frequencias: [
+            ...atual.frequencias.filter((item) => item.turmaId !== dados.frequencia.turmaId),
+            dados.frequencia,
+          ],
+        };
+      });
       setAusencias(paraAusencias(dados.frequencia.faltas));
       setJustificativas(paraJustificativas(dados.frequencia.faltas));
       setObservacoes(paraObservacoes(dados.frequencia.faltas));
@@ -632,6 +647,11 @@ export default function VistaFrequencia({
               turmas={turmas}
               alunos={alunos}
               turmaId={turmaId}
+              dia={dia}
+              frequencias={frequenciasDoDia?.chave === chave ? frequenciasDoDia.frequencias : []}
+              coberturaDisponivel={frequenciasDoDia?.chave === chave}
+              carregando={carregando}
+              temAlteracoes={sujo || conflito}
               travado={travado}
               onEscolher={setTurmaId}
             />
