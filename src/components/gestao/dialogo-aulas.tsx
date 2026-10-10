@@ -84,7 +84,8 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
       ordem: String(aula.ordem),
       inicio: aula.inicio,
       fim: aula.fim,
-      diasSemana: [...aula.diasSemana],
+      // Domingo não tem aula: grades antigas com "dom" abrem sem ele.
+      diasSemana: aula.diasSemana.filter((dia) => dia !== 7),
       disciplinas: { ...aula.disciplinas },
       ativo: aula.ativo,
     });
@@ -224,6 +225,7 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
                     </p>
                     <p className="text-muted-foreground truncate text-xs">
                       {aula.diasSemana
+                        .filter((dia) => dia !== 7)
                         .map(
                           (dia) =>
                             DIAS_DA_SEMANA.find((opcao) => opcao.valor === dia)?.abreviacao ?? dia,
@@ -361,7 +363,7 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
               <fieldset className="flex flex-col gap-1.5">
                 <legend className="text-sm font-medium">Dias da semana</legend>
                 <div className="flex flex-wrap gap-1.5">
-                  {DIAS_DA_SEMANA.map((dia) => {
+                  {DIAS_DA_SEMANA.filter((dia) => dia.valor !== 7).map((dia) => {
                     const marcado = formulario.diasSemana.includes(dia.valor);
                     return (
                       <button

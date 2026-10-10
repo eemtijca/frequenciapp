@@ -38,7 +38,7 @@ import type {
 import {
   alunoDesistenteNoDia,
   diaDaSemanaIso,
-  diaSeguinte,
+  diaDeChamadaVizinho,
   exibirOrigemNaChamada,
   horaNoFuso,
   horariosDaChamada,
@@ -49,6 +49,7 @@ import {
   rotuloDiaSemana,
   rotuloJustificativa,
   type FaltaAluno,
+  ultimoDiaDeChamada,
 } from "@/domain/frequencia";
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
@@ -149,7 +150,9 @@ export default function VistaFrequencia({
 }: Props) {
   const podeAdministrar = temCapacidade(usuario.papel, "administrar");
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
-  const [dia, setDia] = useState(() => alvo?.dia ?? diaCorrente);
+  // Domingo não tem chamada: quem cai nele (hoje ou um atalho) abre no sábado anterior.
+  const diaPadrao = ultimoDiaDeChamada(diaCorrente);
+  const [dia, setDia] = useState(() => ultimoDiaDeChamada(alvo?.dia ?? diaCorrente));
   const [ausencias, setAusencias] = useState<Map<string, Set<string>>>(new Map());
   const [justificativas, setJustificativas] = useState<Map<string, string>>(new Map());
   const [observacoes, setObservacoes] = useState<Map<string, string>>(new Map());
@@ -184,7 +187,7 @@ export default function VistaFrequencia({
   useEffect(() => {
     if (!alvo) return;
     setTurmaId(alvo.turmaId);
-    setDia(alvo.dia);
+    setDia(ultimoDiaDeChamada(alvo.dia));
   }, [alvo]);
 
   useEffect(() => {
@@ -717,7 +720,7 @@ export default function VistaFrequencia({
               className="size-11 shrink-0"
               aria-label="Dia anterior"
               disabled={travado || !dia}
-              onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+              onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, -1))}
             >
               <ChevronLeft size={18} />
             </Button>
@@ -727,6 +730,7 @@ export default function VistaFrequencia({
                 modo="dia"
                 valor={dia}
                 max={diaCorrente}
+                semDomingo
                 disabled={travado}
                 rotuloAcessivel="Data da chamada"
                 rotulo={rotuloDia}
@@ -739,17 +743,17 @@ export default function VistaFrequencia({
               size="icon"
               className="size-11 shrink-0"
               aria-label="Dia seguinte"
-              disabled={travado || !dia || dia >= diaCorrente}
-              onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+              disabled={travado || !dia || dia >= diaPadrao}
+              onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
             >
               <ChevronRight size={18} />
             </Button>
           </div>
-          {dia !== diaCorrente && (
+          {dia !== diaPadrao && (
             <button
               type="button"
               disabled={travado}
-              onClick={() => setDia(diaCorrente)}
+              onClick={() => setDia(diaPadrao)}
               className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
             >
               Voltar para hoje

@@ -596,7 +596,7 @@ describe("frequência organizada por turma e mês", () => {
     expect(marca(confirmada.aba, "02/10/2026")).toBe("F");
   });
 
-  it("envia o sábado registrado, preserva sua coluna e deixa o domingo apenas no app", async () => {
+  it("envia o sábado registrado, preserva sua coluna e deixa um domingo antigo apenas no app", async () => {
     const outubro = mensais["2026-10"];
     if (!outubro) throw new Error("Aba mensal ausente.");
     await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
@@ -604,7 +604,11 @@ describe("frequência organizada por turma e mês", () => {
       await chamar("/api/planilha/estado", "GET"),
     );
     await salvar("2026-10-03", [alunos.A]);
-    await salvar("2026-10-04", []);
+    // A API não aceita mais chamada de domingo; a linha antiga entra direto no banco.
+    await banco.query(
+      "insert into frequencias (turma_id, dia, revisao, atualizado_em) values ($1, '2026-10-04', 1, now())",
+      [turmas.A],
+    );
     const pendente = await dados<{ estado: { alteradasDepois: number } }>(
       await chamar("/api/planilha/estado", "GET"),
     );

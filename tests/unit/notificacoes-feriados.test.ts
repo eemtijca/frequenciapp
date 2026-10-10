@@ -1,4 +1,4 @@
-// Feriados suspendem avisos escolares e pendências, inclusive na conferência final do envio.
+// Feriados e domingos suspendem avisos escolares e pendências, inclusive na conferência final do envio.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const estado = vi.hoisted(() => ({ feriado: false, feriadoNaReserva: false }));
@@ -126,6 +126,29 @@ describe("agenda em feriados", () => {
     expect(consultas.assinatura).not.toHaveBeenCalled();
     expect(consultas.chamadas).not.toHaveBeenCalled();
     expect(consultas.turmas).not.toHaveBeenCalled();
+    expect(enviarPush).not.toHaveBeenCalled();
+  });
+});
+
+describe("agenda aos domingos", () => {
+  it("não cobra turmas pendentes, sem consultar a grade", async () => {
+    expect(await contarChamadasPendentes("2026-10-11")).toBe(0);
+    expect(consultas.turmas).not.toHaveBeenCalled();
+  });
+
+  it("suspende resumo, pendências e avisos de novas chamadas mesmo com todos habilitados", async () => {
+    vi.setSystemTime(new Date("2026-10-11T18:00:00Z"));
+    expect(await enviarAvisosDaAgenda()).toEqual({
+      configurada: true,
+      enviadas: 0,
+      expiradas: 0,
+      falhas: 0,
+      ignoradas: 0,
+    });
+    expect(consultas.chamadas).not.toHaveBeenCalled();
+    expect(consultas.turmas).not.toHaveBeenCalled();
+    expect(consultas.assinaturas).not.toHaveBeenCalled();
+    expect(consultas.criarEntrega).not.toHaveBeenCalled();
     expect(enviarPush).not.toHaveBeenCalled();
   });
 });

@@ -151,7 +151,7 @@ Turma: `{ id, nome, serieId, serieNome, rotulo, horarios }`, com rótulo compost
 
 ### POST /api/turmas
 
-Corpo: `{ "serieId": string, "nome": string }`. Apenas administração. A turma nasce com a aula padrão (00:00 às 23:59, todos os dias).
+Corpo: `{ "serieId": string, "nome": string }`. Apenas administração. A turma nasce com a aula padrão (00:00 às 23:59, de segunda a sábado).
 
 - 201 `{"turma": Turma}`; 404 série inexistente; 409 turma repetida na série.
 
@@ -182,14 +182,14 @@ Todas as rotas de aulas exigem papel de administração.
 - 200 `{"horarios": Horario[]}` na ordem das aulas.
 - 400 quando a turma não é informada ou é inválida.
 
-Horario: `{ id, turmaId, ordem, inicio, fim, diasSemana, disciplinas, ativo }`, com `inicio` e `fim` em `HH:MM` e `diasSemana` em ISO (1 é segunda, 7 é domingo). `disciplinas` é um mapa de nomes por dia, por exemplo `{ "1": "Matemática", "2": "Português" }`; aulas sem nomes retornam `{}`. Cada chave deve corresponder a um dia selecionado e cada nome tem até 80 caracteres após retirar espaços das extremidades.
+Horario: `{ id, turmaId, ordem, inicio, fim, diasSemana, disciplinas, ativo }`, com `inicio` e `fim` em `HH:MM` e `diasSemana` em ISO de 1 (segunda) a 6 (sábado). Domingo não tem aula: `7` é recusado com 400 ("Domingo não tem aula.") ao criar e ao editar, e grades antigas que ainda o guardam são ignoradas na Chamada. `disciplinas` é um mapa de nomes por dia, por exemplo `{ "1": "Matemática", "2": "Português" }`; aulas sem nomes retornam `{}`. Cada chave deve corresponder a um dia selecionado e cada nome tem até 80 caracteres após retirar espaços das extremidades.
 
 ### POST /api/horarios
 
 Corpo: `{ "turmaId": string, "ordem": number, "inicio": "HH:MM", "fim": "HH:MM", "diasSemana": number[], "disciplinas"?: Record<string, string>, "ativo"?: boolean }`.
 
 - 201 `{"horario": Horario}`.
-- 400 horário inválido, fim não posterior ao início, dias vazios ou repetidos, chave de disciplina fora de 1 a 7 ou dos dias selecionados, nome não textual ou acima do limite.
+- 400 horário inválido, fim não posterior ao início, dias vazios ou repetidos, chave de disciplina fora dos dias selecionados, nome não textual ou acima do limite.
 - 404 turma inexistente; 409 ordem repetida na turma.
 
 ### PATCH /api/horarios/{id}
@@ -334,6 +334,8 @@ Permissão: administração ou coordenação.
 
 Sábado letivo: a Chamada do aplicativo bloqueia todo sábado até a pessoa liberar o sábado letivo, e a rota não exige o campo para salvar sábados com aula na grade. `sabadoLetivo: true` só é aceito no sábado. Se não houver aulas previstas nesse dia, usa as aulas ativas da turma, sem alterar a grade semanal. A grade específica de sábado prevalece quando existe. Correções desses sábados sem grade reenviam a liberação. O registro salvo permite reconhecer o sábado letivo ao reabrir a Chamada, no histórico, na Chamada Parcial e no envio às planilhas. Datas futuras e novas faltas em aulas inativas ou de outra turma continuam recusadas.
 
+Domingo não tem aula nem chamada: a rota responde 400 ("Domingo não tem aula nem chamada.") para qualquer turma, mesmo que uma grade antiga tenha domingo. As chamadas de domingo já salvas continuam sendo lidas.
+
 Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes.
 
 Semântica da `revisao`:
@@ -410,7 +412,7 @@ Ao criar a partir da base, `baseChamada` confere a revisão, a participação do
 - 200 `{ "registro": FrequenciaParcial }`.
 - Para criar, a revisão pode ser omitida ou zero. Para corrigir um registro já existente por aluno e dia, é obrigatória a revisão vigente.
 - Correção efetiva incrementa revisão e limpa a confirmação da Seduc. Repetir o mesmo conteúdo não altera a confirmação nem a revisão. Nome e turma históricos continuam preservados.
-- 400 conteúdo inválido ou dia futuro; 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
+- 400 conteúdo inválido, dia futuro ou domingo ("Domingo não tem aula nem chamada."); 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
 
 ### POST /api/frequencias-parciais/{id}/seduc
 

@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   alunoDesistenteNoDia,
   celulasDoMes,
+  celulasDoMesSemDomingo,
   CONFIGURACOES_PADRAO,
   diaDaSemanaIso,
+  diaDeChamadaVizinho,
+  ehDomingo,
   diaLocal,
   diaSeguinte,
   diasDoMes,
@@ -42,6 +45,7 @@ import {
   type Aluno,
   type Frequencia,
   type Horario,
+  ultimoDiaDeChamada,
 } from "@/domain/frequencia";
 
 function aluno(parcial: Partial<Aluno> = {}): Aluno {
@@ -415,6 +419,48 @@ describe("celulasDoMes", () => {
     expect(celulas[0]).toBe("2026-02-01");
     expect(celulas[27]).toBe("2026-02-28");
     expect(celulas.filter(Boolean).length).toBe(28);
+  });
+});
+
+describe("domingo sem chamada", () => {
+  it("reconhece só o domingo", () => {
+    expect(ehDomingo("2026-09-27")).toBe(true);
+    expect(ehDomingo("2026-09-26")).toBe(false);
+    expect(ehDomingo("2026-09-28")).toBe(false);
+  });
+  it("leva o domingo ao sábado anterior e mantém os demais dias", () => {
+    expect(ultimoDiaDeChamada("2026-09-27")).toBe("2026-09-26");
+    expect(ultimoDiaDeChamada("2026-09-26")).toBe("2026-09-26");
+    expect(ultimoDiaDeChamada("2026-09-28")).toBe("2026-09-28");
+    // Domingo na virada do mês e do ano.
+    expect(ultimoDiaDeChamada("2023-01-01")).toBe("2022-12-31");
+  });
+  it("pula o domingo ao navegar entre os dias de chamada", () => {
+    expect(diaDeChamadaVizinho("2026-09-26", 1)).toBe("2026-09-28");
+    expect(diaDeChamadaVizinho("2026-09-28", -1)).toBe("2026-09-26");
+    expect(diaDeChamadaVizinho("2026-09-24", 1)).toBe("2026-09-25");
+    expect(diaDeChamadaVizinho("2026-09-25", -1)).toBe("2026-09-24");
+    expect(diaDeChamadaVizinho("2026-12-31", 1)).toBe("2027-01-01");
+  });
+  it("monta a grade do mês de segunda a sábado, sem o domingo", () => {
+    const celulas = celulasDoMesSemDomingo("2026-09");
+    // 2026-09-01 é uma terça-feira: só a segunda fica vazia.
+    expect(celulas.length % 6).toBe(0);
+    expect(celulas[0]).toBeNull();
+    expect(celulas[1]).toBe("2026-09-01");
+    expect(celulas.filter(Boolean)).toHaveLength(26);
+    expect(celulas.filter((dia): dia is string => Boolean(dia)).some(ehDomingo)).toBe(false);
+    // Cada coluna é o mesmo dia da semana: segunda na primeira, sábado na sexta.
+    celulas.forEach((dia, indice) => {
+      if (dia) expect(diaDaSemanaIso(dia)).toBe((indice % 6) + 1);
+    });
+  });
+  it("não deixa vazios à esquerda quando o mês começa num domingo", () => {
+    // 2026-02-01 é um domingo: o mês começa na segunda e fecha em quatro semanas.
+    const celulas = celulasDoMesSemDomingo("2026-02");
+    expect(celulas).toHaveLength(24);
+    expect(celulas[0]).toBe("2026-02-02");
+    expect(celulas[23]).toBe("2026-02-28");
   });
 });
 

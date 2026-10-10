@@ -283,7 +283,7 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
   expect(await lerGrade()).toEqual(gradeOriginal);
 });
 
-test("sábado com grade também começa bloqueado e não mostra a ação nos dias úteis ou no domingo", async ({
+test("sábado com grade também começa bloqueado e não mostra a ação nos dias úteis", async ({
   page,
 }) => {
   const sabado = ultimoSabado();
@@ -310,7 +310,7 @@ test("sábado com grade também começa bloqueado e não mostra a ação nos dia
   expect(pedido).toMatchObject({ dia: sexta, faltas: [] });
   expect(pedido.sabadoLetivo).toBeUndefined();
 
-  await escolherDia(page, secao, diaSeguinte(sabado, -6));
+  await escolherDia(page, secao, diaSeguinte(sabado, -5));
   await expect(
     secao.getByRole("button", { name: /^(Desbloquear sábado letivo|Sábado letivo)$/ }),
   ).toHaveCount(0);

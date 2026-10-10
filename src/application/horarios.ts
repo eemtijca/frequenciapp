@@ -20,7 +20,14 @@ const horarioBase = z.object({
   inicio: z.string().refine(ehHoraValida, "Horário de início inválido."),
   fim: z.string().refine(ehHoraValida, "Horário de fim inválido."),
   diasSemana: z
-    .array(z.number().int().min(1, "Dia inválido.").max(7, "Dia inválido."))
+    .array(
+      z
+        .number()
+        .int()
+        .min(1, "Dia inválido.")
+        .max(7, "Dia inválido.")
+        .refine((dia) => dia !== 7, "Domingo não tem aula."),
+    )
     .min(1, "Escolha ao menos um dia da semana.")
     .refine((dias) => new Set(dias).size === dias.length, "Há dias repetidos na lista."),
   ativo: z.boolean().default(true),

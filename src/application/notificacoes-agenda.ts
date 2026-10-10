@@ -5,7 +5,7 @@ import type { Prisma, TipoNotificacao } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { conferirParVapid, enviarPush, pushConfigurado } from "@/infra/web-push";
-import { diaLocal, diaSeguinte, diaDaSemanaIso } from "@/domain/frequencia";
+import { diaLocal, diaSeguinte, diaDaSemanaIso, ehDomingo } from "@/domain/frequencia";
 import {
   horarioDeEnvioAtingido,
   mensagemDoResumo,
@@ -26,7 +26,7 @@ type Filtro = () => Promise<Prisma.AssinaturaPushWhereInput | null>;
 async function permitidoAgora(tipo: TipoDeAviso, dia: string): Promise<boolean> {
   const agora = new Date();
   if (diaLocal(agora, ambiente.fuso) !== dia) return false;
-  if (await feriadoDoDia(dia)) return false;
+  if (ehDomingo(dia) || (await feriadoDoDia(dia))) return false;
   const configuracao = await lerConfiguracaoNotificacoes();
   if (!configuracao[tipo]) return false;
   if (tipo === "novasChamadas") return true;
@@ -85,9 +85,9 @@ async function filtroDiretor(
   };
 }
 
-/** Só turmas com alunos participantes e aula ativa prevista precisam de chamada. */
+/** Só turmas com alunos participantes e aula ativa prevista precisam de chamada; domingo não tem. */
 export async function contarChamadasPendentes(dia: string): Promise<number> {
-  if (await feriadoDoDia(dia)) return 0;
+  if (ehDomingo(dia) || (await feriadoDoDia(dia))) return 0;
   const data = new Date(`${dia}T12:00:00Z`);
   return banco().turma.count({
     where: {

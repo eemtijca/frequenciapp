@@ -9,6 +9,7 @@ import {
   diaDaSemanaIso,
   diaLocal,
   ehDiaValido,
+  ehDomingo,
   ehMesValido,
   horariosDaChamada,
   type Frequencia,
@@ -266,6 +267,9 @@ export async function salvarFrequencia(
   }
   const { dia, turmaId, revisao } = dados.data;
 
+  if (ehDomingo(dia)) {
+    throw new ErroHttp("Domingo não tem aula nem chamada.", 400);
+  }
   if (dados.data.sabadoLetivo && diaDaSemanaIso(dia) !== 6) {
     throw new ErroHttp("A liberação de sábado letivo só é válida aos sábados.", 400);
   }
