@@ -172,6 +172,42 @@ describe("coberturaDoDia", () => {
     expect(cobertura.registrados).toBe(1);
     expect(cobertura.turmasPendentes.map((item) => item.id)).toEqual(["turma-b"]);
   });
+
+  it("separa turmas pelo número de alunos ativos e pela chamada salva", () => {
+    const turmas = [
+      turma(),
+      turma({ id: "turma-b", nome: "B" }),
+      turma({ id: "vazia", nome: "C" }),
+    ];
+    const alunos = [
+      aluno({ id: "a" }),
+      aluno({ id: "b" }),
+      aluno({ id: "transferido", turmaId: "turma-b", turmaOriginalId: "turma-a" }),
+      aluno({ id: "inativo", turmaId: "vazia", ativo: false }),
+    ];
+    const cobertura = coberturaDoDia(turmas, alunos, [
+      frequencia({ alunos: ["a", "b", "transferido"] }),
+      frequencia({ turmaId: "vazia" }),
+    ]);
+    expect(cobertura.esperados).toBe(3);
+    expect(cobertura.registrados).toBe(2);
+    expect(cobertura.turmas.map((item) => [item.turma.id, item.esperados, item.concluida])).toEqual(
+      [
+        ["turma-a", 2, true],
+        ["turma-b", 1, false],
+      ],
+    );
+    expect(cobertura.turmasPendentes.map((item) => item.id)).toEqual(["turma-b"]);
+  });
+
+  it("não cria fatias para turmas sem alunos ativos", () => {
+    expect(coberturaDoDia([turma()], [aluno({ ativo: false })], [frequencia()])).toEqual({
+      esperados: 0,
+      registrados: 0,
+      turmasPendentes: [],
+      turmas: [],
+    });
+  });
 });
 
 describe("desistenciasNoDia", () => {
