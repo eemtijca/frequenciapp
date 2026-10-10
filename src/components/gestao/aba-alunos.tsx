@@ -2,7 +2,7 @@
 
 // Aba de alunos: criar, editar, mover de turma, ativar, desativar e
 // excluir, agrupados por turma com busca por nome.
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
   Check,
@@ -63,6 +63,127 @@ interface Formulario {
   turmaOriginalId: string;
 }
 
+interface PropsLinhaAluno {
+  aluno: Aluno;
+  origem: string;
+  modoSelecao: boolean;
+  selecionado: boolean;
+  ocupado: boolean;
+  semMovimento: boolean;
+  onSelecionar: (id: string) => void;
+  onEditar: (aluno: Aluno) => void;
+  onAlternarAtivo: (aluno: Aluno) => void;
+  onExcluir: (aluno: Aluno) => void;
+}
+
+const LinhaAluno = memo(function LinhaAluno({
+  aluno,
+  origem,
+  modoSelecao,
+  selecionado,
+  ocupado,
+  semMovimento,
+  onSelecionar,
+  onEditar,
+  onAlternarAtivo,
+  onExcluir,
+}: PropsLinhaAluno) {
+  return (
+    <motion.li
+      initial={semMovimento ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={semMovimento ? { duration: 0 } : { duration: 0.18 }}
+      className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
+    >
+      {modoSelecao && (
+        <button
+          type="button"
+          aria-pressed={selecionado}
+          aria-label={`Selecionar ${aluno.nome}`}
+          onClick={() => onSelecionar(aluno.id)}
+          className="pressionavel -ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
+        >
+          <span
+            className={`flex size-5 items-center justify-center rounded border ${
+              selecionado ? "border-primary bg-primary text-primary-foreground" : "border-input"
+            }`}
+          >
+            {selecionado && <Check size={13} aria-hidden="true" />}
+          </span>
+        </button>
+      )}
+      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+        {String(aluno.ordem).padStart(2, "0")}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{aluno.nome}</p>
+        {aluno.turmaOriginalId !== aluno.turmaId && (
+          <p className="text-muted-foreground text-xs">Origem {origem}</p>
+        )}
+        {aluno.desistenteEm ? (
+          <p className="text-muted-foreground text-xs">Desistente</p>
+        ) : !aluno.ativo ? (
+          <p className="text-muted-foreground text-xs">desativado</p>
+        ) : null}
+      </div>
+      {!modoSelecao && (
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11"
+            aria-label={`Editar ${aluno.nome}`}
+            onClick={() => onEditar(aluno)}
+          >
+            <Pencil size={16} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-11"
+            aria-label={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
+            onClick={() => onAlternarAtivo(aluno)}
+            disabled={ocupado || Boolean(aluno.desistenteEm)}
+          >
+            <Power size={16} />
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-falta-texto size-11"
+                aria-label={`Excluir ${aluno.nome}`}
+              >
+                <Trash2 size={16} />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  A exclusão é definitiva e apaga também faltas, saídas e entradas do aluno. Para
+                  preservar o histórico, desative em vez de excluir.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => onExcluir(aluno)}
+                  disabled={ocupado}
+                >
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
+    </motion.li>
+  );
+});
+
 export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const semMovimento = useReducedMotion() ?? false;
@@ -94,44 +215,57 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   }, [turmas]);
 
   const grupos = useMemo(() => {
-    const termo = normalizar(busca);
-    const mapa = new Map<string, Turma | undefined>();
+    const turmasPorId = new Map(turmas.map((turma) => [turma.id, turma]));
+    const mapa = new Map<string, Aluno[]>();
     for (const aluno of alunos) {
-      if (!mapa.has(aluno.turmaId)) {
-        mapa.set(
-          aluno.turmaId,
-          turmas.find((t) => t.id === aluno.turmaId),
-        );
-      }
+      const lista = mapa.get(aluno.turmaId) ?? [];
+      lista.push(aluno);
+      mapa.set(aluno.turmaId, lista);
     }
     return [...mapa.entries()]
-      .sort((a, b) => (a[1]?.rotulo ?? "").localeCompare(b[1]?.rotulo ?? "", "pt-BR"))
+      .sort((a, b) =>
+        (turmasPorId.get(a[0])?.rotulo ?? "").localeCompare(
+          turmasPorId.get(b[0])?.rotulo ?? "",
+          "pt-BR",
+        ),
+      )
       .map(
-        ([id, turma]) =>
-          [
-            id,
-            turma,
-            alunos
-              .filter(
-                (aluno) =>
-                  aluno.turmaId === id && (termo === "" || normalizar(aluno.nome).includes(termo)),
-              )
-              .sort((a, b) => a.ordem - b.ordem),
-          ] as const,
+        ([id, lista]) =>
+          [id, turmasPorId.get(id), lista.sort((a, b) => a.ordem - b.ordem)] as const,
       );
-  }, [alunos, turmas, busca]);
+  }, [alunos, turmas]);
+  const nomesParaBusca = useMemo(
+    () => new Map(alunos.map((aluno) => [aluno.id, normalizar(aluno.nome)])),
+    [alunos],
+  );
+  const gruposFiltrados = useMemo(() => {
+    const termo = normalizar(busca);
+    return termo === ""
+      ? grupos
+      : grupos.map(
+          ([id, turma, lista]) =>
+            [
+              id,
+              turma,
+              lista.filter((aluno) => (nomesParaBusca.get(aluno.id) ?? "").includes(termo)),
+            ] as const,
+        );
+  }, [grupos, nomesParaBusca, busca]);
 
-  const ativos = alunos.filter((aluno) => aluno.ativo).length;
-  const visiveis = useMemo(() => grupos.flatMap(([, , lista]) => lista), [grupos]);
+  const ativos = useMemo(() => alunos.filter((aluno) => aluno.ativo).length, [alunos]);
+  const visiveis = useMemo(
+    () => gruposFiltrados.flatMap(([, , lista]) => lista),
+    [gruposFiltrados],
+  );
 
-  function alternarSelecao(id: string) {
+  const alternarSelecao = useCallback((id: string) => {
     setSelecionados((atuais) => {
       const proximos = new Set(atuais);
       if (proximos.has(id)) proximos.delete(id);
       else proximos.add(id);
       return proximos;
     });
-  }
+  }, []);
 
   function alternarTodos() {
     setSelecionados((atuais) => {
@@ -180,7 +314,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     setDialogoAberto(true);
   }
 
-  function abrirEdicao(aluno: Aluno) {
+  const abrirEdicao = useCallback((aluno: Aluno) => {
     setEmEdicao(aluno);
     setFormulario({
       nome: aluno.nome,
@@ -189,7 +323,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     });
     setErro("");
     setDialogoAberto(true);
-  }
+  }, []);
 
   async function submeter() {
     if (enviando) return;
@@ -225,22 +359,25 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     }
   }
 
-  function alternarAtivo(aluno: Aluno) {
-    void executarPorChave(aluno.id, async () => {
-      try {
-        await pedir<{ aluno: Aluno }>(
-          `/api/alunos/${aluno.id}`,
-          corpoAlteracao("PATCH", { ativo: !aluno.ativo }),
-        );
-        toast.success(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
-        await onMudanca();
-      } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
-        toast.error(mensagem);
-      }
-    });
-  }
+  const alternarAtivo = useCallback(
+    (aluno: Aluno) => {
+      void executarPorChave(aluno.id, async () => {
+        try {
+          await pedir<{ aluno: Aluno }>(
+            `/api/alunos/${aluno.id}`,
+            corpoAlteracao("PATCH", { ativo: !aluno.ativo }),
+          );
+          toast.success(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
+          await onMudanca();
+        } catch (excecao) {
+          const mensagem =
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
+          toast.error(mensagem);
+        }
+      });
+    },
+    [executarPorChave, onMudanca],
+  );
 
   function alternarDesistencia(aluno: Aluno) {
     void executarPorChave(aluno.id, async () => {
@@ -262,19 +399,22 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     });
   }
 
-  function excluir(aluno: Aluno) {
-    void executarPorChave(aluno.id, async () => {
-      try {
-        await pedir<{ ok: boolean }>(`/api/alunos/${aluno.id}`, corpoAlteracao("DELETE"));
-        toast.success("Aluno excluído.");
-        await onMudanca();
-      } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o aluno.";
-        toast.error(mensagem);
-      }
-    });
-  }
+  const excluir = useCallback(
+    (aluno: Aluno) => {
+      void executarPorChave(aluno.id, async () => {
+        try {
+          await pedir<{ ok: boolean }>(`/api/alunos/${aluno.id}`, corpoAlteracao("DELETE"));
+          toast.success("Aluno excluído.");
+          await onMudanca();
+        } catch (excecao) {
+          const mensagem =
+            excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o aluno.";
+          toast.error(mensagem);
+        }
+      });
+    },
+    [executarPorChave, onMudanca],
+  );
 
   // A relação sai no mesmo schema da importação: turmas na ordem do cadastro e
   // alunos ativos na ordem da chamada.
@@ -418,7 +558,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               Crie séries e turmas antes de cadastrar alunos.
             </p>
           </div>
-        ) : grupos.length === 0 || grupos.every(([, , lista]) => lista.length === 0) ? (
+        ) : gruposFiltrados.length === 0 ||
+          gruposFiltrados.every(([, , lista]) => lista.length === 0) ? (
           <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
             <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
             <p className="font-medium">Nenhum aluno encontrado</p>
@@ -427,7 +568,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </p>
           </div>
         ) : (
-          grupos
+          gruposFiltrados
             .filter(([, , lista]) => lista.length > 0)
             .map(([id, turma, lista]) => (
               <div key={id}>
@@ -439,105 +580,19 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                 </div>
                 <ul className="divide-y">
                   {lista.map((aluno) => (
-                    <motion.li
+                    <LinhaAluno
                       key={aluno.id}
-                      initial={semMovimento ? false : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={semMovimento ? { duration: 0 } : { duration: 0.18 }}
-                      className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
-                    >
-                      {modoSelecao && (
-                        <button
-                          type="button"
-                          aria-pressed={selecionados.has(aluno.id)}
-                          aria-label={`Selecionar ${aluno.nome}`}
-                          onClick={() => alternarSelecao(aluno.id)}
-                          className="pressionavel -ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
-                        >
-                          <span
-                            className={`flex size-5 items-center justify-center rounded border ${
-                              selecionados.has(aluno.id)
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-input"
-                            }`}
-                          >
-                            {selecionados.has(aluno.id) && <Check size={13} aria-hidden="true" />}
-                          </span>
-                        </button>
-                      )}
-                      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                        {String(aluno.ordem).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{aluno.nome}</p>
-                        {aluno.turmaOriginalId !== aluno.turmaId && (
-                          <p className="text-muted-foreground text-xs">
-                            Origem {rotulo(aluno.turmaOriginalId)}
-                          </p>
-                        )}
-                        {aluno.desistenteEm ? (
-                          <p className="text-muted-foreground text-xs">Desistente</p>
-                        ) : !aluno.ativo ? (
-                          <p className="text-muted-foreground text-xs">desativado</p>
-                        ) : null}
-                      </div>
-                      {!modoSelecao && (
-                        <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-11"
-                            aria-label={`Editar ${aluno.nome}`}
-                            onClick={() => abrirEdicao(aluno)}
-                          >
-                            <Pencil size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-11"
-                            aria-label={
-                              aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`
-                            }
-                            onClick={() => alternarAtivo(aluno)}
-                            disabled={chaveAtiva === aluno.id || Boolean(aluno.desistenteEm)}
-                          >
-                            <Power size={16} />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-falta-texto size-11"
-                                aria-label={`Excluir ${aluno.nome}`}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  A exclusão é definitiva e apaga também faltas, saídas e entradas
-                                  do aluno. Para preservar o histórico, desative em vez de excluir.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => excluir(aluno)}
-                                  disabled={chaveAtiva === aluno.id}
-                                >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      )}
-                    </motion.li>
+                      aluno={aluno}
+                      origem={rotulo(aluno.turmaOriginalId)}
+                      modoSelecao={modoSelecao}
+                      selecionado={selecionados.has(aluno.id)}
+                      ocupado={chaveAtiva === aluno.id}
+                      semMovimento={semMovimento}
+                      onSelecionar={alternarSelecao}
+                      onEditar={abrirEdicao}
+                      onAlternarAtivo={alternarAtivo}
+                      onExcluir={excluir}
+                    />
                   ))}
                 </ul>
               </div>

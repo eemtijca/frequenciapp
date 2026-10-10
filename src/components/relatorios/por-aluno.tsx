@@ -2,7 +2,14 @@
 
 // Relatório por aluno no mês: faltas, faltas justificadas, saídas e dias
 // com registro, com o acumulado de todo o histórico.
-import { useMemo, useState } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, UserRound } from "lucide-react";
 import type {
   Aluno,
@@ -23,7 +30,7 @@ import {
   rotuloMomento,
 } from "@/domain/frequencia";
 import { CirculosAcumulado } from "@/components/ui/circulo-contagem";
-import { indexarPorDia, resumoPorAluno } from "@/domain/relatorios";
+import { indexarPorDia, resumoPorAluno, type ResumoAlunoPeriodo } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -111,6 +118,105 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
   );
 }
 
+interface LinhaResumo {
+  aluno: Aluno;
+  nomeNormalizado: string;
+  resumo: ResumoAlunoPeriodo;
+}
+
+interface ListaAlunosProps {
+  linhas: LinhaResumo[];
+  expandido: string | null;
+  setExpandido: Dispatch<SetStateAction<string | null>>;
+  rotuloTurma: (id: string) => string;
+  acumuladoDe: (id: string) => ResumoAcumulado["porAluno"][number] | null;
+  resumo: ResumoAcumulado | null;
+  dias: string[];
+  porDia: Map<string, Frequencia[]>;
+  horarios: Horario[];
+  saidas: SaidaAntecipada[];
+}
+
+// A lista mantém o último filtro enquanto o campo de busca responde à digitação.
+const ListaAlunos = memo(function ListaAlunos({
+  linhas,
+  expandido,
+  setExpandido,
+  rotuloTurma,
+  acumuladoDe,
+  resumo,
+  dias,
+  porDia,
+  horarios,
+  saidas,
+}: ListaAlunosProps) {
+  return (
+    <ul className="superficie-vidro divide-y overflow-hidden">
+      {linhas.map(({ aluno, resumo: doAluno }) => {
+        const acumulado = acumuladoDe(aluno.id);
+        const aberto = expandido === aluno.id;
+        return (
+          <li
+            key={aluno.id}
+            className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+          >
+            <button
+              type="button"
+              aria-expanded={aberto}
+              onClick={() => setExpandido((atual) => (atual === aluno.id ? null : aluno.id))}
+              className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{aluno.nome}</span>
+                <span className="text-muted-foreground block truncate text-xs">
+                  {rotuloTurma(aluno.turmaId)}
+                  {aluno.turmaOriginalId !== aluno.turmaId
+                    ? ` · origem ${rotuloTurma(aluno.turmaOriginalId)}`
+                    : ""}
+                </span>
+              </span>
+              <CirculosAcumulado
+                faltas={doAluno.faltas}
+                justificadas={doAluno.justificadas}
+                saidas={doAluno.saidas}
+              />
+            </button>
+            {aberto && (
+              <div className="bg-secondary/30 border-t px-4 py-3">
+                <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+                  <span>
+                    Acumulado desde{" "}
+                    {resumo?.primeiroDia
+                      ? resumo.primeiroDia.split("-").reverse().join("/")
+                      : "a primeira chamada"}
+                  </span>
+                  <CirculosAcumulado
+                    faltas={acumulado?.faltas ?? 0}
+                    justificadas={acumulado?.faltasJustificadas ?? 0}
+                  />
+                  <span>
+                    em {resumo?.diasLetivos ?? 0}{" "}
+                    {resumo?.diasLetivos === 1 ? "dia letivo" : "dias letivos"}
+                  </span>
+                </p>
+                <div className="mt-2">
+                  <DetalheAluno
+                    aluno={aluno}
+                    dias={dias}
+                    porDia={porDia}
+                    horarios={horarios}
+                    saidas={saidas}
+                  />
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+});
+
 export default function PorAluno({
   alunos,
   series,
@@ -147,23 +253,34 @@ export default function PorAluno({
   const porDia = useMemo(() => indexarPorDia(frequencias), [frequencias]);
   const horarios = useMemo(() => turmas.flatMap((turma) => turma.horarios), [turmas]);
 
-  const linhas = useMemo(() => {
-    const termo = normalizar(busca);
-    return alunos
-      .filter((aluno) => aluno.ativo)
-      .filter((aluno) => (serieFiltro ? turmaSerie.get(aluno.turmaId) === serieFiltro : true))
-      .filter((aluno) => (turmaFiltro ? aluno.turmaId === turmaFiltro : true))
-      .filter((aluno) => (termo === "" ? true : normalizar(aluno.nome).includes(termo)))
-      .map((aluno) => ({
-        aluno,
-        resumo: resumoPorAluno(aluno, dias, porDia, saidas, horarios),
-      }))
-      .sort(
-        (a, b) =>
-          b.resumo.faltas + b.resumo.justificadas - (a.resumo.faltas + a.resumo.justificadas) ||
-          a.aluno.nome.localeCompare(b.aluno.nome, "pt-BR"),
-      );
-  }, [alunos, busca, serieFiltro, turmaFiltro, turmaSerie, dias, porDia, saidas, horarios]);
+  // Os cálculos do mês e a ordenação não dependem da digitação nem dos filtros.
+  const resumos = useMemo(
+    () =>
+      alunos
+        .filter((aluno) => aluno.ativo)
+        .map((aluno) => ({
+          aluno,
+          nomeNormalizado: normalizar(aluno.nome),
+          resumo: resumoPorAluno(aluno, dias, porDia, saidas, horarios),
+        }))
+        .sort(
+          (a, b) =>
+            b.resumo.faltas + b.resumo.justificadas - (a.resumo.faltas + a.resumo.justificadas) ||
+            a.aluno.nome.localeCompare(b.aluno.nome, "pt-BR"),
+        ),
+    [alunos, dias, porDia, saidas, horarios],
+  );
+  const termo = useDeferredValue(normalizar(busca));
+  const linhas = useMemo(
+    () =>
+      resumos.filter(
+        ({ aluno, nomeNormalizado }) =>
+          (!serieFiltro || turmaSerie.get(aluno.turmaId) === serieFiltro) &&
+          (!turmaFiltro || aluno.turmaId === turmaFiltro) &&
+          (termo === "" || nomeNormalizado.includes(termo)),
+      ),
+    [resumos, serieFiltro, turmaFiltro, turmaSerie, termo],
+  );
 
   const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     try {
@@ -272,69 +389,18 @@ export default function PorAluno({
           <p className="text-muted-foreground text-sm">Ajuste a busca ou os filtros.</p>
         </div>
       ) : (
-        <ul className="superficie-vidro divide-y overflow-hidden">
-          {linhas.map(({ aluno, resumo: doAluno }) => {
-            const acumulado = acumuladoDe(aluno.id);
-            const aberto = expandido === aluno.id;
-            return (
-              <li
-                key={aluno.id}
-                className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
-              >
-                <button
-                  type="button"
-                  aria-expanded={aberto}
-                  onClick={() => setExpandido((atual) => (atual === aluno.id ? null : aluno.id))}
-                  className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{aluno.nome}</span>
-                    <span className="text-muted-foreground block truncate text-xs">
-                      {rotuloTurma(aluno.turmaId)}
-                      {aluno.turmaOriginalId !== aluno.turmaId
-                        ? ` · origem ${rotuloTurma(aluno.turmaOriginalId)}`
-                        : ""}
-                    </span>
-                  </span>
-                  <CirculosAcumulado
-                    faltas={doAluno.faltas}
-                    justificadas={doAluno.justificadas}
-                    saidas={doAluno.saidas}
-                  />
-                </button>
-                {aberto && (
-                  <div className="bg-secondary/30 border-t px-4 py-3">
-                    <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-                      <span>
-                        Acumulado desde{" "}
-                        {resumo?.primeiroDia
-                          ? resumo.primeiroDia.split("-").reverse().join("/")
-                          : "a primeira chamada"}
-                      </span>
-                      <CirculosAcumulado
-                        faltas={acumulado?.faltas ?? 0}
-                        justificadas={acumulado?.faltasJustificadas ?? 0}
-                      />
-                      <span>
-                        em {resumo?.diasLetivos ?? 0}{" "}
-                        {resumo?.diasLetivos === 1 ? "dia letivo" : "dias letivos"}
-                      </span>
-                    </p>
-                    <div className="mt-2">
-                      <DetalheAluno
-                        aluno={aluno}
-                        dias={dias}
-                        porDia={porDia}
-                        horarios={horarios}
-                        saidas={saidas}
-                      />
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <ListaAlunos
+          linhas={linhas}
+          expandido={expandido}
+          setExpandido={setExpandido}
+          rotuloTurma={rotuloTurma}
+          acumuladoDe={acumuladoDe}
+          resumo={resumo}
+          dias={dias}
+          porDia={porDia}
+          horarios={horarios}
+          saidas={saidas}
+        />
       )}
     </section>
   );

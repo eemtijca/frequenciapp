@@ -106,6 +106,8 @@ Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída
 
 `responsividade.spec.ts` confere cabeçalho sem estouro horizontal e rolagem independente do menu, com ações da conta acessíveis em 320x568, 800x600 e 844x390 pixels, além de formulários centralizados e conteúdo limitado em monitor de 1920 pixels. As capturas dos temas claro e escuro e dos tamanhos responsivos ficam anexadas ao relatório dos testes, sem entrar no Git.
 
+`fluidez-mobile.spec.ts` usa massa própria para conferir busca sem acento e ordem do cadastro, edição após filtrar, filtros e totais do relatório por aluno, suspensão de consultas da Grade oculta e retomada com a busca preservada. Também verifica foco e rolagem dos seletores sem deslocar o painel principal e acesso às ações de confirmação em tela de 360x320 pixels. Os cenários não impõem limites de tempo ligados ao hardware.
+
 A navegação desktop dos gráficos é coberta em `painel-filtros.spec.ts`: seleção direta, botões nos extremos, teclado e ausência dos controles no celular. `gestao.spec.ts` cobre categorias isoladas, rascunhos preservados e retorno Google para as três finalidades, inclusive formato antigo.
 
 O Resumo dos Relatórios verifica filtros, comparação entre séries e turmas, os três rankings de alunos (F + FJ, só F e só FJ) com empate por nome e mensagem própria quando vazios, taxas calculadas sobre registros salvos, dias sem chamada, respostas fora de ordem e falha recuperável ao mudar de mês. O período permanece legível em 360 pixels. A evolução diária reutiliza as regras de lista histórica, desistência por data e ausência parcial do domínio.

@@ -35,6 +35,10 @@ Baixar planilha, Exportar relação e Baixar cópia abrem o mesmo diálogo de pr
 
 ## Fluxo de um toque
 
+As listas reutilizam índices de nomes, agrupamentos e opções enquanto os dados não mudam. Alunos, Grade e Relatórios por aluno deixam o campo responder antes de atualizar a lista filtrada; cálculos mensais não são repetidos durante a digitação. A busca da Gestão mantém a seleção em massa sincronizada com o filtro visível. Marcação de falta, rascunhos, confirmação RS e salvamento continuam imediatos. Painel e Grade cancelam somente leituras ao ocultar a visão e consultam novamente ao retornar, preservando filtros e resultados.
+
+O seletor de horário mantém o foco sem deslocar a tela ou o formulário atrás do painel: só a coluna de opções rola. A altura acompanha o espaço disponível. Listas buscáveis agrupam os eventos de redimensionamento do teclado em um ajuste por quadro. Diálogos de confirmação têm altura limitada à tela e rolagem própria, mantendo Cancelar e a ação de confirmação alcançáveis em telas baixas.
+
 Em Gestão, Configurações, Recursos da escola, a chave "Turma de origem na Chamada" controla a indicação. Com o recurso ligado, a administração escolhe séries completas e turmas específicas (as turmas ficam dentro de uma seção que expande e recolhe); a seleção de uma série abrange também as turmas criadas depois. Cada escolha é salva imediatamente. Sem seleção ou com o recurso desligado, nenhuma chamada mostra origem nem asterisco. Desativar preserva a seleção para a próxima ativação.
 
 Nas chamadas selecionadas, a turma de origem aparece em um círculo ao lado do nome. O asterisco visual marca o aluno com origem diferente da turma da chamada e preserva o marcador legado quando habilitado. O nome cadastrado, a Grade e a sincronização por origem continuam iguais. A migração configura a 3ª série já existente para compatibilidade; instalações vazias começam com o recurso desligado. A interface não contém regra fixa por nome de série ([ADR-026](adr/026-origem-configuravel-na-chamada.md)).
