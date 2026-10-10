@@ -349,6 +349,35 @@ describe("calendário escolar por ano", () => {
     expect(feriados.rows.length + chamadas.rows.length).toBe(1);
   });
 
+  it("em corridas repetidas, nunca aceita feriado e chamada na mesma data", async () => {
+    // Dias úteis de 1991, fora das datas usadas no resto da suíte.
+    const datas: string[] = [];
+    for (let deslocamento = 0; datas.length < 25; deslocamento += 1) {
+      const data = new Date(Date.UTC(1991, 2, 4 + deslocamento));
+      if (data.getUTCDay() !== 0) datas.push(data.toISOString().slice(0, 10));
+    }
+    for (const [indice, data] of datas.entries()) {
+      const feriado = () =>
+        chamar("/api/calendario-letivo", "POST", { dia: data, nome: `${prefixo} Corrida` });
+      const salvar = () => chamar("/api/frequencias", "POST", chamada(data), cookieEquipe);
+      // Alterna quem sai primeiro para não favorecer um dos lados.
+      const [primeira, segunda] = await Promise.all(
+        indice % 2 === 0 ? [feriado(), salvar()] : [salvar(), feriado()],
+      );
+      const [doFeriado, daChamada] = indice % 2 === 0 ? [primeira, segunda] : [segunda, primeira];
+      expect([
+        [201, 400],
+        [409, 200],
+      ]).toContainEqual([doFeriado?.status, daChamada?.status]);
+      const feriados = await banco.query("select 1 from feriados where dia = $1", [data]);
+      const chamadas = await banco.query(
+        "select 1 from frequencias where dia = $1 and turma_id = $2",
+        [data, turmaId],
+      );
+      expect(feriados.rows.length + chamadas.rows.length).toBe(1);
+    }
+  });
+
   it("exporta e restaura o calendário por mesclagem, preservando feriados e histórico", async () => {
     const feriado = await criar();
     const exportacao = await chamar("/api/backup/exportar", "POST", {

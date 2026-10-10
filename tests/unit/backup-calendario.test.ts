@@ -8,6 +8,8 @@ const dados = vi.hoisted(() => ({
   refazer: false,
 }));
 const transacao = vi.hoisted(() => ({
+  // Trava do calendário (LOCK TABLE) feita pela transação antes de ler.
+  $executeRaw: vi.fn(async () => 0),
   feriado: {
     findMany: vi.fn(() => dados.feriados),
     create: vi.fn(({ data }: { data: { dia: Date; nome: string } }) => data),
@@ -30,7 +32,7 @@ const transacao = vi.hoisted(() => ({
 }));
 const trava = vi.hoisted(() => vi.fn((tarefa: () => Promise<unknown>) => tarefa()));
 const conferirTrava = vi.hoisted(() => vi.fn());
-vi.mock("@/infra/banco", () => ({ banco: vi.fn() }));
+vi.mock("@/infra/banco", () => ({ banco: vi.fn(), objetoDoBanco: (nome: string) => nome }));
 vi.mock("@/infra/transacoes", () => ({
   comTransacao: async (operacao: (tx: typeof transacao) => Promise<unknown>) => {
     if (dados.refazer) await operacao(transacao);

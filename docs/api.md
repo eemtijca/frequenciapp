@@ -336,7 +336,7 @@ Sábado letivo: a Chamada do aplicativo bloqueia todo sábado até a pessoa libe
 
 Domingo não tem aula nem chamada: a rota responde 400 ("Domingo não tem aula nem chamada.") para qualquer turma, mesmo que uma grade antiga tenha domingo. As chamadas de domingo já salvas continuam sendo lidas.
 
-Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes.
+Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes. O salvamento e o cadastro de feriado travam a tabela de feriados antes de ler, então, se os dois acontecem ao mesmo tempo para a mesma data, um deles sempre vê o outro: a chamada responde 400 ou o feriado responde 409, nunca os dois aceitos (ver `docs/banco.md`).
 
 Semântica da `revisao`:
 

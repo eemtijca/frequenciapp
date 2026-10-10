@@ -17,6 +17,8 @@ const dados = vi.hoisted(() => {
   return { serie, turma, horario, horarios: [horario] };
 });
 const repositorio = vi.hoisted(() => ({
+  // Trava do calendário (LOCK TABLE) feita pela transação antes de ler.
+  $executeRaw: vi.fn(async () => 0),
   feriado: { findMany: vi.fn(() => []) },
   serie: { findMany: vi.fn(() => [dados.serie]) },
   turma: { findMany: vi.fn(() => [dados.turma]) },
@@ -35,7 +37,10 @@ const repositorio = vi.hoisted(() => ({
   justificativa: { findMany: vi.fn(() => []) },
   liberador: { findMany: vi.fn(() => []) },
 }));
-vi.mock("@/infra/banco", () => ({ banco: () => repositorio }));
+vi.mock("@/infra/banco", () => ({
+  banco: () => repositorio,
+  objetoDoBanco: (nome: string) => nome,
+}));
 vi.mock("@/infra/transacoes", () => ({
   comTransacao: (operacao: (tx: typeof repositorio) => Promise<unknown>) => operacao(repositorio),
 }));
