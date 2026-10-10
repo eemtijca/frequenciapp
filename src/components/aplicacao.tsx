@@ -276,9 +276,19 @@ export default function Aplicacao({
   }, [configuracoes.saidaAntecipada, itemFinal, podeOperar]);
   // Gestão segue no catálogo dos painéis e da barra lateral; apenas o acesso
   // do celular muda de lugar, sem invalidar a visão ativa nem perder seu estado.
-  const itensInferiores = useMemo(() => itens.filter((item) => item.visao !== "gestao"), [itens]);
+  // A Chamada Parcial abre pelo botão de ícone da Chamada: continua entre os
+  // painéis, mas sem item próprio nas barras, e a Chamada fica ativa nela.
+  const itensNavegacao = useMemo(
+    () => itens.filter((item) => item.visao !== "chamada-parcial"),
+    [itens],
+  );
+  const itensInferiores = useMemo(
+    () => itensNavegacao.filter((item) => item.visao !== "gestao"),
+    [itensNavegacao],
+  );
+  const visaoNavegacao: Visao = visao === "chamada-parcial" ? "chamada" : visao;
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
-  const indiceInferiorAtivo = itensInferiores.findIndex((item) => item.visao === visao);
+  const indiceInferiorAtivo = itensInferiores.findIndex((item) => item.visao === visaoNavegacao);
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
   const posicoes = useRef(new Map<Visao, number>());
 
@@ -556,6 +566,7 @@ export default function Aplicacao({
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={registrarPendenciasChamada}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
+            onAbrirParcial={podeOperar ? () => trocarVisao("chamada-parcial") : undefined}
           />
         )}
         {alvoVisao === "chamada-parcial" && podeOperar && (
@@ -665,12 +676,15 @@ export default function Aplicacao({
             <p className="text-muted-foreground text-xs">Registro de frequência escolar</p>
           </div>
           <nav aria-label="Seções do aplicativo" className="flex flex-1 flex-col gap-1.5 px-3">
-            {itens.map((item) => (
+            {itensNavegacao.map((item) => (
               <ItemNavegacao
                 key={item.visao}
                 item={item}
-                ativo={visao === item.visao}
-                pendente={pendencias.includes(item.visao)}
+                ativo={visaoNavegacao === item.visao}
+                pendente={
+                  pendencias.includes(item.visao) ||
+                  (item.visao === "chamada" && pendencias.includes("chamada-parcial"))
+                }
                 indicador="indicador-lateral"
                 onTrocar={trocarVisao}
               />
@@ -874,8 +888,11 @@ export default function Aplicacao({
                   <ItemNavegacao
                     key={item.visao}
                     item={item}
-                    ativo={visao === item.visao}
-                    pendente={pendencias.includes(item.visao)}
+                    ativo={visaoNavegacao === item.visao}
+                    pendente={
+                      pendencias.includes(item.visao) ||
+                      (item.visao === "chamada" && pendencias.includes("chamada-parcial"))
+                    }
                     onTrocar={trocarVisao}
                   />
                 ))}
