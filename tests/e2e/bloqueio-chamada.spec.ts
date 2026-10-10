@@ -35,8 +35,8 @@ test.beforeAll(async () => {
     const aId = turmaA.rows[0]?.id;
     const bId = turmaB.rows[0]?.id;
     await cliente.query(
-      "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '07:00', '07:50', $2, true)",
-      [aId, [1, 2, 3, 4, 5, 6, 7]],
+      "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '07:00', '07:50', $3, true), ($2, 1, '07:00', '07:50', $3, true)",
+      [aId, bId, [1, 2, 3, 4, 5, 6, 7]],
     );
     await cliente.query(
       "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Bloqueio Um', $1, $1, 1, true), ('E2E Bloqueio Dois', $2, $2, 1, true)",
@@ -78,7 +78,7 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await expect(aluno).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Salvar" })).toBeDisabled();
 
-  // O botão fica na linha do resumo, à direita dele, sem quadro nem frases de apoio.
+  // Aos sábados o resumo divide a linha com a liberação; a correção fica abaixo.
   const resumo = secao.getByRole("button", { name: /^Resumo d/ });
   const botaoBloqueio = secao.getByRole("button", { name: /^Desbloquear chamada de/ });
   const [caixaResumo, caixaBloqueio] = await Promise.all([
@@ -88,8 +88,12 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   expect(caixaResumo).not.toBeNull();
   expect(caixaBloqueio).not.toBeNull();
   if (caixaResumo && caixaBloqueio) {
-    expect(Math.abs(caixaResumo.y - caixaBloqueio.y)).toBeLessThan(8);
-    expect(caixaBloqueio.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+    if (await secao.getByRole("button", { name: "Sábado letivo", exact: true }).count()) {
+      expect(caixaBloqueio.y).toBeGreaterThanOrEqual(caixaResumo.y + caixaResumo.height);
+    } else {
+      expect(Math.abs(caixaResumo.y - caixaBloqueio.y)).toBeLessThan(8);
+      expect(caixaBloqueio.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+    }
   }
   await expect(secao.getByText("Desbloqueie para corrigir a frequência.")).toHaveCount(0);
   await page.setViewportSize({ width: 360, height: 780 });

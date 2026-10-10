@@ -438,6 +438,20 @@ export function horariosDoDia(horarios: Horario[], dia: string): Horario[] {
     .sort((a, b) => a.ordem - b.ordem);
 }
 
+/** Sábado ocasional liberado usa as aulas ativas sem alterar a grade semanal. */
+export function horariosDaChamada(
+  horarios: Horario[],
+  dia: string,
+  sabadoLetivo = false,
+): Horario[] {
+  const previstos = horariosDoDia(horarios, dia);
+  if (previstos.length > 0 || !sabadoLetivo || diaDaSemanaIso(dia) !== 6) return previstos;
+  return horarios
+    .filter((horario) => horario.ativo)
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem);
+}
+
 /** Dias de um mês, para as colunas da grade. */
 export function diasDoMes(mes: string): string[] {
   const [anoTexto = "0", numeroTexto = "0"] = mes.split("-");
@@ -668,9 +682,12 @@ export function marcaDoAluno(
       .map((frequencia) => frequencia.turmaId),
   );
   const temFrequencia = turmasDaChamada.size > 0;
-  const aulasDaTurma = horariosDoDia(
-    horarios.filter((horario) => turmasDaChamada.has(horario.turmaId)),
-    dia,
+  const aulasDaTurma = [...turmasDaChamada].flatMap((turmaId) =>
+    horariosDaChamada(
+      horarios.filter((horario) => horario.turmaId === turmaId),
+      dia,
+      true,
+    ),
   );
 
   if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;

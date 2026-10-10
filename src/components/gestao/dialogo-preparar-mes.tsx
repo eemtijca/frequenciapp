@@ -206,7 +206,7 @@ export function DialogoPrepararMes({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {resultados === null
-                ? "Cria ou atualiza uma aba por turma, com o nome do mês e datas de segunda a sexta. Nas abas existentes, retira Turma atual e as colunas de sábado e domingo, mantendo os demais registros. Ao concluir todas as turmas, mostra apenas as abas deste mês e oculta o histórico vinculado."
+                ? "Organiza as abas do mês, preservando dias úteis e sábados com chamada salva. Retira Turma atual, domingos e sábados sem chamada. Ao concluir, mostra apenas este mês."
                 : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

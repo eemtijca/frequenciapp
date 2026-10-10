@@ -42,8 +42,11 @@ export function nomeAbaMensal(rotulo: string, mes: string, incluirAno = false): 
   return `${(turma || "Turma").slice(0, 100 - sufixo.length).trim()}${sufixo}`;
 }
 
-/** A planilha mensal contém somente as datas de segunda a sexta-feira. */
-export function diasDaPlanilhaMensal(mes: string): string[] {
+/** Datas úteis e sábados com chamada salva, sem incluir domingos ou outro mês. */
+export function diasDaPlanilhaMensal(mes: string, sabadosLetivos: string[] = []): string[] {
   if (!mesValido(mes)) throw new Error("Informe um mês válido.");
-  return diasDoMes(mes).filter((dia) => diaDaSemanaIso(dia) <= 5);
+  const sabados = new Set(sabadosLetivos);
+  return diasDoMes(mes).filter(
+    (dia) => diaDaSemanaIso(dia) <= 5 || (diaDaSemanaIso(dia) === 6 && sabados.has(dia)),
+  );
 }
