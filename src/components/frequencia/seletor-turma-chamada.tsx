@@ -3,7 +3,14 @@
 // Seletores circulares com situação das chamadas e progresso por série na data consultada.
 // A seleção continua independente da conclusão, com nomes e estados acessíveis.
 import { useId, useMemo, useState } from "react";
-import { CheckCircle2, ChevronDown, CircleMinus, Clock3, LoaderCircle } from "lucide-react";
+import {
+  CalendarOff,
+  CheckCircle2,
+  ChevronDown,
+  CircleMinus,
+  Clock3,
+  LoaderCircle,
+} from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia, type CoberturaTurmaDia } from "@/domain/relatorios";
@@ -20,12 +27,13 @@ interface Props {
   coberturaDisponivel: boolean;
   carregando: boolean;
   temAlteracoes: boolean;
+  feriado?: string;
   /** Bloqueia a troca (alterações por salvar, carregamento ou salvamento). */
   travado: boolean;
   onEscolher: (turmaId: string) => void;
 }
 
-type Situacao = "carregando" | "indisponivel" | "sem-alunos" | "pendente" | "concluida";
+type Situacao = "carregando" | "indisponivel" | "sem-alunos" | "pendente" | "concluida" | "feriado";
 
 const ROTULOS: Record<Situacao, string> = {
   carregando: "Conferindo chamadas",
@@ -33,6 +41,7 @@ const ROTULOS: Record<Situacao, string> = {
   "sem-alunos": "Sem alunos para a chamada",
   pendente: "Chamada pendente",
   concluida: "Chamada salva",
+  feriado: "Feriado, sem chamada prevista",
 };
 
 function nomeDaSerie(nome: string): string {
@@ -41,13 +50,15 @@ function nomeDaSerie(nome: string): string {
 
 function IconeSituacao({ situacao }: { situacao: Situacao }) {
   const Icone =
-    situacao === "concluida"
-      ? CheckCircle2
-      : situacao === "pendente"
-        ? Clock3
-        : situacao === "carregando"
-          ? LoaderCircle
-          : CircleMinus;
+    situacao === "feriado"
+      ? CalendarOff
+      : situacao === "concluida"
+        ? CheckCircle2
+        : situacao === "pendente"
+          ? Clock3
+          : situacao === "carregando"
+            ? LoaderCircle
+            : CircleMinus;
   return (
     <Icone
       aria-hidden="true"
@@ -132,6 +143,7 @@ export function SeletorTurmaChamada({
   coberturaDisponivel,
   carregando,
   temAlteracoes,
+  feriado,
   travado,
   onEscolher,
 }: Props) {
@@ -160,11 +172,12 @@ export function SeletorTurmaChamada({
         turmas,
         participantes,
         frequencias.filter((item) => item.dia === dia),
+        Boolean(feriado),
       ).turmas.map((item) => ({
         ...item,
         concluida: item.concluida && !(item.turma.id === turmaId && temAlteracoes),
       })),
-    [turmas, participantes, frequencias, dia, turmaId, temAlteracoes],
+    [turmas, participantes, frequencias, dia, turmaId, temAlteracoes, feriado],
   );
 
   const contagem = useMemo(() => {
@@ -176,6 +189,7 @@ export function SeletorTurmaChamada({
   }, [participantes]);
 
   function situacaoDe(total: number, concluida: boolean): Situacao {
+    if (feriado) return "feriado";
     if (total === 0) return "sem-alunos";
     if (!coberturaDisponivel) return carregando ? "carregando" : "indisponivel";
     return concluida ? "concluida" : "pendente";
@@ -214,7 +228,7 @@ export function SeletorTurmaChamada({
             turmasDaSerie.every((item) => item.concluida),
           );
           const nome = nomeDaSerie(grupo.nome);
-          const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
+          const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
           return (
             <Button
               key={grupo.id}
@@ -233,7 +247,7 @@ export function SeletorTurmaChamada({
             >
               <AnelSerie
                 turmas={turmasDaSerie}
-                disponivel={coberturaDisponivel}
+                disponivel={coberturaDisponivel && !feriado}
                 progresso={progresso}
               />
               <span className={estilos.nome} aria-hidden="true">
@@ -254,7 +268,7 @@ export function SeletorTurmaChamada({
               </span>
               <span className={estilos.situacao} aria-hidden="true">
                 <IconeSituacao situacao={situacao} />
-                {coberturaDisponivel && total > 0 && <span>{progresso}%</span>}
+                {!feriado && coberturaDisponivel && total > 0 && <span>{progresso}%</span>}
               </span>
               <span id={`${id}-serie-${grupo.id}`} className="sr-only">
                 {descricao}
@@ -305,7 +319,11 @@ export function SeletorTurmaChamada({
                 </span>
                 <span id={`${id}-turma-${opcao.id}`} className="sr-only">
                   {total} {total === 1 ? "aluno" : "alunos"}. {ROTULOS[situacao]}
-                  {temAlteracoes && ativo ? ". Alterações por salvar" : "."}
+                  {feriado
+                    ? `. ${feriado}.`
+                    : temAlteracoes && ativo
+                      ? ". Alterações por salvar"
+                      : "."}
                 </span>
               </Button>
             );

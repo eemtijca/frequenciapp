@@ -292,7 +292,7 @@ Exclui a conta. As frequências da escola são preservadas e a autoria fica anul
 
 ### GET /api/frequencias?dia=YYYY-MM-DD&turmaId=uuid
 
-- 200 `{"frequencia": Frequencia | null}`.
+- 200 `{"frequencia": Frequencia | null, "feriado": Feriado | null}`.
 - 400 quando dia ou turma são inválidos.
 
 Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]` e `alunos` com os ids da lista da chamada.
@@ -308,7 +308,7 @@ Parâmetros opcionais `turmaId` e `registradoPor`.
 
 Sem `turmaId`, devolve o dia inteiro para o Painel.
 
-- 200 `{"frequencias": Frequencia[]}` com todas as turmas do dia.
+- 200 `{"frequencias": Frequencia[], "feriado": Feriado | null}` com todas as turmas do dia.
 - 400 quando o dia é inválido.
 
 ### GET /api/frequencias?de=YYYY-MM-DD&ate=YYYY-MM-DD
@@ -333,6 +333,8 @@ Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, a
 Permissão: administração ou coordenação.
 
 Sábado ocasional: `sabadoLetivo: true` só é aceito no sábado. Se não houver aulas previstas nesse dia, usa as aulas ativas da turma, sem alterar a grade semanal. A grade específica de sábado prevalece quando existe. Correções desses sábados sem grade reenviam a liberação. O registro salvo permite reconhecer o sábado letivo ao reabrir a Chamada, no histórico, na Chamada Parcial e no envio às planilhas. Datas futuras e novas faltas em aulas inativas ou de outra turma continuam recusadas.
+
+Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes.
 
 Semântica da `revisao`:
 
@@ -378,6 +380,8 @@ Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` opcional. Sem data
 - 200 `{ "registros": RegistroPersonalizado[] }`, em ordem de dia, nome e identificador. Cada item é uma `FrequenciaParcial` ou uma `FrequenciaDaChamada`.
 - 400 datas inválidas, período incompleto ou invertido, uso simultâneo de dia e período ou turma inválida.
 
+Quando `dia` é informado, a resposta inclui também `feriado: Feriado | null`, consultado no servidor. Consultas por período preservam o formato sem esse campo.
+
 FrequenciaDaChamada: `{ tipo: "CHAMADA", id, alunoId, dia, turmaId, alunoNome, turmaNome, marca, descricao, justificativas, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, revisaoSeduc, criadoEm, atualizadoEm }`. O identificador é `chamada:<alunoId>:<dia>`. `revisao` pertence à chamada; `revisaoSeduc` pertence à confirmação individual. `marca` preserva P, F, FJ ou S; P tem descrição Dia inteiro. `justificativas` contém motivos únicos do catálogo, incluindo os inativos e o complemento de Outros quando preenchido; presença e falta sem justificativa retornam uma lista vazia. Saídas e entradas não inferem aulas frequentadas.
 
 A consulta combina chamadas salvas com personalizações sem copiar nem gravar dados. A personalização prevalece por aluno e dia antes do filtro de turma. Se o aluno integrou mais de uma chamada no dia, vale a mais recentemente atualizada, com desempate pelo identificador. A lista histórica da chamada define os alunos da base, usando seus nomes e os nomes da turma na consulta; sem chamada salva nem personalização, não há registro de presença. Nomes e turma de personalizações existentes continuam históricos.
@@ -399,7 +403,7 @@ FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, tur
 
 Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "DIA_INTEIRO" | "TURNO" | "AULAS", turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number, baseChamada?: { turmaId: uuid, revisao: number } }`.
 
-`DIA_INTEIRO` exige turno nulo ou ausente e lista de aulas vazia; `TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres; data futura é recusada. As aulas são números da presença personalizada, independentes da configuração de chamada por aula.
+`DIA_INTEIRO` exige turno nulo ou ausente e lista de aulas vazia; `TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres; data futura é recusada. Feriado cadastrado também responde 400, em conferência dentro da transação, inclusive ao corrigir um registro ou personalizar a base da Chamada. As aulas são números da presença personalizada, independentes da configuração de chamada por aula.
 
 Ao criar a partir da base, `baseChamada` confere a revisão, a participação do aluno e a vigência da chamada usada como base e preserva sua turma, inclusive após transferência ou desativação. Se informado, `turmaId` deve corresponder à turma da base. Sem `baseChamada`, registro novo exige aluno ativo e não desistente na data; `turmaId` protege contra transferência concorrente. A personalização guarda nome do aluno e rótulo da turma no momento da criação.
 
@@ -465,7 +469,7 @@ Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pe
 
 ### GET /api/configuracoes
 
-- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[]}}`. Qualquer sessão.
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "feriados": Feriado[]}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data.
 
 ### PATCH /api/configuracoes
 
@@ -474,6 +478,18 @@ Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origem
 As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A seleção é a união das séries completas com as turmas avulsas. Lista vazia não habilita nenhuma turma; alterar somente `origemNaChamada` preserva as seleções. Desligar controla apenas a exibição, sem modificar alunos, chamadas ou planilhas. Seleção inexistente responde 400 e não altera a configuração.
 
 - 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 403 sem papel de administração.
+
+## Calendário letivo
+
+`Feriado` é `{ dia: "YYYY-MM-DD", nome: string }`. Cada data vale para a escola inteira apenas no ano informado, sem repetição anual automática. Datas precisam existir no calendário e pertencer a um ano entre 1900 e 2199; o nome é aparado e deve ter entre 1 e 120 caracteres.
+
+| Rota                                  | Permissão e contrato                                                                                                                                                                             |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/calendario-letivo?ano=YYYY` | Sessão da equipe. 200 `{ feriados: Feriado[] }`, em ordem de data; sem `ano`, lista todos os anos. Ano inválido responde 400.                                                                    |
+| `POST /api/calendario-letivo`         | Administração e origem confiável. Corpo estrito `{ dia, nome }`; 201 `{ feriado: Feriado }`. Data já cadastrada ou com chamada regular ou parcial salva responde 409, sem modificar o histórico. |
+| `DELETE /api/calendario-letivo/{dia}` | Administração e origem confiável. 200 `{ ok: true }`; 400 para data inválida e 404 quando não existe feriado nessa data. Remove somente o feriado.                                               |
+
+Mutações registram auditoria, executam em transação serializável e compartilham a trava do preparo e do envio da frequência às planilhas. Não há alteração de aulas, alunos ou frequências; após excluir o feriado, a data volta a seguir a grade semanal. A administração não pode transformar em feriado uma data que já tenha frequência salva. A leitura permanece sem cache; 401 indica ausência de sessão e 403 indica papel ou origem não permitidos.
 
 ## Justificativas
 
@@ -571,6 +587,8 @@ Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOrigin
 ### POST /api/planilha/mensal
 
 Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e origem confiável. Prepara uma turma por requisição, com Aluno, datas de segunda a sexta, sábados com chamada salva daquela origem, alunos e vínculos. O título usa o mês por extenso, como `1º A · Outubro`; em colisão com a mesma turma e mês de outro ano, acrescenta o ano. Em uma aba mensal existente, renomeia e remove somente colunas próprias reconhecidas de Turma atual, domingos e sábados sem chamada salva para aquela origem, preservando linhas, demais células e destino. Repetição reutiliza o destino já ajustado. Aba manual com o mesmo nome, estrutura inesperada ou outra atualização em andamento responde 409.
+
+Feriados são lidos no servidor sob a mesma trava e omitidos das datas mensais. Em abas existentes, uma coluna própria de feriado só é removida após conferir todas as linhas: valor, fórmula ou nota abaixo do cabeçalho responde 409 e impede a escrita. A leitura aceita até 20.000 linhas e limita cada bloco a 20.000 células; dimensões ausentes ou maiores impedem a remoção. Colunas manuais permanecem preservadas. O marcador histórico `frequenciapp.feriado` permite reconhecer uma data omitida; excluir o feriado não recria a coluna imediatamente, e o envio posterior pode inserir a data que voltou a ser letiva.
 
 - 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira apenas quando a aba existente foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
 - Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
@@ -786,6 +804,7 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
 - As frequências da cópia JSON podem incluir `confirmacoesSeduc`, com autoria, data e revisão por aluno. Cópias anteriores sem esse campo continuam válidas. A mesclagem preserva confirmações divergentes existentes e relata conflito, sem sobrescrever.
 - `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
+- `configuracoes.feriados` é opcional na versão 1 e traz datas e nomes do calendário exportado. Ausência ou lista vazia preserva o calendário vigente. A restauração mescla por data: nome igual conta como idêntico e nome divergente conta como conflito, sem sobrescrita. Novo feriado com frequência regular ou parcial no banco ou na própria cópia conta como conflito; o histórico da cópia tem prioridade sobre esse novo feriado. Frequências da cópia em feriado já cadastrado também contam como conflitos. A restauração com feriados compartilha a trava das planilhas e a transação serializável, sem restaurar os demais recursos configuráveis.
 - A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
 - Tipo (`DIA_INTEIRO`, `TURNO` ou `AULAS`), turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.

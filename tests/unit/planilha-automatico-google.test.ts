@@ -19,6 +19,8 @@ const dubl = vi.hoisted(() => ({
   turmas: vi.fn(),
   frequencias: vi.fn(),
   acesso: vi.fn(),
+  feriados: vi.fn(),
+  feriado: vi.fn(),
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
@@ -42,6 +44,10 @@ vi.mock("@/infra/google-oauth", () => ({ renovarAcesso: dubl.acesso }));
 vi.mock("@/application/alunos", () => ({ listarTodosAlunos: dubl.alunos }));
 vi.mock("@/application/turmas", () => ({ listarTodasTurmas: dubl.turmas }));
 vi.mock("@/application/frequencias", () => ({ listarFrequenciasDoPeriodo: dubl.frequencias }));
+vi.mock("@/application/calendario-letivo", () => ({
+  listarFeriados: dubl.feriados,
+  feriadoDoDia: dubl.feriado,
+}));
 vi.mock("@/infra/trava-planilha-frequencia", () => ({
   comTravaPlanilhaFrequencia: <T>(tarefa: () => Promise<T>) => tarefa(),
   controleTravaPlanilhaFrequencia: () => undefined,
@@ -262,6 +268,8 @@ beforeEach(() => {
   };
   dubl.integracao.mockImplementation(async () => linha);
   dubl.acesso.mockResolvedValue("acesso-sintetico");
+  dubl.feriados.mockResolvedValue([]);
+  dubl.feriado.mockResolvedValue(null);
   dubl.frequencia.mockResolvedValue({ alunos: [{ aluno: { turmaOriginalId: turmaId } }] });
   dubl.frequenciasBanco.mockResolvedValue([]);
   dubl.situacoesPendentes.mockResolvedValue(0);
@@ -380,6 +388,80 @@ describe("enviar ao salvar com a conta Google", () => {
 });
 
 describe("envio mensal com sábados letivos registrados", () => {
+  it.each([false, true])("não envia feriados ao salvar em aba mensal %s", async (mensal) => {
+    if (mensal) usarAbaMensal();
+    dubl.feriado.mockResolvedValue({ dia, nome: "QA Feriado" });
+    const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
+    expect(situacoes.get(turmaId)).toBe("desligado");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dubl.criarEnvio).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    "exclui feriado na prévia mensal com envio incremental %s",
+    async (somenteAlteradas) => {
+      usarAbaMensal();
+      dubl.feriados.mockResolvedValue([{ dia: "2026-10-05", nome: "QA Feriado" }]);
+      const dias = ["2026-10-02", "2026-10-03", "2026-10-05"];
+      dubl.frequencias.mockResolvedValue(dias.map((dia) => ({ ...frequencia, dia })));
+      dubl.frequenciasBanco.mockResolvedValue(
+        dias.map((dia) => ({
+          dia: new Date(`${dia}T12:00:00Z`),
+          atualizadoEm: new Date("2026-10-05T12:00:00Z"),
+        })),
+      );
+      const previa = await simularEnvio(
+        { id: "coordenacao-sintetica" },
+        {
+          turmaOriginalId: turmaId,
+          de: "2026-10-02",
+          ate: "2026-10-05",
+          somenteAlteradas,
+          feriados: [],
+        },
+      );
+      expect(previa.planos[0]?.dias).toEqual(["2026-10-02", "2026-10-03"]);
+      expect(previa.planos[0]?.novasColunas.map((coluna) => coluna.dia)).toEqual(["2026-10-03"]);
+      expect(previa.planos[0]?.amostra.every((celula) => celula.dia !== "2026-10-05")).toBe(true);
+      expect(dubl.feriados).toHaveBeenCalledWith(2026);
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("não simula colunas de feriados em abas legadas", async () => {
+    dubl.feriados.mockResolvedValue([{ dia, nome: "QA Feriado" }]);
+    const previa = await simularEnvio(
+      { id: "coordenacao-sintetica" },
+      { turmaOriginalId: turmaId, de: dia, ate: dia, somenteAlteradas: false },
+    );
+    expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true, novasColunas: [] }]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dubl.criarEnvio).not.toHaveBeenCalled();
+  });
+
+  it("volta a planejar a coluna e as presenças depois de remover o feriado", async () => {
+    usarAbaMensal();
+    const dataLiberada = "2026-10-12";
+    dubl.feriados.mockResolvedValue([{ dia: dataLiberada, nome: "QA Feriado" }]);
+    const entrada = {
+      turmaOriginalId: turmaId,
+      de: dataLiberada,
+      ate: dataLiberada,
+      somenteAlteradas: false,
+    };
+    const bloqueada = await simularEnvio({ id: "coordenacao-sintetica" }, entrada);
+    expect(bloqueada.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+    dubl.feriados.mockResolvedValue([]);
+    dubl.frequencias.mockResolvedValue([{ ...frequencia, dia: dataLiberada }]);
+    const liberada = await simularEnvio({ id: "coordenacao-sintetica" }, entrada);
+    expect(liberada.planos[0]?.dias).toEqual([dataLiberada]);
+    expect(liberada.planos[0]?.novasColunas).toMatchObject([{ dia: dataLiberada }]);
+    expect(liberada.planos[0]?.amostra).toContainEqual(
+      expect.objectContaining({ dia: dataLiberada, valor: "P" }),
+    );
+    expect(lotes).toHaveLength(0);
+  });
+
   it("não tenta enviar automaticamente a chamada mensal de domingo", async () => {
     usarAbaMensal();
     const situacoes = await enviarAposSalvar(

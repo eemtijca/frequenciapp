@@ -276,7 +276,7 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   const dia = salvo?.dia ?? "";
   const diariaAntes = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
   expect(diariaAntes.ok()).toBe(true);
-  expect(await diariaAntes.json()).toEqual({ frequencia: null });
+  expect(await diariaAntes.json()).toEqual({ frequencia: null, feriado: null });
 
   const confirmacao = linha.getByRole("switch", {
     name: "RS, Registrado na Seduc: E2E Parcial Um",
@@ -309,7 +309,7 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   });
   const diariaDepois = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
   expect(diariaDepois.ok()).toBe(true);
-  expect(await diariaDepois.json()).toEqual({ frequencia: null });
+  expect(await diariaDepois.json()).toEqual({ frequencia: null, feriado: null });
 });
 
 test("marca um intervalo e permite retirar aulas específicas antes de salvar", async ({ page }) => {

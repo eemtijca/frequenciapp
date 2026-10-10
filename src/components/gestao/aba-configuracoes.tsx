@@ -47,6 +47,7 @@ import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import IntegracaoParcial from "@/components/gestao/integracao-parcial";
 import SecaoIndicadores from "@/components/gestao/secao-indicadores";
 import SecaoFilaPlanilha from "@/components/gestao/secao-fila-planilha";
+import SecaoCalendarioLetivo from "@/components/gestao/secao-calendario-letivo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -621,6 +622,15 @@ export default function AbaConfiguracoes({
 
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
       </SecaoRecolhivel>
+
+      <SecaoCalendarioLetivo
+        feriados={configuracoes.feriados}
+        diaCorrente={diaCorrente}
+        onAtualizar={async () => {
+          const dados = await pedir<{ configuracoes: Configuracoes }>("/api/configuracoes");
+          onMudanca(dados.configuracoes);
+        }}
+      />
 
       <SecaoRecolhivel
         dataSecao="config-justificativas"

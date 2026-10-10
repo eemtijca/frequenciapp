@@ -15,6 +15,7 @@ import {
   type MensagemPush,
 } from "@/domain/notificacoes";
 import { lerConfiguracaoNotificacoes } from "@/application/notificacoes-configuracao";
+import { feriadoDoDia } from "@/application/calendario-letivo";
 
 function totaisVazios() {
   return { enviadas: 0, expiradas: 0, falhas: 0, ignoradas: 0 };
@@ -25,6 +26,7 @@ type Filtro = () => Promise<Prisma.AssinaturaPushWhereInput | null>;
 async function permitidoAgora(tipo: TipoDeAviso, dia: string): Promise<boolean> {
   const agora = new Date();
   if (diaLocal(agora, ambiente.fuso) !== dia) return false;
+  if (await feriadoDoDia(dia)) return false;
   const configuracao = await lerConfiguracaoNotificacoes();
   if (!configuracao[tipo]) return false;
   if (tipo === "novasChamadas") return true;
@@ -85,6 +87,7 @@ async function filtroDiretor(
 
 /** Só turmas com alunos participantes e aula ativa prevista precisam de chamada. */
 export async function contarChamadasPendentes(dia: string): Promise<number> {
+  if (await feriadoDoDia(dia)) return 0;
   const data = new Date(`${dia}T12:00:00Z`);
   return banco().turma.count({
     where: {

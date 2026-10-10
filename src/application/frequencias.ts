@@ -16,6 +16,7 @@ import {
   type ResultadoSalvamento,
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
+import { exigirDiaLetivo } from "@/application/calendario-letivo";
 
 const faltaEntrada = z.object({
   alunoId: z.string().uuid("Aluno inválido."),
@@ -364,6 +365,7 @@ export async function salvarFrequencia(
 
   try {
     return await comTransacao(async (tx) => {
+      await exigirDiaLetivo(dia, tx);
       const existente = await tx.frequencia.findUnique({
         where: { turmaId_dia: filtroFrequencia },
         ...COMPLEMENTO,

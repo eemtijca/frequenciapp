@@ -14,7 +14,7 @@ Em Gestão, Configurações, Notificações, a administração define os tipos d
 
 Cada conta escolhe seus tipos no diálogo Configurar notificações. As escolhas são salvas sem pedir permissão ao navegador e valem para todos os dispositivos da conta. O resumo dos diretores existentes é preservado. Avisos desligados pela Gestão não são enviados, mesmo quando a preferência pessoal está marcada.
 
-Uma turma vazia, sem aula prevista ou somente com alunos desistentes não gera pendência. A grade semanal não identifica feriados ou suspensões: nesses dias, a Gestão deve desligar o aviso de pendências quando as aulas cadastradas não acontecerem. Uma chamada salva encerra a pendência, inclusive quando não há faltas.
+Uma turma vazia, sem aula prevista ou somente com alunos desistentes não gera pendência. Feriados cadastrados em Gestão, Configurações, Escola, Calendário letivo não geram pendências e suspendem resumo, novas chamadas e avisos de pendências naquela data. O calendário vale para todas as turmas no ano cadastrado, sem desligar as preferências pessoais ou a agenda. Uma chamada salva encerra a pendência, inclusive quando não há faltas.
 
 ## Ativar no dispositivo
 
@@ -76,9 +76,9 @@ Em Docker ou outra hospedagem, usar uma agenda externa com a mesma rota e autent
 - Só contas ativas, com papel adequado ao aviso. Diretores também precisam de palavra-chave vigente, não revogada e já trocada.
 - Só dispositivos que aderiram e usam o par VAPID atual.
 - Só vínculos vigentes no dia, com pelo menos um aluno ativo da turma de origem na lista de uma chamada salva naquele dia. Turma reorganizada não perde o vínculo por origem. Aluno desistente no dia não ativa o aviso.
-- Resumos e novas chamadas não são enviados em dias sem chamada. Pendências dependem da grade semanal e podem ser enviadas mesmo quando nenhuma chamada foi salva no dia.
+- Resumos e novas chamadas não são enviados em dias sem chamada. Pendências dependem da grade semanal e podem ser enviadas mesmo quando nenhuma chamada foi salva no dia. Nenhum desses avisos é enviado em feriado cadastrado.
 - Um resumo e um aviso de pendências por assinatura e dia; um aviso de nova chamada por assinatura, dia e chamada. A reserva dura dois minutos para impedir duplicação em execuções concorrentes.
-- Depois da reserva, o servidor reconsulta regras, preferências, conta, vínculos e pendências. Uma chamada concluída antes desse ponto cancela o aviso de pendências. Após aceitação pelo serviço de push, o aviso já não pode ser recolhido.
+- Depois da reserva, o servidor reconsulta o calendário, regras, preferências, conta, vínculos e pendências. Uma chamada concluída antes desse ponto cancela o aviso de pendências; um feriado impede os avisos do dia. Após aceitação pelo serviço de push, o aviso já não pode ser recolhido.
 - Falha temporária libera a reserva para nova tentativa da agenda no mesmo dia e retorna 503 com contagens. Assinaturas recusadas com 404 ou 410 são removidas.
 - As confirmações são guardadas por até 30 dias e a limpeza ocorre a cada execução configurada. Uma interrupção depois de o provedor aceitar o envio e antes da confirmação no banco pode causar repetição; a etiqueta da notificação agrupa avisos do mesmo dia no dispositivo.
 

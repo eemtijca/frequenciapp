@@ -2,6 +2,10 @@
 
 O FrequenciApp é um processo Node único com página, rotas de API e service worker. O build de produção usa `npm run build`. O banco pode ser o PostgreSQL do Compose ou uma instância gerenciada. Para AWS, Azure ou GCP com Terraform, consulte [implantacao-nuvem.md](implantacao-nuvem.md).
 
+## Migração do calendário letivo
+
+Antes de publicar a versão com feriados, aplicar `20261010124500_calendario_feriados` no banco ou schema do ambiente de destino, usando `npx prisma migrate deploy` com a `DIRECT_URL` já configurada. A migração cria a tabela do calendário, com data, nome e autoria, sem mudar chamadas existentes. Gerar o cliente Prisma ou concluir o build da Vercel não aplica essa migração. Na produção, conferir a execução do workflow de migrações antes de servir a nova versão; cada Preview também precisa estar migrado em seu próprio schema.
+
 ## Docker Compose local
 
 ```bash
