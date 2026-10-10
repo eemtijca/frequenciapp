@@ -11,13 +11,18 @@ export async function aguardarHidratacao(
   seletor = 'button[aria-label="Abrir menu"], nav button',
 ): Promise<void> {
   await page.waitForFunction((alvoTexto) => {
-    for (const alvo of document.querySelectorAll(alvoTexto)) {
-      if (!(alvo instanceof HTMLElement) || alvo.closest("[hidden]")) continue;
+    const visivel = (alvo: Element): boolean => {
+      if (!(alvo instanceof HTMLElement) || alvo.closest("[hidden]")) return false;
       const estilo = getComputedStyle(alvo);
-      if (estilo.display === "none" || estilo.visibility === "hidden") continue;
-      if (Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"))) return true;
-    }
-    return false;
+      return estilo.display !== "none" && estilo.visibility !== "hidden";
+    };
+    const hidratado = (alvo: Element): boolean =>
+      visivel(alvo) && Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"));
+    const preferidos = [...document.querySelectorAll(alvoTexto)];
+    // Com o menu na tela, o clique só vale depois que esse controle hidrata.
+    // Na entrada não há menu: qualquer botão visível, como Entrar, serve.
+    if (preferidos.some(visivel)) return preferidos.some(hidratado);
+    return [...document.querySelectorAll("button")].some(hidratado);
   }, seletor);
 }
 
@@ -115,6 +120,8 @@ export async function rolarAteGrafico(page: Page, nome: string) {
     );
     if (!(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement))
       throw new Error("Cartão não encontrado.");
+    // A faixa só troca o cartão vigente em um gesto ou neste pedido explícito.
+    elemento.setAttribute("data-rolagem-intencional", "true");
     elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
   }, nome);
   await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeInViewport();

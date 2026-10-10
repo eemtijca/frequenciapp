@@ -62,7 +62,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
 
-- A faixa de gráficos do Painel mantém o cartão em exibição quando a largura muda, inclusive ao passar do desktop para o celular.
+- Os anéis de cobertura usam título em uma linha, para a hidratação não descartar a página e o primeiro toque na navegação não se perder.
+
+- A faixa de gráficos do Painel mantém o cartão em exibição quando a largura muda ou a visão é ocultada, inclusive ao passar do desktop para o celular e ao voltar de outra seção.
 
 - Falha de leitura da Chamada mantém marcações e salvamento bloqueados em qualquer dia, preservando o rascunho local até uma consulta confirmada. Navegação e nova tentativa continuam disponíveis.
 
