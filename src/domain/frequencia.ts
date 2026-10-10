@@ -557,6 +557,23 @@ export function celulasDoMes(mes: string): (string | null)[] {
   return celulas;
 }
 
+/**
+ * Células da grade do mês sem o domingo, em semanas de segunda a sábado, com
+ * vazios antes do primeiro dia e depois do último, sem linhas vazias no fim.
+ */
+export function celulasDoMesSemDomingo(mes: string): (string | null)[] {
+  const dias = diasDoMes(mes).filter((dia) => !ehDomingo(dia));
+  const celulas: (string | null)[] = [];
+  const primeiro = dias[0];
+  if (primeiro) {
+    for (let i = 0; i < diaDaSemanaIso(primeiro) - 1; i += 1) celulas.push(null);
+  }
+  celulas.push(...dias);
+  const total = Math.ceil(celulas.length / 6) * 6;
+  while (celulas.length < total) celulas.push(null);
+  return celulas;
+}
+
 /** Dia da semana por extenso, a partir do dia civil. */
 export function rotuloDiaSemana(dia: string): string {
   const data = new Date(`${dia}T12:00:00Z`);
@@ -585,6 +602,22 @@ export function diaSeguinte(dia: string, deslocamento: number): string {
     Date.UTC(Number(anoTexto), Number(mesTexto) - 1, Number(numeroTexto) + deslocamento),
   );
   return data.toISOString().slice(0, 10);
+}
+
+/** Domingo não tem aula nem chamada. */
+export function ehDomingo(dia: string): boolean {
+  return diaDaSemanaIso(dia) === 7;
+}
+
+/** Último dia que admite chamada até a data informada: o sábado anterior, se cair num domingo. */
+export function ultimoDiaDeChamada(dia: string): string {
+  return ehDomingo(dia) ? diaSeguinte(dia, -1) : dia;
+}
+
+/** Dia anterior (-1) ou seguinte (1) que admite chamada, pulando o domingo. */
+export function diaDeChamadaVizinho(dia: string, passo: 1 | -1): string {
+  const vizinho = diaSeguinte(dia, passo);
+  return ehDomingo(vizinho) ? diaSeguinte(vizinho, passo) : vizinho;
 }
 
 /** Mês civil deslocado em meses, formato YYYY-MM. */

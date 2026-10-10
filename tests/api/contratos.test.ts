@@ -314,7 +314,8 @@ describe("gestão de séries e turmas (admin)", () => {
     expect(turmaQA?.horarios[0]?.ordem).toBe(1);
     expect(turmaQA?.horarios[0]?.inicio).toBe("00:00");
     expect(turmaQA?.horarios[0]?.fim).toBe("23:59");
-    expect(turmaQA?.horarios[0]?.diasSemana).toHaveLength(7);
+    // Sem aula no domingo: a grade padrão vai de segunda a sábado.
+    expect(turmaQA?.horarios[0]?.diasSemana).toEqual([1, 2, 3, 4, 5, 6]);
     aulaQA = turmaQA?.horarios[0] ?? null;
 
     const respostaB = await autenticado(cookieAdmin, "/api/turmas", {
@@ -411,6 +412,27 @@ describe("gestão de aulas (admin)", () => {
       }),
     });
     expect(repetida.status).toBe(409);
+  });
+
+  it("recusa aula no domingo ao criar e ao editar", async () => {
+    const criada = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 8,
+        inicio: "13:00",
+        fim: "13:50",
+        diasSemana: [1, 7],
+      }),
+    });
+    expect(criada.status).toBe(400);
+    expect(((await criada.json()) as { error: string }).error).toBe("Domingo não tem aula.");
+    const editada = await autenticado(cookieAdmin, `/api/horarios/${aulaQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ diasSemana: [7] }),
+    });
+    expect(editada.status).toBe(400);
+    expect(((await editada.json()) as { error: string }).error).toBe("Domingo não tem aula.");
   });
 
   it("admin edita a janela e desativa a aula", async () => {
@@ -740,17 +762,17 @@ describe("frequências (uma por turma e dia)", () => {
         ordem: 9,
         inicio: "12:00",
         fim: "12:50",
-        diasSemana: [7],
+        diasSemana: [6],
       }),
     });
     expect(criada.status).toBe(201);
-    const aulaDeDomingo = ((await criada.json()) as { horario: HorarioApi }).horario;
+    const aulaDeSabado = ((await criada.json()) as { horario: HorarioApi }).horario;
     const resposta = await autenticado(cookieCoord, "/api/frequencias", {
       method: "POST",
       body: JSON.stringify({
         dia: DIA_TESTE_5,
         turmaId: turmaQA?.id,
-        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeDomingo.id] }],
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeSabado.id] }],
         revisao: 0,
       }),
     });
@@ -813,6 +835,23 @@ describe("frequências (uma por turma e dia)", () => {
       `/api/frequencias?dia=${DIA_TESTE}&turmaId=abc`,
     );
     expect(turmaInvalida.status).toBe(400);
+  });
+
+  it("recusa chamada em domingo, mesmo com a grade padrão da turma", async () => {
+    // 2026-06-14 é um domingo.
+    const resposta = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({ dia: "2026-06-14", turmaId: turmaQA?.id, faltas: [], revisao: 0 }),
+    });
+    expect(resposta.status).toBe(400);
+    expect(((await resposta.json()) as { error: string }).error).toBe(
+      "Domingo não tem aula nem chamada.",
+    );
+    const gravadas = await banco?.query(
+      "select 1 from frequencias where turma_id = $1 and dia = '2026-06-14'",
+      [turmaQA?.id],
+    );
+    expect(gravadas?.rowCount).toBe(0);
   });
 
   it("recusa registro em dia futuro", async () => {

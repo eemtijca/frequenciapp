@@ -205,6 +205,22 @@ describe("frequências parciais", () => {
     ).toBe(404);
   });
 
+  it("recusa registro em domingo, sem gravar nada", async () => {
+    // 2026-06-14 é um domingo.
+    const resposta = await chamar("/api/frequencias-parciais", "POST", {
+      alunoId: alunoDe("Turno"),
+      turmaId: turma,
+      dia: "2026-06-14",
+      tipo: "TURNO",
+      turno: "MANHA",
+    });
+    expect(resposta.status).toBe(400);
+    expect(((await resposta.json()) as { error: string }).error).toBe(
+      "Domingo não tem aula nem chamada.",
+    );
+    expect(await listar("dia=2026-06-14")).toEqual([]);
+  });
+
   it("registra turno e aulas selecionadas e mantém presença parcial separada", async () => {
     const turno = await salvar({
       alunoId: alunoDe("Turno"),
@@ -338,7 +354,7 @@ describe("frequências parciais", () => {
       { baseChamada: { turmaId: turma, revisao: 1 } },
       { baseChamada: { turmaId: outraTurma, revisao: 2 } },
       { turmaId: outraTurma },
-      { dia: "2026-06-21" },
+      { dia: "2026-06-22" },
       { alunoId: alunoDe("Fora da base") },
     ])
       expect(
@@ -397,7 +413,7 @@ describe("frequências parciais", () => {
         await chamar("/api/frequencias-parciais", "POST", {
           alunoId: transferido,
           turmaId: outraTurma,
-          dia: "2026-06-21",
+          dia: "2026-06-22",
           tipo: "DIA_INTEIRO",
         })
       ).status,
@@ -662,14 +678,14 @@ describe("frequências parciais", () => {
     const inativo = {
       alunoId: alunoDe("Inativo"),
       turmaId: turma,
-      dia: "2026-06-14",
+      dia: "2026-06-12",
       tipo: "TURNO",
       turno: "MANHA",
     };
     const desistente = {
       alunoId: alunoDe("Desistente"),
       turmaId: turma,
-      dia: "2026-06-14",
+      dia: "2026-06-12",
       tipo: "TURNO",
       turno: "TARDE",
     };

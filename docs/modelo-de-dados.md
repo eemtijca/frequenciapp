@@ -102,11 +102,11 @@ A origem nasce igual à turma atual e é preservada quando a administração tra
 | ordem      | inteiro  | Ordem da aula no dia, positiva e única por turma.           |
 | inicio     | texto    | Horário inicial `HH:MM`.                                    |
 | fim        | texto    | Horário final `HH:MM`, posterior ao início.                 |
-| diasSemana | inteiro  | Dias ISO em que a aula acontece (1 é segunda, 7 é domingo). |
+| diasSemana | inteiro  | Dias ISO da aula, de 1 (segunda) a 6 (sábado); sem domingo. |
 | ativo      | booleano | Aula desativada sai das próximas chamadas.                  |
 | criadoEm   | data     |                                                             |
 
-Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, todos os dias), que a administração ajusta quando quiser. A aula com faltas registradas não é excluída, apenas desativada.
+Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, de segunda a sábado), que a administração ajusta quando quiser. A aula com faltas registradas não é excluída, apenas desativada.
 
 ## Frequência (frequencia)
 
