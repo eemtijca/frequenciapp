@@ -329,6 +329,7 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
 }) => {
   const turmas = await turmasDoTeste(page);
   let consultas = 0;
+  let repetir = false;
   let liberar: () => void = () => undefined;
   const espera = new Promise<void>((resolver) => {
     liberar = resolver;
@@ -336,7 +337,9 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
   await page.route(ENDERECO, async (rota) => {
     consultas += 1;
     const dados = resultado(rota.request().url(), turmas);
-    if (consultas > 1) {
+    // A primeira visita pode consultar duas vezes no modo estrito do desenvolvimento.
+    // Só a volta à aba espera e troca os totais.
+    if (repetir) {
       await espera;
       dados.turmas = dados.turmas.filter((grupo) => grupo.turmaRotulo === "E2E Ano B");
       dados.totais = { saidas: 1, entradas: 0, total: 1 };
@@ -347,7 +350,9 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
     const painel = await abrir(page);
     await expect(totais(painel)).toHaveText(["2", "1"]);
     await expect(painel).toHaveAttribute("aria-busy", "false");
-    expect(consultas).toBe(1);
+    const iniciais = consultas;
+    expect(iniciais).toBeGreaterThan(0);
+    repetir = true;
     await page.getByRole("tab", { name: "Histórico", exact: true }).click();
     await expect(painel).toBeHidden();
     await page.evaluate(
@@ -356,9 +361,9 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
           requestAnimationFrame(() => requestAnimationFrame(() => resolver())),
         ),
     );
-    expect(consultas).toBe(1);
+    expect(consultas).toBe(iniciais);
     await page.getByRole("tab", { name: "Saídas e entradas", exact: true }).click();
-    await expect.poll(() => consultas).toBe(2);
+    await expect.poll(() => consultas).toBe(iniciais + 1);
     await expect(painel).toHaveAttribute("aria-busy", "true");
     await expect(totais(painel)).toHaveCount(0);
     await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
