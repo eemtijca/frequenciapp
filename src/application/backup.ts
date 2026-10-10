@@ -8,7 +8,7 @@ import { ErroHttp } from "@/infra/erros";
 import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequencia";
 import { ehHorarioEntrada } from "@/domain/entradas";
 import { lerConfiguracoes } from "@/application/configuracoes";
-import { esquemaCriarFeriado } from "@/application/calendario-letivo";
+import { esquemaCriarFeriado, travarCalendario } from "@/application/calendario-letivo";
 import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import {
   disciplinasCorrespondemAosDias,
@@ -498,6 +498,8 @@ async function mesclarCopia(
   const resultado: ResultadoImportacao = { adicionadas: 0, identicas: 0, conflitos: 0 };
 
   await comTransacao(async (tx) => {
+    // A cópia grava feriados e chamadas: trava o calendário antes de qualquer leitura.
+    await travarCalendario(tx, "SHARE ROW EXCLUSIVE");
     controleTravaPlanilhaFrequencia()?.conferir();
     // Uma tentativa serializável refeita não duplica os contadores do resultado.
     resultado.adicionadas = 0;

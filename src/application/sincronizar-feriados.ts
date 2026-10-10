@@ -1,6 +1,7 @@
 // Sincronização administrativa dos feriados de um ano, bloqueada depois da primeira gravação.
 import { z } from "zod";
 import type { Prisma } from "../../generated/prisma/client";
+import { travarCalendario } from "@/application/calendario-letivo";
 import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
 import { ehAnoLetivoValido } from "@/domain/calendario-letivo";
 import type {
@@ -96,6 +97,7 @@ async function gravar(
   feriados: readonly FeriadoExterno[],
   prova: string | undefined,
 ): Promise<ResumoSincronizacaoFeriados> {
+  await travarCalendario(tx, "SHARE ROW EXCLUSIVE");
   const importados = await tx.feriado.count({ where: { origem: "API" } });
   if (importados > 0) exigirProva(prova, admin.id, ano);
 

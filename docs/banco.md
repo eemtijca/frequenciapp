@@ -61,6 +61,15 @@ Restrições de integridade relevantes:
 
 A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md); a chamada diária com justificativas, saídas e recursos opcionais está na [ADR-012](adr/012-chamada-diaria-com-saidas.md); a grade por período e a cópia JSON estão na [ADR-013](adr/013-grade-por-periodo-e-copia-json.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
 
+## Trava do calendário
+
+Quem grava feriados lê as chamadas da data, e quem salva chamada lê o feriado. Esse par escapou da detecção de conflitos do SERIALIZABLE em corridas no CI, com feriado e chamada aceitos na mesma data. Por isso, as transações envolvidas abrem com `LOCK TABLE feriados`, antes de qualquer consulta (o snapshot só nasce na primeira consulta):
+
+- `SHARE` em `salvarFrequencia` e `salvarFrequenciaParcial`, por meio de `exigirDiaLetivo`. Chamadas não esperam umas pelas outras.
+- `SHARE ROW EXCLUSIVE` em `criarFeriado`, `removerFeriado`, na sincronização de feriados e na restauração da cópia JSON. Essas transações esperam as chamadas em andamento, e as chamadas esperam por elas; quem espera lê depois o que o outro gravou.
+
+A trava de `feriados` vem sempre antes de qualquer outra, o que evita impasse. O auxiliar é `travarCalendario`, em `src/application/calendario-letivo.ts`.
+
 ## Migração inicial reescrita
 
 Enquanto o aplicativo não tinha o primeiro deploy de produção, a migração inicial foi reescrita para o schema da coordenação, sem acúmulo de migrações intermediárias e sem backfill. Ambientes locais criados antes dessa revisão precisam ser recriados:
