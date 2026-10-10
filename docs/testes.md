@@ -90,7 +90,7 @@ Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída
 
 A navegação desktop dos gráficos é coberta em `painel-filtros.spec.ts`: seleção direta, botões nos extremos, teclado e ausência dos controles no celular. `responsividade.spec.ts` verifica conteúdo centralizado e limitado em monitor de 1920 pixels. `gestao.spec.ts` cobre categorias isoladas, rascunhos preservados e retorno Google para as três finalidades, inclusive formato antigo.
 
-O Resumo dos Relatórios verifica filtros, comparação entre séries e turmas, ranking por F + FJ com empate por nome, taxas calculadas sobre registros salvos, dias sem chamada, respostas fora de ordem e falha recuperável ao mudar de mês. O período permanece legível em 360 pixels. A evolução diária reutiliza as regras de lista histórica, desistência por data e ausência parcial do domínio.
+O Resumo dos Relatórios verifica filtros, comparação entre séries e turmas, os três rankings de alunos (F + FJ, só F e só FJ) com empate por nome e mensagem própria quando vazios, taxas calculadas sobre registros salvos, dias sem chamada, respostas fora de ordem e falha recuperável ao mudar de mês. O período permanece legível em 360 pixels. A evolução diária reutiliza as regras de lista histórica, desistência por data e ausência parcial do domínio.
 
 ## Capturas do README
 

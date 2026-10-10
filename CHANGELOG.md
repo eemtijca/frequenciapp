@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Resumo dos Relatórios: três botões escolhem o ranking de alunos com mais faltas no mês, Todas as faltas (F + FJ, o padrão), Sem justificativa (só F) e Justificadas (só FJ), com os filtros de mês, série e turma e o detalhe de F e FJ por aluno.
+
 - Painel externo aceita links privados do Zoho Analytics, além do Looker Studio, com rótulos neutros, guia de conexão à planilha de indicadores e validação restrita do endereço da visualização.
 
 - Painel externo no Google Looker Studio: Gestão prepara uma planilha exclusiva com indicadores agregados de frequência, saídas e entradas, chamada parcial e RS, sem nomes ou textos livres; atualização manual e automática, recuperação de criação incerta e guia para conectar o relatório privado.

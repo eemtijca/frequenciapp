@@ -1,6 +1,6 @@
 "use client";
 
-// Resumo mensal com comparação de séries e turmas, evolução diária e alunos com mais faltas.
+// Resumo mensal com comparação de séries e turmas, evolução diária e rankings de faltas por aluno.
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
 import {
@@ -19,6 +19,7 @@ import {
   distribuicaoDoPeriodo,
   evolucaoDoPeriodo,
   infrequencia,
+  type CriterioRankingFaltas,
 } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -44,6 +45,35 @@ interface Props {
 
 const percentual = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
 
+const RANKINGS: Record<
+  CriterioRankingFaltas,
+  {
+    botao: string;
+    titulo: string;
+    vazio: string;
+    unidade: [singular: string, plural: string];
+  }
+> = {
+  todas: {
+    botao: "Todas as faltas (F + FJ)",
+    titulo: "Alunos com mais faltas",
+    vazio: "Nenhuma falta registrada neste filtro.",
+    unidade: ["falta", "faltas"],
+  },
+  faltas: {
+    botao: "Sem justificativa (F)",
+    titulo: "Alunos com mais faltas sem justificativa",
+    vazio: "Nenhuma falta sem justificativa neste filtro.",
+    unidade: ["falta", "faltas"],
+  },
+  justificadas: {
+    botao: "Justificadas (FJ)",
+    titulo: "Alunos com mais faltas justificadas",
+    vazio: "Nenhuma falta justificada neste filtro.",
+    unidade: ["justificada", "justificadas"],
+  },
+};
+
 export default function ResumoRelatorios({
   mes,
   mesCorrente,
@@ -62,6 +92,7 @@ export default function ResumoRelatorios({
   const [turmaId, setTurmaId] = useState("todas");
   const [compararPor, setCompararPor] = useState("turmas");
   const [mostrarTodos, setMostrarTodos] = useState(false);
+  const [criterioRanking, setCriterioRanking] = useState<CriterioRankingFaltas>("todas");
   const turmasVisiveis = useMemo(
     () => turmas.filter((turma) => serieId === "todas" || turma.serieId === serieId),
     [turmas, serieId],
@@ -97,9 +128,19 @@ export default function ResumoRelatorios({
       rotulo: rotuloDataCurta(dia.dia),
       valor: dia.taxa === null ? null : Math.round(dia.taxa * 1000) / 10,
     }));
-    const ranking = alunosPorFaltas(doFiltro, turmas, frequencias, dias);
+    const ranking = alunosPorFaltas(doFiltro, turmas, frequencias, dias, criterioRanking);
     return { porSerie, porTurma, total, evolucao, ranking };
-  }, [alunos, diaCorrente, frequencias, mes, series, turmaId, turmas, turmasVisiveis]);
+  }, [
+    alunos,
+    criterioRanking,
+    diaCorrente,
+    frequencias,
+    mes,
+    series,
+    turmaId,
+    turmas,
+    turmasVisiveis,
+  ]);
   const { executando, executar } = useAcaoUnica(async () => {
     try {
       await onRecarregar(mes);
@@ -314,12 +355,33 @@ export default function ResumoRelatorios({
                 className="superficie-vidro min-w-0 p-4 xl:col-span-2"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold">Alunos com mais faltas</h3>
+                  <h3 className="font-semibold">{RANKINGS[criterioRanking].titulo}</h3>
                   <p className="text-muted-foreground text-xs">F: falta · FJ: justificada</p>
+                </div>
+                <div
+                  role="group"
+                  aria-label="Ranking de alunos"
+                  className="mt-3 flex flex-wrap gap-2"
+                >
+                  {(Object.keys(RANKINGS) as CriterioRankingFaltas[]).map((criterio) => (
+                    <Button
+                      key={criterio}
+                      type="button"
+                      variant="outline"
+                      aria-pressed={criterioRanking === criterio}
+                      onClick={() => {
+                        setCriterioRanking(criterio);
+                        setMostrarTodos(false);
+                      }}
+                      className={`rounded-full px-4 ${criterioRanking === criterio ? "vidro-selecionado" : ""}`}
+                    >
+                      {RANKINGS[criterio].botao}
+                    </Button>
+                  ))}
                 </div>
                 {dados.ranking.length === 0 ? (
                   <p className="text-muted-foreground mt-3 text-sm">
-                    Nenhuma falta registrada neste filtro.
+                    {RANKINGS[criterioRanking].vazio}
                   </p>
                 ) : (
                   <>
@@ -346,7 +408,8 @@ export default function ResumoRelatorios({
                             </span>
                             <span className="numerais-tabulares shrink-0 text-right">
                               <strong className="block text-sm">
-                                {item.totalFaltas} {item.totalFaltas === 1 ? "falta" : "faltas"}
+                                {item.quantidade}{" "}
+                                {RANKINGS[criterioRanking].unidade[item.quantidade === 1 ? 0 : 1]}
                               </strong>
                               <span className="text-muted-foreground text-xs">
                                 {item.faltas} F · {item.justificadas} FJ
