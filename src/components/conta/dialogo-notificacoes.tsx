@@ -208,7 +208,7 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
       <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Notificações</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             Escolher os avisos da conta e ativar o recebimento neste dispositivo.
           </DialogDescription>
         </DialogHeader>
@@ -235,11 +235,11 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
                         </p>
                       ) : tipo !== "novasChamadas" ? (
                         <p className="text-muted-foreground text-xs">
-                          Envio a partir das{" "}
+                          A partir das{" "}
                           {tipo === "resumoDiario"
                             ? estado.horarioResumo
-                            : estado.horarioPendencias}
-                          , no horário da escola.
+                            : estado.horarioPendencias}{" "}
+                          (horário da escola).
                         </p>
                       ) : null}
                     </div>
@@ -255,8 +255,7 @@ export default function DialogoNotificacoes({ aberto, onAbrir }: Props) {
                   </div>
                 ))}
                 <p className="text-muted-foreground text-xs">
-                  Os tipos escolhidos valem para todos os dispositivos da conta. A ativação abaixo
-                  vale somente para este dispositivo.
+                  Preferências para toda a conta; ativação por dispositivo.
                 </p>
               </div>
             ) : null}

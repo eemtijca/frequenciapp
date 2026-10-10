@@ -176,12 +176,7 @@ export default function PorAluno({
   return (
     <section aria-label="Relatório por aluno" className="flex flex-col gap-4 pb-6">
       <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
-          <p className="text-muted-foreground text-sm">
-            Faltas, justificadas e saídas no mês, com o acumulado do histórico.
-          </p>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
         <Button
           variant="ghost"
           size="icon"

@@ -62,7 +62,7 @@ test("registra chegada, preserva após recarregar e remove para correção", asy
   await escolherHorario(page, "#entrada-horario", "08:15");
   await page.getByLabel("Momento da entrada", { exact: true }).click();
   await page.getByRole("option", { name: "2ª aula", exact: true }).click();
-  await page.getByRole("radio", { name: "Escrever em poucas palavras" }).click();
+  await page.getByRole("radio", { name: "Escrever", exact: true }).click();
   await page.locator("#entrada-motivo").fill("Transporte atrasou");
   await page.getByLabel("Responsável pelo registro", { exact: true }).click();
   await page.getByRole("option", { name: "Coordenadora E2E", exact: true }).click();

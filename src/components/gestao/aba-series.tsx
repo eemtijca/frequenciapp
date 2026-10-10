@@ -122,9 +122,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          {series.length === 0
-            ? "As séries organizam as turmas"
-            : `${series.length} ${series.length === 1 ? "série" : "séries"}`}
+          {series.length} {series.length === 1 ? "série" : "séries"}
         </p>
         <Button size="lg" className="h-11" onClick={abrirNovo}>
           <Plus size={16} />
@@ -164,11 +162,11 @@ export default function AbaSeries({ series, onMudanca }: Props) {
               className="flex items-center gap-3 px-4 py-3 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
             >
               <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">
+                <span className="sr-only">Ordem de exibição </span>
                 {String(serie.ordem).padStart(2, "0")}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{serie.nome}</p>
-                <p className="text-muted-foreground text-xs">ordem de exibição {serie.ordem}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button

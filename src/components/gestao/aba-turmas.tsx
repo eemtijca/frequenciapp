@@ -155,9 +155,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-sm">
-          {turmas.length === 0
-            ? "As turmas recebem os alunos"
-            : `${turmas.length} ${turmas.length === 1 ? "turma" : "turmas"}`}
+          {turmas.length} {turmas.length === 1 ? "turma" : "turmas"}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <DialogoOrdenarTurmas

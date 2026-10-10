@@ -97,6 +97,7 @@ Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo
 
 - Textos curtos, em português, sem exclamações e sem gíria de marketing.
 - Em Gestão > Configurações, títulos e estados identificam as seções. Descrições curtas explicam apenas escolhas que precisam de contexto; instruções repetidas saem da tela. A conexão das planilhas usa Entrar com Google e o seletor de arquivos. Avisos sobre exclusão, restauração e acesso a dados sensíveis permanecem junto das ações e confirmações.
+- Textos de apoio seguem o mesmo critério nas demais telas: Saídas e Entradas usam Escrever e Selecionar tipo para a justificativa, sem repetir a instrução no campo e na ajuda; os limites continuam no contador ou na orientação do campo. Por aluno mantém os títulos dos indicadores sem um subtítulo repetido. Alunos e Notificações preservam explicações curtas sobre administração, conta e dispositivo. Séries mostra a ordem uma vez, com descrição acessível.
 - Números de contagem com singular e plural corretos ("1 falta", "2 faltas").
 - Sem travessão em qualquer texto da interface: ponto, vírgula ou parênteses cumprem o papel. O guarda editorial em `tests/unit/texto-editorial.test.ts` mantém a regra verificada por teste.
 

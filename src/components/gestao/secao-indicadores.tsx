@@ -89,8 +89,7 @@ export default function SecaoIndicadores() {
       {estado && (
         <>
           <p className="text-muted-foreground text-sm">
-            Totais por data, série e turma, em uma planilha separada. Sem nomes de alunos ou
-            observações.
+            Planilha separada com totais por data, série e turma, sem nomes ou observações.
           </p>
           {!estado.conectada && (
             <p role="alert" className="text-sm">
