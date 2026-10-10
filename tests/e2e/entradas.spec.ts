@@ -3,6 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { criarMassaE2E, criarLiberadoresE2E, limparMassaE2E } from "./helpers/banco";
 import {
   abrirAbaMovimentacao,
+  abrirNavegacao,
   aguardarHidratacao,
   escolherHorario,
   trocarVisao,
@@ -248,10 +249,13 @@ test("revê o envio em confirmação própria", async ({ page }) => {
   await painel.evaluate((elemento) => {
     elemento.scrollTop = 0;
   });
-  const botao = page
-    .getByRole("navigation", { name: "Seções do aplicativo" })
-    .getByRole("button", { name: "Saídas e entradas" });
+  await expect(page.getByRole("button", { name: "Abrir menu", exact: true })).toBeVisible();
+  const navegacao = await abrirNavegacao(page);
+  const botao = navegacao.getByRole("button", { name: "Saídas e entradas", exact: true });
   await expect(botao).toBeVisible();
+  await expect(botao).toHaveAttribute("aria-current", "page");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );

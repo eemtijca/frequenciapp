@@ -6,19 +6,48 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * de os manipuladores de evento existirem, e um clique nesse intervalo se perde.
  * O seletor pode apontar para o elemento que será clicado em seguida.
  */
-export async function aguardarHidratacao(page: Page, seletor = "nav button"): Promise<void> {
+export async function aguardarHidratacao(
+  page: Page,
+  seletor = 'button[aria-label="Abrir menu"], nav button',
+): Promise<void> {
   await page.waitForFunction((alvoTexto) => {
-    const alvo = document.querySelector(alvoTexto) ?? document.querySelector("button");
-    if (!alvo) return false;
-    return Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"));
+    const visivel = (alvo: Element): boolean => {
+      if (!(alvo instanceof HTMLElement) || alvo.closest("[hidden]")) return false;
+      const estilo = getComputedStyle(alvo);
+      return estilo.display !== "none" && estilo.visibility !== "hidden";
+    };
+    const hidratado = (alvo: Element): boolean =>
+      visivel(alvo) && Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"));
+    const preferidos = [...document.querySelectorAll(alvoTexto)];
+    // Com o menu na tela, o clique só vale depois que esse controle hidrata.
+    // Na entrada não há menu: qualquer botão visível, como Entrar, serve.
+    if (preferidos.some(visivel)) return preferidos.some(hidratado);
+    return [...document.querySelectorAll("button")].some(hidratado);
   }, seletor);
 }
 
 /**
- * Troca de visão pelo cabeçalho ou pela navegação (a Chamada Parcial, pelo ícone
- * da Chamada). O Fast Refresh pode trocar
- * os nós durante a hidratação, então o clique é repetido até o painel mudar.
+ * Expõe as seções na barra lateral do desktop ou abre o menu do celular.
+ * Espera o controle visível: o botão do celular fica oculto no desktop e
+ * não pode ser o alvo de um clique longo.
  */
+export async function abrirNavegacao(page: Page): Promise<Locator> {
+  await aguardarHidratacao(page);
+  const navegacao = page
+    .getByRole("navigation", { name: "Seções do aplicativo", exact: true })
+    .locator("visible=true");
+  const abrir = page
+    .getByRole("button", { name: "Abrir menu", exact: true })
+    .locator("visible=true");
+  await expect(navegacao.or(abrir).first()).toBeVisible();
+  if ((await navegacao.count()) > 0) return navegacao.first();
+  await abrir.click();
+  const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
+  await expect(menu).toBeVisible();
+  return menu.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
+}
+
+/** Troca de visão com um clique; a Chamada Parcial abre pelo ícone da Chamada. */
 export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
   // A Chamada Parcial não tem item na navegação: abre pelo ícone da Chamada.
   if (visao === "chamada-parcial") {
@@ -26,31 +55,18 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
     const icone = page
       .locator('section[aria-label="Fazer chamada"]')
       .getByRole("button", { name: "Chamada Parcial", exact: true });
-    await expect
-      .poll(
-        async () => {
-          await icone.click({ force: true });
-          return page.locator("main").getAttribute("data-visao");
-        },
-        { timeout: 20_000 },
-      )
-      .toBe("chamada-parcial");
+    await icone.click();
+    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada-parcial");
     return;
   }
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const botao = page
-    .locator("header, nav")
-    .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) });
-  await expect
-    .poll(
-      async () => {
-        await botao.click();
-        return page.locator("main").getAttribute("data-visao");
-      },
-      { timeout: 20_000 },
-    )
-    .toBe(visao);
+  const navegacao = await abrirNavegacao(page);
+  await navegacao
+    .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
+    .click();
+  await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
+  await expect(page.locator("main")).toHaveAttribute("data-visao", visao);
 }
 
 /**
@@ -104,6 +120,8 @@ export async function rolarAteGrafico(page: Page, nome: string) {
     );
     if (!(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement))
       throw new Error("Cartão não encontrado.");
+    // A faixa só troca o cartão vigente em um gesto ou neste pedido explícito.
+    elemento.setAttribute("data-rolagem-intencional", "true");
     elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
   }, nome);
   await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeInViewport();

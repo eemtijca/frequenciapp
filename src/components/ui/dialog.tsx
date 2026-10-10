@@ -44,11 +44,14 @@ function DialogContent({
   children,
   showCloseButton = true,
   folha = false,
+  lateral = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
   /** No celular, abre como folha inferior em vez de modal centralizado. */
   folha?: boolean;
+  /** Abre um painel pela lateral, com a altura disponível do dispositivo. */
+  lateral?: boolean;
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -56,8 +59,12 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "superficie-vidro vidro-flutuante data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid max-h-[90dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain p-6 duration-200 sm:max-w-lg",
+          "superficie-vidro vidro-flutuante data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-50 duration-200",
+          lateral
+            ? "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 flex h-dvh w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-l-none border-y-0 border-l-0"
+            : "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-[50%] left-[50%] grid max-h-[90dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain p-6 sm:max-w-lg",
           folha &&
+            !lateral &&
             "max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[92dvh] max-sm:translate-y-0 max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
           className,
         )}

@@ -1,7 +1,7 @@
 // Avisos de sucesso preservam o acesso à Gestão no celular e no tablet.
 import { expect, test } from "@playwright/test";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
-import { aguardarHidratacao } from "./helpers/pagina";
+import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 let inicial: ConfiguracaoOrigem | null = null;
 
@@ -48,14 +48,11 @@ for (const largura of [390, 800]) {
       })
       .toBe(true);
 
-    await page
-      .getByRole("navigation", { name: "Seções do aplicativo" })
-      .getByRole("button", { name: "Chamada", exact: true })
-      .click();
+    await trocarVisao(page, "Chamada", "chamada");
     await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
     await expect(aviso).toBeVisible();
 
-    await cabecalho.getByRole("button", { name: "Gestão", exact: true }).click();
+    await trocarVisao(page, "Gestão", "gestao");
     await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
     await expect(aviso).toBeVisible();

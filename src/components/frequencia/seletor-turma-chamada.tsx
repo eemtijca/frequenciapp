@@ -123,9 +123,7 @@ function AnelSerie({
               data-turma-id={item.turma.id}
               data-situacao={item.concluida ? "concluida" : "pendente"}
             >
-              <title>
-                {item.turma.rotulo}: {item.concluida ? "chamada salva" : "chamada pendente"}
-              </title>
+              <title>{`${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`}</title>
             </circle>
           );
         })
