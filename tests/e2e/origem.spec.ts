@@ -2,7 +2,12 @@
 // e definição da turma original em massa na Gestão.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "./helpers/pagina";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 
 let configuracaoInicial: ConfiguracaoOrigem;
@@ -141,6 +146,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await trocarVisao(page, "Chamada", "chamada");
     const secao = page.locator('section[aria-label="Fazer chamada"]');
     await escolherTurmaNaChamada(secao, /2º ano E2E Movimento B/);
+    await liberarSabadoSeNecessario(secao);
     const linha = secao.getByRole("button", { name: /^E2E Movimento Um:/ });
     await expect(linha).toBeVisible();
     await expect(linha.getByText("E2E Movimento Um", { exact: true })).toBeVisible();

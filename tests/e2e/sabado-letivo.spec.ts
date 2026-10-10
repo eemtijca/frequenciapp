@@ -283,20 +283,22 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
   expect(await lerGrade()).toEqual(gradeOriginal);
 });
 
-test("reconhece sábado recorrente e não mostra a ação nos dias úteis ou no domingo", async ({
+test("sábado com grade também começa bloqueado e não mostra a ação nos dias úteis ou no domingo", async ({
   page,
 }) => {
   const sabado = ultimoSabado();
   const secao = await abrirTurma(page, "C", sabado);
-  await expect(
-    secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true }),
-  ).toHaveCount(0);
+  const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
+  await expect(liberar).toBeVisible();
+  await expect(aluno(secao, "C")).toBeDisabled();
+  await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
+  await liberar.click();
   await expect(secao.getByRole("button", { name: "Sábado letivo", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
   await expect(aluno(secao, "C")).toBeEnabled();
-  expect(await salvar(page, secao)).toMatchObject({ dia: sabado, faltas: [] });
+  expect(await salvar(page, secao)).toMatchObject({ dia: sabado, sabadoLetivo: true, faltas: [] });
 
   const sexta = diaSeguinte(sabado, -1);
   await escolherDia(page, secao, sexta);

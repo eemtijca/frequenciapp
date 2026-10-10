@@ -3,7 +3,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 let turmaId = "";
@@ -71,6 +76,7 @@ async function abrirChamada(page: Page) {
   const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
   if (await secao.getByRole("group", { name: "Turma atual", exact: true }).isVisible())
     await escolherTurmaNaChamada(secao, /E2E Seduc Normal A/);
+  await liberarSabadoSeNecessario(secao);
   await expect(secao.getByText(`${prefixo} Um`, { exact: true })).toBeVisible();
   return secao;
 }

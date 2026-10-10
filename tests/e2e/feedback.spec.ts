@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { ADMIN_E2E, comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { entrar } from "./helpers/auth";
-import { trocarVisao } from "./helpers/pagina";
+import { liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
 
 test.describe("toasts e toque duplo", () => {
   test.beforeAll(async () => {
@@ -22,6 +22,7 @@ test.describe("toasts e toque duplo", () => {
     const chamada = page.locator('section[aria-label="Fazer chamada"]');
     const pilula = chamada.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    await liberarSabadoSeNecessario(chamada);
     await chamada.locator("ul.divide-y li").first().waitFor();
     await chamada.locator("ul.divide-y li button[aria-pressed]").first().click();
     await chamada.getByRole("button", { name: "Salvar" }).click({ clickCount: 2, delay: 30 });

@@ -2,7 +2,7 @@
 // grade e falta justificada. O modo por aula é ligado pela configuração.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
 
 test.describe("chamada com saída por aula", () => {
   test.beforeAll(async ({ request }) => {
@@ -30,6 +30,7 @@ test.describe("chamada com saída por aula", () => {
     if (await pilula.isVisible().catch(() => false)) {
       await pilula.click();
     }
+    await liberarSabadoSeNecessario(painel);
     await expect(painel.getByText("E2E Aluno Um")).toBeVisible();
 
     // O seletor próprio mostra o rótulo amigável e abre o painel no clique.
@@ -82,6 +83,8 @@ test.describe("chamada com saída por aula", () => {
       expect(lista?.x ?? 0).toBeLessThan(info?.x ?? 0);
     }
 
+    // Trocar de dia e voltar refaz a leitura e, aos sábados, a chamada volta a começar bloqueada.
+    await liberarSabadoSeNecessario(painel);
     const linha = painel.locator("ul li").first();
     await linha.locator("button[aria-pressed]").first().click();
     await painel.getByRole("button", { name: /Aulas em que E2E Aluno Um/ }).click();
@@ -210,6 +213,7 @@ test.describe("chamada com saída por aula", () => {
     }
     const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
     await painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ }).click();
+    await liberarSabadoSeNecessario(painel);
     await linha.locator("button[aria-pressed]").first().click();
     await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();
     await page.getByRole("option", { name: "D · Doente" }).click();
