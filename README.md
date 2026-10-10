@@ -53,6 +53,7 @@ A aplicação publicada fica em https://frequenciappjca.vercel.app. Para experim
 ## Recursos
 
 - **Chamada diária**: turmas por toque, data com navegação por setas, busca por nome, resumo ao vivo e salvamento com rascunho local. A falta pode receber um código de justificativa e vira FJ; o acumulado do aluno aparece na lista e no resumo de faltas.
+- **Horários semanais**: consulta por turma e dia ou semana completa, pelo menu após Chamada. A administração configura ordem, início, fim, dias e disciplinas em Gestão > Turmas, sem cadastro de professores.
 - **Chamada Parcial**: registro independente por aluno e dia, com turno inteiro ou aulas frequentadas e chave manual "Registrado na Seduc". Correções reabrem a pendência; uma terceira planilha Google recebe os registros após prévia.
 - **Entradas atrasadas**: a área Saídas e entradas registra data, horário e motivo da chegada, preservando a turma do registro e a chamada. Envio manual com prévia para aba própria pela Sheets API.
 - **Saídas antecipadas**: registro separado da chamada, com momento (aulas, intervalos e almoço), justificativa (tipo do catálogo ou texto escrito), observação e quem libera escolhido em um catálogo da Gestão. A lista das saídas do dia, com remoção para correção, completa a área; o relatório por turma ou por aluno fica em Relatórios.

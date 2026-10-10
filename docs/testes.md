@@ -100,6 +100,8 @@ Os specs em `tests/e2e/` rodam com Playwright headless e cobrem entrada e saída
 
 `navegacao.spec.ts` cobre troca de seção, seleção inclusive da seção atual, tema, Gestão no menu e Chamada Parcial somente pelo ícone, com Chamada selecionada. `menu-lateral.spec.ts` compara as seções da barra lateral e do menu, confirma Gestão apenas para a administração, foco contido por teclado, fechamento por Escape, botão ou toque fora, retorno do foco, passagem de 1023 para 1024 pixels, abertura dos diálogos de senha e notificações e confirmação de saída com rascunho da chamada diária.
 
+`horarios.spec.ts` cobre disciplinas diferentes por dia configuradas na Gestão e preservadas após recarga, falha de salvamento com formulário mantido para nova tentativa, consulta de turma, dia e semana pela coordenação sem ações de edição, omissão de aulas inativas e alternativa Sem disciplina. A semana e o formulário são conferidos em 360 pixels, incluindo tela baixa, foco e ausência de rolagem horizontal, com capturas sintéticas anexadas ao relatório.
+
 `responsividade.spec.ts` confere cabeçalho sem estouro horizontal e rolagem independente do menu, com ações da conta acessíveis em 320x568, 800x600 e 844x390 pixels, além de formulários centralizados e conteúdo limitado em monitor de 1920 pixels. As capturas dos temas claro e escuro e dos tamanhos responsivos ficam anexadas ao relatório dos testes, sem entrar no Git.
 
 A navegação desktop dos gráficos é coberta em `painel-filtros.spec.ts`: seleção direta, botões nos extremos, teclado e ausência dos controles no celular. `gestao.spec.ts` cobre categorias isoladas, rascunhos preservados e retorno Google para as três finalidades, inclusive formato antigo.

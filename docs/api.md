@@ -182,19 +182,19 @@ Todas as rotas de aulas exigem papel de administração.
 - 200 `{"horarios": Horario[]}` na ordem das aulas.
 - 400 quando a turma não é informada ou é inválida.
 
-Horario: `{ id, turmaId, ordem, inicio, fim, diasSemana, ativo }`, com `inicio` e `fim` em `HH:MM` e `diasSemana` em ISO (1 é segunda, 7 é domingo).
+Horario: `{ id, turmaId, ordem, inicio, fim, diasSemana, disciplinas, ativo }`, com `inicio` e `fim` em `HH:MM` e `diasSemana` em ISO (1 é segunda, 7 é domingo). `disciplinas` é um mapa de nomes por dia, por exemplo `{ "1": "Matemática", "2": "Português" }`; aulas sem nomes retornam `{}`. Cada chave deve corresponder a um dia selecionado e cada nome tem até 80 caracteres após retirar espaços das extremidades.
 
 ### POST /api/horarios
 
-Corpo: `{ "turmaId": string, "ordem": number, "inicio": "HH:MM", "fim": "HH:MM", "diasSemana": number[], "ativo"?: boolean }`.
+Corpo: `{ "turmaId": string, "ordem": number, "inicio": "HH:MM", "fim": "HH:MM", "diasSemana": number[], "disciplinas"?: Record<string, string>, "ativo"?: boolean }`.
 
 - 201 `{"horario": Horario}`.
-- 400 horário inválido, fim não posterior ao início, dias vazios ou repetidos.
+- 400 horário inválido, fim não posterior ao início, dias vazios ou repetidos, chave de disciplina fora de 1 a 7 ou dos dias selecionados, nome não textual ou acima do limite.
 - 404 turma inexistente; 409 ordem repetida na turma.
 
 ### PATCH /api/horarios/{id}
 
-Corpo parcial: `{ ordem?, inicio?, fim?, diasSemana?, ativo? }`.
+Corpo parcial: `{ ordem?, inicio?, fim?, diasSemana?, disciplinas?, ativo? }`. Omitir `disciplinas` preserva os nomes; informar apenas alguns dias mescla os nomes sem substituir os outros. Texto vazio limpa o nome daquele dia. Retirar um dia de `diasSemana` também retira sua disciplina.
 
 - 200 `{"horario": Horario}`; 404 inexistente; 409 ordem repetida.
 

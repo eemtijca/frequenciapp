@@ -13,7 +13,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `series`                      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
 | `turmas`                      | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
 | `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
-| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
+| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana, disciplinas por dia e situação.           |
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
 | `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.  |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
@@ -72,6 +72,12 @@ docker compose down -v && docker compose up --build
 ```
 
 Depois do primeiro deploy de produção, a regra passa a ser aplicada sem exceção: nunca editar uma migração aplicada; qualquer ajuste entra como migração nova.
+
+## Disciplinas semanais
+
+`horarios.disciplinas` guarda um objeto JSON com nomes por dia ISO, de `"1"` (segunda-feira) a `"7"` (domingo), apenas nos dias selecionados da aula. Os nomes têm até 80 caracteres; não há campos de professores. A migração `20261010164000_disciplinas_semanais` adiciona a coluna `JSONB` obrigatória com padrão `{}`, sem recriar aulas ou alterar faltas.
+
+A API normaliza aulas antigas para `disciplinas: {}`. Edições parciais preservam os dias omitidos, texto vazio limpa o nome daquele dia e retirar um dia da aula remove sua disciplina. A cópia JSON inclui o mapa e continua aceitando cópias antigas sem o campo: aulas novas recebem `{}` e aulas existentes preservam as disciplinas. Mapas divergentes informados na cópia contam como conflito sem sobrescrita.
 
 ## Entradas atrasadas
 

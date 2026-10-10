@@ -5,6 +5,11 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { ehHoraValida, rotuloDeTurma, type Horario } from "@/domain/frequencia";
+import { disciplinasDoHorario, mesclarDisciplinas } from "@/domain/horarios-semanais";
+import {
+  disciplinasCorrespondemAosDias,
+  esquemaDisciplinas,
+} from "@/application/esquema-disciplinas";
 
 const horarioBase = z.object({
   ordem: z
@@ -19,14 +24,19 @@ const horarioBase = z.object({
     .min(1, "Escolha ao menos um dia da semana.")
     .refine((dias) => new Set(dias).size === dias.length, "Há dias repetidos na lista."),
   ativo: z.boolean().default(true),
+  disciplinas: esquemaDisciplinas.optional(),
 });
 
-export const esquemaCriarHorario = horarioBase.extend({
-  turmaId: z.string().uuid("Turma inválida."),
-});
+export const esquemaCriarHorario = horarioBase
+  .extend({ turmaId: z.string().uuid("Turma inválida.") })
+  .refine((dados) => disciplinasCorrespondemAosDias(dados.disciplinas, dados.diasSemana), {
+    message: "A disciplina deve corresponder a um dia selecionado.",
+    path: ["disciplinas"],
+  });
 
 export const esquemaAtualizarHorario = horarioBase
   .partial()
+  .extend({ ativo: z.boolean().optional() })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
   });
@@ -38,6 +48,7 @@ interface LinhaHorario {
   inicio: string;
   fim: string;
   diasSemana: number[];
+  disciplinas?: unknown;
   ativo: boolean;
 }
 
@@ -49,6 +60,7 @@ function paraHorario(linha: LinhaHorario): Horario {
     inicio: linha.inicio,
     fim: linha.fim,
     diasSemana: linha.diasSemana,
+    disciplinas: disciplinasDoHorario(linha.disciplinas),
     ativo: linha.ativo,
   };
 }
@@ -94,6 +106,7 @@ export async function criarHorario(admin: { id: string }, entrada: unknown): Pro
         inicio: dados.data.inicio,
         fim: dados.data.fim,
         diasSemana: dados.data.diasSemana,
+        disciplinas: mesclarDisciplinas({}, dados.data.disciplinas, dados.data.diasSemana),
         ativo: dados.data.ativo,
       },
     });
@@ -108,7 +121,7 @@ export async function criarHorario(admin: { id: string }, entrada: unknown): Pro
   return paraHorario(linha);
 }
 
-/** Atualiza uma aula: janela, ordem, dias e situação. */
+/** Atualiza a aula e suas disciplinas sem substituir nomes de dias omitidos. */
 export async function atualizarHorario(
   admin: { id: string },
   id: string,
@@ -118,22 +131,24 @@ export async function atualizarHorario(
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
-  const existente = await banco().horario.findUnique({ where: { id } });
-  if (!existente) throw new ErroHttp("Aula não encontrada.", 404);
-
-  const inicio = dados.data.inicio ?? existente.inicio;
-  const fim = dados.data.fim ?? existente.fim;
-  if (inicio >= fim) {
-    throw new ErroHttp("O horário de fim deve ser posterior ao de início.", 400);
-  }
-  if (dados.data.ordem !== undefined && dados.data.ordem !== existente.ordem) {
-    const repetida = await banco().horario.findFirst({
-      where: { turmaId: existente.turmaId, ordem: dados.data.ordem },
-    });
-    if (repetida) throw new ErroHttp("Já existe uma aula com esta ordem nesta turma.", 409);
-  }
-
   const linha = await comTransacao(async (tx) => {
+    const existente = await tx.horario.findUnique({ where: { id } });
+    if (!existente) throw new ErroHttp("Aula não encontrada.", 404);
+    const inicio = dados.data.inicio ?? existente.inicio;
+    const fim = dados.data.fim ?? existente.fim;
+    if (inicio >= fim) {
+      throw new ErroHttp("O horário de fim deve ser posterior ao de início.", 400);
+    }
+    if (dados.data.ordem !== undefined && dados.data.ordem !== existente.ordem) {
+      const repetida = await tx.horario.findFirst({
+        where: { turmaId: existente.turmaId, ordem: dados.data.ordem },
+      });
+      if (repetida) throw new ErroHttp("Já existe uma aula com esta ordem nesta turma.", 409);
+    }
+    const diasSemana = dados.data.diasSemana ?? existente.diasSemana;
+    if (!disciplinasCorrespondemAosDias(dados.data.disciplinas, diasSemana)) {
+      throw new ErroHttp("A disciplina deve corresponder a um dia selecionado.", 400);
+    }
     const atualizada = await tx.horario.update({
       where: { id },
       data: {
@@ -142,6 +157,15 @@ export async function atualizarHorario(
         ...(dados.data.fim !== undefined ? { fim: dados.data.fim } : {}),
         ...(dados.data.diasSemana !== undefined ? { diasSemana: dados.data.diasSemana } : {}),
         ...(dados.data.ativo !== undefined ? { ativo: dados.data.ativo } : {}),
+        ...(dados.data.disciplinas !== undefined || dados.data.diasSemana !== undefined
+          ? {
+              disciplinas: mesclarDisciplinas(
+                existente.disciplinas,
+                dados.data.disciplinas,
+                diasSemana,
+              ),
+            }
+          : {}),
       },
     });
     await auditar(

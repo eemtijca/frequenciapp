@@ -9,6 +9,11 @@ import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequen
 import { ehHorarioEntrada } from "@/domain/entradas";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { esquemaCriarFeriado } from "@/application/calendario-letivo";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
+import {
+  disciplinasCorrespondemAosDias,
+  esquemaDisciplinas,
+} from "@/application/esquema-disciplinas";
 import {
   comTravaPlanilhaFrequencia,
   controleTravaPlanilhaFrequencia,
@@ -112,15 +117,20 @@ const esquemaCopia = z.object({
     .max(5000),
   horarios: z
     .array(
-      z.object({
-        id: uuid,
-        turmaId: uuid,
-        ordem: z.number().int().min(1).max(999),
-        inicio: z.string().max(5),
-        fim: z.string().max(5),
-        diasSemana: z.array(z.number().int().min(1).max(7)).max(7),
-        ativo: z.boolean(),
-      }),
+      z
+        .object({
+          id: uuid,
+          turmaId: uuid,
+          ordem: z.number().int().min(1).max(999),
+          inicio: z.string().max(5),
+          fim: z.string().max(5),
+          diasSemana: z.array(z.number().int().min(1).max(7)).max(7),
+          ativo: z.boolean(),
+          disciplinas: esquemaDisciplinas.optional(),
+        })
+        .refine((horario) =>
+          disciplinasCorrespondemAosDias(horario.disciplinas, horario.diasSemana),
+        ),
     )
     .max(50000),
   alunos: z
@@ -312,6 +322,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         inicio: true,
         fim: true,
         diasSemana: true,
+        disciplinas: true,
         ativo: true,
       },
     }),
@@ -420,7 +431,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     exportadoEm: new Date().toISOString(),
     series,
     turmas,
-    horarios,
+    horarios: horarios.map((horario) => ({
+      ...horario,
+      disciplinas: disciplinasDoHorario(horario.disciplinas),
+    })),
     alunos: alunos.map((aluno) => ({
       ...aluno,
       desistenteEm: aluno.desistenteEm?.toISOString().slice(0, 10) ?? null,
@@ -631,6 +645,7 @@ async function mesclarCopia(
             inicio: true,
             fim: true,
             diasSemana: true,
+            disciplinas: true,
             ativo: true,
           },
         })
@@ -639,7 +654,13 @@ async function mesclarCopia(
     const horariosNovos = copia.horarios.filter(
       (horario) => !horariosAtuais.has(horario.id) && idsTurmas.has(horario.turmaId),
     );
-    if (horariosNovos.length > 0) await tx.horario.createMany({ data: horariosNovos });
+    if (horariosNovos.length > 0)
+      await tx.horario.createMany({
+        data: horariosNovos.map((horario) => ({
+          ...horario,
+          disciplinas: disciplinasDoHorario(horario.disciplinas),
+        })),
+      });
     for (const horario of copia.horarios) {
       const atual = horariosAtuais.get(horario.id);
       if (atual) {
@@ -649,7 +670,10 @@ async function mesclarCopia(
           atual.inicio === horario.inicio &&
           atual.fim === horario.fim &&
           atual.ativo === horario.ativo &&
-          [...atual.diasSemana].sort().join(",") === [...horario.diasSemana].sort().join(",");
+          [...atual.diasSemana].sort().join(",") === [...horario.diasSemana].sort().join(",") &&
+          (horario.disciplinas === undefined ||
+            JSON.stringify(Object.entries(disciplinasDoHorario(atual.disciplinas)).sort()) ===
+              JSON.stringify(Object.entries(disciplinasDoHorario(horario.disciplinas)).sort()));
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
       } else if (idsTurmas.has(horario.turmaId)) resultado.adicionadas += 1;

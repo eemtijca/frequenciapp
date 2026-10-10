@@ -647,27 +647,35 @@ describe("frequência organizada por turma e mês", () => {
     const outubro = mensais["2026-10"];
     if (!outubro) throw new Error("Aba mensal ausente.");
     await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: true }));
-    await salvar("2026-10-10", []);
-    await expect
-      .poll(
-        async () => {
-          const registro = await banco.query<{ resultado: string }>(
-            `select resultado from sincronizacoes_planilha where turma_original_id = $1
-             and destino = $2 and de = '2026-10-10'::date order by criado_em desc limit 1`,
-            [turmas.A, outubro.destino],
-          );
-          return registro.rows[0]?.resultado;
-        },
-        { timeout: 15_000 },
-      )
-      .toBe("SUCESSO");
-    expect(marca(outubro.aba, "10/10/2026")).toBe("P");
-    expect(cabecalho(outubro.aba)).not.toContain("11/10/2026");
-    expect(cabecalho(outubro.aba)).not.toContain("17/10/2026");
-    await dados<Mensal>(await preparar("2026-10"));
-    expect(marca(outubro.aba, "03/10/2026")).toBe("F");
-    expect(marca(outubro.aba, "10/10/2026")).toBe("P");
-    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
+    try {
+      await salvar("2026-10-10", []);
+      await expect
+        .poll(
+          async () => {
+            const registro = await banco.query<{ resultado: string }>(
+              `select resultado from sincronizacoes_planilha where turma_original_id = $1
+               and destino = $2 and de = '2026-10-10'::date order by criado_em desc limit 1`,
+              [turmas.A, outubro.destino],
+            );
+            const fila = await banco.query<{ estado: string }>(
+              `select estado from fila_planilha where turma_id = $1 and dia = '2026-10-10'::date
+               and tipo = 'FREQUENCIA' order by sequencia desc limit 1`,
+              [turmas.A],
+            );
+            return `${registro.rows[0]?.resultado}:${fila.rows[0]?.estado}`;
+          },
+          { timeout: 15_000 },
+        )
+        .toBe("SUCESSO:CONCLUIDO");
+      expect(marca(outubro.aba, "10/10/2026")).toBe("P");
+      expect(cabecalho(outubro.aba)).not.toContain("11/10/2026");
+      expect(cabecalho(outubro.aba)).not.toContain("17/10/2026");
+      await dados<Mensal>(await preparar("2026-10"));
+      expect(marca(outubro.aba, "03/10/2026")).toBe("F");
+      expect(marca(outubro.aba, "10/10/2026")).toBe("P");
+    } finally {
+      await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
+    }
   });
 
   it("não libera sábados de outra origem nem recebe calendário externo no preparo", async () => {
