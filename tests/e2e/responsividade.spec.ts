@@ -1,6 +1,7 @@
 // Responsividade: navegação, largura de leitura no desktop e formulários
 // centralizados em telas pequenas.
 import { expect, test } from "@playwright/test";
+import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("responsividade", () => {
@@ -67,32 +68,6 @@ test.describe("responsividade", () => {
     expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
   });
 
-  test("em monitor largo, o conteúdo fica centralizado com largura de leitura", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto("/");
-    await aguardarHidratacao(page);
-    for (const [rotulo, visao, largura] of [
-      ["Painel", "painel", 1024],
-      ["Chamada", "chamada", 1152],
-      ["Chamada Parcial", "chamada-parcial", 896],
-      ["Relatórios", "relatorios", 1280],
-      ["Gestão", "gestao", 1152],
-    ] as const) {
-      await trocarVisao(page, rotulo, visao);
-      const painel = page.locator("main > div > section:not([hidden])");
-      const caixaPainel = await painel.boundingBox();
-      const conteudo = await painel.locator(":scope > div").boundingBox();
-      expect(conteudo).not.toBeNull();
-      expect(conteudo?.width ?? Infinity).toBeLessThanOrEqual(largura);
-      expect(conteudo?.width ?? 0).toBeGreaterThan(700);
-      const centroPainel = (caixaPainel?.x ?? 0) + (caixaPainel?.width ?? 0) / 2;
-      const centroConteudo = (conteudo?.x ?? 0) + (conteudo?.width ?? 0) / 2;
-      expect(Math.abs(centroPainel - centroConteudo)).toBeLessThanOrEqual(1);
-    }
-  });
-
   test("no celular os campos do login têm margem confortável", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.context().clearCookies();
@@ -101,5 +76,36 @@ test.describe("responsividade", () => {
     const campo = await page.locator("#email").boundingBox();
     expect(campo?.width ?? 0).toBeLessThanOrEqual(330);
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
+  });
+  // A Chamada Parcial abre pelo ícone da Chamada, que só existe com turmas cadastradas.
+  test.describe("com turmas cadastradas", () => {
+    test.beforeAll(criarMassaE2E);
+    test.afterAll(limparMassaE2E);
+
+    test("em monitor largo, o conteúdo fica centralizado com largura de leitura", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await page.goto("/");
+      await aguardarHidratacao(page);
+      for (const [rotulo, visao, largura] of [
+        ["Painel", "painel", 1024],
+        ["Chamada", "chamada", 1152],
+        ["Chamada Parcial", "chamada-parcial", 896],
+        ["Relatórios", "relatorios", 1280],
+        ["Gestão", "gestao", 1152],
+      ] as const) {
+        await trocarVisao(page, rotulo, visao);
+        const painel = page.locator("main > div > section:not([hidden])");
+        const caixaPainel = await painel.boundingBox();
+        const conteudo = await painel.locator(":scope > div").boundingBox();
+        expect(conteudo).not.toBeNull();
+        expect(conteudo?.width ?? Infinity).toBeLessThanOrEqual(largura);
+        expect(conteudo?.width ?? 0).toBeGreaterThan(700);
+        const centroPainel = (caixaPainel?.x ?? 0) + (caixaPainel?.width ?? 0) / 2;
+        const centroConteudo = (conteudo?.x ?? 0) + (conteudo?.width ?? 0) / 2;
+        expect(Math.abs(centroPainel - centroConteudo)).toBeLessThanOrEqual(1);
+      }
+    });
   });
 });

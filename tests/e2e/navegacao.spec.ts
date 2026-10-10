@@ -1,5 +1,6 @@
 // Fumaça do shell: troca de visão pela navegação e tema.
 import { expect, test } from "@playwright/test";
+import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("navegação", () => {
@@ -79,32 +80,6 @@ test.describe("navegação", () => {
     expect(Math.abs(centroIndicador - centroBotao)).toBeLessThan(12);
   });
 
-  test("no celular, Gestão fica no cabeçalho e segue acessível entre as visões", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/");
-    await aguardarHidratacao(page);
-    const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo" });
-    const gestao = page.locator("header").getByRole("button", { name: "Gestão", exact: true });
-    await expect(gestao).toBeVisible();
-    await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
-
-    await trocarVisao(page, "Gestão", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
-    await expect(gestao).toHaveAttribute("aria-current", "page");
-    await expect(navegacao.locator("[aria-current=page]")).toHaveCount(0);
-    await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
-
-    await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
-    await expect(gestao).not.toHaveAttribute("aria-current", "page");
-    await expect(
-      navegacao.getByRole("button", { name: "Chamada Parcial", exact: true }),
-    ).toHaveAttribute("aria-current", "page");
-    await trocarVisao(page, "Gestão", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
-  });
-
   test("um link direto para Gestão mantém o painel ativo no celular", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/?visao=gestao");
@@ -115,5 +90,81 @@ test.describe("navegação", () => {
       "aria-current",
       "page",
     );
+  });
+  // A Chamada Parcial abre pelo ícone da Chamada, que só existe com turmas cadastradas.
+  test.describe("com turmas cadastradas", () => {
+    test.beforeAll(criarMassaE2E);
+    test.afterAll(limparMassaE2E);
+
+    test("no celular, Gestão fica no cabeçalho e segue acessível entre as visões", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/");
+      await aguardarHidratacao(page);
+      const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo" });
+      const gestao = page.locator("header").getByRole("button", { name: "Gestão", exact: true });
+      await expect(gestao).toBeVisible();
+      await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
+
+      await trocarVisao(page, "Gestão", "gestao");
+      await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+      await expect(gestao).toHaveAttribute("aria-current", "page");
+      await expect(navegacao.locator("[aria-current=page]")).toHaveCount(0);
+      await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
+
+      await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
+      await expect(gestao).not.toHaveAttribute("aria-current", "page");
+      await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
+      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      await trocarVisao(page, "Gestão", "gestao");
+      await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    });
+
+    test("a Chamada Parcial abre por um ícone ao lado do Resumo, sem item na navegação", async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/");
+      await aguardarHidratacao(page);
+      const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo" });
+      await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
+      await trocarVisao(page, "Chamada", "chamada");
+      const chamada = page.locator('section[aria-label="Fazer chamada"]');
+      const icone = chamada.getByRole("button", { name: "Chamada Parcial", exact: true });
+      const resumo = chamada.getByRole("button", { name: /^Resumo d/ });
+      await expect(icone).toBeVisible();
+      await expect(icone).toHaveText("");
+      const [caixaResumo, caixaIcone] = await Promise.all([
+        resumo.boundingBox(),
+        icone.boundingBox(),
+      ]);
+      expect(caixaResumo).not.toBeNull();
+      expect(caixaIcone).not.toBeNull();
+      if (caixaResumo && caixaIcone) {
+        expect(Math.abs(caixaResumo.y - caixaIcone.y)).toBeLessThan(8);
+        expect(caixaIcone.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+      }
+      await page.setViewportSize({ width: 360, height: 780 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      await page.setViewportSize({ width: 390, height: 844 });
+
+      await icone.click();
+      await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada-parcial");
+      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      await trocarVisao(page, "Chamada", "chamada");
+      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
   });
 });

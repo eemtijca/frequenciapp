@@ -20,6 +20,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada Parcial deixa de ter item na navegação e passa a abrir por um botão só de ícone na linha do Resumo da Chamada, à direita do Desbloquear. A visão, o estado e a confirmação de alterações não salvas não mudam, e o botão Chamada da navegação fica destacado enquanto ela está aberta.
+
 - Chamada: o botão Desbloquear (ou Bloquear) passa para a linha do Resumo, à direita dele, e o quadro com "Chamada bloqueada" e a frase de apoio deixa de aparecer. A lógica do bloqueio e o rótulo acessível do botão não mudam.
 
 - Legendas dos gráficos diários mostram apenas o total de alunos em uma caixa com cantos arredondados; a cobertura completa permanece no nome acessível e no detalhe por apontamento. Círculos de quantidade e distribuição das faltas recebem fundo vermelho do tema, também no gráfico personalizado.
