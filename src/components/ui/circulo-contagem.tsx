@@ -1,5 +1,5 @@
 // Círculos de contagem: valor e sigla (F, FJ ou S) do acumulado e dos relatórios,
-// e o círculo neutro que separa números nos gráficos, no lugar de pontos.
+// e círculos de valores neutros ou de faltas nos gráficos, no lugar de pontos.
 import { cn } from "@/lib/utils";
 
 type TomContagem = "falta" | "justificada" | "saida";
@@ -44,16 +44,22 @@ interface CirculoValorProps {
   texto: string;
   /** Leitura por extenso para leitores de tela, por exemplo "27 faltas". */
   rotulo: string;
+  tom?: "neutro" | "falta";
 }
 
-/** Um número isolado em círculo neutro; vários lado a lado se separam sem pontos. */
-export function CirculoValor({ texto, rotulo }: CirculoValorProps) {
+/** Um número isolado em círculo; o tom de falta usa o vermelho semântico do tema. */
+export function CirculoValor({ texto, rotulo, tom = "neutro" }: CirculoValorProps) {
   return (
     <span
       role="img"
       title={rotulo}
       aria-label={rotulo}
-      className="numerais-tabulares bg-secondary text-foreground border-border inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] leading-none font-semibold"
+      className={cn(
+        "numerais-tabulares inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] leading-none font-semibold",
+        tom === "falta"
+          ? "vidro-reflexo border-falta bg-falta text-falta-foreground"
+          : "bg-secondary text-foreground border-border",
+      )}
     >
       <span aria-hidden="true">{texto}</span>
     </span>

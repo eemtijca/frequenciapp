@@ -368,7 +368,7 @@ test.describe("infrequência do dia", () => {
 
   test("distingue ausência de chamadas de zero faltas e calcula a taxa sobre chamadas salvas", async ({
     page,
-  }) => {
+  }, testInfo) => {
     const { alunos } = (await (await page.request.get("/api/alunos")).json()) as {
       alunos: Aluno[];
     };
@@ -423,6 +423,24 @@ test.describe("infrequência do dia", () => {
     await expect(
       page.getByRole("article", { name: /: Toda a escola$/ }).getByText(/faltas \(F \+ FJ\)/),
     ).toHaveCount(0);
+    const escola = page.getByRole("article", { name: /: Toda a escola$/ });
+    await escola
+      .getByRole("img", { name: "Faltas do dia por série", exact: true })
+      .scrollIntoViewIfNeeded();
+    // O número fica compacto, mas a cobertura continua legível por tecnologia assistiva.
+    await expect(
+      escola.getByRole("img", { name: "1 de 1 alunos com chamada", exact: true }),
+    ).toHaveText("1");
+    await testInfo.attach("Legenda compacta clara", {
+      body: await escola.screenshot(),
+      contentType: "image/png",
+    });
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await testInfo.attach("Legenda compacta escura", {
+      body: await escola.screenshot(),
+      contentType: "image/png",
+    });
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);

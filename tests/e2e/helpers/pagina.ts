@@ -23,7 +23,7 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
   await expect
     .poll(
       async () => {
-        await botao.click({ force: true });
+        await botao.click();
         return page.locator("main").getAttribute("data-visao");
       },
       { timeout: 20_000 },
