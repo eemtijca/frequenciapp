@@ -7,6 +7,7 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { rotuloDeTurma } from "@/domain/frequencia";
 import type { Horario, Turma } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 
 const nomeTurma = z
   .string()
@@ -28,7 +29,7 @@ export const esquemaAtualizarTurma = z
     message: "Nada a atualizar.",
   });
 
-/** Aula padrão de uma turma nova: cobre o dia inteiro, todos os dias. */
+/** Aula padrão de uma turma nova: cobre o dia inteiro, de segunda a sábado. */
 export const AULA_PADRAO: {
   ordem: number;
   inicio: string;
@@ -38,7 +39,7 @@ export const AULA_PADRAO: {
   ordem: 1,
   inicio: "00:00",
   fim: "23:59",
-  diasSemana: [1, 2, 3, 4, 5, 6, 7],
+  diasSemana: [1, 2, 3, 4, 5, 6],
 };
 
 interface LinhaHorario {
@@ -48,6 +49,7 @@ interface LinhaHorario {
   inicio: string;
   fim: string;
   diasSemana: number[];
+  disciplinas?: unknown;
   ativo: boolean;
 }
 
@@ -67,6 +69,7 @@ function paraHorario(linha: LinhaHorario): Horario {
     inicio: linha.inicio,
     fim: linha.fim,
     diasSemana: linha.diasSemana,
+    disciplinas: disciplinasDoHorario(linha.disciplinas),
     ativo: linha.ativo,
   };
 }

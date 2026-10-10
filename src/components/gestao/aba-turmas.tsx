@@ -226,7 +226,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                         <p className="truncate font-medium">{turma.rotulo}</p>
                         <p className="text-muted-foreground text-xs">
                           {turma.horarios.length === 0
-                            ? "sem aulas configuradas"
+                            ? "sem horários configurados"
                             : `${turma.horarios.length} ${
                                 turma.horarios.length === 1 ? "aula" : "aulas"
                               }`}
@@ -237,7 +237,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                           variant="ghost"
                           size="icon"
                           className="size-11"
-                          aria-label={`Aulas de ${turma.rotulo}`}
+                          aria-label={`Horários de ${turma.rotulo}`}
                           onClick={() => {
                             setTurmaDasAulas(turma);
                             setAulasAberto(true);

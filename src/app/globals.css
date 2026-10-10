@@ -195,6 +195,39 @@
   }
 }
 
+/* Gaveta lateral do menu e véu: só transform e opacidade, que o navegador anima fora
+   da thread principal. */
+@keyframes gaveta-entra {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes gaveta-sai {
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes veu-entra {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes veu-sai {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Com a gaveta do menu aberta, o Radix põe pointer-events: none no body. A
+   propriedade é herdada e forçaria recalcular o estilo do app inteiro ao abrir e
+   ao fechar; o véu já bloqueia os toques, então o contêiner mantém o valor. */
+[data-gaveta-aberta] {
+  pointer-events: auto;
+}
+
 /* Movimento reduzido: transições e animações decorativas param na hora,
    exceto os indicadores de carregamento, que continuam comunicando espera. */
 @media (prefers-reduced-motion: reduce) {

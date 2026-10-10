@@ -70,7 +70,9 @@ A cópia JSON permanece na versão 1 e acrescenta `frequenciasParciais` opcional
 
 ## Página única com visões locais
 
-O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Chamada Parcial, Saídas e entradas e Relatórios para a equipe; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
+O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Horários, Chamada Parcial, Saídas e entradas e Relatórios para a equipe; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
+
+Horários reutiliza as aulas no escopo de turmas da equipe e permite consulta por dia ou semana, sem nova rota de página. A administração configura as mesmas aulas em Gestão > Turmas. O mapa de disciplinas usa os dias ISO como chaves e não altera as regras de frequência nem inclui dados de professores.
 
 ## Organização de diretórios
 
@@ -107,6 +109,7 @@ src/
     auth/                   tela de entrada
     painel/                 indicadores do dia com gráficos
     frequencia/             vista da chamada diária
+    horarios/               consulta semanal das disciplinas por turma
     frequencia-parcial/     vista e formulários da presença parcial
     saidas/                 registro e relatórios das saídas antecipadas
     relatorios/             sub-abas de histórico, grade e por aluno
@@ -123,6 +126,7 @@ src/
     planilha-parcial.ts     planejamento da terceira planilha
     fila-planilha.ts        regras puras da fila FIFO: ordem, esperas, reserva e desfecho
     frequencia.ts           regras puras de frequência, justificativas e saídas
+    horarios-semanais.ts    mapa de disciplinas por dia da semana
     relatorios.ts           indicadores e relatórios derivados
     planilha.ts             dataframe, esquema da planilha, CSV e planejamento conservador
     usuarios.ts             política de senha, papéis e rótulos

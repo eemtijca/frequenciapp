@@ -62,6 +62,35 @@ test.describe("menu lateral", () => {
     await expect(abrir).toBeFocused();
   });
 
+  test("abre e fecha sem trava de rolagem, desfoque ou bloqueio herdado pela tela", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const raiz = page.locator("main").locator("xpath=ancestor::div[contains(@class, 'h-dvh')]");
+    await abrirNavegacao(page);
+    const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
+    await expect(page.locator('[data-slot="dialog-veu"]')).toBeVisible();
+    // Cada uma dessas mudanças obrigaria o navegador a recalcular o estilo do app inteiro.
+    const estado = await menu.evaluate((gaveta) => ({
+      desfoque: getComputedStyle(gaveta).backdropFilter,
+      travaDeRolagem: document.body.hasAttribute("data-scroll-locked"),
+      variavelHerdada: getComputedStyle(document.body)
+        .getPropertyValue("--removed-body-scroll-bar-size")
+        .trim(),
+    }));
+    expect(estado).toEqual({ desfoque: "none", travaDeRolagem: false, variavelHerdada: "" });
+    await expect(raiz).toHaveAttribute("data-gaveta-aberta", "");
+    await expect(raiz).toHaveCSS("pointer-events", "auto");
+
+    // O véu continua recebendo o toque fora da gaveta e fechando o menu.
+    await page.mouse.click(387, 422);
+    await expect(menu).toBeHidden();
+    await expect(raiz).not.toHaveAttribute("data-gaveta-aberta");
+    expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe("");
+  });
+
   test("usa as seções do desktop e fecha ao ampliar a tela para 1024 px", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");

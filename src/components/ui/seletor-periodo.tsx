@@ -8,12 +8,15 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   celulasDoMes,
+  celulasDoMesSemDomingo,
   diaDaSemanaIso,
+  diaDeChamadaVizinho,
   diaSeguinte,
   diasDoMes,
   mesSeguinte,
   nomeDoMes,
   rotuloMes,
+  ultimoDiaDeChamada,
 } from "@/domain/frequencia";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -28,10 +31,13 @@ interface Props {
   rotulo: string;
   detalhe?: string;
   mostrarSelo?: boolean;
+  /** Calendário de segunda a sábado: o domingo não aparece e a navegação o pula. */
+  semDomingo?: boolean;
   onValor: (valor: string) => void;
 }
 
 const SEMANAS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const SEMANAS_SEM_DOMINGO = SEMANAS.slice(1);
 const MESES = Array.from({ length: 12 }, (_, indice) => indice + 1);
 
 /** Mesmo dia em outro mês, limitado ao último dia do mês de destino. */
@@ -52,6 +58,7 @@ export function SeletorPeriodo({
   rotulo,
   detalhe,
   mostrarSelo = true,
+  semDomingo = false,
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
@@ -61,7 +68,11 @@ export function SeletorPeriodo({
   const botoes = useRef(new Map<string, HTMLButtonElement>());
   const focoPendente = useRef(false);
 
-  const referencia = valor > max ? max : valor;
+  // Sem domingo, qualquer data que caia nele vale pelo sábado anterior,
+  // inclusive o limite: se hoje é domingo, o último dia escolhível é o sábado.
+  const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
+  const limite = aprumar(max);
+  const referencia = aprumar(valor > max ? max : valor);
   const selo = mostrarSelo && valor === max ? (modo === "dia" ? "Hoje" : "Este mês") : "";
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
@@ -99,17 +110,26 @@ export function SeletorPeriodo({
 
   function aoTeclarDia(evento: React.KeyboardEvent) {
     let proximo: string | null = null;
-    if (evento.key === "ArrowLeft") proximo = diaSeguinte(foco, -1);
-    else if (evento.key === "ArrowRight") proximo = diaSeguinte(foco, 1);
+    if (evento.key === "ArrowLeft")
+      proximo = semDomingo ? diaDeChamadaVizinho(foco, -1) : diaSeguinte(foco, -1);
+    else if (evento.key === "ArrowRight")
+      proximo = semDomingo ? diaDeChamadaVizinho(foco, 1) : diaSeguinte(foco, 1);
     else if (evento.key === "ArrowUp") proximo = diaSeguinte(foco, -7);
     else if (evento.key === "ArrowDown") proximo = diaSeguinte(foco, 7);
     else if (evento.key === "PageUp") proximo = mesmoDiaNoMes(foco, -1);
     else if (evento.key === "PageDown") proximo = mesmoDiaNoMes(foco, 1);
-    else if (evento.key === "Home") proximo = diaSeguinte(foco, -(diaDaSemanaIso(foco) % 7));
-    else if (evento.key === "End") proximo = diaSeguinte(foco, 6 - (diaDaSemanaIso(foco) % 7));
+    else if (evento.key === "Home")
+      proximo = semDomingo
+        ? diaSeguinte(foco, 1 - diaDaSemanaIso(foco))
+        : diaSeguinte(foco, -(diaDaSemanaIso(foco) % 7));
+    else if (evento.key === "End")
+      proximo = semDomingo
+        ? diaSeguinte(foco, 6 - diaDaSemanaIso(foco))
+        : diaSeguinte(foco, 6 - (diaDaSemanaIso(foco) % 7));
     else return;
     evento.preventDefault();
-    if (proximo > max) proximo = max;
+    proximo = aprumar(proximo);
+    if (proximo > limite) proximo = limite;
     setFoco(proximo);
     setMesVisivel(proximo.slice(0, 7));
   }
@@ -137,8 +157,8 @@ export function SeletorPeriodo({
     setMesVisivel(proximoMes);
     const ultimo = diasDoMes(proximoMes).length;
     const numero = Math.min(Number(foco.slice(8)), ultimo);
-    const proximo = `${proximoMes}-${String(numero).padStart(2, "0")}`;
-    setFoco(proximo > max ? max : proximo);
+    const proximo = aprumar(`${proximoMes}-${String(numero).padStart(2, "0")}`);
+    setFoco(proximo > limite ? limite : proximo);
   }
 
   function mudarAno(deslocamento: number) {
@@ -190,8 +210,11 @@ export function SeletorPeriodo({
           className="flex flex-col gap-1"
           onKeyDown={aoTeclarDia}
         >
-          <div className="grid grid-cols-7 gap-1" aria-hidden="true">
-            {SEMANAS.map((letra, indice) => (
+          <div
+            className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}
+            aria-hidden="true"
+          >
+            {(semDomingo ? SEMANAS_SEM_DOMINGO : SEMANAS).map((letra, indice) => (
               <span
                 key={`${letra}-${indice}`}
                 className="text-muted-foreground flex h-7 w-full items-center justify-center text-[11px] font-medium"
@@ -200,39 +223,41 @@ export function SeletorPeriodo({
               </span>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
-            {celulasDoMes(mesVisivel).map((dia, indice) => {
-              if (!dia)
+          <div className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}>
+            {(semDomingo ? celulasDoMesSemDomingo(mesVisivel) : celulasDoMes(mesVisivel)).map(
+              (dia, indice) => {
+                if (!dia)
+                  return (
+                    <span
+                      key={`vazio-${indice}`}
+                      aria-hidden="true"
+                      className="aspect-square w-full"
+                    />
+                  );
+                const selecionado = dia === valor;
+                const futuro = dia > max;
+                const corrente = dia === max;
+                const numero = Number(dia.slice(8));
                 return (
-                  <span
-                    key={`vazio-${indice}`}
-                    aria-hidden="true"
-                    className="aspect-square w-full"
-                  />
+                  <button
+                    key={dia}
+                    ref={(elemento) => registrar(dia, elemento)}
+                    type="button"
+                    tabIndex={dia === foco ? 0 : -1}
+                    disabled={futuro}
+                    aria-pressed={selecionado}
+                    aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${corrente ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
+                    onClick={() => escolher(dia)}
+                    className={cn(
+                      "aspect-square w-full",
+                      classeCelula(selecionado, futuro, corrente),
+                    )}
+                  >
+                    {numero}
+                  </button>
                 );
-              const selecionado = dia === valor;
-              const futuro = dia > max;
-              const corrente = dia === max;
-              const numero = Number(dia.slice(8));
-              return (
-                <button
-                  key={dia}
-                  ref={(elemento) => registrar(dia, elemento)}
-                  type="button"
-                  tabIndex={dia === foco ? 0 : -1}
-                  disabled={futuro}
-                  aria-pressed={selecionado}
-                  aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${corrente ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
-                  onClick={() => escolher(dia)}
-                  className={cn(
-                    "aspect-square w-full",
-                    classeCelula(selecionado, futuro, corrente),
-                  )}
-                >
-                  {numero}
-                </button>
-              );
-            })}
+              },
+            )}
           </div>
         </div>
       ) : (
@@ -268,8 +293,8 @@ export function SeletorPeriodo({
       <div className="flex items-center justify-between gap-2 border-t pt-3">
         <button
           type="button"
-          disabled={valor === max}
-          onClick={() => escolher(max)}
+          disabled={valor === limite}
+          onClick={() => escolher(limite)}
           className="vidro-discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
         >
           {modo === "dia" ? "Hoje" : "Este mês"}
