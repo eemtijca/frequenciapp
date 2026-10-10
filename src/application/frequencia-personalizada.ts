@@ -5,7 +5,7 @@ import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/c
 import { esquemaFiltrosParciais } from "./frequencia-parcial";
 import {
   diaLocal,
-  horariosDoDia,
+  horariosDaChamada,
   JUSTIFICATIVA_OUTROS,
   type Horario,
   type Marca,
@@ -43,7 +43,7 @@ function descreverChamada(
   dia: string,
 ): { marca: Marca; descricao: string } {
   if (faltas.length === 0) return { marca: "P", descricao: "Dia inteiro" };
-  const aulasDoDia = horariosDoDia(horarios, dia);
+  const aulasDoDia = horariosDaChamada(horarios, dia, true);
   const idsAusentes = new Set(faltas.map((falta) => falta.horarioId));
   const aulasAusentes = aulasDoDia.filter((aula) => idsAusentes.has(aula.id));
   if (aulasAusentes.length > 0 && aulasAusentes.length < aulasDoDia.length) {

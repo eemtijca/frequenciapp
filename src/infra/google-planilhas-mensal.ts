@@ -1,7 +1,7 @@
 // Abas mensais identificadas por turma e mês, com preparação atômica e idempotente.
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { diaDaSemanaIso, diasDoMes, rotuloData } from "@/domain/frequencia";
+import { diaDaSemanaIso, diasDoMes, ehDiaValido, rotuloData } from "@/domain/frequencia";
 import { colunasDeNovaAba } from "@/domain/planilha-apresentacao";
 import { ordenarAlunosDaPlanilha } from "@/domain/ordenacao-planilha";
 import {
@@ -26,6 +26,16 @@ export const esquemaPreparacaoMensalGoogle = z.object({
   turmaOriginalId: z.string().uuid(),
   rotulo: z.string().trim().min(1).max(200),
   mes: z.string().refine(mesValido, "Informe um mês válido."),
+  // A aplicação calcula esta lista a partir das chamadas salvas, nunca do formulário.
+  sabadosLetivos: z
+    .array(
+      z
+        .string()
+        .refine(ehDiaValido)
+        .refine((dia) => diaDaSemanaIso(dia) === 6),
+    )
+    .max(5)
+    .default([]),
   alunos: z
     .array(
       z.object({
@@ -87,7 +97,10 @@ function pedidosDePreparacao(
   geracao: string,
   entrada: PreparacaoMensal,
 ) {
-  const cabecalho = ["Aluno", ...diasDaPlanilhaMensal(entrada.mes).map(rotuloData)];
+  const cabecalho = [
+    "Aluno",
+    ...diasDaPlanilhaMensal(entrada.mes, entrada.sabadosLetivos).map(rotuloData),
+  ];
   const linhas = Math.max(1000, entrada.alunos.length + 1);
   const alunos = ordenarAlunosDaPlanilha(entrada.alunos);
   const valores = [cabecalho, ...alunos.map((aluno) => [aluno.nome])];
@@ -193,6 +206,7 @@ async function colunasParaRemover(
   doc: DocumentoGoogle,
   aba: AbaGoogle,
   mes: string,
+  sabadosLetivos: string[],
 ): Promise<number[]> {
   const marcadores = metadadosDaAba(doc, aba).filter(
     (item) => item.metadataKey === "frequenciapp.coluna",
@@ -217,6 +231,7 @@ async function colunasParaRemover(
   const cabecalho = bloco?.valores[0] ?? [];
   const formulas = bloco?.formula[0] ?? [];
   const calendario = new Map(diasDoMes(mes).map((dia) => [rotuloData(dia), dia]));
+  const diasPermitidos = new Set(diasDaPlanilhaMensal(mes, sabadosLetivos));
   const encontrados = new Set<string>();
   const remover: number[] = [];
   for (const indice of indices) {
@@ -233,7 +248,7 @@ async function colunasParaRemover(
     }
     const dia = calendario.get(rotulo);
     if (!dia) return estruturaMensalInesperada();
-    if (diaDaSemanaIso(dia) > 5) remover.push(indice);
+    if (!diasPermitidos.has(dia)) remover.push(indice);
   }
   if (diasDaPlanilhaMensal(mes).some((dia) => !encontrados.has(rotuloData(dia))))
     return estruturaMensalInesperada();
@@ -261,7 +276,14 @@ async function atualizarAbaExistente(
   if (!aba) return estruturaMensalInesperada();
   const sheetId = aba.properties.sheetId;
   const nome = nomeDisponivel(doc, entrada, sheetId);
-  const remover = await colunasParaRemover(id, acesso, doc, aba, entrada.mes);
+  const remover = await colunasParaRemover(
+    id,
+    acesso,
+    doc,
+    aba,
+    entrada.mes,
+    entrada.sabadosLetivos,
+  );
   const pedidos: Record<string, unknown>[] = remover.map((indice) => ({
     deleteDimension: {
       range: { sheetId, dimension: "COLUMNS", startIndex: indice, endIndex: indice + 1 },
@@ -290,7 +312,16 @@ async function atualizarAbaExistente(
       if (
         identidade &&
         abaConferida &&
-        !(await colunasParaRemover(id, acesso, conferido, abaConferida, entrada.mes)).length
+        !(
+          await colunasParaRemover(
+            id,
+            acesso,
+            conferido,
+            abaConferida,
+            entrada.mes,
+            entrada.sabadosLetivos,
+          )
+        ).length
       )
         return { ...identidade, criada: false, atualizada: true };
     } catch {
@@ -305,7 +336,7 @@ async function atualizarAbaExistente(
 export async function prepararAbaMensalGoogle(
   id: string,
   acesso: string,
-  entrada: PreparacaoMensal,
+  entrada: z.input<typeof esquemaPreparacaoMensalGoogle>,
 ): Promise<ResultadoPreparacao> {
   const dados = esquemaPreparacaoMensalGoogle.safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Confira a turma, o mês e a lista de alunos.", 400);

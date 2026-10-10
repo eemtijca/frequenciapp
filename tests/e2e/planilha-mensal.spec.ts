@@ -104,7 +104,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   await preparar.click();
   const dialogo = page.getByRole("alertdialog");
   await expect(
-    dialogo.getByText(/retira Turma atual e as colunas de sábado e domingo/),
+    dialogo.getByText(/Retira Turma atual, domingos e sábados sem chamada/),
   ).toBeVisible();
   await expect(dialogo.getByRole("button", { name: /Mês das novas abas/ })).toContainText(
     rotuloMes(mes),
@@ -395,7 +395,7 @@ test("atualiza abas antigas pelo preparo do mês e preserva marcas úteis e vín
   await preparar.click();
   const dialogo = page.getByRole("alertdialog");
   await expect(
-    dialogo.getByText(/retira Turma atual e as colunas de sábado e domingo/),
+    dialogo.getByText(/Retira Turma atual, domingos e sábados sem chamada/),
   ).toBeVisible();
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();

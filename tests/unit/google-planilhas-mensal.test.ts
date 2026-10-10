@@ -257,6 +257,23 @@ describe("identificação do mês da planilha", () => {
     expect(diasDaPlanilhaMensal("2024-02")).toContain("2024-02-29");
     expect(() => diasDaPlanilhaMensal("2026-13")).toThrow("mês válido");
   });
+
+  it("inclui somente os sábados registrados do mês, ordenados e sem repetição", () => {
+    const dias = diasDaPlanilhaMensal("2026-10", [
+      "2026-10-10",
+      "2026-10-03",
+      "2026-10-03",
+      "2026-10-04",
+      "2026-09-26",
+      "2026-10-99",
+    ]);
+    expect(dias).toHaveLength(24);
+    expect(dias.slice(0, 4)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-05"]);
+    expect(dias).toContain("2026-10-10");
+    expect(dias).not.toContain("2026-10-04");
+    expect(dias).not.toContain("2026-10-17");
+    expect(dias).not.toContain("2026-09-26");
+  });
 });
 
 describe("preparação das abas mensais", () => {
@@ -445,6 +462,78 @@ describe("preparação das abas mensais", () => {
     );
     await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
     expect(celulas.get(sheetId)?.[0]).toContain("03/10/2026");
+  });
+
+  it("preserva sábado registrado e suas marcas ao simplificar a aba antiga", async () => {
+    const { documento, celulas, lotes } = simularGoogle();
+    const sheetId = inserirLegada(documento, celulas);
+    const linhas = celulas.get(sheetId);
+    if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+    const marcaSabado = linhas[1][linhas[0].indexOf("03/10/2026")];
+    const liberada = { ...entrada, sabadosLetivos: ["2026-10-03"] };
+    const preparada = await prepararAbaMensalGoogle("arquivo", "acesso", liberada);
+    const cabecalho = celulas.get(sheetId)?.[0] ?? [];
+    expect(cabecalho).toEqual([
+      "Aluno",
+      ...diasDaPlanilhaMensal(entrada.mes, liberada.sabadosLetivos).map(rotuloData),
+    ]);
+    expect(celulas.get(sheetId)?.[1]?.[cabecalho.indexOf("03/10/2026")]).toBe(marcaSabado);
+    expect(cabecalho).not.toContain("04/10/2026");
+    expect(cabecalho).not.toContain("10/10/2026");
+    expect(preparada.destino).toBe(`arquivo:${sheetId}:${GERACAO}`);
+    expect(lotes).toHaveLength(1);
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", liberada)).resolves.toMatchObject({
+      criada: false,
+      atualizada: false,
+    });
+    expect(lotes).toHaveLength(1);
+  });
+
+  it("aceita sábado novo ainda sem coluna na aba já preparada", async () => {
+    const { lotes } = simularGoogle();
+    await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    await expect(
+      prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        sabadosLetivos: ["2026-10-03"],
+      }),
+    ).resolves.toMatchObject({ criada: false, atualizada: false });
+    expect(lotes).toHaveLength(1);
+  });
+
+  it("cria a aba com o sábado registrado junto das datas úteis", async () => {
+    const { documento, celulas } = simularGoogle();
+    const criada = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      sabadosLetivos: ["2026-10-03"],
+    });
+    const aba = documento.sheets.find((item) => item.properties.title === criada.aba);
+    if (!aba) throw new Error("Aba mensal ausente.");
+    const cabecalho = celulas.get(aba.properties.sheetId)?.[0] ?? [];
+    expect(cabecalho.slice(0, 5)).toEqual([
+      "Aluno",
+      "01/10/2026",
+      "02/10/2026",
+      "03/10/2026",
+      "05/10/2026",
+    ]);
+    expect(cabecalho).not.toContain("04/10/2026");
+    expect(cabecalho).not.toContain("10/10/2026");
+  });
+
+  it("confirma atualização após resposta perdida preservando o sábado registrado", async () => {
+    const { documento, celulas, lotes } = simularGoogle("resposta_perdida");
+    const sheetId = inserirLegada(documento, celulas);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(
+      prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        sabadosLetivos: ["2026-10-03"],
+      }),
+    ).resolves.toMatchObject({ criada: false, atualizada: true });
+    expect(celulas.get(sheetId)?.[0]).toContain("03/10/2026");
+    expect(celulas.get(sheetId)?.[0]).not.toContain("04/10/2026");
+    expect(lotes).toHaveLength(1);
   });
 
   it("confirma atualização após resposta perdida apenas quando título e colunas já mudaram", async () => {

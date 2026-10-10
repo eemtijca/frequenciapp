@@ -41,7 +41,7 @@ import {
   type LeituraAba,
   type PlanoSincronizacao,
 } from "@/domain/planilha";
-import { diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
+import { diaDaSemanaIso, diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
 import { diasSemEnvioConfirmado } from "@/domain/planilha-envios";
 import { diasDaPlanilhaMensal, mesValido } from "@/domain/planilha-mensal";
 import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
@@ -135,7 +135,7 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
       JOIN ${objetoDoBanco("alunos")} AS aluno ON aluno.id = chamada.aluno_id
       WHERE chamada.frequencia_id = frequencia.id
         AND (
-          EXTRACT(ISODOW FROM frequencia.dia) <= 5
+          EXTRACT(ISODOW FROM frequencia.dia) <= 6
           OR NOT EXISTS (
             SELECT 1 FROM jsonb_array_elements(${mensais}::jsonb) AS mensal
             WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
@@ -478,6 +478,30 @@ interface SimulacaoInterna {
   planoHashGeral: string;
 }
 
+/** Sábados registrados por alunos da origem, mesmo após mudar de turma atual. */
+export async function sabadosComChamadaSalva(
+  turmaOriginalId: string,
+  de: string,
+  ate: string,
+): Promise<string[]> {
+  if (!diasEntre(de, ate).some((dia) => diaDaSemanaIso(dia) === 6)) return [];
+  const linhas = await banco().frequencia.findMany({
+    where: {
+      dia: { gte: new Date(`${de}T12:00:00Z`), lte: new Date(`${ate}T12:00:00Z`) },
+      alunos: { some: { aluno: { turmaOriginalId } } },
+    },
+    select: { dia: true },
+    orderBy: { dia: "asc" },
+  });
+  return [
+    ...new Set(
+      linhas
+        .map((linha) => linha.dia.toISOString().slice(0, 10))
+        .filter((dia) => diaDaSemanaIso(dia) === 6),
+    ),
+  ];
+}
+
 /**
  * Dias a enviar para uma turma original: com `somenteAlteradas`, os dias com
  * chamada sem sucesso posterior à sua atualização que cubra aquele dia,
@@ -718,7 +742,14 @@ async function montarSimulacao(
   }
   const diasPorAba = new Map<string, { dias: string[]; incremental: boolean }>();
   for (const par of pares) {
-    const diasMensais = par.mes ? new Set(diasDaPlanilhaMensal(par.mes)) : null;
+    const diasMensais = par.mes
+      ? new Set(
+          diasDaPlanilhaMensal(
+            par.mes,
+            await sabadosComChamadaSalva(par.turmaOriginalId, entrada.de, entrada.ate),
+          ),
+        )
+      : null;
     const diasDoDestino = diasMensais ? periodo.filter((dia) => diasMensais.has(dia)) : periodo;
     if (diasDoDestino.length === 0) {
       diasPorAba.set(par.aba, { dias: [], incremental: entrada.somenteAlteradas !== false });
@@ -734,8 +765,8 @@ async function montarSimulacao(
       true,
       par.destino,
     );
-    // Chamadas de fim de semana continuam no aplicativo, mas não recriam
-    // colunas removidas das abas mensais, inclusive no envio incremental.
+    // Só sábados com chamada salva podem recriar a coluna mensal;
+    // domingos e outros sábados continuam fora, inclusive no envio incremental.
     diasPorAba.set(par.aba, {
       ...envio,
       dias: diasMensais ? envio.dias.filter((dia) => diasMensais.has(dia)) : envio.dias,
@@ -887,7 +918,10 @@ export async function enviarAposSalvar(
     for (const origem of origens) {
       const vinculos = salvo?.mapa.filter((par) => par.turmaOriginalId === origem) ?? [];
       const mensais = vinculos.filter((par) => par.mes);
-      if (mensais.length > 0 && !diasDaPlanilhaMensal(dia.slice(0, 7)).includes(dia)) {
+      if (
+        mensais.length > 0 &&
+        !diasDaPlanilhaMensal(dia.slice(0, 7), frequencia ? [dia] : []).includes(dia)
+      ) {
         situacoes.set(origem, "desligado");
         continue;
       }

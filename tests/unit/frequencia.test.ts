@@ -20,6 +20,7 @@ import {
   ehMomentoValido,
   exibirOrigemNaChamada,
   horaNoFuso,
+  horariosDaChamada,
   horariosDoDia,
   marcaDoAluno,
   mesSeguinte,
@@ -308,6 +309,61 @@ describe("horariosDoDia", () => {
   });
   it("devolve vazio quando nenhuma aula acontece no dia", () => {
     expect(horariosDoDia([horario({ diasSemana: [6, 7] })], "2026-09-25")).toEqual([]);
+  });
+});
+
+describe("sábado letivo ocasional", () => {
+  const sabado = "2026-09-26";
+  const grade = [
+    horario({ id: "aula-2", ordem: 2 }),
+    horario({ id: "inativa", ordem: 3, ativo: false }),
+    horario({ id: "aula-1", ordem: 1 }),
+  ];
+
+  it("exige liberação para o sábado sem grade e mantém domingo e grade semanal", () => {
+    expect(horariosDaChamada(grade, sabado)).toEqual([]);
+    expect(horariosDaChamada(grade, sabado, true).map((aula) => aula.id)).toEqual([
+      "aula-1",
+      "aula-2",
+    ]);
+    expect(horariosDaChamada(grade, "2026-09-27", true)).toEqual([]);
+    expect(horariosDoDia(grade, sabado)).toEqual([]);
+    expect(grade.map((aula) => aula.id)).toEqual(["aula-2", "inativa", "aula-1"]);
+  });
+
+  it("respeita a grade específica do sábado quando já foi cadastrada", () => {
+    const especifica = horario({ id: "sabado", diasSemana: [6] });
+    expect(horariosDaChamada([...grade, especifica], sabado, true)).toEqual([especifica]);
+  });
+
+  it("mantém a falta parcial e a justificativa da chamada salva no sábado", () => {
+    const parcial = frequencia({
+      dia: sabado,
+      faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"], justificativa: "D" }],
+    });
+    expect(marcaDoAluno(aluno(), sabado, [], grade)).toBeNull();
+    expect(marcaDoAluno(aluno(), sabado, [parcial], grade)).toBe("S");
+    const integral = frequencia({
+      dia: sabado,
+      faltas: [{ alunoId: "aluno-1", horarios: ["aula-1", "aula-2"], justificativa: "D" }],
+    });
+    expect(marcaDoAluno(aluno(), sabado, [integral], grade)).toBe("FJ");
+    expect(marcaDoAluno(aluno(), sabado, [frequencia({ dia: sabado })], grade)).toBe("P");
+  });
+
+  it("resolve cada turma do sábado separadamente após transferência no mesmo dia", () => {
+    const chamadas = [
+      frequencia({
+        dia: sabado,
+        alunos: ["aluno-1"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1", "aula-2"] }],
+      }),
+      frequencia({ dia: sabado, turmaId: "turma-b", alunos: ["aluno-1"] }),
+    ];
+    const outra = horario({ id: "aula-b", turmaId: "turma-b", diasSemana: [6] });
+    expect(marcaDoAluno(aluno({ turmaId: "turma-b" }), sabado, chamadas, [...grade, outra])).toBe(
+      "S",
+    );
   });
 });
 

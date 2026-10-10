@@ -229,6 +229,7 @@ async function responderGoogle(entrada: URL | string, opcoes?: RequestInit): Pro
 
 beforeEach(() => {
   vi.clearAllMocks();
+  cabecalho.splice(0, cabecalho.length, "Aluno", "02/10/2026");
   nomeNaPlanilha = aluno.nome;
   vinculada = true;
   celula = "";
@@ -378,20 +379,37 @@ describe("enviar ao salvar com a conta Google", () => {
   });
 });
 
-describe("envio mensal sem colunas de fim de semana", () => {
-  it.each(["2026-10-03", "2026-10-04"])(
-    "não tenta enviar automaticamente a chamada mensal de %s",
-    async (dia) => {
-      usarAbaMensal();
-      const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
-      expect(situacoes.get(turmaId)).toBe("desligado");
-      expect(fetch).not.toHaveBeenCalled();
-      expect(dubl.criarEnvio).not.toHaveBeenCalled();
-    },
-  );
+describe("envio mensal com sábados letivos registrados", () => {
+  it("não tenta enviar automaticamente a chamada mensal de domingo", async () => {
+    usarAbaMensal();
+    const situacoes = await enviarAposSalvar(
+      { id: "coordenacao-sintetica" },
+      turmaId,
+      "2026-10-04",
+    );
+    expect(situacoes.get(turmaId)).toBe("desligado");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dubl.criarEnvio).not.toHaveBeenCalled();
+  });
+
+  it("envia automaticamente um sábado com chamada salva e não duplica a gravação", async () => {
+    const sabado = "2026-10-03";
+    cabecalho[1] = "03/10/2026";
+    usarAbaMensal();
+    dubl.frequencias.mockResolvedValue([{ ...frequencia, dia: sabado }]);
+    dubl.frequenciasBanco.mockResolvedValue([{ dia: new Date(`${sabado}T12:00:00Z`) }]);
+    const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, sabado);
+    expect(situacoes.get(turmaId)).toBe("enviado");
+    expect(celula).toBe("P");
+    expect(lotes).toHaveLength(1);
+    expect(registros).toMatchObject([{ resultado: "SUCESSO", preenchidas: 1 }]);
+    const reenvio = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, sabado);
+    expect(reenvio.get(turmaId)).toBe("enviado");
+    expect(lotes).toHaveLength(1);
+  });
 
   it.each([false, true])(
-    "mantém apenas dias de segunda a sexta na prévia com envio incremental %s",
+    "inclui sábado registrado e exclui domingo na prévia com envio incremental %s",
     async (somenteAlteradas) => {
       usarAbaMensal();
       const dias = ["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"];
@@ -407,23 +425,52 @@ describe("envio mensal sem colunas de fim de semana", () => {
         { turmaOriginalId: turmaId, de: "2026-10-02", ate: "2026-10-05", somenteAlteradas },
       );
       expect(previa.planos).toHaveLength(1);
-      expect(previa.planos[0]?.dias).toEqual(["2026-10-02", "2026-10-05"]);
-      expect(previa.planos[0]?.novasColunas.map((coluna) => coluna.dia)).toEqual(["2026-10-05"]);
-      expect(previa.planos[0]?.amostra.every((celula) => celula.dia !== "2026-10-03")).toBe(true);
+      expect(previa.planos[0]?.dias).toEqual(["2026-10-02", "2026-10-03", "2026-10-05"]);
+      expect(previa.planos[0]?.novasColunas.map((coluna) => coluna.dia)).toEqual([
+        "2026-10-03",
+        "2026-10-05",
+      ]);
+      expect(previa.planos[0]?.amostra.some((celula) => celula.dia === "2026-10-03")).toBe(true);
+      expect(previa.planos[0]?.amostra.every((celula) => celula.dia !== "2026-10-04")).toBe(true);
+      expect(dubl.frequenciasBanco).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            alunos: { some: { aluno: { turmaOriginalId: turmaId } } },
+          }),
+          select: { dia: true },
+        }),
+      );
       expect(lotes).toHaveLength(0);
     },
   );
 
-  it("não envia nem lê células quando o período mensal contém apenas sábado e domingo", async () => {
+  it("não envia nem lê células de sábados sem chamada e domingos, mesmo com lista externa", async () => {
     usarAbaMensal();
     const previa = await simularEnvio(
       { id: "coordenacao-sintetica" },
-      { turmaOriginalId: turmaId, de: "2026-10-03", ate: "2026-10-04", somenteAlteradas: false },
+      {
+        turmaOriginalId: turmaId,
+        de: "2026-10-03",
+        ate: "2026-10-04",
+        somenteAlteradas: false,
+        sabadosLetivos: ["2026-10-03"],
+      },
     );
     expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true, novasColunas: [] }]);
     expect(fetch).not.toHaveBeenCalled();
     expect(dubl.frequencias).not.toHaveBeenCalled();
     expect(dubl.criarEnvio).not.toHaveBeenCalled();
+  });
+
+  it("ignora sábados registrados fora do período pedido", async () => {
+    usarAbaMensal();
+    dubl.frequenciasBanco.mockResolvedValue([{ dia: new Date("2026-10-10T12:00:00Z") }]);
+    const previa = await simularEnvio(
+      { id: "coordenacao-sintetica" },
+      { turmaOriginalId: turmaId, de: "2026-10-03", ate: "2026-10-04", somenteAlteradas: false },
+    );
+    expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("mantém o envio de fim de semana nas abas legadas", async () => {
