@@ -1,9 +1,9 @@
 // Calendário anual de feriados, com bloqueio transacional de chamadas e auditoria.
 import { z } from "zod";
-import type { Prisma } from "../../generated/prisma/client";
+import { Prisma } from "../../generated/prisma/client";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido } from "@/domain/frequencia";
-import { banco } from "@/infra/banco";
+import { banco, objetoDoBanco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
@@ -81,8 +81,31 @@ export async function feriadoDoDia(dia: string, tx: Cliente = banco()): Promise<
   return linha ? apresentar(linha) : null;
 }
 
-/** Recusa uma chamada em feriado dentro da mesma transação do salvamento. */
+/**
+ * Trava a tabela de feriados como primeira instrução da transação. Quem grava
+ * feriados lê as chamadas da data, e quem salva chamada lê o feriado: os dois
+ * lados formam um par que o SERIALIZABLE sozinho deixou passar em corridas.
+ * Em SERIALIZABLE o snapshot nasce na primeira consulta, e LOCK TABLE não é
+ * consulta; quem espera a trava lê depois o que o outro já gravou.
+ *
+ * - `SHARE`: salvamentos de chamada; não esperam uns pelos outros.
+ * - `SHARE ROW EXCLUSIVE`: quem grava feriados; exclui os salvamentos e a si mesmo.
+ *
+ * Sempre antes de qualquer outra trava, para a ordem fixa evitar impasse.
+ */
+export async function travarCalendario(
+  tx: Prisma.TransactionClient,
+  modo: "SHARE" | "SHARE ROW EXCLUSIVE",
+): Promise<void> {
+  await tx.$executeRaw`LOCK TABLE ${objetoDoBanco("feriados")} IN ${Prisma.raw(modo)} MODE`;
+}
+
+/**
+ * Recusa uma chamada em feriado dentro da mesma transação do salvamento. Deve
+ * ser a primeira instrução da transação: trava o calendário antes de ler.
+ */
 export async function exigirDiaLetivo(dia: string, tx: Prisma.TransactionClient): Promise<void> {
+  await travarCalendario(tx, "SHARE");
   if (await feriadoDoDia(dia, tx)) {
     throw new ErroHttp(
       "Esta data é feriado. Remova o feriado na Gestão para registrar chamadas.",
@@ -101,6 +124,7 @@ export async function criarFeriado(admin: { id: string }, entrada: unknown): Pro
   try {
     return await comTravaPlanilhaFrequencia(() =>
       comTransacao(async (tx) => {
+        await travarCalendario(tx, "SHARE ROW EXCLUSIVE");
         if (await tx.feriado.findUnique({ where: { dia }, select: { dia: true } })) {
           throw new ErroHttp("Já existe um feriado nesta data.", 409);
         }
@@ -134,6 +158,7 @@ export async function removerFeriado(admin: { id: string }, entrada: string): Pr
   const dia = new Date(`${dados.data}T12:00:00Z`);
   await comTravaPlanilhaFrequencia(() =>
     comTransacao(async (tx) => {
+      await travarCalendario(tx, "SHARE ROW EXCLUSIVE");
       if (!(await tx.feriado.findUnique({ where: { dia }, select: { dia: true } }))) {
         throw new ErroHttp("Feriado não encontrado.", 404);
       }

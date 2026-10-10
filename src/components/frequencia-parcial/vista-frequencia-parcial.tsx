@@ -16,7 +16,8 @@ import {
 import type { Aluno, ConfirmacaoSeducAluno, Serie, Turma } from "@/domain/frequencia";
 import {
   alunoDesistenteNoDia,
-  diaSeguinte,
+  diaDeChamadaVizinho,
+  ultimoDiaDeChamada,
   normalizar,
   rotuloDiaSemana,
 } from "@/domain/frequencia";
@@ -117,7 +118,9 @@ export default function VistaFrequenciaParcial({
   feriados,
   onPendencia,
 }: Props) {
-  const [dia, setDia] = useState(diaInicial);
+  // Domingo não tem chamada: abrir num domingo mostra o sábado anterior.
+  const diaPadrao = ultimoDiaDeChamada(diaInicial);
+  const [dia, setDia] = useState(diaPadrao);
   const [turmaSelecionada, setTurmaId] = useState(turmas[0]?.id ?? "");
   const turmaId = turmas.some((item) => item.id === turmaSelecionada)
     ? turmaSelecionada
@@ -439,7 +442,7 @@ export default function VistaFrequenciaParcial({
           variant="outline"
           size="icon"
           aria-label="Dia anterior da chamada parcial"
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, -1))}
           disabled={ocupado || editorAberto}
           className="size-11 shrink-0"
         >
@@ -451,6 +454,7 @@ export default function VistaFrequenciaParcial({
             modo="dia"
             valor={dia}
             max={diaInicial}
+            semDomingo
             rotulo={dia.split("-").reverse().join("/")}
             detalhe={rotuloDiaSemana(dia)}
             rotuloAcessivel="Data da chamada parcial"
@@ -463,8 +467,8 @@ export default function VistaFrequenciaParcial({
           variant="outline"
           size="icon"
           aria-label="Dia seguinte da chamada parcial"
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
-          disabled={ocupado || editorAberto || dia >= diaInicial}
+          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
+          disabled={ocupado || editorAberto || dia >= diaPadrao}
           className="size-11 shrink-0"
         >
           <ChevronRight size={18} />

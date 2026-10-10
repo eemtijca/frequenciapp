@@ -13,7 +13,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `series`                      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
 | `turmas`                      | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
 | `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
-| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana e situação.                                |
+| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana, disciplinas por dia e situação.           |
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
 | `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.  |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
@@ -61,6 +61,15 @@ Restrições de integridade relevantes:
 
 A decisão de guardar apenas as faltas, com presença implícita, está em [ADR-003](adr/003-faltas-normalizadas.md) e detalhada em [modelo-de-dados.md](modelo-de-dados.md). A frequência única com saídas por aula está em [ADR-010](adr/010-frequencia-unica-com-aulas.md); a chamada diária com justificativas, saídas e recursos opcionais está na [ADR-012](adr/012-chamada-diaria-com-saidas.md); a grade por período e a cópia JSON estão na [ADR-013](adr/013-grade-por-periodo-e-copia-json.md). A decisão de transações serializáveis está em [ADR-007](adr/007-transacoes-acid.md).
 
+## Trava do calendário
+
+Quem grava feriados lê as chamadas da data, e quem salva chamada lê o feriado. Esse par escapou da detecção de conflitos do SERIALIZABLE em corridas no CI, com feriado e chamada aceitos na mesma data. Por isso, as transações envolvidas abrem com `LOCK TABLE feriados`, antes de qualquer consulta (o snapshot só nasce na primeira consulta):
+
+- `SHARE` em `salvarFrequencia` e `salvarFrequenciaParcial`, por meio de `exigirDiaLetivo`. Chamadas não esperam umas pelas outras.
+- `SHARE ROW EXCLUSIVE` em `criarFeriado`, `removerFeriado`, na sincronização de feriados e na restauração da cópia JSON. Essas transações esperam as chamadas em andamento, e as chamadas esperam por elas; quem espera lê depois o que o outro gravou.
+
+A trava de `feriados` vem sempre antes de qualquer outra, o que evita impasse. O auxiliar é `travarCalendario`, em `src/application/calendario-letivo.ts`.
+
 ## Migração inicial reescrita
 
 Enquanto o aplicativo não tinha o primeiro deploy de produção, a migração inicial foi reescrita para o schema da coordenação, sem acúmulo de migrações intermediárias e sem backfill. Ambientes locais criados antes dessa revisão precisam ser recriados:
@@ -72,6 +81,12 @@ docker compose down -v && docker compose up --build
 ```
 
 Depois do primeiro deploy de produção, a regra passa a ser aplicada sem exceção: nunca editar uma migração aplicada; qualquer ajuste entra como migração nova.
+
+## Disciplinas semanais
+
+`horarios.disciplinas` guarda um objeto JSON com nomes por dia ISO, de `"1"` (segunda-feira) a `"7"` (domingo), apenas nos dias selecionados da aula. Os nomes têm até 80 caracteres; não há campos de professores. A migração `20261010164000_disciplinas_semanais` adiciona a coluna `JSONB` obrigatória com padrão `{}`, sem recriar aulas ou alterar faltas.
+
+A API normaliza aulas antigas para `disciplinas: {}`. Edições parciais preservam os dias omitidos, texto vazio limpa o nome daquele dia e retirar um dia da aula remove sua disciplina. A cópia JSON inclui o mapa e continua aceitando cópias antigas sem o campo: aulas novas recebem `{}` e aulas existentes preservam as disciplinas. Mapas divergentes informados na cópia contam como conflito sem sobrescrita.
 
 ## Entradas atrasadas
 

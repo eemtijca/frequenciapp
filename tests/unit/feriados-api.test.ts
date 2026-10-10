@@ -38,6 +38,13 @@ function resposta(feriados: { data: string; nome: string }[], total?: number, st
   );
 }
 
+function respostaDeErro(status: number, corpo: unknown) {
+  return new Response(JSON.stringify(corpo), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 beforeEach(() => {
   vi.resetModules();
   vi.unstubAllEnvs();
@@ -147,7 +154,7 @@ describe("cliente da base de feriados", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { buscarFeriadosDoAno } = await import("@/infra/feriados-api");
     await expect(buscarFeriadosDoAno(2026)).rejects.toThrow(
-      "Não foi possível consultar os feriados. Confira a configuração da integração.",
+      "A chave da base de feriados foi recusada. Confira o token da integração.",
     );
     await expect(buscarFeriadosDoAno(2026)).rejects.toThrow(
       "Não foi possível consultar os feriados agora. Tente novamente.",
@@ -155,6 +162,44 @@ describe("cliente da base de feriados", () => {
     const registrado = vi.mocked(console.error).mock.calls.flat().join(" ");
     expect(registrado).not.toContain(TOKEN);
     expect(registrado).not.toContain("segredo interno");
+  });
+
+  it("separa a chave inválida da recusa de plano e registra o motivo", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respostaDeErro(401, { error: "Invalid API Key" }))
+      .mockResolvedValueOnce(
+        respostaDeErro(403, {
+          error: "Upgrade required",
+          message: "This endpoint is not available on the Free plan",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const { buscarFeriadosDoAno } = await import("@/infra/feriados-api");
+    await expect(buscarFeriadosDoAno(2026)).rejects.toThrow(
+      "A chave da base de feriados foi recusada. Confira o token da integração.",
+    );
+    await expect(buscarFeriadosDoAno(2026)).rejects.toThrow(
+      "A base de feriados recusou a consulta. Confira o plano da integração.",
+    );
+    const registrado = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(registrado).toContain("HTTP 401: Invalid API Key");
+    expect(registrado).toContain(
+      "HTTP 403: Upgrade required - This endpoint is not available on the Free plan",
+    );
+    expect(registrado).not.toContain(TOKEN);
+  });
+
+  it("redige o token quando o motivo da recusa o repete", async () => {
+    const fetchMock = vi.fn(async () => respostaDeErro(403, { error: `recusado para ${TOKEN}` }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { buscarFeriadosDoAno } = await import("@/infra/feriados-api");
+    await expect(buscarFeriadosDoAno(2026)).rejects.toThrow(
+      "A base de feriados recusou a consulta. Confira o plano da integração.",
+    );
+    const registrado = vi.mocked(console.error).mock.calls.flat().join(" ");
+    expect(registrado).toContain("recusado para ***");
+    expect(registrado).not.toContain(TOKEN);
   });
 
   it("não segue redirecionamento", async () => {

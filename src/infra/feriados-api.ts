@@ -72,12 +72,35 @@ function erroTemporario(): ErroHttp {
   );
 }
 
-function erroDeConfiguracao(): ErroHttp {
+function erroDeChave(): ErroHttp {
   return new ErroHttp(
-    "Não foi possível consultar os feriados. Confira a configuração da integração.",
+    "A chave da base de feriados foi recusada. Confira o token da integração.",
     503,
-    "FERIADOS_CONFIGURACAO",
+    "FERIADOS_CHAVE",
   );
+}
+
+function erroDeRecusa(): ErroHttp {
+  return new ErroHttp(
+    "A base de feriados recusou a consulta. Confira o plano da integração.",
+    503,
+    "FERIADOS_PLANO",
+  );
+}
+
+const LIMITE_MOTIVO = 200;
+
+/** Motivo curto devolvido pela base, com o token redigido, para o log do servidor. */
+function motivoDaResposta(corpo: unknown, token: string): string {
+  if (typeof corpo !== "object" || corpo === null) return "";
+  const dados = corpo as Record<string, unknown>;
+  const partes = [dados.error, dados.message].filter(
+    (valor): valor is string => typeof valor === "string" && valor.trim().length > 0,
+  );
+  if (partes.length === 0) return "";
+  const texto = partes.join(" - ").replace(/\s+/g, " ").trim();
+  const redigido = token ? texto.split(token).join("***") : texto;
+  return redigido.slice(0, LIMITE_MOTIVO);
 }
 
 async function pedirPagina(url: URL, token: string): Promise<z.infer<typeof esquemaPagina>> {
@@ -103,8 +126,10 @@ async function pedirPagina(url: URL, token: string): Promise<z.infer<typeof esqu
   }
   const corpo: unknown = await resposta.json().catch(() => null);
   if (!resposta.ok) {
-    console.error(`[feriados-api] HTTP ${resposta.status}`);
-    if (resposta.status === 401 || resposta.status === 403) throw erroDeConfiguracao();
+    const motivo = motivoDaResposta(corpo, token);
+    console.error(`[feriados-api] HTTP ${resposta.status}${motivo ? `: ${motivo}` : ""}`);
+    if (resposta.status === 401) throw erroDeChave();
+    if (resposta.status === 403) throw erroDeRecusa();
     throw erroTemporario();
   }
   const dados = esquemaPagina.safeParse(corpo);
