@@ -41,3 +41,4 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 
 - [Painel externo no Zoho Analytics ou Looker Studio](looker-studio.md): preparação de fontes agregadas, painel privado e atualização.
 - [ADR-040: indicadores para Looker Studio](adr/040-indicadores-looker-studio.md): minimização e substituição atômica.
+- [ADR-041: sincronização de feriados](adr/041-sincronizacao-de-feriados.md): base externa opcional, gravação única e senha para repetir.

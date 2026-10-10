@@ -1,6 +1,6 @@
 "use client";
 
-// Calendário anual de feriados com confirmação de remoção e recuperação da leitura após salvar.
+// Calendário anual de feriados, com sincronização, remoção confirmada e releitura.
 import { useState } from "react";
 import {
   CalendarDays,
@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import ControleSincronizarFeriados from "@/components/gestao/controle-sincronizar-feriados";
 import { Selo } from "@/components/ui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
@@ -48,6 +49,7 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
   const [erro, setErro] = useState("");
   const [varianteErro, setVarianteErro] = useState<VarianteEstado>("dados_invalidos");
   const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
   const anoValido = /^\d{4}$/.test(ano) && ehAnoLetivoValido(Number(ano));
   const feriadosDoAno = anoValido
     ? feriados
@@ -132,7 +134,8 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
       avisarInfo(mensagem);
     }
   });
-  const bloqueado = executando || precisaAtualizar;
+  const bloqueado = executando || precisaAtualizar || sincronizando;
+  const revisaoFeriados = feriadosDoAno.map((feriado) => feriado.dia).join("|");
 
   return (
     <SecaoRecolhivel
@@ -140,7 +143,7 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
       icone={CalendarDays}
       aberto={aberto}
       onAbertoChange={(valor) => {
-        if (!executando) setAberto(valor);
+        if (!bloqueado) setAberto(valor);
       }}
       dataSecao="config-calendario"
       resumo={
@@ -189,6 +192,14 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
           </Button>
         </div>
       </div>
+      <ControleSincronizarFeriados
+        ano={ano}
+        anoValido={anoValido}
+        revisao={revisaoFeriados}
+        desabilitado={bloqueado}
+        onExecutandoChange={setSincronizando}
+        onAtualizar={onAtualizar}
+      />
       <form
         className="flex flex-col gap-3"
         aria-busy={executando}

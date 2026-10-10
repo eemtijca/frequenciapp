@@ -24,6 +24,19 @@ Para as planilhas de frequência e de saídas por OAuth, configure as cinco vari
 
 O segredo de atualização da conta Google é cifrado com uma chave derivada de `AUTH_SECRET`. Trocar `AUTH_SECRET` exige conectar a conta Google novamente. Consulte [planilha.md](planilha.md) para preparar o projeto Cloud e a planilha.
 
+## Feriados opcionais
+
+A sincronização do calendário letivo consulta uma base externa somente quando a administração aciona o botão. Sem `FERIADOS_API_TOKEN`, o restante do aplicativo sobe e o botão fica desligado.
+
+| Variável           | Obrigatória | Padrão                    | Descrição                                                                                     |
+| ------------------ | ----------- | ------------------------- | --------------------------------------------------------------------------------------------- |
+| FERIADOS_API_URL   | não         | `https://feriadosapi.com` | Origem HTTPS, sem caminho, usuário ou consulta. HTTP só é aceito em localhost e em 127.0.0.1. |
+| FERIADOS_API_TOKEN | não         |                           | Token Bearer da base. Fica somente no servidor e não entra na cópia nem no navegador.         |
+| FERIADOS_UF        | não         |                           | Duas letras da UF. A consulta passa a incluir feriados estaduais e nacionais.                 |
+| FERIADOS_IBGE      | não         |                           | Código de 7 dígitos. Quando presente, prevalece sobre a UF e inclui feriados municipais.      |
+
+A consulta envia o ano, a página e o recorte geográfico. Não envia alunos, frequências nem senhas. Pontos facultativos ficam de fora. A decisão está na [ADR-041](adr/041-sincronizacao-de-feriados.md).
+
 ## Notificações opcionais
 
 O cadastro Web Push funciona sem configuração manual: o servidor deriva um par VAPID estável de `AUTH_SECRET`, com contexto criptográfico exclusivo para notificações. A chave privada fica somente no servidor. Um par já configurado em `PUSH_VAPID_PUBLIC_KEY` e `PUSH_VAPID_PRIVATE_KEY` tem prioridade; as duas chaves precisam estar presentes juntas. `PUSH_VAPID_SUBJECT` permite informar um contato em `mailto:` ou HTTPS, inclusive sem definir chaves próprias.

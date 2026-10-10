@@ -83,6 +83,15 @@ enum ResultadoSincronizacao {
   @@map("resultado_sincronizacao")
 }
 
+// Origem do feriado no calendário da escola. MANUAL é o cadastro da Gestão;
+// API marca o que a sincronização gravou e sustenta o bloqueio do botão.
+enum OrigemFeriado {
+  MANUAL
+  API
+
+  @@map("origem_feriado")
+}
+
 // Usuário da aplicação. Sem dados além do necessário: nome de
 // tratamento, e-mail para acesso, hash da senha e papel.
 model Usuario {
@@ -522,12 +531,13 @@ model Configuracao {
 // Feriado escolar em uma data civil explícita, válido para todas as turmas.
 // O histórico de chamadas permanece independente do calendário anual.
 model Feriado {
-  dia          DateTime @id @db.Date
-  nome         String   @db.VarChar(120)
-  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
-  criadoPorId  String?  @map("criado_por_id") @db.Uuid
-  criadoPor    Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+  dia          DateTime      @id @db.Date
+  nome         String        @db.VarChar(120)
+  origem       OrigemFeriado @default(MANUAL)
+  criadoEm     DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime      @updatedAt @map("atualizado_em") @db.Timestamptz
+  criadoPorId  String?       @map("criado_por_id") @db.Uuid
+  criadoPor    Usuario?      @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   @@map("feriados")
 }
