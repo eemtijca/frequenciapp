@@ -2,7 +2,7 @@
 // sem editar nem reenviar uma frequência por toque acidental.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -67,6 +67,7 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   const turmaA = turmas.getByRole("button", { name: /E2E Bloqueio A/ });
   const turmaB = turmas.getByRole("button", { name: /E2E Bloqueio B/ });
   await turmaA.click();
+  await liberarSabadoSeNecessario(secao);
   const aluno = secao.getByRole("button", { name: /^E2E Bloqueio Um:/ });
   await expect(aluno).toBeEnabled();
   await expect(secao.getByRole("button", { name: /bloquear chamada de/i })).toHaveCount(0);
@@ -101,6 +102,7 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await page.setViewportSize({ width: 1280, height: 720 });
 
   await turmaB.click();
+  await liberarSabadoSeNecessario(secao);
   await expect(secao.getByRole("button", { name: /^E2E Bloqueio Dois:/ })).toBeEnabled();
   await turmaA.click();
   await expect(aluno).toBeDisabled();

@@ -4,7 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
 
 // As leituras interceptadas passam pelo navegador; a cobertura do worker é separada.
 test.use({ serviceWorkers: "block" });
@@ -244,6 +244,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   }
   await expect(turmaB).toHaveAccessibleDescription(/3 alunos.*pendente/i);
 
+  await liberarSabadoSeNecessario(secao);
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(turmaA).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "pendente");
@@ -268,6 +269,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   }
 
   await turmaB.click();
+  await liberarSabadoSeNecessario(secao);
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeEnabled();
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(turmaB).toHaveAttribute("data-situacao", "concluida");

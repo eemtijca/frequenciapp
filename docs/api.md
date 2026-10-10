@@ -332,7 +332,7 @@ Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, a
 
 Permissão: administração ou coordenação.
 
-Sábado ocasional: `sabadoLetivo: true` só é aceito no sábado. Se não houver aulas previstas nesse dia, usa as aulas ativas da turma, sem alterar a grade semanal. A grade específica de sábado prevalece quando existe. Correções desses sábados sem grade reenviam a liberação. O registro salvo permite reconhecer o sábado letivo ao reabrir a Chamada, no histórico, na Chamada Parcial e no envio às planilhas. Datas futuras e novas faltas em aulas inativas ou de outra turma continuam recusadas.
+Sábado letivo: a Chamada do aplicativo bloqueia todo sábado até a pessoa liberar o sábado letivo, e a rota não exige o campo para salvar sábados com aula na grade. `sabadoLetivo: true` só é aceito no sábado. Se não houver aulas previstas nesse dia, usa as aulas ativas da turma, sem alterar a grade semanal. A grade específica de sábado prevalece quando existe. Correções desses sábados sem grade reenviam a liberação. O registro salvo permite reconhecer o sábado letivo ao reabrir a Chamada, no histórico, na Chamada Parcial e no envio às planilhas. Datas futuras e novas faltas em aulas inativas ou de outra turma continuam recusadas.
 
 Semântica da `revisao`:
 

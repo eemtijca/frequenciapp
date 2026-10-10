@@ -22,6 +22,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada bloqueia todo sábado por padrão, também quando a turma tem aula no sábado na grade, e só o botão Sábado letivo libera a chamada daquela turma e data; chamada salva e rascunho recuperado mantêm a liberação. A regra é da interface: a API não muda.
+
 - Chamada: o botão Desbloquear (ou Bloquear) passa para a linha do Resumo, à direita dele, e o quadro com "Chamada bloqueada" e a frase de apoio deixa de aparecer. A lógica do bloqueio e o rótulo acessível do botão não mudam.
 
 - Legendas dos gráficos diários mostram apenas o total de alunos em uma caixa com cantos arredondados; a cobertura completa permanece no nome acessível e no detalhe por apontamento. Círculos de quantidade e distribuição das faltas recebem fundo vermelho do tema, também no gráfico personalizado.

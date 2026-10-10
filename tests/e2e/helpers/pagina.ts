@@ -35,6 +35,21 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
     .toBe(visao);
 }
 
+/**
+ * Aos sábados a chamada começa bloqueada, mesmo com aula na grade: libera o
+ * sábado letivo da turma aberta. Nos demais dias o botão não existe e nada muda.
+ */
+export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
+  const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
+  if (!(await liberar.isVisible().catch(() => false))) return;
+  await expect(liberar).toBeEnabled();
+  await liberar.click();
+  await expect(secao.getByRole("button", { name: "Sábado letivo", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+}
+
 /** Escolhe um horário "HH:MM" pelo popover próprio, como a pessoa faria com o mouse. */
 export async function escolherHorario(page: Page, id: string, horario: string): Promise<void> {
   const [hora, minuto] = horario.split(":");

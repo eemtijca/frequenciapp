@@ -40,7 +40,6 @@ import {
   exibirOrigemNaChamada,
   horaNoFuso,
   horariosDaChamada,
-  horariosDoDia,
   JUSTIFICATIVA_OUTROS,
   normalizar,
   nomeNaChamada,
@@ -190,15 +189,12 @@ export default function VistaFrequencia({
   const ehSabado = diaDaSemanaIso(dia) === 6;
   const leituraConfirmada = frequenciasDoDia?.chave === chave;
   const temAulasAtivas = turma?.horarios.some((aula) => aula.ativo) ?? false;
-  const aulasPrevistas = useMemo(
-    () => (turma ? horariosDoDia(turma.horarios, dia) : []),
-    [turma, dia],
-  );
+  // Todo sábado começa bloqueado, mesmo com aula na grade: só o botão libera.
+  // Uma chamada já salva ou um rascunho recuperado mantêm a liberação.
   const sabadoLiberado =
     ehSabado &&
     leituraConfirmada &&
     (sabadoDesbloqueado === chave ||
-      aulasPrevistas.length > 0 ||
       frequenciasDoDia.frequencias.some((item) => item.turmaId === turmaId));
 
   // Carrega as chamadas do dia, seleciona a turma e recupera o rascunho local.
@@ -791,7 +787,7 @@ export default function VistaFrequencia({
                       ? "Cadastre aulas ativas na Gestão."
                       : !leituraConfirmada
                         ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
-                        : "Libera as aulas ativas somente para esta turma e este sábado."
+                        : "Libera a chamada somente para esta turma e este sábado."
                   }
                   className={`h-auto min-h-11 rounded-full px-3 py-2 text-sm whitespace-normal ${sabadoLiberado ? "vidro-selecionado" : ""}`}
                   onClick={() => {
