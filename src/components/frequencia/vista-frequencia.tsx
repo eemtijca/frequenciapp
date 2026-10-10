@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   CloudCheck,
   CheckCircle2,
   LockKeyhole,
@@ -85,6 +86,8 @@ interface Props {
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "chamada"[]) => void;
   onAbrirGestao?: () => void;
+  /** Abre a Chamada Parcial; ausente para quem não pode operar. */
+  onAbrirParcial?: () => void;
 }
 
 function chaveRascunho(usuarioId: string, dia: string, turmaId: string): string {
@@ -141,6 +144,7 @@ export default function VistaFrequencia({
   onFrequenciasMudaram,
   onPendencia,
   onAbrirGestao,
+  onAbrirParcial,
 }: Props) {
   const podeAdministrar = temCapacidade(usuario.papel, "administrar");
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
@@ -823,6 +827,19 @@ export default function VistaFrequencia({
               >
                 {chamadaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
                 {chamadaBloqueada ? "Desbloquear" : "Bloquear"}
+              </Button>
+            )}
+            {onAbrirParcial && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                aria-label="Chamada Parcial"
+                title="Chamada Parcial"
+                onClick={onAbrirParcial}
+              >
+                <ClipboardList size={18} aria-hidden="true" />
               </Button>
             )}
           </div>
