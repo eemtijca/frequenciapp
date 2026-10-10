@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Chamada permite desbloquear um sábado letivo por turma e data com as aulas ativas, sem alterar a grade semanal. A liberação acompanha rascunhos e chamadas salvas, mantendo justificativas, frequência parcial e travas de revisão. Sábados com chamada salva são enviados e preservados nas abas mensais; domingos e sábados sem registros continuam fora.
+
 - Seletores circulares de séries e turmas na Chamada: pendência em vermelho, conclusão em verde e anel por série com fatias proporcionais aos alunos. O progresso acompanha a data consultada e o salvamento, trata rascunhos e conflitos como pendência e mantém estado neutro em falhas ou turmas sem participantes. Rótulos usuais de ano aparecem como série no seletor.
 
 - Resumo dos Relatórios: três botões escolhem o ranking de alunos com mais faltas no mês, Todas as faltas (F + FJ, o padrão), Sem justificativa (só F) e Justificadas (só FJ), com os filtros de mês, série e turma e o detalhe de F e FJ por aluno.

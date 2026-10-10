@@ -575,7 +575,7 @@ describe("frequência organizada por turma e mês", () => {
     expect(marca(confirmada.aba, "02/10/2026")).toBe("F");
   });
 
-  it("conserva chamadas de sábado e domingo no app sem recriar suas colunas", async () => {
+  it("envia o sábado registrado, preserva sua coluna e deixa o domingo apenas no app", async () => {
     const outubro = mensais["2026-10"];
     if (!outubro) throw new Error("Aba mensal ausente.");
     await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
@@ -584,6 +584,10 @@ describe("frequência organizada por turma e mês", () => {
     );
     await salvar("2026-10-03", [alunos.A]);
     await salvar("2026-10-04", []);
+    const pendente = await dados<{ estado: { alteradasDepois: number } }>(
+      await chamar("/api/planilha/estado", "GET"),
+    );
+    expect(pendente.estado.alteradasDepois).toBe(antes.estado.alteradasDepois + 1);
     const periodo = { de: "2026-10-01", ate: "2026-10-04" };
     const previa = await dados<{ planos: Plano[] }>(
       await chamar("/api/planilha/simular", "POST", {
@@ -593,11 +597,11 @@ describe("frequência organizada por turma e mês", () => {
       }),
     );
     const plano = planoDaAba(previa.planos, outubro.aba);
-    expect(plano.dias).toEqual(["2026-10-01", "2026-10-02"]);
+    expect(plano.dias).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
     expect((await aplicar(plano, periodo, false)).resultados).toMatchObject([
       { aba: outubro.aba, resultado: "sucesso" },
     ]);
-    expect(cabecalho(outubro.aba)).not.toContain("03/10/2026");
+    expect(marca(outubro.aba, "03/10/2026")).toBe("F");
     expect(cabecalho(outubro.aba)).not.toContain("04/10/2026");
     expect(cabecalho(outubro.aba)).not.toContain("Turma atual");
     const chamadas = await banco.query(
@@ -607,10 +611,64 @@ describe("frequência organizada por turma e mês", () => {
     expect(chamadas.rows).toHaveLength(2);
     const fimDeSemana = await simular({ de: "2026-10-03", ate: "2026-10-04" });
     expect(fimDeSemana.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+    const reparada = await dados<Mensal>(await preparar("2026-10"));
+    expect(reparada.destino).toBe(outubro.destino);
+    expect(marca(outubro.aba, "03/10/2026")).toBe("F");
+    expect(cabecalho(outubro.aba)).not.toContain("04/10/2026");
+    expect(cabecalho(outubro.aba)).not.toContain("10/10/2026");
     const depois = await dados<{ estado: { alteradasDepois: number } }>(
       await chamar("/api/planilha/estado", "GET"),
     );
     expect(depois.estado.alteradasDepois).toBe(antes.estado.alteradasDepois);
+  });
+
+  it("insere automaticamente somente o sábado registrado e mantém as marcas ao preparar", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: true }));
+    await salvar("2026-10-10", []);
+    await expect
+      .poll(
+        async () => {
+          const registro = await banco.query<{ resultado: string }>(
+            `select resultado from sincronizacoes_planilha where turma_original_id = $1
+             and destino = $2 and de = '2026-10-10'::date order by criado_em desc limit 1`,
+            [turmas.A, outubro.destino],
+          );
+          return registro.rows[0]?.resultado;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe("SUCESSO");
+    expect(marca(outubro.aba, "10/10/2026")).toBe("P");
+    expect(cabecalho(outubro.aba)).not.toContain("11/10/2026");
+    expect(cabecalho(outubro.aba)).not.toContain("17/10/2026");
+    await dados<Mensal>(await preparar("2026-10"));
+    expect(marca(outubro.aba, "03/10/2026")).toBe("F");
+    expect(marca(outubro.aba, "10/10/2026")).toBe("P");
+    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
+  });
+
+  it("não libera sábados de outra origem nem recebe calendário externo no preparo", async () => {
+    const preparada = await dados<Mensal>(
+      await chamar("/api/planilha/mensal", "POST", {
+        turmaOriginalId: turmas.B,
+        mes: "2026-10",
+        sabadosLetivos: ["2026-10-03", "2026-10-10"],
+      }),
+    );
+    expect(cabecalho(preparada.aba)).not.toContain("03/10/2026");
+    expect(cabecalho(preparada.aba)).not.toContain("10/10/2026");
+    const previa = await dados<{ planos: Plano[] }>(
+      await chamar("/api/planilha/simular", "POST", {
+        turmaOriginalId: turmas.B,
+        de: "2026-10-03",
+        ate: "2026-10-04",
+        somenteAlteradas: false,
+        sabadosLetivos: ["2026-10-03"],
+      }),
+    );
+    expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true }]);
   });
 
   it("reenvia o histórico ao preparar novamente uma aba mensal excluída", async () => {
@@ -663,6 +721,18 @@ describe("frequência organizada por turma e mês", () => {
       criada: false,
       atualizada: false,
     });
+    const setembro = mensais["2026-09"];
+    if (!setembro) throw new Error("Aba mensal ausente.");
+    await salvar("2026-09-26", [alunos.A], turmas.B);
+    const sabado = { de: "2026-09-26", ate: "2026-09-26" };
+    const planoSabado = planoDaAba((await simular(sabado)).planos, setembro.aba);
+    expect(planoSabado.dias).toEqual(["2026-09-26"]);
+    expect((await aplicar(planoSabado, sabado)).resultados).toMatchObject([
+      { aba: setembro.aba, resultado: "sucesso" },
+    ]);
+    expect(marca(setembro.aba, "26/09/2026")).toBe("F");
+    await dados<Mensal>(await preparar("2026-09"));
+    expect(marca(setembro.aba, "26/09/2026")).toBe("F");
   });
   it("alterna o mês visível, preserva o legado e mantém o envio histórico disponível", async () => {
     google.definirAba("QA Anotações", [["Anotações"], ["Preservar"]]);

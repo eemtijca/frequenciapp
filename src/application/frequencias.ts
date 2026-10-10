@@ -6,10 +6,11 @@ import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade } from "@/infra/erros";
 import {
+  diaDaSemanaIso,
   diaLocal,
   ehDiaValido,
   ehMesValido,
-  horariosDoDia,
+  horariosDaChamada,
   type Frequencia,
   type ResumoAcumulado,
   type ResultadoSalvamento,
@@ -40,6 +41,7 @@ export const esquemaSalvarFrequencia = z.object({
     z.array(faltaEntrada).max(500, "Lista de faltas grande demais."),
   ]),
   revisao: z.number().int().min(0, "Revisão inválida.").max(999999),
+  sabadoLetivo: z.boolean().optional(),
 });
 
 interface LinhaFrequencia {
@@ -262,6 +264,10 @@ export async function salvarFrequencia(
   }
   const { dia, turmaId, revisao } = dados.data;
 
+  if (dados.data.sabadoLetivo && diaDaSemanaIso(dia) !== 6) {
+    throw new ErroHttp("A liberação de sábado letivo só é válida aos sábados.", 400);
+  }
+
   // O dia corrente vem do fuso da escola, nunca do relógio do cliente.
   const hoje = diaLocal(new Date(), ambiente.fuso);
   if (dia > hoje) {
@@ -274,7 +280,7 @@ export async function salvarFrequencia(
   });
   if (!turma) throw new ErroHttp("Turma não encontrada.", 404);
 
-  const aulasDoDia = horariosDoDia(turma.horarios, dia);
+  const aulasDoDia = horariosDaChamada(turma.horarios, dia, dados.data.sabadoLetivo);
   if (aulasDoDia.length === 0) {
     throw new ErroHttp(
       "Não há aulas programadas para este dia nesta turma. Ajuste a grade na Gestão.",

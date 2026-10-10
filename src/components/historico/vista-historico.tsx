@@ -14,7 +14,7 @@ import {
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
   horaNoFuso,
-  horariosDoDia,
+  horariosDaChamada,
   mesSeguinte,
   normalizar,
   rotuloDiaSemana,
@@ -225,7 +225,7 @@ export default function VistaHistorico({
                 const rotulo = rotuloDia(frequencia.dia);
                 const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
                 const turma = turmas.find((item) => item.id === frequencia.turmaId);
-                const aulasDoDia = horariosDoDia(turma?.horarios ?? [], frequencia.dia);
+                const aulasDoDia = horariosDaChamada(turma?.horarios ?? [], frequencia.dia, true);
                 const parciais = frequencia.faltas.filter(
                   (falta) => aulasDoDia.length > 0 && falta.horarios.length < aulasDoDia.length,
                 ).length;

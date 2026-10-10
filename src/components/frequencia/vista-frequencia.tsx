@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ClipboardList,
   CloudCheck,
+  CheckCircle2,
   LockKeyhole,
   LockKeyholeOpen,
   LoaderCircle,
@@ -35,9 +36,11 @@ import type {
 } from "@/domain/frequencia";
 import {
   alunoDesistenteNoDia,
+  diaDaSemanaIso,
   diaSeguinte,
   exibirOrigemNaChamada,
   horaNoFuso,
+  horariosDaChamada,
   horariosDoDia,
   JUSTIFICATIVA_OUTROS,
   normalizar,
@@ -95,6 +98,7 @@ interface Rascunho {
   versao: 3;
   faltas: FaltaAluno[];
   revisao: number;
+  sabadoLetivo?: boolean;
 }
 
 /** Converte as faltas agrupadas do servidor em mapa por aluno. */
@@ -150,6 +154,7 @@ export default function VistaFrequencia({
   const [observacoes, setObservacoes] = useState<Map<string, string>>(new Map());
   const [aulasAbertas, setAulasAbertas] = useState<string | null>(null);
   const [resumoAberto, setResumoAberto] = useState(false);
+  const [sabadoDesbloqueado, setSabadoDesbloqueado] = useState<string | null>(null);
   const idResumo = useId();
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
@@ -186,6 +191,19 @@ export default function VistaFrequencia({
 
   const turma = turmas.find((t) => t.id === turmaId);
   const chave = `${dia}|${turmaId}`;
+  const ehSabado = diaDaSemanaIso(dia) === 6;
+  const leituraConfirmada = frequenciasDoDia?.chave === chave;
+  const temAulasAtivas = turma?.horarios.some((aula) => aula.ativo) ?? false;
+  const aulasPrevistas = useMemo(
+    () => (turma ? horariosDoDia(turma.horarios, dia) : []),
+    [turma, dia],
+  );
+  const sabadoLiberado =
+    ehSabado &&
+    leituraConfirmada &&
+    (sabadoDesbloqueado === chave ||
+      aulasPrevistas.length > 0 ||
+      frequenciasDoDia.frequencias.some((item) => item.turmaId === turmaId));
 
   // Carrega as chamadas do dia, seleciona a turma e recupera o rascunho local.
   useEffect(() => {
@@ -197,6 +215,7 @@ export default function VistaFrequencia({
     }
     let viva = true;
     setCarregando(true);
+    setSabadoDesbloqueado(null);
     setFrequenciasDoDia(null);
     setErro("");
     setConflito(false);
@@ -237,6 +256,7 @@ export default function VistaFrequencia({
               setAusencias(paraAusencias(rascunho.faltas));
               setJustificativas(paraJustificativas(rascunho.faltas));
               setObservacoes(paraObservacoes(rascunho.faltas));
+              if (rascunho.sabadoLetivo && diaDaSemanaIso(dia) === 6) setSabadoDesbloqueado(chave);
               setSujo(true);
               if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
                 toast(
@@ -285,12 +305,23 @@ export default function VistaFrequencia({
           observacao: observacoes.get(alunoId) ?? null,
         })),
         revisao: revisaoSalva,
+        ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
       };
       sessionStorage.setItem(chaveRascunho(usuario.id, dia, turmaId), JSON.stringify(rascunho));
     } catch {
       sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
     }
-  }, [sujo, ausencias, justificativas, observacoes, revisaoSalva, usuario.id, dia, turmaId]);
+  }, [
+    sujo,
+    ausencias,
+    justificativas,
+    observacoes,
+    revisaoSalva,
+    usuario.id,
+    dia,
+    turmaId,
+    sabadoLiberado,
+  ]);
 
   useEffect(() => {
     onPendencia(sujo ? ["chamada"] : []);
@@ -326,7 +357,10 @@ export default function VistaFrequencia({
     return (id: string) => mapa.get(id) ?? "";
   }, [turmas]);
 
-  const aulasDoDia = useMemo(() => (turma ? horariosDoDia(turma.horarios, dia) : []), [turma, dia]);
+  const aulasDoDia = useMemo(
+    () => (turma ? horariosDaChamada(turma.horarios, dia, sabadoLiberado) : []),
+    [turma, dia, sabadoLiberado],
+  );
   const acumuladoDe = useMemo(() => {
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
     return (alunoId: string): AcumuladoAluno | null => mapa.get(alunoId) ?? null;
@@ -375,7 +409,7 @@ export default function VistaFrequencia({
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
   const ocupado = carregando || salvando || conflito;
-  const bloqueado = ocupado || chamadaBloqueada;
+  const bloqueado = ocupado || chamadaBloqueada || (ehSabado && !sabadoLiberado);
   const travado = ocupado || sujo;
   const podeSalvar = !bloqueado && (sujo || revisaoSalva === 0);
 
@@ -499,6 +533,7 @@ export default function VistaFrequencia({
                 : null,
           })),
           revisao: revisaoSalva,
+          ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
         }),
       );
       setFrequenciasDoDia((atual) => {
@@ -734,20 +769,49 @@ export default function VistaFrequencia({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              aria-expanded={resumoAberto}
-              aria-controls={idResumo}
-              onClick={() => setResumoAberto((atual) => !atual)}
-              className="vidro-selecionado rounded-full px-4"
-            >
-              {tituloResumo}
-              <ChevronDown
-                aria-hidden="true"
-                className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
-              />
-            </Button>
+            <div className={ehSabado ? "grid w-full grid-cols-2 items-stretch gap-2" : "contents"}>
+              <Button
+                type="button"
+                variant="outline"
+                aria-expanded={resumoAberto}
+                aria-controls={idResumo}
+                onClick={() => setResumoAberto((atual) => !atual)}
+                className={`vidro-selecionado rounded-full px-4 ${ehSabado ? "h-auto min-h-11 py-2 text-sm whitespace-normal" : ""}`}
+              >
+                <span>{tituloResumo}</span>
+                <ChevronDown
+                  aria-hidden="true"
+                  className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
+                />
+              </Button>
+              {ehSabado && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-pressed={sabadoLiberado}
+                  disabled={ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas}
+                  title={
+                    !temAulasAtivas
+                      ? "Cadastre aulas ativas na Gestão."
+                      : !leituraConfirmada
+                        ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
+                        : "Libera as aulas ativas somente para esta turma e este sábado."
+                  }
+                  className={`h-auto min-h-11 rounded-full px-3 py-2 text-sm whitespace-normal ${sabadoLiberado ? "vidro-selecionado" : ""}`}
+                  onClick={() => {
+                    if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas) return;
+                    setSabadoDesbloqueado(chave);
+                  }}
+                >
+                  {sabadoLiberado ? (
+                    <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+                  ) : (
+                    <LockKeyholeOpen className="size-4 shrink-0" aria-hidden="true" />
+                  )}
+                  <span>{sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}</span>
+                </Button>
+              )}
+            </div>
             {revisaoSalva > 0 && (
               <Button
                 type="button"

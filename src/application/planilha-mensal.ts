@@ -1,6 +1,7 @@
 // Prepara o destino mensal da frequência e preserva vínculos já salvos de outras turmas.
 import { z } from "zod";
 import { ambiente } from "@/infra/ambiente";
+import { diasDoMes } from "@/domain/frequencia";
 import { ErroHttp } from "@/infra/erros";
 import { auditar } from "@/infra/auditoria";
 import { comTransacao } from "@/infra/transacoes";
@@ -12,7 +13,7 @@ import { hashTexto } from "@/domain/planilha";
 import { listarTodasTurmas } from "./turmas";
 import { listarTodosAlunos } from "./alunos";
 import { chamarIntegracao, idDaIntegracao, lerLinha } from "./planilha-comum";
-import { detectarAba, esquemaSalvo, type EsquemaSalvo } from "./planilha";
+import { detectarAba, esquemaSalvo, sabadosComChamadaSalva, type EsquemaSalvo } from "./planilha";
 
 const entradaMensal = z.object({
   turmaOriginalId: z.string().uuid(),
@@ -32,6 +33,12 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
       const [turmas, alunos] = await Promise.all([listarTodasTurmas(), listarTodosAlunos()]);
       const turma = turmas.find((item) => item.id === dados.data.turmaOriginalId);
       if (!turma) throw new ErroHttp("Turma de origem não encontrada.", 404);
+      const dias = diasDoMes(dados.data.mes);
+      const sabadosLetivos = await sabadosComChamadaSalva(
+        turma.id,
+        dias[0] ?? `${dados.data.mes}-01`,
+        dias.at(-1) ?? `${dados.data.mes}-01`,
+      );
       const preparada = await chamarIntegracao<
         AbaMensalPlanilha & { criada: boolean; atualizada: boolean }
       >(linha, {
@@ -39,6 +46,7 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
         turmaOriginalId: turma.id,
         rotulo: turma.rotulo,
         mes: dados.data.mes,
+        sabadosLetivos,
         alunos: alunos
           .filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id)
           .map((aluno) => ({

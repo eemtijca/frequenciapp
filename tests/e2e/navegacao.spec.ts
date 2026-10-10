@@ -145,8 +145,17 @@ test.describe("navegação", () => {
       expect(caixaResumo).not.toBeNull();
       expect(caixaIcone).not.toBeNull();
       if (caixaResumo && caixaIcone) {
-        expect(Math.abs(caixaResumo.y - caixaIcone.y)).toBeLessThan(8);
-        expect(caixaIcone.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+        // Aos sábados o resumo divide a linha com a liberação e o ícone desce para a linha seguinte.
+        const sabado = await chamada
+          .getByRole("button", { name: /^(Desbloquear sábado letivo|Sábado letivo)$/ })
+          .count();
+        if (sabado > 0) {
+          expect(caixaIcone.y).toBeGreaterThanOrEqual(caixaResumo.y + caixaResumo.height - 1);
+        } else {
+          expect(Math.abs(caixaResumo.y - caixaIcone.y)).toBeLessThan(8);
+          expect(caixaIcone.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+        }
+        expect(caixaIcone.x + caixaIcone.width).toBeLessThanOrEqual(390);
       }
       await page.setViewportSize({ width: 360, height: 780 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

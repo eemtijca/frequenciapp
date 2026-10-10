@@ -37,7 +37,11 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
       .toBe("chamada-parcial");
     return;
   }
-  const botao = page.locator("header, nav").getByRole("button", { name: rotulo, exact: true });
+  // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
+  const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const botao = page
+    .locator("header, nav")
+    .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) });
   await expect
     .poll(
       async () => {
