@@ -29,7 +29,14 @@ test.describe("responsividade", () => {
       (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
     );
     expect(semEstouro).toBe(true);
-    await expect(cabecalho.getByRole("button")).toHaveCount(2);
+    const tema = cabecalho.getByRole("button", { name: /tema/i });
+    const caixaTema = await tema.boundingBox();
+    expect(caixaTema).not.toBeNull();
+    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(caixaTema?.x ?? 0);
+    expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
+      caixaNotificacoes?.x ?? 0,
+    );
+    await expect(cabecalho.getByRole("button")).toHaveCount(3);
     await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
     await info.attach("conteudo-mobile-390", {
       body: await page.screenshot({ animations: "disabled" }),
@@ -102,6 +109,8 @@ test.describe("responsividade", () => {
       );
       const fechar = menu.getByRole("button", { name: "Fechar menu", exact: true });
       await expect(fechar).toBeInViewport();
+      await expect(menu.getByRole("button", { name: /tema/i })).toHaveCount(0);
+      expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(240 + 1);
       for (const nome of ["Gestão", "Trocar senha", "Sair da conta"]) {
         const acao = menu.getByRole("button", { name: nome, exact: true });
         await acao.scrollIntoViewIfNeeded();
