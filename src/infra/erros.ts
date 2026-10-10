@@ -176,6 +176,13 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
     if (traduzido) return traduzido;
   }
 
+  if (ehConflitoDeSerializacao(erro)) {
+    return {
+      mensagem: "Outra pessoa salvou os mesmos dados agora. Tente novamente.",
+      status: 409,
+    };
+  }
+
   if (erro instanceof PrismaClientValidationError) {
     return { mensagem: "Os dados enviados não estão no formato esperado.", status: 400 };
   }
@@ -212,9 +219,22 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
   };
 }
 
-/** Verdadeiro quando o erro é o conflito de serialização (P2034). */
+/**
+ * Verdadeiro quando o erro vem de um conflito de serialização ou deadlock do
+ * PostgreSQL. O Prisma o entrega como P2034 na maioria dos casos, mas uma falha
+ * no meio de uma consulta SQL direta ou no commit chega do adaptador pg como
+ * DriverAdapterError, com a causa TransactionWriteConflict (SQLSTATE 40001) ou
+ * o código original de serialização e deadlock.
+ */
 export function ehConflitoDeSerializacao(erro: unknown): boolean {
-  return erro instanceof PrismaClientKnownRequestError && erro.code === "P2034";
+  if (erro instanceof PrismaClientKnownRequestError) return erro.code === "P2034";
+  if (!(erro instanceof Error) || erro.name !== "DriverAdapterError") return false;
+  const causa = erro.cause;
+  if (typeof causa !== "object" || causa === null) return false;
+  const { kind, originalCode } = causa as { kind?: unknown; originalCode?: unknown };
+  return (
+    kind === "TransactionWriteConflict" || originalCode === "40001" || originalCode === "40P01"
+  );
 }
 
 /** Verdadeiro quando o erro é duplicidade de índice único (P2002). */

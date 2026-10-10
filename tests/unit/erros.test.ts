@@ -8,6 +8,13 @@ import {
 } from "@prisma/client/runtime/client";
 import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade, traduzirErro } from "@/infra/erros";
 
+/** Falha de serialização que o adaptador pg entrega sem passar pelo código P2034. */
+function erroDoAdaptador(causa: Record<string, unknown>): Error {
+  const erro = new Error("TransactionWriteConflict", { cause: causa });
+  erro.name = "DriverAdapterError";
+  return erro;
+}
+
 function erroConhecido(
   code: string,
   meta?: Record<string, unknown>,
@@ -90,6 +97,19 @@ describe("traduzirErro", () => {
     const resultado = traduzirErro(erroConhecido("P2034"));
     expect(resultado.status).toBe(409);
     expect(resultado.mensagem).toContain("salvou os mesmos dados");
+  });
+
+  it("traduz conflito de serialização que chega do adaptador sem código P2034", () => {
+    const erro = erroDoAdaptador({
+      kind: "TransactionWriteConflict",
+      originalCode: "40001",
+      originalMessage:
+        "could not serialize access due to read/write dependencies among transactions",
+    });
+    const resultado = traduzirErro(erro);
+    expect(resultado.status).toBe(409);
+    expect(resultado.mensagem).toContain("salvou os mesmos dados");
+    expect(resultado.mensagem).not.toContain("serialize");
   });
 
   it("traduz corpo fora do formato (validação do Prisma)", () => {
@@ -201,5 +221,19 @@ describe("classificadores", () => {
     expect(ehDuplicidade(erroConhecido("P2002"))).toBe(true);
     expect(ehDuplicidade(erroConhecido("P2034"))).toBe(false);
     expect(ehDuplicidade(new Error("x"))).toBe(false);
+  });
+
+  it("reconhece serialização e deadlock vindos do adaptador do banco", () => {
+    expect(ehConflitoDeSerializacao(erroDoAdaptador({ kind: "TransactionWriteConflict" }))).toBe(
+      true,
+    );
+    expect(ehConflitoDeSerializacao(erroDoAdaptador({ originalCode: "40001" }))).toBe(true);
+    expect(ehConflitoDeSerializacao(erroDoAdaptador({ originalCode: "40P01" }))).toBe(true);
+    expect(ehConflitoDeSerializacao(erroDoAdaptador({ originalCode: "23505" }))).toBe(false);
+    expect(ehConflitoDeSerializacao(erroDoAdaptador({ kind: "UniqueConstraintViolation" }))).toBe(
+      false,
+    );
+    expect(ehConflitoDeSerializacao(new Error("TransactionWriteConflict"))).toBe(false);
+    expect(ehConflitoDeSerializacao(null)).toBe(false);
   });
 });
