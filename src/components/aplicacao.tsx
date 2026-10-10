@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import {
   Bell,
+  CalendarDays,
   ChartPie,
   ClipboardCheck,
   ClipboardList,
@@ -59,6 +60,7 @@ import {
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import VistaFrequencia from "@/components/frequencia/vista-frequencia";
 import VistaChamadaParcial from "@/components/frequencia-parcial/vista-frequencia-parcial";
+import VistaHorarios from "@/components/horarios/vista-horarios";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaMovimentacoes from "@/components/saidas/vista-movimentacoes";
 import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
@@ -69,7 +71,14 @@ import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
 export type Visao =
-  "painel" | "chamada" | "chamada-parcial" | "saidas" | "relatorios" | "alunos" | "gestao";
+  | "painel"
+  | "chamada"
+  | "horarios"
+  | "chamada-parcial"
+  | "saidas"
+  | "relatorios"
+  | "alunos"
+  | "gestao";
 
 interface Props {
   usuario: Identidade;
@@ -94,6 +103,7 @@ const CHAVE_AVISO_ENTRADA = "frequenciapp:aviso-entrada";
 const VISOES: Visao[] = [
   "painel",
   "chamada",
+  "horarios",
   "chamada-parcial",
   "saidas",
   "relatorios",
@@ -123,6 +133,7 @@ interface ItemNav {
 const ITENS_INICIAIS: ItemNav[] = [
   { visao: "painel", rotulo: "Painel", icone: ChartPie },
   { visao: "chamada", rotulo: "Chamada", icone: ClipboardCheck },
+  { visao: "horarios", rotulo: "Horários", icone: CalendarDays },
 ];
 
 const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas e entradas", icone: DoorOpen };
@@ -141,6 +152,7 @@ const ITENS_FIM: ItemNav[] = [
 const LARGURAS: Record<Visao, string> = {
   painel: "max-w-5xl",
   chamada: "max-w-2xl xl:max-w-6xl",
+  horarios: "max-w-6xl",
   "chamada-parcial": "max-w-4xl",
   saidas: "max-w-5xl",
   relatorios: "max-w-7xl",
@@ -603,6 +615,7 @@ export default function Aplicacao({
             onPendencia={registrarPendenciaParcial}
           />
         )}
+        {alvoVisao === "horarios" && <VistaHorarios turmas={turmas} diaCorrente={diaCorrente} />}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaMovimentacoes
             abaInicial={abaMovimentacaoInicial}

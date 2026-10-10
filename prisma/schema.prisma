@@ -282,16 +282,17 @@ model Aluno {
 // Aula da turma: ordem, janela de horário e dias da semana em que acontece.
 // A aula padrão cobre o dia inteiro para nenhuma turma ficar sem chamada.
 model Horario {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId    String   @map("turma_id") @db.Uuid
-  ordem      Int
-  inicio     String   @db.VarChar(5)
-  fim        String   @db.VarChar(5)
-  diasSemana Int[]    @map("dias_semana")
-  ativo      Boolean  @default(true)
-  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  turma      Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
-  faltas     Falta[]
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId     String   @map("turma_id") @db.Uuid
+  ordem       Int
+  inicio      String   @db.VarChar(5)
+  fim         String   @db.VarChar(5)
+  diasSemana  Int[]    @map("dias_semana")
+  disciplinas Json     @default("{}")
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  turma       Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  faltas      Falta[]
 
   @@unique([turmaId, ordem])
   @@index([turmaId])

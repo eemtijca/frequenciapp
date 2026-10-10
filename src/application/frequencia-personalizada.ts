@@ -12,6 +12,7 @@ import {
 } from "@/domain/frequencia";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
 import type { RegistroPersonalizado } from "@/domain/frequencia-personalizada";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import { ambiente } from "@/infra/ambiente";
 import { ErroHttp } from "@/infra/erros";
 import { comTransacao } from "@/infra/transacoes";
@@ -126,7 +127,14 @@ export async function listarFrequenciasPersonalizadas(
           turmaId: chamada.turmaId,
           alunoNome: aluno.aluno.nome,
           turmaNome: `${chamada.turma.serie.nome} ${chamada.turma.nome}`,
-          ...descreverChamada(faltas, chamada.turma.horarios, dia),
+          ...descreverChamada(
+            faltas,
+            chamada.turma.horarios.map((horario) => ({
+              ...horario,
+              disciplinas: disciplinasDoHorario(horario.disciplinas),
+            })),
+            dia,
+          ),
           justificativas: motivosDasFaltas(faltas, catalogo),
           registradoSeduc: aluno.registradoSeduc,
           registradoSeducEm: aluno.registradoSeducEm?.toISOString() ?? null,

@@ -7,6 +7,7 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { rotuloDeTurma } from "@/domain/frequencia";
 import type { Horario, Turma } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 
 const nomeTurma = z
   .string()
@@ -48,6 +49,7 @@ interface LinhaHorario {
   inicio: string;
   fim: string;
   diasSemana: number[];
+  disciplinas?: unknown;
   ativo: boolean;
 }
 
@@ -67,6 +69,7 @@ function paraHorario(linha: LinhaHorario): Horario {
     inicio: linha.inicio,
     fim: linha.fim,
     diasSemana: linha.diasSemana,
+    disciplinas: disciplinasDoHorario(linha.disciplinas),
     ativo: linha.ativo,
   };
 }

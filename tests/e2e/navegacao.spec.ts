@@ -10,6 +10,10 @@ test.describe("navegação", () => {
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     await trocarVisao(page, "Chamada", "chamada");
     await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await trocarVisao(page, "Horários", "horarios");
+    await expect(
+      page.getByRole("region", { name: "Horários semanais", exact: true }),
+    ).toBeVisible();
     await trocarVisao(page, "Relatórios", "relatorios");
     await expect(page.getByRole("heading", { name: "Relatórios" })).toBeVisible();
     await page.getByRole("tab", { name: "Grade" }).click();

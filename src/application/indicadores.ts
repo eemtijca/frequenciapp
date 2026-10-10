@@ -11,6 +11,7 @@ import {
 } from "@/infra/google-indicadores";
 import { comTravaPlanilha, type ControleTravaPlanilha } from "@/infra/trava-planilha";
 import { diaLocal } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import {
   enderecoPainelPermitido,
   montarIndicadores,
@@ -144,7 +145,10 @@ async function retrato(ano: number) {
         chamadas.map((c) => ({
           ...c,
           dia: civil(c.dia),
-          horarios: c.turma.horarios,
+          horarios: c.turma.horarios.map((horario) => ({
+            ...horario,
+            disciplinas: disciplinasDoHorario(horario.disciplinas),
+          })),
           alunos: c.alunos.map((a) => ({
             alunoId: a.alunoId,
             desistenteEm: a.aluno.desistenteEm ? civil(a.aluno.desistenteEm) : null,

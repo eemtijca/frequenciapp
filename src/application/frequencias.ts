@@ -18,6 +18,7 @@ import {
 } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 import { exigirDiaLetivo } from "@/application/calendario-letivo";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 
 const faltaEntrada = z.object({
   alunoId: z.string().uuid("Aluno inválido."),
@@ -285,7 +286,14 @@ export async function salvarFrequencia(
   });
   if (!turma) throw new ErroHttp("Turma não encontrada.", 404);
 
-  const aulasDoDia = horariosDaChamada(turma.horarios, dia, dados.data.sabadoLetivo);
+  const aulasDoDia = horariosDaChamada(
+    turma.horarios.map((horario) => ({
+      ...horario,
+      disciplinas: disciplinasDoHorario(horario.disciplinas),
+    })),
+    dia,
+    dados.data.sabadoLetivo,
+  );
   if (aulasDoDia.length === 0) {
     throw new ErroHttp(
       "Não há aulas programadas para este dia nesta turma. Ajuste a grade na Gestão.",

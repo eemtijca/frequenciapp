@@ -225,6 +225,7 @@ export interface Horario {
   inicio: string;
   fim: string;
   diasSemana: number[];
+  disciplinas?: Record<string, string>;
   ativo: boolean;
 }
 
