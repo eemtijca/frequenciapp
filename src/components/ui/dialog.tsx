@@ -78,7 +78,7 @@ function DialogContent({
           lateral
             ? // A gaveta é opaca e anima só o deslocamento: desfoque e opacidade sobre a
               // altura toda da tela travam a animação no celular.
-              "bg-popover inset-y-0 left-0 flex h-dvh w-[min(20rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-l-none border-y-0 border-l-0 data-[state=closed]:animate-[gaveta-sai_160ms_cubic-bezier(0.4,0,1,1)] data-[state=open]:animate-[gaveta-entra_220ms_cubic-bezier(0.32,0.72,0,1)]"
+              "bg-popover inset-y-0 left-0 flex h-dvh w-[min(15rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-l-none border-y-0 border-l-0 data-[state=closed]:animate-[gaveta-sai_160ms_cubic-bezier(0.4,0,1,1)] data-[state=open]:animate-[gaveta-entra_220ms_cubic-bezier(0.32,0.72,0,1)]"
             : "vidro-flutuante data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 top-[50%] left-[50%] grid max-h-[90dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto overscroll-contain p-6 duration-200 sm:max-w-lg",
           folha &&
             !lateral &&
