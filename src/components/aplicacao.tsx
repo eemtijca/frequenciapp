@@ -152,14 +152,17 @@ interface ItemNavegacaoProps {
   item: ItemNav;
   ativo: boolean;
   pendente: boolean;
-  /** Cada apresentação do menu possui seu próprio indicador. */
-  indicador: string;
+  /**
+   * Indicador animado entre itens; sem ele, a marca é estática. A gaveta do
+   * celular fecha ao trocar de tela, então lá a animação só custaria medições.
+   */
+  indicador?: string;
   onTrocar: (visao: Visao) => void;
 }
 
 function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNavegacaoProps) {
   const Icone = item.icone;
-  const semMovimento = useReducedMotion() ?? false;
+  const semMovimento = (useReducedMotion() ?? false) || indicador === undefined;
   return (
     <button
       type="button"
@@ -193,6 +196,109 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
         />
       )}
     </button>
+  );
+}
+
+type DestinoFocoMenu = "gatilho" | "conteudo" | "dialogo";
+type FecharMenu = (destino?: DestinoFocoMenu) => void;
+
+interface MenuMovelProps {
+  /** Contêiner do app, que recebe a marca de gaveta aberta (ver `globals.css`). */
+  raizRef: React.RefObject<HTMLDivElement | null>;
+  gatilhoRef: React.RefObject<HTMLButtonElement | null>;
+  conteudoRef: React.RefObject<HTMLElement | null>;
+  pendente: boolean;
+  renderizarConteudo: (fechar: FecharMenu) => React.ReactNode;
+}
+
+/**
+ * Botão e gaveta do menu no celular. O estado aberto fica aqui, fora da raiz:
+ * abrir e fechar renderiza só a gaveta, sem passar pelas telas montadas.
+ */
+function MenuMovel({
+  raizRef,
+  gatilhoRef,
+  conteudoRef,
+  pendente,
+  renderizarConteudo,
+}: MenuMovelProps) {
+  const [aberto, setAberto] = useState(false);
+  // Para onde o foco volta quando a gaveta fecha; em estado, porque o fechamento
+  // é passado ao conteúdo durante a renderização.
+  const [destinoFoco, setDestinoFoco] = useState<DestinoFocoMenu>("gatilho");
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // A mudança de largura encerra também o modal, liberando o fundo e o foco.
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    function aoMudarLargura() {
+      if (!desktop.matches) return;
+      setDestinoFoco("conteudo");
+      setAberto(false);
+    }
+    desktop.addEventListener("change", aoMudarLargura);
+    return () => desktop.removeEventListener("change", aoMudarLargura);
+  }, []);
+
+  const fechar = useCallback<FecharMenu>((destino = "gatilho") => {
+    setDestinoFoco(destino);
+    setAberto(false);
+  }, []);
+
+  return (
+    <Dialog
+      open={aberto}
+      onOpenChange={(proximo) => {
+        if (proximo) {
+          // Antes de o Radix bloquear o body: a marca corta a herança do bloqueio.
+          raizRef.current?.setAttribute("data-gaveta-aberta", "");
+          setDestinoFoco("gatilho");
+        }
+        setAberto(proximo);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          ref={gatilhoRef}
+          variant="ghost"
+          size="icon"
+          className="relative size-11 shrink-0 rounded-full"
+          aria-label="Abrir menu"
+          title="Menu"
+        >
+          <Menu size={22} aria-hidden="true" />
+          {pendente && (
+            <span
+              aria-hidden="true"
+              className="bg-falta absolute top-2 right-2 size-1.5 rounded-full"
+            />
+          )}
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        ref={menuRef}
+        lateral={{ aberto }}
+        showCloseButton={false}
+        aria-modal="true"
+        aria-describedby={undefined}
+        onOpenAutoFocus={(evento) => {
+          evento.preventDefault();
+          menuRef.current
+            ?.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')
+            ?.focus();
+        }}
+        onCloseAutoFocus={(evento) => {
+          // Chega depois de o Radix devolver o body; a marca já pode sair.
+          raizRef.current?.removeAttribute("data-gaveta-aberta");
+          if (destinoFoco === "gatilho") return;
+          evento.preventDefault();
+          if (destinoFoco === "conteudo") conteudoRef.current?.focus();
+        }}
+      >
+        <DialogTitle className="sr-only">Menu do aplicativo</DialogTitle>
+        {renderizarConteudo(fechar)}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -248,12 +354,10 @@ export default function Aplicacao({
   const [visaoComPendencia, setVisaoComPendencia] = useState<Visao | null>(null);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
-  const [menuAberto, setMenuAberto] = useState(false);
-  const destinoFocoMenu = useRef<"gatilho" | "conteudo" | "dialogo">("gatilho");
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const gatilhoMenuRef = useRef<HTMLButtonElement | null>(null);
   const origemDialogoRef = useRef<HTMLElement | null>(null);
   const conteudoRef = useRef<HTMLElement | null>(null);
+  const raizRef = useRef<HTMLDivElement | null>(null);
   const [offline, setOffline] = useState(false);
   const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
     abaRelatoriosDe(visaoInicial),
@@ -391,29 +495,19 @@ export default function Aplicacao({
     },
     [ativarVisao, itens, pendencias, visao],
   );
-  // A mudança de largura encerra também o modal, liberando o fundo e o foco.
-  useEffect(() => {
-    const desktop = window.matchMedia("(min-width: 1024px)");
-    function aoMudarLargura() {
-      if (!desktop.matches) return;
-      destinoFocoMenu.current = "conteudo";
-      setMenuAberto(false);
-    }
-    desktop.addEventListener("change", aoMudarLargura);
-    return () => desktop.removeEventListener("change", aoMudarLargura);
-  }, []);
-
-  function fecharMenu(destino: "gatilho" | "conteudo" | "dialogo" = "gatilho") {
-    destinoFocoMenu.current = destino;
-    setMenuAberto(false);
-  }
-
-  function navegarPeloMenu(proxima: Visao) {
+  function navegarPeloMenu(proxima: Visao, fecharMenu: FecharMenu) {
     const pedeConferencia =
       visao === "chamada-parcial" && pendencias.includes("chamada-parcial") && proxima !== visao;
-    if (pedeConferencia) origemDialogoRef.current = gatilhoMenuRef.current;
-    fecharMenu(pedeConferencia ? "dialogo" : "gatilho");
-    trocarVisao(proxima);
+    if (pedeConferencia) {
+      origemDialogoRef.current = gatilhoMenuRef.current;
+      fecharMenu("dialogo");
+      trocarVisao(proxima);
+      return;
+    }
+    fecharMenu();
+    // A gaveta fecha primeiro; a nova tela renderiza numa transição, sem
+    // segurar o início da animação de saída.
+    startTransition(() => trocarVisao(proxima));
   }
 
   function devolverFocoDoDialogo() {
@@ -676,7 +770,8 @@ export default function Aplicacao({
     );
   }
 
-  function renderizarMenu(movel: boolean) {
+  function renderizarMenu(fecharMenu?: FecharMenu) {
+    const movel = fecharMenu !== undefined;
     return (
       <div
         className="flex min-h-0 flex-1 flex-col"
@@ -715,8 +810,10 @@ export default function Aplicacao({
                   pendencias.includes(item.visao) ||
                   (item.visao === "chamada" && pendencias.includes("chamada-parcial"))
                 }
-                indicador={movel ? "indicador-menu-movel" : "indicador-lateral"}
-                onTrocar={movel ? navegarPeloMenu : trocarVisao}
+                indicador={movel ? undefined : "indicador-lateral"}
+                onTrocar={
+                  fecharMenu ? (proxima) => navegarPeloMenu(proxima, fecharMenu) : trocarVisao
+                }
               />
             ))}
           </nav>
@@ -740,7 +837,7 @@ export default function Aplicacao({
                 className="h-11 w-full justify-start gap-2"
                 onClick={(evento) => {
                   origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  if (movel) fecharMenu("dialogo");
+                  fecharMenu?.("dialogo");
                   setNotificacoesAbertas(true);
                 }}
               >
@@ -753,7 +850,7 @@ export default function Aplicacao({
                 className="h-11 w-full justify-start gap-2"
                 onClick={(evento) => {
                   origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  if (movel) fecharMenu("dialogo");
+                  fecharMenu?.("dialogo");
                   setSenhaAberta(true);
                 }}
               >
@@ -766,7 +863,7 @@ export default function Aplicacao({
                 className="h-11 w-full justify-start gap-2"
                 onClick={(evento) => {
                   origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  if (movel) fecharMenu(pendencias.length > 0 ? "dialogo" : "gatilho");
+                  fecharMenu?.(pendencias.length > 0 ? "dialogo" : "gatilho");
                   void sair();
                 }}
                 disabled={saindo}
@@ -783,140 +880,100 @@ export default function Aplicacao({
 
   return (
     <>
-      <Dialog
-        open={menuAberto}
-        onOpenChange={(aberto) => {
-          if (aberto) destinoFocoMenu.current = "gatilho";
-          setMenuAberto(aberto);
+      <div
+        ref={raizRef}
+        className="flex h-dvh w-full flex-col lg:flex-row"
+        style={{
+          paddingLeft: "env(safe-area-inset-left)",
+          paddingRight: "env(safe-area-inset-right)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
-        <div
-          className="flex h-dvh w-full flex-col lg:flex-row"
-          style={{
-            paddingLeft: "env(safe-area-inset-left)",
-            paddingRight: "env(safe-area-inset-right)",
-            paddingBottom: "env(safe-area-inset-bottom)",
-          }}
+        <a
+          href="#conteudo"
+          className="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
         >
-          <a
-            href="#conteudo"
-            className="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
+          Pular para o conteúdo
+        </a>
+
+        <aside className="superficie-vidro hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
+          {renderizarMenu()}
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <header
+            className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
           >
-            Pular para o conteúdo
-          </a>
-
-          <aside className="superficie-vidro hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
-            {renderizarMenu(false)}
-          </aside>
-
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <header
-              className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
-              style={{ paddingTop: "env(safe-area-inset-top)" }}
-            >
-              <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
-                <DialogTrigger asChild>
-                  <Button
-                    ref={gatilhoMenuRef}
-                    variant="ghost"
-                    size="icon"
-                    className="relative size-11 shrink-0 rounded-full"
-                    aria-label="Abrir menu"
-                    title="Menu"
-                  >
-                    <Menu size={22} aria-hidden="true" />
-                    {pendencias.length > 0 && (
-                      <span
-                        aria-hidden="true"
-                        className="bg-falta absolute top-2 right-2 size-1.5 rounded-full"
-                      />
-                    )}
-                  </Button>
-                </DialogTrigger>
-                <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
-                  FrequenciApp
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-11 shrink-0 rounded-full"
-                  aria-label="Configurar notificações"
-                  title="Configurar notificações"
-                  onClick={(evento) => {
-                    origemDialogoRef.current = evento.currentTarget;
-                    setNotificacoesAbertas(true);
-                  }}
-                >
-                  <Bell size={18} aria-hidden="true" />
-                </Button>
-              </div>
-            </header>
-
-            {offline && (
-              <div
-                role="status"
-                className="bg-falta-fraca text-falta-texto flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-xs"
+            <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
+              <MenuMovel
+                raizRef={raizRef}
+                gatilhoRef={gatilhoMenuRef}
+                conteudoRef={conteudoRef}
+                pendente={pendencias.length > 0}
+                renderizarConteudo={renderizarMenu}
+              />
+              <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+                FrequenciApp
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-11 shrink-0 rounded-full"
+                aria-label="Configurar notificações"
+                title="Configurar notificações"
+                onClick={(evento) => {
+                  origemDialogoRef.current = evento.currentTarget;
+                  setNotificacoesAbertas(true);
+                }}
               >
-                <WifiOff size={14} aria-hidden="true" />
-                Sem conexão. As marcações continuam na tela e precisam de internet para salvar.
-              </div>
-            )}
+                <Bell size={18} aria-hidden="true" />
+              </Button>
+            </div>
+          </header>
 
-            <main
-              ref={conteudoRef}
-              tabIndex={-1}
-              id="conteudo"
-              data-visao={visao}
-              className="relative min-h-0 flex-1 overflow-hidden"
+          {offline && (
+            <div
+              role="status"
+              className="bg-falta-fraca text-falta-texto flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-xs"
             >
-              <div ref={pagerRef} data-pager="principal" className="h-full overflow-hidden">
-                {itens.map((item, indice) => {
-                  const ativo = item.visao === visao;
-                  const distante = Math.abs(indice - indiceAtivo) > 1;
-                  if (!ativo && !visitadas.has(item.visao)) return null;
-                  return (
-                    <section
-                      key={item.visao}
-                      role="group"
-                      aria-label={item.rotulo}
-                      aria-hidden={!ativo}
-                      inert={!ativo}
-                      data-distante={distante ? "true" : undefined}
-                      hidden={!ativo}
-                      onScroll={(evento) => guardarRolagem(item.visao, evento)}
-                      className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
-                    >
-                      {renderizarVisao(item.visao, ativo)}
-                    </section>
-                  );
-                })}
-              </div>
-            </main>
-          </div>
-        </div>
+              <WifiOff size={14} aria-hidden="true" />
+              Sem conexão. As marcações continuam na tela e precisam de internet para salvar.
+            </div>
+          )}
 
-        <DialogContent
-          ref={menuRef}
-          lateral
-          showCloseButton={false}
-          aria-modal="true"
-          aria-describedby={undefined}
-          onOpenAutoFocus={(evento) => {
-            evento.preventDefault();
-            menuRef.current
-              ?.querySelector<HTMLButtonElement>('nav button[aria-current="page"]')
-              ?.focus();
-          }}
-          onCloseAutoFocus={(evento) => {
-            if (destinoFocoMenu.current === "gatilho") return;
-            evento.preventDefault();
-            if (destinoFocoMenu.current === "conteudo") conteudoRef.current?.focus();
-          }}
-        >
-          <DialogTitle className="sr-only">Menu do aplicativo</DialogTitle>
-          {renderizarMenu(true)}
-        </DialogContent>
-      </Dialog>
+          <main
+            ref={conteudoRef}
+            tabIndex={-1}
+            id="conteudo"
+            data-visao={visao}
+            className="relative min-h-0 flex-1 overflow-hidden"
+          >
+            <div ref={pagerRef} data-pager="principal" className="h-full overflow-hidden">
+              {itens.map((item, indice) => {
+                const ativo = item.visao === visao;
+                const distante = Math.abs(indice - indiceAtivo) > 1;
+                if (!ativo && !visitadas.has(item.visao)) return null;
+                return (
+                  <section
+                    key={item.visao}
+                    role="group"
+                    aria-label={item.rotulo}
+                    aria-hidden={!ativo}
+                    inert={!ativo}
+                    data-distante={distante ? "true" : undefined}
+                    hidden={!ativo}
+                    onScroll={(evento) => guardarRolagem(item.visao, evento)}
+                    className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
+                  >
+                    {renderizarVisao(item.visao, ativo)}
+                  </section>
+                );
+              })}
+            </div>
+          </main>
+        </div>
+      </div>
 
       <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
         <AlertDialogContent
