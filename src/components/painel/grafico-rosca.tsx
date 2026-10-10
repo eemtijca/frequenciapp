@@ -9,6 +9,7 @@ export interface FatiaGrafico {
   nome: string;
   valor: number;
   detalhe?: string;
+  alunos?: number;
 }
 
 // Tons do próprio tema: verde institucional, verde claro e grafite. O
@@ -22,6 +23,7 @@ interface Props {
   unidadeSingular?: string;
   unidadePlural?: string;
   vazio?: string;
+  tomValores?: "neutro" | "falta";
 }
 
 export default function GraficoRosca({
@@ -31,6 +33,7 @@ export default function GraficoRosca({
   unidadeSingular = "falta",
   unidadePlural = "faltas",
   vazio = "Nenhuma falta registrada",
+  tomValores = "neutro",
 }: Props) {
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
@@ -115,19 +118,30 @@ export default function GraficoRosca({
               />
               <span className="min-w-0 flex-1 break-words">
                 {fatia.nome}
-                {fatia.detalhe && (
+                {fatia.alunos !== undefined ? (
+                  <span
+                    role="img"
+                    aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
+                    title={fatia.detalhe ?? `${fatia.alunos} alunos`}
+                    className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none"
+                  >
+                    <span aria-hidden="true">{fatia.alunos}</span>
+                  </span>
+                ) : fatia.detalhe ? (
                   <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>
-                )}
+                ) : null}
               </span>
             </span>
             <span className="ml-auto flex shrink-0 items-center gap-1">
               <CirculoValor
                 texto={String(fatia.valor)}
                 rotulo={`${fatia.valor} ${fatia.valor === 1 ? unidadeSingular : unidadePlural}`}
+                tom={tomValores}
               />
               <CirculoValor
                 texto={percentual.format(fatia.valor / total)}
                 rotulo={`${percentual.format(fatia.valor / total)} do total`}
+                tom={tomValores}
               />
             </span>
           </li>
