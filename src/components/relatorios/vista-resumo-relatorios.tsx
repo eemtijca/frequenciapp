@@ -128,19 +128,12 @@ export default function ResumoRelatorios({
       rotulo: rotuloDataCurta(dia.dia),
       valor: dia.taxa === null ? null : Math.round(dia.taxa * 1000) / 10,
     }));
-    const ranking = alunosPorFaltas(doFiltro, turmas, frequencias, dias, criterioRanking);
-    return { porSerie, porTurma, total, evolucao, ranking };
-  }, [
-    alunos,
-    criterioRanking,
-    diaCorrente,
-    frequencias,
-    mes,
-    series,
-    turmaId,
-    turmas,
-    turmasVisiveis,
-  ]);
+    return { porSerie, porTurma, total, evolucao, doFiltro, dias };
+  }, [alunos, diaCorrente, frequencias, mes, series, turmaId, turmas, turmasVisiveis]);
+  const ranking = useMemo(
+    () => alunosPorFaltas(dados.doFiltro, turmas, frequencias, dados.dias, criterioRanking),
+    [dados.doFiltro, dados.dias, turmas, frequencias, criterioRanking],
+  );
   const { executando, executar } = useAcaoUnica(async () => {
     try {
       await onRecarregar(mes);
@@ -379,56 +372,52 @@ export default function ResumoRelatorios({
                     </Button>
                   ))}
                 </div>
-                {dados.ranking.length === 0 ? (
+                {ranking.length === 0 ? (
                   <p className="text-muted-foreground mt-3 text-sm">
                     {RANKINGS[criterioRanking].vazio}
                   </p>
                 ) : (
                   <>
                     <ol className="mt-4 grid gap-3 md:grid-cols-2">
-                      {(mostrarTodos ? dados.ranking : dados.ranking.slice(0, 10)).map(
-                        (item, indice) => (
-                          <li
-                            key={item.aluno.id}
-                            className="flex min-w-0 items-center gap-3 rounded-lg border p-3"
+                      {(mostrarTodos ? ranking : ranking.slice(0, 10)).map((item, indice) => (
+                        <li
+                          key={item.aluno.id}
+                          className="flex min-w-0 items-center gap-3 rounded-lg border p-3"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="text-muted-foreground numerais-tabulares text-xs"
                           >
-                            <span
-                              aria-hidden="true"
-                              className="text-muted-foreground numerais-tabulares text-xs"
-                            >
-                              {indice + 1}
+                            {indice + 1}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium break-words">
+                              {item.aluno.nome}
                             </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-medium break-words">
-                                {item.aluno.nome}
-                              </span>
-                              <span className="text-muted-foreground text-xs">
-                                {turmas.find((turma) => turma.id === item.aluno.turmaId)?.rotulo}
-                              </span>
+                            <span className="text-muted-foreground text-xs">
+                              {turmas.find((turma) => turma.id === item.aluno.turmaId)?.rotulo}
                             </span>
-                            <span className="numerais-tabulares shrink-0 text-right">
-                              <strong className="block text-sm">
-                                {item.quantidade}{" "}
-                                {RANKINGS[criterioRanking].unidade[item.quantidade === 1 ? 0 : 1]}
-                              </strong>
-                              <span className="text-muted-foreground text-xs">
-                                {item.faltas} F · {item.justificadas} FJ
-                              </span>
+                          </span>
+                          <span className="numerais-tabulares shrink-0 text-right">
+                            <strong className="block text-sm">
+                              {item.quantidade}{" "}
+                              {RANKINGS[criterioRanking].unidade[item.quantidade === 1 ? 0 : 1]}
+                            </strong>
+                            <span className="text-muted-foreground text-xs">
+                              {item.faltas} F · {item.justificadas} FJ
                             </span>
-                          </li>
-                        ),
-                      )}
+                          </span>
+                        </li>
+                      ))}
                     </ol>
-                    {dados.ranking.length > 10 && (
+                    {ranking.length > 10 && (
                       <Button
                         variant="ghost"
                         className="mt-3"
                         aria-expanded={mostrarTodos}
                         onClick={() => setMostrarTodos((atual) => !atual)}
                       >
-                        {mostrarTodos
-                          ? "Mostrar 10 primeiros"
-                          : `Ver todos (${dados.ranking.length})`}
+                        {mostrarTodos ? "Mostrar 10 primeiros" : `Ver todos (${ranking.length})`}
                       </Button>
                     )}
                   </>

@@ -2,7 +2,7 @@
 
 // Alunos: lista de consulta do professor, agrupada por turma atual ou por
 // turma de origem. O cadastro e a edição acontecem na área de Gestão.
-import { useMemo, useState } from "react";
+import { memo, useDeferredValue, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
@@ -21,10 +21,73 @@ const AGRUPAMENTOS: { valor: Agrupamento; rotulo: string }[] = [
   { valor: "origem", rotulo: "Turma de origem" },
 ];
 
+interface PropsGrupo {
+  turma: Turma | undefined;
+  lista: Aluno[];
+  agrupamento: Agrupamento;
+  semMovimento: boolean;
+  rotuloDe: (id: string, fallback: string) => string;
+}
+
+const GrupoAlunos = memo(function GrupoAlunos({
+  turma,
+  lista,
+  agrupamento,
+  semMovimento,
+  rotuloDe,
+}: PropsGrupo) {
+  return (
+    <motion.div
+      initial={semMovimento ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      className="superficie-vidro overflow-hidden"
+    >
+      <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
+        <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
+        <span className="numerais-tabulares text-muted-foreground text-xs">
+          {lista.filter((aluno) => aluno.ativo).length} ativos
+        </span>
+      </div>
+      <ul className="divide-y">
+        {lista.map((aluno) => (
+          <li
+            key={aluno.id}
+            className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
+          >
+            <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+              {String(aluno.ordem).padStart(2, "0")}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{aluno.nome}</p>
+              {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId && (
+                <p className="text-muted-foreground text-xs">
+                  Origem {rotuloDe(aluno.turmaOriginalId, "outra turma")}
+                </p>
+              )}
+              {agrupamento === "origem" && aluno.turmaId !== aluno.turmaOriginalId && (
+                <p className="text-muted-foreground text-xs">
+                  Atual {rotuloDe(aluno.turmaId, "outra turma")}
+                </p>
+              )}
+            </div>
+            {aluno.desistenteEm ? (
+              <span className="text-muted-foreground text-xs">Desistente</span>
+            ) : !aluno.ativo ? (
+              <span className="text-muted-foreground text-xs">desativado</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </motion.div>
+  );
+});
+
 export default function VistaAlunos({ alunos, turmas }: Props) {
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
   const semMovimento = useReducedMotion() ?? false;
   const [busca, setBusca] = useState("");
+  const buscaAplicada = useDeferredValue(busca);
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
@@ -33,11 +96,12 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
 
   const grupos = useMemo(() => {
     const porTurma = agrupamento === "atual";
+    const turmasPorId = new Map(turmas.map((turma) => [turma.id, turma]));
     const mapa = new Map<string, { turma: Turma | undefined; alunos: Aluno[] }>();
     for (const aluno of alunos) {
       const chave = porTurma ? aluno.turmaId : aluno.turmaOriginalId;
       const item = mapa.get(chave) ?? {
-        turma: turmas.find((turma) => turma.id === chave),
+        turma: turmasPorId.get(chave),
         alunos: [],
       };
       item.alunos.push(aluno);
@@ -57,20 +121,33 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
       });
   }, [agrupamento, alunos, turmas]);
 
-  const ativos = alunos.filter((aluno) => aluno.ativo).length;
-  const termo = normalizar(busca);
-  const gruposFiltrados =
-    termo === ""
+  const ativos = useMemo(() => alunos.filter((aluno) => aluno.ativo).length, [alunos]);
+  const nomesParaBusca = useMemo(
+    () => new Map(alunos.map((aluno) => [aluno.id, normalizar(aluno.nome)])),
+    [alunos],
+  );
+  const gruposFiltrados = useMemo(() => {
+    const termo = normalizar(buscaAplicada);
+    return termo === ""
       ? grupos
       : grupos
           .map(
             ([id, turma, lista]) =>
-              [id, turma, lista.filter((aluno) => normalizar(aluno.nome).includes(termo))] as const,
+              [
+                id,
+                turma,
+                lista.filter((aluno) => (nomesParaBusca.get(aluno.id) ?? "").includes(termo)),
+              ] as const,
           )
           .filter(([, , lista]) => lista.length > 0);
+  }, [grupos, nomesParaBusca, buscaAplicada]);
 
   return (
-    <section aria-label="Lista de alunos" className="flex flex-col gap-4 pb-6">
+    <section
+      aria-label="Lista de alunos"
+      aria-busy={busca !== buscaAplicada}
+      className="flex flex-col gap-4 pb-6"
+    >
       <div className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Alunos</h1>
@@ -131,52 +208,14 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
         </div>
       ) : (
         gruposFiltrados.map(([id, turma, lista]) => (
-          <motion.div
+          <GrupoAlunos
             key={id}
-            initial={semMovimento ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={
-              semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
-            }
-            className="superficie-vidro overflow-hidden"
-          >
-            <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
-              <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
-              <span className="numerais-tabulares text-muted-foreground text-xs">
-                {lista.filter((aluno) => aluno.ativo).length} ativos
-              </span>
-            </div>
-            <ul className="divide-y">
-              {lista.map((aluno) => (
-                <li
-                  key={aluno.id}
-                  className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
-                >
-                  <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                    {String(aluno.ordem).padStart(2, "0")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{aluno.nome}</p>
-                    {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId && (
-                      <p className="text-muted-foreground text-xs">
-                        Origem {rotuloDe(aluno.turmaOriginalId, "outra turma")}
-                      </p>
-                    )}
-                    {agrupamento === "origem" && aluno.turmaId !== aluno.turmaOriginalId && (
-                      <p className="text-muted-foreground text-xs">
-                        Atual {rotuloDe(aluno.turmaId, "outra turma")}
-                      </p>
-                    )}
-                  </div>
-                  {aluno.desistenteEm ? (
-                    <span className="text-muted-foreground text-xs">Desistente</span>
-                  ) : !aluno.ativo ? (
-                    <span className="text-muted-foreground text-xs">desativado</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </motion.div>
+            turma={turma}
+            lista={lista}
+            agrupamento={agrupamento}
+            semMovimento={semMovimento}
+            rotuloDe={rotuloDe}
+          />
         ))
       )}
     </section>

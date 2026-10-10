@@ -42,14 +42,12 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
   const [minuto, setMinuto] = useState(() => partes(valor).minuto);
   const [coluna, setColuna] = useState<Coluna>("hora");
   const opcoes = useRef(new Map<string, HTMLButtonElement>());
-  const focoPendente = useRef(false);
   const gatilhoRef = useRef<HTMLButtonElement | null>(null);
 
   function aoAbrir(abertoNovo: boolean) {
     setAberto(abertoNovo);
     if (!abertoNovo) return;
     const atual = partes(valor || agora || "00:00");
-    focoPendente.current = true;
     setHora(atual.hora);
     setMinuto(atual.minuto);
     setColuna("hora");
@@ -57,11 +55,23 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
 
   const chaveFoco = `${coluna}-${coluna === "hora" ? hora : minuto}`;
 
+  function focarOpcao(elemento: HTMLButtonElement | undefined, centralizar = false) {
+    if (!elemento) return;
+    if (document.activeElement !== elemento) elemento.focus({ preventScroll: true });
+    const painel = elemento.parentElement;
+    if (!painel) return;
+    // Só a coluna rola; o foco não desloca a tela nem o formulário por trás.
+    const topo = elemento.offsetTop;
+    const fundo = topo + elemento.offsetHeight;
+    if (centralizar) painel.scrollTop = topo - (painel.clientHeight - elemento.offsetHeight) / 2;
+    else if (topo < painel.scrollTop) painel.scrollTop = topo;
+    else if (fundo > painel.scrollTop + painel.clientHeight)
+      painel.scrollTop = fundo - painel.clientHeight;
+  }
+
   useEffect(() => {
     if (!aberto) return;
-    const elemento = opcoes.current.get(chaveFoco);
-    elemento?.focus();
-    elemento?.scrollIntoView({ block: "nearest" });
+    focarOpcao(opcoes.current.get(chaveFoco));
   }, [aberto, chaveFoco]);
 
   function registrar(chave: string, elemento: HTMLButtonElement | null) {
@@ -70,12 +80,6 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
       return;
     }
     opcoes.current.set(chave, elemento);
-    // O painel monta depois do efeito; o foco inicial sai daqui.
-    if (focoPendente.current && chave === chaveFoco) {
-      focoPendente.current = false;
-      elemento.focus();
-      elemento.scrollIntoView({ block: "center" });
-    }
   }
 
   // A hora vale na hora: o campo já reflete a escolha e o painel segue aberto
@@ -131,7 +135,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
       <div
         role="listbox"
         aria-label={rotulo}
-        className="flex max-h-64 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1"
+        className="relative flex max-h-64 min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1"
         onKeyDown={(evento) => aoTeclar(evento, tipo)}
       >
         {lista.map((numero) => (
@@ -153,16 +157,19 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
   }
 
   const painel = (
-    <div className="flex flex-col gap-3">
-      <div className="text-muted-foreground flex gap-2 text-[11px] font-medium" aria-hidden="true">
+    <div className="flex min-h-0 flex-col gap-3">
+      <div
+        className="text-muted-foreground flex shrink-0 gap-2 text-[11px] font-medium"
+        aria-hidden="true"
+      >
         <span className="flex-1 text-center">Hora</span>
         <span className="flex-1 text-center">Minuto</span>
       </div>
-      <div className="flex gap-2">
+      <div className="flex min-h-0 gap-2">
         {renderColuna("hora", HORAS, "Horas")}
         {renderColuna("minuto", MINUTOS, "Minutos")}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t pt-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t pt-3">
         {agora ? (
           <button
             type="button"
@@ -214,12 +221,15 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
         aria-label={rotuloAcessivel}
         align="center"
         collisionPadding={8}
-        className="w-[min(18rem,calc(100vw-1.5rem))] p-3"
-        onOpenAutoFocus={(evento) => evento.preventDefault()}
+        className="flex max-h-[var(--radix-popover-content-available-height)] w-[min(18rem,calc(100vw-1.5rem))] flex-col overflow-hidden p-3"
+        onOpenAutoFocus={(evento) => {
+          evento.preventDefault();
+          focarOpcao(opcoes.current.get(chaveFoco), true);
+        }}
         onCloseAutoFocus={(evento) => {
           // Sem Trigger do Radix, o foco volta ao gatilho por aqui.
           evento.preventDefault();
-          gatilhoRef.current?.focus();
+          gatilhoRef.current?.focus({ preventScroll: true });
         }}
       >
         {painel}

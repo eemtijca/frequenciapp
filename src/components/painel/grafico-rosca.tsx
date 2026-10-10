@@ -15,6 +15,10 @@ export interface FatiaGrafico {
 // Tons do próprio tema: verde institucional, verde claro e grafite. O
 // vermelho fica reservado ao sentido de falta e erro.
 const CORES = ["var(--chart-1)", "var(--chart-4)", "var(--chart-3)", "var(--primary)"];
+const percentual = new Intl.NumberFormat("pt-BR", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
 
 interface Props {
   titulo: string;
@@ -37,10 +41,6 @@ export default function GraficoRosca({
 }: Props) {
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
-  const percentual = new Intl.NumberFormat("pt-BR", {
-    style: "percent",
-    maximumFractionDigits: 1,
-  });
 
   if (total === 0) {
     return (

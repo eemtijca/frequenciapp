@@ -99,13 +99,12 @@ function resumoDoRegistro(registro: RegistroPersonalizado | undefined): string {
     .join(" · ");
 }
 
-function momentoDaConfirmacao(registro: RegistroPersonalizado, fuso: string): string {
+function momentoDaConfirmacao(
+  registro: RegistroPersonalizado,
+  formatador: Intl.DateTimeFormat,
+): string {
   if (!registro.registradoSeducEm) return "";
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: fuso,
-  }).format(new Date(registro.registradoSeducEm));
+  return formatador.format(new Date(registro.registradoSeducEm));
 }
 
 export default function VistaFrequenciaParcial({
@@ -121,6 +120,15 @@ export default function VistaFrequenciaParcial({
   // Domingo não tem chamada: abrir num domingo mostra o sábado anterior.
   const diaPadrao = ultimoDiaDeChamada(diaInicial);
   const [dia, setDia] = useState(diaPadrao);
+  const formatadorConfirmacao = useMemo(
+    () =>
+      new Intl.DateTimeFormat("pt-BR", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: fuso,
+      }),
+    [fuso],
+  );
   const [turmaSelecionada, setTurmaId] = useState(turmas[0]?.id ?? "");
   const turmaId = turmas.some((item) => item.id === turmaSelecionada)
     ? turmaSelecionada
@@ -165,6 +173,10 @@ export default function VistaFrequenciaParcial({
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
   }, [series, turmas]);
+  const opcoesTurma = useMemo(
+    () => turmasOrdenadas.map((item) => ({ valor: item.id, rotulo: item.rotulo })),
+    [turmasOrdenadas],
+  );
   const turma = turmas.find((item) => item.id === turmaId);
   const listaAlunos = useMemo(() => {
     const registrosPorAluno = new Map(registros.map((registro) => [registro.alunoId, registro]));
@@ -190,34 +202,41 @@ export default function VistaFrequenciaParcial({
     );
   }, [alunos, registros, turmaId, dia]);
   const origemEdicao = registroEditado ?? baseEdicao;
-  const alunosDaEdicao = origemEdicao
-    ? [
-        {
-          ...(alunos.find((aluno) => aluno.id === origemEdicao.alunoId) ?? {
-            turmaId: origemEdicao.turmaId,
-            turmaOriginalId: origemEdicao.turmaId,
-            ordem: 0,
-            ativo: false,
-          }),
-          id: origemEdicao.alunoId,
-          nome: origemEdicao.alunoNome,
-        },
-      ]
-    : alunos.filter((aluno) => aluno.id === edicao.alunoId);
-  const alunosFiltrados = useMemo(
+  const alunosDaEdicao = useMemo(
     () =>
-      listaAlunos.filter(
-        (aluno) =>
-          normalizar(aluno.nome).includes(normalizar(busca)) &&
-          (filtro === "todos" ||
-            (filtro === "sem-registro"
-              ? !aluno.registro
-              : filtro === "pendentes"
-                ? aluno.registro && !aluno.registro.registradoSeduc
-                : aluno.registro?.registradoSeduc)),
-      ),
-    [listaAlunos, busca, filtro],
+      origemEdicao
+        ? [
+            {
+              ...(alunos.find((aluno) => aluno.id === origemEdicao.alunoId) ?? {
+                turmaId: origemEdicao.turmaId,
+                turmaOriginalId: origemEdicao.turmaId,
+                ordem: 0,
+                ativo: false,
+              }),
+              id: origemEdicao.alunoId,
+              nome: origemEdicao.alunoNome,
+            },
+          ]
+        : alunos.filter((aluno) => aluno.id === edicao.alunoId),
+    [alunos, origemEdicao, edicao.alunoId],
   );
+  const nomesParaBusca = useMemo(
+    () => new Map(listaAlunos.map((aluno) => [aluno.id, normalizar(aluno.nome)])),
+    [listaAlunos],
+  );
+  const alunosFiltrados = useMemo(() => {
+    const termo = normalizar(busca);
+    return listaAlunos.filter(
+      (aluno) =>
+        (nomesParaBusca.get(aluno.id) ?? "").includes(termo) &&
+        (filtro === "todos" ||
+          (filtro === "sem-registro"
+            ? !aluno.registro
+            : filtro === "pendentes"
+              ? aluno.registro && !aluno.registro.registradoSeduc
+              : aluno.registro?.registradoSeduc)),
+    );
+  }, [listaAlunos, nomesParaBusca, busca, filtro]);
 
   useEffect(() => {
     onPendencia?.(sujo);
@@ -431,7 +450,7 @@ export default function VistaFrequenciaParcial({
           id="parcial-turma"
           value={turmaId}
           onValueChange={setTurmaId}
-          opcoes={turmasOrdenadas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
+          opcoes={opcoesTurma}
           disabled={ocupado || editorAberto}
           placeholder="Selecione a turma"
         />
@@ -602,7 +621,7 @@ export default function VistaFrequenciaParcial({
                       <>
                         <p className="mt-3 text-xs" role="status">
                           {registro.registradoSeduc
-                            ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, fuso)}` : ""}`
+                            ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`
                             : "Pendente de lançamento na Seduc"}
                         </p>
                         {registro.tipo !== "CHAMADA" && registro.observacao && (

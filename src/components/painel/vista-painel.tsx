@@ -94,6 +94,8 @@ export default function VistaPainel({
       : feriadoCadastrado;
 
   useEffect(() => {
+    if (!ativo) return;
+    const controlador = new AbortController();
     let viva = true;
     async function buscar() {
       setCarregando(true);
@@ -102,10 +104,13 @@ export default function VistaPainel({
         const [respostaFrequencias, respostaSaidas] = await Promise.all([
           pedir<{ frequencias: Frequencia[]; feriado?: Feriado | null }>(
             `/api/frequencias?dia=${dia}`,
+            { signal: controlador.signal },
           ),
           compartilhado
             ? Promise.resolve({ saidas: [] as SaidaAntecipada[] })
-            : pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
+            : pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`, {
+                signal: controlador.signal,
+              }),
         ]);
         if (!viva) return;
         setDoDia({
@@ -129,8 +134,9 @@ export default function VistaPainel({
     void buscar();
     return () => {
       viva = false;
+      controlador.abort();
     };
-  }, [compartilhado, dia, recarregar, nomeFeriadoNoCadastro]);
+  }, [ativo, compartilhado, dia, recarregar, nomeFeriadoNoCadastro]);
 
   const frequenciasDoDia = useMemo(
     () =>
