@@ -87,6 +87,21 @@ describe("recuperação durável da automação", () => {
     expect(
       (await banco().sincronizacaoPlanilha.findUnique({ where: { id: inicial } }))?.resultado,
     ).toBe("PARCIAL");
+    const confirmado = await banco().sincronizacaoPlanilha.findFirst({
+      where: { planoHash: marcador, resultado: "SUCESSO" },
+      select: { id: true },
+    });
+    if (!confirmado) throw new Error("Conferência concluída ausente.");
+    const instante = new Date("2026-10-10T15:00:00.000Z");
+    await banco().sincronizacaoPlanilha.update({
+      where: { id: inicial },
+      data: { criadoEm: instante },
+    });
+    await banco().sincronizacaoPlanilha.update({
+      where: { id: confirmado.id },
+      data: { criadoEm: instante },
+    });
+    expect(await haEnvioMovimentacaoSemConfirmacao(linha, "Saídas")).toBe(false);
     await tentativa();
     expect(await haEnvioMovimentacaoSemConfirmacao(linha, "Saídas")).toBe(true);
   });

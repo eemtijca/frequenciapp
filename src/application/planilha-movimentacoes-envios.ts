@@ -11,7 +11,10 @@ export function destinoMovimentacao(linha: LinhaIntegracao, aba: string): string
   return `movimentacao:${hashTexto(JSON.stringify([linha.googlePlanilhaId, aba]))}`;
 }
 
-/** Um sucesso só reconcilia tentativas anteriores do mesmo destino e período coberto. */
+/**
+ * Um sucesso reconcilia tentativas do mesmo destino e período coberto.
+ * O instante igual também conta: o relógio pode repetir o microssegundo.
+ */
 export async function haEnvioMovimentacaoSemConfirmacao(linha: LinhaIntegracao, aba: string) {
   const destino = destinoMovimentacao(linha, aba);
   const tabela = objetoDoBanco("sincronizacoes_planilha");
@@ -26,7 +29,8 @@ export async function haEnvioMovimentacaoSemConfirmacao(linha: LinhaIntegracao, 
         WHERE s.finalidade = 'SAIDAS' AND s.resultado = 'SUCESSO'
           AND s.puladas_ocupadas = 0 AND s.puladas_formula = 0
           AND (s.destino = ${destino} OR (p.destino IS NULL AND s.destino IS NULL))
-          AND s.de <= p.de AND s.ate >= p.ate AND s.criado_em > p.criado_em
+          AND s.id <> p.id
+          AND s.de <= p.de AND s.ate >= p.ate AND s.criado_em >= p.criado_em
       )
     LIMIT 1
   `;

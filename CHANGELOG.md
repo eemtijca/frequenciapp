@@ -60,6 +60,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
+
 - A faixa de gráficos do Painel mantém o cartão em exibição quando a largura muda, inclusive ao passar do desktop para o celular.
 
 - Falha de leitura da Chamada mantém marcações e salvamento bloqueados em qualquer dia, preservando o rascunho local até uma consulta confirmada. Navegação e nova tentativa continuam disponíveis.
