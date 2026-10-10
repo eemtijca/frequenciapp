@@ -27,6 +27,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Menu lateral do celular abre, fecha e troca de tela sem engasgos. O estado aberto fica num componente próprio, sem renderizar as telas montadas a cada toque; o painel lateral fica opaco e sem desfoque; o véu deixa de usar a trava de rolagem do Radix, que recalculava o estilo do app inteiro; e a nova tela renderiza depois do fechamento. Num celular emulado com CPU 4× mais lenta, a maior tarefa longa ao abrir cai de cerca de 230 ms para nenhuma.
+
 - Navegação no celular passa da barra inferior para um menu lateral aberto pelo cabeçalho, com as mesmas seções, permissões e ações de conta da barra lateral do desktop. O menu reúne perfil, tema, senha, notificações e saída, fecha ao selecionar, usar Escape, tocar fora ou ampliar para desktop, e mantém foco, áreas seguras e rolagem própria. Chamada Parcial continua acessível somente pelo ícone da Chamada.
 
 - Chamada bloqueia todo sábado por padrão, também quando a turma tem aula no sábado na grade, e só o botão Sábado letivo libera a chamada daquela turma e data; chamada salva e rascunho recuperado mantêm a liberação. A regra é da interface: a API não muda.
