@@ -35,7 +35,7 @@ A sincronização do calendário letivo consulta uma base externa somente quando
 | FERIADOS_UF        | não         |                           | Duas letras da UF. A consulta passa a incluir feriados estaduais e nacionais.                 |
 | FERIADOS_IBGE      | não         |                           | Código de 7 dígitos. Quando presente, prevalece sobre a UF e inclui feriados municipais.      |
 
-A consulta envia o ano, a página e o recorte geográfico. Não envia alunos, frequências nem senhas. Pontos facultativos ficam de fora. A decisão está na [ADR-041](adr/041-sincronizacao-de-feriados.md).
+A consulta envia o ano, a página e o recorte geográfico. Não envia alunos, frequências nem senhas. Pontos facultativos ficam de fora. Na base padrão, as capitais são gratuitas e os demais municípios exigem plano pago. A decisão está na [ADR-041](adr/041-sincronizacao-de-feriados.md).
 
 ## Notificações opcionais
 
