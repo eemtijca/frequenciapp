@@ -69,14 +69,32 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await turmaA.click();
   const aluno = secao.getByRole("button", { name: /^E2E Bloqueio Um:/ });
   await expect(aluno).toBeEnabled();
-  await expect(secao.getByRole("group", { name: "Bloqueio da chamada" })).toHaveCount(0);
+  await expect(secao.getByRole("button", { name: /bloquear chamada de/i })).toHaveCount(0);
 
   await aluno.click();
   await secao.getByRole("button", { name: "Salvar" }).click();
-  await expect(secao.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   expect(salvamentos).toBe(1);
   await expect(aluno).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Salvar" })).toBeDisabled();
+
+  // O botão fica na linha do resumo, à direita dele, sem quadro nem frases de apoio.
+  const resumo = secao.getByRole("button", { name: /^Resumo d/ });
+  const botaoBloqueio = secao.getByRole("button", { name: /^Desbloquear chamada de/ });
+  const [caixaResumo, caixaBloqueio] = await Promise.all([
+    resumo.boundingBox(),
+    botaoBloqueio.boundingBox(),
+  ]);
+  expect(caixaResumo).not.toBeNull();
+  expect(caixaBloqueio).not.toBeNull();
+  if (caixaResumo && caixaBloqueio) {
+    expect(Math.abs(caixaResumo.y - caixaBloqueio.y)).toBeLessThan(8);
+    expect(caixaBloqueio.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+  }
+  await expect(secao.getByText("Desbloqueie para corrigir a frequência.")).toHaveCount(0);
+  await page.setViewportSize({ width: 360, height: 780 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await turmaB.click();
   await expect(secao.getByRole("button", { name: /^E2E Bloqueio Dois:/ })).toBeEnabled();
@@ -97,7 +115,7 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   ).toBeDisabled();
   await secao.getByRole("button", { name: "Salvar" }).click();
   await expect(aluno).toBeDisabled();
-  await expect(secao.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   expect(salvamentos).toBe(2);
 
   await page.reload();

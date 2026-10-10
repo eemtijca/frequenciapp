@@ -144,7 +144,7 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   const chamada = await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(chamada.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await expect(chamada.getByRole("switch")).toHaveCount(0);
 
   const secao = await abrirParcial(page);
@@ -187,7 +187,7 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await expect(chamada.getByRole("switch")).toHaveCount(0);
   await chamada.getByRole("button", { name: new RegExp(`${prefixo} Um: presente`) }).click();
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(chamada.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await abrirParcial(page);
   await expect(
     secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta", { exact: true }),
@@ -207,7 +207,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
 }) => {
   const chamada = await abrirChamada(page);
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(chamada.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
     name: `RS, Registrado na Seduc: ${prefixo} Um`,
@@ -247,7 +247,7 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
 }) => {
   const chamada = await abrirChamada(page);
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(chamada.getByText("Chamada bloqueada", { exact: true })).toBeVisible();
+  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const confirmacao = linha.getByRole("switch", {
