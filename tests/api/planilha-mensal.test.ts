@@ -2,6 +2,8 @@
 // preparação idempotente e envio automático contra a Sheets API sintética.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { rotuloData } from "../../src/domain/frequencia";
+import { diasDaPlanilhaMensal } from "../../src/domain/planilha-mensal";
 import { CHAVE_TRAVA_FREQUENCIA } from "../../src/infra/trava-planilha-frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 
@@ -10,6 +12,7 @@ const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
 const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
 const LEGADA = "QA Mensal A";
 const PERIODO = { de: "2026-09-30", ate: "2026-10-01" };
+const MES_CALENDARIO = "2024-02";
 const daSerie =
   "select id from turmas where serie_id in (select id from series where nome = 'QA Mensal')";
 
@@ -46,7 +49,7 @@ const mensais: Record<string, Mensal> = {};
 
 function chamar(
   caminho: string,
-  metodo: "GET" | "POST" | "PATCH" = "POST",
+  metodo: "GET" | "POST" | "PATCH" | "DELETE" = "POST",
   corpo?: unknown,
   cookie = cookieAdmin,
 ) {
@@ -67,6 +70,9 @@ async function dados<T>(resposta: Response, status = 200): Promise<T> {
 }
 
 async function limpar() {
+  await banco.query(
+    "delete from feriados where nome like 'QA Mensal Calendário%' and dia between '2024-02-01' and '2024-02-29'",
+  );
   await banco.query(`delete from sincronizacoes_planilha where turma_original_id in (${daSerie})`);
   await banco.query(
     `update integracoes_planilha set ativa = false, google_refresh_token = null,
@@ -140,6 +146,21 @@ async function salvar(dia: string, faltas: string[], turmaId = turmas.A) {
       })
     ).status,
   ).toBe(200);
+}
+
+async function diaLivreDoCalendario(): Promise<string> {
+  const ocupadas = await banco.query<{ dia: string }>(
+    `select to_char(dia, 'YYYY-MM-DD') as dia from frequencias
+      where dia between '2024-02-01' and '2024-02-29'
+     union select to_char(dia, 'YYYY-MM-DD') as dia from frequencias_parciais
+      where dia between '2024-02-01' and '2024-02-29'
+     union select to_char(dia, 'YYYY-MM-DD') as dia from feriados
+      where dia between '2024-02-01' and '2024-02-29'`,
+  );
+  const salvas = new Set(ocupadas.rows.map((linha) => linha.dia));
+  const dia = diasDaPlanilhaMensal(MES_CALENDARIO).find((data) => !salvas.has(data));
+  if (!dia) throw new Error("Data útil livre ausente na massa mensal de teste.");
+  return dia;
 }
 
 async function restaurarFormatoAntigo(mensal: Mensal) {
@@ -806,5 +827,116 @@ describe("frequência organizada por turma e mês", () => {
     );
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
     google.removerAba("QA Anotações");
+  });
+
+  it("prepara sem feriado e recria a data liberada no envio da chamada", async () => {
+    const dia = await diaLivreDoCalendario();
+    const nome = "QA Mensal Calendário livre";
+    const periodo = { de: dia, ate: dia };
+    let feriadoCriado = false;
+    await dados(await chamar("/api/planilha", "PATCH", { envioAutomatico: false }));
+    try {
+      await dados(await chamar("/api/calendario-letivo", "POST", { dia, nome }), 201);
+      feriadoCriado = true;
+      const preparada = await dados<Mensal>(await preparar(MES_CALENDARIO));
+      expect(preparada).toMatchObject({ mes: MES_CALENDARIO, criada: true });
+      const datas = diasDaPlanilhaMensal(MES_CALENDARIO, [], [dia]).map(rotuloData);
+      expect(cabecalho(preparada.aba).filter(Boolean)).toEqual(["Aluno", ...datas]);
+      expect(google.feriadosDaAba(preparada.aba)).toEqual([dia]);
+      expect(google.vinculos(preparada.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+      const bloqueada = await dados<{ planos: Plano[] }>(
+        await chamar("/api/planilha/simular", "POST", {
+          turmaOriginalId: turmas.A,
+          ...periodo,
+          somenteAlteradas: false,
+          feriados: [],
+        }),
+      );
+      expect(bloqueada.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+      await dados(await chamar(`/api/calendario-letivo/${dia}`, "DELETE"));
+      feriadoCriado = false;
+      // O marcador da omissão mantém a aba válida após remover o feriado.
+      expect(await dados<Mensal>(await preparar(MES_CALENDARIO))).toMatchObject({
+        destino: preparada.destino,
+        criada: false,
+        atualizada: false,
+      });
+      expect(cabecalho(preparada.aba).filter(Boolean)).toEqual(["Aluno", ...datas]);
+      const cadastro = await banco.query<{ turma_id: string }>(
+        "select turma_id from alunos where id = $1",
+        [alunos.A],
+      );
+      const turmaAtual = cadastro.rows[0]?.turma_id;
+      if (!turmaAtual) throw new Error("Turma atual ausente na massa mensal de teste.");
+      await salvar(dia, [alunos.A], turmaAtual);
+      const previa = await simular(periodo);
+      const plano = planoDaAba(previa.planos, preparada.aba);
+      expect(plano.dias).toEqual([dia]);
+      expect((await aplicar(plano, periodo)).resultados).toMatchObject([
+        { aba: preparada.aba, resultado: "sucesso" },
+      ]);
+      expect(marca(preparada.aba, rotuloData(dia))).toBe("F");
+      expect(cabecalho(preparada.aba).filter(Boolean).sort()).toEqual(
+        ["Aluno", ...diasDaPlanilhaMensal(MES_CALENDARIO).map(rotuloData)].sort(),
+      );
+      expect(
+        cabecalho(preparada.aba).filter((valor) => valor && valor !== rotuloData(dia)),
+      ).toEqual(["Aluno", ...datas]);
+      expect(google.vinculos(preparada.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
+      const revisada = await dados<Mensal>(await preparar(MES_CALENDARIO));
+      expect(revisada).toMatchObject({ destino: preparada.destino, atualizada: false });
+      expect(marca(preparada.aba, rotuloData(dia))).toBe("F");
+    } finally {
+      if (feriadoCriado) await dados(await chamar(`/api/calendario-letivo/${dia}`, "DELETE"));
+    }
+  });
+
+  it("recusa retirar feriado com lançamento manual e preserva a coluna", async () => {
+    const dia = await diaLivreDoCalendario();
+    const preparada = await dados<Mensal>(await preparar(MES_CALENDARIO));
+    const coluna = cabecalho(preparada.aba).indexOf(rotuloData(dia)) + 1;
+    expect(coluna).toBeGreaterThan(0);
+    google.definirValor(preparada.aba, 2, coluna, "FJ");
+    let feriadoCriado = false;
+    try {
+      await dados(
+        await chamar("/api/calendario-letivo", "POST", {
+          dia,
+          nome: "QA Mensal Calendário manual",
+        }),
+        201,
+      );
+      feriadoCriado = true;
+      const cabecalhoAnterior = cabecalho(preparada.aba);
+      const vinculosAnteriores = google.vinculos(preparada.aba);
+      const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+      expect(await dados(await preparar(MES_CALENDARIO), 409)).toMatchObject({
+        error: expect.stringContaining("Há registros na coluna de um feriado"),
+      });
+      expect(cabecalho(preparada.aba)).toEqual(cabecalhoAnterior);
+      expect(marca(preparada.aba, rotuloData(dia))).toBe("FJ");
+      expect(google.vinculos(preparada.aba)).toEqual(vinculosAnteriores);
+      expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas);
+      const cabecalhoRestante = cabecalhoAnterior.filter(
+        (valor) => valor && valor !== rotuloData(dia),
+      );
+      const valoresRestantes = cabecalhoRestante.map((data) =>
+        google.valor(preparada.aba, 2, cabecalhoAnterior.indexOf(data) + 1),
+      );
+      // A conferência manual libera somente esta coluna depois de retirar seu conteúdo.
+      google.definirValor(preparada.aba, 2, coluna, "");
+      expect(await dados<Mensal>(await preparar(MES_CALENDARIO))).toMatchObject({
+        destino: preparada.destino,
+        criada: false,
+        atualizada: true,
+      });
+      expect(cabecalho(preparada.aba).filter(Boolean)).toEqual(cabecalhoRestante);
+      expect(
+        cabecalhoRestante.map((_, indice) => google.valor(preparada.aba, 2, indice + 1)),
+      ).toEqual(valoresRestantes);
+      expect(google.feriadosDaAba(preparada.aba)).toContain(dia);
+    } finally {
+      if (feriadoCriado) await dados(await chamar(`/api/calendario-letivo/${dia}`, "DELETE"));
+    }
   });
 });

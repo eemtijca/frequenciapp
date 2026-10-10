@@ -3,7 +3,8 @@
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e destaque para a infrequência do dia.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChartPie, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
+import { CalendarOff, ChartPie, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
+import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type {
   Aluno,
   Configuracoes,
@@ -68,8 +69,11 @@ export default function VistaPainel({
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [doDia, setDoDia] = useState<{
+    dia: string;
     frequencias: Frequencia[];
     saidas: SaidaAntecipada[];
+    feriado?: Feriado | null;
+    nomeFeriadoNoCadastro: string;
   } | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -77,22 +81,36 @@ export default function VistaPainel({
   const [recarregar, setRecarregar] = useState(0);
 
   const compartilhado = dia.startsWith(mes);
+  const feriadoCadastrado = feriadoNaData(configuracoes.feriados, dia);
+  const nomeFeriadoNoCadastro = feriadoCadastrado?.nome ?? "";
+  const feriado =
+    doDia?.dia === dia &&
+    doDia.nomeFeriadoNoCadastro === nomeFeriadoNoCadastro &&
+    doDia.feriado !== undefined
+      ? doDia.feriado
+      : feriadoCadastrado;
 
   useEffect(() => {
-    if (compartilhado) return;
     let viva = true;
     async function buscar() {
       setCarregando(true);
       setErro("");
       try {
         const [respostaFrequencias, respostaSaidas] = await Promise.all([
-          pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`),
-          pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
+          pedir<{ frequencias: Frequencia[]; feriado?: Feriado | null }>(
+            `/api/frequencias?dia=${dia}`,
+          ),
+          compartilhado
+            ? Promise.resolve({ saidas: [] as SaidaAntecipada[] })
+            : pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`),
         ]);
         if (!viva) return;
         setDoDia({
+          dia,
           frequencias: respostaFrequencias.frequencias,
           saidas: respostaSaidas.saidas,
+          feriado: respostaFrequencias.feriado,
+          nomeFeriadoNoCadastro,
         });
       } catch (excecao) {
         if (viva) {
@@ -109,17 +127,24 @@ export default function VistaPainel({
     return () => {
       viva = false;
     };
-  }, [compartilhado, dia, recarregar]);
+  }, [compartilhado, dia, recarregar, nomeFeriadoNoCadastro]);
 
   const frequenciasDoDia = useMemo(
     () =>
       compartilhado
         ? frequencias.filter((frequencia) => frequencia.dia === dia)
-        : (doDia?.frequencias ?? []),
+        : doDia?.dia === dia
+          ? doDia.frequencias
+          : [],
     [compartilhado, dia, frequencias, doDia],
   );
   const saidasDoDia = useMemo(
-    () => (compartilhado ? saidas.filter((saida) => saida.dia === dia) : (doDia?.saidas ?? [])),
+    () =>
+      compartilhado
+        ? saidas.filter((saida) => saida.dia === dia)
+        : doDia?.dia === dia
+          ? doDia.saidas
+          : [],
     [compartilhado, dia, saidas, doDia],
   );
 
@@ -145,8 +170,8 @@ export default function VistaPainel({
     [series, turmas, ativos, marcas],
   );
   const cobertura = useMemo(
-    () => coberturaDoDia(turmas, ativos, frequenciasDoDia),
-    [turmas, ativos, frequenciasDoDia],
+    () => coberturaDoDia(turmas, ativos, frequenciasDoDia, Boolean(feriado)),
+    [turmas, ativos, frequenciasDoDia, feriado],
   );
 
   const rotuloDia = dia.split("-").reverse().join("/");
@@ -162,10 +187,10 @@ export default function VistaPainel({
     emAtualizacao.current = true;
     try {
       if (compartilhado) await onRecarregar(mes);
-      else setRecarregar((valor) => valor + 1);
     } catch {
       // Mantém os números atuais até a próxima tentativa.
     } finally {
+      setRecarregar((valor) => valor + 1);
       emAtualizacao.current = false;
     }
   }, [compartilhado, mes, onRecarregar]);
@@ -199,7 +224,9 @@ export default function VistaPainel({
       )
         ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
         : null;
-    return carregandoPainel ? (
+    return feriado ? (
+      <IndicadorCobertura turmas={[]} feriado={feriado.nome} />
+    ) : carregandoPainel ? (
       <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
         <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
         Carregando indicadores...
@@ -335,16 +362,23 @@ export default function VistaPainel({
         <h2 className="min-w-0 font-medium">Infrequência do dia</h2>
         <span
           className={
-            resumo.registrados > 0
+            !feriado && resumo.registrados > 0
               ? "numerais-tabulares shrink-0 text-3xl font-semibold sm:text-4xl"
               : "text-muted-foreground shrink-0 text-sm"
           }
         >
-          {carregandoPainel
-            ? ""
-            : resumo.registrados > 0
-              ? percentual.format(resumo.infrequencia)
-              : "Sem dados"}
+          {feriado ? (
+            <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+              <CalendarOff aria-hidden="true" className="size-4 shrink-0" />
+              Feriado
+            </span>
+          ) : carregandoPainel ? (
+            ""
+          ) : resumo.registrados > 0 ? (
+            percentual.format(resumo.infrequencia)
+          ) : (
+            "Sem dados"
+          )}
         </span>
       </div>
 

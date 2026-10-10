@@ -12,6 +12,7 @@ import { ErroGoogle } from "@/infra/google-planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
+import { feriadoDoDia, listarFeriados } from "@/application/calendario-letivo";
 import {
   ativarModoCompleto as ativarModoCompletoComum,
   criarAba as criarAbaComum,
@@ -129,7 +130,10 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
   const contagem = await banco().$queryRaw<{ total: bigint }[]>`
     SELECT COUNT(*) AS total
     FROM ${objetoDoBanco("frequencias")} AS frequencia
-    WHERE EXISTS (
+    WHERE NOT EXISTS (
+      SELECT 1 FROM ${objetoDoBanco("feriados")} AS feriado
+      WHERE feriado.dia = frequencia.dia
+    ) AND EXISTS (
       SELECT 1
       FROM ${objetoDoBanco("alunos_chamada")} AS chamada
       JOIN ${objetoDoBanco("alunos")} AS aluno ON aluno.id = chamada.aluno_id
@@ -713,6 +717,17 @@ async function montarSimulacao(
   if (periodo.length === 0 || periodo.length > LIMITE_DIAS_ENVIO) {
     throw new ErroHttp("Envie períodos de até três meses por vez.", 400);
   }
+  const feriados = new Set(
+    (
+      await Promise.all(
+        [...new Set(periodo.map((dia) => Number(dia.slice(0, 4))))].map((ano) =>
+          listarFeriados(ano),
+        ),
+      )
+    )
+      .flat()
+      .map((feriado) => feriado.dia),
+  );
   const origens = entrada.todas
     ? [...new Set(salvo.mapa.map((item) => item.turmaOriginalId))]
     : [entrada.turmaOriginalId];
@@ -747,10 +762,13 @@ async function montarSimulacao(
           diasDaPlanilhaMensal(
             par.mes,
             await sabadosComChamadaSalva(par.turmaOriginalId, entrada.de, entrada.ate),
+            [...feriados],
           ),
         )
       : null;
-    const diasDoDestino = diasMensais ? periodo.filter((dia) => diasMensais.has(dia)) : periodo;
+    const diasPermitidos = (dia: string) =>
+      !feriados.has(dia) && (!diasMensais || diasMensais.has(dia));
+    const diasDoDestino = periodo.filter(diasPermitidos);
     if (diasDoDestino.length === 0) {
       diasPorAba.set(par.aba, { dias: [], incremental: entrada.somenteAlteradas !== false });
       continue;
@@ -765,11 +783,10 @@ async function montarSimulacao(
       true,
       par.destino,
     );
-    // Só sábados com chamada salva podem recriar a coluna mensal;
-    // domingos e outros sábados continuam fora, inclusive no envio incremental.
+    // O calendário vale também para o envio incremental e para abas legadas.
     diasPorAba.set(par.aba, {
       ...envio,
-      dias: diasMensais ? envio.dias.filter((dia) => diasMensais.has(dia)) : envio.dias,
+      dias: envio.dias.filter(diasPermitidos),
     });
   }
   const todosOsDias = [...diasPorAba.values()].flatMap((item) => item.dias).sort();
@@ -915,12 +932,14 @@ export async function enviarAposSalvar(
       select: { alunos: { select: { aluno: { select: { turmaOriginalId: true } } } } },
     });
     const origens = new Set((frequencia?.alunos ?? []).map((item) => item.aluno.turmaOriginalId));
+    const feriado = await feriadoDoDia(dia);
     for (const origem of origens) {
       const vinculos = salvo?.mapa.filter((par) => par.turmaOriginalId === origem) ?? [];
       const mensais = vinculos.filter((par) => par.mes);
       if (
-        mensais.length > 0 &&
-        !diasDaPlanilhaMensal(dia.slice(0, 7), frequencia ? [dia] : []).includes(dia)
+        feriado ||
+        (mensais.length > 0 &&
+          !diasDaPlanilhaMensal(dia.slice(0, 7), frequencia ? [dia] : []).includes(dia))
       ) {
         situacoes.set(origem, "desligado");
         continue;

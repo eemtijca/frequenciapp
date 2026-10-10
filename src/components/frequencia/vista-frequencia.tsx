@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CloudCheck,
+  CalendarOff,
   CheckCircle2,
   LockKeyhole,
   LockKeyholeOpen,
@@ -58,6 +59,7 @@ import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorTurmaChamada } from "@/components/frequencia/seletor-turma-chamada";
+import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -159,6 +161,8 @@ export default function VistaFrequencia({
   const [frequenciasDoDia, setFrequenciasDoDia] = useState<{
     chave: string;
     frequencias: Frequencia[];
+    feriado?: Feriado | null;
+    nomeFeriadoNoCadastro: string;
   } | null>(null);
   const [atualizadoEm, setAtualizadoEm] = useState("");
   const [carregando, setCarregando] = useState(true);
@@ -189,6 +193,14 @@ export default function VistaFrequencia({
   const chave = `${dia}|${turmaId}`;
   const ehSabado = diaDaSemanaIso(dia) === 6;
   const leituraConfirmada = frequenciasDoDia?.chave === chave;
+  const feriadoCadastrado = feriadoNaData(configuracoes.feriados, dia);
+  const nomeFeriadoNoCadastro = feriadoCadastrado?.nome ?? "";
+  const feriado =
+    leituraConfirmada &&
+    frequenciasDoDia.nomeFeriadoNoCadastro === nomeFeriadoNoCadastro &&
+    frequenciasDoDia.feriado !== undefined
+      ? frequenciasDoDia.feriado
+      : feriadoCadastrado;
   const temAulasAtivas = turma?.horarios.some((aula) => aula.ativo) ?? false;
   const aulasPrevistas = useMemo(
     () => (turma ? horariosDoDia(turma.horarios, dia) : []),
@@ -229,12 +241,12 @@ export default function VistaFrequencia({
     setAtualizadoEm("");
     chaveCarregada.current = chave;
 
-    pedir<{ frequencias: Frequencia[] }>(`/api/frequencias?dia=${dia}`)
+    pedir<{ frequencias: Frequencia[]; feriado?: Feriado | null }>(`/api/frequencias?dia=${dia}`)
       .then((dados) => {
         if (!viva) return;
         const frequencias = dados.frequencias.filter((item) => item.dia === dia);
         const frequencia = frequencias.find((item) => item.turmaId === turmaId) ?? null;
-        setFrequenciasDoDia({ chave, frequencias });
+        setFrequenciasDoDia({ chave, frequencias, feriado: dados.feriado, nomeFeriadoNoCadastro });
         setAusencias(paraAusencias(frequencia?.faltas ?? []));
         setJustificativas(paraJustificativas(frequencia?.faltas ?? []));
         setObservacoes(paraObservacoes(frequencia?.faltas ?? []));
@@ -286,7 +298,7 @@ export default function VistaFrequencia({
     return () => {
       viva = false;
     };
-  }, [chave, recarregar, usuario.id, dia, turmaId]);
+  }, [chave, recarregar, usuario.id, dia, turmaId, nomeFeriadoNoCadastro]);
 
   // Grava rascunho enquanto houver marcação não salva.
   useEffect(() => {
@@ -405,7 +417,12 @@ export default function VistaFrequencia({
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
   const ocupado = carregando || salvando || conflito;
-  const bloqueado = ocupado || chamadaBloqueada || (ehSabado && !sabadoLiberado);
+  const bloqueado =
+    ocupado ||
+    !leituraConfirmada ||
+    chamadaBloqueada ||
+    Boolean(feriado) ||
+    (ehSabado && !sabadoLiberado);
   const travado = ocupado || sujo;
   const podeSalvar = !bloqueado && (sujo || revisaoSalva === 0);
 
@@ -535,7 +552,7 @@ export default function VistaFrequencia({
       setFrequenciasDoDia((atual) => {
         if (atual?.chave !== chave) return atual;
         return {
-          chave,
+          ...atual,
           frequencias: [
             ...atual.frequencias.filter((item) => item.turmaId !== dados.frequencia.turmaId),
             dados.frequencia,
@@ -683,6 +700,7 @@ export default function VistaFrequencia({
               alunos={alunos}
               turmaId={turmaId}
               dia={dia}
+              feriado={feriado?.nome}
               frequencias={frequenciasDoDia?.chave === chave ? frequenciasDoDia.frequencias : []}
               coberturaDisponivel={frequenciasDoDia?.chave === chave}
               carregando={carregando}
@@ -737,6 +755,15 @@ export default function VistaFrequencia({
               Voltar para hoje
             </button>
           )}
+          {feriado && (
+            <div
+              role="status"
+              className="superficie-vidro text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+            >
+              <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
+              <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
+            </div>
+          )}
           {sujo && (
             <p className="text-muted-foreground text-xs">
               Salve ou descarte as alterações para mudar a data ou a turma.
@@ -765,14 +792,18 @@ export default function VistaFrequencia({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className={ehSabado ? "grid w-full grid-cols-2 items-stretch gap-2" : "contents"}>
+            <div
+              className={
+                ehSabado && !feriado ? "grid w-full grid-cols-2 items-stretch gap-2" : "contents"
+              }
+            >
               <Button
                 type="button"
                 variant="outline"
                 aria-expanded={resumoAberto}
                 aria-controls={idResumo}
                 onClick={() => setResumoAberto((atual) => !atual)}
-                className={`vidro-selecionado rounded-full px-4 ${ehSabado ? "h-auto min-h-11 py-2 text-sm whitespace-normal" : ""}`}
+                className={`vidro-selecionado rounded-full px-4 ${ehSabado && !feriado ? "h-auto min-h-11 py-2 text-sm whitespace-normal" : ""}`}
               >
                 <span>{tituloResumo}</span>
                 <ChevronDown
@@ -780,7 +811,7 @@ export default function VistaFrequencia({
                   className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
                 />
               </Button>
-              {ehSabado && (
+              {ehSabado && !feriado && (
                 <Button
                   type="button"
                   variant="outline"
@@ -1261,7 +1292,7 @@ export default function VistaFrequencia({
               </ul>
             )}
           </div>
-          {!chamadaBloqueada && (
+          {!chamadaBloqueada && !feriado && (
             <p className="text-muted-foreground text-xs">
               Toque de novo em um aluno marcado para voltar a presente. Escolha a justificativa para
               registrar falta justificada (FJ).
@@ -1274,8 +1305,10 @@ export default function VistaFrequencia({
           >
             <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
               <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">
-                <p className="truncate text-sm font-medium">{tituloEstado}</p>
-                <p className="text-muted-foreground truncate text-xs">{detalheEstado}</p>
+                <p className="truncate text-sm font-medium">{feriado ? "Feriado" : tituloEstado}</p>
+                <p className="text-muted-foreground truncate text-xs">
+                  {feriado?.nome ?? detalheEstado}
+                </p>
               </div>
               <div className="flex shrink-0 items-center gap-2 xl:w-full">
                 {sujo && (

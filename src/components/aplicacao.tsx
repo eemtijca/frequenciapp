@@ -566,6 +566,7 @@ export default function Aplicacao({
             diaInicial={diaCorrente}
             ativa={ativo}
             fuso={fuso}
+            feriados={configuracoes.feriados}
             onPendencia={registrarPendenciaParcial}
           />
         )}

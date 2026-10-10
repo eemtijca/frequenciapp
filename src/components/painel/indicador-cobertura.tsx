@@ -1,14 +1,29 @@
 // Cobertura das chamadas por turma em fatias verdes e vermelhas, ponderadas pelos alunos.
-import { CheckCircle2, ChevronDown, Clock3, UsersRound } from "lucide-react";
+import { CalendarOff, CheckCircle2, ChevronDown, Clock3, UsersRound } from "lucide-react";
 import { useId } from "react";
 import type { CoberturaTurmaDia } from "@/domain/relatorios";
 
 interface Props {
   turmas: CoberturaTurmaDia[];
+  feriado?: string;
 }
 
-export function IndicadorCobertura({ turmas }: Props) {
+export function IndicadorCobertura({ turmas, feriado }: Props) {
   const descricaoId = useId();
+  if (feriado) {
+    return (
+      <div className="superficie-vidro flex items-center gap-3 p-4">
+        <div className="text-muted-foreground flex size-16 shrink-0 items-center justify-center rounded-full border">
+          <CalendarOff aria-hidden="true" className="size-6" />
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="font-medium">Feriado</h2>
+          <span className="text-muted-foreground text-sm break-words">{feriado}</span>
+          <span className="sr-only">Não há chamadas pendentes nesta data.</span>
+        </div>
+      </div>
+    );
+  }
   const esperados = turmas.reduce((total, item) => total + item.esperados, 0);
   const registrados = turmas.reduce(
     (total, item) => total + (item.concluida ? item.esperados : 0),

@@ -11,6 +11,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
+  CalendarOff,
 } from "lucide-react";
 import type { Aluno, ConfirmacaoSeducAluno, Serie, Turma } from "@/domain/frequencia";
 import {
@@ -20,6 +21,7 @@ import {
   rotuloDiaSemana,
 } from "@/domain/frequencia";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
+import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import {
   rotuloFrequenciaPersonalizada,
   type RegistroPersonalizado,
@@ -62,6 +64,7 @@ interface Props {
   diaInicial: string;
   ativa: boolean;
   fuso: string;
+  feriados: Feriado[];
   onPendencia?: (pendente: boolean) => void;
 }
 
@@ -75,6 +78,7 @@ interface CargaParcial {
   registros: RegistroPersonalizado[];
   erro: string;
   variante: VarianteEstado;
+  feriado?: Feriado | null;
 }
 
 const REGISTROS_VAZIOS: RegistroPersonalizado[] = [];
@@ -110,6 +114,7 @@ export default function VistaFrequenciaParcial({
   diaInicial,
   ativa,
   fuso,
+  feriados,
   onPendencia,
 }: Props) {
   const [dia, setDia] = useState(diaInicial);
@@ -126,7 +131,11 @@ export default function VistaFrequenciaParcial({
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState("todos");
   const [recarregar, setRecarregar] = useState(0);
-  const chaveCarga = `${dia}|${turmaId}|${recarregar}`;
+  const feriadoCadastrado = feriadoNaData(feriados, dia);
+  const nomeFeriadoNoCadastro = feriadoCadastrado?.nome ?? "";
+  const chaveCarga = JSON.stringify([dia, turmaId, recarregar, nomeFeriadoNoCadastro]);
+  const feriado =
+    carga.chave === chaveCarga && carga.feriado !== undefined ? carga.feriado : feriadoCadastrado;
   const registros = carga.chave === chaveCarga ? carga.registros : REGISTROS_VAZIOS;
   const carregando = turmaId !== "" && carga.chave !== chaveCarga;
   const erro = carga.chave === chaveCarga ? carga.erro : "";
@@ -216,7 +225,7 @@ export default function VistaFrequenciaParcial({
   useEffect(() => {
     if (!ativa || !dia || !turmaId) return;
     let atual = true;
-    pedir<{ registros: RegistroPersonalizado[] }>(
+    pedir<{ registros: RegistroPersonalizado[]; feriado?: Feriado | null }>(
       `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
     )
       .then((dados) => {
@@ -226,6 +235,7 @@ export default function VistaFrequenciaParcial({
             registros: dados.registros,
             erro: "",
             variante: "indisponivel",
+            feriado: dados.feriado,
           });
       })
       .catch((excecao: unknown) => {
@@ -265,6 +275,7 @@ export default function VistaFrequenciaParcial({
   }, []);
 
   function abrirEditor(registro: RegistroPersonalizado | null, alunoId: string) {
+    if (feriado) return;
     const base = registro?.tipo === "CHAMADA" ? registro : null;
     const personalizado = registro?.tipo === "CHAMADA" ? null : registro;
     const inicial: EdicaoParcial = { ...edicaoDoRegistro(personalizado ?? undefined), alunoId };
@@ -284,7 +295,7 @@ export default function VistaFrequenciaParcial({
   }
 
   const { executando: salvando, executar: salvar } = useAcaoUnica(async () => {
-    if (!edicao.alunoId || conflito) return;
+    if (!edicao.alunoId || conflito || feriado) return;
     setErroEdicao("");
     try {
       const dados = await pedir<{ registro: FrequenciaParcial }>(
@@ -314,7 +325,7 @@ export default function VistaFrequenciaParcial({
 
   const { executando: recarregandoEdicao, executar: recarregarEdicao } = useAcaoUnica(async () => {
     try {
-      const dados = await pedir<{ registros: RegistroPersonalizado[] }>(
+      const dados = await pedir<{ registros: RegistroPersonalizado[]; feriado?: Feriado | null }>(
         `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
       );
       setCarga({
@@ -322,6 +333,7 @@ export default function VistaFrequenciaParcial({
         registros: dados.registros,
         erro: "",
         variante: "indisponivel",
+        feriado: dados.feriado,
       });
       const vigente = dados.registros.find((registro) => registro.alunoId === edicao.alunoId);
       if (vigente) abrirEditor(vigente, vigente.alunoId);
@@ -458,6 +470,15 @@ export default function VistaFrequenciaParcial({
           <ChevronRight size={18} />
         </Button>
       </div>
+      {feriado && (
+        <div
+          role="status"
+          className="superficie-vidro text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+        >
+          <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
+          <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row">
         <BarraBusca
           id="parcial-busca"
@@ -593,7 +614,12 @@ export default function VistaFrequenciaParcial({
                         variant={registro ? "ghost" : "outline"}
                         onClick={() => abrirEditor(registro ?? null, aluno.id)}
                         aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
-                        disabled={ocupado || editorAberto || (!registro && aluno.desistente)}
+                        disabled={
+                          ocupado ||
+                          editorAberto ||
+                          Boolean(feriado) ||
+                          (!registro && aluno.desistente)
+                        }
                         className="h-11"
                       >
                         {registro ? <Pencil size={15} /> : <Plus size={15} />}
@@ -641,7 +667,8 @@ export default function VistaFrequenciaParcial({
         dia={dia}
         sujo={sujo}
         salvando={salvando || recarregandoEdicao}
-        erro={erroEdicao}
+        bloqueado={Boolean(feriado)}
+        erro={feriado ? `Feriado · ${feriado.nome}` : erroEdicao}
         conflito={conflito}
         onEdicao={setEdicao}
         onFechar={fecharEditor}

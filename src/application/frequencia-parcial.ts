@@ -9,6 +9,7 @@ import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
 import { diaLocal, ehDiaValido } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
+import { exigirDiaLetivo } from "@/application/calendario-letivo";
 import {
   LIMITE_AULAS_PARCIAL,
   LIMITE_OBSERVACAO_PARCIAL,
@@ -131,6 +132,7 @@ export async function salvarFrequenciaParcial(
   const dia = new Date(`${dados.data.dia}T12:00:00Z`);
   try {
     const salva = await comTransacao(async (tx) => {
+      await exigirDiaLetivo(dados.data.dia, tx);
       const existente = await tx.frequenciaParcial.findUnique({
         where: { alunoId_dia: { alunoId: dados.data.alunoId, dia } },
       });

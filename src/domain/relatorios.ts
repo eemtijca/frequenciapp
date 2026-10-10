@@ -103,7 +103,9 @@ export function coberturaDoDia(
   turmas: Turma[],
   alunos: Aluno[],
   frequenciasDoDia: Frequencia[],
+  feriado = false,
 ): CoberturaDia {
+  if (feriado) return { esperados: 0, registrados: 0, turmasPendentes: [], turmas: [] };
   const ativos = alunos.filter((aluno) => aluno.ativo);
   const salvas = new Set(frequenciasDoDia.map((frequencia) => frequencia.turmaId));
   const coberturaTurmas = turmas

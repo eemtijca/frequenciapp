@@ -28,6 +28,7 @@ vi.mock("@/infra/web-push", () => ({
   conferirParVapid: vi.fn(),
   enviarPush: vi.fn(),
 }));
+vi.mock("@/application/calendario-letivo", () => ({ feriadoDoDia: async () => null }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
     configuracaoNotificacoes: {

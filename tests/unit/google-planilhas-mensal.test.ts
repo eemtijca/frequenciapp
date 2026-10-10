@@ -27,6 +27,10 @@ const entrada = {
 };
 
 type Pedido = Record<string, unknown>;
+interface ConteudoCelula {
+  userEnteredValue?: { formulaValue?: string; numberValue?: number; stringValue?: string };
+  note?: string;
+}
 function simularGoogle(
   modo?: "recusar" | "resposta_perdida" | "resposta_perdida_antes" | "concorrente",
 ) {
@@ -39,6 +43,7 @@ function simularGoogle(
   const lotes: Pedido[][] = [];
   const requisicoes: string[] = [];
   const celulas = new Map<number, string[][]>();
+  const conteudos = new Map<number, Map<string, ConteudoCelula>>();
   const controle = { modo };
   vi.stubGlobal(
     "fetch",
@@ -78,7 +83,11 @@ function simularGoogle(
             };
             documento.developerMetadata?.push({
               ...criado.developerMetadata,
-              metadataId: (documento.developerMetadata?.length ?? 0) + 1,
+              metadataId:
+                Math.max(
+                  0,
+                  ...(documento.developerMetadata?.map((item) => item.metadataId) ?? []),
+                ) + 1,
             });
           }
           if (pedido.updateCells) {
@@ -148,20 +157,38 @@ function simularGoogle(
       }
       const endereco = new URL(String(url));
       if (endereco.searchParams.get("includeGridData") === "true") {
-        const faixa = endereco.searchParams.get("ranges") ?? "";
+        const faixas = endereco.searchParams.getAll("ranges");
+        const faixa = faixas[0] ?? "";
         const nome = /^'((?:[^']|'')*)'!/.exec(faixa)?.[1]?.replaceAll("''", "'");
         const aba = documento.sheets.find((item) => item.properties.title === nome);
         const valores = aba ? (celulas.get(aba.properties.sheetId) ?? []) : [];
         return Response.json({
           sheets: [
             {
-              data: [
-                {
-                  rowData: valores.map((linha) => ({
-                    values: linha.map((formattedValue) => ({ formattedValue })),
+              data: faixas.map((faixa) => {
+                const intervalo = /!([A-Z]+)1:([A-Z]+)(\d+)$/.exec(faixa);
+                const indiceDaColuna = (letras: string) =>
+                  [...letras].reduce((valor, letra) => valor * 26 + letra.charCodeAt(0) - 64, 0) -
+                  1;
+                const inicio = indiceDaColuna(intervalo?.[1] ?? "A");
+                const fim = indiceDaColuna(intervalo?.[2] ?? "A");
+                const linhas = Number(intervalo?.[3] ?? 1);
+                return {
+                  rowData: Array.from({ length: linhas }, (_, linha) => ({
+                    values: Array.from({ length: fim - inicio + 1 }, (_, coluna) => {
+                      const indice = inicio + coluna;
+                      const formattedValue = valores[linha]?.[indice] ?? "";
+                      return {
+                        formattedValue,
+                        ...(formattedValue.startsWith("=")
+                          ? { userEnteredValue: { formulaValue: formattedValue } }
+                          : {}),
+                        ...conteudos.get(aba?.properties.sheetId ?? -1)?.get(`${linha}:${indice}`),
+                      };
+                    }),
                   })),
-                },
-              ],
+                };
+              }),
             },
           ],
         });
@@ -170,7 +197,7 @@ function simularGoogle(
       return Response.json(documento);
     }),
   );
-  return { documento, lotes, requisicoes, celulas, controle };
+  return { documento, lotes, requisicoes, celulas, conteudos, controle };
 }
 
 function inserirLegada(documento: DocumentoGoogle, celulas: Map<number, string[][]>) {
@@ -179,6 +206,7 @@ function inserirLegada(documento: DocumentoGoogle, celulas: Map<number, string[]
   const aba = documento.sheets.find((item) => item.properties.sheetId === sheetId);
   if (!aba) throw new Error("Aba de teste ausente.");
   aba.properties.title = "1º A · 10-2026";
+  aba.properties.gridProperties = { rowCount: 1000, columnCount: 33 };
   const cabecalho = ["Aluno", "Turma atual", ...diasDoMes(entrada.mes).map(rotuloData)];
   celulas.set(sheetId, [
     cabecalho,
@@ -273,6 +301,18 @@ describe("identificação do mês da planilha", () => {
     expect(dias).not.toContain("2026-10-04");
     expect(dias).not.toContain("2026-10-17");
     expect(dias).not.toContain("2026-09-26");
+  });
+
+  it("exclui feriados úteis e sábados mesmo quando constam na lista de dias liberados", () => {
+    const feriados = ["2026-10-12", "2026-10-03", "2026-10-12", "2026-09-07"];
+    const sabados = ["2026-10-03", "2026-10-10"];
+    const dias = diasDaPlanilhaMensal("2026-10", sabados, feriados);
+    expect(dias).toHaveLength(22);
+    expect(dias).not.toContain("2026-10-12");
+    expect(dias).not.toContain("2026-10-03");
+    expect(dias).toContain("2026-10-10");
+    expect(dias).toContain("2026-10-13");
+    expect(feriados).toEqual(["2026-10-12", "2026-10-03", "2026-10-12", "2026-09-07"]);
   });
 });
 
@@ -519,6 +559,167 @@ describe("preparação das abas mensais", () => {
     ]);
     expect(cabecalho).not.toContain("04/10/2026");
     expect(cabecalho).not.toContain("10/10/2026");
+  });
+
+  it("cria a aba sem colunas dos feriados cadastrados", async () => {
+    const { documento, celulas } = simularGoogle();
+    const criada = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      sabadosLetivos: ["2026-10-03"],
+      feriados: ["2026-10-03", "2026-10-12"],
+    });
+    const aba = documento.sheets.find((item) => item.properties.title === criada.aba);
+    if (!aba) throw new Error("Aba mensal ausente.");
+    const cabecalho = celulas.get(aba.properties.sheetId)?.[0] ?? [];
+    expect(cabecalho).not.toContain("03/10/2026");
+    expect(cabecalho).not.toContain("12/10/2026");
+    expect(cabecalho).toContain("13/10/2026");
+  });
+
+  it("retira coluna própria vazia de feriado e aceita novos preparos sem essa data", async () => {
+    const { documento, celulas, lotes, requisicoes } = simularGoogle();
+    const sheetId = inserirLegada(documento, celulas);
+    const linhas = celulas.get(sheetId);
+    if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+    linhas[1][linhas[0].indexOf("12/10/2026")] = "";
+    const antes = structuredClone(linhas);
+    const calendario = { ...entrada, feriados: ["2026-10-12"] };
+    const preparada = await prepararAbaMensalGoogle("arquivo", "acesso", calendario);
+    const dias = diasDaPlanilhaMensal(entrada.mes, [], calendario.feriados).map(rotuloData);
+    expect(celulas.get(sheetId)?.[0]).toEqual(["Aluno", ...dias]);
+    expect(celulas.get(sheetId)?.[1]).toEqual([
+      "QA Nome preservado",
+      ...dias.map((dia) => antes[1]?.[antes[0]?.indexOf(dia) ?? -1]),
+    ]);
+    expect(
+      requisicoes.some((url) => new URL(url).searchParams.get("ranges")?.endsWith("1000")),
+    ).toBe(true);
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", calendario)).resolves.toMatchObject({
+      destino: preparada.destino,
+      atualizada: false,
+    });
+    expect(lotes).toHaveLength(1);
+  });
+
+  it.each([false, true])(
+    "mantém a estrutura reconhecida depois de remover feriado de aba criada antes %s",
+    async (existente) => {
+      const { documento, celulas, lotes } = simularGoogle();
+      if (existente) {
+        const sheetId = inserirLegada(documento, celulas);
+        const linhas = celulas.get(sheetId);
+        if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+        linhas[1][linhas[0].indexOf("12/10/2026")] = "";
+      }
+      const preparada = await prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        feriados: ["2026-10-12"],
+      });
+      const aba = documento.sheets.find((item) => item.properties.title === preparada.aba);
+      if (!aba) throw new Error("Aba mensal ausente.");
+      expect(celulas.get(aba.properties.sheetId)?.[0]).not.toContain("12/10/2026");
+      expect(documento.developerMetadata).toContainEqual(
+        expect.objectContaining({
+          metadataKey: "frequenciapp.feriado",
+          metadataValue: "2026-10-12",
+          location: { sheetId: aba.properties.sheetId },
+        }),
+      );
+      await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toMatchObject({
+        destino: preparada.destino,
+        atualizada: false,
+      });
+      expect(lotes).toHaveLength(1);
+    },
+  );
+
+  it("continua recusando data útil ausente sem metadado de feriado", async () => {
+    const { documento, celulas, lotes } = simularGoogle();
+    const preparada = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      feriados: ["2026-10-12"],
+    });
+    const aba = documento.sheets.find((item) => item.properties.title === preparada.aba);
+    if (!aba) throw new Error("Aba mensal ausente.");
+    documento.developerMetadata = documento.developerMetadata?.filter(
+      (item) => item.metadataKey !== "frequenciapp.feriado",
+    );
+    const antes = structuredClone(celulas.get(aba.properties.sheetId));
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(celulas.get(aba.properties.sheetId)).toEqual(antes);
+    expect(lotes).toHaveLength(1);
+  });
+
+  it.each(["marcação", "número oculto", "fórmula vazia", "nota"])(
+    "recusa retirada de coluna de feriado com %s sem alterar nenhuma célula",
+    async (conteudo) => {
+      const { documento, celulas, conteudos, lotes } = simularGoogle();
+      const sheetId = inserirLegada(documento, celulas);
+      const linhas = celulas.get(sheetId);
+      if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+      const coluna = linhas[0].indexOf("12/10/2026");
+      linhas[1][coluna] = conteudo === "marcação" ? "P" : "";
+      const oculto: ConteudoCelula =
+        conteudo === "número oculto"
+          ? { userEnteredValue: { numberValue: 0 } }
+          : conteudo === "fórmula vazia"
+            ? { userEnteredValue: { formulaValue: '=IF(TRUE,"","")' } }
+            : conteudo === "nota"
+              ? { note: "QA Conferir esta data" }
+              : {};
+      // O último registro pode estar muito abaixo da lista visível de alunos.
+      conteudos.set(sheetId, new Map([[`999:${coluna}`, oculto]]));
+      const antes = structuredClone(celulas.get(sheetId));
+      await expect(
+        prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, feriados: ["2026-10-12"] }),
+      ).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Há registros") });
+      expect(celulas.get(sheetId)).toEqual(antes);
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("preserva coluna manual de feriado sem marcador da integração", async () => {
+    const { documento, celulas } = simularGoogle();
+    const sheetId = inserirLegada(documento, celulas);
+    const coluna = celulas.get(sheetId)?.[0]?.indexOf("12/10/2026");
+    documento.developerMetadata = documento.developerMetadata?.filter(
+      (item) => item.location.dimensionRange?.startColumnIndex !== coluna,
+    );
+    await prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, feriados: ["2026-10-12"] });
+    const indice = celulas.get(sheetId)?.[0]?.indexOf("12/10/2026") ?? -1;
+    expect(indice).toBeGreaterThan(0);
+    expect(celulas.get(sheetId)?.[1]?.[indice]).toBeTruthy();
+  });
+
+  it.each([undefined, 20_001])(
+    "recusa remoção de feriado sem poder conferir todas as linhas %s",
+    async (rowCount) => {
+      const { documento, celulas, lotes } = simularGoogle();
+      const sheetId = inserirLegada(documento, celulas);
+      const aba = documento.sheets.find((item) => item.properties.sheetId === sheetId);
+      if (!aba) throw new Error("Aba mensal ausente.");
+      aba.properties.gridProperties = { rowCount };
+      await expect(
+        prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, feriados: ["2026-10-12"] }),
+      ).rejects.toMatchObject({ status: 409, message: expect.stringContaining("conferir") });
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("confirma remoção de feriado após resposta perdida sem repetir a escrita", async () => {
+    const { documento, celulas, lotes } = simularGoogle("resposta_perdida");
+    const sheetId = inserirLegada(documento, celulas);
+    const linhas = celulas.get(sheetId);
+    if (!linhas?.[0] || !linhas[1]) throw new Error("Células de teste ausentes.");
+    linhas[1][linhas[0].indexOf("12/10/2026")] = "";
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(
+      prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, feriados: ["2026-10-12"] }),
+    ).resolves.toMatchObject({ criada: false, atualizada: true });
+    expect(celulas.get(sheetId)?.[0]).not.toContain("12/10/2026");
+    expect(lotes).toHaveLength(1);
   });
 
   it("confirma atualização após resposta perdida preservando o sábado registrado", async () => {

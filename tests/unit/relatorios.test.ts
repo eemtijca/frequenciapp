@@ -161,6 +161,23 @@ describe("distribuicaoDoDia na turma reorganizada", () => {
 });
 
 describe("coberturaDoDia", () => {
+  it("não cobra chamadas nem apresenta conclusão em feriado, preservando os registros", () => {
+    const turmas = [turma(), turma({ id: "turma-b", nome: "B" })];
+    const alunos = [aluno(), aluno({ id: "aluno-b", turmaId: "turma-b" })];
+    const salvas = [frequencia({ alunos: ["aluno-a"] })];
+    expect(coberturaDoDia(turmas, alunos, salvas, true)).toEqual({
+      esperados: 0,
+      registrados: 0,
+      turmasPendentes: [],
+      turmas: [],
+    });
+    expect(salvas).toHaveLength(1);
+    expect(salvas[0]?.alunos).toEqual(["aluno-a"]);
+    expect(coberturaDoDia(turmas, alunos, salvas).turmasPendentes.map((item) => item.id)).toEqual([
+      "turma-b",
+    ]);
+  });
+
   it("conta registrados e turmas pendentes", () => {
     const alunos = [
       aluno({ id: "aluno-a" }),

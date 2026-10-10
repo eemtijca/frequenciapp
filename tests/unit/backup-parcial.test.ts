@@ -38,6 +38,7 @@ const dados = vi.hoisted(() => {
   return { serie, turma, aluno, parcial };
 });
 const transacao = vi.hoisted(() => ({
+  feriado: { findMany: vi.fn(() => []) },
   justificativa: { findMany: vi.fn(() => []) },
   liberador: { findMany: vi.fn(() => []) },
   serie: { findMany: vi.fn(() => [dados.serie]) },

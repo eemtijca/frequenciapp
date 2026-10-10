@@ -14,6 +14,7 @@ const CHAVES_METADADOS = [
   "frequenciapp.aba",
   "frequenciapp.turma",
   "frequenciapp.mes",
+  "frequenciapp.feriado",
   "frequenciapp.geracao",
   "frequenciapp.copia",
 ];
@@ -21,6 +22,8 @@ const CAMPOS_ESTRUTURA =
   "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
   "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue))))";
+const CAMPOS_CELULAS_COM_NOTAS =
+  "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue,note))))";
 
 const faixa = z.object({
   sheetId: z.number().optional(),
@@ -420,6 +423,7 @@ export async function abaVaziaGoogle(id: string, acesso: string, nome: string, s
 const celula = z.object({
   formattedValue: z.string().optional(),
   userEnteredValue: z.object({ formulaValue: z.string().optional() }).passthrough().optional(),
+  note: z.string().optional(),
 });
 const grade = z.object({
   sheets: z.array(
@@ -442,6 +446,7 @@ export interface BlocoGoogle {
   colunas: number;
   valores: string[][];
   formula: boolean[][];
+  ocupado?: boolean[][];
 }
 
 /** Lê somente as faixas pedidas, com valores exibidos e fórmula separada. */
@@ -451,13 +456,17 @@ export async function lerBlocosGoogle(
   nome: string,
   linhas: number,
   pedidos: { coluna: number; colunas: number }[],
+  opcoes: { conferirConteudo?: boolean } = {},
 ): Promise<BlocoGoogle[]> {
   if (linhas * pedidos.reduce((total, item) => total + item.colunas, 0) > 20_000) {
     throw new ErroHttp("Intervalo grande demais para uma leitura.", 400);
   }
   const url = new URL(`${BASE}/${encodeURIComponent(id)}`);
   url.searchParams.set("includeGridData", "true");
-  url.searchParams.set("fields", CAMPOS_CELULAS);
+  url.searchParams.set(
+    "fields",
+    opcoes.conferirConteudo ? CAMPOS_CELULAS_COM_NOTAS : CAMPOS_CELULAS,
+  );
   for (const pedido of pedidos) {
     const inicio = letra(pedido.coluna);
     const fim = letra(pedido.coluna + pedido.colunas - 1);
@@ -470,6 +479,7 @@ export async function lerBlocosGoogle(
     const trecho = dados[indice];
     const valores: string[][] = [];
     const formula: boolean[][] = [];
+    const ocupado: boolean[][] | undefined = opcoes.conferirConteudo ? [] : undefined;
     for (let linha = 0; linha < linhas; linha += 1) {
       const itens = trecho?.rowData?.[linha]?.values ?? [];
       valores.push(
@@ -480,8 +490,23 @@ export async function lerBlocosGoogle(
           Boolean(itens[coluna]?.userEnteredValue?.formulaValue),
         ),
       );
+      ocupado?.push(
+        Array.from({ length: pedido.colunas }, (_, coluna) => {
+          const celula = itens[coluna];
+          return (
+            Boolean(celula?.formattedValue || celula?.note) ||
+            Object.keys(celula?.userEnteredValue ?? {}).length > 0
+          );
+        }),
+      );
     }
-    return { coluna: pedido.coluna, colunas: pedido.colunas, valores, formula };
+    return {
+      coluna: pedido.coluna,
+      colunas: pedido.colunas,
+      valores,
+      formula,
+      ...(ocupado ? { ocupado } : {}),
+    };
   });
 }
 

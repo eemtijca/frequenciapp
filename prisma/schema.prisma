@@ -105,6 +105,7 @@ model Usuario {
   parciaisConfirmadas      FrequenciaParcial[]        @relation("ParcialConfirmadaPor")
   chamadasConfirmadas      AlunoDaChamada[]           @relation("ChamadaConfirmadaPor")
   configuracoesAtualizadas Configuracao[]             @relation("ConfiguracaoAtualizadaPor")
+  feriadosCriados          Feriado[]
   integracoesModo          IntegracaoPlanilha[]       @relation("IntegracaoModoPor")
   integracoesAtualizadas   IntegracaoPlanilha[]       @relation("IntegracaoAtualizadaPor")
   sincronizacoesPlanilha   SincronizacaoPlanilha[]    @relation("SincronizacaoCriadaPor")
@@ -516,6 +517,19 @@ model Configuracao {
   atualizadoPor     Usuario?                  @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("configuracoes")
+}
+
+// Feriado escolar em uma data civil explícita, válido para todas as turmas.
+// O histórico de chamadas permanece independente do calendário anual.
+model Feriado {
+  dia          DateTime @id @db.Date
+  nome         String   @db.VarChar(120)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  criadoPorId  String?  @map("criado_por_id") @db.Uuid
+  criadoPor    Usuario? @relation(fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@map("feriados")
 }
 
 // Seleções de exibição na Chamada, sem alterar a origem dos alunos.

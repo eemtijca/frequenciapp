@@ -70,6 +70,16 @@ A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e 
 
 - Integração com Google Planilhas contra OAuth e Sheets API simulados: conexão, estrutura, mapa, células ocupadas e fórmulas preservadas, marcadores, identificação por código após renomeação, saídas, entradas, envio automático, autorização revogada e resposta perdida sem repetição. Rotas antigas respondem 404 e configuração com endpoint é recusada.
 
+## Calendário letivo
+
+Os cenários do calendário usam feriados, alunos e turmas sintéticos, com datas explícitas em anos isolados. `tests/api/calendario-letivo.test.ts` cobre leitura pela equipe, cadastro e exclusão restritos à administração, origem confiável, ano entre 1900 e 2199, data válida, nome com até 120 caracteres, ordenação e ausência de repetição em outro ano. Confere persistência, duplicatas, recusa de feriado com chamada regular ou parcial salva, bloqueio do salvamento para todas as turmas e para sábado liberado, exclusão sem mudar a grade e cadastro concorrente com chamada.
+
+`tests/unit/calendario-letivo.test.ts` cobre datas, faixa de anos, consulta por data e validação do cadastro. `tests/unit/backup-calendario.test.ts` e os contratos de API protegem exportação e mesclagem: cópia antiga ou lista vazia não remove feriados, nomes divergentes não sobrescrevem, histórico conflitante é preservado e perda da trava interrompe a restauração. O resultado da importação não duplica contagens quando a transação é refeita.
+
+`tests/unit/notificacoes-feriados.test.ts` verifica ausência de pendências e de resumo, novas chamadas e avisos de pendências, inclusive após a reserva de envio. Os testes do domínio de relatórios conferem cobertura neutra em feriados. A preparação mensal simulada verifica que colunas próprias vazias de feriados são retiradas e que valores, fórmulas, notas ou dimensões sem conferência completa impedem a escrita. Também protege metadados históricos, preservação de sábados salvos e nova inserção de data após remover o feriado.
+
+`tests/e2e/calendario-letivo.spec.ts` acompanha cadastro por ano, recarga, remoção confirmada, estados neutros do Painel e seletores, bloqueio da Chamada e da Chamada Parcial, sábado marcado como feriado, preservação de frequência salva e recuperação de leitura sem repetir o cadastro. Também preserva o rascunho durante um feriado e permite salvá-lo após remover a data do calendário; uma falha de leitura em dia útil mantém a edição bloqueada sem alterar o rascunho e permite recuperá-lo pela nova tentativa. Os cenários de interface incluem celular e temas claro e escuro.
+
 ## Chamada Parcial
 
 A cobertura da Chamada Parcial protege os ajustes por dia inteiro, turno ou aulas, validação de datas e limites, confirmação manual e revisão concorrente. Correções efetivas reabrem a pendência da Seduc; nenhuma operação cria frequência regular ou altera indicadores da chamada normal.
