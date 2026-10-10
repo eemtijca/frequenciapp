@@ -2,26 +2,26 @@
 // centralizados em telas pequenas.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.describe("responsividade", () => {
-  test("no celular usa a navegação inferior e centraliza os formulários", async ({ page }) => {
+  test("no celular usa o menu lateral e centraliza os formulários", async ({ page }, info) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toHaveCount(0);
     await expect(page.locator("aside")).toBeHidden();
     const cabecalho = page.getByRole("banner");
-    const gestao = cabecalho.getByRole("button", { name: "Gestão", exact: true });
+    const abrir = cabecalho.getByRole("button", { name: "Abrir menu", exact: true });
     const notificacoes = cabecalho.getByRole("button", {
       name: "Configurar notificações",
       exact: true,
     });
-    const caixaGestao = await gestao.boundingBox();
+    const caixaAbrir = await abrir.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
-    expect(caixaGestao).not.toBeNull();
+    expect(caixaAbrir).not.toBeNull();
     expect(caixaNotificacoes).not.toBeNull();
-    expect((caixaGestao?.x ?? 0) + (caixaGestao?.width ?? 0)).toBeLessThanOrEqual(
+    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
 
@@ -29,6 +29,18 @@ test.describe("responsividade", () => {
       (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
     );
     expect(semEstouro).toBe(true);
+    await expect(cabecalho.getByRole("button")).toHaveCount(2);
+    await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
+    await info.attach("conteudo-mobile-390", {
+      body: await page.screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
+    const navegacao = await abrirNavegacao(page);
+    await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toBeVisible();
+    await info.attach("menu-mobile-390", {
+      body: await page.screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
 
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("button", { name: "Nova série" }).click();
@@ -39,12 +51,14 @@ test.describe("responsividade", () => {
     expect(Math.abs(centro - 422)).toBeLessThan(30);
   });
 
-  test("no desktop usa a barra lateral", async ({ page }) => {
+  test("no desktop usa a barra lateral", async ({ page }, info) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.locator("aside")).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
+    await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toHaveCount(0);
 
     // As ações da conta cabem na barra lateral, sem estourar a largura.
     const semEstouro = await page
@@ -56,7 +70,58 @@ test.describe("responsividade", () => {
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
     );
+    await info.attach("barra-lateral-desktop", {
+      body: await page.screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
   });
+
+  for (const [largura, altura] of [
+    [320, 568],
+    [800, 600],
+    [844, 390],
+  ] as const) {
+    test(`em ${largura} por ${altura} px, o menu permite alcançar todas as ações`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await page.goto("/");
+      await abrirNavegacao(page);
+      const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
+      await expect.poll(async () => (await menu.boundingBox())?.x ?? -1).toBeGreaterThanOrEqual(0);
+      const caixa = await menu.boundingBox();
+      expect(caixa).not.toBeNull();
+      expect(caixa?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((caixa?.x ?? 0) + (caixa?.width ?? Infinity)).toBeLessThanOrEqual(largura + 1);
+      expect((caixa?.y ?? 0) + (caixa?.height ?? Infinity)).toBeLessThanOrEqual(altura + 1);
+      expect(
+        await menu.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+      ).toBe(true);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+      const fechar = menu.getByRole("button", { name: "Fechar menu", exact: true });
+      await expect(fechar).toBeInViewport();
+      for (const nome of ["Gestão", "Trocar senha", "Sair da conta"]) {
+        const acao = menu.getByRole("button", { name: nome, exact: true });
+        await acao.scrollIntoViewIfNeeded();
+        await expect(acao).toBeInViewport();
+        const tamanho = await acao.boundingBox();
+        expect(tamanho?.height ?? 0).toBeGreaterThanOrEqual(44);
+      }
+      await info.attach(`menu-${largura}-${altura}`, {
+        body: await page.screenshot({ animations: "disabled" }),
+        contentType: "image/png",
+      });
+      await fechar.click();
+      await expect(menu).toBeHidden();
+      await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
+      const cabecalho = page.getByRole("banner");
+      expect(
+        await cabecalho.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+      ).toBe(true);
+    });
+  }
 
   test("as metades do login são simétricas", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });

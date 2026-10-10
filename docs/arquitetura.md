@@ -103,7 +103,7 @@ src/
     icon.svg                ícone do aplicativo
     layout.tsx              metadados, manifest da PWA e fontes
   components/
-    aplicacao.tsx           shell com visões e navegação inferior
+    aplicacao.tsx           shell com visões, barra lateral e menu responsivo
     auth/                   tela de entrada
     painel/                 indicadores do dia com gráficos
     frequencia/             vista da chamada diária
