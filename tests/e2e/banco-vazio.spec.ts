@@ -10,7 +10,9 @@ test.describe("banco sem turmas", () => {
     test.skip(total > 0, "A base local tem turmas; o cenário vazio roda no CI limpo.");
     await page.goto("/");
     await trocarVisao(page, "Chamada", "chamada");
-    await expect(page.getByText("Nenhuma turma cadastrada")).toBeVisible();
+    await expect(
+      page.locator('section[aria-label="Fazer chamada"]').getByText("Nenhuma turma cadastrada"),
+    ).toBeVisible();
     await expect(page.getByText("Carregando chamada...")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ir para a Gestão" })).toBeVisible();
   });
