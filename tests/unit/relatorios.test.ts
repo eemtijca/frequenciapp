@@ -545,4 +545,76 @@ describe("alunosPorFaltas", () => {
     });
     expect(alunosPorFaltas(alunos, [turma({ horarios })], chamadas, ["2026-09-03"])).toEqual([]);
   });
+
+  describe("critério do ranking", () => {
+    const alunos = [
+      aluno({ id: "a", nome: "Carla" }),
+      aluno({ id: "b", nome: "Bruno" }),
+      aluno({ id: "c", nome: "Ana" }),
+      aluno({ id: "d", nome: "Davi" }),
+    ];
+    const dias = ["2026-09-01", "2026-09-02", "2026-09-03"];
+    // Carla: F, FJ, FJ. Bruno: F, F. Ana: FJ, FJ. Davi: presente.
+    const chamadas = [
+      frequencia({
+        dia: "2026-09-01",
+        alunos: ["a", "b", "c", "d"],
+        faltas: [
+          { alunoId: "a", horarios: ["aula-1"] },
+          { alunoId: "b", horarios: ["aula-1"] },
+          { alunoId: "c", horarios: ["aula-1"], justificativa: "D" },
+        ],
+      }),
+      frequencia({
+        dia: "2026-09-02",
+        alunos: ["a", "b", "c", "d"],
+        faltas: [
+          { alunoId: "a", horarios: ["aula-1"], justificativa: "D" },
+          { alunoId: "b", horarios: ["aula-1"] },
+          { alunoId: "c", horarios: ["aula-1"], justificativa: "D" },
+        ],
+      }),
+      frequencia({
+        dia: "2026-09-03",
+        alunos: ["a"],
+        faltas: [{ alunoId: "a", horarios: ["aula-1"], justificativa: "D" }],
+      }),
+    ];
+
+    it("mantém F + FJ como padrão", () => {
+      const padrao = alunosPorFaltas(alunos, [turma()], chamadas, dias);
+      expect(padrao.map((item) => [item.aluno.id, item.quantidade])).toEqual([
+        ["a", 3],
+        ["c", 2],
+        ["b", 2],
+      ]);
+      expect(alunosPorFaltas(alunos, [turma()], chamadas, dias, "todas")).toEqual(padrao);
+    });
+
+    it("classifica só as faltas sem justificativa e ignora quem só tem FJ", () => {
+      const resultado = alunosPorFaltas(alunos, [turma()], chamadas, dias, "faltas");
+      expect(resultado.map((item) => [item.aluno.id, item.quantidade])).toEqual([
+        ["b", 2],
+        ["a", 1],
+      ]);
+      expect(resultado[0]).toMatchObject({ faltas: 2, justificadas: 0, totalFaltas: 2 });
+    });
+
+    it("classifica só as faltas justificadas, desempatando por nome", () => {
+      const resultado = alunosPorFaltas(alunos, [turma()], chamadas, dias, "justificadas");
+      expect(resultado.map((item) => [item.aluno.id, item.quantidade])).toEqual([
+        ["c", 2],
+        ["a", 2],
+      ]);
+      expect(resultado[1]).toMatchObject({ faltas: 1, justificadas: 2, totalFaltas: 3 });
+    });
+
+    it("devolve lista vazia quando nenhum aluno tem o tipo de falta", () => {
+      const soJustificadas = chamadas.map((chamada) => ({
+        ...chamada,
+        faltas: chamada.faltas.map((falta) => ({ ...falta, justificativa: "D" })),
+      }));
+      expect(alunosPorFaltas(alunos, [turma()], soJustificadas, dias, "faltas")).toEqual([]);
+    });
+  });
 });

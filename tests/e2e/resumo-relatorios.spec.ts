@@ -115,6 +115,85 @@ test("compara séries e ordena alunos por faltas com justificadas discriminadas"
   await expect(classificados.nth(1)).toContainText("0 F · 1 FJ");
 });
 
+test("alterna entre os rankings de faltas, sem justificativa e justificadas", async ({ page }) => {
+  const { painel, chamada, alunos } = await abrir(page);
+  const primeiro = alunos[0];
+  const segundo = alunos[1];
+  if (!primeiro || !segundo) throw new Error("Alunos de teste ausentes.");
+  await page.route("**/api/frequencias?mes=**", async (rota) => {
+    const mes = new URL(rota.request().url()).searchParams.get("mes");
+    await rota.fulfill({
+      json: {
+        frequencias: [
+          { ...chamada, dia: `${mes}-01` },
+          {
+            ...chamada,
+            dia: `${mes}-02`,
+            faltas: alunos.map((aluno) => ({
+              alunoId: aluno.id,
+              horarios: ["aula-sintetica"],
+              justificativa: "D",
+            })),
+          },
+        ],
+      },
+    });
+  });
+  await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
+  const ranking = painel.getByRole("region", { name: "Alunos com mais faltas", exact: true });
+  const grupo = ranking.getByRole("group", { name: "Ranking de alunos", exact: true });
+  const todas = grupo.getByRole("button", { name: "Todas as faltas (F + FJ)", exact: true });
+  const semJustificativa = grupo.getByRole("button", {
+    name: "Sem justificativa (F)",
+    exact: true,
+  });
+  const justificadas = grupo.getByRole("button", { name: "Justificadas (FJ)", exact: true });
+  const classificados = ranking.getByRole("listitem");
+  await expect(todas).toHaveAttribute("aria-pressed", "true");
+  await expect(classificados).toHaveCount(2);
+
+  await semJustificativa.click();
+  await expect(semJustificativa).toHaveAttribute("aria-pressed", "true");
+  await expect(todas).toHaveAttribute("aria-pressed", "false");
+  await expect(
+    ranking.getByRole("heading", { name: "Alunos com mais faltas sem justificativa" }),
+  ).toBeVisible();
+  await expect(classificados).toHaveCount(1);
+  await expect(classificados.nth(0)).toContainText(primeiro.nome);
+  await expect(classificados.nth(0)).toContainText("1 falta");
+  await expect(classificados.nth(0)).toContainText("1 F · 1 FJ");
+
+  await justificadas.click();
+  await expect(justificadas).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    ranking.getByRole("heading", { name: "Alunos com mais faltas justificadas" }),
+  ).toBeVisible();
+  await expect(classificados).toHaveCount(2);
+  await expect(classificados.nth(0)).toContainText("1 justificada");
+  await expect(classificados.nth(1)).toContainText("1 justificada");
+
+  await todas.click();
+  await expect(classificados).toHaveCount(2);
+  await expect(classificados.nth(0)).toContainText("2 faltas");
+
+  await page.setViewportSize({ width: 360, height: 780 });
+  await expect(grupo).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("mostra mensagem própria quando o ranking escolhido não tem alunos", async ({ page }) => {
+  const { painel, chamada } = await abrir(page);
+  await page.route("**/api/frequencias?mes=**", async (rota) => {
+    const mes = new URL(rota.request().url()).searchParams.get("mes");
+    await rota.fulfill({ json: { frequencias: [{ ...chamada, dia: `${mes}-01` }] } });
+  });
+  await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
+  const ranking = painel.getByRole("region", { name: "Alunos com mais faltas", exact: true });
+  await ranking.getByRole("button", { name: "Justificadas (FJ)", exact: true }).click();
+  await expect(ranking.getByText("Nenhuma falta justificada neste filtro.")).toBeVisible();
+  await expect(ranking.getByRole("listitem")).toHaveCount(0);
+});
+
 test("oculta indicadores antigos na falha e recupera o mês pela atualização", async ({ page }) => {
   const { painel, chamada } = await abrir(page);
   let falhar = false;

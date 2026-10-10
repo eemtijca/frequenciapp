@@ -385,12 +385,19 @@ export function resumoPorAluno(
   };
 }
 
-/** Alunos ativos com F ou FJ no período, ordenados pelo total e pelo nome no empate. */
+/** Critério do ranking: F + FJ, só F (sem justificativa) ou só FJ (justificadas). */
+export type CriterioRankingFaltas = "todas" | "faltas" | "justificadas";
+
+/**
+ * Alunos ativos com ausência no período, ordenados pela quantidade do critério e,
+ * no empate, pelo nome e pelo identificador. `quantidade` é o valor classificado.
+ */
 export function alunosPorFaltas(
   alunos: Aluno[],
   turmas: Turma[],
   frequencias: Frequencia[],
   dias: string[],
+  criterio: CriterioRankingFaltas = "todas",
 ) {
   const porDia = indexarPorDia(frequencias);
   const horarios = turmas.flatMap((turma) => turma.horarios);
@@ -398,12 +405,19 @@ export function alunosPorFaltas(
     .filter((aluno) => aluno.ativo)
     .map((aluno) => {
       const resumo = resumoPorAluno(aluno, dias, porDia, [], horarios);
-      return { aluno, ...resumo, totalFaltas: resumo.faltas + resumo.justificadas };
+      const totalFaltas = resumo.faltas + resumo.justificadas;
+      const quantidade =
+        criterio === "faltas"
+          ? resumo.faltas
+          : criterio === "justificadas"
+            ? resumo.justificadas
+            : totalFaltas;
+      return { aluno, ...resumo, totalFaltas, quantidade };
     })
-    .filter((item) => item.totalFaltas > 0)
+    .filter((item) => item.quantidade > 0)
     .sort(
       (a, b) =>
-        b.totalFaltas - a.totalFaltas ||
+        b.quantidade - a.quantidade ||
         a.aluno.nome.localeCompare(b.aluno.nome, "pt-BR", { sensitivity: "base" }) ||
         a.aluno.id.localeCompare(b.aluno.id),
     );
