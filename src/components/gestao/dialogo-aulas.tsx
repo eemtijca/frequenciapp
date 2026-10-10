@@ -40,7 +40,6 @@ const DIAS = [
   { valor: 4, rotulo: "qui" },
   { valor: 5, rotulo: "sex" },
   { valor: 6, rotulo: "sáb" },
-  { valor: 7, rotulo: "dom" },
 ];
 
 interface Formulario {
@@ -91,7 +90,8 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
       ordem: String(aula.ordem),
       inicio: aula.inicio,
       fim: aula.fim,
-      diasSemana: [...aula.diasSemana],
+      // Domingo não tem aula: grades antigas com "dom" abrem sem ele.
+      diasSemana: aula.diasSemana.filter((dia) => dia !== 7),
       ativo: aula.ativo,
     });
     setErro("");
@@ -210,6 +210,7 @@ export default function DialogoAulas({ turma, aberto, onAbrir, onMudanca }: Prop
                   </p>
                   <p className="text-muted-foreground truncate text-xs">
                     {aula.diasSemana
+                      .filter((dia) => dia !== 7)
                       .map((dia) => DIAS.find((opcao) => opcao.valor === dia)?.rotulo ?? dia)
                       .join(" ")}
                     {aula.ativo ? "" : " · desativada"}

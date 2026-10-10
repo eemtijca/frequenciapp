@@ -7,7 +7,7 @@ import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
-import { diaLocal, ehDiaValido } from "@/domain/frequencia";
+import { diaLocal, ehDiaValido, ehDomingo } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 import { exigirDiaLetivo } from "@/application/calendario-letivo";
 import {
@@ -121,6 +121,7 @@ export async function salvarFrequenciaParcial(
   const dados = esquemaRegistroParcial.safeParse(entrada);
   if (!dados.success)
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Registro inválido.", 400);
+  if (ehDomingo(dados.data.dia)) throw new ErroHttp("Domingo não tem aula nem chamada.", 400);
   if (dados.data.dia > diaLocal(new Date(), ambiente.fuso))
     throw new ErroHttp("Não é possível registrar frequência parcial em dia futuro.", 400);
   const valores = {

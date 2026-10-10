@@ -28,7 +28,7 @@ export const esquemaAtualizarTurma = z
     message: "Nada a atualizar.",
   });
 
-/** Aula padrão de uma turma nova: cobre o dia inteiro, todos os dias. */
+/** Aula padrão de uma turma nova: cobre o dia inteiro, de segunda a sábado. */
 export const AULA_PADRAO: {
   ordem: number;
   inicio: string;
@@ -38,7 +38,7 @@ export const AULA_PADRAO: {
   ordem: 1,
   inicio: "00:00",
   fim: "23:59",
-  diasSemana: [1, 2, 3, 4, 5, 6, 7],
+  diasSemana: [1, 2, 3, 4, 5, 6],
 };
 
 interface LinhaHorario {

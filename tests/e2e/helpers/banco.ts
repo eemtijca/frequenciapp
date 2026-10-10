@@ -99,7 +99,7 @@ export async function contarSeries(): Promise<number> {
 
 /**
  * Cria a massa da suíte de frequência: série E2E Ano, turma A, três aulas
- * de segunda a domingo e dois alunos. Chamada no beforeAll do spec.
+ * de segunda a sábado e dois alunos. Chamada no beforeAll do spec.
  */
 export async function criarMassaE2E(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -131,7 +131,7 @@ export async function criarMassaE2E(): Promise<void> {
     for (const [ordem, inicio, fim] of aulas) {
       await cliente.query(
         "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, $2, $3, $4, $5, true)",
-        [turmaId, ordem, inicio, fim, [1, 2, 3, 4, 5, 6, 7]],
+        [turmaId, ordem, inicio, fim, [1, 2, 3, 4, 5, 6]],
       );
     }
     await cliente.query(

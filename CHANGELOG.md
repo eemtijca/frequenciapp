@@ -62,6 +62,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Domingo não tem aula nem chamada. A API recusa salvar Chamada e Chamada Parcial em domingo, o calendário e as setas de dia da Chamada, da Chamada Parcial e do Painel pulam o domingo (aos domingos abrem no sábado anterior), a grade padrão de uma turma nova vai de segunda a sábado, a Gestão e a API de aulas não aceitam domingo e os lembretes de chamada pendente não o contam. Chamadas de domingo já salvas continuam nos relatórios e no histórico.
+
 - Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
 
 - Os anéis de cobertura usam título em uma linha, para a hidratação não descartar a página e o primeiro toque na navegação não se perder.
