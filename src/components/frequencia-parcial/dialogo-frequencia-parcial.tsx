@@ -61,6 +61,7 @@ interface Props {
   dia: string;
   sujo: boolean;
   salvando: boolean;
+  bloqueado?: boolean;
   erro: string;
   conflito: boolean;
   onEdicao: (edicao: EdicaoParcial) => void;
@@ -78,6 +79,7 @@ export function DialogoFrequenciaParcial({
   dia,
   sujo,
   salvando,
+  bloqueado = false,
   erro,
   conflito,
   onEdicao,
@@ -298,6 +300,7 @@ export function DialogoFrequenciaParcial({
               type="submit"
               disabled={
                 salvando ||
+                bloqueado ||
                 !edicao.alunoId ||
                 (edicao.tipo === "AULAS" && edicao.aulas.length === 0) ||
                 conflito ||

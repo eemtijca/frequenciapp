@@ -12,6 +12,7 @@ import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { hashTexto } from "@/domain/planilha";
 import { listarTodasTurmas } from "./turmas";
 import { listarTodosAlunos } from "./alunos";
+import { listarFeriados } from "./calendario-letivo";
 import { chamarIntegracao, idDaIntegracao, lerLinha } from "./planilha-comum";
 import { detectarAba, esquemaSalvo, sabadosComChamadaSalva, type EsquemaSalvo } from "./planilha";
 
@@ -39,6 +40,9 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
         dias[0] ?? `${dados.data.mes}-01`,
         dias.at(-1) ?? `${dados.data.mes}-01`,
       );
+      const feriados = (await listarFeriados(Number(dados.data.mes.slice(0, 4))))
+        .map((feriado) => feriado.dia)
+        .filter((dia) => dia.startsWith(`${dados.data.mes}-`));
       const preparada = await chamarIntegracao<
         AbaMensalPlanilha & { criada: boolean; atualizada: boolean }
       >(linha, {
@@ -47,6 +51,7 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
         rotulo: turma.rotulo,
         mes: dados.data.mes,
         sabadosLetivos,
+        feriados,
         alunos: alunos
           .filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id)
           .map((aluno) => ({

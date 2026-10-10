@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Calendário letivo anual em Gestão, Configurações, Escola, com feriados por data e nome para todas as turmas. Feriados bloqueiam Chamada e Chamada Parcial, inclusive sábados liberados, deixam a cobertura neutra e suspendem avisos escolares. Datas com frequências salvas são recusadas sem alterar o histórico; a cópia JSON preserva o calendário por mesclagem. Abas mensais omitem feriados e só retiram colunas próprias após conferir ausência de valores, fórmulas e notas.
+
 - Chamada permite desbloquear um sábado letivo por turma e data com as aulas ativas, sem alterar a grade semanal. A liberação acompanha rascunhos e chamadas salvas, mantendo justificativas, frequência parcial e travas de revisão. Sábados com chamada salva são enviados e preservados nas abas mensais; domingos e sábados sem registros continuam fora.
 
 - Seletores circulares de séries e turmas na Chamada: pendência em vermelho, conclusão em verde e anel por série com fatias proporcionais aos alunos. O progresso acompanha a data consultada e o salvamento, trata rascunhos e conflitos como pendência e mantém estado neutro em falhas ou turmas sem participantes. Rótulos usuais de ano aparecem como série no seletor.
@@ -23,6 +25,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Alterado
 
 - Chamada bloqueia todo sábado por padrão, também quando a turma tem aula no sábado na grade, e só o botão Sábado letivo libera a chamada daquela turma e data; chamada salva e rascunho recuperado mantêm a liberação. A regra é da interface: a API não muda.
+
+- Chamada Parcial deixa de ter item na navegação e passa a abrir por um botão só de ícone na linha do Resumo da Chamada, à direita do Desbloquear. A visão, o estado e a confirmação de alterações não salvas não mudam, e o botão Chamada da navegação fica destacado enquanto ela está aberta.
 
 - Chamada: o botão Desbloquear (ou Bloquear) passa para a linha do Resumo, à direita dele, e o quadro com "Chamada bloqueada" e a frase de apoio deixa de aparecer. A lógica do bloqueio e o rótulo acessível do botão não mudam.
 
@@ -53,6 +57,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Falha de leitura da Chamada mantém marcações e salvamento bloqueados em qualquer dia, preservando o rascunho local até uma consulta confirmada. Navegação e nova tentativa continuam disponíveis.
 
 - Abas mensais novas recebem os alunos em ordem alfabética. Envios de frequência posicionam alunos novos e transferidos pelo nome, movendo a linha inteira com marcas, fórmulas e vínculo do aluno, e conservando as posições de cabeçalhos e linhas manuais sem identificação.
 

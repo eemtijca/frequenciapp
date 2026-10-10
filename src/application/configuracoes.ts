@@ -6,6 +6,8 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { CONFIGURACOES_PADRAO, type Configuracoes } from "@/domain/frequencia";
+import { listarFeriados } from "@/application/calendario-letivo";
+import type { Feriado } from "@/domain/calendario-letivo";
 
 const ID = "principal";
 
@@ -45,13 +47,14 @@ const SELECAO = {
   origemTurmas: { select: { turmaId: true }, orderBy: { turmaId: "asc" } },
 } as const;
 
-function paraConfiguracoes(linha: LinhaConfiguracao): Configuracoes {
+function paraConfiguracoes(linha: LinhaConfiguracao, feriados: Feriado[]): Configuracoes {
   return {
     frequenciaPorAula: linha.frequenciaPorAula,
     saidaAntecipada: linha.saidaAntecipada,
     origemNaChamada: linha.origemNaChamada,
     origemNaChamadaSerieIds: linha.origemSeries.map((item) => item.serieId),
     origemNaChamadaTurmaIds: linha.origemTurmas.map((item) => item.turmaId),
+    feriados,
   };
 }
 
@@ -63,7 +66,7 @@ export async function lerConfiguracoes(): Promise<Configuracoes> {
     create: { id: ID },
     select: SELECAO,
   });
-  return paraConfiguracoes(linha);
+  return paraConfiguracoes(linha, await listarFeriados());
 }
 
 /** Atualiza os recursos ligados e desligados pela administração. */
@@ -124,5 +127,5 @@ export async function atualizarConfiguracoes(
     await auditar(tx, admin.id, "configuracao.atualizar", `configuracao:${ID}`);
     return atualizada;
   });
-  return paraConfiguracoes(linha);
+  return paraConfiguracoes(linha, await listarFeriados());
 }

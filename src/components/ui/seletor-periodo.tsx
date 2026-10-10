@@ -27,6 +27,7 @@ interface Props {
   rotuloAcessivel: string;
   rotulo: string;
   detalhe?: string;
+  mostrarSelo?: boolean;
   onValor: (valor: string) => void;
 }
 
@@ -50,6 +51,7 @@ export function SeletorPeriodo({
   rotuloAcessivel,
   rotulo,
   detalhe,
+  mostrarSelo = true,
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
@@ -60,7 +62,7 @@ export function SeletorPeriodo({
   const focoPendente = useRef(false);
 
   const referencia = valor > max ? max : valor;
-  const selo = valor === max ? (modo === "dia" ? "Hoje" : "Este mês") : "";
+  const selo = mostrarSelo && valor === max ? (modo === "dia" ? "Hoje" : "Este mês") : "";
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
   function aoAbrir(abertoNovo: boolean) {

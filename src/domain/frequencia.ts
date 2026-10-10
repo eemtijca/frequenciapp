@@ -1,5 +1,6 @@
 // Domínio da frequência. Regras puras, sem dependência de framework
 // ou de banco: tudo aqui é testável de forma isolada.
+import type { Feriado } from "@/domain/calendario-letivo";
 
 /** Marca de frequência de um aluno em um dia. */
 export type Marca = "P" | "S" | "F" | "FJ";
@@ -293,6 +294,7 @@ export interface Configuracoes {
   origemNaChamada: boolean;
   origemNaChamadaSerieIds: string[];
   origemNaChamadaTurmaIds: string[];
+  feriados: Feriado[];
 }
 
 /** Padrões de fábrica dos recursos. */
@@ -302,6 +304,7 @@ export const CONFIGURACOES_PADRAO: Configuracoes = {
   origemNaChamada: false,
   origemNaChamadaSerieIds: [],
   origemNaChamadaTurmaIds: [],
+  feriados: [],
 };
 
 /** Acumulado de um aluno desde a primeira chamada salva. */

@@ -1,6 +1,7 @@
 // Frequências: consulta por dia, turma, período ou mês, e salvamento
 // compartilhado com revisão, justificativa e proteção de duplicata.
 import { after } from "next/server";
+import { feriadoDoDia } from "@/application/calendario-letivo";
 import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
 import {
   carregarFrequencia,
@@ -73,9 +74,17 @@ export async function GET(requisicao: Request): Promise<Response> {
     }
     // Sem turma, a consulta devolve o dia inteiro, para o Painel.
     if (!turmaId) {
-      return json({ frequencias: await listarFrequenciasDoPeriodo(dia, dia) });
+      const [frequencias, feriado] = await Promise.all([
+        listarFrequenciasDoPeriodo(dia, dia),
+        feriadoDoDia(dia),
+      ]);
+      return json({ frequencias, feriado });
     }
-    return json({ frequencia: await carregarFrequencia(turmaId, dia) });
+    const [frequencia, feriado] = await Promise.all([
+      carregarFrequencia(turmaId, dia),
+      feriadoDoDia(dia),
+    ]);
+    return json({ frequencia, feriado });
   });
 }
 

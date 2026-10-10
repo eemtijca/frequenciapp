@@ -59,6 +59,7 @@ export interface GoogleFalso {
   formulaDe(nome: string, linha: number, coluna: number): string;
   apresentacao(nome: string): { congeladasLinhas: number; faixas: Objeto[] };
   vinculos(nome: string): { linha: number; alunoId: string }[];
+  feriadosDaAba(nome: string): string[];
   marcarLinha(nome: string, linha: number): void;
   marcarColuna(nome: string, coluna: number): void;
   criarCopiaAntiga(nome: string): string;
@@ -208,9 +209,11 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
                         const celula = item.celulas[faixa.linha + l]?.[faixa.coluna + c];
                         return {
                           formattedValue,
-                          userEnteredValue: celula?.formula
-                            ? { formulaValue: celula.formula }
-                            : { stringValue: formattedValue },
+                          ...(celula?.formula
+                            ? { userEnteredValue: { formulaValue: celula.formula } }
+                            : formattedValue
+                              ? { userEnteredValue: { stringValue: formattedValue } }
+                              : {}),
                         };
                       }),
                     })),
@@ -613,6 +616,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
           alunoId: texto(meta.metadataValue),
         }))
         .sort((a, b) => a.linha - b.linha),
+    feriadosDaAba: (nome) =>
+      (aba(nome)?.metadados ?? [])
+        .filter((meta) => meta.metadataKey === "frequenciapp.feriado")
+        .map((meta) => texto(meta.metadataValue)),
     marcarLinha: (nome, linha) => {
       const item = aba(nome);
       if (item)

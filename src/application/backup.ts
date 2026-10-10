@@ -8,6 +8,11 @@ import { ErroHttp } from "@/infra/erros";
 import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequencia";
 import { ehHorarioEntrada } from "@/domain/entradas";
 import { lerConfiguracoes } from "@/application/configuracoes";
+import { esquemaCriarFeriado } from "@/application/calendario-letivo";
+import {
+  comTravaPlanilhaFrequencia,
+  controleTravaPlanilhaFrequencia,
+} from "@/infra/trava-planilha-frequencia";
 
 export const FORMATO_COPIA = "frequenciapp";
 export const VERSAO_COPIA = 1;
@@ -227,6 +232,15 @@ const esquemaCopia = z.object({
       origemNaChamada: z.boolean().optional(),
       origemNaChamadaSerieIds: z.array(z.uuid()).optional(),
       origemNaChamadaTurmaIds: z.array(z.uuid()).optional(),
+      // Ausente em cópias anteriores; a restauração nunca limpa o calendário atual.
+      feriados: z
+        .array(esquemaCriarFeriado)
+        .max(50000)
+        .refine(
+          (itens) => new Set(itens.map((item) => item.dia)).size === itens.length,
+          "Os feriados devem ter datas distintas.",
+        )
+        .optional(),
     })
     .optional(),
 });
@@ -459,9 +473,55 @@ export async function importarCopia(
     );
   }
   const copia = analise.data;
+  const mesclar = () => mesclarCopia(admin, copia);
+  return copia.configuracoes?.feriados?.length ? comTravaPlanilhaFrequencia(mesclar) : mesclar();
+}
+
+async function mesclarCopia(
+  admin: { id: string },
+  copia: CopiaFrequenciapp,
+): Promise<ResultadoImportacao> {
   const resultado: ResultadoImportacao = { adicionadas: 0, identicas: 0, conflitos: 0 };
 
   await comTransacao(async (tx) => {
+    controleTravaPlanilhaFrequencia()?.conferir();
+    // Uma tentativa serializável refeita não duplica os contadores do resultado.
+    resultado.adicionadas = 0;
+    resultado.identicas = 0;
+    resultado.conflitos = 0;
+    const diasComHistoricoNaCopia = new Set([
+      ...copia.frequencias.map((item) => item.dia),
+      ...(copia.frequenciasParciais ?? []).map((item) => item.dia),
+    ]);
+    const feriadosAtuais = new Map(
+      (await tx.feriado.findMany({ select: { dia: true, nome: true } })).map((item) => [
+        item.dia.toISOString().slice(0, 10),
+        item,
+      ]),
+    );
+    for (const feriado of copia.configuracoes?.feriados ?? []) {
+      const atual = feriadosAtuais.get(feriado.dia);
+      if (atual) {
+        if (atual.nome === feriado.nome) resultado.identicas += 1;
+        else resultado.conflitos += 1;
+        continue;
+      }
+      const diaRepositorio = new Date(`${feriado.dia}T12:00:00Z`);
+      const [chamada, parcial] = await Promise.all([
+        tx.frequencia.findFirst({ where: { dia: diaRepositorio }, select: { id: true } }),
+        tx.frequenciaParcial.findFirst({ where: { dia: diaRepositorio }, select: { id: true } }),
+      ]);
+      if (diasComHistoricoNaCopia.has(feriado.dia) || chamada || parcial) {
+        resultado.conflitos += 1;
+        continue;
+      }
+      const criada = await tx.feriado.create({
+        data: { dia: diaRepositorio, nome: feriado.nome, criadoPorId: admin.id },
+        select: { dia: true, nome: true },
+      });
+      feriadosAtuais.set(feriado.dia, criada);
+      resultado.adicionadas += 1;
+    }
     // Justificativas do catálogo
     const justificativasAtuais = new Map(
       (
@@ -683,6 +743,10 @@ export async function importarCopia(
 
     // Frequências
     for (const frequencia of copia.frequencias) {
+      if (feriadosAtuais.has(frequencia.dia)) {
+        resultado.conflitos += 1;
+        continue;
+      }
       if (!idsTurmas.has(frequencia.turmaId)) {
         resultado.conflitos += 1;
         continue;
@@ -799,6 +863,10 @@ export async function importarCopia(
 
     // Registros parciais têm identidade própria e não alteram a chamada regular.
     for (const parcial of copia.frequenciasParciais ?? []) {
+      if (feriadosAtuais.has(parcial.dia)) {
+        resultado.conflitos += 1;
+        continue;
+      }
       if (!idsAlunos.has(parcial.alunoId) || !idsTurmas.has(parcial.turmaId)) {
         resultado.conflitos += 1;
         continue;
@@ -959,6 +1027,7 @@ export async function importarCopia(
       "backup.importar",
       `adicionadas:${resultado.adicionadas} identicas:${resultado.identicas} conflitos:${resultado.conflitos}`,
     );
+    controleTravaPlanilhaFrequencia()?.conferir();
   });
 
   return resultado;

@@ -36,6 +36,8 @@ export const esquemaPreparacaoMensalGoogle = z.object({
     )
     .max(5)
     .default([]),
+  // O calendário é lido no servidor sob a mesma trava do preparo e do envio.
+  feriados: z.array(z.string().refine(ehDiaValido)).max(31).default([]),
   alunos: z
     .array(
       z.object({
@@ -99,7 +101,7 @@ function pedidosDePreparacao(
 ) {
   const cabecalho = [
     "Aluno",
-    ...diasDaPlanilhaMensal(entrada.mes, entrada.sabadosLetivos).map(rotuloData),
+    ...diasDaPlanilhaMensal(entrada.mes, entrada.sabadosLetivos, entrada.feriados).map(rotuloData),
   ];
   const linhas = Math.max(1000, entrada.alunos.length + 1);
   const alunos = ordenarAlunosDaPlanilha(entrada.alunos);
@@ -123,6 +125,7 @@ function pedidosDePreparacao(
     marcador("frequenciapp.turma", entrada.turmaOriginalId, { sheetId }),
     marcador("frequenciapp.mes", entrada.mes, { sheetId }),
     marcador("frequenciapp.geracao", geracao, { sheetId }),
+    ...feriadosDoMes(entrada).map((dia) => marcador("frequenciapp.feriado", dia, { sheetId })),
     {
       updateCells: {
         range: {
@@ -199,7 +202,30 @@ function estruturaMensalInesperada(): never {
   );
 }
 
-/** Reconhece somente as colunas criadas pela integração, sem ler os dados dos alunos. */
+function feriadosDoMes(entrada: PreparacaoMensal): string[] {
+  return [...new Set(entrada.feriados.filter((dia) => dia.startsWith(`${entrada.mes}-`)))];
+}
+
+/** O histórico da estrutura permite recriar datas cujo feriado foi removido depois. */
+function feriadosDaAba(doc: DocumentoGoogle, aba: AbaGoogle, mes: string): Set<string> {
+  const dias = metadadosDaAba(doc, aba)
+    .filter((item) => item.metadataKey === "frequenciapp.feriado")
+    .map((item) => {
+      const dia = item.metadataValue;
+      if (
+        item.location.sheetId !== aba.properties.sheetId ||
+        !dia ||
+        !ehDiaValido(dia) ||
+        !dia.startsWith(`${mes}-`)
+      )
+        return estruturaMensalInesperada();
+      return dia;
+    });
+  if (new Set(dias).size !== dias.length) return estruturaMensalInesperada();
+  return new Set(dias);
+}
+
+/** Confere as colunas próprias e impede apagar conteúdo em datas que viraram feriados. */
 async function colunasParaRemover(
   id: string,
   acesso: string,
@@ -207,6 +233,7 @@ async function colunasParaRemover(
   aba: AbaGoogle,
   mes: string,
   sabadosLetivos: string[],
+  feriados: string[],
 ): Promise<number[]> {
   const marcadores = metadadosDaAba(doc, aba).filter(
     (item) => item.metadataKey === "frequenciapp.coluna",
@@ -231,9 +258,12 @@ async function colunasParaRemover(
   const cabecalho = bloco?.valores[0] ?? [];
   const formulas = bloco?.formula[0] ?? [];
   const calendario = new Map(diasDoMes(mes).map((dia) => [rotuloData(dia), dia]));
-  const diasPermitidos = new Set(diasDaPlanilhaMensal(mes, sabadosLetivos));
+  const diasPermitidos = new Set(diasDaPlanilhaMensal(mes, sabadosLetivos, feriados));
+  const diasSemAula = new Set(feriados);
+  const feriadosAnteriores = feriadosDaAba(doc, aba, mes);
   const encontrados = new Set<string>();
   const remover: number[] = [];
+  const conferirConteudo: number[] = [];
   for (const indice of indices) {
     const rotulo = cabecalho[indice] ?? "";
     if (formulas[indice] || encontrados.has(rotulo)) return estruturaMensalInesperada();
@@ -248,9 +278,16 @@ async function colunasParaRemover(
     }
     const dia = calendario.get(rotulo);
     if (!dia) return estruturaMensalInesperada();
-    if (!diasPermitidos.has(dia)) remover.push(indice);
+    if (!diasPermitidos.has(dia)) {
+      remover.push(indice);
+      if (diasSemAula.has(dia)) conferirConteudo.push(indice);
+    }
   }
-  if (diasDaPlanilhaMensal(mes).some((dia) => !encontrados.has(rotuloData(dia))))
+  if (
+    diasDaPlanilhaMensal(mes, [], [...feriados, ...feriadosAnteriores]).some(
+      (dia) => !encontrados.has(rotuloData(dia)),
+    )
+  )
     return estruturaMensalInesperada();
   if (
     (aba.merges ?? []).some((mesclagem) =>
@@ -262,6 +299,32 @@ async function colunasParaRemover(
     )
   )
     return estruturaMensalInesperada();
+  if (conferirConteudo.length > 0) {
+    const linhas = aba.properties.gridProperties?.rowCount;
+    if (!linhas || !Number.isInteger(linhas) || linhas < 1 || linhas > 20_000)
+      throw new ErroHttp("Não foi possível conferir as colunas de feriados. Confira a aba.", 409);
+    const colunasPorLeitura = Math.floor(20_000 / linhas);
+    for (let inicio = 0; inicio < conferirConteudo.length; inicio += colunasPorLeitura) {
+      const colunas = conferirConteudo.slice(inicio, inicio + colunasPorLeitura);
+      const blocos = await lerBlocosGoogle(
+        id,
+        acesso,
+        aba.properties.title,
+        linhas,
+        colunas.map((indice) => ({ coluna: indice + 1, colunas: 1 })),
+        { conferirConteudo: true },
+      );
+      if (
+        blocos.some(
+          (bloco) => !bloco.ocupado || bloco.ocupado.slice(1).some((linha) => linha.some(Boolean)),
+        )
+      )
+        throw new ErroHttp(
+          "Há registros na coluna de um feriado. Confira a planilha antes de preparar o mês.",
+          409,
+        );
+    }
+  }
   return remover.sort((a, b) => b - a);
 }
 
@@ -283,12 +346,19 @@ async function atualizarAbaExistente(
     aba,
     entrada.mes,
     entrada.sabadosLetivos,
+    entrada.feriados,
   );
   const pedidos: Record<string, unknown>[] = remover.map((indice) => ({
     deleteDimension: {
       range: { sheetId, dimension: "COLUMNS", startIndex: indice, endIndex: indice + 1 },
     },
   }));
+  const feriadosAnteriores = feriadosDaAba(doc, aba, entrada.mes);
+  pedidos.push(
+    ...feriadosDoMes(entrada)
+      .filter((dia) => !feriadosAnteriores.has(dia))
+      .map((dia) => marcador("frequenciapp.feriado", dia, { sheetId })),
+  );
   if (nome !== existente.aba)
     pedidos.push({
       updateSheetProperties: { properties: { sheetId, title: nome }, fields: "title" },
@@ -312,6 +382,9 @@ async function atualizarAbaExistente(
       if (
         identidade &&
         abaConferida &&
+        feriadosDoMes(entrada).every((dia) =>
+          feriadosDaAba(conferido, abaConferida, entrada.mes).has(dia),
+        ) &&
         !(
           await colunasParaRemover(
             id,
@@ -320,6 +393,7 @@ async function atualizarAbaExistente(
             abaConferida,
             entrada.mes,
             entrada.sabadosLetivos,
+            entrada.feriados,
           )
         ).length
       )

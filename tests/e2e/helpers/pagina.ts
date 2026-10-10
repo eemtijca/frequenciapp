@@ -15,10 +15,28 @@ export async function aguardarHidratacao(page: Page, seletor = "nav button"): Pr
 }
 
 /**
- * Troca de visão pelo cabeçalho ou pela navegação. O Fast Refresh pode trocar
+ * Troca de visão pelo cabeçalho ou pela navegação (a Chamada Parcial, pelo ícone
+ * da Chamada). O Fast Refresh pode trocar
  * os nós durante a hidratação, então o clique é repetido até o painel mudar.
  */
 export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
+  // A Chamada Parcial não tem item na navegação: abre pelo ícone da Chamada.
+  if (visao === "chamada-parcial") {
+    await trocarVisao(page, "Chamada", "chamada");
+    const icone = page
+      .locator('section[aria-label="Fazer chamada"]')
+      .getByRole("button", { name: "Chamada Parcial", exact: true });
+    await expect
+      .poll(
+        async () => {
+          await icone.click({ force: true });
+          return page.locator("main").getAttribute("data-visao");
+        },
+        { timeout: 20_000 },
+      )
+      .toBe("chamada-parcial");
+    return;
+  }
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const botao = page
