@@ -62,6 +62,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A sincronização de feriados distingue a chave recusada da recusa da base: cada caso tem mensagem própria, e o motivo devolvido pela base entra no log sem repetir o token.
+
 - Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
 
 - Os anéis de cobertura usam título em uma linha, para a hidratação não descartar a página e o primeiro toque na navegação não se perder.
