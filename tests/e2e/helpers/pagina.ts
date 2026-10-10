@@ -11,26 +11,35 @@ export async function aguardarHidratacao(
   seletor = 'button[aria-label="Abrir menu"], nav button',
 ): Promise<void> {
   await page.waitForFunction((alvoTexto) => {
-    const alvo = document.querySelector(alvoTexto) ?? document.querySelector("button");
-    if (!alvo) return false;
-    return Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"));
+    for (const alvo of document.querySelectorAll(alvoTexto)) {
+      if (!(alvo instanceof HTMLElement) || alvo.closest("[hidden]")) continue;
+      const estilo = getComputedStyle(alvo);
+      if (estilo.display === "none" || estilo.visibility === "hidden") continue;
+      if (Object.keys(alvo).some((chave) => chave.startsWith("__reactProps"))) return true;
+    }
+    return false;
   }, seletor);
 }
 
 /**
  * Expõe as seções na barra lateral do desktop ou abre o menu do celular.
+ * Espera o controle visível: o botão do celular fica oculto no desktop e
+ * não pode ser o alvo de um clique longo.
  */
 export async function abrirNavegacao(page: Page): Promise<Locator> {
   await aguardarHidratacao(page);
-  const navegacao = page.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
-  if (!(await navegacao.isVisible())) {
-    await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
-    await expect(
-      page.getByRole("dialog", { name: "Menu do aplicativo", exact: true }),
-    ).toBeVisible();
-  }
-  await expect(navegacao).toBeVisible();
-  return navegacao;
+  const navegacao = page
+    .getByRole("navigation", { name: "Seções do aplicativo", exact: true })
+    .locator("visible=true");
+  const abrir = page
+    .getByRole("button", { name: "Abrir menu", exact: true })
+    .locator("visible=true");
+  await expect(navegacao.or(abrir).first()).toBeVisible();
+  if ((await navegacao.count()) > 0) return navegacao.first();
+  await abrir.click();
+  const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
+  await expect(menu).toBeVisible();
+  return menu.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
 }
 
 /** Troca de visão com um clique; a Chamada Parcial abre pelo ícone da Chamada. */

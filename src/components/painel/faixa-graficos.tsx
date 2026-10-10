@@ -17,6 +17,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const faixa = useRef<HTMLDivElement>(null);
   const larguraFaixa = useRef(0);
   const indiceSalvo = useRef(0);
+  const realinhando = useRef(false);
   const [indice, setIndice] = useState(0);
   const [altura, setAltura] = useState<number>();
   const ajudaId = useId();
@@ -46,6 +47,8 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
     const primeiro = elemento?.firstElementChild;
     const cartao = elemento?.children.item(destino);
     if (!elemento || !(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement)) return;
+    indiceSalvo.current = destino;
+    setIndice(destino);
     elemento.scrollTo({
       left: cartao.offsetLeft - primeiro.offsetLeft,
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -66,6 +69,8 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
     )
       return;
     if (larguraFaixa.current === 0) larguraFaixa.current = elemento.clientWidth;
+    let quadro = 0;
+    let quadroSeguinte = 0;
     const observador = new ResizeObserver(() => {
       if (elemento.clientWidth === 0) {
         larguraFaixa.current = 0;
@@ -73,14 +78,32 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
       }
       const barra = elemento.offsetHeight - elemento.clientHeight;
       setAltura(Math.ceil(cartao.getBoundingClientRect().height) + barra + 8);
-      if (larguraFaixa.current !== elemento.clientWidth) {
-        larguraFaixa.current = elemento.clientWidth;
-        elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
-      }
+      if (larguraFaixa.current === elemento.clientWidth) return;
+      const destino = indiceSalvo.current;
+      realinhando.current = true;
+      larguraFaixa.current = elemento.clientWidth;
+      const alinhar = () => {
+        const base = elemento.firstElementChild;
+        const alvo = elemento.children.item(destino);
+        if (!(base instanceof HTMLElement) || !(alvo instanceof HTMLElement)) return;
+        elemento.scrollTo({ left: alvo.offsetLeft - base.offsetLeft, behavior: "instant" });
+      };
+      alinhar();
+      quadro = requestAnimationFrame(() => {
+        alinhar();
+        quadroSeguinte = requestAnimationFrame(() => {
+          realinhando.current = false;
+        });
+      });
     });
     observador.observe(cartao);
     observador.observe(elemento);
-    return () => observador.disconnect();
+    return () => {
+      cancelAnimationFrame(quadro);
+      cancelAnimationFrame(quadroSeguinte);
+      realinhando.current = false;
+      observador.disconnect();
+    };
   }, [ativo, atual, identidade, cartoes.length]);
 
   return (
@@ -143,7 +166,12 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
           const elemento = evento.currentTarget;
           // A mudança de largura pode gerar scroll antes do ResizeObserver.
           // O observador realinha o cartão vigente antes de recalcular a posição.
-          if (!ativo || elemento.clientWidth === 0 || elemento.clientWidth !== larguraFaixa.current)
+          if (
+            !ativo ||
+            realinhando.current ||
+            elemento.clientWidth === 0 ||
+            elemento.clientWidth !== larguraFaixa.current
+          )
             return;
           const primeiro = elemento.firstElementChild;
           if (!(primeiro instanceof HTMLElement)) return;
