@@ -82,8 +82,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
       </div>
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
-        Lista de consulta das suas turmas. Inclusões, mudanças de turma e desligamentos são feitos
-        pelo administrador da escola, na área de Gestão.
+        Cadastros, transferências e desligamentos são feitos pelo administrador em Gestão.
       </p>
 
       <div
@@ -109,7 +108,7 @@ export default function VistaAlunos({ alunos, turmas }: Props) {
 
       {agrupamento === "origem" && (
         <p className="text-muted-foreground -mt-2 text-xs leading-relaxed">
-          A lista segue a turma de origem da matrícula, a mesma da Grade e da planilha.
+          Turma da matrícula, usada na Grade e na planilha.
         </p>
       )}
 

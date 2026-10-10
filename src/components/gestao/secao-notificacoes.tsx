@@ -32,7 +32,7 @@ const CAMPOS: { tipo: TipoDeAviso; rotulo: string; descricao?: string }[] = [
     tipo: "chamadasPendentes",
     rotulo: "Chamadas pendentes para a coordenação",
     descricao:
-      "Aviso diário sobre turmas com aula prevista, alunos ativos e chamada pendente. Inclui a Gestão.",
+      "Diariamente, para turmas com aula prevista e alunos ativos. A Gestão também recebe.",
   },
 ];
 

@@ -393,7 +393,7 @@ export default function VistaSaidas({
               }}
               className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
             >
-              Escrever em poucas palavras
+              Escrever
             </button>
             <button
               type="button"
@@ -405,7 +405,7 @@ export default function VistaSaidas({
               }}
               className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
             >
-              Tipos de justificativa
+              Selecionar tipo
             </button>
           </div>
           {formaJustificativa === "texto" ? (
@@ -421,12 +421,9 @@ export default function VistaSaidas({
                 value={texto}
                 maxLength={LIMITE_TEXTO_SAIDA}
                 onChange={(evento) => setTexto(evento.target.value)}
-                placeholder="Escreva a justificativa em poucas palavras"
+                placeholder="Descreva o motivo"
                 className="h-11"
               />
-              <p className="text-muted-foreground text-xs">
-                Até {LIMITE_TEXTO_SAIDA} caracteres. Este texto é a justificativa da saída.
-              </p>
             </div>
           ) : (
             <>
@@ -456,9 +453,7 @@ export default function VistaSaidas({
                     placeholder="Opcional: descreva a saída durante a aula"
                     className="h-11"
                   />
-                  <p className="text-muted-foreground text-xs">
-                    Opcional, até {LIMITE_TEXTO_SAIDA} caracteres. Aparece nos relatórios.
-                  </p>
+                  <p className="text-muted-foreground text-xs">Opcional. Aparece nos relatórios.</p>
                 </div>
               ) : justificativa === JUSTIFICATIVA_OUTROS ? (
                 <div className="flex flex-col gap-1.5">

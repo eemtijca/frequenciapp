@@ -55,7 +55,7 @@ test.describe("saída durante a aula", () => {
     await page.getByRole("option", { name: /E2E Aluno Dois/ }).click();
     await page.locator("#saida-momento").click();
     await page.getByRole("option", { name: "1º intervalo" }).click();
-    await page.getByRole("radio", { name: "Escrever em poucas palavras" }).click();
+    await page.getByRole("radio", { name: "Escrever", exact: true }).click();
     await page.locator("#saida-texto").fill("Foi buscar o irmão");
     await page.locator("#saida-responsavel").click();
     await page.getByRole("option", { name: "Coordenadora E2E" }).click();

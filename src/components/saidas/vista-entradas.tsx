@@ -292,8 +292,8 @@ export default function VistaEntradas({
           >
             {(
               [
-                { valor: "texto", rotulo: "Escrever em poucas palavras" },
-                { valor: "catalogo", rotulo: "Tipos de justificativa" },
+                { valor: "texto", rotulo: "Escrever" },
+                { valor: "catalogo", rotulo: "Selecionar tipo" },
               ] as const
             ).map((item) => (
               <button
@@ -325,12 +325,10 @@ export default function VistaEntradas({
                 value={motivo}
                 disabled={executando}
                 onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Escreva a justificativa em poucas palavras"
+                placeholder="Descreva o motivo"
                 className="h-11"
               />
-              <p className="text-muted-foreground text-xs">
-                Até 100 caracteres. Este texto é a justificativa da entrada.
-              </p>
+              <p className="text-muted-foreground text-xs">Até 100 caracteres.</p>
             </div>
           ) : (
             <>
