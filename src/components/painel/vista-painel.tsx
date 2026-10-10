@@ -15,9 +15,10 @@ import type {
 } from "@/domain/frequencia";
 import {
   alunoDesistenteNoDia,
-  diaSeguinte,
+  diaDeChamadaVizinho,
   exibirOrigemNaChamada,
   rotuloDiaSemana,
+  ultimoDiaDeChamada,
 } from "@/domain/frequencia";
 import {
   coberturaDoDia,
@@ -67,7 +68,9 @@ export default function VistaPainel({
   configuracoes,
   onRecarregar,
 }: Props) {
-  const [dia, setDia] = useState(diaCorrente);
+  // Domingo não tem chamada: aos domingos o painel abre no sábado anterior.
+  const diaPadrao = ultimoDiaDeChamada(diaCorrente);
+  const [dia, setDia] = useState(diaPadrao);
   const [doDia, setDoDia] = useState<{
     dia: string;
     frequencias: Frequencia[];
@@ -314,7 +317,7 @@ export default function VistaPainel({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia anterior"
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, -1))}
         >
           <ChevronLeft size={18} />
         </Button>
@@ -324,6 +327,7 @@ export default function VistaPainel({
             modo="dia"
             valor={dia}
             max={diaCorrente}
+            semDomingo
             rotuloAcessivel="Dia do painel"
             rotulo={rotuloDia}
             detalhe={diaDaSemana}
@@ -335,16 +339,16 @@ export default function VistaPainel({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia seguinte"
-          disabled={dia >= diaCorrente}
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+          disabled={dia >= diaPadrao}
+          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
         >
           <ChevronRight size={18} />
         </Button>
       </div>
-      {dia !== diaCorrente && (
+      {dia !== diaPadrao && (
         <button
           type="button"
-          onClick={() => setDia(diaCorrente)}
+          onClick={() => setDia(diaPadrao)}
           className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para hoje

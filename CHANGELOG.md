@@ -11,6 +11,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Adicionado
 
 - Sincronização dos feriados do ano em Gestão, Configurações, Escola, Calendário letivo. A consulta lê todas as páginas da base configurada e grava as datas no calendário. O botão fica bloqueado depois da gravação; uma nova sincronização exige a senha do administrador. Sem feriados importados, o botão permanece ativo. Datas com chamada salva e feriados cadastrados à mão são preservados.
+- Horários no menu, após Chamada, com consulta semanal por turma e dia e visualização da semana completa. Gestão > Turmas configura ordem, início, fim, dias e disciplina por dia, reutilizando as aulas existentes, sem nomes de professores. A migração adiciona o mapa de disciplinas vazio às aulas; cópias JSON antigas continuam aceitas.
 
 - Calendário letivo anual em Gestão, Configurações, Escola, com feriados por data e nome para todas as turmas. Feriados bloqueiam Chamada e Chamada Parcial, inclusive sábados liberados, deixam a cobertura neutra e suspendem avisos escolares. Datas com frequências salvas são recusadas sem alterar o histórico; a cópia JSON preserva o calendário por mesclagem. Abas mensais omitem feriados e só retiram colunas próprias após conferir ausência de valores, fórmulas e notas.
 
@@ -63,6 +64,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Domingo não tem aula nem chamada. A API recusa salvar Chamada e Chamada Parcial em domingo, o calendário e as setas de dia da Chamada, da Chamada Parcial e do Painel pulam o domingo (aos domingos abrem no sábado anterior), a grade padrão de uma turma nova vai de segunda a sábado, a Gestão e a API de aulas não aceitam domingo e os lembretes de chamada pendente não o contam. Chamadas de domingo já salvas continuam nos relatórios e no histórico.
 
 - Uma conferência concluída de saídas ou entradas libera a tentativa anterior mesmo quando as duas gravações caem no mesmo instante.
 
