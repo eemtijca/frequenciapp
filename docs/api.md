@@ -198,6 +198,16 @@ Corpo parcial: `{ ordem?, inicio?, fim?, diasSemana?, disciplinas?, ativo? }`. O
 
 - 200 `{"horario": Horario}`; 404 inexistente; 409 ordem repetida.
 
+### POST /api/horarios/copiar
+
+Corpo: `{ "turmaOrigemId": uuid, "turmaDestinoId": uuid }`. Apenas administração, com origem permitida.
+
+- 201 `{"horarios": Horario[]}` com as aulas copiadas, ordenadas por ordem, com novos identificadores e a turma de destino.
+- 400 identificador inválido, origem igual ao destino ou origem sem aulas; 404 turma inexistente.
+- 409 se alguma ordem da origem já existe no destino, inclusive em aula desativada. Nenhuma aula é copiada nesse caso.
+
+A cópia inclui todas as aulas da origem, preservando ordem, início, fim, dias, disciplinas e estado ativo. Aulas de outras ordens no destino permanecem intactas. Leitura, conferência, inserção em lote e auditoria ocorrem na mesma transação serializável. A operação não altera faltas, frequências nem cópias JSON existentes. Sem sessão responde 401; coordenação e origem não permitida recebem 403.
+
 ### DELETE /api/horarios/{id}
 
 - 200 `{"ok": true}`; 409 quando a aula já tem faltas registradas (o caminho é desativar); 404 inexistente.

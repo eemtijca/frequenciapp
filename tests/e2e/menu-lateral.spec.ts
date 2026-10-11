@@ -57,7 +57,7 @@ test.describe("menu lateral", () => {
 
     await abrir.click();
     await expect(menu).toBeVisible();
-    await page.mouse.click(387, 422);
+    await page.locator('[data-slot="dialog-veu"]').click({ position: { x: 387, y: 422 } });
     await expect(menu).toBeHidden();
     await expect(abrir).toBeFocused();
   });
@@ -85,7 +85,7 @@ test.describe("menu lateral", () => {
     await expect(raiz).toHaveCSS("pointer-events", "auto");
 
     // O véu continua recebendo o toque fora da gaveta e fechando o menu.
-    await page.mouse.click(387, 422);
+    await page.locator('[data-slot="dialog-veu"]').click({ position: { x: 387, y: 422 } });
     await expect(menu).toBeHidden();
     await expect(raiz).not.toHaveAttribute("data-gaveta-aberta");
     expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe("");

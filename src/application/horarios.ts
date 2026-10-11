@@ -1,5 +1,6 @@
 // Aulas da turma: gestão pela administração e leitura pela coordenação.
 import { z } from "zod";
+import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
@@ -48,6 +49,25 @@ export const esquemaAtualizarHorario = horarioBase
     message: "Nada a atualizar.",
   });
 
+export const esquemaCopiarHorarios = z
+  .object(
+    {
+      turmaOrigemId: z
+        .string("Informe a turma de origem.")
+        .uuid("Turma de origem inválida.")
+        .transform((id) => id.toLowerCase()),
+      turmaDestinoId: z
+        .string("Informe a turma de destino.")
+        .uuid("Turma de destino inválida.")
+        .transform((id) => id.toLowerCase()),
+    },
+    { error: "Informe as turmas de origem e destino." },
+  )
+  .refine((dados) => dados.turmaOrigemId !== dados.turmaDestinoId, {
+    message: "Escolha uma turma de destino diferente da origem.",
+    path: ["turmaDestinoId"],
+  });
+
 interface LinhaHorario {
   id: string;
   turmaId: string;
@@ -85,6 +105,67 @@ export async function listarHorariosDaTurma(turmaId: string): Promise<Horario[]>
   const linhas = await banco().horario.findMany({
     where: { turmaId },
     orderBy: { ordem: "asc" },
+  });
+  return linhas.map(paraHorario);
+}
+
+/** Copia a grade completa entre turmas sem substituir aulas ou alterar o histórico. */
+export async function copiarHorarios(admin: { id: string }, entrada: unknown): Promise<Horario[]> {
+  const dados = esquemaCopiarHorarios.safeParse(entrada);
+  if (!dados.success) {
+    throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  }
+
+  const linhas = await comTransacao(async (tx) => {
+    const { turmaOrigemId, turmaDestinoId } = dados.data;
+    const turmas = await tx.turma.findMany({
+      where: { id: { in: [turmaOrigemId, turmaDestinoId] } },
+      include: { serie: { select: { nome: true } } },
+    });
+    const origem = turmas.find((turma) => turma.id === turmaOrigemId);
+    if (!origem) throw new ErroHttp("Turma de origem não encontrada.", 404);
+    const destino = turmas.find((turma) => turma.id === turmaDestinoId);
+    if (!destino) throw new ErroHttp("Turma de destino não encontrada.", 404);
+
+    const aulas = await tx.horario.findMany({
+      where: { turmaId: turmaOrigemId },
+      orderBy: { ordem: "asc" },
+    });
+    if (aulas.length === 0) {
+      throw new ErroHttp("A turma de origem não tem aulas para copiar.", 400);
+    }
+    const conflito = await tx.horario.findFirst({
+      where: { turmaId: turmaDestinoId, ordem: { in: aulas.map((aula) => aula.ordem) } },
+      select: { ordem: true },
+      orderBy: { ordem: "asc" },
+    });
+    if (conflito) {
+      throw new ErroHttp(
+        `A turma de destino já tem a aula ${conflito.ordem}. Nenhuma aula foi copiada.`,
+        409,
+      );
+    }
+
+    const copiadas = await tx.horario.createManyAndReturn({
+      data: aulas.map((aula) => ({
+        turmaId: turmaDestinoId,
+        ordem: aula.ordem,
+        inicio: aula.inicio,
+        fim: aula.fim,
+        diasSemana: aula.diasSemana,
+        disciplinas: aula.disciplinas === null ? Prisma.JsonNull : aula.disciplinas,
+        ativo: aula.ativo,
+      })),
+    });
+    // A cópia só é confirmada se a trilha de auditoria também for gravada.
+    await tx.auditoria.create({
+      data: {
+        usuarioId: admin.id,
+        acao: "horario.copiar",
+        alvo: `${rotuloDeTurma(origem.serie.nome, origem.nome)} para ${rotuloDeTurma(destino.serie.nome, destino.nome)}: ${copiadas.length} aulas`,
+      },
+    });
+    return copiadas.sort((a, b) => a.ordem - b.ordem);
   });
   return linhas.map(paraHorario);
 }
