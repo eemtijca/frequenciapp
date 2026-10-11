@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- FrequenciBI recebe leitura escolar paginada por chave independente da sessão, com escopos por série, turma, período e base. Gestão administra criação, edição, rotação, revogação e histórico das chaves, com senha e auditoria; segredo aparece uma vez e permanece fora da cópia escolar.
+
 - Administração edita a turma selecionada diretamente em Horários, com o cadastro existente e edição rápida de disciplina ou janela pela grade. Toda gravação depende de ação explícita; edição rápida e cópia entre turmas têm conferência antes de salvar. A cópia preserva aulas ativas e desativadas, recusa ordens repetidas sem gravar parte da grade e mantém faltas e histórico. Gestão conta apenas as aulas ativas e confirma a ativação ou desativação.
 
 - Sincronização dos feriados do ano em Gestão, Configurações, Escola, Calendário letivo. A consulta lê todas as páginas da base configurada e grava as datas no calendário. O botão fica bloqueado depois da gravação; uma nova sincronização exige a senha do administrador. Sem feriados importados, o botão permanece ativo. Datas com chamada salva e feriados cadastrados à mão são preservados.

@@ -153,3 +153,7 @@ A cobertura protege o essencial do domínio (derivação de marcas e grade), a s
 ## Indicadores externos
 
 `tests/unit/indicadores.test.ts` e `google-indicadores.test.ts` verificam agregação histórica, minimização e lote atômico. `tests/api/indicadores.test.ts` usa Google sintético com múltiplos arquivos para cobrir autorização, recuperação de resposta perdida, exclusões e agenda. `tests/e2e/indicadores.spec.ts` cobre a configuração pelo navegador em desktop e celulares. As suítes de API e navegador precisam de banco migrado e servidor com o transporte sintético de testes; a agenda usa o CRON_SECRET de teste. Não há acesso a contas Google ou dados reais.
+
+## FrequenciBI
+
+`bi-acesso.test.ts` verifica segredos, validação, expiração e interseção de escopos. `bi.test.ts` exercita o endpoint real com massa QA própria, autenticação independente do cookie, ausência do segredo no banco e listagem, permissões administrativas, CSRF, recortes históricos, paginação, rotação, revogação, expiração e limite por chave. `guardas-rotas.test.ts` exige a guarda exclusiva de chave no GET `/api/bi` e guardas administrativas na gestão. Nenhum teste usa dados escolares reais.

@@ -40,6 +40,7 @@ import { Switch } from "@/components/ui/switch";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import DialogoDownload from "@/components/conta/dialogo-download";
+import SecaoChavesBi from "@/components/gestao/secao-chaves-bi";
 import SecaoAcessoDiretores from "@/components/gestao/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/secao-notificacoes";
 import IntegracaoPlanilha from "@/components/gestao/integracao-planilha";
@@ -1065,6 +1066,10 @@ export default function AbaConfiguracoes({
             {resultado.identicas} {resultado.identicas === 1 ? "já era igual" : "já eram iguais"} e{" "}
             {resultado.conflitos}{" "}
             {resultado.conflitos === 1 ? "conflito mantido" : "conflitos mantidos"}.
+            <span className="mt-2 block">
+              Chaves do FrequenciBI não são restauradas. Gere novas chaves na Gestão quando
+              necessário.
+            </span>
           </p>
         )}
       </SecaoRecolhivel>
@@ -1135,6 +1140,7 @@ export default function AbaConfiguracoes({
           inert={categoria !== "acesso"}
           className="flex min-w-0 flex-col gap-4"
         >
+          <SecaoChavesBi series={series} turmas={turmas} />
           <SecaoAcessoDiretores />
           <SecaoNotificacoes />
         </section>

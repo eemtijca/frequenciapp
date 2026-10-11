@@ -50,6 +50,11 @@ describe("guardas das rotas da API", () => {
   it.each(todos.map((item) => [item.chave, item] as const))(
     "%s passa por uma guarda ou está na lista pública",
     (chave, item) => {
+      if (chave === "bi GET") {
+        expect(item.corpo).toMatch(/exigirChaveBi\(requisicao\)/);
+        expect(GUARDA.test(item.corpo)).toBe(false);
+        return;
+      }
       if (
         chave === "notificacoes/resumo GET" ||
         chave === "notificacoes/agenda GET" ||
