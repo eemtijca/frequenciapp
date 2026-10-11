@@ -29,3 +29,11 @@ Continuar apenas com os painéis externos limita a análise e depende de outras 
 ## Consequências
 
 A entrega tem dois PRs sequenciais: leitura e Gestão de chaves, depois experiência do BI. O painel externo continua independente. A escola controla distribuição, revisão e revogação das chaves e a guarda dos dispositivos e arquivos exportados. Nenhuma chave autoriza mutações escolares.
+
+## Experiência e execução local
+
+A segunda parte entrega abas curadas, explorador e painéis em `/bi`, isolados do bundle do aplicativo principal. Recharts é carregado sob demanda; um worker agrupa bases com passagem única. Medidas ponderadas reutilizam os totais consolidados pelo contrato e recusam combinações sem significado na base escolhida. Aulas enumeradas são expandidas somente em dimensões de aula. Alunos homônimos são separados pelo identificador.
+
+Personalização estrita usa formato v2 com migração da v1; arquivos exportados excluem chave e bases. IndexedDB guarda somente downloads completos, separados por chave, escopo, base e período. Offline mostra retrato e data, sem afirmar validade da chave. Apenas o HTML anônimo de `/bi` entra no service worker; APIs e páginas autenticadas continuam fora desse cache. Recusa ou mudança de escopo online encerra o acesso e remove os retratos antigos. A alternativa sem worker mantém os cálculos no cliente; armazenamento bloqueado mantém a aba utilizável com aviso explícito.
+
+Cobertura histórica é uma estimativa baseada nas turmas atuais, feriados e chamadas existentes. Não se infere matrícula antiga nem quantidade de aulas de turnos sem enumeração. O dicionário informa essas limitações e a turma atual das saídas. O guia operacional fica em [FrequenciBI](../frequencibi.md).

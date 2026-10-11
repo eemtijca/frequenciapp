@@ -1,0 +1,36 @@
+/* Grade de painéis: arraste e redimensionamento ficam apenas nos puxadores, sem bloquear a rolagem. */
+.grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.item {
+  min-width: 0;
+  min-height: var(--altura, 360px);
+}
+.puxador {
+  touch-action: none;
+  cursor: grab;
+}
+.redimensionar {
+  touch-action: none;
+  cursor: nwse-resize;
+}
+@media (min-width: 900px) {
+  .grade {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .item {
+    grid-column: span var(--largura, 6);
+  }
+}
+@media print {
+  .grade {
+    display: block;
+  }
+  .item {
+    break-inside: avoid;
+    margin-bottom: 1rem;
+    min-height: 0;
+  }
+}

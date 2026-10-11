@@ -44,3 +44,4 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 - [ADR-041: sincronização de feriados](adr/041-sincronizacao-de-feriados.md): base externa opcional, gravação única e senha para repetir.
 
 - [ADR-042: FrequenciBI interno](adr/042-frequencibi.md).
+- [FrequenciBI](frequencibi.md): análise curada, explorador, painéis locais e uso offline.

@@ -1,0 +1,58 @@
+/* Área de BI isolada, com espaços seguros e modo de apresentação e impressão. */
+.raiz {
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+.cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0;
+}
+.conteudo {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 1rem;
+  min-width: 0;
+}
+.apresentacao .cabecalho {
+  display: none;
+}
+@media (min-width: 900px) {
+  .conteudo {
+    padding: 1.5rem 2rem;
+  }
+}
+@media print {
+  .conteudo {
+    max-width: none;
+    padding: 0;
+  }
+  .conteudo article {
+    break-inside: avoid;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+  .raiz {
+    padding: 0;
+  }
+}
+
+.apresentacao :global([class~="print:hidden"]) {
+  display: none;
+}
+.sairApresentacao {
+  position: fixed;
+  z-index: 30;
+  top: max(0.5rem, env(safe-area-inset-top));
+  right: max(0.5rem, env(safe-area-inset-right));
+}
+@media print {
+  .sairApresentacao {
+    display: none;
+  }
+}

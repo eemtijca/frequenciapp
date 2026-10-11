@@ -1,6 +1,6 @@
 // Service worker: casca offline e avisos push sem dados de estudantes.
 // A API nunca é cacheada; a navegação tenta a rede antes da página offline.
-const VERSAO = "frequenciapp-5";
+const VERSAO = "frequenciapp-6";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",
@@ -120,10 +120,23 @@ self.addEventListener("fetch", (evento) => {
   // Navegação: rede primeiro, página offline como rede de proteção.
   if (requisicao.mode === "navigate") {
     evento.respondWith(
-      fetch(requisicao).catch(async () => {
-        const cache = await caches.open(CACHE);
-        return (await cache.match("/offline.html")) ?? Response.error();
-      }),
+      fetch(requisicao)
+        .then(async (resposta) => {
+          // Só a página pública do BI pode ser guardada; seu HTML não contém dados ou sessão.
+          if (url.pathname === "/bi" && resposta.ok) {
+            const cache = await caches.open(CACHE);
+            await cache.put("/bi", resposta.clone());
+          }
+          return resposta;
+        })
+        .catch(async () => {
+          const cache = await caches.open(CACHE);
+          if (url.pathname === "/bi") {
+            const casca = await cache.match("/bi");
+            if (casca) return casca;
+          }
+          return (await cache.match("/offline.html")) ?? Response.error();
+        }),
     );
     return;
   }
