@@ -898,3 +898,13 @@ Apenas administração e origem válida. `{}` retorna `{ previa: { copias: strin
 | GET /api/indicadores/agenda     | Atualiza fontes ativas com Authorization: Bearer CRON_SECRET, sem criar arquivo         |
 
 As rotas administrativas exigem capacidade administrar; mutações verificam origem. Criação incerta bloqueia nova criação até recuperação. Operações concorrentes recebem 409. Erros não expõem dados pessoais ou credenciais. O último sucesso só avança após confirmação. Detalhes de fontes, atualização, compartilhamento e limites em [looker-studio.md](looker-studio.md).
+
+## FrequenciBI
+
+GET `/api/bi` usa somente `Authorization: Bearer fbi_...`; não aceita sessão nem chave na URL. Sem `recurso`, devolve metadados de acesso, escopo e bases permitidas, sem dado escolar. `recurso=acesso` testa a chave; demais bases: `series`, `turmas`, `alunos`, `horarios`, `justificativas`, `liberadores`, `feriados`, `chamadas`, `faltas`, `lista`, `saidas`, `entradas`, `parciais` e `contexto`.
+
+Filtros opcionais: `inicio` e `fim` civis, `serieId`, `turmaId`, `pagina` a partir de 1 e `limite` entre 1 e 200. O escopo da chave sempre prevalece por interseção. Resposta: `recurso`, `linhas`, `pagina`, `proximaPagina`, `consultadoEm`, `escopo` e `recursos`. `proximaPagina=null` encerra a leitura. Totais da chamada usam a lista histórica e as regras existentes de presença parcial e desistência. Autoria expõe somente nome; contas e recursos operacionais ficam fora do contrato. A paginação usa ordem estável; uma atualização escolar entre páginas pode mudar o retrato, portanto a interface deduplica por identificador e atualiza sob demanda.
+
+GET `/api/bi/chaves` lista metadados para administração. POST na mesma rota exige sessão administrativa, origem própria e senha. Corpo: `acao`, `senha` e campos da ação. `criar` exige `rotulo`, `expiraEm` ISO ou null e `escopo`; `editar` acrescenta `id`; `rotacionar` e `revogar` exigem `id`; `revogar-todas` e `limpar` não recebem identificador. O escopo permite listas de UUIDs `series` e `turmas`, datas `inicio` e `fim` e lista de `recursos`. Campos ausentes não restringem; listas vazias recusam tudo. O segredo aparece somente no retorno de criação ou rotação. A rotação preserva rótulo, escopo e validade e mantém o registro antigo revogado para auditoria de uso. Limpeza remove somente revogadas e expiradas, preservando auditoria.
+
+Erros de leitura: 400 para consulta inválida, 401 genérico para chave indisponível, 403 para base fora do escopo e 429 para limites. Somente GET é implementado na leitura. Todas as respostas são sem cache; nenhuma mudança de dados escolares existe nesse endpoint. Limites e consequências do cache local estão na ADR-042.

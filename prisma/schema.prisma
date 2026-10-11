@@ -10,6 +10,24 @@ datasource db {
   provider = "postgresql"
 }
 
+// Chave opaca de leitura escolar. O segredo aparece uma vez e só seu hash fica no banco.
+// Sem vínculo obrigatório com conta e fora da cópia de segurança escolar.
+model ChaveBi {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rotulo        String    @db.VarChar(80)
+  segredoHash   String    @unique @map("segredo_hash") @db.VarChar(64)
+  escopo        Json      @default("{}")
+  criadaEm      DateTime  @default(now()) @map("criada_em") @db.Timestamptz
+  expiraEm      DateTime? @map("expira_em") @db.Timestamptz
+  revogadaEm    DateTime? @map("revogada_em") @db.Timestamptz
+  primeiroUsoEm DateTime? @map("primeiro_uso_em") @db.Timestamptz
+  ultimoUsoEm   DateTime? @map("ultimo_uso_em") @db.Timestamptz
+  usos          Int       @default(0)
+
+  @@index([revogadaEm, expiraEm])
+  @@map("chaves_bi")
+}
+
 // Papel do usuário. ADMIN cuida de contas e cadastros; COORDENACAO faz a
 // frequência, consulta o histórico e a grade do mês; DIRETOR_TURMA só lê as
 // estatísticas das turmas do seu vínculo (ADR-021).

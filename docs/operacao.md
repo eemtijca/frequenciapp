@@ -211,3 +211,9 @@ npm run build
 ```
 
 As migrations são aditivas por padrão. O changelog avisa quando houver passo destrutivo.
+
+## Operação do FrequenciBI
+
+Aplique a migração `chaves_frequencibi` pelo fluxo normal de migrações. A administração abre Gestão, Configurações, Acesso e avisos, FrequenciBI e cria uma chave com rótulo, validade opcional e escopo. Copie o segredo exibido uma única vez e entregue por canal restrito. Não use URL com chave. A lista informa primeiro e último uso, contagem e inatividade após 90 dias. Revise chaves sem uso, rotacione quando houver perda do segredo e revogue no desligamento ou perda do dispositivo. Revogar todas encerra novas consultas de todas as pessoas.
+
+Limpar histórico remove apenas chaves revogadas ou expiradas e conserva auditoria. Cópias escolares não incluem chaves; confira o acesso após restauração. Uma recusa genérica de leitura pode indicar segredo incorreto, expiração ou revogação; consulte o estado na Gestão, sem solicitar o segredo em logs. Limites de leitura são compartilhados no banco e recuperam acesso ao vencer a janela, sem reiniciar instâncias.

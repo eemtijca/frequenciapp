@@ -276,7 +276,9 @@ describe("palavra-chave e entrada do diretor", () => {
         { method: rota.metodo, ...(rota.metodo === "GET" ? {} : { body: "{}" }) },
         cookieDiretor,
       );
-      if (resposta.status !== 403)
+      // A leitura do BI exige chave própria; o cookie também permanece sem acesso.
+      const esperado = rota.metodo === "GET" && rota.caminho === "/api/bi" ? 401 : 403;
+      if (resposta.status !== esperado)
         liberadas.push(`${rota.metodo} ${rota.caminho} ${resposta.status}`);
     }
     expect(liberadas).toEqual([]);

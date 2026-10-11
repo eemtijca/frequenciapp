@@ -86,3 +86,9 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 ## Superfície de dependências
 
 Distribuição enxuta: framework, UI, Prisma 7 com adaptador pg, zod, Motion e dotenv para o CLI. Nenhuma dependência de serviços externos em runtime, o que elimina toda uma classe de risco de integração. O service worker é código próprio, auditável em um arquivo.
+
+## Chaves do FrequenciBI
+
+O acesso ao BI é independente do cookie e exclusivamente de leitura. Chaves de 256 bits aparecem uma vez e somente o hash fica no banco. Todas as ações administrativas exigem senha e auditoria transacional. Escopos intersectam séries, turmas, período e bases, inclusive quando a URL pede um recorte maior. Revogação e rotação impedem novas leituras com o segredo antigo. Consulte a ADR-042 para limites compartilhados e contratos.
+
+Distribua chaves apenas à equipe autorizada, com rótulo por pessoa ou dispositivo, escopo mínimo e validade quando aplicável. Ao desligamento ou perda de dispositivo, revogue a chave; em incidente abrangente, revogue todas. Dados já baixados e exportados não são apagados remotamente. O segredo não pode aparecer em links, logs, auditoria ou configuração exportada. A cópia escolar não exporta nem restaura chaves; após restauração, confira as chaves existentes e gere novas quando necessário.

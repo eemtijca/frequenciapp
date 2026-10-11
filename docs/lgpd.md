@@ -86,3 +86,9 @@ Observações devem conter apenas o necessário ao lançamento escolar. A confir
 ## Indicadores externos
 
 A integração Looker Studio exporta somente contagens agregadas para arquivo separado, sem nomes, identificadores pessoais, justificativas, motivos ou observações. Totais de grupos pequenos não equivalem a anonimização e precisam de acesso restrito. A gestão controla compartilhamento do arquivo, fontes e relatório. Exclusões no banco alcançam a fonte externa após atualização confirmada; cópias manuais e exportações do relatório seguem controle de retenção separado. Procedimento em [looker-studio.md](looker-studio.md).
+
+## Análises no FrequenciBI
+
+Finalidade: acompanhamento escolar e análise interna de frequência e movimentações. O BI disponibiliza à equipe autorizada nomes de alunos, observações, motivos, autoria e confirmação Seduc. A administração controla acesso por chaves nomeadas, escopos e validade; nenhuma publicação pública é criada. O painel externo agregado continua separado.
+
+Personalização e chave permanecem no navegador da pessoa autorizada. Dados consultados são retidos no IndexedDB até a limpeza explícita, sem envio a terceiros. O dispositivo e os arquivos exportados devem permanecer sob guarda da equipe. Exportações pessoais exigem confirmação. Revogação impede consultas novas, sem apagar arquivos e retratos offline já baixados. A interface mostra a data do retrato e permite esquecer a chave, limpar dados e limpar toda a personalização. Solicitações de acesso, correção e eliminação seguem os procedimentos da escola e as limitações legais de preservação do histórico descritas neste documento.
