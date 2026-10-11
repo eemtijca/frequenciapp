@@ -6,13 +6,13 @@ Suítes do FrequenciApp com Vitest e Playwright.
 
 `tests/api/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/e2e/notificacoes.spec.ts` valida a Gestão e a coordenação; `pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
 
-| Suíte            | Comando             | Pré-requisitos                                           |
-| ---------------- | ------------------- | -------------------------------------------------------- |
-| Unidade          | `npm run test:unit` | Nenhum.                                                  |
-| Contratos de API | `npm run test:api`  | Aplicativo no ar, banco migrado, contas de teste.        |
-| Ponta a ponta    | `npm run test:e2e`  | Aplicativo no ar e navegadores instalados.               |
-| PWA              | `npm run test:pwa`  | Build de produção no ar (`npm run build` e `npm start`). |
-| API e unidade    | `npm test`          | Idem, na ordem.                                          |
+| Suíte            | Comando              | Pré-requisitos                                             |
+| ---------------- | -------------------- | ---------------------------------------------------------- |
+| Unidade          | `pnpm run test:unit` | Nenhum.                                                    |
+| Contratos de API | `pnpm run test:api`  | Aplicativo no ar, banco migrado, contas de teste.          |
+| Ponta a ponta    | `pnpm run test:e2e`  | Aplicativo no ar e navegadores instalados.                 |
+| PWA              | `pnpm run test:pwa`  | Build de produção no ar (`pnpm run build` e `pnpm start`). |
+| API e unidade    | `pnpm test`          | Idem, na ordem.                                            |
 
 ## Unidade
 
@@ -45,11 +45,11 @@ A suíte aponta para o aplicativo em execução. O banco de testes precisa estar
 
 ```bash
 # 1. banco migrado
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 
 # 2. contas de teste (padrões demo@escola.exemplo e direcao@escola.exemplo)
-ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção npm run criar-admin
-CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo npm run criar-coordenacao
+ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção pnpm run criar-admin
+CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo pnpm run criar-coordenacao
 
 # 3. aplicativo de testes com configuração Google sintética
 # Usar os mesmos DATABASE_URL e AUTH_SECRET no servidor e nas suítes.
@@ -58,10 +58,10 @@ export GOOGLE_CLIENT_SECRET=segredo-sintetico
 export GOOGLE_REDIRECT_URI=http://localhost:3000/api/planilha/google/retorno
 export GOOGLE_PICKER_API_KEY=picker-sintetico
 export GOOGLE_PROJECT_NUMBER=123456789
-NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" npm run dev
+NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" pnpm run dev
 
 # 4. suíte
-DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia npm run test:api
+DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia pnpm run test:api
 ```
 
 Variáveis aceitas:
@@ -80,23 +80,23 @@ Os testes de planilha criam um servidor HTTP local que responde nos formatos OAu
 
 ## Ponta a ponta com Playwright
 
-Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. O aplicativo precisa estar no ar antes (`docker compose up -d` ou `npm run dev`):
+Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. O aplicativo precisa estar no ar antes (`docker compose up -d` ou `pnpm run dev`):
 
 ```bash
-npm run test:e2e:docker            # todos os projetos
-npm run test:e2e:docker:chromium   # só o Chromium
-npm run capturas:readme            # capturas do README em docs/imagens
+pnpm run test:e2e:docker            # todos os projetos
+pnpm run test:e2e:docker:chromium   # só o Chromium
+pnpm run capturas:readme            # capturas do README em docs/imagens
 ```
 
-O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test`. Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
+O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test` (a imagem não expõe um binário global). Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
 
 Como alternativa, instale os navegadores no host e mantenha a configuração já presente no repositório:
 
 ```bash
-npm i -D @playwright/test
-npx playwright install --with-deps chromium webkit
-npm run dev            # ou docker compose up -d
-npx playwright test    # headless, execução serial
+pnpm add -D @playwright/test
+pnpm exec playwright install --with-deps chromium webkit
+pnpm run dev            # ou docker compose up -d
+pnpm exec playwright test    # headless, execução serial
 ```
 
 - `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
@@ -109,7 +109,7 @@ npx playwright test    # headless, execução serial
 - `horarios.spec.ts`: cadastro das disciplinas por dia na Gestão, recarga e nova tentativa sem perder o formulário, consulta por turma, dia e semana pela coordenação, aulas inativas omitidas e Sem disciplina. Confere semana e edição em 360 pixels e anexa capturas sintéticas ao relatório.
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
-O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `npm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e carrega o transporte de testes por `NODE_OPTIONS` (ver `compose.ci.yml`), para OAuth e Sheets API simulados responderem no loopback do runner.
+O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `pnpm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e carrega o transporte de testes por `NODE_OPTIONS` (ver `compose.ci.yml`), para OAuth e Sheets API simulados responderem no loopback do runner.
 
 ## Verificação visual e de ponta a ponta
 
@@ -118,8 +118,8 @@ Além das suítes, a validação inclui inspeção visual das telas (captura e a
 As capturas oficiais do README ficam em `docs/imagens/` e são geradas por `tests/e2e/imagens.spec.ts`, com o aplicativo no ar e a semente aplicada:
 
 ```bash
-npm run capturas:readme         # Playwright local
-npm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
+pnpm run capturas:readme         # Playwright local
+pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
 ```
 
 O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.

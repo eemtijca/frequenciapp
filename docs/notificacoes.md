@@ -38,11 +38,11 @@ O sistema operacional e o navegador podem atrasar ou silenciar avisos. A aceita�
 
 ## Configuração da instalação
 
-Aplicar as migrações antes de servir esta versão: `npx prisma migrate deploy`. A migração `preferencias_notificacoes` cria regras e preferências, separa confirmações por tipo e chamada e registra o instante de criação da frequência para distinguir chamadas novas. Confirmações anteriores continuam sendo resumos. Assinaturas, chaves, preferências pessoais e regras de notificações ficam fora da cópia JSON de frequência.
+Aplicar as migrações antes de servir esta versão: `pnpm exec prisma migrate deploy`. A migração `preferencias_notificacoes` cria regras e preferências, separa confirmações por tipo e chamada e registra o instante de criação da frequência para distinguir chamadas novas. Confirmações anteriores continuam sendo resumos. Assinaturas, chaves, preferências pessoais e regras de notificações ficam fora da cópia JSON de frequência.
 
 As notificações podem ser ativadas sem ajustes da administração no aplicativo ou variáveis VAPID na hospedagem. O servidor deriva um par estável de `AUTH_SECRET` com HKDF-SHA-256 e contexto exclusivo para Web Push. Reinícios e instâncias com o mesmo segredo mantêm o par. A chave privada permanece somente no servidor, e o contato padrão é o endereço HTTPS do repositório do FrequenciApp.
 
-Uma instalação com par VAPID próprio continua usando suas chaves, sem troca automática. Para definir esse par, gerar uma única vez com `npx web-push generate-vapid-keys` e configurar as duas chaves juntas. Não incluir a chave privada em commits, imagens, issues ou logs públicos. O contato pode ser personalizado de forma independente:
+Uma instalação com par VAPID próprio continua usando suas chaves, sem troca automática. Para definir esse par, gerar uma única vez com `pnpm exec web-push generate-vapid-keys` e configurar as duas chaves juntas. Não incluir a chave privada em commits, imagens, issues ou logs públicos. O contato pode ser personalizado de forma independente:
 
 | Variável                 | Conteúdo                                                          |
 | ------------------------ | ----------------------------------------------------------------- |

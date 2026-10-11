@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/docker-cache
-          key: docker-frequenciapp-${{ hashFiles('package-lock.json', 'Dockerfile') }}
+          key: docker-frequenciapp-${{ hashFiles('pnpm-lock.yaml', 'Dockerfile') }}
 
       - name: Construir a imagem da aplicação
         run: |

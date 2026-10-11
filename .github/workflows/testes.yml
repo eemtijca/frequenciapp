@@ -30,14 +30,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: Instalar dependências
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Preparar chaves sintéticas de push
         run: node tests/gerar-ambiente-push.mjs "$GITHUB_ENV"
@@ -61,7 +64,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Gerar cliente Prisma
-        run: npm run db:generate
+        run: pnpm run db:generate
 
       - name: Subir aplicação e banco
         run: docker compose -f compose.yml -f compose.ci.yml up -d
@@ -94,20 +97,20 @@ jobs:
           ADMIN_EMAIL: direcao@escola.exemplo
           ADMIN_SENHA: DirecaoFrequencia2026
           ADMIN_NOME: Direção
-        run: npm run criar-admin
+        run: pnpm run criar-admin
 
       - name: Criar coordenação de teste
         env:
           CONTA_EMAIL: demo@escola.exemplo
           CONTA_SENHA: DemoFrequencia2026
           CONTA_NOME: Demo
-        run: npm run criar-coordenacao
+        run: pnpm run criar-coordenacao
 
       - name: Testes de contratos da API
-        run: npm run test:api
+        run: pnpm run test:api
 
       - name: Instalar navegadores do Playwright
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Testes de ponta a ponta (Playwright)
         env:
@@ -116,14 +119,14 @@ jobs:
           TEST_BASE_URL: http://localhost:3000
           PLAYWRIGHT_SKIP_WEBSERVER: "1"
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-        run: npm run test:e2e:chromium
+        run: pnpm run test:e2e:chromium
 
       - name: Testes de PWA (Playwright)
         env:
           TEST_BASE_URL: http://localhost:3000
           PLAYWRIGHT_SKIP_WEBSERVER: "1"
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-        run: npm run test:pwa -- --project=chromium
+        run: pnpm run test:pwa --project=chromium
 
       - name: Publicar relatório do Playwright
         if: failure()

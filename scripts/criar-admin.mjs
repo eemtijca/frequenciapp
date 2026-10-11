@@ -14,7 +14,7 @@ const somenteCriar = process.argv.includes("--somente-criar");
 if (!email || !senha || !nome) {
   console.error("Defina ADMIN_EMAIL, ADMIN_SENHA e ADMIN_NOME no ambiente (ver .env.example).");
   console.error(
-    "Exemplo: ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin",
+    "Exemplo: ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' pnpm run criar-admin",
   );
   process.exit(1);
 }

@@ -97,15 +97,15 @@ O Compose sobe o PostgreSQL 17, aplica as migrações na partida e inicia o apli
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direção' \
-  docker compose exec app npm run criar-admin
+  docker compose exec app pnpm run criar-admin
 ```
 
 Com o administrador no dispositivo, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e a semente:
 
 ```bash
 CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha forte' CONTA_NOME='Equipe' \
-  docker compose exec app npm run criar-coordenacao
-SEED_ALUNOS=12 docker compose exec app npm run seed
+  docker compose exec app pnpm run criar-coordenacao
+SEED_ALUNOS=12 docker compose exec app pnpm run seed
 ```
 
 Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambiente.md](docs/ambiente.md). Publicação em [docs/deploy.md](docs/deploy.md).
@@ -152,16 +152,16 @@ As camadas, o fluxo de requisição e as decisões registradas estão em [docs/a
 
 ## Testes e qualidade
 
-| Comando                   | Efeito                                                   |
-| ------------------------- | -------------------------------------------------------- |
-| `npm run format:check`    | Prettier em modo verificação.                            |
-| `npm run lint`            | ESLint com regras estritas.                              |
-| `npm run tsc`             | Verificação de tipos sem emissão.                        |
-| `npm run test:unit`       | Testes de unidade e guarda editorial.                    |
-| `npm run test:api`        | Contratos de API com o aplicativo no ar.                 |
-| `npm run test:e2e:docker` | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
-| `npm run test:pwa:docker` | PWA contra o build de produção.                          |
-| `npm run capturas:readme` | Regenera as capturas do README em `docs/imagens/`.       |
+| Comando                    | Efeito                                                   |
+| -------------------------- | -------------------------------------------------------- |
+| `pnpm run format:check`    | Prettier em modo verificação.                            |
+| `pnpm run lint`            | ESLint com regras estritas.                              |
+| `pnpm run tsc`             | Verificação de tipos sem emissão.                        |
+| `pnpm run test:unit`       | Testes de unidade e guarda editorial.                    |
+| `pnpm run test:api`        | Contratos de API com o aplicativo no ar.                 |
+| `pnpm run test:e2e:docker` | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
+| `pnpm run test:pwa:docker` | PWA contra o build de produção.                          |
+| `pnpm run capturas:readme` | Regenera as capturas do README em `docs/imagens/`.       |
 
 A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/README.md](tests/README.md).
 
@@ -169,7 +169,7 @@ A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/REA
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp&project-name=frequenciapp&repository-name=frequenciapp&env=DATABASE_URL,DIRECT_URL,AUTH_SECRET,TZ_APP,ADMIN_EMAIL,ADMIN_SENHA,ADMIN_NOME&envDescription=Vari%C3%A1veis%20do%20FrequenciApp%3A%20banco%2C%20segredo%20de%20sess%C3%A3o%2C%20fuso%20e%20administrador%20inicial&envLink=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp%2Fblob%2Fmain%2Fdocs%2Fambiente.md)
 
-O build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de migrações na `main` ou manualmente com `npm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
+O build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de migrações na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
 ## Privacidade
 

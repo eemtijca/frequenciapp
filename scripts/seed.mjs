@@ -11,7 +11,7 @@ const totalDeDias = Number(process.env.SEED_DIAS ?? 5);
 
 if (!email) {
   console.error(
-    "Defina CONTA_EMAIL (a conta precisa existir; crie com npm run criar-coordenacao).",
+    "Defina CONTA_EMAIL (a conta precisa existir; crie com pnpm run criar-coordenacao).",
   );
   process.exit(1);
 }
@@ -113,7 +113,7 @@ try {
   );
   if (coordenacao.rowCount === 0) {
     console.error(
-      `Conta de coordenação ${email} não encontrada. Rode npm run criar-coordenacao antes.`,
+      `Conta de coordenação ${email} não encontrada. Rode pnpm run criar-coordenacao antes.`,
     );
     process.exit(2);
   }

@@ -1,10 +1,10 @@
 # Deploy
 
-O FrequenciApp é um processo Node único com página, rotas de API e service worker. O build de produção usa `npm run build`. O banco pode ser o PostgreSQL do Compose ou uma instância gerenciada. Para AWS, Azure ou GCP com Terraform, consulte [implantacao-nuvem.md](implantacao-nuvem.md).
+O FrequenciApp é um processo Node único com página, rotas de API e service worker. O build de produção usa `pnpm run build`. O banco pode ser o PostgreSQL do Compose ou uma instância gerenciada. Para AWS, Azure ou GCP com Terraform, consulte [implantacao-nuvem.md](implantacao-nuvem.md).
 
 ## Migração do calendário letivo
 
-Antes de publicar a versão com feriados, aplicar `20261010124500_calendario_feriados` no banco ou schema do ambiente de destino, usando `npx prisma migrate deploy` com a `DIRECT_URL` já configurada. A migração cria a tabela do calendário, com data, nome e autoria, sem mudar chamadas existentes. Gerar o cliente Prisma ou concluir o build da Vercel não aplica essa migração. Na produção, conferir a execução do workflow de migrações antes de servir a nova versão; cada Preview também precisa estar migrado em seu próprio schema.
+Antes de publicar a versão com feriados, aplicar `20261010124500_calendario_feriados` no banco ou schema do ambiente de destino, usando `pnpm exec prisma migrate deploy` com a `DIRECT_URL` já configurada. A migração cria a tabela do calendário, com data, nome e autoria, sem mudar chamadas existentes. Gerar o cliente Prisma ou concluir o build da Vercel não aplica essa migração. Na produção, conferir a execução do workflow de migrações antes de servir a nova versão; cada Preview também precisa estar migrado em seu próprio schema.
 
 A sincronização com a base de feriados exige também `20261010183000_origem_feriado`. Essa migração acrescenta a origem do feriado, com padrão manual, sem alterar chamadas nem datas já cadastradas. `FERIADOS_API_TOKEN` é opcional e fica somente no servidor. Sem o token, o botão de sincronização permanece desligado.
 
@@ -27,14 +27,14 @@ As URLs dentro do contêiner usam o host `db`:
 postgresql://frequencia:frequencia@db:5432/frequencia
 ```
 
-O `.env` do host usa `localhost`, para permitir executar `npm run criar-admin`, `npm run criar-coordenacao`, `npm run seed` e a suíte de API contra o banco publicado.
+O `.env` do host usa `localhost`, para permitir executar `pnpm run criar-admin`, `pnpm run criar-coordenacao`, `pnpm run seed` e a suíte de API contra o banco publicado.
 
 Ao preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`, o entrypoint cria o administrador inicial na partida. O modo de bootstrap é não destrutivo: se a conta já existir, ele não regrava a senha nem altera o nome. Para criar ou atualizar a senha explicitamente, use o comando abaixo (que sempre aplica os valores):
 
 ```bash
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' \
-  docker compose exec app npm run criar-admin
-SEED_ALUNOS=12 docker compose exec app npm run seed
+  docker compose exec app pnpm run criar-admin
+SEED_ALUNOS=12 docker compose exec app pnpm run seed
 ```
 
 O restante da configuração é feito pela área de Gestão do aplicativo.
@@ -47,7 +47,7 @@ curl -fsS http://localhost:3000/api/saude
 docker compose -p frequenciapp-test down -v --remove-orphans
 ```
 
-Se a migration inicial for recriada durante o desenvolvimento, bancos antigos precisam ser removidos ou recriados. O comando `npx prisma migrate reset --force` também serve para um ambiente local descartável.
+Se a migration inicial for recriada durante o desenvolvimento, bancos antigos precisam ser removidos ou recriados. O comando `pnpm exec prisma migrate reset --force` também serve para um ambiente local descartável.
 
 ## Imagem avulsa
 
@@ -94,8 +94,8 @@ Com `pg` 8.16 ou superior, `sslmode=require` passou a verificar o certificado e 
 A Vercel usa a integração nativa de Git para publicar a `main`. O arquivo `vercel.json` define:
 
 - framework `nextjs`;
-- `npm ci` como instalação;
-- `npm run vercel-build` como build;
+- `pnpm install --frozen-lockfile` como instalação;
+- `pnpm run vercel-build` como build;
 - saída `.next`;
 - URLs limpas e cabeçalhos de segurança.
 
@@ -119,7 +119,7 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 2. configurar `DATABASE_URL` e `DIRECT_URL` na Vercel;
 3. configurar `DIRECT_URL_PROD` como segredo do GitHub;
 4. aplicar as migrações pelo workflow `migracoes.yml`;
-5. confirmar `npx prisma migrate status` com a conexão de sessão;
+5. confirmar `pnpm exec prisma migrate status` com a conexão de sessão;
 6. publicar a `main` na Vercel;
 7. verificar login, frequência, histórico e `/api/saude`.
 
@@ -143,8 +143,8 @@ Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABAS
 O provisionamento das roles, do schema e dos default privileges está em [`scripts/provisionar-preview.sql`](../scripts/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
 
 1. Crie o schema de Preview com uma conta administrativa do banco e conceda os privilégios necessários às roles de migração e runtime. Limite essas permissões ao ambiente correspondente.
-2. Em um terminal com as variáveis do Preview, aplique `npx prisma migrate deploy` e confira `npx prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.
-3. Configure `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` para uma conta de teste e execute `npm run criar-admin` com a mesma conexão de Preview. As contas da produção não são copiadas.
+2. Em um terminal com as variáveis do Preview, aplique `pnpm exec prisma migrate deploy` e confira `pnpm exec prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.
+3. Configure `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` para uma conta de teste e execute `pnpm run criar-admin` com a mesma conexão de Preview. As contas da produção não são copiadas.
 4. Publique novamente o Preview após salvar as variáveis na Vercel. Confirme o login e um salvamento com dados sintéticos no schema esperado.
 
 Mantenha as variáveis do escopo Production e `DIRECT_URL_PROD` intactas. O build da Vercel apenas gera o cliente Prisma; não aplica migrações no Preview. O migrador Docker e os scripts administrativos exigem o schema existente e não usam `public` como alternativa quando o schema explícito está ausente.
@@ -185,7 +185,7 @@ Os workflows ficam em `.github/workflows/`:
 
 Para acompanhar e operar workflows e releases pelo terminal, use o GitHub CLI (`gh`): confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Depois use `gh run list`, `gh run watch`, `gh run view --log-failed`, `gh pr checks --watch` e `gh release create`. Nunca inclua segredos em comandos.
 
-O Dependabot atualiza npm, GitHub Actions e Docker semanalmente, agrupando versões minor e patch.
+O Dependabot atualiza as dependências (ecossistema npm, com `pnpm-lock.yaml`), o GitHub Actions e o Docker semanalmente, agrupando versões minor e patch.
 
 ## VPS sem TLS (rede interna)
 
@@ -202,9 +202,9 @@ O cookie de sessão deixa de usar `Secure`, o HSTS não é enviado e o CSP não 
 Build e execução diretos:
 
 ```bash
-npm ci
-npm run build
-DATABASE_URL=... DIRECT_URL=... AUTH_SECRET=... npm start
+pnpm install --frozen-lockfile
+pnpm run build
+DATABASE_URL=... DIRECT_URL=... AUTH_SECRET=... pnpm start
 ```
 
 Exemplo de unidade mínima:
@@ -219,7 +219,7 @@ WorkingDirectory=/opt/frequenciapp
 Environment=DATABASE_URL=postgresql://frequencia:senha@localhost:5432/frequencia
 Environment=DIRECT_URL=postgresql://frequencia:senha@localhost:5432/frequencia
 EnvironmentFile=/opt/frequenciapp/.env
-ExecStart=/usr/bin/npm start
+ExecStart=/usr/bin/pnpm start
 Restart=on-failure
 User=frequenciapp
 

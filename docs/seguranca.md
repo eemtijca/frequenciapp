@@ -5,7 +5,7 @@ Detalhamento das decisões de segurança. O resumo para reportar falhas está em
 ## Autenticação
 
 - Senhas com scrypt (N 16384, r 8, p 1, chave de 64 bytes, sal de 16 bytes por conta), comparação em tempo constante. Formato do hash versionado em texto, o que permite trocar parâmetros no futuro sem quebrar contas existentes.
-- O administrador inicial é criado pelo comando `npm run criar-admin` com credenciais do `.env` (idempotente) ou, no Compose, pelo entrypoint na partida (modo `--somente-criar`, que preserva uma conta existente); as contas de coordenação nascem pelo comando `npm run criar-coordenacao` ou pela área de Gestão, sem cadastro público.
+- O administrador inicial é criado pelo comando `pnpm run criar-admin` com credenciais do `.env` (idempotente) ou, no Compose, pelo entrypoint na partida (modo `--somente-criar`, que preserva uma conta existente); as contas de coordenação nascem pelo comando `pnpm run criar-coordenacao` ou pela área de Gestão, sem cadastro público.
 - Política de senha em toda criação e redefinição: mínimo de 8 caracteres com ao menos uma letra e um número, verificada também por regra pura testada em unidade.
 - Contas desativadas não entram; a sessão de uma conta desativada é encerrada na primeira requisição seguinte.
 - Tentativas de entrada limitadas por dispositivo e login e por login, na janela dos parâmetros de acesso (padrão: 10, 30 e 15 minutos), contadas na tabela `tentativas_entrada` com um upsert atômico. O limite vale entre instâncias, o contador é limpo no sucesso e as chaves paradas há mais de um dia saem num expurgo ocasional. Quando o login não existe, uma verificação descartável iguala o tempo de resposta e não revela contas. Os limites operacionais da planilha usam o mesmo armazenamento.
