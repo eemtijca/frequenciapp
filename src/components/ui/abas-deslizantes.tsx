@@ -20,6 +20,8 @@ interface Props<T extends string> {
   abas: AbaItem<T>[];
   chaveIndicador: string;
   dataPager: string;
+  /** Bloqueia só a troca de abas, preservando a edição no conteúdo ativo. */
+  bloqueada?: boolean;
   /** Avisa a troca de aba (por exemplo, para refletir a aba na URL). */
   aoTrocar?: (aba: T) => void;
   /** Ação ao lado das abas (por exemplo, um botão), na mesma linha. */
@@ -33,6 +35,7 @@ export default function AbasDeslizantes<T extends string>({
   abas,
   chaveIndicador,
   dataPager,
+  bloqueada = false,
   aoTrocar,
   acao,
   children,
@@ -56,6 +59,7 @@ export default function AbasDeslizantes<T extends string>({
 
   const trocarAba = useCallback(
     (proxima: T, focar = false) => {
+      if (bloqueada) return;
       const indice = abas.findIndex((item) => item.valor === proxima);
       if (indice < 0) return;
       const indiceAtual = abas.findIndex((item) => item.valor === aba);
@@ -72,7 +76,7 @@ export default function AbasDeslizantes<T extends string>({
       }
       if (focar) abasRef.current[indice]?.focus();
     },
-    [aba, abas, aoTrocar, controles, ehDesktop, semMovimento],
+    [aba, abas, aoTrocar, controles, ehDesktop, semMovimento, bloqueada],
   );
 
   function aoTeclar(evento: React.KeyboardEvent) {
@@ -110,6 +114,7 @@ export default function AbasDeslizantes<T extends string>({
                 aria-selected={ativo}
                 aria-controls={`painel-${item.valor}`}
                 tabIndex={ativo ? 0 : -1}
+                disabled={bloqueada}
                 onClick={() => trocarAba(item.valor)}
                 className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-0 text-[11px] font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs"
               >

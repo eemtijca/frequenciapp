@@ -1,4 +1,13 @@
-// Nomes das disciplinas por dia da semana, separados das regras da frequência.
+// Disciplinas por dia e turnos de consulta, separados das regras da frequência.
+
+export const INTERVALO_ALMOCO = { inicio: "11:50", fim: "13:00" } as const;
+export type TurnoHorario = "manha" | "tarde" | "almoco";
+
+/** Agrupa pelo início da aula, preservando também horários cadastrados durante o almoço. */
+export function turnoDoHorario(inicio: string): TurnoHorario {
+  if (inicio < INTERVALO_ALMOCO.inicio) return "manha";
+  return inicio < INTERVALO_ALMOCO.fim ? "almoco" : "tarde";
+}
 
 export const DIAS_DA_SEMANA = [
   { valor: 1, rotulo: "segunda-feira", abreviacao: "Seg" },

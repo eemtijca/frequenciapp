@@ -33,6 +33,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.
+
 - Gerenciamento de dependências migrado de npm para pnpm, com o `packageManager` fixado, `pnpm-lock.yaml` versionado e `pnpm-workspace.yaml` autorizando os scripts de build; `pg` passa a ser declarado e o estágio de execução do Dockerfile usa as dependências de produção do pnpm.
 
 - Buscas de Alunos, Gestão, Chamada, Chamada Parcial e Grade reutilizam nomes e agrupamentos; a Gestão preserva os controles das linhas mantidas ao filtrar, relatórios por aluno não recalculam o mês a cada tecla, e a troca do ranking mantém os indicadores já calculados. Painel e Grade suspendem consultas ocultas e retomam ao abrir, preservando filtros. Seletores de horário rolam apenas as opções, listas buscáveis agrupam ajustes do teclado por quadro e confirmações ficam roláveis em telas baixas.
