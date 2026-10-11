@@ -14,6 +14,7 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  ChartNoAxesCombined,
   Settings2,
   Table2,
   UserRound,
@@ -845,6 +846,14 @@ export default function Aplicacao({
                 }
               />
             ))}
+            {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
+              <Button asChild variant="ghost" className="h-11 justify-start gap-2 px-4">
+                <a href="/bi" target="_blank" rel="noopener" aria-label="FrequenciBI, nova aba">
+                  <ChartNoAxesCombined size={18} aria-hidden="true" />
+                  FrequenciBI
+                </a>
+              </Button>
+            )}
           </nav>
           <div className="border-border mt-auto shrink-0 border-t p-3">
             <div className="flex items-center gap-2 px-1">

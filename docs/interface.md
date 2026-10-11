@@ -125,3 +125,9 @@ Após a primeira visita, o gráfico permanece montado e o módulo fica reutiliz�
 ## Administração do FrequenciBI
 
 Gestão, Configurações, Acesso inclui seção FrequenciBI carregada sob demanda. Criar e editar mostram rótulo, validade opcional e escopo por série, turma, período e base. Toda ação sensível pede senha e confirmação explícita. O segredo aparece em diálogo apenas na criação ou substituição, com cópia manual e automática; fechar apaga o segredo da interface. A lista admite busca e ordenação e mostra estado, datas de uso, quantidade de consultas e aviso de inatividade. A restauração escolar lembra que chaves não são restauradas.
+
+## FrequenciBI
+
+A área independente `/bi` mantém tipografia, tema, controles e superfícies de vidro. O portão não depende da sessão. Administração e coordenação têm link na barra lateral; o login tem acesso público ao portão. O aplicativo do diretor não ganha esse item.
+
+Filtros têm aplicação explícita de período, recortes adicionais recolhidos e data dos retratos. Painéis usam puxadores específicos com `touch-action: none`, preservando a rolagem do restante do cartão. Ordem e tamanho também respondem às setas do teclado. Gráficos carregam próximos da área visível, com cálculo em worker e tabela acessível, ordenável e paginada. Exportações pessoais abrem confirmação, enquanto importações inválidas preservam a personalização vigente. O [guia do BI](frequencibi.md) descreve fórmulas, cache, limites e operação.

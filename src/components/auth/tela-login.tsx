@@ -212,6 +212,10 @@ export default function TelaLogin() {
             </Button>
           </form>
 
+          <Button asChild variant="outline">
+            <a href="/bi">Abrir FrequenciBI</a>
+          </Button>
+
           <p className="text-muted-foreground text-center text-xs leading-relaxed lg:text-left">
             Acesso pessoal. As contas são criadas pela administração da escola e a recuperação de
             senha é feita com ela, sem cadastro público.
