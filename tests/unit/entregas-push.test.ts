@@ -1,6 +1,6 @@
 // Aviso diário: reserva concorrente, confirmação por dia, repetição de
 // falhas e retirada de assinaturas expiradas, sem banco ou rede externos.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 
 interface Entrega {
@@ -88,10 +88,17 @@ import { enviarResumosDiarios } from "@/application/notificacoes";
 import { enviarPush } from "@/infra/web-push";
 
 beforeEach(() => {
+  // A agenda não envia aos domingos nem em feriados; fixa um dia útil no fuso da escola.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-13T12:00:00Z"));
   estado.entrega = null;
   estado.ativa = true;
   estado.canceladaNaReserva = false;
   vi.mocked(enviarPush).mockReset();
+});
+
+afterAll(() => {
+  vi.useRealTimers();
 });
 
 describe("entregas diárias de push", () => {

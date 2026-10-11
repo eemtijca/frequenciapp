@@ -75,7 +75,7 @@ A trava de `feriados` vem sempre antes de qualquer outra, o que evita impasse. O
 Enquanto o aplicativo não tinha o primeiro deploy de produção, a migração inicial foi reescrita para o schema da coordenação, sem acúmulo de migrações intermediárias e sem backfill. Ambientes locais criados antes dessa revisão precisam ser recriados:
 
 ```bash
-npx prisma migrate reset --force
+pnpm exec prisma migrate reset --force
 # ou
 docker compose down -v && docker compose up --build
 ```
@@ -125,13 +125,13 @@ Produção e Preview podem usar schemas distintos no mesmo database. Cada schema
 Dia a dia em desenvolvimento:
 
 ```bash
-npx prisma migrate dev --name ajuste
+pnpm exec prisma migrate dev --name ajuste
 ```
 
 Aplicação em produção e ambientes limpos:
 
 ```bash
-npx prisma migrate deploy
+pnpm exec prisma migrate deploy
 ```
 
 O contêiner da aplicação aplica as migrations na partida com um migrador próprio que registra cada arquivo em `_prisma_migrations`, usa trava consultiva para dois contêineres não aplicarem a mesma migração em paralelo e confere o checksum das migrações já aplicadas. O código está em `docker/app/migrar.mjs`.
@@ -139,10 +139,10 @@ O contêiner da aplicação aplica as migrations na partida com um migrador pró
 ## Regeneração do cliente
 
 ```bash
-npx prisma generate
+pnpm exec prisma generate
 ```
 
-O `postinstall` do npm executa a regeneração. O código gerado fica em `generated/`, fora do controle de versão, e o runtime o importa de `src/infra/banco.ts` junto com o adaptador `pg`.
+O `postinstall` executa a regeneração. O código gerado fica em `generated/`, fora do controle de versão, e o runtime o importa de `src/infra/banco.ts` junto com o adaptador `pg`.
 
 ## Fuso e datas civis
 

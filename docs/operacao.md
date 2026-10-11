@@ -7,7 +7,7 @@ Rotinas do operador do FrequenciApp: contas, diretores de turma, backup, restaur
 O primeiro usuário, com acesso root de configuração, nasce do ambiente:
 
 ```bash
-ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin
+ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' pnpm run criar-admin
 ```
 
 O comando é idempotente: reexecutar atualiza a senha, o nome e devolve o papel de administrador. A partir dele, o dia a dia de contas acontece na área de Gestão do próprio aplicativo.
@@ -19,7 +19,7 @@ Com Docker Compose, preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.e
 Pela área de Gestão, recomendado, ou pelo comando idempotente de demonstração:
 
 ```bash
-CONTA_EMAIL=equipe@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Equipe' npm run criar-coordenacao
+CONTA_EMAIL=equipe@escola.br CONTA_SENHA='nova senha forte' CONTA_NOME='Equipe' pnpm run criar-coordenacao
 ```
 
 Trocar a senha é o mesmo comando: o hash é recalculado. Pela Gestão, a troca encerra as sessões dos outros dispositivos; pelo comando, as sessões existentes continuam válidas até expirarem. Para encerrar sessões imediatamente:
@@ -204,9 +204,9 @@ A rota consulta o banco: responde `{"ok":true}` com a conexão saudável e 503 q
 
 ```bash
 git pull
-npm ci
-DIRECT_URL=... npm run db:deploy
-npm run build
+pnpm install --frozen-lockfile
+DIRECT_URL=... pnpm run db:deploy
+pnpm run build
 # Reinicie o processo do systemd, Docker ou plataforma.
 ```
 

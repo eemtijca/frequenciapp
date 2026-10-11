@@ -10,7 +10,7 @@ O aplicativo é de uso pessoal da equipe da escola. Cadastro público aberto amp
 
 ## Decisão
 
-- A conta é criada pelo comando de operação `npm run criar-coordenacao`, idempotente, com variáveis de ambiente.
+- A conta é criada pelo comando de operação `pnpm run criar-coordenacao`, idempotente, com variáveis de ambiente.
 - Entrada por e-mail e senha, com limitador de tentativas por origem e e-mail.
 - Sem fluxo de recuperação por e-mail: a redefinição é operacional, pelo mesmo comando, que também atualiza a senha.
 - O schema separa `usuarios` de `sessoes`, permitindo contas múltiplas com isolamento por dono quando a implantação quiser.

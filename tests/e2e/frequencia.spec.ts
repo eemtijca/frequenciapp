@@ -1,7 +1,9 @@
 // Chamada com saída por aula: marcação parcial, persistência, histórico,
 // grade e falta justificada. O modo por aula é ligado pela configuração.
 import { expect, test } from "@playwright/test";
+import { rotuloData } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { diaCorrente, diaDeChamada, tituloResumoDoDia } from "./helpers/dia";
 import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
 
 test.describe("chamada com saída por aula", () => {
@@ -34,21 +36,24 @@ test.describe("chamada com saída por aula", () => {
     await expect(painel.getByText("E2E Aluno Um")).toBeVisible();
 
     // O seletor próprio mostra o rótulo amigável e abre o painel no clique.
-    await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
     const gatilhoDia = painel.locator("#dia-frequencia");
-    // A coluna lateral do desktop preserva a data e o selo sem sobreposição.
+    await expect(gatilhoDia).toHaveAttribute(
+      "aria-label",
+      new RegExp(`Data da chamada: ${rotuloData(diaDeChamada())}`),
+    );
+    if (diaDeChamada() === diaCorrente()) {
+      await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
+    }
+    // A coluna lateral do desktop preserva a data e, quando há selo "Hoje",
+    // os dois ficam sem sobreposição.
     expect(
       await gatilhoDia.evaluate((botao) => {
         const data = botao.querySelector(".numerais-tabulares")?.getBoundingClientRect();
         const selo = botao.querySelector(".rounded-full")?.getBoundingClientRect();
         const caixa = botao.getBoundingClientRect();
-        return Boolean(
-          data &&
-          selo &&
-          data.left >= caixa.left &&
-          data.right <= selo.left &&
-          selo.right <= caixa.right,
-        );
+        if (!data || data.left < caixa.left || data.right > caixa.right) return false;
+        if (!selo) return true;
+        return data.right <= selo.left && selo.right <= caixa.right;
       }),
     ).toBe(true);
     await expect(gatilhoDia).toHaveAttribute("aria-haspopup", "dialog");
@@ -73,7 +78,13 @@ test.describe("chamada com saída por aula", () => {
     await expect(painel.getByRole("button", { name: "Resumo do dia" })).toBeVisible();
     await expect(painel.getByRole("button", { name: "Voltar para hoje" })).toBeVisible();
     await painel.getByRole("button", { name: "Voltar para hoje" }).click();
-    await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
+    await expect(gatilhoDia).toHaveAttribute(
+      "aria-label",
+      new RegExp(`Data da chamada: ${rotuloData(diaDeChamada())}`),
+    );
+    if (diaDeChamada() === diaCorrente()) {
+      await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
+    }
 
     // No desktop, a lista fica à esquerda e o painel de informações à direita.
     if (!isMobile) {
@@ -120,8 +131,8 @@ test.describe("chamada com saída por aula", () => {
     });
 
     // Recolher o resumo preserva o filtro, com uma saída acessível junto da lista.
-    const botaoResumo = painel.getByRole("button", { name: "Resumo de hoje" });
-    const resumo = painel.getByRole("region", { name: "Resumo de hoje" });
+    const botaoResumo = painel.getByRole("button", { name: tituloResumoDoDia() });
+    const resumo = painel.getByRole("region", { name: tituloResumoDoDia() });
     const alunoPresente = painel.getByRole("button", { name: /^E2E Aluno Dois:/ });
     await expect(botaoResumo).toHaveAttribute("aria-expanded", "false");
     await expect(resumo).toBeHidden();

@@ -1,5 +1,5 @@
 // Cria ou atualiza a conta de uma pessoa da coordenação (idempotente). Uso:
-// CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... npm run criar-coordenacao
+// CONTA_EMAIL=... CONTA_SENHA=... CONTA_NOME=... pnpm run criar-coordenacao
 import pg from "pg";
 import "dotenv/config";
 import { hashear, senhaValida } from "./senha.mjs";
@@ -12,7 +12,7 @@ const nome = process.env.CONTA_NOME?.trim();
 if (!email || !senha || !nome) {
   console.error("Defina CONTA_EMAIL, CONTA_SENHA e CONTA_NOME no ambiente.");
   console.error(
-    "Exemplo: CONTA_EMAIL=equipe@escola.br CONTA_SENHA='senha forte' CONTA_NOME='Equipe' npm run criar-coordenacao",
+    "Exemplo: CONTA_EMAIL=equipe@escola.br CONTA_SENHA='senha forte' CONTA_NOME='Equipe' pnpm run criar-coordenacao",
   );
   process.exit(1);
 }

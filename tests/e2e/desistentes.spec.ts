@@ -2,7 +2,15 @@
 // isolada e limpeza ao final.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
+import { hojeEDomingo } from "./helpers/dia";
 import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
+
+// A desistência marcada hoje aparece na chamada a partir de hoje; aos domingos
+// a chamada abre no sábado anterior e o fluxo não pode ser conferido.
+test.skip(
+  hojeEDomingo(),
+  "Aos domingos a chamada abre no sábado e a desistência do dia não aparece.",
+);
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {

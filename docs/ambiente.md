@@ -94,14 +94,14 @@ O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhi
 Pré-requisitos: Node.js 20.19 ou superior e um PostgreSQL 17 acessível.
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 cp .env.example .env
 # Edite DATABASE_URL, DIRECT_URL e cole um AUTH_SECRET aleatório
-npx prisma migrate deploy
-ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' npm run criar-admin
-CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Equipe' npm run criar-coordenacao
-npm run seed  # opcional, séries, turmas e alunos sintéticos
-npm run dev
+pnpm exec prisma migrate deploy
+ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' pnpm run criar-admin
+CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Equipe' pnpm run criar-coordenacao
+pnpm run seed  # opcional, séries, turmas e alunos sintéticos
+pnpm run dev
 ```
 
 O aplicativo responde em http://localhost:3000. A página única é dinâmica: cada carregamento resolve a sessão e busca os dados correntes.

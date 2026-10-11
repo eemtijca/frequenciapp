@@ -12,7 +12,7 @@ download/
 skills/
 dev.log
 server.log
-package-lock.json
+pnpm-lock.yaml
 bun.lock
 worklog.md
 playwright-report/

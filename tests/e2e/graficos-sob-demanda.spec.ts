@@ -1,7 +1,7 @@
 // Confere o download adiado de Recharts, a montagem por visibilidade e a contenção de falhas.
 import { expect, test, type Page } from "@playwright/test";
-import { diaLocal } from "@/domain/frequencia";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { diaDeChamada } from "./helpers/dia";
 import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
@@ -12,7 +12,7 @@ test.beforeAll(async () => {
       "select id from turmas where serie_id in (select id from series where nome='E2E Ano')",
     );
     const turmaId = turma.rows[0]?.id;
-    const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+    const hoje = diaDeChamada();
     const chamada = await cliente.query<{ id: string }>(
       "insert into frequencias (turma_id,dia,atualizado_em) values ($1,$2,now()) returning id",
       [turmaId, hoje],

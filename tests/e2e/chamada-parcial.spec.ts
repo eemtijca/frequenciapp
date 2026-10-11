@@ -1,6 +1,7 @@
 // Chamada parcial independente, confirmação manual na Seduc e revisão de conflitos.
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
+import { diaDeChamada } from "./helpers/dia";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
@@ -47,7 +48,9 @@ async function abrirRegistro(page: Page) {
 }
 
 async function registrosDoDia(page: Page) {
-  const resposta = await page.request.get(`/api/frequencias-parciais?turmaId=${turmaId}`);
+  const resposta = await page.request.get(
+    `/api/frequencias-parciais?dia=${diaDeChamada()}&turmaId=${turmaId}`,
+  );
   expect(resposta.ok()).toBe(true);
   return (await resposta.json()) as {
     registros: {

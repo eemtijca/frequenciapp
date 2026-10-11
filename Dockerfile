@@ -1,16 +1,21 @@
 # FrequenciApp. Imagem da aplicação (Next.js standalone).
 # Multi-estágio para manter a imagem final pequena.
 
+# Base comum: habilita o pnpm via Corepack em todos os estágios.
+FROM node:24-bookworm-slim AS base
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+
 # 1. Dependências (prisma junto: o postinstall gera o cliente)
-FROM node:24-bookworm-slim AS dependencias
+FROM base AS dependencias
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # 2. Compilação
-FROM node:24-bookworm-slim AS compilacao
+FROM base AS compilacao
 WORKDIR /app
 COPY --from=dependencias /app/node_modules ./node_modules
 COPY . .
@@ -21,9 +26,16 @@ RUN DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
     DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
     AUTH_SECRET=segredo-dummy-de-32-bytes-para-build-0000 \
     TZ_APP=America/Fortaleza \
-    npm run build
+    pnpm run build
 
-# 3. Execução (somente o necessário)
+# 3. Dependências de produção (o migrador e os scripts administrativos rodam
+# fora da árvore do standalone e usam pg e dotenv).
+FROM base AS producao
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile --ignore-scripts
+
+# 4. Execução (somente o necessário)
 FROM node:24-bookworm-slim AS execucao
 WORKDIR /app
 ENV NODE_ENV=production
@@ -32,7 +44,12 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
   && chown -R node:node /app
-COPY --from=compilacao /app/.next/standalone ./
+# Dependências de produção completas (o standalone não cobre o migrador).
+COPY --from=producao /app/node_modules ./node_modules
+# Servidor standalone do Next e arquivos estáticos.
+COPY --from=compilacao /app/.next/standalone/server.js ./server.js
+COPY --from=compilacao /app/.next/standalone/package.json ./package.json
+COPY --from=compilacao /app/.next/standalone/.next ./.next
 COPY --from=compilacao /app/.next/static ./.next/static
 COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/prisma ./prisma
@@ -40,22 +57,6 @@ COPY --from=compilacao /app/generated ./generated
 COPY --from=compilacao /app/docker ./docker
 COPY --from=compilacao /app/scripts ./scripts
 COPY --from=compilacao /app/src/infra/schema-postgres.mjs ./src/infra/schema-postgres.mjs
-# Fecho de dependências do migrador e dos scripts administrativos, que
-# rodam fora da árvore do standalone: pg e transitivas, mais dotenv.
-COPY --from=dependencias /app/node_modules/dotenv ./node_modules/dotenv
-COPY --from=dependencias /app/node_modules/pg ./node_modules/pg
-COPY --from=dependencias /app/node_modules/pg-connection-string ./node_modules/pg-connection-string
-COPY --from=dependencias /app/node_modules/pg-int8 ./node_modules/pg-int8
-COPY --from=dependencias /app/node_modules/pg-pool ./node_modules/pg-pool
-COPY --from=dependencias /app/node_modules/pg-protocol ./node_modules/pg-protocol
-COPY --from=dependencias /app/node_modules/pg-types ./node_modules/pg-types
-COPY --from=dependencias /app/node_modules/pgpass ./node_modules/pgpass
-COPY --from=dependencias /app/node_modules/postgres-array ./node_modules/postgres-array
-COPY --from=dependencias /app/node_modules/postgres-bytea ./node_modules/postgres-bytea
-COPY --from=dependencias /app/node_modules/postgres-date ./node_modules/postgres-date
-COPY --from=dependencias /app/node_modules/postgres-interval ./node_modules/postgres-interval
-COPY --from=dependencias /app/node_modules/split2 ./node_modules/split2
-COPY --from=dependencias /app/node_modules/xtend ./node_modules/xtend
 RUN chmod +x ./docker/app/entrypoint.sh
 USER node
 EXPOSE 3000

@@ -33,6 +33,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Gerenciamento de dependências migrado de npm para pnpm, com o `packageManager` fixado, `pnpm-lock.yaml` versionado e `pnpm-workspace.yaml` autorizando os scripts de build; `pg` passa a ser declarado e o estágio de execução do Dockerfile usa as dependências de produção do pnpm.
+
 - Buscas de Alunos, Gestão, Chamada, Chamada Parcial e Grade reutilizam nomes e agrupamentos; a Gestão preserva os controles das linhas mantidas ao filtrar, relatórios por aluno não recalculam o mês a cada tecla, e a troca do ranking mantém os indicadores já calculados. Painel e Grade suspendem consultas ocultas e retomam ao abrir, preservando filtros. Seletores de horário rolam apenas as opções, listas buscáveis agrupam ajustes do teclado por quadro e confirmações ficam roláveis em telas baixas.
 
 - No celular, o seletor de tema passa do menu lateral para o cabeçalho, ao lado do sino de notificações, e o menu lateral fica mais estreito (15 rem no máximo, antes 20 rem). No desktop, o seletor continua no cartão da pessoa, na barra lateral.
@@ -74,6 +76,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- As suítes usam o último dia com chamada como referência: os testes de entrega de push fixam o relógio em um dia útil, o contrato da agenda e o fluxo de desistência são ignorados aos domingos, e os cenários de ponta a ponta passam a usar o sábado quando hoje é domingo.
 
 - Feriado e chamada da mesma data salvos ao mesmo tempo não são mais aceitos os dois. As transações que gravam feriados (cadastro, remoção, sincronização e restauração da cópia) e as que salvam Chamada e Chamada Parcial travam a tabela de feriados antes de ler. Chamadas simultâneas continuam sem esperar umas pelas outras.
 

@@ -33,7 +33,7 @@ export default defineConfig({
     process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1"
       ? undefined
       : {
-          command: "npm run dev",
+          command: "pnpm run dev",
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,
