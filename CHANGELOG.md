@@ -77,6 +77,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As suítes usam o último dia com chamada como referência: os testes de entrega de push fixam o relógio em um dia útil, o contrato da agenda e o fluxo de desistência são ignorados aos domingos, e os cenários de ponta a ponta passam a usar o sábado quando hoje é domingo.
+
 - Feriado e chamada da mesma data salvos ao mesmo tempo não são mais aceitos os dois. As transações que gravam feriados (cadastro, remoção, sincronização e restauração da cópia) e as que salvam Chamada e Chamada Parcial travam a tabela de feriados antes de ler. Chamadas simultâneas continuam sem esperar umas pelas outras.
 
 - A sincronização de feriados distingue a chave recusada da recusa da base: cada caso tem mensagem própria, e o motivo devolvido pela base entra no log sem repetir o token.

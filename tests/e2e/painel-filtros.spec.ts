@@ -3,6 +3,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { diaLocal, mesSeguinte, nomeDoMes, type Aluno, type Frequencia } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
+import { diaDeChamada } from "./helpers/dia";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
 
@@ -109,7 +110,7 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
   page,
   isMobile,
 }, testInfo) => {
-  const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  const hoje = diaDeChamada();
   async function abrirSerie() {
     await page.goto("/");
     await aguardarHidratacao(page);

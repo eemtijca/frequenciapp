@@ -1,7 +1,7 @@
 // Chamada com um botão por série, que expande e recolhe as turmas, e Gestão com
 // as turmas específicas da origem numa seção recolhível. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { diaLocal } from "@/domain/frequencia";
+import { diaDeChamada } from "./helpers/dia";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
 import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
@@ -14,7 +14,7 @@ let inicial: ConfiguracaoOrigem;
 const turmasDoProgresso = new Map<string, string>();
 
 function diaAtual(): string {
-  return diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  return diaDeChamada();
 }
 
 async function abrirChamada(page: Page): Promise<Locator> {

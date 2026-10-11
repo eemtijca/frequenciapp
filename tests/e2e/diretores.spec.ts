@@ -2,7 +2,7 @@
 // uma única vez, revogação com motivo, parâmetros de acesso e a visão só de
 // leitura do diretor, que entra pelo identificador e troca a palavra.
 import { expect, test } from "@playwright/test";
-import { diaLocal } from "@/domain/frequencia";
+import { diaDeChamada } from "./helpers/dia";
 import {
   comBanco,
   criarMassaE2E,
@@ -147,7 +147,7 @@ test.describe("diretores de turma na Gestão", () => {
   test("o diretor entra pelo identificador e só lê a própria turma", async ({ page, browser }) => {
     const baseURL = test.info().project.use.baseURL ?? "http://localhost:3000";
     // Chamada de hoje com falta do primeiro aluno, pela sessão da administração.
-    const dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+    const dia = diaDeChamada();
     const { turmaId, alunoId } = await comBanco(async (cliente) => {
       const linha = await cliente.query<{ turma_id: string; id: string }>(
         "select turma_id, id from alunos where nome = 'E2E Aluno Um'",
@@ -178,6 +178,15 @@ test.describe("diretores de turma na Gestão", () => {
     const palavra = (await page.locator("[data-palavra-chave]").textContent()) ?? "";
     expect(palavra).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
     await page.getByRole("button", { name: "Já entreguei" }).click();
+
+    // O vínculo começa hoje; o teste recua o início para o dia da chamada,
+    // para que as estatísticas do diretor contem a falta registrada.
+    await comBanco(async (cliente) => {
+      await cliente.query(
+        "update vinculos_diretor set inicio = least(inicio, $1::date) where turma_id = $2",
+        [dia, turmaId],
+      );
+    });
 
     const contexto = await browser.newContext({
       baseURL,

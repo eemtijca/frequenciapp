@@ -2,6 +2,7 @@
 // e definição da turma original em massa na Gestão.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
+import { tituloResumoDoDia } from "./helpers/dia";
 import {
   aguardarHidratacao,
   escolherTurmaNaChamada,
@@ -152,7 +153,7 @@ test.describe("consulta por origem (coordenação)", () => {
     await expect(linha.getByText("E2E Movimento Um", { exact: true })).toBeVisible();
     await expect(linha.getByRole("img", { name: /Turma original/ })).toHaveCount(0);
     await linha.click();
-    await secao.getByRole("button", { name: "Resumo de hoje" }).click();
+    await secao.getByRole("button", { name: tituloResumoDoDia() }).click();
     await expect(secao.getByText("Origem 2º ano E2E Movimento A")).toHaveCount(0);
   });
 });

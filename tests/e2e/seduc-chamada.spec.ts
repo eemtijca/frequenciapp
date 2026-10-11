@@ -1,7 +1,7 @@
 // A Chamada Parcial concentra a confirmação da Seduc e permite personalizar
 // a frequência diária sem alterar a chamada salva pela coordenação.
 import { expect, test, type Page } from "@playwright/test";
-import { diaLocal } from "@/domain/frequencia";
+import { diaDeChamada } from "./helpers/dia";
 import { comBanco } from "./helpers/banco";
 import {
   aguardarHidratacao,
@@ -94,7 +94,7 @@ async function abrirParcial(page: Page) {
 }
 
 function diaAtual() {
-  return diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  return diaDeChamada();
 }
 
 async function chamadaSalva(page: Page) {
