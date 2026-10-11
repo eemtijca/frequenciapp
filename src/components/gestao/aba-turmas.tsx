@@ -220,74 +220,75 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                   </span>
                 </div>
                 <ul className="divide-y">
-                  {grupo.turmas.map((turma) => (
-                    <li key={turma.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{turma.rotulo}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {turma.horarios.length === 0
-                            ? "sem horários configurados"
-                            : `${turma.horarios.length} ${
-                                turma.horarios.length === 1 ? "aula" : "aulas"
-                              }`}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-11"
-                          aria-label={`Horários de ${turma.rotulo}`}
-                          onClick={() => {
-                            setTurmaDasAulas(turma);
-                            setAulasAberto(true);
-                          }}
-                        >
-                          <Clock size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-11"
-                          aria-label={`Editar turma ${turma.rotulo}`}
-                          onClick={() => abrirEdicao(turma)}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-falta-texto size-11"
-                              aria-label={`Excluir turma ${turma.rotulo}`}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir a turma {turma.rotulo}?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                A exclusão só é possível quando a turma não tem alunos nem
-                                frequências.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                variant="destructive"
-                                onClick={() => excluir(turma)}
-                                disabled={chaveAtiva === turma.id}
+                  {grupo.turmas.map((turma) => {
+                    const aulasAtivas = turma.horarios.filter((aula) => aula.ativo).length;
+                    return (
+                      <li key={turma.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{turma.rotulo}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {aulasAtivas === 0
+                              ? "sem aulas ativas"
+                              : `${aulasAtivas} ${aulasAtivas === 1 ? "aula" : "aulas"}`}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-11"
+                            aria-label={`Horários de ${turma.rotulo}`}
+                            onClick={() => {
+                              setTurmaDasAulas(turma);
+                              setAulasAberto(true);
+                            }}
+                          >
+                            <Clock size={16} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-11"
+                            aria-label={`Editar turma ${turma.rotulo}`}
+                            onClick={() => abrirEdicao(turma)}
+                          >
+                            <Pencil size={16} />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-falta-texto size-11"
+                                aria-label={`Excluir turma ${turma.rotulo}`}
                               >
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </li>
-                  ))}
+                                <Trash2 size={16} />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Excluir a turma {turma.rotulo}?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  A exclusão só é possível quando a turma não tem alunos nem
+                                  frequências.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  variant="destructive"
+                                  onClick={() => excluir(turma)}
+                                  disabled={chaveAtiva === turma.id}
+                                >
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </motion.div>
             ))
@@ -351,6 +352,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
 
       <DialogoAulas
         turma={turmaDasAulasAtual}
+        turmas={turmas}
         aberto={aulasAberto}
         onAbrir={setAulasAberto}
         onMudanca={onMudanca}

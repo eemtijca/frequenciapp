@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
+import { DialogoCopiarHorarios } from "@/components/gestao/dialogo-copiar-horarios";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ interface Formulario {
 
 interface Props {
   turma: Turma | null;
+  turmas: Turma[];
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
   onMudanca: () => Promise<void>;
@@ -57,13 +59,25 @@ export default function DialogoAulas(props: Props) {
   );
 }
 
-function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
+function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Props) {
   const [formulario, setFormulario] = useState<Formulario | null>(null);
+  const [copiando, setCopiando] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
 
   const aulas = turma?.horarios ?? [];
+
+  async function atualizarGradeAposGravacao() {
+    try {
+      await onMudanca();
+    } catch {
+      avisarInfo(
+        "Alteração salva.",
+        "Recarregue a página para visualizar os horários atualizados.",
+      );
+    }
+  }
 
   function abrirNova() {
     const proxima = aulas.length > 0 ? Math.max(...aulas.map((aula) => aula.ordem)) + 1 : 1;
@@ -103,7 +117,7 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
   }
 
   const { executando: enviando, executar: submeter } = useAcaoUnica(async () => {
-    if (!turma || !formulario || chaveAtiva !== null) return;
+    if (!turma || !formulario || chaveAtiva !== null || copiando) return;
     setErro("");
     const corpo = {
       ordem: Number(formulario.ordem),
@@ -124,24 +138,24 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
           `/api/horarios/${formulario.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        avisarSucesso("Horário atualizado.");
       } else {
         await pedir<{ horario: Horario }>(
           "/api/horarios",
           corpoJson({ turmaId: turma.id, ...corpo }),
         );
-        avisarSucesso("Horário criado.");
       }
-      setFormulario(null);
-      await onMudanca();
     } catch (excecao) {
       setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a aula.");
       setErroVariante(estadoDeErro(excecao));
       avisarErro(excecao, { contexto: "Não foi possível salvar a aula." });
+      return;
     }
+    avisarSucesso(formulario.id ? "Horário atualizado." : "Horário criado.");
+    setFormulario(null);
+    await atualizarGradeAposGravacao();
   });
 
-  const ocupado = enviando || chaveAtiva !== null;
+  const ocupado = enviando || chaveAtiva !== null || copiando;
 
   function alternarAtiva(aula: Horario) {
     if (ocupado) return;
@@ -151,18 +165,19 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
           `/api/horarios/${aula.id}`,
           corpoAlteracao("PATCH", { ativo: !aula.ativo }),
         );
-        avisarSucesso(
-          aula.ativo ? "Aula desativada." : "Aula reativada.",
-          aula.ativo
-            ? "As faltas já registradas continuam guardadas."
-            : "Ela volta a aparecer na grade da turma.",
-        );
-        await onMudanca();
       } catch (excecao) {
         const mensagem =
           excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
         toast.error(mensagem);
+        return;
       }
+      avisarSucesso(
+        aula.ativo ? "Aula desativada." : "Aula reativada.",
+        aula.ativo
+          ? "As faltas já registradas continuam guardadas."
+          : "Ela volta a aparecer na grade da turma.",
+      );
+      await atualizarGradeAposGravacao();
     });
   }
 
@@ -171,13 +186,14 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
     void executarPorChave(aula.id, async () => {
       try {
         await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
-        toast.success("Aula excluída.");
-        await onMudanca();
       } catch (excecao) {
         const mensagem =
           excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
         toast.error(mensagem);
+        return;
       }
+      toast.success("Aula excluída.");
+      await atualizarGradeAposGravacao();
     });
   }
 
@@ -244,18 +260,39 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
                   >
                     <Pencil size={16} />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-11"
-                    aria-label={
-                      aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
-                    }
-                    onClick={() => alternarAtiva(aula)}
-                    disabled={ocupado}
-                  >
-                    <Power size={16} />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-11"
+                        aria-label={
+                          aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
+                        }
+                        disabled={ocupado}
+                      >
+                        <Power size={16} />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {aula.ativo ? "Desativar" : "Ativar"} a aula {aula.ordem}?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {aula.ativo
+                            ? "A aula deixa de aparecer na grade da turma. Faltas já registradas continuam guardadas."
+                            : "A aula volta a aparecer na grade da turma. Faltas já registradas continuam guardadas."}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={ocupado}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => alternarAtiva(aula)} disabled={ocupado}>
+                          {aula.ativo ? "Desativar" : "Ativar"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -296,15 +333,26 @@ function ConteudoDialogoAulas({ turma, aberto, onAbrir, onMudanca }: Props) {
         )}
 
         {!formulario ? (
-          <Button
-            variant="outline"
-            onClick={abrirNova}
-            disabled={aulas.length >= 99 || ocupado}
-            className="min-h-11"
-          >
-            <Plus size={16} />
-            Nova aula
-          </Button>
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              onClick={abrirNova}
+              disabled={aulas.length >= 99 || ocupado}
+              className="min-h-11"
+            >
+              <Plus size={16} />
+              Nova aula
+            </Button>
+            {turma && (
+              <DialogoCopiarHorarios
+                destino={turma}
+                turmas={turmas}
+                disabled={ocupado}
+                onOcupado={setCopiando}
+                onMudanca={onMudanca}
+              />
+            )}
+          </div>
         ) : (
           <form
             className="superficie-vidro flex flex-col gap-3 p-3"

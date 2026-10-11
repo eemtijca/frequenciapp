@@ -499,7 +499,7 @@ export default function Aplicacao({
   const trocarVisao = useCallback(
     (proxima: Visao) => {
       if (!itens.some((item) => item.visao === proxima) || proxima === visao) return;
-      if (visao === "chamada-parcial" && pendencias.includes("chamada-parcial")) {
+      if ((visao === "chamada-parcial" || visao === "horarios") && pendencias.includes(visao)) {
         setVisaoComPendencia(proxima);
         return;
       }
@@ -509,7 +509,9 @@ export default function Aplicacao({
   );
   function navegarPeloMenu(proxima: Visao, fecharMenu: FecharMenu) {
     const pedeConferencia =
-      visao === "chamada-parcial" && pendencias.includes("chamada-parcial") && proxima !== visao;
+      (visao === "chamada-parcial" || visao === "horarios") &&
+      pendencias.includes(visao) &&
+      proxima !== visao;
     if (pedeConferencia) {
       origemDialogoRef.current = gatilhoMenuRef.current;
       fecharMenu("dialogo");
@@ -535,6 +537,12 @@ export default function Aplicacao({
     setPendencias((atuais) => {
       const restantes = atuais.filter((item) => item !== "chamada-parcial");
       return pendente ? [...restantes, "chamada-parcial"] : restantes;
+    });
+  }, []);
+  const registrarPendenciaHorarios = useCallback((pendente: boolean) => {
+    setPendencias((atuais) => {
+      const semHorarios = atuais.filter((item) => item !== "horarios");
+      return pendente ? [...semHorarios, "horarios"] : semHorarios;
     });
   }, []);
   // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
@@ -709,7 +717,15 @@ export default function Aplicacao({
             onPendencia={registrarPendenciaParcial}
           />
         )}
-        {alvoVisao === "horarios" && <VistaHorarios turmas={turmas} diaCorrente={diaCorrente} />}
+        {alvoVisao === "horarios" && (
+          <VistaHorarios
+            turmas={turmas}
+            diaCorrente={diaCorrente}
+            admin={ehAdmin}
+            onMudanca={recarregarEscopo}
+            onPendencia={registrarPendenciaHorarios}
+          />
+        )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
           <VistaMovimentacoes
             abaInicial={abaMovimentacaoInicial}
@@ -1024,7 +1040,11 @@ export default function Aplicacao({
           }}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>Há alterações não salvas na Chamada Parcial</AlertDialogTitle>
+            <AlertDialogTitle>
+              {visao === "horarios"
+                ? "Há alterações não salvas nos Horários"
+                : "Há alterações não salvas na Chamada Parcial"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               Os registros continuam pendentes. Ao voltar, será possível salvá-los.
             </AlertDialogDescription>
