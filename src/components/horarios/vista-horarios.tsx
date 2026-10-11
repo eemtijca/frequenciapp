@@ -2,9 +2,9 @@
 
 // Grade semanal por turma, com edição administrativa confirmada e rascunho preservado.
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarDays, Clock, LoaderCircle, Pencil } from "lucide-react";
+import { CalendarDays, Clock, LoaderCircle, Pencil, Sun, Sunset, Utensils } from "lucide-react";
 import { ehHoraValida, type Horario, type Turma } from "@/domain/frequencia";
-import { DIAS_DA_SEMANA } from "@/domain/horarios-semanais";
+import { DIAS_DA_SEMANA, INTERVALO_ALMOCO, turnoDoHorario } from "@/domain/horarios-semanais";
 import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -25,6 +25,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
+
+const TURNOS: AbaItem<"manha" | "tarde">[] = [
+  { valor: "manha", rotulo: "Manhã", icone: Sun },
+  { valor: "tarde", rotulo: "Tarde", icone: Sunset },
+];
 
 interface Props {
   turmas: Turma[];
@@ -56,6 +62,7 @@ interface PropsAulasDoDia {
   aulaEmEdicao: string | undefined;
   onEditar: (aula: Horario, dia: number) => void;
   editor: (aula: Horario, dia: number) => ReactNode;
+  turno?: string;
 }
 
 function AulasDoDia({
@@ -66,12 +73,17 @@ function AulasDoDia({
   aulaEmEdicao,
   onEditar,
   editor,
+  turno,
 }: PropsAulasDoDia) {
   if (aulas.length === 0)
-    return <p className="text-muted-foreground px-4 py-6 text-sm">Sem aulas neste dia.</p>;
+    return (
+      <p className="text-muted-foreground px-4 py-6 text-sm">
+        {turno ? "Sem aulas neste turno." : "Sem aulas neste dia."}
+      </p>
+    );
 
   return (
-    <ol aria-label={`Aulas de ${rotuloDia(dia)}`} className="divide-y">
+    <ol aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`} className="divide-y">
       {aulas.map((aula) => (
         <li key={aula.id} className="flex min-w-0 flex-col gap-3 px-4 py-4">
           <div className="flex items-start gap-3">
@@ -137,6 +149,14 @@ export default function VistaHorarios({
   );
   const dia = Number(diaSelecionado);
   const aulasDoDia = aulas.filter((aula) => aula.diasSemana.includes(dia));
+  // Uma atualização externa da janela não esconde o formulário ainda em edição.
+  const turnoDaAula = (aula: Horario) =>
+    turnoDoHorario(rascunho?.aulaId === aula.id ? rascunho.inicioInicial : aula.inicio);
+  const aulasPorTurno = {
+    manha: aulasDoDia.filter((aula) => turnoDaAula(aula) === "manha"),
+    tarde: aulasDoDia.filter((aula) => turnoDaAula(aula) === "tarde"),
+    almoco: aulasDoDia.filter((aula) => turnoDaAula(aula) === "almoco"),
+  };
   const disciplinaAlterada =
     rascunho !== null && rascunho.disciplina.trim() !== rascunho.disciplinaInicial;
   const inicioAlterado = rascunho !== null && rascunho.inicio !== rascunho.inicioInicial;
@@ -459,19 +479,60 @@ export default function VistaHorarios({
           </div>
         </>
       ) : (
-        <div className="superficie-vidro overflow-hidden">
-          <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
-            {rotuloDia(dia)}
-          </h2>
-          <AulasDoDia
-            dia={dia}
-            aulas={aulasDoDia}
-            admin={admin}
-            bloqueado={navegacaoBloqueada}
-            aulaEmEdicao={rascunho?.aulaId}
-            onEditar={abrirEdicao}
-            editor={(aula, diaDaAula) => renderizarEditor(aula, diaDaAula, "dia")}
-          />
+        <div className="flex min-w-0 flex-col gap-3">
+          <AbasDeslizantes
+            key={`${turma?.id}-${dia}`}
+            rotuloAcessivel="Turnos do dia"
+            abaInicial={
+              aulasPorTurno.manha.length === 0 && aulasPorTurno.tarde.length > 0 ? "tarde" : "manha"
+            }
+            abas={TURNOS}
+            chaveIndicador="horarios-turno"
+            dataPager="horarios-turnos"
+            bloqueada={navegacaoBloqueada}
+          >
+            {(turno) => (
+              <section
+                aria-label={`Aulas de ${rotuloDia(dia)} · ${turno === "manha" ? "Manhã" : "Tarde"}`}
+                className="superficie-vidro mt-3 overflow-hidden"
+              >
+                <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
+                  {rotuloDia(dia)}
+                </h2>
+                <AulasDoDia
+                  dia={dia}
+                  aulas={aulasPorTurno[turno]}
+                  turno={turno === "manha" ? "Manhã" : "Tarde"}
+                  admin={admin}
+                  bloqueado={navegacaoBloqueada}
+                  aulaEmEdicao={rascunho?.aulaId}
+                  onEditar={abrirEdicao}
+                  editor={(aula, diaDaAula) => renderizarEditor(aula, diaDaAula, `dia-${turno}`)}
+                />
+              </section>
+            )}
+          </AbasDeslizantes>
+          <section aria-label="Intervalo de almoço" className="superficie-vidro overflow-hidden">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
+              <Utensils size={16} aria-hidden="true" />
+              <h2 className="font-medium">Almoço</h2>
+              <span className="numerais-tabulares ml-auto">
+                {INTERVALO_ALMOCO.inicio} às {INTERVALO_ALMOCO.fim}
+              </span>
+            </div>
+            {aulasPorTurno.almoco.length > 0 && (
+              <AulasDoDia
+                dia={dia}
+                aulas={aulasPorTurno.almoco}
+                turno="Almoço"
+                admin={admin}
+                bloqueado={navegacaoBloqueada}
+                aulaEmEdicao={rascunho?.aulaId}
+                onEditar={abrirEdicao}
+                editor={(aula, diaDaAula) => renderizarEditor(aula, diaDaAula, "dia-almoco")}
+              />
+            )}
+          </section>
         </div>
       )}
 

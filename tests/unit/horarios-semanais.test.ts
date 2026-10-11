@@ -1,6 +1,28 @@
 // Disciplinas por dia: validação, atualização parcial e preservação das aulas.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { disciplinasDoHorario, mesclarDisciplinas } from "@/domain/horarios-semanais";
+import {
+  disciplinasDoHorario,
+  mesclarDisciplinas,
+  INTERVALO_ALMOCO,
+  turnoDoHorario,
+} from "@/domain/horarios-semanais";
+
+describe("turnos da consulta diária", () => {
+  it.each([
+    ["07:00", "manha"],
+    ["11:49", "manha"],
+    ["11:50", "almoco"],
+    ["12:59", "almoco"],
+    ["13:00", "tarde"],
+    ["17:00", "tarde"],
+  ])("classifica início %s como %s sem perder aulas no intervalo", (inicio, turno) => {
+    expect(turnoDoHorario(inicio)).toBe(turno);
+  });
+
+  it("define o intervalo de almoço usado na consulta", () => {
+    expect(INTERVALO_ALMOCO).toEqual({ inicio: "11:50", fim: "13:00" });
+  });
+});
 
 const dados = vi.hoisted(() => ({
   horario: {
