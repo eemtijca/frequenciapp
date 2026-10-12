@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import {
   Archive,
   Check,
+  Clock,
   Download,
   FileSpreadsheet,
   LoaderCircle,
@@ -49,6 +50,7 @@ import IntegracaoParcial from "@/components/gestao/integracao-parcial";
 import SecaoIndicadores from "@/components/gestao/secao-indicadores";
 import SecaoFilaPlanilha from "@/components/gestao/secao-fila-planilha";
 import SecaoCalendarioLetivo from "@/components/gestao/secao-calendario-letivo";
+import VistaHorarios from "@/components/horarios/vista-horarios";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +74,8 @@ interface Props {
   onMudanca: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
   onLiberadoresMudaram: () => Promise<void>;
+  onHorariosMudaram: () => Promise<void> | void;
+  onPendenciaHorarios?: (pendente: boolean) => void;
   onAbrirSaidas?: () => void;
   onAbrirParcial?: () => void;
 }
@@ -85,6 +89,7 @@ interface ResultadoImportacao {
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
 const CATEGORIAS = [
   { valor: "escola", rotulo: "Escola", icone: Settings2 },
+  { valor: "horarios", rotulo: "Horários", icone: Clock },
   { valor: "planilhas", rotulo: "Planilhas", icone: FileSpreadsheet },
   { valor: "acesso", rotulo: "Acesso e avisos", icone: ShieldCheck },
   { valor: "dados", rotulo: "Dados", icone: Archive },
@@ -102,10 +107,14 @@ export default function AbaConfiguracoes({
   onMudanca,
   onJustificativasMudaram,
   onLiberadoresMudaram,
+  onHorariosMudaram,
+  onPendenciaHorarios,
   onAbrirSaidas,
   onAbrirParcial,
 }: Props) {
   const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
+  // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
+  const [horariosAbertos, setHorariosAbertos] = useState(false);
   const [abertoRecursos, setAbertoRecursos] = useState(true);
   const [abertoJustificativas, setAbertoJustificativas] = useState(false);
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
@@ -1090,7 +1099,10 @@ export default function AbaConfiguracoes({
             variant="ghost"
             aria-pressed={categoria === valor}
             aria-controls={`config-grupo-${valor}`}
-            onClick={() => setCategoria(valor)}
+            onClick={() => {
+              setCategoria(valor);
+              if (valor === "horarios") setHorariosAbertos(true);
+            }}
             className={`h-12 min-w-0 justify-start px-3 text-xs sm:text-sm ${
               categoria === valor ? "vidro-selecionado" : "text-muted-foreground"
             }`}
@@ -1109,6 +1121,23 @@ export default function AbaConfiguracoes({
           className="flex min-w-0 flex-col gap-4"
         >
           {escola}
+        </section>
+        <section
+          id="config-grupo-horarios"
+          aria-labelledby="categoria-config-horarios"
+          hidden={categoria !== "horarios"}
+          inert={categoria !== "horarios"}
+          className="flex min-w-0 flex-col gap-4"
+        >
+          {horariosAbertos && (
+            <VistaHorarios
+              turmas={turmas}
+              diaCorrente={diaCorrente}
+              editavel
+              onMudanca={onHorariosMudaram}
+              onPendencia={onPendenciaHorarios}
+            />
+          )}
         </section>
         <section
           id="config-grupo-planilhas"

@@ -500,22 +500,26 @@ export default function Aplicacao({
     },
     [itens],
   );
+  // A Chamada Parcial guarda o rascunho na própria visão; a edição de horários, em Gestão.
+  const visaoComRascunho = useCallback(
+    (alvo: Visao) =>
+      (alvo === "chamada-parcial" && pendencias.includes("chamada-parcial")) ||
+      (alvo === "gestao" && pendencias.includes("horarios")),
+    [pendencias],
+  );
   const trocarVisao = useCallback(
     (proxima: Visao) => {
       if (!itens.some((item) => item.visao === proxima) || proxima === visao) return;
-      if ((visao === "chamada-parcial" || visao === "horarios") && pendencias.includes(visao)) {
+      if (visaoComRascunho(visao)) {
         setVisaoComPendencia(proxima);
         return;
       }
       ativarVisao(proxima);
     },
-    [ativarVisao, itens, pendencias, visao],
+    [ativarVisao, itens, visao, visaoComRascunho],
   );
   function navegarPeloMenu(proxima: Visao, fecharMenu: FecharMenu) {
-    const pedeConferencia =
-      (visao === "chamada-parcial" || visao === "horarios") &&
-      pendencias.includes(visao) &&
-      proxima !== visao;
+    const pedeConferencia = visaoComRascunho(visao) && proxima !== visao;
     if (pedeConferencia) {
       origemDialogoRef.current = gatilhoMenuRef.current;
       fecharMenu("dialogo");
@@ -725,9 +729,8 @@ export default function Aplicacao({
           <VistaHorarios
             turmas={turmas}
             diaCorrente={diaCorrente}
-            admin={ehAdmin}
+            editavel={false}
             onMudanca={recarregarEscopo}
-            onPendencia={registrarPendenciaHorarios}
           />
         )}
         {alvoVisao === "saidas" && configuracoes.saidaAntecipada && (
@@ -795,6 +798,8 @@ export default function Aplicacao({
             onConfiguracoesMudaram={setConfiguracoes}
             onJustificativasMudaram={recarregarJustificativas}
             onLiberadoresMudaram={recarregarLiberadores}
+            onHorariosMudaram={recarregarEscopo}
+            onPendenciaHorarios={registrarPendenciaHorarios}
             onAbrirSaidas={() => trocarVisao("saidas")}
             onAbrirParcial={() => trocarVisao("chamada-parcial")}
           />
@@ -841,7 +846,8 @@ export default function Aplicacao({
                 ativo={visaoNavegacao === item.visao}
                 pendente={
                   pendencias.includes(item.visao) ||
-                  (item.visao === "chamada" && pendencias.includes("chamada-parcial"))
+                  (item.visao === "chamada" && pendencias.includes("chamada-parcial")) ||
+                  (item.visao === "gestao" && pendencias.includes("horarios"))
                 }
                 indicador={movel ? undefined : "indicador-lateral"}
                 onTrocar={
@@ -1066,7 +1072,7 @@ export default function Aplicacao({
         >
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {visao === "horarios"
+              {visao === "gestao"
                 ? "Há alterações não salvas nos Horários"
                 : "Há alterações não salvas na Chamada Parcial"}
             </AlertDialogTitle>
