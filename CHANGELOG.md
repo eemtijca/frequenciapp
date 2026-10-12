@@ -51,6 +51,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Horários: a edição passa para Gestão, Configurações, categoria Horários, e a aba Horários fica só para consulta, inclusive para a administração. Intervalo da manhã (09:00 às 09:20), almoço (11:50 às 13:00) e intervalo da tarde (14:40 às 14:55) aparecem como linhas na ordem do horário, na consulta diária, nos cartões por dia e na tabela da semana, no lugar do cartão separado do almoço.
+
 - Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.
 
 - Gerenciamento de dependências migrado de npm para pnpm, com o `packageManager` fixado, `pnpm-lock.yaml` versionado e `pnpm-workspace.yaml` autorizando os scripts de build; `pg` passa a ser declarado e o estágio de execução do Dockerfile usa as dependências de produção do pnpm.
