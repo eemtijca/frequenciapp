@@ -307,6 +307,12 @@ A convenção e a cobertura estão em [docs/testes.md](docs/testes.md); os pré-
 
 Mudanças estruturais ganham uma nota curta em [docs/adr/](docs/adr/), com estado, contexto, decisão, alternativas e consequências. Novas notas seguem a numeração sequencial e o formato dos ADRs existentes. O índice fica em [docs/README.md](docs/README.md).
 
+### Documentação da API
+
+Toda mudança de rota ou de contrato atualiza [docs/openapi.json](docs/openapi.json). Mudanças de convenção também atualizam [docs/api.md](docs/api.md), servido em `GET /api/docs/api.md`, e as orientações de uso por agentes em [public/llms.txt](public/llms.txt). A interface em `GET /api/docs` e a especificação em `GET /api/docs/openapi.json` refletem esses arquivos na hora.
+
+Antes do pull request, rode `pnpm run lint:api` e `pnpm exec vitest run tests/unit/openapi.test.ts`; a guarda reprova rota sem documentação e a repetição do título no topo da descrição.
+
 ### Padrão da documentação
 
 Toda a documentação usa português brasileiro com acentuação e cedilha corretas, em tom técnico e impessoal. Evite primeira pessoa, exclamações e frases de preenchimento.
