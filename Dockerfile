@@ -6,10 +6,12 @@ FROM node:24-bookworm-slim AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 
-# 1. Dependências (prisma junto: o postinstall gera o cliente)
+# 1. Dependências (prisma e scripts junto: o postinstall gera o cliente
+# e copia os assets do Swagger UI para public/vendor)
 FROM base AS dependencias
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY scripts ./scripts
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 RUN pnpm install --frozen-lockfile
@@ -19,6 +21,8 @@ FROM base AS compilacao
 WORKDIR /app
 COPY --from=dependencias /app/node_modules ./node_modules
 COPY . .
+# Os assets do Swagger UI nascem no postinstall e não existem no contexto do Git.
+COPY --from=dependencias /app/public ./public
 # O cliente é sempre regenerado no build, independente do que houver no host.
 COPY --from=dependencias /app/generated ./generated
 ENV NEXT_TELEMETRY_DISABLED=1

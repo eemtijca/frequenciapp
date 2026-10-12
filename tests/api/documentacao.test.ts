@@ -17,5 +17,8 @@ describe("documentacao.test", () => {
     const referencia = await fetch(`${APP_URL}/api/docs/api.md`);
     expect(referencia.status).toBe(200);
     expect(referencia.headers.get("content-type")).toContain("text/markdown");
+
+    const asset = await fetch(`${APP_URL}/vendor/swagger-ui/swagger-ui-bundle.js`);
+    expect(asset.status).toBe(200);
   });
 });
