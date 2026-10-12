@@ -1,2 +1,7 @@
+# A raiz, o índice para agentes e a documentação da API ficam abertos.
+# O restante do aplicativo exige sessão.
 User-agent: *
+Allow: /$
+Allow: /llms.txt
+Allow: /api/docs
 Disallow: /

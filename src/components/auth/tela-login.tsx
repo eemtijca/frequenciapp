@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
 
@@ -22,7 +23,12 @@ const DESTAQUES = [
   { Icone: WifiOff, texto: "Rascunho local enquanto a rede oscila" },
 ];
 
-export default function TelaLogin() {
+interface Props {
+  /** URL do índice para agentes de IA, montada a partir da requisição. */
+  urlIndiceAgentes: string;
+}
+
+export default function TelaLogin({ urlIndiceAgentes }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -31,6 +37,7 @@ export default function TelaLogin() {
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado | null>(null);
   const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(null);
+  const [sobreAberto, setSobreAberto] = useState(false);
 
   // Preenche o e-mail lembrado neste dispositivo, se houver.
   useEffect(() => {
@@ -220,6 +227,42 @@ export default function TelaLogin() {
             Acesso pessoal. As contas são criadas pela administração da escola e a recuperação de
             senha é feita com ela, sem cadastro público.
           </p>
+
+          <nav
+            aria-label="Projeto"
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs lg:justify-start"
+          >
+            <a
+              href="https://github.com/eemtijca/frequenciapp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              GitHub
+            </a>
+            <a
+              href="/api/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              Documentação da API
+            </a>
+            <button
+              type="button"
+              onClick={() => setSobreAberto(true)}
+              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              Sobre
+            </button>
+          </nav>
+
+          {/* Link oculto para agentes de IA: a raiz anônima aponta o índice do projeto. */}
+          <a href={urlIndiceAgentes} hidden aria-hidden="true">
+            llms.txt
+          </a>
+
+          <DialogoSobre aberto={sobreAberto} onAbrir={setSobreAberto} />
         </div>
       </main>
     </div>

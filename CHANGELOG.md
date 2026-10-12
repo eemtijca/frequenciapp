@@ -37,6 +37,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Índice `public/llms.txt` para agentes de IA, com o contrato, a referência e a orientação de uso seguro.
 
+- Descoberta do índice para agentes de IA na raiz anônima: link oculto com o domínio que atendeu a requisição, `rel=alternate` no HTML e cabeçalho `Link` da resposta; o `robots.txt` libera a raiz, o `llms.txt` e a documentação da API.
+
+- Tela de entrada com os links do repositório no GitHub e da documentação da API, e diálogo Sobre com os desenvolvedores, o repositório, a instituição e a licença, também aberto no menu lateral e na tela do diretor de turma.
+
 - ADR-043 sobre a documentação interativa e o CSP por URL.
 
 ### Alterado
@@ -90,6 +94,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- A documentação interativa deixa de repetir o título da API no topo da página: a descrição da especificação começa pela visão geral, e a guarda de unidade reprova a repetição do título.
 
 - Horários no celular: o cartão do almoço deixava de aparecer inteiro ao rolar até o fim, com a borda inferior colada na borda da tela, e a página termina agora com folga. Semana completa e Editar horários passam a dividir uma linha, deixando a tela menos alta.
 

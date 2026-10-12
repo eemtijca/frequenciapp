@@ -21,4 +21,18 @@ describe("documentacao.test", () => {
     const asset = await fetch(`${APP_URL}/vendor/swagger-ui/swagger-ui-bundle.js`);
     expect(asset.status).toBe(200);
   });
+
+  it("aponta o índice para agentes na raiz anônima", async () => {
+    const raiz = await fetch(`${APP_URL}/`);
+    expect(raiz.status).toBe(200);
+    expect(raiz.headers.get("link")).toContain("</llms.txt>");
+
+    const html = await raiz.text();
+    expect(html).toContain('rel="alternate"');
+    expect(html).toContain("llms.txt");
+
+    const indice = await fetch(`${APP_URL}/llms.txt`);
+    expect(indice.status).toBe(200);
+    expect(await indice.text()).toContain("# FrequenciApp");
+  });
 });

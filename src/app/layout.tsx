@@ -42,7 +42,12 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  robots: { index: false, follow: false },
+  alternates: {
+    types: { "text/markdown": "/llms.txt" },
+  },
+  // Fora do índice de busca, mas com os links da página seguidos: a raiz
+  // anônima aponta o índice para agentes de IA.
+  robots: { index: false, follow: true },
 };
 
 export const viewport: Viewport = {

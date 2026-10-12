@@ -3,6 +3,32 @@
 /** URL pública da especificação OpenAPI. */
 export const URL_ESPECIFICACAO = "/api/docs/openapi.json";
 
+/** Caminho público do índice para agentes de IA. */
+export const CAMINHO_INDICE_AGENTES = "/llms.txt";
+
+/** Cabeçalhos de requisição que bastam para montar a origem pública. */
+interface CabecalhosDaRequisicao {
+  get(nome: string): string | null;
+}
+
+/**
+ * Monta a URL do índice para agentes na origem que atendeu a requisição,
+ * para o link valer em qualquer domínio de produção. Sem host nos cabeçalhos,
+ * devolve o caminho relativo e o navegador resolve pelo domínio da página.
+ */
+export function urlDoIndiceDeAgentes(cabecalhos: CabecalhosDaRequisicao): string {
+  const host = (cabecalhos.get("x-forwarded-host") ?? cabecalhos.get("host"))
+    ?.split(",")[0]
+    ?.trim();
+  if (!host) return CAMINHO_INDICE_AGENTES;
+  const local =
+    host === "localhost" || host.startsWith("localhost:") || host.startsWith("127.0.0.1");
+  const protocolo =
+    cabecalhos.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() ??
+    (local ? "http" : "https");
+  return `${protocolo}://${host}${CAMINHO_INDICE_AGENTES}`;
+}
+
 /**
  * Monta a página do Swagger UI com o nonce da CSP. Os assets são servidos de
  * /vendor/swagger-ui, copiados de node_modules no postinstall.

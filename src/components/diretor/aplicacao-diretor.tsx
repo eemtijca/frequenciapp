@@ -4,7 +4,7 @@
 // No primeiro acesso, a troca da palavra-chave vem antes de qualquer dado.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, KeyRound, LoaderCircle, LogOut } from "lucide-react";
+import { Bell, Info, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { pedir } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
+import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 
@@ -27,6 +28,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
   const router = useRouter();
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
+  const [sobreAberto, setSobreAberto] = useState(false);
 
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
@@ -63,6 +65,16 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
                 <Bell size={18} />
               </Button>
             ) : null}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-11 rounded-full"
+              aria-label="Sobre"
+              title="Sobre"
+              onClick={() => setSobreAberto(true)}
+            >
+              <Info size={18} />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -108,6 +120,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
         }}
       />
       <DialogoNotificacoes aberto={notificacoesAbertas} onAbrir={setNotificacoesAbertas} />
+      <DialogoSobre aberto={sobreAberto} onAbrir={setSobreAberto} />
       <RegistroPwa />
     </div>
   );

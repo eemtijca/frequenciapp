@@ -54,5 +54,6 @@ Informe se houve apoio de ferramentas de IA e como o resultado foi revisado. A r
 - [ ] Rodei `pnpm run test:api` com o aplicativo no ar.
 - [ ] Rodei `pnpm run test:e2e:docker` quando a mudança afeta a interface.
 - [ ] Atualizei a documentação correspondente e o CHANGELOG.md.
+- [ ] Atualizei `docs/openapi.json`, `docs/api.md` e `public/llms.txt` quando o contrato da API mudou.
 - [ ] Revisei a segurança quando a mudança toca dependências, autenticação, permissões, workflows ou dados sensíveis.
 - [ ] Não incluí segredos nem dados reais de alunos.
