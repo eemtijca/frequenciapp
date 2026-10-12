@@ -1,0 +1,13 @@
+# Regras do linter da especificação OpenAPI (Redocly CLI).
+# Documentação: https://redocly.com/docs/cli/rules/
+extends:
+  - recommended-strict
+
+rules:
+  # As sondas de saúde e de sessão respondem apenas 200; a guarda
+  # tests/unit/openapi.test.ts exige 4xx nas demais operações.
+  operation-4xx-response: warn
+
+  # GET /api/backup responde apenas 405 (o download é POST) e o retorno do
+  # Google OAuth responde 302; ambas são intencionais.
+  operation-2xx-response: warn
