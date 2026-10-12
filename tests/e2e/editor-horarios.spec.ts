@@ -94,7 +94,22 @@ function observarGravacoes(page: Page): Request[] {
   return gravacoes;
 }
 
+/** A edição fica em Gestão, Configurações, categoria Horários. */
 async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
+  await page.goto("/?visao=gestao");
+  await aguardarHidratacao(page);
+  await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await page.locator("#categoria-config-horarios").click();
+  const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
+  await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
+  await page.getByRole("option", { name: turma, exact: true }).click();
+  await vista.getByRole("button", { name: "Semana completa", exact: true }).click();
+  return vista;
+}
+
+/** A consulta da aba Horários, sem controles de edição. */
+async function abrirConsulta(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=horarios");
   await aguardarHidratacao(page);
   await expect(page.locator("main")).toHaveAttribute("data-visao", "horarios");
@@ -234,12 +249,7 @@ test("a grade do desktop descarta sem gravar e confirma a disciplina antes de pe
   expect(atual[0]?.disciplinas).toEqual({ "1": "Ciências", "2": "Português" });
   expect(atual[0]?.id).toBe(antes[0]?.id);
   expect(atual.slice(1)).toEqual(antes.slice(1));
-  await page.reload();
-  await aguardarHidratacao(page);
-  vista = page.getByRole("region", { name: "Horários semanais", exact: true });
-  await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
-  await page.getByRole("option", { name: origem, exact: true }).click();
-  await vista.getByRole("button", { name: "Semana completa", exact: true }).click();
+  vista = await abrirHorarios(page);
   await expect(vista.getByText("Ciências", { exact: true }).locator("visible=true")).toBeVisible();
   await expect(vista.getByText("Português", { exact: true }).locator("visible=true")).toBeVisible();
 });
@@ -322,7 +332,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   const disciplina = formulario.getByRole("textbox", { name: "Disciplina", exact: true });
   await disciplina.fill("Ciências");
   const navegacao = await abrirNavegacao(page);
-  await navegacao.getByRole("button", { name: "Gestão", exact: true }).click();
+  await navegacao.getByRole("button", { name: "Painel", exact: true }).click();
   const avisoSaida = page.getByRole("alertdialog", {
     name: "Há alterações não salvas nos Horários",
     exact: true,
@@ -330,7 +340,9 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   await expect(avisoSaida).toBeVisible();
   expect(gravacoes).toHaveLength(0);
   await avisoSaida.getByRole("button", { name: "Mudar de tela", exact: true }).click();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+  await expect(page.locator("main")).toHaveAttribute("data-visao", "painel");
+  await trocarVisao(page, "Gestão", "gestao");
+  await expect(formulario).toBeVisible();
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   await page.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
   const dialogo = page.getByRole("dialog", { name: `Horários de ${origem}`, exact: true });
@@ -341,7 +353,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
     .click();
   await expect(page.getByText("Aula desativada.", { exact: true })).toBeVisible();
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
-  await trocarVisao(page, "Horários", "horarios");
+  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
   await expect(
     vista.getByText("Esta aula não está mais disponível na grade.", { exact: true }),
   ).toBeVisible();
@@ -643,7 +655,7 @@ test.describe("consulta pela coordenação", () => {
   test.use({ storageState: "tests/e2e/.auth/coordenacao.json" });
 
   test("mantém a consulta semanal sem edição, cópia nem aulas desativadas", async ({ page }) => {
-    const vista = await abrirHorarios(page);
+    const vista = await abrirConsulta(page);
     await expect(
       vista.getByText("Matemática", { exact: true }).locator("visible=true"),
     ).toBeVisible();

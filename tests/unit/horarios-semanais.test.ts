@@ -4,6 +4,9 @@ import {
   disciplinasDoHorario,
   mesclarDisciplinas,
   INTERVALO_ALMOCO,
+  INTERVALO_MANHA,
+  INTERVALO_TARDE,
+  sequenciaDoDia,
   turnoDoHorario,
 } from "@/domain/horarios-semanais";
 
@@ -21,6 +24,55 @@ describe("turnos da consulta diária", () => {
 
   it("define o intervalo de almoço usado na consulta", () => {
     expect(INTERVALO_ALMOCO).toEqual({ inicio: "11:50", fim: "13:00" });
+  });
+});
+
+describe("pausas do dia", () => {
+  const inicios = (valores: string[]) =>
+    sequenciaDoDia(valores, (inicio) => inicio).map((item) =>
+      item.tipo === "aula" ? item.aula : item.pausa.id,
+    );
+
+  it("fixa os intervalos da manhã e da tarde", () => {
+    expect(INTERVALO_MANHA).toEqual({ inicio: "09:00", fim: "09:20" });
+    expect(INTERVALO_TARDE).toEqual({ inicio: "14:40", fim: "14:55" });
+  });
+
+  it("intercala intervalos e almoço na posição do horário", () => {
+    expect(
+      inicios(["07:20", "08:10", "09:20", "10:10", "11:00", "13:00", "13:50", "14:55", "15:45"]),
+    ).toEqual([
+      "07:20",
+      "08:10",
+      "intervalo-manha",
+      "09:20",
+      "10:10",
+      "11:00",
+      "almoco",
+      "13:00",
+      "13:50",
+      "intervalo-tarde",
+      "14:55",
+      "15:45",
+    ]);
+  });
+
+  it("não deixa pausa solta no começo nem no fim do turno", () => {
+    expect(inicios(["07:20", "08:10"])).toEqual(["07:20", "08:10"]);
+    expect(inicios(["13:00", "13:50"])).toEqual(["13:00", "13:50"]);
+    expect(inicios(["09:20", "10:10"])).toEqual(["09:20", "10:10"]);
+  });
+
+  it("mostra o almoço antes de uma aula cadastrada dentro da janela dele", () => {
+    expect(inicios(["07:20", "11:50", "13:00"])).toEqual(["07:20", "almoco", "11:50", "13:00"]);
+  });
+
+  it("não cria intervalo da manhã com aulas só em turnos diferentes", () => {
+    expect(inicios(["07:20", "13:00"])).toEqual(["07:20", "almoco", "13:00"]);
+  });
+
+  it("devolve lista vazia sem aulas", () => {
+    expect(inicios([])).toEqual([]);
   });
 });
 

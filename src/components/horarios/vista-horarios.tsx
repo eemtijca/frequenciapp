@@ -1,10 +1,25 @@
 "use client";
 
-// Grade semanal por turma, com edição administrativa confirmada e rascunho preservado.
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarDays, Clock, LoaderCircle, Pencil, Sun, Sunset, Utensils } from "lucide-react";
+// Grade semanal por turma: consulta para todos e, em Gestão, edição confirmada com rascunho preservado.
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import {
+  CalendarDays,
+  Clock,
+  Coffee,
+  LoaderCircle,
+  Pencil,
+  Sun,
+  Sunset,
+  Utensils,
+} from "lucide-react";
 import { ehHoraValida, type Horario, type Turma } from "@/domain/frequencia";
-import { DIAS_DA_SEMANA, INTERVALO_ALMOCO, turnoDoHorario } from "@/domain/horarios-semanais";
+import {
+  DIAS_DA_SEMANA,
+  sequenciaDoDia,
+  turnoDoHorario,
+  type ItemDoDia,
+  type Pausa,
+} from "@/domain/horarios-semanais";
 import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -35,7 +50,8 @@ const TURNOS: AbaItem<"manha" | "tarde">[] = [
 interface Props {
   turmas: Turma[];
   diaCorrente: string;
-  admin: boolean;
+  /** Falso na consulta (aba Horários); verdadeiro na edição, em Gestão, Configurações. */
+  editavel: boolean;
   onMudanca: () => Promise<void> | void;
   onPendencia?: (pendente: boolean) => void;
 }
@@ -54,10 +70,29 @@ function nomeDisciplina(aula: Horario, dia: number): string {
   return aula.disciplinas?.[String(dia)]?.trim() || "Sem disciplina";
 }
 
+function IconePausa({ pausa }: { pausa: Pausa }) {
+  const Icone = pausa.id === "almoco" ? Utensils : Coffee;
+  return <Icone size={16} aria-hidden="true" className="shrink-0" />;
+}
+
+function PausaDoDia({ pausa }: { pausa: Pausa }) {
+  return (
+    <li className="bg-secondary/30 text-muted-foreground flex min-w-0 items-center gap-3 px-4 py-3 text-sm">
+      <span className="flex size-11 shrink-0 items-center justify-center">
+        <IconePausa pausa={pausa} />
+      </span>
+      <span className="min-w-0 flex-1 font-medium">{pausa.rotulo}</span>
+      <span className="numerais-tabulares shrink-0 text-xs">
+        {pausa.inicio} às {pausa.fim}
+      </span>
+    </li>
+  );
+}
+
 interface PropsAulasDoDia {
-  aulas: Horario[];
+  itens: ItemDoDia<Horario>[];
   dia: number;
-  admin: boolean;
+  editavel: boolean;
   bloqueado: boolean;
   aulaEmEdicao: string | undefined;
   onEditar: (aula: Horario, dia: number) => void;
@@ -66,16 +101,16 @@ interface PropsAulasDoDia {
 }
 
 function AulasDoDia({
-  aulas,
+  itens,
   dia,
-  admin,
+  editavel,
   bloqueado,
   aulaEmEdicao,
   onEditar,
   editor,
   turno,
 }: PropsAulasDoDia) {
-  if (aulas.length === 0)
+  if (!itens.some((item) => item.tipo === "aula"))
     return (
       <p className="text-muted-foreground px-4 py-6 text-sm">
         {turno ? "Sem aulas neste turno." : "Sem aulas neste dia."}
@@ -84,41 +119,45 @@ function AulasDoDia({
 
   return (
     <ol aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`} className="divide-y">
-      {aulas.map((aula) => (
-        <li key={aula.id} className="flex min-w-0 flex-col gap-3 px-4 py-4">
-          <div className="flex items-start gap-3">
-            <span className="controle-vidro numerais-tabulares flex size-11 shrink-0 items-center justify-center text-sm font-semibold">
-              <span aria-hidden="true">{aula.ordem}ª</span>
-              <span className="sr-only">{aula.ordem}ª aula</span>
-            </span>
-            <div className="min-w-0 flex-1">
-              <p
-                className={`text-sm font-medium break-words ${aula.disciplinas?.[String(dia)] ? "" : "text-muted-foreground"}`}
-              >
-                {nomeDisciplina(aula, dia)}
-              </p>
-              <p className="numerais-tabulares text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
-                <Clock size={14} aria-hidden="true" className="shrink-0" />
-                {aula.inicio} às {aula.fim}
-              </p>
+      {itens.map((item) => {
+        if (item.tipo === "pausa") return <PausaDoDia key={item.pausa.id} pausa={item.pausa} />;
+        const aula = item.aula;
+        return (
+          <li key={aula.id} className="flex min-w-0 flex-col gap-3 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <span className="controle-vidro numerais-tabulares flex size-11 shrink-0 items-center justify-center text-sm font-semibold">
+                <span aria-hidden="true">{aula.ordem}ª</span>
+                <span className="sr-only">{aula.ordem}ª aula</span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p
+                  className={`text-sm font-medium break-words ${aula.disciplinas?.[String(dia)] ? "" : "text-muted-foreground"}`}
+                >
+                  {nomeDisciplina(aula, dia)}
+                </p>
+                <p className="numerais-tabulares text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
+                  <Clock size={14} aria-hidden="true" className="shrink-0" />
+                  {aula.inicio} às {aula.fim}
+                </p>
+              </div>
+              {editavel ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Editar ${aula.ordem}ª aula de ${rotuloDia(dia)}`}
+                  aria-expanded={aulaEmEdicao === aula.id}
+                  disabled={bloqueado}
+                  onClick={() => onEditar(aula, dia)}
+                >
+                  <Pencil size={16} aria-hidden="true" />
+                </Button>
+              ) : null}
             </div>
-            {admin ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Editar ${aula.ordem}ª aula de ${rotuloDia(dia)}`}
-                aria-expanded={aulaEmEdicao === aula.id}
-                disabled={bloqueado}
-                onClick={() => onEditar(aula, dia)}
-              >
-                <Pencil size={16} aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
-          {editor(aula, dia)}
-        </li>
-      ))}
+            {editor(aula, dia)}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -126,10 +165,11 @@ function AulasDoDia({
 export default function VistaHorarios({
   turmas,
   diaCorrente,
-  admin,
+  editavel,
   onMudanca,
   onPendencia,
 }: Props) {
+  const base = useId();
   const [turmaId, setTurmaId] = useState(turmas[0]?.id ?? "");
   const [diaSelecionado, setDiaSelecionado] = useState(String(diaDaSemana(diaCorrente)));
   const [editorCompleto, setEditorCompleto] = useState(false);
@@ -147,16 +187,33 @@ export default function VistaHorarios({
   const diasDaGrade = DIAS_DA_SEMANA.filter(
     (dia) => dia.valor <= 5 || aulas.some((aula) => aula.diasSemana.includes(dia.valor)),
   );
+  const sequenciaDaGrade = sequenciaDoDia(aulas, (aula) => aula.inicio);
   const dia = Number(diaSelecionado);
   const aulasDoDia = aulas.filter((aula) => aula.diasSemana.includes(dia));
   // Uma atualização externa da janela não esconde o formulário ainda em edição.
-  const turnoDaAula = (aula: Horario) =>
-    turnoDoHorario(rascunho?.aulaId === aula.id ? rascunho.inicioInicial : aula.inicio);
-  const aulasPorTurno = {
-    manha: aulasDoDia.filter((aula) => turnoDaAula(aula) === "manha"),
-    tarde: aulasDoDia.filter((aula) => turnoDaAula(aula) === "tarde"),
-    almoco: aulasDoDia.filter((aula) => turnoDaAula(aula) === "almoco"),
+  const inicioEstavel = (aula: Horario) =>
+    rascunho?.aulaId === aula.id ? rascunho.inicioInicial : aula.inicio;
+  const turnoDaAula = (aula: Horario) => turnoDoHorario(inicioEstavel(aula));
+  const sequenciaDoDiaAtual = sequenciaDoDia(aulasDoDia, inicioEstavel);
+  const almocoDoDia = sequenciaDoDiaAtual.find(
+    (item) => item.tipo === "pausa" && item.pausa.id === "almoco",
+  );
+  // Aulas cadastradas na janela do almoço ficam na manhã, logo depois da linha do almoço.
+  const itensPorTurno = {
+    manha: sequenciaDoDiaAtual.filter((item) =>
+      item.tipo === "aula"
+        ? turnoDaAula(item.aula) !== "tarde"
+        : item.pausa.id !== "intervalo-tarde",
+    ),
+    tarde: sequenciaDoDiaAtual.filter((item) =>
+      item.tipo === "aula"
+        ? turnoDaAula(item.aula) === "tarde"
+        : item.pausa.id === "intervalo-tarde",
+    ),
   };
+  if (almocoDoDia && itensPorTurno.tarde.length > 0) itensPorTurno.tarde.unshift(almocoDoDia);
+  const aulasDoTurno = (turno: "manha" | "tarde") =>
+    itensPorTurno[turno].filter((item) => item.tipo === "aula").length;
   const disciplinaAlterada =
     rascunho !== null && rascunho.disciplina.trim() !== rascunho.disciplinaInicial;
   const inicioAlterado = rascunho !== null && rascunho.inicio !== rascunho.inicioInicial;
@@ -188,7 +245,7 @@ export default function VistaHorarios({
   }, [emEdicao]);
 
   function abrirEdicao(aula: Horario, diaDaAula: number | null) {
-    if (!admin || rascunho || editorCompleto) return;
+    if (!editavel || rascunho || editorCompleto) return;
     gatilhoEdicao.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const disciplina = diaDaAula ? (aula.disciplinas?.[String(diaDaAula)]?.trim() ?? "") : "";
@@ -224,7 +281,7 @@ export default function VistaHorarios({
   }
 
   const { executando: enviando, executar: salvar } = useAcaoUnica(async () => {
-    if (!admin || !rascunho || !contextoDisponivel || !confirmando || !alterado) return;
+    if (!editavel || !rascunho || !contextoDisponivel || !confirmando || !alterado) return;
     setErro("");
     try {
       // Campos omitidos permanecem no servidor, inclusive as disciplinas dos demais dias.
@@ -262,17 +319,17 @@ export default function VistaHorarios({
   }
 
   function renderizarEditor(aula: Horario, diaDaAula: number | null, versao: string) {
-    if (!admin || !rascunho || !contextoDisponivel || rascunho.aulaId !== aula.id) return null;
+    if (!editavel || !rascunho || !contextoDisponivel || rascunho.aulaId !== aula.id) return null;
     if (diaDaAula !== null && diaDaAula !== diaDoEditor) return null;
     return renderizarFormulario(versao);
   }
 
   function renderizarFormulario(versao: string) {
-    if (!admin || !rascunho) return null;
+    if (!editavel || !rascunho) return null;
     return (
       <EditorAula
         rascunho={rascunho}
-        identificador={`horarios-${versao}-${rascunho.aulaId}`}
+        identificador={`${base}-${versao}-${rascunho.aulaId}`}
         rotuloDia={rascunho.dia ? rotuloDia(rascunho.dia) : ""}
         ocupado={enviando}
         somenteLeitura={!contextoDisponivel}
@@ -293,13 +350,20 @@ export default function VistaHorarios({
 
   return (
     // A página rola sem folga inferior: o pb-6 deixa o último cartão respirar acima da borda.
-    <section aria-label="Horários semanais" className="flex min-w-0 flex-col gap-5 pb-6">
-      <h1 className="sr-only">Horários</h1>
+    <section
+      aria-label={editavel ? "Edição de horários" : "Horários semanais"}
+      className={`flex min-w-0 flex-col gap-5 ${editavel ? "" : "pb-6"}`}
+    >
+      {editavel ? (
+        <h2 className="sr-only">Horários das turmas</h2>
+      ) : (
+        <h1 className="sr-only">Horários</h1>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="horarios-turma">Turma</Label>
+          <Label htmlFor={`${base}-turma`}>Turma</Label>
           <Selecionar
-            id="horarios-turma"
+            id={`${base}-turma`}
             value={turma?.id ?? ""}
             onValueChange={setTurmaId}
             opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
@@ -307,9 +371,9 @@ export default function VistaHorarios({
           />
         </div>
         <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="horarios-dia">Dia da semana</Label>
+          <Label htmlFor={`${base}-dia`}>Dia da semana</Label>
           <Selecionar
-            id="horarios-dia"
+            id={`${base}-dia`}
             value={diaSelecionado}
             onValueChange={setDiaSelecionado}
             opcoes={[
@@ -335,7 +399,7 @@ export default function VistaHorarios({
           <CalendarDays size={16} aria-hidden="true" />
           Semana completa
         </Button>
-        {admin ? (
+        {editavel ? (
           <Button
             type="button"
             variant="outline"
@@ -350,7 +414,7 @@ export default function VistaHorarios({
         ) : null}
       </div>
 
-      {admin && rascunho && !contextoDisponivel ? (
+      {editavel && rascunho && !contextoDisponivel ? (
         <div className="flex min-w-0 flex-col gap-3">
           <AvisoCompacto
             variante="dados_invalidos"
@@ -389,69 +453,90 @@ export default function VistaHorarios({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {aulas.map((aula) => (
-                    <Fragment key={aula.id}>
-                      <tr>
-                        <th scope="row" className="numerais-tabulares px-3 py-4 font-medium">
-                          {aula.ordem}ª aula
-                          <span className="text-muted-foreground mt-1 block text-xs font-normal">
-                            {aula.inicio} às {aula.fim}
-                          </span>
-                          {admin ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="mt-1"
-                              aria-label={`Editar horário da ${aula.ordem}ª aula`}
-                              disabled={navegacaoBloqueada}
-                              onClick={() => abrirEdicao(aula, null)}
-                            >
-                              <Pencil size={16} aria-hidden="true" />
-                            </Button>
-                          ) : null}
-                        </th>
-                        {diasDaGrade.map((item) => (
-                          <td key={item.valor} className="px-3 py-4 align-top break-words">
-                            {aula.diasSemana.includes(item.valor) ? (
-                              <div className="flex min-w-0 flex-col items-start gap-1">
-                                <span
-                                  className={
-                                    aula.disciplinas?.[String(item.valor)]
-                                      ? "font-medium"
-                                      : "text-muted-foreground"
-                                  }
-                                >
-                                  {nomeDisciplina(aula, item.valor)}
-                                </span>
-                                {admin ? (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={`Editar disciplina da ${aula.ordem}ª aula de ${rotuloDia(item.valor)}`}
-                                    disabled={navegacaoBloqueada}
-                                    onClick={() => abrirEdicao(aula, item.valor)}
-                                  >
-                                    <Pencil size={16} aria-hidden="true" />
-                                  </Button>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <span className="sr-only">Sem aula</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                      {admin && rascunho?.aulaId === aula.id ? (
-                        <tr>
-                          <td colSpan={diasDaGrade.length + 1} className="px-3 py-4">
-                            {renderizarEditor(aula, null, "grade")}
+                  {sequenciaDaGrade.map((entrada) => {
+                    if (entrada.tipo === "pausa") {
+                      return (
+                        <tr
+                          key={entrada.pausa.id}
+                          className="bg-secondary/30 text-muted-foreground"
+                        >
+                          <td colSpan={diasDaGrade.length + 1} className="px-3 py-2.5 text-xs">
+                            <span className="flex items-center gap-2 font-medium">
+                              <IconePausa pausa={entrada.pausa} />
+                              {entrada.pausa.rotulo}
+                              <span className="numerais-tabulares ml-auto font-normal">
+                                {entrada.pausa.inicio} às {entrada.pausa.fim}
+                              </span>
+                            </span>
                           </td>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  ))}
+                      );
+                    }
+                    const aula = entrada.aula;
+                    return (
+                      <Fragment key={aula.id}>
+                        <tr>
+                          <th scope="row" className="numerais-tabulares px-3 py-4 font-medium">
+                            {aula.ordem}ª aula
+                            <span className="text-muted-foreground mt-1 block text-xs font-normal">
+                              {aula.inicio} às {aula.fim}
+                            </span>
+                            {editavel ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="mt-1"
+                                aria-label={`Editar horário da ${aula.ordem}ª aula`}
+                                disabled={navegacaoBloqueada}
+                                onClick={() => abrirEdicao(aula, null)}
+                              >
+                                <Pencil size={16} aria-hidden="true" />
+                              </Button>
+                            ) : null}
+                          </th>
+                          {diasDaGrade.map((item) => (
+                            <td key={item.valor} className="px-3 py-4 align-top break-words">
+                              {aula.diasSemana.includes(item.valor) ? (
+                                <div className="flex min-w-0 flex-col items-start gap-1">
+                                  <span
+                                    className={
+                                      aula.disciplinas?.[String(item.valor)]
+                                        ? "font-medium"
+                                        : "text-muted-foreground"
+                                    }
+                                  >
+                                    {nomeDisciplina(aula, item.valor)}
+                                  </span>
+                                  {editavel ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      aria-label={`Editar disciplina da ${aula.ordem}ª aula de ${rotuloDia(item.valor)}`}
+                                      disabled={navegacaoBloqueada}
+                                      onClick={() => abrirEdicao(aula, item.valor)}
+                                    >
+                                      <Pencil size={16} aria-hidden="true" />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                <span className="sr-only">Sem aula</span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                        {editavel && rascunho?.aulaId === aula.id ? (
+                          <tr>
+                            <td colSpan={diasDaGrade.length + 1} className="px-3 py-4">
+                              {renderizarEditor(aula, null, "grade")}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -468,8 +553,11 @@ export default function VistaHorarios({
                 </h2>
                 <AulasDoDia
                   dia={item.valor}
-                  aulas={aulas.filter((aula) => aula.diasSemana.includes(item.valor))}
-                  admin={admin}
+                  itens={sequenciaDoDia(
+                    aulas.filter((aula) => aula.diasSemana.includes(item.valor)),
+                    (aula) => aula.inicio,
+                  )}
+                  editavel={editavel}
                   bloqueado={navegacaoBloqueada}
                   aulaEmEdicao={diaDoEditor === item.valor ? rascunho?.aulaId : undefined}
                   onEditar={abrirEdicao}
@@ -487,11 +575,11 @@ export default function VistaHorarios({
             key={`${turma?.id}-${dia}`}
             rotuloAcessivel="Turnos do dia"
             abaInicial={
-              aulasPorTurno.manha.length === 0 && aulasPorTurno.tarde.length > 0 ? "tarde" : "manha"
+              aulasDoTurno("manha") === 0 && aulasDoTurno("tarde") > 0 ? "tarde" : "manha"
             }
             abas={TURNOS}
-            chaveIndicador="horarios-turno"
-            dataPager="horarios-turnos"
+            chaveIndicador={editavel ? "horarios-turno-edicao" : "horarios-turno"}
+            dataPager={editavel ? "horarios-turnos-edicao" : "horarios-turnos"}
             bloqueada={navegacaoBloqueada}
           >
             {(turno) => (
@@ -504,9 +592,9 @@ export default function VistaHorarios({
                 </h2>
                 <AulasDoDia
                   dia={dia}
-                  aulas={aulasPorTurno[turno]}
+                  itens={itensPorTurno[turno]}
                   turno={turno === "manha" ? "Manhã" : "Tarde"}
-                  admin={admin}
+                  editavel={editavel}
                   bloqueado={navegacaoBloqueada}
                   aulaEmEdicao={rascunho?.aulaId}
                   onEditar={abrirEdicao}
@@ -515,31 +603,10 @@ export default function VistaHorarios({
               </section>
             )}
           </AbasDeslizantes>
-          <section aria-label="Intervalo de almoço" className="superficie-vidro overflow-hidden">
-            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
-              <Utensils size={16} aria-hidden="true" />
-              <h2 className="font-medium">Almoço</h2>
-              <span className="numerais-tabulares ml-auto">
-                {INTERVALO_ALMOCO.inicio} às {INTERVALO_ALMOCO.fim}
-              </span>
-            </div>
-            {aulasPorTurno.almoco.length > 0 && (
-              <AulasDoDia
-                dia={dia}
-                aulas={aulasPorTurno.almoco}
-                turno="Almoço"
-                admin={admin}
-                bloqueado={navegacaoBloqueada}
-                aulaEmEdicao={rascunho?.aulaId}
-                onEditar={abrirEdicao}
-                editor={(aula, diaDaAula) => renderizarEditor(aula, diaDaAula, "dia-almoco")}
-              />
-            )}
-          </section>
         </div>
       )}
 
-      {admin ? (
+      {editavel ? (
         <>
           <DialogoAulas
             turma={turma ?? null}

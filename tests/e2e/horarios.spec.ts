@@ -59,6 +59,16 @@ async function escolherDia(page: Page, vista: Locator, dia: string): Promise<voi
   await page.getByRole("option", { name: dia, exact: true }).click();
 }
 
+async function abrirEdicaoDeHorarios(page: Page): Promise<Locator> {
+  await trocarVisao(page, "Gestão", "gestao");
+  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await page.locator("#categoria-config-horarios").click();
+  const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
+  await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
+  await page.getByRole("option", { name: rotulo, exact: true }).click();
+  return vista;
+}
+
 async function abrirGestaoDaTurma(page: Page): Promise<Locator> {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
@@ -66,16 +76,14 @@ async function abrirGestaoDaTurma(page: Page): Promise<Locator> {
   return page.getByRole("dialog", { name: `Horários de ${rotulo}`, exact: true });
 }
 
-test("no celular, o cartão do almoço termina com folga e os atalhos dividem uma linha", async ({
-  page,
-}) => {
+test("no celular, a consulta termina com folga abaixo do último cartão", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await comBanco((banco) =>
     banco.query(
       `insert into horarios (turma_id,ordem,inicio,fim,dias_semana,disciplinas)
        select t.id,a.ordem,a.inicio,a.fim,'{1}','{}'::jsonb
        from turmas t join series s on s.id=t.serie_id
-       cross join (values (4,'09:40','10:30'),(5,'10:30','11:20'),(6,'11:20','11:50'),(7,'13:00','13:50')) as a(ordem,inicio,fim)
+       cross join (values (4,'09:20','10:10'),(5,'10:10','11:00'),(6,'11:00','11:50'),(7,'11:50','12:40')) as a(ordem,inicio,fim)
        where s.nome=$1`,
       [serie],
     ),
@@ -84,27 +92,20 @@ test("no celular, o cartão do almoço termina com folga e os atalhos dividem um
   await aguardarHidratacao(page);
   const vista = await abrirHorarios(page);
   await escolherDia(page, vista, "Segunda-feira");
-  const semana = vista.getByRole("button", { name: "Semana completa", exact: true });
-  const editar = vista.getByRole("button", { name: `Editar horários de ${rotulo}`, exact: true });
-  const caixaSemana = await semana.boundingBox();
-  const caixaEditar = await editar.boundingBox();
-  expect(caixaSemana).not.toBeNull();
-  expect(caixaEditar).not.toBeNull();
-  expect(Math.abs((caixaSemana?.y ?? 0) - (caixaEditar?.y ?? 99))).toBeLessThan(2);
   const pagina = vista.locator("xpath=ancestor::section[contains(@class,'pagina-painel')]");
   await pagina.evaluate((elemento) => elemento.scrollTo(0, elemento.scrollHeight));
-  const almoco = vista.getByRole("region", { name: "Intervalo de almoço", exact: true });
-  await expect(almoco).toBeInViewport({ ratio: 1 });
-  const caixaAlmoco = await almoco.boundingBox();
+  const cartao = vista.getByRole("region", { name: "Aulas de Segunda-feira · Manhã", exact: true });
+  await expect(cartao).toBeInViewport({ ratio: 1 });
+  const caixaCartao = await cartao.boundingBox();
   const caixaPagina = await pagina.boundingBox();
   const folga =
     (caixaPagina?.y ?? 0) +
     (caixaPagina?.height ?? 0) -
-    ((caixaAlmoco?.y ?? 0) + (caixaAlmoco?.height ?? 0));
+    ((caixaCartao?.y ?? 0) + (caixaCartao?.height ?? 0));
   expect(folga).toBeGreaterThanOrEqual(16);
 });
 
-test("separa manhã, almoço e tarde e protege a edição ao trocar de turno", async ({
+test("separa manhã, almoço e tarde na consulta, sem controles de edição", async ({
   page,
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -130,9 +131,8 @@ test("separa manhã, almoço e tarde e protege a edição ao trocar de turno", a
   await expect(manha).toHaveAttribute("aria-selected", "true");
   await expect(vista.getByText("Matemática", { exact: true })).toBeVisible();
   await expect(vista.getByText("Física", { exact: true })).toBeHidden();
-  await expect(vista.getByRole("region", { name: "Intervalo de almoço" })).toContainText(
-    "11:50 às 13:00",
-  );
+  const almocoDaManha = vista.getByRole("listitem").filter({ hasText: /^Almoço/ });
+  await expect(almocoDaManha).toContainText("11:50 às 13:00");
   await expect(vista.getByText("Atividade cadastrada no almoço", { exact: true })).toBeVisible();
   await tarde.click();
   await expect(tarde).toHaveAttribute("aria-selected", "true");
@@ -141,8 +141,75 @@ test("separa manhã, almoço e tarde e protege a edição ao trocar de turno", a
   await tarde.press("ArrowLeft");
   await expect(manha).toBeFocused();
   await expect(vista.getByText("Matemática", { exact: true })).toBeVisible();
-  await vista.getByRole("button", { name: "Editar 1ª aula de Segunda-feira", exact: true }).click();
-  const formulario = vista.getByRole("form", {
+  await expect(vista.getByRole("button", { name: /editar/i })).toHaveCount(0);
+  await expect(vista.getByRole("form")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await info.attach("horarios-turno-tarde", {
+    body: await page.screenshot({ animations: "disabled", fullPage: true }),
+    contentType: "image/png",
+  });
+  await escolherDia(page, vista, "Semana completa");
+  await expect(vista.getByRole("tab", { name: "Manhã", exact: true })).toHaveCount(0);
+  await expect(vista.getByText("Física", { exact: true }).filter({ visible: true })).toBeVisible();
+});
+
+test("mostra intervalos e almoço na posição do horário, nos dois turnos e na semana", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await comBanco((banco) =>
+    banco.query(
+      `insert into horarios (turma_id,ordem,inicio,fim,dias_semana,disciplinas)
+       select t.id,a.ordem,a.inicio,a.fim,'{1}','{}'::jsonb
+       from turmas t join series s on s.id=t.serie_id
+       cross join (values
+         (4,'09:20','10:10'),(5,'10:10','11:00'),(6,'11:00','11:50'),
+         (7,'13:00','13:50'),(8,'13:50','14:40'),(9,'14:55','15:45')
+       ) as a(ordem,inicio,fim)
+       where s.nome=$1`,
+      [serie],
+    ),
+  );
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const vista = await abrirHorarios(page);
+  await escolherDia(page, vista, "Segunda-feira");
+  const textos = async (turno: string) => {
+    const itens = vista
+      .getByRole("region", { name: `Aulas de Segunda-feira · ${turno}`, exact: true })
+      .getByRole("listitem");
+    await expect(itens.first()).toBeVisible();
+    return (await itens.allInnerTexts()).map((texto) => texto.replace(/\s+/g, " ").trim());
+  };
+  const manha = await textos("Manhã");
+  expect(manha.findIndex((texto) => texto.startsWith("Intervalo"))).toBe(2);
+  expect(manha[2]).toContain("09:00 às 09:20");
+  expect(manha[manha.length - 1]).toMatch(/^Almoço.*11:50 às 13:00$/);
+  await vista.getByRole("tab", { name: "Tarde", exact: true }).click();
+  const tarde = await textos("Tarde");
+  expect(tarde[0]).toMatch(/^Almoço.*11:50 às 13:00$/);
+  expect(tarde[3]).toMatch(/^Intervalo.*14:40 às 14:55$/);
+  expect(tarde).toHaveLength(5);
+  await escolherDia(page, vista, "Semana completa");
+  const grade = vista.getByRole("table", { name: `Grade semanal de ${rotulo}`, exact: true });
+  await expect(grade.getByRole("row", { name: /^Intervalo.*09:00 às 09:20/ })).toBeVisible();
+  await expect(grade.getByRole("row", { name: /^Almoço.*11:50 às 13:00/ })).toBeVisible();
+  await expect(grade.getByRole("row", { name: /^Intervalo.*14:40 às 14:55/ })).toBeVisible();
+});
+
+test("a edição fica em Gestão, Configurações, e a consulta mostra a mudança", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const edicao = await abrirEdicaoDeHorarios(page);
+  await escolherDia(page, edicao, "Segunda-feira");
+  const manha = edicao.getByRole("tab", { name: "Manhã", exact: true });
+  const tarde = edicao.getByRole("tab", { name: "Tarde", exact: true });
+  await edicao
+    .getByRole("button", { name: "Editar 1ª aula de Segunda-feira", exact: true })
+    .click();
+  const formulario = edicao.getByRole("form", {
     name: "Editar 1ª aula de Segunda-feira",
     exact: true,
   });
@@ -157,18 +224,12 @@ test("separa manhã, almoço e tarde e protege a edição ao trocar de turno", a
     .getByRole("alertdialog", { name: "Confirmar alterações na aula", exact: true })
     .getByRole("button", { name: "Confirmar alterações", exact: true })
     .click();
-  await expect(vista.getByText("Ciências", { exact: true })).toBeVisible();
+  await expect(edicao.getByText("Ciências", { exact: true })).toBeVisible();
   await expect(tarde).toBeEnabled();
-  await tarde.click();
-  await expect(page.getByText("Horário atualizado.", { exact: true })).toBeHidden();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await info.attach("horarios-turno-tarde", {
-    body: await page.screenshot({ animations: "disabled", fullPage: true }),
-    contentType: "image/png",
-  });
-  await escolherDia(page, vista, "Semana completa");
-  await expect(vista.getByRole("tab", { name: "Manhã", exact: true })).toHaveCount(0);
-  await expect(vista.getByText("Física", { exact: true }).filter({ visible: true })).toBeVisible();
+  const consulta = await abrirHorarios(page);
+  await escolherDia(page, consulta, "Segunda-feira");
+  await expect(consulta.getByText("Ciências", { exact: true })).toBeVisible();
+  await expect(consulta.getByRole("button", { name: /editar/i })).toHaveCount(0);
 });
 
 test("a gestão configura disciplinas diferentes por dia e a consulta persiste após recarregar", async ({

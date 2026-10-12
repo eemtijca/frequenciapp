@@ -1,12 +1,56 @@
 // Disciplinas por dia e turnos de consulta, separados das regras da frequência.
 
 export const INTERVALO_ALMOCO = { inicio: "11:50", fim: "13:00" } as const;
+export const INTERVALO_MANHA = { inicio: "09:00", fim: "09:20" } as const;
+export const INTERVALO_TARDE = { inicio: "14:40", fim: "14:55" } as const;
 export type TurnoHorario = "manha" | "tarde" | "almoco";
+
+export type IdPausa = "intervalo-manha" | "almoco" | "intervalo-tarde";
+
+export interface Pausa {
+  id: IdPausa;
+  rotulo: string;
+  inicio: string;
+  fim: string;
+  /** Intervalos só valem entre aulas do próprio turno; o almoço separa os dois turnos. */
+  turno: "manha" | "tarde" | null;
+}
+
+export const PAUSAS: readonly Pausa[] = [
+  { id: "intervalo-manha", rotulo: "Intervalo", turno: "manha", ...INTERVALO_MANHA },
+  { id: "almoco", rotulo: "Almoço", turno: null, ...INTERVALO_ALMOCO },
+  { id: "intervalo-tarde", rotulo: "Intervalo", turno: "tarde", ...INTERVALO_TARDE },
+];
+
+export type ItemDoDia<T> = { tipo: "aula"; aula: T } | { tipo: "pausa"; pausa: Pausa };
 
 /** Agrupa pelo início da aula, preservando também horários cadastrados durante o almoço. */
 export function turnoDoHorario(inicio: string): TurnoHorario {
   if (inicio < INTERVALO_ALMOCO.inicio) return "manha";
   return inicio < INTERVALO_ALMOCO.fim ? "almoco" : "tarde";
+}
+
+/**
+ * Intercala intervalos e almoço entre as aulas, na ordem do horário. Cada pausa só aparece
+ * quando há aula antes e depois dela (no mesmo turno, no caso dos intervalos), para não
+ * deixar pausa solta no começo ou no fim do dia. `aulas` já vem ordenada.
+ */
+export function sequenciaDoDia<T>(
+  aulas: readonly T[],
+  inicioDe: (aula: T) => string,
+): ItemDoDia<T>[] {
+  const itens: ItemDoDia<T>[] = aulas.map((aula) => ({ tipo: "aula", aula }));
+  for (const pausa of PAUSAS) {
+    const noTurno = aulas.filter(
+      (aula) => pausa.turno === null || turnoDoHorario(inicioDe(aula)) === pausa.turno,
+    );
+    const depois = noTurno.find((aula) => inicioDe(aula) >= pausa.inicio);
+    const antes = noTurno.some((aula) => inicioDe(aula) < pausa.inicio);
+    if (!depois || !antes) continue;
+    const posicao = itens.findIndex((item) => item.tipo === "aula" && item.aula === depois);
+    itens.splice(posicao, 0, { tipo: "pausa", pausa });
+  }
+  return itens;
 }
 
 export const DIAS_DA_SEMANA = [

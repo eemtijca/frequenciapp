@@ -38,6 +38,8 @@ interface Props {
   onConfiguracoesMudaram: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
   onLiberadoresMudaram: () => Promise<void>;
+  onHorariosMudaram: () => Promise<void> | void;
+  onPendenciaHorarios?: (pendente: boolean) => void;
   onAbrirSaidas?: () => void;
   onAbrirParcial?: () => void;
 }
@@ -68,6 +70,8 @@ export default function VistaGestao({
   onConfiguracoesMudaram,
   onJustificativasMudaram,
   onLiberadoresMudaram,
+  onHorariosMudaram,
+  onPendenciaHorarios,
   onAbrirSaidas,
   onAbrirParcial,
 }: Props) {
@@ -110,6 +114,8 @@ export default function VistaGestao({
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}
                 onLiberadoresMudaram={onLiberadoresMudaram}
+                onHorariosMudaram={onHorariosMudaram}
+                onPendenciaHorarios={onPendenciaHorarios}
                 onAbrirSaidas={onAbrirSaidas}
                 onAbrirParcial={onAbrirParcial}
               />
