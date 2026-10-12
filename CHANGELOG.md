@@ -31,6 +31,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Painel externo no Google Looker Studio: Gestão prepara uma planilha exclusiva com indicadores agregados de frequência, saídas e entradas, chamada parcial e RS, sem nomes ou textos livres; atualização manual e automática, recuperação de criação incerta e guia para conectar o relatório privado.
 
+- Documentação interativa da API em `GET /api/docs` com Swagger UI, especificação OpenAPI 3.1 em `GET /api/docs/openapi.json` e referência em Markdown em `GET /api/docs/api.md`, com `operationId`, descrições, exemplos e erros por operação.
+
+- Lint da especificação OpenAPI com Redocly CLI (`pnpm run lint:api`) no workflow de qualidade, com o ruleset em `redocly.yaml`.
+
+- Índice `public/llms.txt` para agentes de IA, com o contrato, a referência e a orientação de uso seguro.
+
+- ADR-043 sobre a documentação interativa e o CSP por URL.
+
 ### Alterado
 
 - Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.
@@ -69,6 +77,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Planilha de saídas passa a se chamar "Planilha de entradas e saídas" na Gestão, e a aba Entradas tem as mesmas sete colunas de Saídas (sem Código, com Responsável no lugar de Liberado por). Preparar e organizar a aba Entradas saíram da área Saídas e entradas e ficam nessa seção; preparar realinha a aba no formato anterior, preservando os registros.
 
 - Textos de apoio mais curtos em Gestão, Alunos, Notificações, Saídas e Entradas; Relatórios por aluno deixa de repetir a descrição dos indicadores. Limites dos campos, rótulos acessíveis e orientações de privacidade e segurança permanecem disponíveis.
+
+- CSP passa a ser montada por URL em `src/infra/csp.ts`, com `'unsafe-eval'` apenas na documentação interativa, exigido pela validação do "Try it out".
+
+- O `postinstall` também copia os assets do Swagger UI para `public/vendor/swagger-ui`, e `@scarf/scarf` (telemetria transitiva) fica explicitamente negado nos scripts de instalação.
 
 ### Removido
 

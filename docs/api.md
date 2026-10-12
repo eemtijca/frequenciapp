@@ -6,6 +6,20 @@ Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure 
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
+## Documentação interativa
+
+A especificação OpenAPI 3.1 é mantida em `docs/openapi.json` e servida em `GET /api/docs/openapi.json`; a interface Swagger UI fica em `GET /api/docs` e a referência em Markdown em `GET /api/docs/api.md`. Cada operação traz `operationId` estável, resumo, descrição, exemplos e as respostas de erro. O "Try it out" reaproveita a sessão do navegador: entre no aplicativo antes de testar.
+
+- Em desenvolvimento: `http://localhost:3000/api/docs`.
+- Lint da especificação: `pnpm run lint:api`, com o ruleset em `redocly.yaml`.
+- Guarda de cobertura: `tests/unit/openapi.test.ts` confere a especificação contra as rotas. A decisão está no [ADR-043](adr/043-documentacao-interativa-e-csp.md).
+
+## Consumo por agentes de IA
+
+- A especificação em `/api/docs/openapi.json` é a fonte da verdade para modelos e agentes: operações, schemas, exemplos e erros.
+- O índice [../public/llms.txt](../public/llms.txt) é servido em `/llms.txt` e aponta o contrato, a referência e a orientação de uso seguro.
+- Os `operationId` em português são estáveis e viram nome de ferramenta em geradores de SDK e de servidores MCP. A versão em Markdown da referência fica em `/api/docs/api.md`.
+
 ## Autenticação
 
 ### POST /api/auth/entrar

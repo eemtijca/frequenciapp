@@ -1,0 +1,25 @@
+# FrequenciApp
+
+> Aplicativo de frequência escolar: chamada diária, saídas, justificativas, relatórios e integração opcional com o Google Planilhas.
+
+A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "codigo"?: string }`. Datas civis usam `YYYY-MM-DD`, timestamps usam ISO 8601 e o fuso vem de `TZ_APP`. As mutações exigem sessão e origem confiável.
+
+## Contrato e documentação
+
+- [Especificação OpenAPI 3.1](/api/docs/openapi.json): contrato completo com schemas, exemplos e erros por operação.
+- [Interface Swagger UI](/api/docs): navegação interativa; o "Try it out" usa a sessão do navegador.
+- [Referência em Markdown](/api/docs/api.md): a mesma referência em texto limpo, para leitura direta.
+- [Referência no GitHub](https://github.com/eemtijca/frequenciapp/blob/main/docs/api.md): convenções, fluxos e catálogo de erros.
+
+## Orientação para agentes
+
+- Use a especificação OpenAPI como fonte da verdade para requisições, respostas e erros.
+- Faça login em `POST /api/auth/entrar` para obter o cookie de sessão; o diretor de turma usa identificador e palavra-chave.
+- A chamada é salva com revisão otimista: conflito responde 409 com a versão vigente, sem sobrescrever o registro.
+- Não chame rotas destrutivas, como exclusões, restaurações de backup e limpezas, sem pedido explícito.
+- As rotas da agenda de notificações usam `Authorization: Bearer <CRON_SECRET>`, sem sessão de usuário.
+
+## Optional
+
+- [Arquitetura](https://github.com/eemtijca/frequenciapp/blob/main/docs/arquitetura.md) e [planilha](https://github.com/eemtijca/frequenciapp/blob/main/docs/planilha.md).
+- [Segurança](https://github.com/eemtijca/frequenciapp/blob/main/docs/seguranca.md): controles, decisões e lacunas conhecidas.

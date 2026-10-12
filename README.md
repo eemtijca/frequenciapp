@@ -205,25 +205,25 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 
 ## Documentação
 
-| Documento                                                                                  | Conteúdo                                           |
-| ------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| [docs/arquitetura.md](docs/arquitetura.md)                                                 | Camadas, fluxo de requisição e organização.        |
-| [docs/ambiente.md](docs/ambiente.md)                                                       | Variáveis de ambiente e execução local.            |
-| [docs/banco.md](docs/banco.md)                                                             | Esquema, migrações e rotinas de banco.             |
-| [docs/modelo-de-dados.md](docs/modelo-de-dados.md)                                         | Entidades e regras de frequência.                  |
-| [docs/api.md](docs/api.md)                                                                 | Contratos das rotas HTTP.                          |
-| [docs/interface.md](docs/interface.md)                                                     | Decisões de interface, movimento e acessibilidade. |
-| [docs/planilha.md](docs/planilha.md)                                                       | Integração opcional com Google Planilhas.          |
-| [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                    |
-| [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.            |
-| [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                    |
-| [docs/seguranca.md](docs/seguranca.md)                                                     | Autenticação, sessões, CSRF, papéis e cabeçalhos.  |
-| [docs/lgpd.md](docs/lgpd.md)                                                               | Dados tratados, minimização e direitos.            |
-| [docs/operacao.md](docs/operacao.md)                                                       | Backup, restauração e rotinas do operador.         |
-| [docs/adr/001-postgresql-com-prisma.md](docs/adr/001-postgresql-com-prisma.md) e seguintes | Decisões de arquitetura registradas.               |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                                                         | Como preparar o ambiente e propor mudanças.        |
-| [SECURITY.md](SECURITY.md)                                                                 | Como reportar vulnerabilidades.                    |
-| [CHANGELOG.md](CHANGELOG.md)                                                               | Histórico de mudanças do projeto.                  |
+| Documento                                                                                  | Conteúdo                                            |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| [docs/arquitetura.md](docs/arquitetura.md)                                                 | Camadas, fluxo de requisição e organização.         |
+| [docs/ambiente.md](docs/ambiente.md)                                                       | Variáveis de ambiente e execução local.             |
+| [docs/banco.md](docs/banco.md)                                                             | Esquema, migrações e rotinas de banco.              |
+| [docs/modelo-de-dados.md](docs/modelo-de-dados.md)                                         | Entidades e regras de frequência.                   |
+| [docs/api.md](docs/api.md)                                                                 | Contratos das rotas HTTP e Swagger UI em /api/docs. |
+| [docs/interface.md](docs/interface.md)                                                     | Decisões de interface, movimento e acessibilidade.  |
+| [docs/planilha.md](docs/planilha.md)                                                       | Integração opcional com Google Planilhas.           |
+| [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                     |
+| [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.             |
+| [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                     |
+| [docs/seguranca.md](docs/seguranca.md)                                                     | Autenticação, sessões, CSRF, papéis e cabeçalhos.   |
+| [docs/lgpd.md](docs/lgpd.md)                                                               | Dados tratados, minimização e direitos.             |
+| [docs/operacao.md](docs/operacao.md)                                                       | Backup, restauração e rotinas do operador.          |
+| [docs/adr/001-postgresql-com-prisma.md](docs/adr/001-postgresql-com-prisma.md) e seguintes | Decisões de arquitetura registradas.                |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                                         | Como preparar o ambiente e propor mudanças.         |
+| [SECURITY.md](SECURITY.md)                                                                 | Como reportar vulnerabilidades.                     |
+| [CHANGELOG.md](CHANGELOG.md)                                                               | Histórico de mudanças do projeto.                   |
 
 ## Contribuindo
 
