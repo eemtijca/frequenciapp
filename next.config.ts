@@ -34,7 +34,14 @@ const nextConfig: NextConfig = {
     "/api/docs/api.md": ["./docs/api.md"],
   },
   async headers() {
-    return [{ source: "/:path*", headers: cabecalhosSeguranca }];
+    return [
+      {
+        // Descoberta do índice para agentes de IA na raiz.
+        source: "/",
+        headers: [{ key: "Link", value: '</llms.txt>; rel="alternate"; type="text/markdown"' }],
+      },
+      { source: "/:path*", headers: cabecalhosSeguranca },
+    ];
   },
 };
 

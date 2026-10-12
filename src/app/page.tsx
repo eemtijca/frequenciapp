@@ -1,4 +1,5 @@
 // Página autenticada: carrega o escopo e encaminha o retorno da conexão Google.
+import { headers } from "next/headers";
 import { identidadeAtual } from "@/application/sessao";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
@@ -9,6 +10,7 @@ import { listarJustificativas } from "@/application/justificativas";
 import { listarLiberadores } from "@/application/liberadores";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { ambiente } from "@/infra/ambiente";
+import { urlDoIndiceDeAgentes } from "@/infra/documentacao";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
 import { temCapacidade } from "@/domain/usuarios";
 import TelaLogin from "@/components/auth/tela-login";
@@ -29,14 +31,15 @@ export default async function Pagina({
   }>;
 }) {
   const usuario = await identidadeAtual(ambiente.authSecret);
-  if (!usuario) return <TelaLogin />;
+  const urlIndiceAgentes = urlDoIndiceDeAgentes(await headers());
+  if (!usuario) return <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />;
   // Recusa por padrão: o aplicativo completo só abre para quem opera a
   // escola; o diretor de turma tem a própria tela, só de leitura.
   if (!temCapacidade(usuario.papel, "operar")) {
     if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
       return <AplicacaoDiretor usuario={usuario} contexto={await contextoDoDiretor(usuario.id)} />;
     }
-    return <TelaLogin />;
+    return <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />;
   }
   const parametros = await searchParams;
   const dia = diaLocal(new Date(), ambiente.fuso);

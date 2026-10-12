@@ -6,7 +6,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import especificacao from "../../docs/openapi.json";
 import { criarPoliticaDeSeguranca } from "@/infra/csp";
-import { paginaDocumentacao, URL_ESPECIFICACAO } from "@/infra/documentacao";
+import {
+  CAMINHO_INDICE_AGENTES,
+  paginaDocumentacao,
+  URL_ESPECIFICACAO,
+  urlDoIndiceDeAgentes,
+} from "@/infra/documentacao";
 
 const RAIZ = path.resolve(fileURLToPath(new URL("../../src/app/api", import.meta.url)));
 
@@ -255,5 +260,31 @@ describe("documentação interativa", () => {
     expect(nonces.length).toBe(scripts.length);
     expect(pagina).toContain("/vendor/swagger-ui/swagger-ui-bundle.js");
     expect(pagina).toContain(URL_ESPECIFICACAO);
+  });
+});
+
+describe("índice para agentes", () => {
+  it("monta a URL absoluta na origem que atendeu a requisição", () => {
+    expect(
+      urlDoIndiceDeAgentes(
+        new Headers({ host: "frequenciappjca.vercel.app", "x-forwarded-proto": "https" }),
+      ),
+    ).toBe("https://frequenciappjca.vercel.app/llms.txt");
+
+    expect(
+      urlDoIndiceDeAgentes(
+        new Headers({
+          "x-forwarded-host": "escola.exemplo.br, interno",
+          "x-forwarded-proto": "https, http",
+        }),
+      ),
+    ).toBe("https://escola.exemplo.br/llms.txt");
+  });
+
+  it("usa HTTP em localhost e o caminho relativo sem host", () => {
+    expect(urlDoIndiceDeAgentes(new Headers({ host: "localhost:3000" }))).toBe(
+      `http://localhost:3000${CAMINHO_INDICE_AGENTES}`,
+    );
+    expect(urlDoIndiceDeAgentes(new Headers())).toBe(CAMINHO_INDICE_AGENTES);
   });
 });

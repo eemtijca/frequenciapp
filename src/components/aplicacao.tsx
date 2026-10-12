@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   DoorOpen,
+  Info,
   KeyRound,
   LogOut,
   Menu,
@@ -69,6 +70,7 @@ import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
+import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 
 export type Visao =
@@ -367,6 +369,7 @@ export default function Aplicacao({
   const [visaoComPendencia, setVisaoComPendencia] = useState<Visao | null>(null);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
+  const [sobreAberto, setSobreAberto] = useState(false);
   const gatilhoMenuRef = useRef<HTMLButtonElement | null>(null);
   const origemDialogoRef = useRef<HTMLElement | null>(null);
   const conteudoRef = useRef<HTMLElement | null>(null);
@@ -901,6 +904,19 @@ export default function Aplicacao({
                 className="h-11 w-full justify-start gap-2"
                 onClick={(evento) => {
                   origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
+                  fecharMenu?.("dialogo");
+                  setSobreAberto(true);
+                }}
+              >
+                <Info size={16} aria-hidden="true" />
+                Sobre
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-11 w-full justify-start gap-2"
+                onClick={(evento) => {
+                  origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
                   fecharMenu?.(pendencias.length > 0 ? "dialogo" : "gatilho");
                   void sair();
                 }}
@@ -1081,6 +1097,11 @@ export default function Aplicacao({
       <DialogoNotificacoes
         aberto={notificacoesAbertas}
         onAbrir={setNotificacoesAbertas}
+        onDevolverFoco={devolverFocoDoDialogo}
+      />
+      <DialogoSobre
+        aberto={sobreAberto}
+        onAbrir={setSobreAberto}
         onDevolverFoco={devolverFocoDoDialogo}
       />
       <RegistroPwa />
