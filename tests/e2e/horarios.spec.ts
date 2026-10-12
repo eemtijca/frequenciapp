@@ -66,6 +66,44 @@ async function abrirGestaoDaTurma(page: Page): Promise<Locator> {
   return page.getByRole("dialog", { name: `Horários de ${rotulo}`, exact: true });
 }
 
+test("no celular, o cartão do almoço termina com folga e os atalhos dividem uma linha", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await comBanco((banco) =>
+    banco.query(
+      `insert into horarios (turma_id,ordem,inicio,fim,dias_semana,disciplinas)
+       select t.id,a.ordem,a.inicio,a.fim,'{1}','{}'::jsonb
+       from turmas t join series s on s.id=t.serie_id
+       cross join (values (4,'09:40','10:30'),(5,'10:30','11:20'),(6,'11:20','11:50'),(7,'13:00','13:50')) as a(ordem,inicio,fim)
+       where s.nome=$1`,
+      [serie],
+    ),
+  );
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const vista = await abrirHorarios(page);
+  await escolherDia(page, vista, "Segunda-feira");
+  const semana = vista.getByRole("button", { name: "Semana completa", exact: true });
+  const editar = vista.getByRole("button", { name: `Editar horários de ${rotulo}`, exact: true });
+  const caixaSemana = await semana.boundingBox();
+  const caixaEditar = await editar.boundingBox();
+  expect(caixaSemana).not.toBeNull();
+  expect(caixaEditar).not.toBeNull();
+  expect(Math.abs((caixaSemana?.y ?? 0) - (caixaEditar?.y ?? 99))).toBeLessThan(2);
+  const pagina = vista.locator("xpath=ancestor::section[contains(@class,'pagina-painel')]");
+  await pagina.evaluate((elemento) => elemento.scrollTo(0, elemento.scrollHeight));
+  const almoco = vista.getByRole("region", { name: "Intervalo de almoço", exact: true });
+  await expect(almoco).toBeInViewport({ ratio: 1 });
+  const caixaAlmoco = await almoco.boundingBox();
+  const caixaPagina = await pagina.boundingBox();
+  const folga =
+    (caixaPagina?.y ?? 0) +
+    (caixaPagina?.height ?? 0) -
+    ((caixaAlmoco?.y ?? 0) + (caixaAlmoco?.height ?? 0));
+  expect(folga).toBeGreaterThanOrEqual(16);
+});
+
 test("separa manhã, almoço e tarde e protege a edição ao trocar de turno", async ({
   page,
 }, info) => {

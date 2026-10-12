@@ -292,9 +292,10 @@ export default function VistaHorarios({
   const navegacaoBloqueada = rascunho !== null || enviando;
 
   return (
-    <section aria-label="Horários semanais" className="flex min-w-0 flex-col gap-5">
+    // A página rola sem folga inferior: o pb-6 deixa o último cartão respirar acima da borda.
+    <section aria-label="Horários semanais" className="flex min-w-0 flex-col gap-5 pb-6">
       <h1 className="sr-only">Horários</h1>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1.5">
           <Label htmlFor="horarios-turma">Turma</Label>
           <Selecionar
@@ -321,9 +322,12 @@ export default function VistaHorarios({
             disabled={turmas.length === 0 || navegacaoBloqueada}
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:flex">
         <Button
           variant="outline"
-          className="min-h-11 self-end"
+          className="min-h-11 min-w-0"
           aria-pressed={semanaCompleta}
           onClick={() => setDiaSelecionado("0")}
           disabled={turmas.length === 0 || navegacaoBloqueada}
@@ -331,21 +335,20 @@ export default function VistaHorarios({
           <CalendarDays size={16} aria-hidden="true" />
           Semana completa
         </Button>
+        {admin ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 min-w-0"
+            aria-label={`Editar horários de ${turma?.rotulo ?? "turma"}`}
+            disabled={!turma || navegacaoBloqueada}
+            onClick={() => setEditorCompleto(true)}
+          >
+            <Pencil size={16} aria-hidden="true" />
+            Editar horários
+          </Button>
+        ) : null}
       </div>
-
-      {admin ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="self-start"
-          aria-label={`Editar horários de ${turma?.rotulo ?? "turma"}`}
-          disabled={!turma || navegacaoBloqueada}
-          onClick={() => setEditorCompleto(true)}
-        >
-          <Pencil size={16} aria-hidden="true" />
-          Editar horários
-        </Button>
-      ) : null}
 
       {admin && rascunho && !contextoDisponivel ? (
         <div className="flex min-w-0 flex-col gap-3">
