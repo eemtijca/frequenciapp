@@ -45,6 +45,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Semente de demonstração ampliada para um ano letivo: nove turmas (1º ao 3º ano, A a C), 35 a 50 alunos por turma, grade de tempo integral com nove aulas, chamadas e faltas em cauda longa com crônicos, episódios e justificativas, saídas, entradas, frequências parciais, feriados e recessos do calendário e diretores de turma de exemplo. A semente é determinística, com perfis de volume (`SEED_PERFIL`), parâmetros (`SEED_ALUNOS`, `SEED_DIAS`, `SEED_ANO`, `SEED_SEMENTE`) e limpeza seletiva (`pnpm run seed:limpar`).
 
+- Capturas do README com dados: o Painel e a Chamada passam a exigir a semente aplicada e a mostrar o último dia letivo com chamada, e entram o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão.
+
+- Capturas do README com dados: o Painel e a Chamada passam a exigir a semente aplicada e a mostrar o último dia letivo com chamada, e entram o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão.
+
 ### Alterado
 
 - Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.
