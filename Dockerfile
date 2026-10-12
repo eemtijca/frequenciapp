@@ -21,7 +21,7 @@ FROM base AS compilacao
 WORKDIR /app
 COPY --from=dependencias /app/node_modules ./node_modules
 COPY . .
-# Os assets do Swagger UI nascem no postinstall e não existem no contexto do Git.
+# Os assets do Swagger UI são gerados na instalação e novamente antes do build.
 COPY --from=dependencias /app/public ./public
 # O cliente é sempre regenerado no build, independente do que houver no host.
 COPY --from=dependencias /app/generated ./generated

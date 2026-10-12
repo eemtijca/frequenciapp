@@ -17,9 +17,16 @@ describe("documentacao.test", () => {
     const referencia = await fetch(`${APP_URL}/api/docs/api.md`);
     expect(referencia.status).toBe(200);
     expect(referencia.headers.get("content-type")).toContain("text/markdown");
+  });
 
-    const asset = await fetch(`${APP_URL}/vendor/swagger-ui/swagger-ui-bundle.js`);
-    expect(asset.status).toBe(200);
+  it.each([
+    ["swagger-ui-bundle.js", "javascript"],
+    ["swagger-ui.css", "text/css"],
+  ])("serve %s como arquivo, sem retornar uma página de erro", async (arquivo, tipo) => {
+    const resposta = await fetch(`${APP_URL}/vendor/swagger-ui/${arquivo}`);
+    expect(resposta.status).toBe(200);
+    expect(resposta.headers.get("content-type")).toContain(tipo);
+    expect((await resposta.text()).length).toBeGreaterThan(1000);
   });
 
   it("aponta o índice para agentes na raiz anônima", async () => {

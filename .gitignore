@@ -81,5 +81,5 @@ tool-results/
 crash.log
 crash.*.log
 
-# Swagger UI vendor (gerado via postinstall)
+# Swagger UI vendor (gerado na instalação e no build)
 public/vendor/

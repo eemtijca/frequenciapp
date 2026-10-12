@@ -101,6 +101,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Build da documentação interativa prepara o JavaScript e o CSS do Swagger UI também na Vercel, independentemente do postinstall em cache. A instalação inclui as dependências de desenvolvimento mesmo em ambiente de produção; arquivos ausentes interrompem a compilação e o teste de navegador confere a renderização real da API.
+
 - A documentação interativa deixa de repetir o título da API no topo da página: a descrição da especificação começa pela visão geral, e a guarda de unidade reprova a repetição do título.
 
 - Horários no celular: o cartão do almoço deixava de aparecer inteiro ao rolar até o fim, com a borda inferior colada na borda da tela, e a página termina agora com folga. Semana completa e Editar horários passam a dividir uma linha, deixando a tela menos alta.
