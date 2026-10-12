@@ -1,3 +1,4 @@
+# Compilação com o mesmo comando de instalação configurado para a Vercel.
 name: Build
 
 on:
@@ -35,8 +36,20 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      - name: Instalar dependências
-        run: pnpm install --frozen-lockfile
+      - name: Conferir a instalação da Vercel
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
+          const { installCommand } = JSON.parse(readFileSync('vercel.json', 'utf8'));
+          const resultado = spawnSync(installCommand, {
+            shell: true,
+            stdio: 'inherit',
+            env: { ...process.env, NODE_ENV: 'production' },
+          });
+          if (resultado.error) throw resultado.error;
+          process.exit(resultado.status ?? 1);
+          JS
 
       - name: Build
         run: pnpm run build

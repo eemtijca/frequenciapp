@@ -10,7 +10,9 @@ Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB r
 
 A especificação OpenAPI 3.1 é mantida em `docs/openapi.json` e servida em `GET /api/docs/openapi.json`; a interface Swagger UI fica em `GET /api/docs` e a referência em Markdown em `GET /api/docs/api.md`. Cada operação traz `operationId` estável, resumo, descrição, exemplos e as respostas de erro. O "Try it out" reaproveita a sessão do navegador: entre no aplicativo antes de testar.
 
-O JavaScript e o CSS do Swagger UI são servidos localmente em `/vendor/swagger-ui`. A instalação, o início de desenvolvimento e o build copiam os dois arquivos de `swagger-ui-dist`; o build da Vercel também passa por essa preparação, mesmo com dependências em cache. A falta de um arquivo interrompe o comando antes da compilação. `vercel.json` inclui as dependências de desenvolvimento com `--prod=false`, inclusive quando `NODE_ENV=production`. Em caso de 404 nesses caminhos, refaça o deploy com `pnpm run vercel-build`.
+O JavaScript e o CSS do Swagger UI são servidos localmente em `/vendor/swagger-ui`. A instalação, o início de desenvolvimento e o build copiam os dois arquivos de `swagger-ui-dist`; o build da Vercel também passa por essa preparação, mesmo com dependências em cache. A falta de um arquivo interrompe o comando antes da compilação. `vercel.json` usa `NODE_ENV=development` somente no comando de instalação para incluir as dependências de desenvolvimento, com a sintaxe aceita pelo pnpm 12. O build e a execução continuam em produção. Em caso de 404 nesses caminhos, refaça o deploy com `pnpm run vercel-build`.
+
+O workflow de build executa o comando de instalação de `vercel.json` com um ambiente inicial de produção. Essa conferência usa a versão do pnpm fixada em `package.json` e detecta opções incompatíveis antes de compilar.
 
 - Em desenvolvimento: `http://localhost:3000/api/docs`.
 - Lint da especificação: `pnpm run lint:api`, com o ruleset em `redocly.yaml`.
