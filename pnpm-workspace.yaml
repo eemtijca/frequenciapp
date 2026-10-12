@@ -4,6 +4,8 @@
 allowBuilds:
   "@parcel/watcher": true
   "@prisma/engines": true
+  # Telemetria transitiva do Redocly: o script não é necessário e fica negado.
+  "@scarf/scarf": false
   "@swc/core": true
   prisma: true
   sharp: true

@@ -2,6 +2,7 @@
 // cross-site (CSRF) e cabeçalhos de segurança com CSP por nonce.
 
 import { NextResponse, type NextRequest } from "next/server";
+import { criarPoliticaDeSeguranca } from "@/infra/csp";
 
 function hostProprio(req: NextRequest): string {
   const hostPublico =
@@ -53,24 +54,14 @@ export function proxy(request: NextRequest) {
   // Sem TLS, forçar upgrade para HTTPS quebraria os recursos da própria página.
   const exigirHttps = !ehDev && pedidoHttps(request);
 
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' https://apis.google.com 'wasm-unsafe-eval' ${ehDev ? "'unsafe-inline' 'unsafe-eval'" : `'nonce-${nonce}' 'strict-dynamic'`}`,
-    "style-src 'self' 'unsafe-inline'",
-    "style-src-elem 'self' 'unsafe-inline'",
-    "style-src-attr 'unsafe-inline'",
-    "worker-src 'self' blob:",
-    "child-src blob:",
-    "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
-    "frame-src https://docs.google.com https://drive.google.com",
-    "font-src 'self' data:",
-    "img-src 'self' data: blob:",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    ...(exigirHttps ? ["upgrade-insecure-requests"] : []),
-  ].join("; ");
+  // A política é montada por URL: a documentação interativa precisa de
+  // `unsafe-eval` na validação do "Try it out" e o restante da aplicação não.
+  const csp = criarPoliticaDeSeguranca({
+    nonce,
+    desenvolvimento: ehDev,
+    exigirHttps,
+    caminho: request.nextUrl.pathname,
+  });
 
   const cabecalhosRequisicao = new Headers(request.headers);
   cabecalhosRequisicao.set("x-nonce", nonce);

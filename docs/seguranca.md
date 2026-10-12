@@ -33,11 +33,11 @@ A combinação cobre navegadores modernos sem tokens por formulário.
 
 ## Cabeçalhos e CSP
 
-- CSP por nonce em cada requisição: scripts limitados ao próprio servidor com `strict-dynamic`; estilos externos com `'unsafe-inline'` para as posições dinâmicas dos componentes; `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`.
+- CSP por nonce em cada requisição, montada por URL em `src/infra/csp.ts`: scripts limitados ao próprio servidor com `strict-dynamic`; estilos externos com `'unsafe-inline'` para as posições dinâmicas dos componentes; `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`. Em produção, a única exceção é a documentação interativa, que recebe `'unsafe-eval'` para a validação do "Try it out" (ver [ADR-043](adr/043-documentacao-interativa-e-csp.md)).
 - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` sem câmera, microfone ou geolocalição.
 - Sem `X-Powered-By`. HSTS é adicionado no caminho self-hosted pelo `next.config.ts` apenas quando o tráfego é TLS (produção sem `PERMITIR_HTTP`); na Vercel, o cabeçalho vem da plataforma. O CSP só inclui `upgrade-insecure-requests` quando a requisição chega por HTTPS.
 
-Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que não vale em produção.
+Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que não vale em produção, exceto na rota da documentação interativa (ADR-043).
 
 ## Papéis e isolamento
 

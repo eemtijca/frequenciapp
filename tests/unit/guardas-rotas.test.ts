@@ -12,6 +12,9 @@ const PUBLICAS: Record<string, string> = {
   "auth/sair POST": "encerra a sessão do cookie recebido, se houver",
   "auth/sessao GET": "informa se há sessão, sem dado escolar",
   "saude GET": "verificação de saúde do contêiner, sem dado escolar",
+  "docs GET": "interface de documentação pública, sem dado escolar",
+  "docs/api.md GET": "referência pública em Markdown, sem dado escolar",
+  "docs/openapi.json GET": "especificação pública das rotas, sem dado escolar",
 };
 
 const GUARDA = /\bexigir(?:Capacidade|Sessao|Admin)\(/;

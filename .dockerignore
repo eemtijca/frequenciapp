@@ -10,7 +10,9 @@ analysis
 .sandbox-tools
 download
 skills
-docs
+docs/*
+!docs/api.md
+!docs/openapi.json
 tests
 coverage
 dev.log

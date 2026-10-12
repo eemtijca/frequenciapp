@@ -31,6 +31,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Painel externo no Google Looker Studio: Gestão prepara uma planilha exclusiva com indicadores agregados de frequência, saídas e entradas, chamada parcial e RS, sem nomes ou textos livres; atualização manual e automática, recuperação de criação incerta e guia para conectar o relatório privado.
 
+- Documentação interativa da API em `GET /api/docs` com Swagger UI, especificação OpenAPI 3.1 em `GET /api/docs/openapi.json` e referência em Markdown em `GET /api/docs/api.md`, com `operationId`, descrições, exemplos e erros por operação.
+
+- Lint da especificação OpenAPI com Redocly CLI (`pnpm run lint:api`) no workflow de qualidade, com o ruleset em `redocly.yaml`.
+
+- Índice `public/llms.txt` para agentes de IA, com o contrato, a referência e a orientação de uso seguro.
+
+- ADR-043 sobre a documentação interativa e o CSP por URL.
+
 ### Alterado
 
 - Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.
@@ -70,6 +78,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Textos de apoio mais curtos em Gestão, Alunos, Notificações, Saídas e Entradas; Relatórios por aluno deixa de repetir a descrição dos indicadores. Limites dos campos, rótulos acessíveis e orientações de privacidade e segurança permanecem disponíveis.
 
+- CSP passa a ser montada por URL em `src/infra/csp.ts`, com `'unsafe-eval'` apenas na documentação interativa, exigido pela validação do "Try it out".
+
+- O `postinstall` também copia os assets do Swagger UI para `public/vendor/swagger-ui`, e `@scarf/scarf` (telemetria transitiva) fica explicitamente negado nos scripts de instalação.
+
 ### Removido
 
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).
@@ -82,6 +94,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Horários no celular: o cartão do almoço deixava de aparecer inteiro ao rolar até o fim, com a borda inferior colada na borda da tela, e a página termina agora com folga. Semana completa e Editar horários passam a dividir uma linha, deixando a tela menos alta.
 
 - As suítes usam o último dia com chamada como referência: os testes de entrega de push fixam o relógio em um dia útil, o contrato da agenda e o fluxo de desistência são ignorados aos domingos, e os cenários de ponta a ponta passam a usar o sábado quando hoje é domingo.
+
+- O cenário de Calendário escolhe dias livres anteriores ao dia de referência: quando a execução cai em um dia útil, o feriado criado pelo próprio teste não desabilita o seletor de turma antes do clique.
 
 - Feriado e chamada da mesma data salvos ao mesmo tempo não são mais aceitos os dois. As transações que gravam feriados (cadastro, remoção, sincronização e restauração da cópia) e as que salvam Chamada e Chamada Parcial travam a tabela de feriados antes de ler. Chamadas simultâneas continuam sem esperar umas pelas outras.
 

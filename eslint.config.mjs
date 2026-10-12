@@ -32,6 +32,7 @@ const eslintConfig = [
   {
     ignores: [
       "node_modules/**",
+      "public/vendor/**",
       "sandbox/**",
       "scripts-icone.cjs",
       "tool-results/**",

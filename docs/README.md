@@ -8,7 +8,8 @@
 | [ambiente.md](ambiente.md)                           | Variáveis de ambiente e execução local.                    |
 | [banco.md](banco.md)                                 | Esquema, migrações e rotinas de banco.                     |
 | [modelo-de-dados.md](modelo-de-dados.md)             | Entidades, regras de frequência e derivações.              |
-| [api.md](api.md)                                     | Contratos das rotas HTTP.                                  |
+| [api.md](api.md)                                     | Contratos das rotas HTTP e Swagger UI em /api/docs.        |
+| [llms.txt](../public/llms.txt)                       | Índice da documentação para agentes de IA.                 |
 | [interface.md](interface.md)                         | Interface, movimento, PWA e acessibilidade.                |
 | [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |

@@ -3,6 +3,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
+import { diaDeChamada } from "./helpers/dia";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
@@ -158,8 +159,13 @@ test.beforeAll(async () => {
       [hoje],
     );
     const uteis = livres.rows.filter((item) => item.semana < 6);
-    diaUtil = uteis[0]?.dia ?? "";
-    diaProtegido = uteis[1]?.dia ?? "";
+    // A Chamada abre no dia de referência (hoje, ou o sábado anterior no domingo).
+    // diaUtil precisa ser anterior: o feriado criado pelos testes não pode
+    // desabilitar o seletor de turma antes do clique, conforme os helpers.
+    const referencia = diaDeChamada();
+    const livresParaEdicao = uteis.filter((item) => item.dia !== referencia);
+    diaUtil = livresParaEdicao[0]?.dia ?? "";
+    diaProtegido = livresParaEdicao[1]?.dia ?? "";
     sabado = livres.rows.find((item) => item.semana === 6)?.dia ?? "";
     if (!diaUtil || !diaProtegido || !sabado)
       throw new Error("Não há datas livres para o calendário de teste.");
