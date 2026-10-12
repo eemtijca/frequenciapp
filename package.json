@@ -36,6 +36,7 @@
     "criar-admin": "node scripts/criar-admin.mjs",
     "criar-coordenacao": "node scripts/criar-coordenacao.mjs",
     "seed": "node scripts/seed.mjs",
+    "seed:limpar": "SEED_LIMPAR=true SEED_APENAS_LIMPAR=true node scripts/seed.mjs",
     "etiquetas:sync": "node scripts/sincronizar-etiquetas.mjs",
     "lint:api": "redocly lint docs/openapi.json",
     "infra:fmt": "terraform fmt -recursive infra/terraform",

@@ -128,6 +128,14 @@ jobs:
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
         run: pnpm run test:pwa --project=chromium
 
+      - name: Validar a semente de demonstração
+        # Depois do e2e: o cenário de banco vazio depende da base limpa.
+        env:
+          CONTA_EMAIL: demo@escola.exemplo
+          DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+          SEED_PERFIL: leve
+        run: pnpm run seed
+
       - name: Publicar relatório do Playwright
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

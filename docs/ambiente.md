@@ -100,11 +100,27 @@ cp .env.example .env
 pnpm exec prisma migrate deploy
 ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='senha forte' ADMIN_NOME='Direção' pnpm run criar-admin
 CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha' CONTA_NOME='Equipe' pnpm run criar-coordenacao
-pnpm run seed  # opcional, séries, turmas e alunos sintéticos
+pnpm run seed   # semente de demonstração (ver a seção Semente de demonstração)
 pnpm run dev
 ```
 
 O aplicativo responde em http://localhost:3000. A página única é dinâmica: cada carregamento resolve a sessão e busca os dados correntes.
+
+## Semente de demonstração
+
+`pnpm run seed` simula um ano letivo de uso para a conta de coordenação existente: nove turmas (1º ao 3º ano, A a C), 35 a 50 alunos por turma, grade de tempo integral com nove aulas, chamadas e faltas em cauda longa (com crônicos, episódios e justificativas), saídas, entradas, frequências parciais, feriados e recessos do calendário e dois diretores de turma de exemplo. É determinística, idempotente e usa apenas nomes sintéticos.
+
+| Variável             | Padrão                  | Papel                                                                                 |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------------------- |
+| `SEED_PERFIL`        | `padrao`                | `leve` (40 dias e 6 aulas), `padrao` (ano completo) ou `pesado` (mais movimentações). |
+| `SEED_ALUNOS`        | variação de 35 a 50     | Fixa a quantidade de alunos por turma (20 a 60).                                      |
+| `SEED_DIAS`          | `0`                     | Limita aos últimos N dias letivos; `0` usa o ano completo até hoje.                   |
+| `SEED_ANO`           | ano corrente            | Ano letivo simulado.                                                                  |
+| `SEED_SEMENTE`       | `202602`                | Semente do gerador pseudoaleatório.                                                   |
+| `SEED_SENHA_DIRETOR` | `DiretorFrequencia2026` | Palavra-chave dos diretores de exemplo.                                               |
+| `SEED_LIMPAR`        | `false`                 | Remove a massa anterior da semente antes de aplicar.                                  |
+
+`pnpm run seed:limpar` é o atalho de `SEED_LIMPAR=true SEED_APENAS_LIMPAR=true pnpm run seed`: remove a massa e encerra sem recriar, deixando a base limpa para o e2e. A semente é apenas de desenvolvimento: nunca rode em produção, e as suítes de ponta a ponta esperam uma base com apenas a própria massa (rode `pnpm run seed:limpar` antes delas; o setup global orienta quando a massa de demonstração está presente).
 
 ## Com Docker Compose
 

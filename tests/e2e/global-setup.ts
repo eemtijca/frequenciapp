@@ -3,7 +3,12 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { request } from "@playwright/test";
-import { ADMIN_E2E, COORD_E2E, garantirContasDeTeste } from "./helpers/banco";
+import {
+  ADMIN_E2E,
+  COORD_E2E,
+  garantirContasDeTeste,
+  massaDeDemonstracaoPresente,
+} from "./helpers/banco";
 
 const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 const PASTA_ESTADO = path.resolve("tests/e2e/.auth");
@@ -32,6 +37,14 @@ async function guardarEstado(conta: Conta, arquivo: string): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  // As capturas do README rodam com a semente aplicada; as suítes, sem ela.
+  const capturas = process.env.CAPTURAS === "1";
+  if (!capturas && (await massaDeDemonstracaoPresente())) {
+    throw new Error(
+      "A base tem a massa de demonstração da semente, que as suítes não esperam. " +
+        "Rode `pnpm run seed:limpar` antes do e2e; a semente é para uso manual e capturas.",
+    );
+  }
   await garantirContasDeTeste();
   await mkdir(PASTA_ESTADO, { recursive: true });
   await guardarEstado(ADMIN_E2E, path.join(PASTA_ESTADO, "admin.json"));

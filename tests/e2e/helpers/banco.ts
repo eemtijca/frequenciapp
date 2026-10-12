@@ -98,6 +98,17 @@ export async function contarSeries(): Promise<number> {
 }
 
 /**
+ * Detecta a massa de demonstração da semente. As suítes contam com a base
+ * limpa, com apenas a própria massa; a semente é para uso manual e capturas.
+ */
+export async function massaDeDemonstracaoPresente(): Promise<boolean> {
+  return comBanco(async (cliente) => {
+    const resultado = await cliente.query("select count(*)::int as total from alunos");
+    return (resultado.rows[0]?.total ?? 0) > 300;
+  });
+}
+
+/**
  * Cria a massa da suíte de frequência: série E2E Ano, turma A, três aulas
  * de segunda a sábado e dois alunos. Chamada no beforeAll do spec.
  */

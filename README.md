@@ -100,13 +100,15 @@ ADMIN_EMAIL=direcao@escola.br ADMIN_SENHA='uma senha forte' ADMIN_NOME='Direçã
   docker compose exec app pnpm run criar-admin
 ```
 
-Com o administrador no dispositivo, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e a semente:
+Com o administrador no dispositivo, o restante (contas da equipe, séries, turmas, aulas e alunos) é configurado pela área de Gestão, sem comandos. Para experimentar com dados sintéticos (nenhum dado real de pessoa), crie também a conta de coordenação de demonstração e aplique a semente, que simula um ano letivo com nove turmas, 35 a 50 alunos por turma, chamadas, faltas, saídas, entradas, parciais e diretores de turma de exemplo:
 
 ```bash
 CONTA_EMAIL=equipe@escola.br CONTA_SENHA='outra senha forte' CONTA_NOME='Equipe' \
   docker compose exec app pnpm run criar-coordenacao
-SEED_ALUNOS=12 docker compose exec app pnpm run seed
+docker compose exec app pnpm run seed
 ```
+
+A semente é determinística, idempotente e sem dados reais. Ajuste o volume com `SEED_PERFIL=leve|padrao|pesado`, `SEED_ALUNOS`, `SEED_DIAS`, `SEED_ANO` e `SEED_SEMENTE`; `pnpm run seed:limpar` remove apenas o que ela criou. Os diretores de exemplo entram com `diretor.1a` e `diretor.2b`.
 
 Instruções sem Docker, variáveis de ambiente e demais detalhes em [docs/ambiente.md](docs/ambiente.md). Publicação em [docs/deploy.md](docs/deploy.md).
 
