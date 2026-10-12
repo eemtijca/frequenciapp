@@ -21,5 +21,6 @@ exec docker run --rm --ipc=host --network "$REDE" \
   -e DIRECT_URL="$BANCO" \
   -e TZ_APP="${TZ_APP:-America/Fortaleza}" \
   -e AUTH_SECRET="${AUTH_SECRET:-segredo-dummy-de-32-bytes-para-testes-00}" \
+  -e CAPTURAS="${CAPTURAS:-}" \
   "$IMAGEM" \
   npx playwright test "$@"

@@ -23,7 +23,7 @@ FrequenciApp: aplicativo de frequência escolar para a coordenação de uma esco
 Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). O CI e a imagem Docker usam Node 24.
 
 - Gerenciador é pnpm, com `pnpm-lock.yaml` versionado; não use bun, yarn nem npm nos comandos.
-- Ambiente local: `pnpm install --frozen-lockfile`; `cp .env.example .env` com `AUTH_SECRET` de 32 caracteres ou mais; `pnpm exec prisma migrate deploy`; depois `pnpm run criar-admin`, `pnpm run criar-coordenacao` e `pnpm run seed` com as variáveis `ADMIN_*`, `CONTA_*` e `SEED_*`.
+- Ambiente local: `pnpm install --frozen-lockfile`; `cp .env.example .env` com `AUTH_SECRET` de 32 caracteres ou mais; `pnpm exec prisma migrate deploy`; depois `pnpm run criar-admin`, `pnpm run criar-coordenacao` e `pnpm run seed` com as variáveis `ADMIN_*`, `CONTA_*` e `SEED_*`. A semente simula um ano letivo com nove turmas e 35 a 50 alunos por turma; parâmetros e limpeza em `docs/ambiente.md`.
 - Docker (recomendado): `docker compose up --build` sobe banco e aplicativo; as migrações rodam na partida. Comando administrativo dentro do contêiner: `docker compose exec app pnpm run criar-admin`.
 - Ordem de verificação antes do pull request: `pnpm run format:check`, `pnpm run lint`, `pnpm run tsc`, `pnpm run test:unit`. `pnpm run format` corrige a formatação.
 - `pnpm test` não é autossuficiente: depois da suíte de unidade ele roda os contratos de API, que exigem o aplicativo no ar (padrão `APP_URL=http://localhost:3000`), banco migrado, contas de teste e `DATABASE_URL` exportada para a limpeza da massa. O CI separa: o `qualidade.yml` roda apenas formatação, lint, tipos e unidade; o `testes.yml` sobe o Compose e roda API, ponta a ponta no Chromium e PWA.

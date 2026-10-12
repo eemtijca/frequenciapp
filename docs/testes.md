@@ -116,12 +116,14 @@ O Resumo dos Relatórios verifica filtros, comparação entre séries e turmas, 
 
 ## Capturas do README
 
-As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente de desenvolvimento aplicada. O spec usa o estado de sessão criado pelo setup global, captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sem dados reais. Para regenerar:
+As imagens do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente de desenvolvimento aplicada. O spec usa o estado de sessão criado pelo setup global e captura o Painel em 1440x900 no Chromium (claro e escuro), a Chamada em 390x844 no mobile-chrome (claro e escuro) e, no desktop, o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão, sem dados reais. Aplique a semente antes de capturar; sem ela o spec falha com a orientação para rodar `pnpm run seed`. Para regenerar:
 
 ```bash
 pnpm run capturas:readme         # Playwright local, com o aplicativo no ar
 pnpm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
 ```
+
+Quando o dia corrente é feriado ou fim de semana, o spec volta ao último dia letivo com chamada para a captura sair com dados.
 
 Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas e confira o diff das imagens no pull request.
 
