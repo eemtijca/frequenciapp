@@ -80,3 +80,6 @@ tool-results/
 !*.tfvars.example
 crash.log
 crash.*.log
+
+# Swagger UI vendor (gerado via postinstall)
+public/vendor/

@@ -50,6 +50,8 @@ COPY --from=producao /app/node_modules ./node_modules
 COPY --from=compilacao /app/.next/standalone/server.js ./server.js
 COPY --from=compilacao /app/.next/standalone/package.json ./package.json
 COPY --from=compilacao /app/.next/standalone/.next ./.next
+# Documentação em Markdown lida em tempo de execução por /api/docs/api.md.
+COPY --from=compilacao /app/.next/standalone/docs ./docs
 COPY --from=compilacao /app/.next/static ./.next/static
 COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/prisma ./prisma
