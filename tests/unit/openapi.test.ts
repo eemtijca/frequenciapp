@@ -34,7 +34,7 @@ interface Operacao {
 
 interface Documento {
   openapi: string;
-  info: { title: string };
+  info: { title: string; description?: string };
   servers?: unknown[];
   security?: unknown[];
   tags?: { name: string; description?: string }[];
@@ -129,6 +129,12 @@ describe("especificação OpenAPI", () => {
     expect(documento.components?.securitySchemes).toHaveProperty("sessao");
     expect(documento.components?.securitySchemes).toHaveProperty("segredoAgendador");
     expect(documento.components?.securitySchemes).toHaveProperty("chaveBi");
+  });
+
+  it("não repete o título no topo da descrição", () => {
+    const descricao = documento.info.description ?? "";
+    expect(descricao).not.toMatch(/^#\s/);
+    expect(descricao).not.toContain(`# ${documento.info.title}`);
   });
 
   it("cobre exatamente as rotas da API, sem vazar rotas internas", async () => {
