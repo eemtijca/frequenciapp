@@ -53,6 +53,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Relatórios, Por aluno: a lista se agrupa em séries e turmas recolhíveis, com a contagem de alunos e os totais do mês na turma, e os seletores de série e turma dão lugar aos botões Série e Turma, que recolhem ou expandem todos os grupos do nível. A busca mantém abertos os grupos com resultado. O novo botão Emitir relatório fica ao lado, por enquanto só com um aviso de que a geração do relatório em PDF virá em breve.
+
 - Horários: a edição passa para Gestão, Configurações, categoria Horários, e a aba Horários fica só para consulta, inclusive para a administração. Intervalo da manhã (09:00 às 09:20), almoço (11:50 às 13:00) e intervalo da tarde (14:40 às 14:55) aparecem como linhas na ordem do horário, na consulta diária, nos cartões por dia e na tabela da semana, no lugar do cartão separado do almoço.
 
 - Consulta diária de Horários separa Manhã e Tarde em botões, com intervalo de almoço das 11:50 às 13:00. A edição bloqueia a troca de turno sem desativar o formulário; aulas cadastradas no intervalo continuam acessíveis e a semana completa permanece disponível.

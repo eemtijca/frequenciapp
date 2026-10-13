@@ -231,7 +231,7 @@ test("selecionar todos respeita a busca e a edição usa os dados atuais da linh
   await reaberto.getByRole("button", { name: "Cancelar", exact: true }).click();
 });
 
-test("a busca e o filtro por turma preservam os totais e o detalhe do aluno", async ({ page }) => {
+test("a busca e o grupo da turma preservam os totais e o detalhe do aluno", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Relatórios", "relatorios");
@@ -240,9 +240,8 @@ test("a busca e o filtro por turma preservam os totais e o detalhe do aluno", as
     name: "Relatório por aluno",
     exact: true,
   });
-  await relatorio.locator("#por-aluno-turma").click();
-  await page.getByRole("option", { name: turmaA, exact: true }).click();
-  const linhas = relatorio.getByRole("listitem");
+  const grupo = relatorio.getByRole("region", { name: turmaA, exact: true });
+  const linhas = grupo.getByRole("listitem");
   await expect(linhas).toHaveCount(3);
   await expect(linhas.first()).toContainText(alvaro);
   const busca = relatorio.getByRole("searchbox", {
@@ -263,8 +262,48 @@ test("a busca e o filtro por turma preservam os totais e o detalhe do aluno", as
   await expect(linhas).toHaveCount(3);
   await expect(linhas.first()).toContainText(alvaro);
   await expect(linhas.first().getByRole("button")).toHaveAttribute("aria-expanded", "true");
-  await expect(relatorio.locator("#por-aluno-turma")).toContainText(turmaA);
+  await expect(grupo).toBeVisible();
   await expect(aluno.getByRole("img", { name: "1 falta", exact: true })).toBeVisible();
+});
+
+test("os grupos de série e turma recolhem a lista, a busca reabre e Emitir relatório avisa", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Relatórios", "relatorios");
+  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  const relatorio = page.getByRole("region", { name: "Relatório por aluno", exact: true });
+  const grupoSerie = relatorio.getByRole("region", { name: serie, exact: true });
+  const grupoA = relatorio.getByRole("region", { name: turmaA, exact: true });
+  const cabecalhoA = grupoA.getByRole("button").first();
+  await expect(grupoA.getByRole("listitem")).toHaveCount(3);
+  await expect(cabecalhoA).toHaveAttribute("aria-expanded", "true");
+
+  await cabecalhoA.click();
+  await expect(cabecalhoA).toHaveAttribute("aria-expanded", "false");
+  await expect(grupoA.getByRole("listitem")).toHaveCount(0);
+  await cabecalhoA.click();
+  await expect(grupoA.getByRole("listitem")).toHaveCount(3);
+
+  await relatorio.getByRole("button", { name: "Recolher todas as turmas", exact: true }).click();
+  await expect(grupoA.getByRole("listitem")).toHaveCount(0);
+  await expect(grupoSerie.getByRole("button").first()).toHaveAttribute("aria-expanded", "true");
+  await relatorio.getByRole("button", { name: "Recolher todas as séries", exact: true }).click();
+  await expect(grupoA).toHaveCount(0);
+  await relatorio.getByRole("button", { name: "Expandir todas as turmas", exact: true }).click();
+  await expect(grupoA.getByRole("listitem")).toHaveCount(3);
+
+  await relatorio.getByRole("button", { name: "Recolher todas as turmas", exact: true }).click();
+  const busca = relatorio.getByRole("searchbox", { name: "Buscar aluno", exact: true });
+  await busca.fill("alvaro");
+  await expect(grupoA.getByRole("listitem")).toHaveCount(1);
+  await expect(relatorio.getByRole("button", { name: /todas as turmas/ })).toBeDisabled();
+  await relatorio.getByRole("button", { name: "Limpar busca", exact: true }).click();
+  await expect(grupoA.getByRole("listitem")).toHaveCount(0);
+
+  await relatorio.getByRole("button", { name: "Emitir relatório", exact: true }).click();
+  await expect(page.getByText("Emissão de relatório em preparação", { exact: true })).toBeVisible();
 });
 
 test("a grade suspende a consulta fora da aba e a retoma conservando turma, período e busca", async ({
