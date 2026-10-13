@@ -1,7 +1,7 @@
 "use client";
 
-// Relatório por aluno no mês: faltas, faltas justificadas, saídas e dias
-// com registro, com o acumulado de todo o histórico.
+// Relatório por aluno no mês: faltas, faltas justificadas, saídas e dias com registro,
+// com o acumulado de todo o histórico. A lista se agrupa em séries e turmas recolhíveis.
 import {
   memo,
   useDeferredValue,
@@ -10,7 +10,17 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw, UserRound } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  FileText,
+  LoaderCircle,
+  RefreshCw,
+  UserRound,
+} from "lucide-react";
 import type {
   Aluno,
   Frequencia,
@@ -34,9 +44,8 @@ import { indexarPorDia, resumoPorAluno, type ResumoAlunoPeriodo } from "@/domain
 import { Button } from "@/components/ui/button";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { BarraBusca } from "@/components/ui/barra-busca";
-import { avisarErro } from "@/lib/avisos";
+import { avisarErro, avisarInfo } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
@@ -124,6 +133,63 @@ interface LinhaResumo {
   resumo: ResumoAlunoPeriodo;
 }
 
+interface GrupoTurma {
+  turma: Turma;
+  linhas: LinhaResumo[];
+}
+
+interface GrupoSerie {
+  serie: Pick<Serie, "id" | "nome">;
+  turmas: GrupoTurma[];
+  alunos: number;
+}
+
+function contagemDeAlunos(total: number): string {
+  return `${total} ${total === 1 ? "aluno" : "alunos"}`;
+}
+
+interface CabecalhoGrupoProps {
+  titulo: string;
+  total: number;
+  aberto: boolean;
+  nivel: "serie" | "turma";
+  linhas?: LinhaResumo[];
+  onAlternar: () => void;
+}
+
+/** Cabeçalho de série ou turma: recolhe e expande os alunos abaixo dele. */
+function CabecalhoGrupo({ titulo, total, aberto, nivel, linhas, onAlternar }: CabecalhoGrupoProps) {
+  return (
+    <button
+      type="button"
+      aria-expanded={aberto}
+      onClick={onAlternar}
+      className={`pressionavel hover:bg-secondary/60 flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left transition-colors ${
+        nivel === "serie" ? "bg-secondary/50 font-semibold" : "font-medium"
+      }`}
+    >
+      <ChevronDown
+        size={18}
+        aria-hidden="true"
+        className={`text-muted-foreground shrink-0 transition-transform ${aberto ? "" : "-rotate-90"}`}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">{titulo}</span>
+        <span className="text-muted-foreground block text-xs font-normal">
+          {contagemDeAlunos(total)}
+        </span>
+      </span>
+      {linhas && (
+        <CirculosAcumulado
+          faltas={linhas.reduce((soma, { resumo }) => soma + resumo.faltas, 0)}
+          justificadas={linhas.reduce((soma, { resumo }) => soma + resumo.justificadas, 0)}
+          saidas={linhas.reduce((soma, { resumo }) => soma + resumo.saidas, 0)}
+        />
+      )}
+    </button>
+  );
+}
+
 interface ListaAlunosProps {
   linhas: LinhaResumo[];
   expandido: string | null;
@@ -151,15 +217,12 @@ const ListaAlunos = memo(function ListaAlunos({
   saidas,
 }: ListaAlunosProps) {
   return (
-    <ul className="superficie-vidro divide-y overflow-hidden">
+    <ul className="divide-y border-t">
       {linhas.map(({ aluno, resumo: doAluno }) => {
         const acumulado = acumuladoDe(aluno.id);
         const aberto = expandido === aluno.id;
         return (
-          <li
-            key={aluno.id}
-            className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
-          >
+          <li key={aluno.id}>
             <button
               type="button"
               aria-expanded={aberto}
@@ -230,19 +293,14 @@ export default function PorAluno({
   onRecarregar,
 }: Props) {
   const [busca, setBusca] = useState("");
-  const [serieFiltro, setSerieFiltro] = useState("");
-  const [turmaFiltro, setTurmaFiltro] = useState("");
+  const [seriesFechadas, setSeriesFechadas] = useState<ReadonlySet<string>>(new Set());
+  const [turmasFechadas, setTurmasFechadas] = useState<ReadonlySet<string>>(new Set());
   const [expandido, setExpandido] = useState<string | null>(null);
 
   const rotuloTurma = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
     return (id: string) => mapa.get(id) ?? "Sem turma";
   }, [turmas]);
-
-  const turmaSerie = useMemo(
-    () => new Map(turmas.map((turma) => [turma.id, turma.serieId])),
-    [turmas],
-  );
 
   const acumuladoDe = useMemo(() => {
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
@@ -272,15 +330,71 @@ export default function PorAluno({
   );
   const termo = useDeferredValue(normalizar(busca));
   const linhas = useMemo(
-    () =>
-      resumos.filter(
-        ({ aluno, nomeNormalizado }) =>
-          (!serieFiltro || turmaSerie.get(aluno.turmaId) === serieFiltro) &&
-          (!turmaFiltro || aluno.turmaId === turmaFiltro) &&
-          (termo === "" || nomeNormalizado.includes(termo)),
-      ),
-    [resumos, serieFiltro, turmaFiltro, turmaSerie, termo],
+    () => resumos.filter(({ nomeNormalizado }) => termo === "" || nomeNormalizado.includes(termo)),
+    [resumos, termo],
   );
+  // Séries e turmas seguem a ordem do cadastro; só aparecem as que têm aluno na busca.
+  const grupos = useMemo<GrupoSerie[]>(() => {
+    const porTurma = new Map<string, LinhaResumo[]>();
+    for (const linha of linhas) {
+      porTurma.set(linha.aluno.turmaId, [...(porTurma.get(linha.aluno.turmaId) ?? []), linha]);
+    }
+    const ordemSeries = [...series].sort(
+      (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"),
+    );
+    const resultado: GrupoSerie[] = [];
+    for (const serie of ordemSeries) {
+      const gruposTurma = turmas
+        .filter((turma) => turma.serieId === serie.id && porTurma.has(turma.id))
+        .sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR", { numeric: true }))
+        .map((turma) => ({ turma, linhas: porTurma.get(turma.id) ?? [] }));
+      if (gruposTurma.length === 0) continue;
+      resultado.push({
+        serie,
+        turmas: gruposTurma,
+        alunos: gruposTurma.reduce((soma, grupo) => soma + grupo.linhas.length, 0),
+      });
+    }
+    return resultado;
+  }, [linhas, series, turmas]);
+
+  // Na busca, os grupos com resultado ficam abertos; o recolhimento volta ao limpar o campo.
+  const buscando = termo !== "";
+  const todasSeriesAbertas = grupos.every(({ serie }) => !seriesFechadas.has(serie.id));
+  const todasTurmasAbertas =
+    todasSeriesAbertas &&
+    grupos.every(({ turmas: doGrupo }) =>
+      doGrupo.every(({ turma }) => !turmasFechadas.has(turma.id)),
+    );
+
+  function alternarSeries() {
+    setSeriesFechadas(
+      todasSeriesAbertas ? new Set(grupos.map(({ serie }) => serie.id)) : new Set(),
+    );
+  }
+
+  function alternarTurmas() {
+    if (todasTurmasAbertas) {
+      setTurmasFechadas(
+        new Set(grupos.flatMap(({ turmas: doGrupo }) => doGrupo.map(({ turma }) => turma.id))),
+      );
+      return;
+    }
+    // Abrir as turmas também abre as séries, para o resultado aparecer na tela.
+    setSeriesFechadas(new Set());
+    setTurmasFechadas(new Set());
+  }
+
+  function alternarGrupo(
+    atual: ReadonlySet<string>,
+    definir: Dispatch<SetStateAction<ReadonlySet<string>>>,
+    id: string,
+  ) {
+    const proximo = new Set(atual);
+    if (proximo.has(id)) proximo.delete(id);
+    else proximo.add(id);
+    definir(proximo);
+  }
 
   const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
     try {
@@ -351,34 +465,52 @@ export default function PorAluno({
           placeholder="Buscar aluno"
         />
         <div className="flex flex-wrap gap-3">
-          <div className="flex min-w-48 flex-1 flex-col gap-1.5">
-            <span className="text-muted-foreground text-xs font-medium">Série</span>
-            <Selecionar
-              id="por-aluno-serie"
-              value={serieFiltro}
-              onValueChange={setSerieFiltro}
-              placeholder="Todas as séries"
-              opcoes={[
-                { valor: "", rotulo: "Todas as séries" },
-                ...series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
-              ]}
-            />
-          </div>
-          <div className="flex min-w-48 flex-1 flex-col gap-1.5">
-            <span className="text-muted-foreground text-xs font-medium">Turma</span>
-            <Selecionar
-              id="por-aluno-turma"
-              value={turmaFiltro}
-              onValueChange={setTurmaFiltro}
-              placeholder="Todas as turmas"
-              opcoes={[
-                { valor: "", rotulo: "Todas as turmas" },
-                ...turmas
-                  .filter((turma) => (serieFiltro ? turma.serieId === serieFiltro : true))
-                  .map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-              ]}
-            />
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 min-w-28 flex-1"
+            aria-expanded={todasSeriesAbertas}
+            aria-label={`${todasSeriesAbertas ? "Recolher" : "Expandir"} todas as séries`}
+            disabled={buscando || grupos.length === 0}
+            onClick={alternarSeries}
+          >
+            {todasSeriesAbertas ? (
+              <ChevronsDownUp size={16} aria-hidden="true" />
+            ) : (
+              <ChevronsUpDown size={16} aria-hidden="true" />
+            )}
+            Série
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11 min-w-28 flex-1"
+            aria-expanded={todasTurmasAbertas}
+            aria-label={`${todasTurmasAbertas ? "Recolher" : "Expandir"} todas as turmas`}
+            disabled={buscando || grupos.length === 0}
+            onClick={alternarTurmas}
+          >
+            {todasTurmasAbertas ? (
+              <ChevronsDownUp size={16} aria-hidden="true" />
+            ) : (
+              <ChevronsUpDown size={16} aria-hidden="true" />
+            )}
+            Turma
+          </Button>
+          <Button
+            type="button"
+            className="min-h-11 min-w-44 flex-[2]"
+            onClick={() =>
+              avisarInfo(
+                "Emissão de relatório em preparação",
+                "A geração do relatório em PDF será liberada em breve.",
+                "emitir-relatorio-por-aluno",
+              )
+            }
+          >
+            <FileText size={16} aria-hidden="true" />
+            Emitir relatório
+          </Button>
         </div>
       </div>
 
@@ -386,21 +518,61 @@ export default function PorAluno({
         <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum aluno encontrado</p>
-          <p className="text-muted-foreground text-sm">Ajuste a busca ou os filtros.</p>
+          <p className="text-muted-foreground text-sm">Ajuste a busca.</p>
         </div>
       ) : (
-        <ListaAlunos
-          linhas={linhas}
-          expandido={expandido}
-          setExpandido={setExpandido}
-          rotuloTurma={rotuloTurma}
-          acumuladoDe={acumuladoDe}
-          resumo={resumo}
-          dias={dias}
-          porDia={porDia}
-          horarios={horarios}
-          saidas={saidas}
-        />
+        <div className="superficie-vidro divide-y overflow-hidden">
+          {grupos.map(({ serie, turmas: gruposTurma, alunos: totalSerie }) => {
+            const serieAberta = buscando || !seriesFechadas.has(serie.id);
+            return (
+              <section key={serie.id} aria-label={serie.nome}>
+                <CabecalhoGrupo
+                  nivel="serie"
+                  titulo={serie.nome}
+                  total={totalSerie}
+                  aberto={serieAberta}
+                  onAlternar={() => alternarGrupo(seriesFechadas, setSeriesFechadas, serie.id)}
+                />
+                {serieAberta &&
+                  gruposTurma.map(({ turma, linhas: linhasTurma }) => {
+                    const turmaAberta = buscando || !turmasFechadas.has(turma.id);
+                    return (
+                      <section key={turma.id} aria-label={turma.rotulo} className="border-t">
+                        <CabecalhoGrupo
+                          nivel="turma"
+                          titulo={turma.rotulo}
+                          total={linhasTurma.length}
+                          linhas={linhasTurma}
+                          aberto={turmaAberta}
+                          onAlternar={() =>
+                            alternarGrupo(turmasFechadas, setTurmasFechadas, turma.id)
+                          }
+                        />
+                        {turmaAberta && (
+                          <ListaAlunos
+                            linhas={linhasTurma}
+                            expandido={
+                              linhasTurma.some(({ aluno }) => aluno.id === expandido)
+                                ? expandido
+                                : null
+                            }
+                            setExpandido={setExpandido}
+                            rotuloTurma={rotuloTurma}
+                            acumuladoDe={acumuladoDe}
+                            resumo={resumo}
+                            dias={dias}
+                            porDia={porDia}
+                            horarios={horarios}
+                            saidas={saidas}
+                          />
+                        )}
+                      </section>
+                    );
+                  })}
+              </section>
+            );
+          })}
+        </div>
       )}
     </section>
   );
