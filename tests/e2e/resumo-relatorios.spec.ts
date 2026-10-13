@@ -27,6 +27,7 @@ async function abrir(page: Page) {
     atualizadoEm: "2026-01-01T12:00:00Z",
     atualizadoPorNome: null,
     alunos: doTeste.map((aluno) => aluno.id),
+    aulas: ["aula-sintetica"],
     faltas: [{ alunoId: primeiro.id, horarios: ["aula-sintetica"] }],
   };
   return { painel, chamada, alunos: doTeste };
@@ -41,7 +42,7 @@ test("mostra comparação, filtra a turma e oferece os dados do gráfico sem cor
     await rota.fulfill({ json: { frequencias: [{ ...chamada, dia: `${mes}-01` }] } });
   });
   await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
-  await expect(painel.locator("dd")).toHaveText(["1", "0", "50%"]);
+  await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
   await painel.getByRole("combobox", { name: "Série do resumo" }).click();
   await page.getByRole("option", { name: "E2E Ano", exact: true }).click();
   await painel.getByRole("combobox", { name: "Turma do resumo" }).click();
@@ -99,7 +100,7 @@ test("compara séries e ordena alunos por faltas com justificadas discriminadas"
     });
   });
   await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
-  await expect(painel.locator("dd")).toHaveText(["3", "2", "75%"]);
+  await expect(painel.locator("dd")).toHaveText(["3", "2", "0", "75%"]);
   await painel.getByRole("combobox", { name: "Comparar por", exact: true }).click();
   await page.getByRole("option", { name: "Séries", exact: true }).click();
   const comparacao = painel.getByRole("region", { name: "Infrequência por série", exact: true });
@@ -206,7 +207,7 @@ test("oculta indicadores antigos na falha e recupera o mês pela atualização",
     }
   });
   await painel.getByRole("button", { name: "Atualizar resumo" }).click();
-  await expect(painel.locator("dd")).toHaveText(["1", "0", "50%"]);
+  await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
   falhar = true;
   await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
   await expect(painel.getByRole("alert")).toBeVisible();
@@ -215,7 +216,7 @@ test("oculta indicadores antigos na falha e recupera o mês pela atualização",
   falhar = false;
   await painel.getByRole("button", { name: "Atualizar resumo" }).click();
   await expect(painel.getByRole("alert")).toHaveCount(0);
-  await expect(painel.locator("dd")).toHaveText(["1", "0", "50%"]);
+  await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
 });
 
 test("descarta a resposta atrasada de um mês anterior", async ({ page }) => {
@@ -245,7 +246,7 @@ test("descarta a resposta atrasada de um mês anterior", async ({ page }) => {
     await page.getByRole("tab", { name: "Histórico", exact: true }).click();
     await historico.getByRole("button", { name: "Mês anterior", exact: true }).click();
     await page.getByRole("tab", { name: "Resumo", exact: true }).click();
-    await expect(painel.locator("dd")).toHaveText(["1", "0", "50%"]);
+    await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
     const respostaAntiga = page.waitForResponse((resposta) => resposta.url() === primeiraUrl);
     liberar();
     await (await respostaAntiga).finished();
@@ -256,7 +257,7 @@ test("descarta a resposta atrasada de um mês anterior", async ({ page }) => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolver())),
         ),
     );
-    await expect(painel.locator("dd")).toHaveText(["1", "0", "50%"]);
+    await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
   } finally {
     liberar();
   }

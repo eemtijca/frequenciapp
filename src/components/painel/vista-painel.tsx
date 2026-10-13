@@ -369,7 +369,14 @@ export default function VistaPainel({
         aria-label="Resumo do dia"
         aria-busy={carregandoPainel}
       >
-        <h2 className="min-w-0 font-medium">Infrequência do dia</h2>
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="font-medium">Infrequência do dia</h2>
+          {!feriado && !carregandoPainel && resumo.parciais > 0 && (
+            <span className="text-muted-foreground text-xs">
+              {resumo.parciais} {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+            </span>
+          )}
+        </div>
         <span
           className={
             !feriado && resumo.registrados > 0

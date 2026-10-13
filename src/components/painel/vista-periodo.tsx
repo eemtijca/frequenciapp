@@ -56,8 +56,9 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
       presentes: soma.presentes + item.presentes,
       faltas: soma.faltas + item.faltas,
       justificadas: soma.justificadas + item.justificadas,
+      parciais: soma.parciais + item.parciais,
     }),
-    { esperados: 0, registrados: 0, presentes: 0, faltas: 0, justificadas: 0 },
+    { esperados: 0, registrados: 0, presentes: 0, faltas: 0, justificadas: 0, parciais: 0 },
   );
 
   function invalidar() {
@@ -205,11 +206,12 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
           <div
             role="group"
             aria-label="Resumo do período"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
           >
             {[
               ["Faltas (F + FJ)", String(ausencias(resumo))],
               ["Registros de aluno por dia", String(resumo.registrados)],
+              ["Presenças parciais", String(resumo.parciais)],
               [
                 "Infrequência",
                 resumo.registrados > 0 ? percentual.format(infrequencia(resumo)) : "Sem dados",
