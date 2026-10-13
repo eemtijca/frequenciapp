@@ -49,6 +49,7 @@ const chamadaSelect = {
   turma: { select: { ...turmaSelect, horarios: true } },
   alunos: { select: { alunoId: true, aluno: { select: { nome: true, desistenteEm: true } } } },
   faltas: { select: { alunoId: true, horarioId: true, justificativa: true, observacao: true } },
+  aulas: { select: { horarioId: true } },
 } as const;
 type Chamada = Prisma.FrequenciaGetPayload<{ select: typeof chamadaSelect }>;
 /** Somente valores escolares selecionados chegam à serialização; relações de autoria expõem apenas nome. */
@@ -102,6 +103,7 @@ function retrato(c: Chamada) {
       alunoId: a.alunoId,
       desistenteEm: a.aluno.desistenteEm ? civil(a.aluno.desistenteEm) : null,
     })),
+    aulas: c.aulas.map((a) => a.horarioId),
     faltas: c.faltas,
   };
 }
@@ -318,6 +320,7 @@ async function lerRecurso(
           atualizadoEm: c.atualizadoEm.toISOString(),
           atualizadoPorNome: c.atualizadoPor?.nome ?? null,
           alunos: c.alunos.map((a) => a.alunoId),
+          aulas: c.aulas.map((a) => a.horarioId),
           faltas: c.faltas.map((f) => ({
             alunoId: f.alunoId,
             horarios: [f.horarioId],

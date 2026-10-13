@@ -69,6 +69,7 @@ function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
     atualizadoPorNome: parcial.atualizadoPorNome ?? null,
     faltas: parcial.faltas ?? [],
     ...(parcial.alunos ? { alunos: parcial.alunos } : {}),
+    ...(parcial.aulas ? { aulas: parcial.aulas } : {}),
   };
 }
 
@@ -521,6 +522,68 @@ describe("marcaDoAluno", () => {
       }),
     ];
     expect(marcaDoAluno(aluno(), "2026-09-10", doDia, [horario({ id: "aula-1" })])).toBe("F");
+  });
+});
+
+describe("retrato das aulas na chamada", () => {
+  const gradeMaior = [
+    horario({ id: "aula-1", ordem: 1 }),
+    horario({ id: "aula-2", ordem: 2, inicio: "07:50", fim: "08:40" }),
+    horario({ id: "aula-3", ordem: 3, inicio: "08:40", fim: "09:30" }),
+  ];
+
+  it("mantém a falta integral quando a grade ganha aulas depois do registro", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        aulas: ["aula-1", "aula-2"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1", "aula-2"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, gradeMaior)).toBe("F");
+  });
+
+  it("marca parcial quando a falta cobre parte das aulas registradas", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        aulas: ["aula-1", "aula-2"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, gradeMaior)).toBe("S");
+  });
+
+  it("mantém integral a falta registrada fora do retrato", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        aulas: ["aula-1", "aula-2"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-3"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, gradeMaior)).toBe("F");
+  });
+
+  it("ignora aula fora do retrato ao decidir entre integral e parcial", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        aulas: ["aula-1", "aula-2"],
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1", "aula-2", "aula-3"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, gradeMaior)).toBe("F");
+  });
+
+  it("sem retrato, mantém a derivação pela grade atual", () => {
+    const doDia = [
+      frequencia({
+        turmaId: "turma-a",
+        faltas: [{ alunoId: "aluno-1", horarios: ["aula-1"] }],
+      }),
+    ];
+    expect(marcaDoAluno(aluno(), "2026-09-10", doDia, gradeMaior)).toBe("S");
   });
 });
 

@@ -55,6 +55,7 @@ function chamada(): ChamadaIndicador {
       alunoId,
       desistenteEm: alunoId === "desistente" ? "2026-10-05" : null,
     })),
+    aulas: ["aula1", "aula2"],
     faltas: [
       ...[1, 2].map((n) => ({
         alunoId: "justificado",

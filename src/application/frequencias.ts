@@ -67,6 +67,7 @@ interface LinhaFrequencia {
     registradoSeducPorNome: string | null;
     revisaoSeduc: number;
   }[];
+  aulas: { horarioId: string }[];
 }
 
 /**
@@ -105,6 +106,7 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     atualizadoEm: linha.atualizadoEm.toISOString(),
     atualizadoPorNome: linha.atualizadoPor?.nome ?? linha.criadoPor?.nome ?? null,
     alunos: linha.alunos.map((item) => item.alunoId),
+    aulas: linha.aulas.map((item) => item.horarioId),
     confirmacoesSeduc: linha.alunos.map((item) => ({
       alunoId: item.alunoId,
       registradoSeduc: item.registradoSeduc,
@@ -140,6 +142,7 @@ const COMPLEMENTO = {
         revisaoSeduc: true,
       },
     },
+    aulas: { select: { horarioId: true } },
     criadoPor: { select: { nome: true } },
     atualizadoPor: { select: { nome: true } },
   },
@@ -495,6 +498,8 @@ export async function salvarFrequencia(
             atualizadoPorId: identidade.id,
             faltas: { create: faltasParaGravar },
             alunos: { create: [...lista].map((alunoId) => ({ alunoId })) },
+            // Retrato congelado das aulas do dia, base da derivação das marcas.
+            aulas: { create: idsDeAulaAtiva.map((horarioId) => ({ horarioId })) },
           },
           ...COMPLEMENTO,
         });
@@ -522,6 +527,14 @@ export async function salvarFrequencia(
         data: [...lista].map((alunoId) => ({ frequenciaId: linha.id, alunoId })),
         skipDuplicates: true,
       });
+      // O retrato das aulas é congelado na criação: edições não o reescrevem.
+      // Um retrato vazio (chamada gravada antes desta versão) é curado agora.
+      if ((existente?.aulas.length ?? 0) === 0) {
+        await tx.aulaDaChamada.createMany({
+          data: idsDeAulaAtiva.map((horarioId) => ({ frequenciaId: linha.id, horarioId })),
+          skipDuplicates: true,
+        });
+      }
       // Só uma mudança efetiva na frequência do aluno desfaz sua confirmação.
       const assinatura = (faltas: LinhaFrequencia["faltas"], alunoId: string) =>
         JSON.stringify(

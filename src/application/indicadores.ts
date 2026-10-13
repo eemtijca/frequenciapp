@@ -116,6 +116,7 @@ async function retrato(ano: number) {
           turma: { select: { ...selecaoTurma, horarios: true } },
           alunos: { select: { alunoId: true, aluno: { select: { desistenteEm: true } } } },
           faltas: { select: { alunoId: true, horarioId: true, justificativa: true } },
+          aulas: { select: { horarioId: true } },
         },
       });
       const saidas = await tx.saidaAntecipada.findMany({
@@ -153,6 +154,7 @@ async function retrato(ano: number) {
             alunoId: a.alunoId,
             desistenteEm: a.aluno.desistenteEm ? civil(a.aluno.desistenteEm) : null,
           })),
+          aulas: c.aulas.map((aula) => aula.horarioId),
         })),
         [
           ...saidas.map((s) => ({

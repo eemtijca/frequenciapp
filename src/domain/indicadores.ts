@@ -18,6 +18,7 @@ export interface ChamadaIndicador {
   horarios: Horario[];
   alunos: { alunoId: string; desistenteEm: string | null }[];
   faltas: { alunoId: string; horarioId: string; justificativa: string | null }[];
+  aulas: string[];
 }
 export interface MovimentoIndicador {
   dia: string;
@@ -88,6 +89,7 @@ export function montarIndicadores(
       atualizadoEm: "",
       atualizadoPorNome: null,
       alunos: chamada.alunos.map((aluno) => aluno.alunoId),
+      aulas: chamada.aulas,
       faltas: [...faltas].map(([alunoId, grupo]) => ({
         alunoId,
         horarios: grupo.horarios,
