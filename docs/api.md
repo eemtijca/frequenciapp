@@ -324,7 +324,7 @@ Exclui a conta. As frequências da escola são preservadas e a autoria fica anul
 - 200 `{"frequencia": Frequencia | null, "feriado": Feriado | null}`.
 - 400 quando dia ou turma são inválidos.
 
-Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]` e `alunos` com os ids da lista da chamada.
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, aulas, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]`, `alunos` com os ids da lista da chamada e `aulas` com o retrato das aulas previstas no dia.
 
 ### GET /api/frequencias?mes=YYYY-MM
 
@@ -357,7 +357,7 @@ Três formas de faltas:
 - lista de `{ "alunoId": string, "horarios": string[] }`: falta apenas nas aulas informadas;
 - lista de `{ "alunoId": string, "justificativa"?: string, "observacao"?: string, "horarios"?: string[] }`: falta com justificativa do catálogo. Sem `horarios`, cobre todas as aulas do dia. A observação é aceita para qualquer código e faz sentido no código `O` (Outros).
 
-Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios, justificativa?, observacao? }]`; os dois últimos campos só aparecem quando há justificativa. `alunos` é a lista da chamada: na primeira gravação, a relação atual da turma; depois, a lista gravada, mais quem entrou na turma quando o dia é o corrente ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)).
+Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, aulas, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios, justificativa?, observacao? }]`; os dois últimos campos só aparecem quando há justificativa. `alunos` é a lista da chamada: na primeira gravação, a relação atual da turma; depois, a lista gravada, mais quem entrou na turma quando o dia é o corrente ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)). `aulas` é o retrato das aulas previstas no dia, gravado no primeiro salvamento e usado na derivação das marcas; editar a grade depois não reclassifica o histórico ([ADR-044](adr/044-retratos-da-chamada.md)).
 
 Permissão: administração ou coordenação.
 

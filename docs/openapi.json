@@ -12469,6 +12469,14 @@
               "format": "uuid"
             }
           },
+          "aulas": {
+            "type": "array",
+            "description": "Retrato congelado das aulas previstas no dia, gravado no primeiro salvamento. Mudar a grade depois não altera o histórico.",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "confirmacoesSeduc": {
             "type": "array",
             "items": {
