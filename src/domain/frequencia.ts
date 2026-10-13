@@ -352,6 +352,12 @@ export interface Frequencia {
    * quando o aluno muda de turma depois. Ausente só em dado de teste antigo.
    */
   alunos?: string[];
+  /**
+   * Aulas previstas no dia, gravadas no primeiro salvamento. O retrato é
+   * congelado: mudar a grade depois não reclassifica o histórico. Ausente em
+   * dado antigo, quando a derivação volta a usar a grade atual.
+   */
+  aulas?: string[];
   confirmacoesSeduc?: ConfirmacaoSeducAluno[];
 }
 
@@ -682,10 +688,13 @@ export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; mi
 
 /**
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
- * aulas. Regra: falta em todas as aulas vira F, ou FJ quando todas as faltas
- * do dia têm justificativa; falta em parte vira S (saiu antes ou chegou
+ * aulas. Regra: falta em todas as aulas do dia vira F, ou FJ quando todas as
+ * faltas do dia têm justificativa; falta em parte vira S (saiu antes ou chegou
  * depois); sem falta e na lista de uma chamada do dia vira P; vazio quando
- * o aluno não estava em nenhuma chamada do dia. A falta prevalece mesmo em aula que saiu da grade depois do
+ * o aluno não estava em nenhuma chamada do dia. As aulas do dia saem do
+ * retrato gravado com a chamada, congelado no primeiro salvamento, então
+ * mudar a grade depois não reclassifica o histórico; sem retrato, vale a
+ * grade atual. A falta prevalece mesmo em aula que saiu da grade depois do
  * registro.
  */
 export function marcaDoAluno(
@@ -719,6 +728,27 @@ export function marcaDoAluno(
       .map((frequencia) => frequencia.turmaId),
   );
   const temFrequencia = turmasDaChamada.size > 0;
+
+  if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
+  const tudoJustificado = [...faltasDoAluno.values()].every(Boolean);
+  const marcaIntegral = tudoJustificado ? "FJ" : "F";
+  // Sem frequência da turma no dia, a falta de outra turma prevalece.
+  if (!temFrequencia) return marcaIntegral;
+
+  // O retrato da chamada manda sobre a grade atual. Sem retrato, a derivação
+  // volta ao comportamento antigo, pela grade vigente.
+  const retrato = new Set(
+    frequenciasDoDia
+      .filter((frequencia) => turmasDaChamada.has(frequencia.turmaId))
+      .flatMap((frequencia) => frequencia.aulas ?? []),
+  );
+  if (retrato.size > 0) {
+    const faltando = [...faltasDoAluno.keys()].filter((horarioId) => retrato.has(horarioId)).length;
+    // Falta só fora do retrato, ou cobrindo tudo, continua integral.
+    if (faltando === 0 || faltando >= retrato.size) return marcaIntegral;
+    return "S";
+  }
+
   const aulasDaTurma = [...turmasDaChamada].flatMap((turmaId) =>
     horariosDaChamada(
       horarios.filter((horario) => horario.turmaId === turmaId),
@@ -726,12 +756,6 @@ export function marcaDoAluno(
       true,
     ),
   );
-
-  if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
-  const tudoJustificado = [...faltasDoAluno.values()].every(Boolean);
-  const marcaIntegral = tudoJustificado ? "FJ" : "F";
-  // Sem frequência da turma no dia, a falta de outra turma prevalece.
-  if (!temFrequencia) return marcaIntegral;
   const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id)).length;
   if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return marcaIntegral;
   if (faltando > 0) return "S";

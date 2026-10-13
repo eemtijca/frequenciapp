@@ -142,6 +142,7 @@ interface FrequenciaApi {
   revisao: number;
   atualizadoPorNome: string | null;
   faltas: { alunoId: string; horarios: string[]; justificativa?: string | null }[];
+  aulas: string[];
 }
 
 let serieQA: Serie | null = null;
@@ -668,6 +669,8 @@ describe("frequências (uma por turma e dia)", () => {
     expect(dados.frequencia.faltas).toHaveLength(1);
     expect(dados.frequencia.faltas[0]?.alunoId).toBe(alunoQA?.id);
     expect(dados.frequencia.faltas[0]?.horarios.length).toBeGreaterThan(1);
+    expect(dados.frequencia.aulas).toContain(aulaQA?.id);
+    expect(dados.frequencia.aulas).toContain(turmaQA?.horarios[0]?.id);
   });
 
   it("bloqueia duplicata do mesmo dia e turma com conflito 409", async () => {
@@ -798,6 +801,48 @@ describe("frequências (uma por turma e dia)", () => {
       method: "PATCH",
       body: JSON.stringify({ ativo: true }),
     });
+  });
+
+  it("congela o retrato das aulas e ignora aula criada depois", async () => {
+    const antes = await autenticado(
+      cookieCoord,
+      `/api/frequencias?dia=${DIA_TESTE_3}&turmaId=${turmaQA?.id}`,
+    );
+    const dadosAntes = (await antes.json()) as { frequencia: FrequenciaApi | null };
+    const retratoAntes = dadosAntes.frequencia?.aulas ?? [];
+    expect(retratoAntes).toContain(aulaQA?.id);
+
+    const criada = await autenticado(cookieAdmin, "/api/horarios", {
+      method: "POST",
+      body: JSON.stringify({
+        turmaId: turmaQA?.id,
+        ordem: 11,
+        inicio: "13:00",
+        fim: "13:50",
+        diasSemana: [1, 2, 3, 4, 5],
+      }),
+    });
+    expect(criada.status).toBe(201);
+    const nova = ((await criada.json()) as { horario: HorarioApi }).horario;
+
+    const atualizada = await autenticado(cookieCoord, "/api/frequencias", {
+      method: "POST",
+      body: JSON.stringify({
+        dia: DIA_TESTE_3,
+        turmaId: turmaQA?.id,
+        faltas: [{ alunoId: alunoQA?.id, horarios: [aulaQA?.id] }],
+        revisao: 2,
+      }),
+    });
+    expect(atualizada.status).toBe(200);
+    const dadosAtualizada = (await atualizada.json()) as { frequencia: FrequenciaApi };
+    expect(dadosAtualizada.frequencia.aulas).toEqual(retratoAntes);
+    expect(dadosAtualizada.frequencia.aulas).not.toContain(nova.id);
+
+    const removida = await autenticado(cookieAdmin, `/api/horarios/${nova.id}`, {
+      method: "DELETE",
+    });
+    expect(removida.status).toBe(200);
   });
 
   it("recusa falta de aluno desativado sem registro anterior", async () => {

@@ -19,6 +19,7 @@ export interface ContagemDia {
   presentes: number;
   faltas: number;
   justificadas: number;
+  parciais: number;
 }
 
 /** Marca de cada aluno no dia, pela mesma derivação da grade. */
@@ -44,12 +45,14 @@ export function contagemDeMarcas(marcas: Map<string, Marca>, esperados: number):
     presentes: 0,
     faltas: 0,
     justificadas: 0,
+    parciais: 0,
   };
   for (const marca of marcas.values()) {
     contagem.registrados += 1;
     if (marca === "P") contagem.presentes += 1;
     else if (marca === "F") contagem.faltas += 1;
     else if (marca === "FJ") contagem.justificadas += 1;
+    else if (marca === "S") contagem.parciais += 1;
   }
   return contagem;
 }
@@ -207,8 +210,9 @@ export function distribuicaoDoDia(
           presentes: soma.presentes + contagem.presentes,
           faltas: soma.faltas + contagem.faltas,
           justificadas: soma.justificadas + contagem.justificadas,
+          parciais: soma.parciais + contagem.parciais,
         }),
-        { esperados: 0, registrados: 0, presentes: 0, faltas: 0, justificadas: 0 },
+        { esperados: 0, registrados: 0, presentes: 0, faltas: 0, justificadas: 0, parciais: 0 },
       );
       const totalSerie = ausencias(contagemSerie);
       return {
@@ -301,6 +305,7 @@ export function distribuicaoDoPeriodo(
     destino.presentes += origem.presentes;
     destino.faltas += origem.faltas;
     destino.justificadas += origem.justificadas;
+    destino.parciais += origem.parciais;
   };
   for (const [dia, doDia] of porDia) {
     const ativos = alunos.filter((aluno) => aluno.ativo && !alunoDesistenteNoDia(aluno, dia));

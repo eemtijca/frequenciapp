@@ -540,7 +540,7 @@ test.describe("gráfico personalizado por período", () => {
     await expect(painel.getByText("De 31/08/2026 a 01/09/2026", { exact: true })).toBeVisible();
     const resumo = painel.getByRole("group", { name: "Resumo do período" });
     await expect(resumo).toContainText("66,7%");
-    await expect(resumo.locator("strong")).toHaveText(["2", "3", "66,7%"]);
+    await expect(resumo.locator("strong")).toHaveText(["2", "3", "0", "66,7%"]);
     expect(consultas).toEqual(["?de=2026-08-31&ate=2026-09-01"]);
 
     await painel.getByRole("combobox", { name: "Série", exact: true }).click();
@@ -553,7 +553,7 @@ test.describe("gráfico personalizado por período", () => {
     await expect(
       painel.getByRole("img", { name: "Faltas do período por turma da E2E Painel Um" }),
     ).toBeVisible();
-    await expect(resumo.locator("strong")).toHaveText(["1", "2", "50%"]);
+    await expect(resumo.locator("strong")).toHaveText(["1", "2", "0", "50%"]);
     await expect(painel.getByRole("list")).not.toContainText("E2E Painel Dois");
 
     await rolarAteGrafico(page, "Toda a escola");
@@ -563,7 +563,7 @@ test.describe("gráfico personalizado por período", () => {
     await rolarAteGrafico(page, "Personalizado");
     await expect(
       painel.getByRole("group", { name: "Resumo do período" }).locator("strong"),
-    ).toHaveText(["1", "2", "50%"]);
+    ).toHaveText(["1", "2", "0", "50%"]);
     await expect(painel.getByRole("combobox", { name: "Turma", exact: true })).toContainText(
       "E2E Painel Um B",
     );

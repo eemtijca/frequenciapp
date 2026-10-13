@@ -120,8 +120,9 @@ export default function ResumoRelatorios({
         registrados: soma.registrados + turma.registrados,
         faltas: soma.faltas + turma.faltas,
         justificadas: soma.justificadas + turma.justificadas,
+        parciais: soma.parciais + turma.parciais,
       }),
-      { registrados: 0, faltas: 0, justificadas: 0 },
+      { registrados: 0, faltas: 0, justificadas: 0, parciais: 0 },
     );
     const evolucao = evolucaoDoPeriodo(doFiltro, turmas, frequencias, dias).map((dia) => ({
       ...dia,
@@ -233,10 +234,11 @@ export default function ResumoRelatorios({
         </p>
       ) : (
         <>
-          <dl className="grid grid-cols-3 gap-2 sm:gap-4">
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
             {[
               ["Faltas (F + FJ)", dados.total.faltas + dados.total.justificadas],
               ["Justificadas", dados.total.justificadas],
+              ["Presenças parciais", dados.total.parciais],
               ["Infrequência", taxa],
             ].map(([rotulo, valor]) => (
               <div key={rotulo} className="superficie-vidro min-w-0 p-3 sm:p-4">
@@ -299,6 +301,9 @@ export default function ResumoRelatorios({
                       <p className="text-muted-foreground mt-1 text-xs">
                         {ausencias(turma)} {ausencias(turma) === 1 ? "falta" : "faltas"} em{" "}
                         {turma.registrados} registros de aluno por dia
+                        {turma.parciais > 0
+                          ? ` · ${turma.parciais} ${turma.parciais === 1 ? "parcial" : "parciais"}`
+                          : ""}
                       </p>
                     </li>
                   ))}
@@ -323,6 +328,7 @@ export default function ResumoRelatorios({
                         </th>
                         <th scope="col">F + FJ</th>
                         <th scope="col">Registros</th>
+                        <th scope="col">Parciais</th>
                         <th scope="col">Taxa</th>
                       </tr>
                     </thead>
@@ -334,6 +340,7 @@ export default function ResumoRelatorios({
                           </th>
                           <td>{ausencias(dia)}</td>
                           <td>{dia.registrados}</td>
+                          <td>{dia.parciais}</td>
                           <td>
                             {dia.taxa === null ? "Sem registro" : percentual.format(dia.taxa)}
                           </td>

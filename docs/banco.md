@@ -17,6 +17,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
 | `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.  |
 | `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
+| `aulas_chamada`               | Retrato congelado das aulas previstas no dia de cada chamada.                                    |
 | `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
 | `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.       |
 | `configuracoes`               | Linha única com os recursos ligados: chamada por aula, saída antecipada e origem na Chamada.     |
@@ -42,6 +43,7 @@ Restrições de integridade relevantes:
 - `frequencias` tem unicidade de (turma, dia): uma frequência por turma e dia, compartilhada pela coordenação.
 - `alunos.desistente_em` é uma data opcional: a partir dela o aluno continua na lista da chamada, sem novas marcas. `situacao_atualizada_em` permite incluir a mudança no próximo envio incremental à planilha. A turma de origem não muda quando a turma atual é alterada.
 - `alunos_chamada` tem chave composta (`frequencia_id`, `aluno_id`) e exclusão em cascata com a frequência e com o aluno. A migração `lista_da_chamada` preenche as chamadas já salvas com quem tem falta nelas e com os alunos ativos que estão na turma da chamada.
+- `aulas_chamada` tem chave composta (`frequencia_id`, `horario_id`) e exclusão em cascata com a frequência e com a aula. A migração `aulas_da_chamada` preenche as chamadas já salvas com as aulas que têm falta registrada e com as aulas ativas do dia da semana criadas até a chamada, incluindo a regra do sábado letivo. O retrato fica congelado no primeiro salvamento, para a grade atual não reclassificar o histórico ([ADR-044](adr/044-retratos-da-chamada.md)).
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
 - `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`. A linha exige código de justificativa ou texto livre, e `liberado_por_codigo`, quando preenchido, aponta para o catálogo `liberadores`, validado na aplicação.
 - `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
@@ -147,6 +149,26 @@ O `postinstall` executa a regeneração. O código gerado fica em `generated/`, 
 ## Fuso e datas civis
 
 As datas civis trafegam como texto `YYYY-MM-DD` e são gravadas como `date` a partir do meio-dia UTC, imunes a deslocamentos de fuso na gravação. O dia corrente é resolvido com `TZ_APP` ([ambiente.md](ambiente.md)).
+
+## Retrato das aulas
+
+Cada chamada grava em `aulas_chamada` as aulas previstas no dia, e o retrato fica congelado: a derivação das marcas usa o retrato da chamada, não a grade atual ([ADR-044](adr/044-retratos-da-chamada.md)). A migração `20261013035746_aulas_da_chamada` reconstrói o retrato das chamadas existentes com as aulas que já têm falta registrada mais as aulas ativas do dia da semana criadas até a chamada, incluindo a regra do sábado letivo; aulas criadas depois não entram. Para auditar um banco com histórico, a consulta abaixo compara as aulas ativas do dia com a maior cobertura de marcação de cada chamada:
+
+```sql
+select t.nome as turma, f.dia,
+       (select count(*) from horarios h
+         where h.turma_id = f.turma_id and h.ativo
+           and extract(isodow from f.dia) = any(h.dias_semana)) as aulas_do_dia,
+       (select max(m.c) from (
+          select count(*) c from faltas fa
+           where fa.frequencia_id = f.id group by fa.aluno_id) m) as maior_marcacao
+  from frequencias f
+  join turmas t on t.id = f.turma_id
+ where f.dia >= date '2026-09-28'
+ order by f.dia desc, t.nome;
+```
+
+Em dias com chamada, `maior_marcacao` menor que `aulas_do_dia` indica grade maior que as marcações registradas; a Chamada mostra a mesma informação no rótulo "falta em X de Y aulas". Depois da correção, o retrato da chamada é a referência do cálculo e a consulta serve para conferir o histórico recuperado.
 
 ## Manutenção
 

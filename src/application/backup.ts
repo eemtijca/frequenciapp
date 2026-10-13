@@ -5,7 +5,12 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { ehDiaValido, ehMomentoValido, ordenarPorRotulo } from "@/domain/frequencia";
+import {
+  diaDaSemanaIso,
+  ehDiaValido,
+  ehMomentoValido,
+  ordenarPorRotulo,
+} from "@/domain/frequencia";
 import { ehHorarioEntrada } from "@/domain/entradas";
 import { lerConfiguracoes } from "@/application/configuracoes";
 import { esquemaCriarFeriado, travarCalendario } from "@/application/calendario-letivo";
@@ -165,6 +170,8 @@ const esquemaCopia = z.object({
             .max(50000),
           // Lista da chamada. Cópias antigas não trazem; a importação a deduz.
           alunos: z.array(uuid).max(5000).optional(),
+          // Retrato das aulas. Cópias antigas não trazem; a importação o deduz.
+          aulas: z.array(uuid).max(500).optional(),
           confirmacoesSeduc: z.array(esquemaSeducChamada).max(5000).optional(),
         })
         .refine((item) => {
@@ -357,6 +364,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
             revisaoSeduc: true,
           },
         },
+        aulas: { select: { horarioId: true } },
       },
     }),
     banco().frequenciaParcial.findMany({
@@ -445,6 +453,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       revisao: frequencia.revisao,
       faltas: frequencia.faltas,
       alunos: frequencia.alunos.map((item) => item.alunoId),
+      aulas: frequencia.aulas.map((item) => item.horarioId),
       confirmacoesSeduc: frequencia.alunos.map((item) => ({
         ...item,
         registradoSeducEm: item.registradoSeducEm?.toISOString() ?? null,
@@ -825,6 +834,27 @@ async function mesclarCopia(
         resultado.conflitos += 1;
         continue;
       }
+      // Sem retrato na cópia, ele é deduzido como na migração: aulas com falta
+      // registrada mais a grade do dia. Sábado sem grade usa as aulas ativas.
+      const diaSemana = diaDaSemanaIso(frequencia.dia);
+      const daTurma = copia.horarios.filter((horario) => horario.turmaId === frequencia.turmaId);
+      const previstas = daTurma.filter(
+        (horario) => horario.ativo && horario.diasSemana.includes(diaSemana),
+      );
+      const retratoDeduzido = (
+        previstas.length === 0 && diaSemana === 6
+          ? daTurma.filter((horario) => horario.ativo)
+          : previstas
+      ).map((horario) => horario.id);
+      const aulas = new Set(
+        (frequencia.aulas ?? retratoDeduzido).concat(
+          frequencia.faltas.map((falta) => falta.horarioId),
+        ),
+      );
+      if ([...aulas].some((horarioId) => !idsHorarios.has(horarioId))) {
+        resultado.conflitos += 1;
+        continue;
+      }
       // Sem lista na cópia, vale o que ela diz da turma: ativos dela e quem
       // tem falta na chamada.
       const lista = new Set(
@@ -860,6 +890,9 @@ async function mesclarCopia(
               justificativa: falta.justificativa ?? null,
               observacao: falta.justificativa ? (falta.observacao ?? null) : null,
             })),
+          },
+          aulas: {
+            create: [...aulas].map((horarioId) => ({ horarioId })),
           },
           alunos: {
             create: [...lista]

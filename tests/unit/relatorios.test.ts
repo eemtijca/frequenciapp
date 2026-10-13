@@ -59,6 +59,7 @@ function frequencia(parcial: Partial<Frequencia> = {}): Frequencia {
     atualizadoPorNome: parcial.atualizadoPorNome ?? null,
     faltas: parcial.faltas ?? [],
     ...(parcial.alunos ? { alunos: parcial.alunos } : {}),
+    ...(parcial.aulas ? { aulas: parcial.aulas } : {}),
   };
 }
 
@@ -109,6 +110,21 @@ describe("marcasDoDia e resumoDoDia", () => {
     expect(resumo.ausencias).toBe(2);
     expect(resumo.saidas).toBe(1);
     expect(resumo.infrequencia).toBeCloseTo(2 / 3);
+  });
+
+  it("conta presença parcial sem somar como ausência", () => {
+    const parcial = frequencia({
+      turmaId: "turma-a",
+      aulas: ["aula-1", "aula-2"],
+      faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }],
+    });
+    const marcas = marcasDoDia([aluno({ id: "aluno-a" })], "2026-09-10", [parcial]);
+    const resumo = resumoDoDia(marcas, 1);
+    expect(marcas.get("aluno-a")).toBe("S");
+    expect(resumo.parciais).toBe(1);
+    expect(resumo.ausencias).toBe(0);
+    expect(resumo.registrados).toBe(1);
+    expect(resumo.infrequencia).toBe(0);
   });
 });
 
@@ -339,6 +355,25 @@ describe("distribuicaoDoPeriodo", () => {
     });
     if (resultado[0]) expect(infrequencia(resultado[0])).toBe(0.5);
     expect(resultado[0]?.turmas[0]).toMatchObject({ faltas: 1, registrados: 2, percentual: 1 });
+  });
+
+  it("soma presenças parciais no período sem contaminar a taxa", () => {
+    const resultado = distribuicaoDoPeriodo(
+      [serie()],
+      [turma()],
+      [aluno()],
+      [
+        frequencia({
+          dia: "2026-09-01",
+          aulas: ["aula-1", "aula-2"],
+          faltas: [{ alunoId: "aluno-a", horarios: ["aula-1"] }],
+        }),
+      ],
+      "2026-09-01",
+      "2026-09-30",
+    );
+    expect(resultado[0]).toMatchObject({ parciais: 1, registrados: 1, faltas: 0, percentual: 0 });
+    expect(resultado[0]?.turmas[0]).toMatchObject({ parciais: 1 });
   });
 
   it("calcula a taxa sobre registros, em vez da média das taxas dos dias", () => {

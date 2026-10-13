@@ -375,6 +375,15 @@ export default function VistaFrequencia({
     () => (turma ? horariosDaChamada(turma.horarios, dia, sabadoLiberado) : []),
     [turma, dia, sabadoLiberado],
   );
+  // Retrato congelado da chamada salva: o denominador de aulas do dia e das
+  // faltas parciais não muda quando a grade muda depois do registro.
+  const aulasRegistradas = useMemo(() => {
+    const frequencia = leituraConfirmada
+      ? frequenciasDoDia?.frequencias.find((item) => item.turmaId === turmaId)
+      : null;
+    return frequencia?.aulas && frequencia.aulas.length > 0 ? frequencia.aulas : null;
+  }, [leituraConfirmada, frequenciasDoDia, turmaId]);
+  const totalAulasDoDia = aulasRegistradas?.length ?? aulasDoDia.length;
   const acumuladoDe = useMemo(() => {
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
     return (alunoId: string): AcumuladoAluno | null => mapa.get(alunoId) ?? null;
@@ -403,11 +412,10 @@ export default function VistaFrequencia({
       if (ausencias.has(aluno.id)) contagemFaltas += 1;
       if (justificativas.has(aluno.id)) contagemJustificadas += 1;
       const marcadas = ausencias.get(aluno.id)?.size ?? 0;
-      if (marcadas > 0 && aulasDoDia.length > 0 && marcadas < aulasDoDia.length)
-        contagemParciais += 1;
+      if (marcadas > 0 && totalAulasDoDia > 0 && marcadas < totalAulasDoDia) contagemParciais += 1;
     }
     return { contagemFaltas, contagemJustificadas, contagemParciais };
-  }, [participantes, ausencias, justificativas, aulasDoDia.length]);
+  }, [participantes, ausencias, justificativas, totalAulasDoDia]);
   const contagemPresencas = participantes.length - contagemFaltas;
 
   const nomesParaBusca = useMemo(
@@ -1134,7 +1142,7 @@ export default function VistaFrequencia({
                   const desistente = desistentesDaTurma.has(aluno.id);
                   const faltando = !desistente && ausencias.has(aluno.id);
                   const marcadas = ausencias.get(aluno.id)?.size ?? 0;
-                  const parcial = faltando && aulasDoDia.length > 0 && marcadas < aulasDoDia.length;
+                  const parcial = faltando && totalAulasDoDia > 0 && marcadas < totalAulasDoDia;
                   const codigo = justificativas.get(aluno.id) ?? "";
                   const acumulado = acumuladoDe(aluno.id);
                   const temAcumulado = Boolean(
@@ -1159,7 +1167,7 @@ export default function VistaFrequencia({
                               desistente
                                 ? "desistente. Marcação bloqueada."
                                 : faltando
-                                  ? `falta em ${marcadas} de ${aulasDoDia.length} aulas. Toque para voltar a presente.`
+                                  ? `falta em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
                                   : "presente. Toque para marcar falta."
                             }${
                               temAcumulado && acumulado

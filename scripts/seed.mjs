@@ -602,6 +602,7 @@ try {
   const sorteio = criarSorteio(semente);
   const faltasPendentes = [];
   const alunosChamadaPendentes = [];
+  const aulasChamadaPendentes = [];
   const ausencias = new Set();
   const estadoDosAlunos = new Map();
   let chamadasCriadas = 0;
@@ -675,6 +676,7 @@ try {
         for (const aluno of alunosDaTurmaAtual) {
           alunosChamadaPendentes.push([frequenciaId, aluno.id]);
         }
+        aulasChamadaPendentes.push(...idsDeAula.map((aulaId) => [frequenciaId, aulaId]));
         alunosNaChamada += alunosDaTurmaAtual.length;
 
         const data = dataCivil(dia);
@@ -721,6 +723,16 @@ try {
       `insert into alunos_chamada (frequencia_id, aluno_id)
        select v.frequencia, v.aluno
        from (select unnest($1::uuid[]) as frequencia, unnest($2::uuid[]) as aluno) as v
+       on conflict do nothing`,
+      [lote.map((linha) => linha[0]), lote.map((linha) => linha[1])],
+    );
+  }
+  for (let inicio = 0; inicio < aulasChamadaPendentes.length; inicio += 5000) {
+    const lote = aulasChamadaPendentes.slice(inicio, inicio + 5000);
+    await cliente.query(
+      `insert into aulas_chamada (frequencia_id, horario_id)
+       select v.frequencia, v.aula
+       from (select unnest($1::uuid[]) as frequencia, unnest($2::uuid[]) as aula) as v
        on conflict do nothing`,
       [lote.map((linha) => linha[0]), lote.map((linha) => linha[1])],
     );
