@@ -31,7 +31,7 @@ export function urlDoIndiceDeAgentes(cabecalhos: CabecalhosDaRequisicao): string
 
 /**
  * Monta a página do Swagger UI com o nonce da CSP. Os assets são servidos de
- * /vendor/swagger-ui, copiados de node_modules no postinstall.
+ * /vendor/swagger-ui, copiados de node_modules na instalação e antes do build.
  */
 export function paginaDocumentacao(nonce: string): string {
   return `<!doctype html>

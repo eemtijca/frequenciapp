@@ -10,7 +10,7 @@ A API não publicava especificação nem interface de teste, e as rotas eram doc
 ## Decisão
 
 1. Publicar `docs/openapi.json` (OpenAPI 3.1) mantido no repositório e servido em `GET /api/docs/openapi.json`, com a versão em Markdown em `GET /api/docs/api.md`, que acompanha a função no standalone e na Vercel via `outputFileTracingIncludes`.
-2. Servir o Swagger UI em `GET /api/docs`, com os assets copiados de `node_modules/swagger-ui-dist` para `public/vendor/swagger-ui` no `postinstall` e marcados com o nonce da CSP.
+2. Servir o Swagger UI em `GET /api/docs`, com os assets copiados de `node_modules/swagger-ui-dist` para `public/vendor/swagger-ui` no `postinstall`, antes do build e do início de desenvolvimento, e marcados com o nonce da CSP. O build da Vercel reutiliza essa preparação; arquivos ausentes interrompem a publicação em vez de deixar a página em branco.
 3. Montar o CSP por URL em `src/infra/csp.ts`: estrito em toda a aplicação e `'unsafe-eval'` apenas em `/api/docs`, exigido pela validação do "Try it out".
 4. Proteger a cobertura com `tests/unit/openapi.test.ts` (rotas contra especificação, estrutura, segurança, `$ref`, convenção editorial e CSP) e aplicar o lint do Redocly CLI em `pnpm run lint:api`, no workflow de qualidade.
 
