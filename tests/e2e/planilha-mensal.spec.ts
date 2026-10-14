@@ -514,8 +514,17 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
     data: { nome: "E2E Ano A", cabecalho: ["Aluno", "29/09/2026"] },
   });
   expect(criada.status()).toBe(200);
-  google.definirValor("E2E Ano A", 2, 1, "E2E Aluno Um");
-  google.definirValor("E2E Ano A", 2, 2, "FJ");
+  google.definirAba(
+    "E2E Ano A",
+    [
+      ["Aluno", "29/09/2026", "Total"],
+      ["E2E Aluno Um", "FJ", "1"],
+    ],
+    {
+      formulas: { C2: '=COUNTIF(B2:B2;"FJ")' },
+      notas: { A2: "E2E Nota reservada" },
+    },
+  );
   await comBanco(async (cliente) => {
     const { rows } = await cliente.query<{ id: string }>(
       "select id from turmas where nome = 'A' and serie_id in (select id from series where nome = 'E2E Ano')",
@@ -538,11 +547,34 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
   const dialogo = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
   await dialogo.getByText("Abas sem mês", { exact: true }).click();
   await dialogo.getByRole("button", { name: "Conferir abas antigas", exact: true }).click();
-  const confirmar = dialogo.getByRole("button", {
-    name: "Transferir e retirar 1 aba",
+  const confirmar = dialogo.getByRole("button", { name: /^Transferir e retirar/ });
+  await expect(confirmar).toBeVisible();
+  await expect(confirmar).toBeDisabled();
+  await expect(
+    dialogo.getByText("Fórmulas: 1 · Notas: 1 · Totais: 0", { exact: true }),
+  ).toBeVisible();
+  await dialogo.getByText("Ver exemplos de células", { exact: true }).click();
+  await expect(dialogo.getByRole("link", { name: "C2 (fórmula)", exact: true })).toHaveAttribute(
+    "href",
+    /&range=C2$/,
+  );
+  await expect(dialogo).not.toContainText("E2E Nota reservada");
+  const autorizar = dialogo.getByRole("checkbox", {
+    name: "Autorizo descartar os totais e notas antigos listados",
     exact: true,
   });
-  await expect(confirmar).toBeVisible();
+  await expect(autorizar).not.toBeChecked();
+  await autorizar.check();
+  await expect(confirmar).toBeDisabled();
+  await dialogo.getByLabel("Senha administrativa", { exact: true }).fill("E2E Senha incorreta");
+  await confirmar.click();
+  await expect(
+    dialogo.getByRole("status").filter({ hasText: "A senha do administrador está incorreta" }),
+  ).toBeVisible();
+  expect(google.abas()).toContain("E2E Ano A");
+  await expect(dialogo.getByLabel("Senha administrativa", { exact: true })).toHaveValue("");
+  await dialogo.getByLabel("Senha administrativa", { exact: true }).fill("DirecaoFrequencia2026");
+  await expect(confirmar).toBeEnabled();
   expect(google.abas()).toContain("E2E Ano A");
   await dialogo.screenshot({ path: testInfo.outputPath("previa-aba-sem-mes.png") });
   const escritas = google.chamadas().filter((acao) => acao === "gravar").length;

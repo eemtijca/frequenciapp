@@ -1,6 +1,6 @@
 // Retirada de abas antigas exige dados preservados, destino inequívoco e nova conferência.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import type { AbaGoogle, BlocoGoogle, DocumentoGoogle } from "@/infra/google-planilhas-api";
 
 vi.mock("@/infra/google-planilhas-escrita", () => ({ enviarLoteAtomicoGoogle: vi.fn() }));
@@ -106,6 +106,22 @@ beforeEach(() => {
     return pedidos.map((pedido) => ({
       coluna: pedido.coluna,
       colunas: pedido.colunas,
+      valorInformado: Array.from({ length: linhas }, (_, linha) =>
+        Array.from(
+          { length: pedido.colunas },
+          (_, coluna) =>
+            fonte.valorInformado?.[linha]?.[pedido.coluna + coluna - 1] ??
+            Boolean(
+              fonte.valores[linha]?.[pedido.coluna + coluna - 1] ||
+              fonte.formula[linha]?.[pedido.coluna + coluna - 1] ||
+              (fonte.ocupado?.[linha]?.[pedido.coluna + coluna - 1] &&
+                !fonte.notas?.[linha]?.[pedido.coluna + coluna - 1]),
+            ),
+        ),
+      ),
+      conteudoHash: createHash("sha256")
+        .update(JSON.stringify([fonte, pedido]))
+        .digest("hex"),
       valores: Array.from({ length: linhas }, (_, linha) =>
         Array.from(
           { length: pedido.colunas },
@@ -176,7 +192,6 @@ describe("organização das abas antigas", () => {
   });
   it.each([
     "divergência",
-    "nota na origem",
     "nota no destino",
     "fórmula na origem",
     "fórmula no destino",
@@ -189,12 +204,12 @@ describe("organização das abas antigas", () => {
     "origem mensal",
     "conteúdo oculto na origem",
     "conteúdo oculto no destino",
+    "valor oculto com nota",
   ])("preserva a aba diante de %s", async (caso) => {
     const antiga = grades.get(entrada.aba);
     const destino = grades.get("QA A · Outubro");
     if (!antiga || !destino || !doc.sheets[0]) throw new Error("Massa ausente.");
     if (caso === "divergência" && destino.valores[1]) destino.valores[1][1] = "F";
-    if (caso === "nota na origem") antiga.notas = [[], [], [], [false, false, false, true]];
     if (caso === "nota no destino") destino.notas = [[], [false, true]];
     if (caso === "fórmula na origem") antiga.formula = [[], [false, true]];
     if (caso === "fórmula no destino") destino.formula = [[], [false, true]];
@@ -208,7 +223,62 @@ describe("organização das abas antigas", () => {
     if (caso === "conteúdo oculto na origem")
       antiga.ocupado = [[], [], [], [false, false, false, true]];
     if (caso === "conteúdo oculto no destino") destino.ocupado = [[], [false, true]];
+    if (caso === "valor oculto com nota") {
+      antiga.notas = [[], [], [], [false, false, false, true]];
+      antiga.valorInformado = [[], [], [], [false, false, false, true]];
+    }
     await expect(prever()).rejects.toThrow();
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+  });
+  it("lista totais e notas sem escrever e exige confirmação do descarte", async () => {
+    const antiga = grades.get(entrada.aba);
+    if (!antiga?.valores[0] || !antiga.valores[1]) throw new Error("Massa ausente.");
+    antiga.valores[0][3] = "Total";
+    antiga.valores[1][3] = "1";
+    antiga.formula = [[], [false, false, false, true]];
+    antiga.notas = [[], [], [], [false, false, false, true]];
+    const previa = await prever();
+    expect(previa.complementos).toEqual({
+      formulas: 1,
+      notas: 1,
+      totais: 0,
+      amostras: [
+        { celula: "D2", tipo: "fórmula" },
+        { celula: "D4", tipo: "nota" },
+      ],
+    });
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, impressao: previa.impressao },
+        true,
+      ),
+    ).rejects.toThrow("Confirme o descarte");
+    await organizarAbaAntigaGoogle(
+      "arquivo",
+      "acesso",
+      { ...entrada, impressao: previa.impressao, descartarComplementos: true },
+      true,
+    );
+    expect(enviarLoteAtomicoGoogle).toHaveBeenCalledOnce();
+  });
+  it("invalida a prévia quando o conteúdo muda sem mudar os indicadores visuais", async () => {
+    const antiga = grades.get(entrada.aba);
+    if (!antiga) throw new Error("Massa ausente.");
+    antiga.notas = [[], [true]];
+    antiga.conteudoHash = "QA Nota anterior";
+    const previa = await prever();
+    antiga.conteudoHash = "QA Nota corrigida";
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, impressao: previa.impressao, descartarComplementos: true },
+        true,
+      ),
+    ).rejects.toThrow("A planilha mudou");
     expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
   });
   it("não repete uma escrita quando a resposta é perdida", async () => {

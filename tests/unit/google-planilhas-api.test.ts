@@ -1,6 +1,11 @@
 // Tradução das leituras da Sheets API para a estrutura usada pela frequência.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { estruturaGoogle, lerGoogle, mesclagensDaAssinatura } from "@/infra/google-planilhas-api";
+import {
+  estruturaGoogle,
+  lerGoogle,
+  lerBlocosGoogle,
+  mesclagensDaAssinatura,
+} from "@/infra/google-planilhas-api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -59,6 +64,60 @@ const documento = {
     },
   ],
 };
+
+describe("assinatura do conteúdo completo", () => {
+  it.each(["nota", "fórmula"])(
+    "distingue alteração de %s com o mesmo resultado exibido",
+    async (tipo) => {
+      let alterada = false;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({
+            sheets: [
+              {
+                data: [
+                  {
+                    rowData: [
+                      {
+                        values: [
+                          {
+                            formattedValue: "2",
+                            userEnteredValue: {
+                              formulaValue: tipo === "fórmula" && alterada ? "=4/2" : "=1+1",
+                            },
+                            note:
+                              tipo === "nota" && alterada
+                                ? "QA Nota corrigida"
+                                : "QA Nota original",
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+      );
+      const ler = async () =>
+        (
+          await lerBlocosGoogle("arquivo", "acesso", "QA", 1, [{ coluna: 1, colunas: 1 }], {
+            conferirNotas: true,
+            conferirConteudo: true,
+          })
+        )[0];
+      const antes = await ler();
+      alterada = true;
+      const depois = await ler();
+      expect(depois?.valores).toEqual(antes?.valores);
+      expect(depois?.formula).toEqual(antes?.formula);
+      expect(depois?.notas).toEqual(antes?.notas);
+      expect(depois?.conteudoHash).not.toBe(antes?.conteudoHash);
+    },
+  );
+});
 
 describe("leitura pela Sheets API", () => {
   it.each([

@@ -1,6 +1,6 @@
 // Migra marcas de uma aba antiga vinculada, conferindo o conteúdo antes de retirá-la.
 import { createHash } from "node:crypto";
-import { ehDiaValido } from "@/domain/frequencia";
+import { ehDiaValido, normalizar } from "@/domain/frequencia";
 import { ErroHttp } from "./erros";
 import {
   lerDocumentoGoogle,
@@ -33,7 +33,9 @@ async function lerInteira(id: string, acesso: string, aba: AbaGoogle) {
     formula: Array.from({ length: linhas }, () => []),
     notas: Array.from({ length: linhas }, () => []),
     ocupado: Array.from({ length: linhas }, () => []),
+    valorInformado: Array.from({ length: linhas }, () => []),
   };
+  const assinaturas: string[] = [];
   const largura = Math.max(1, Math.floor(20_000 / linhas));
   for (let inicio = 1; inicio <= colunas; inicio += largura) {
     const [bloco] = await lerBlocosGoogle(
@@ -45,14 +47,95 @@ async function lerInteira(id: string, acesso: string, aba: AbaGoogle) {
       { conferirNotas: true, conferirConteudo: true },
     );
     conferir(
-      bloco?.notas && bloco.ocupado,
+      bloco?.notas && bloco.ocupado && bloco.valorInformado && bloco.conteudoHash,
       "Não foi possível conferir o conteúdo completo da aba.",
     );
+    assinaturas.push(bloco.conteudoHash);
     for (let linha = 0; linha < linhas; linha++) {
       resultado.valores[linha]?.push(...(bloco.valores[linha] ?? []));
       resultado.formula[linha]?.push(...(bloco.formula[linha] ?? []));
       resultado.notas?.[linha]?.push(...(bloco.notas[linha] ?? []));
       resultado.ocupado?.[linha]?.push(...(bloco.ocupado[linha] ?? []));
+      resultado.valorInformado?.[linha]?.push(...(bloco.valorInformado[linha] ?? []));
+    }
+  }
+  resultado.conteudoHash = createHash("sha256").update(JSON.stringify(assinaturas)).digest("hex");
+  return resultado;
+}
+
+function referencia(linha: number, coluna: number): string {
+  let numero = coluna + 1;
+  let letra = "";
+  while (numero > 0) {
+    numero--;
+    letra = String.fromCharCode(65 + (numero % 26)) + letra;
+    numero = Math.floor(numero / 26);
+  }
+  return `${letra}${linha + 1}`;
+}
+
+function ehResumo(rotulo: string): boolean {
+  const nome = normalizar(rotulo)
+    .replace(/[().:]/g, "")
+    .replace(/\s*\+\s*/g, "+")
+    .replace(/\s+/g, " ")
+    .trim();
+  return new Set([
+    "total",
+    "faltas",
+    "total de faltas",
+    "faltas totais",
+    "justificadas",
+    "faltas justificadas",
+    "faltas nao justificadas",
+    "total f+fj",
+    "total f",
+    "total fj",
+    "presentes",
+    "presencas",
+  ]).has(nome);
+}
+
+export interface ComplementosAntigos {
+  formulas: number;
+  notas: number;
+  totais: number;
+  amostras: { celula: string; tipo: "fórmula" | "nota" | "total" }[];
+}
+
+/** A lista identifica o descarte sem devolver o texto de notas ou fórmulas ao navegador. */
+function conferirComplementos(fonte: BlocoGoogle): ComplementosAntigos {
+  const resultado: ComplementosAntigos = { formulas: 0, notas: 0, totais: 0, amostras: [] };
+  function registrar(linha: number, coluna: number, tipo: "fórmula" | "nota" | "total") {
+    if (tipo === "fórmula") resultado.formulas++;
+    if (tipo === "nota") resultado.notas++;
+    if (tipo === "total") resultado.totais++;
+    if (resultado.amostras.length < 18)
+      resultado.amostras.push({ celula: referencia(linha, coluna), tipo });
+  }
+  for (let linha = 0; linha < fonte.valores.length; linha++) {
+    for (let coluna = 0; coluna < fonte.colunas; coluna++) {
+      const resumo = coluna > 0 && ehResumo(fonte.valores[0]?.[coluna] ?? "");
+      if (fonte.formula[linha]?.[coluna]) {
+        conferir(
+          linha > 0 && resumo,
+          `Há fórmula fora dos totais em ${referencia(linha, coluna)}. Confira essa célula antes de retirar a aba.`,
+        );
+        registrar(linha, coluna, "fórmula");
+      } else if (linha > 0 && resumo && fonte.valores[linha]?.[coluna]) {
+        conferir(
+          /^\d+(?:[.,]\d+)?$/.test(fonte.valores[linha]?.[coluna] ?? ""),
+          `Há conteúdo diferente de um total em ${referencia(linha, coluna)}. Confira a célula.`,
+        );
+        registrar(linha, coluna, "total");
+      }
+      if (fonte.notas?.[linha]?.[coluna]) registrar(linha, coluna, "nota");
+      conferir(
+        !fonte.valorInformado?.[linha]?.[coluna] ||
+          fonte.valores[linha]?.[coluna] ||
+          (fonte.formula[linha]?.[coluna] && resumo),
+        `Há conteúdo não visível em ${referencia(linha, coluna)}. Confira antes de retirar a aba.`,
+      );
     }
   }
   return resultado;
@@ -96,7 +179,12 @@ function linhasPorAluno(doc: DocumentoGoogle, aba: AbaGoogle, grade: BlocoGoogle
 export async function organizarAbaAntigaGoogle(
   id: string,
   acesso: string,
-  entrada: { aba: string; turmaOriginalId: string; impressao?: string },
+  entrada: {
+    aba: string;
+    turmaOriginalId: string;
+    impressao?: string;
+    descartarComplementos?: boolean;
+  },
   aplicar: boolean,
 ) {
   const doc = await lerDocumentoGoogle(id, acesso);
@@ -110,17 +198,7 @@ export async function organizarAbaAntigaGoogle(
     fonte.valores[0]?.[0] === "Aluno",
     "Corrija o cabeçalho da aba antiga antes de retirá-la.",
   );
-  conferir(
-    !fonte.formula.some((linha) => linha.some(Boolean)) &&
-      !fonte.notas?.some((linha) => linha.some(Boolean)),
-    "Há fórmulas ou notas na aba antiga. Confira esses dados antes de retirá-la.",
-  );
-  conferir(
-    !fonte.ocupado?.some((linha, l) =>
-      linha.some((ocupada, c) => ocupada && !fonte.valores[l]?.[c]),
-    ),
-    "Há conteúdo não visível na aba antiga. Confira antes de retirá-la.",
-  );
+  const complementos = conferirComplementos(fonte);
   const origem = linhasPorAluno(doc, antiga, fonte);
   const destinos = new Map<
     string,
@@ -136,7 +214,7 @@ export async function organizarAbaAntigaGoogle(
   const datas = new Set<string>();
   for (let coluna = 1; coluna < fonte.colunas; coluna++) {
     const rotulo: string = fonte.valores[0]?.[coluna] ?? "";
-    if (rotulo === "Turma atual") continue;
+    if (rotulo === "Turma atual" || ehResumo(rotulo)) continue;
     const dia = diaDoCabecalho(rotulo);
     if (!dia) {
       conferir(
@@ -280,6 +358,11 @@ export async function organizarAbaAntigaGoogle(
       entrada.impressao === impressao,
       "A planilha mudou. Confira uma nova prévia antes de continuar.",
     );
+    conferir(
+      !(complementos.formulas + complementos.notas + complementos.totais) ||
+        entrada.descartarComplementos,
+      "Confirme o descarte dos totais e notas antigos antes de retirar a aba.",
+    );
     await enviarLoteAtomicoGoogle(id, acesso, pedidos);
   }
   return {
@@ -287,6 +370,8 @@ export async function organizarAbaAntigaGoogle(
     impressao,
     preenchidas,
     conferidas,
+    complementos,
+    urlAntiga: `https://docs.google.com/spreadsheets/d/${doc.spreadsheetId}/edit#gid=${antiga.properties.sheetId}`,
     destinos: [...destinos].map(([mes, { aba }]) => ({ mes, aba: aba.properties.title })),
     removida: aplicar,
   };
