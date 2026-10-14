@@ -111,6 +111,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Organização das abas sem mês mostra aluno, data e células das pendências, permite conferir homônimos, incluir linhas de alunos históricos e escolher marcas divergentes com nova prévia e senha administrativa. Códigos estáveis reconhecem nomes corrigidos; destinos únicos sem código também são aceitos, sem associar códigos diferentes.
+
 - FrequenciBI repete de forma limitada a conferência de acesso após falhas temporárias de rede, sem repetir recusas de chave ou limites de consultas. Falhas de revalidação também ficam visíveis durante uma consulta aberta.
 
 - FrequenciBI corrige categorias duplicadas, ordem semanal, taxas por aluno, cobertura restrita ao escopo e atualização da comparação. Tabelas ajustam a paginação, mapas de calor preservam células após o centésimo grupo, séries mantêm lacunas sem base e PNG inclui legenda e resumo. A impressão aguarda os gráficos fora da tela.
