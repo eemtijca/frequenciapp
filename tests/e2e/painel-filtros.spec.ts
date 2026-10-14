@@ -307,7 +307,7 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
-  // O seletor e as setas em grupo ficam só no computador; no celular há uma seta no canto do painel.
+  // O seletor e o grupo de navegação ficam só no computador; no celular há duas setas acima dos cartões.
   await expect(page.getByRole("group", { name: "Navegação dos gráficos" })).toHaveCount(0);
   await rolarAteGrafico(page, "Personalizado");
   await rolarAteGrafico(page, "Desistentes");
@@ -347,30 +347,48 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   }
 });
 
-test("no celular, a seta do canto avança pelos gráficos e volta ao primeiro no último", async ({
+test("no celular, as setas acima dos cartões percorrem os gráficos e respeitam os extremos", async ({
   page,
   isMobile,
 }) => {
-  test.skip(!isMobile, "A seta do canto aparece só abaixo da largura de computador.");
+  test.skip(!isMobile, "As setas aparecem só abaixo da largura de computador.");
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
   const total = await page.getByRole("article", { includeHidden: true }).count();
-  const seta = page.getByRole("button", { name: "Próximo gráfico", exact: true });
-  const caixa = await seta.boundingBox();
+  const anterior = page.getByRole("button", { name: "Gráfico anterior", exact: true });
+  const proximo = page.getByRole("button", { name: "Próximo gráfico", exact: true });
+  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  await expect(anterior).toBeDisabled();
+  // Ficam acima dos cartões e dentro da tela, sem cobrir os textos.
+  const [caixaAnterior, caixaProximo, caixaFaixa] = await Promise.all([
+    anterior.boundingBox(),
+    proximo.boundingBox(),
+    faixa.boundingBox(),
+  ]);
   const largura = page.viewportSize()?.width ?? 0;
-  expect((caixa?.x ?? -1) + (caixa?.width ?? Infinity)).toBeLessThanOrEqual(largura);
+  expect((caixaAnterior?.y ?? Infinity) + (caixaAnterior?.height ?? Infinity)).toBeLessThanOrEqual(
+    (caixaFaixa?.y ?? 0) + 1,
+  );
+  expect((caixaProximo?.y ?? Infinity) + (caixaProximo?.height ?? Infinity)).toBeLessThanOrEqual(
+    (caixaFaixa?.y ?? 0) + 1,
+  );
+  expect((caixaProximo?.x ?? -1) + (caixaProximo?.width ?? Infinity)).toBeLessThanOrEqual(largura);
   for (let posicao = 2; posicao <= total; posicao += 1) {
-    await seta.click();
+    await proximo.click();
     await expect(
       page.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
     ).toBeInViewport();
   }
-  const voltar = page.getByRole("button", { name: "Voltar ao primeiro gráfico", exact: true });
-  await expect(voltar).toBeVisible();
-  await voltar.click();
+  await expect(proximo).toBeDisabled();
+  for (let posicao = total - 1; posicao >= 1; posicao -= 1) {
+    await anterior.click();
+    await expect(
+      page.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
+    ).toBeInViewport();
+  }
+  await expect(anterior).toBeDisabled();
   await expect(page.getByRole("article", { name: /^1 de \d+: Toda a escola$/ })).toBeInViewport();
-  await expect(seta).toBeVisible();
 });
 
 test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserName, isMobile }) => {
@@ -396,6 +414,43 @@ test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserNa
   await sessao.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
   await sessao.detach();
   await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
+  await expect(page.getByRole("article")).toBeInViewport();
+});
+
+test("o deslize que começa sobre um campo do gráfico personalizado também troca o gráfico", async ({
+  page,
+  browserName,
+  isMobile,
+}) => {
+  test.skip(browserName !== "chromium" || !isMobile, "Gesto nativo por CDP disponível no Android.");
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel");
+  await rolarAteGrafico(page, "Personalizado");
+  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  // O seletor de data está sempre ativo; o de série fica desativado sem séries cadastradas.
+  const campo = page
+    .getByRole("region", { name: "Infrequência personalizada", exact: true })
+    .getByRole("button")
+    .first();
+  await campo.scrollIntoViewIfNeeded();
+  const [caixaFaixa, caixaCampo] = await Promise.all([faixa.boundingBox(), campo.boundingBox()]);
+  if (!caixaFaixa || !caixaCampo) throw new Error("Faixa ou campo não encontrado.");
+  const sessao = await page.context().newCDPSession(page);
+  const y = caixaCampo.y + caixaCampo.height / 2;
+  const x = caixaCampo.x + 40;
+  await sessao.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+  for (let passo = 1; passo <= 12; passo += 1) {
+    await sessao.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: x + ((caixaFaixa.width - 80) * passo) / 12, y }],
+    });
+    await page.waitForTimeout(16);
+  }
+  await sessao.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sessao.detach();
+  // Voltar um cartão: o Personalizado sai da exibição em vez de a faixa recuar sozinha.
+  await expect(page.getByRole("article", { name: /: Personalizado$/ })).toHaveCount(0);
   await expect(page.getByRole("article")).toBeInViewport();
 });
 

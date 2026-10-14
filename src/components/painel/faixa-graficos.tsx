@@ -43,6 +43,8 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const intencionalAte = useRef(0);
   const animandoAte = useRef(0);
   const ticketAlinhar = useRef(0);
+  // Toque em curso: o arrasto horizontal vale como gesto mesmo quando começa sobre um controle.
+  const toque = useRef<{ x: number; y: number; arrastando: boolean } | null>(null);
   // Posições dos cartões, medidas só quando a largura muda, para o evento de rolagem não ler o layout.
   const posicoes = useRef<{ largura: number; esquerdas: number[] }>({ largura: 0, esquerdas: [] });
   const [indice, setIndice] = useState(0);
@@ -53,7 +55,6 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const faixaId = useId();
   const atual = Math.min(indice, cartoes.length - 1);
   const identidade = cartoes[atual]?.id;
-  const ultimo = atual >= cartoes.length - 1;
 
   const esquerdaDoSalvo = useCallback((elemento: HTMLElement): number | null => {
     const primeiro = elemento.firstElementChild;
@@ -252,115 +253,152 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
       <p id={ajudaId} className="sr-only">
         Deslize para os lados para ver os gráficos. Com o teclado, use as setas esquerda e direita.
       </p>
-      {/* A faixa também é `relative`: sem isso, elementos posicionados dentro dos cartões tomariam
-          este contêiner como referência, escapariam do recorte da faixa e alargariam a página. */}
-      <div className="relative min-w-0">
-        {/* No celular não há seletor: uma seta no canto do painel avança para o próximo gráfico. */}
+      {/* No celular não há seletor: as setas ficam acima dos cartões, sem cobrir os textos. */}
+      <div
+        role="group"
+        aria-label="Setas dos gráficos"
+        className="flex justify-end gap-2 lg:hidden"
+      >
         <Button
           type="button"
           variant="outline"
           size="icon"
-          aria-label={ultimo ? "Voltar ao primeiro gráfico" : "Próximo gráfico"}
+          aria-label="Gráfico anterior"
           aria-controls={faixaId}
-          onClick={() => irPara(ultimo ? 0 : atual + 1)}
-          className="absolute top-2.5 right-2.5 z-10 size-10 rounded-full lg:hidden"
+          disabled={atual <= 0}
+          onClick={() => irPara(atual - 1)}
+          className="size-10 rounded-full"
         >
-          {ultimo ? <ChevronLeft aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+          <ChevronLeft aria-hidden="true" />
         </Button>
-        <div
-          id={faixaId}
-          ref={faixa}
-          role="group"
-          aria-label="Cartões de gráficos"
-          aria-describedby={`${ajudaId} ${posicaoId}`}
-          tabIndex={0}
-          style={altura === undefined ? undefined : { height: altura }}
-          className="focus-visible:ring-ring relative flex min-w-0 snap-x snap-mandatory items-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-lg pb-2 focus-visible:ring-2 focus-visible:outline-none"
-          onPointerDown={(evento) => {
-            if (alvoInterativo(evento.target)) return;
-            renovarIntencao(evento.currentTarget);
-          }}
-          onWheel={(evento) => {
-            renovarIntencao(evento.currentTarget);
-          }}
-          onScroll={(evento) => {
-            const elemento = evento.currentTarget;
-            if (elemento.dataset.rolagemIntencional === "true") {
-              delete elemento.dataset.rolagemIntencional;
-              renovarIntencao(elemento);
-            }
-            // A mudança de largura pode gerar scroll antes do ResizeObserver.
-            // O observador realinha o cartão vigente antes de recalcular a posição.
-            if (!ativo || elemento.clientWidth === 0) return;
-            const gesto = window.performance.now() < intencionalAte.current;
-            if (!gesto && (realinhando.current || elemento.clientWidth !== larguraFaixa.current))
-              return;
-            if (!gesto && window.performance.now() < animandoAte.current) return;
-            let proximo = 0;
-            let distancia = Infinity;
-            posicoesDe(elemento).forEach((esquerda, posicao) => {
-              const diferenca = Math.abs(esquerda - elemento.scrollLeft);
-              if (diferenca < distancia) {
-                distancia = diferenca;
-                proximo = posicao;
-              }
-            });
-            // Ocultar a visão e o encaixe do navegador não escolhem outro cartão.
-            if (!gesto) {
-              const esquerda = esquerdaDoSalvo(elemento);
-              if (esquerda !== null && Math.abs(elemento.scrollLeft - esquerda) > 1)
-                alinhar(elemento, esquerda, false);
-              return;
-            }
-            renovarIntencao(elemento);
-            // Posição no meio do caminho, sem encaixe, não troca o cartão vigente.
-            if (distancia > 16) return;
-            if (proximo !== atual) {
-              const anterior = elemento.children.item(atual);
-              if (anterior?.contains(document.activeElement))
-                elemento.focus({ preventScroll: true });
-              indiceSalvo.current = proximo;
-              idSalvo.current = cartoes[proximo]?.id;
-              setIndice(proximo);
-            }
-          }}
-          onKeyDown={(evento) => {
-            // Calendários, seletores e outros campos mantêm os próprios atalhos.
-            if (
-              evento.target !== evento.currentTarget ||
-              evento.altKey ||
-              evento.ctrlKey ||
-              evento.metaKey
-            )
-              return;
-            const destinos: Record<string, number> = {
-              ArrowLeft: Math.max(0, atual - 1),
-              ArrowRight: Math.min(cartoes.length - 1, atual + 1),
-              Home: 0,
-              End: cartoes.length - 1,
-            };
-            const destino = destinos[evento.key];
-            if (destino === undefined) return;
-            evento.preventDefault();
-            irPara(destino);
-          }}
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="Próximo gráfico"
+          aria-controls={faixaId}
+          disabled={atual >= cartoes.length - 1}
+          onClick={() => irPara(atual + 1)}
+          className="size-10 rounded-full"
         >
-          {cartoes.map((cartao, posicao) => (
-            <article
-              key={cartao.id}
-              data-cartao={cartao.id}
-              aria-label={`${posicao + 1} de ${cartoes.length}: ${cartao.nome}`}
-              aria-roledescription="cartão"
-              aria-hidden={posicao !== atual}
-              inert={posicao !== atual}
-              className="min-w-0 shrink-0 basis-full snap-start snap-always space-y-4"
-            >
-              <AquecimentoGraficos.Provider value={faixaVisivel && Math.abs(posicao - atual) === 1}>
-                {cartao.conteudo}
-              </AquecimentoGraficos.Provider>
-            </article>
-          ))}
-        </div>
+          <ChevronRight aria-hidden="true" />
+        </Button>
+      </div>
+      <div
+        id={faixaId}
+        ref={faixa}
+        role="group"
+        aria-label="Cartões de gráficos"
+        aria-describedby={`${ajudaId} ${posicaoId}`}
+        tabIndex={0}
+        style={altura === undefined ? undefined : { height: altura }}
+        className="focus-visible:ring-ring flex min-w-0 snap-x snap-mandatory items-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-lg pb-2 focus-visible:ring-2 focus-visible:outline-none"
+        onPointerDown={(evento) => {
+          if (alvoInterativo(evento.target)) return;
+          renovarIntencao(evento.currentTarget);
+        }}
+        onWheel={(evento) => {
+          renovarIntencao(evento.currentTarget);
+        }}
+        onTouchStart={(evento) => {
+          const ponto = evento.touches[0];
+          toque.current = ponto ? { x: ponto.clientX, y: ponto.clientY, arrastando: false } : null;
+        }}
+        onTouchMove={(evento) => {
+          const atual = toque.current;
+          const ponto = evento.touches[0];
+          if (!atual || !ponto) return;
+          const dx = Math.abs(ponto.clientX - atual.x);
+          if (!atual.arrastando && dx > 3 && dx > Math.abs(ponto.clientY - atual.y))
+            atual.arrastando = true;
+          if (atual.arrastando) renovarIntencao(evento.currentTarget);
+        }}
+        onTouchEnd={(evento) => {
+          // Os últimos eventos de rolagem e o encaixe chegam depois de soltar o dedo.
+          if (toque.current?.arrastando) renovarIntencao(evento.currentTarget);
+          toque.current = null;
+        }}
+        onTouchCancel={(evento) => {
+          if (toque.current?.arrastando) renovarIntencao(evento.currentTarget);
+          toque.current = null;
+        }}
+        onScroll={(evento) => {
+          const elemento = evento.currentTarget;
+          if (elemento.dataset.rolagemIntencional === "true") {
+            delete elemento.dataset.rolagemIntencional;
+            renovarIntencao(elemento);
+          }
+          // A mudança de largura pode gerar scroll antes do ResizeObserver.
+          // O observador realinha o cartão vigente antes de recalcular a posição.
+          if (!ativo || elemento.clientWidth === 0) return;
+          const gesto =
+            window.performance.now() < intencionalAte.current || toque.current?.arrastando === true;
+          if (!gesto && (realinhando.current || elemento.clientWidth !== larguraFaixa.current))
+            return;
+          if (!gesto && window.performance.now() < animandoAte.current) return;
+          let proximo = 0;
+          let distancia = Infinity;
+          posicoesDe(elemento).forEach((esquerda, posicao) => {
+            const diferenca = Math.abs(esquerda - elemento.scrollLeft);
+            if (diferenca < distancia) {
+              distancia = diferenca;
+              proximo = posicao;
+            }
+          });
+          // Ocultar a visão e o encaixe do navegador não escolhem outro cartão.
+          if (!gesto) {
+            const esquerda = esquerdaDoSalvo(elemento);
+            if (esquerda !== null && Math.abs(elemento.scrollLeft - esquerda) > 1)
+              alinhar(elemento, esquerda, false);
+            return;
+          }
+          renovarIntencao(elemento);
+          // Posição no meio do caminho, sem encaixe, não troca o cartão vigente.
+          if (distancia > 16) return;
+          if (proximo !== atual) {
+            const anterior = elemento.children.item(atual);
+            if (anterior?.contains(document.activeElement)) elemento.focus({ preventScroll: true });
+            indiceSalvo.current = proximo;
+            idSalvo.current = cartoes[proximo]?.id;
+            setIndice(proximo);
+          }
+        }}
+        onKeyDown={(evento) => {
+          // Calendários, seletores e outros campos mantêm os próprios atalhos.
+          if (
+            evento.target !== evento.currentTarget ||
+            evento.altKey ||
+            evento.ctrlKey ||
+            evento.metaKey
+          )
+            return;
+          const destinos: Record<string, number> = {
+            ArrowLeft: Math.max(0, atual - 1),
+            ArrowRight: Math.min(cartoes.length - 1, atual + 1),
+            Home: 0,
+            End: cartoes.length - 1,
+          };
+          const destino = destinos[evento.key];
+          if (destino === undefined) return;
+          evento.preventDefault();
+          irPara(destino);
+        }}
+      >
+        {cartoes.map((cartao, posicao) => (
+          <article
+            key={cartao.id}
+            data-cartao={cartao.id}
+            aria-label={`${posicao + 1} de ${cartoes.length}: ${cartao.nome}`}
+            aria-roledescription="cartão"
+            aria-hidden={posicao !== atual}
+            inert={posicao !== atual}
+            className="min-w-0 shrink-0 basis-full snap-start snap-always space-y-4"
+          >
+            <AquecimentoGraficos.Provider value={faixaVisivel && Math.abs(posicao - atual) === 1}>
+              {cartao.conteudo}
+            </AquecimentoGraficos.Provider>
+          </article>
+        ))}
       </div>
       <p id={posicaoId} role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {atual + 1} de {cartoes.length} · {cartoes[atual]?.nome}

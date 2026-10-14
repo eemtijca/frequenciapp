@@ -16,7 +16,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
         <div className="text-muted-foreground flex size-16 shrink-0 items-center justify-center rounded-full border">
           <CalendarOff aria-hidden="true" className="size-6" />
         </div>
-        <div className="flex min-w-0 flex-col gap-1 pr-12 lg:pr-0">
+        <div className="flex min-w-0 flex-col gap-1">
           <h2 className="font-medium">Feriado</h2>
           <span className="text-muted-foreground text-sm break-words">{feriado}</span>
           <span className="sr-only">Não há chamadas pendentes nesta data.</span>
