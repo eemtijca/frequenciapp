@@ -1,8 +1,10 @@
 "use client";
 
-// Monta uma visualização uma vez, quando próxima da tela; mantém o estado depois da visita.
+// Monta uma visualização uma vez, quando próxima da tela ou quando o carrossel pede o aquecimento;
+// mantém o estado depois da visita.
 import LimiteErroGrafico from "./limite-erro-grafico";
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { AquecimentoGraficos } from "./aquecimento-graficos";
+import { Suspense, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 export default function GraficoSobDemanda({
   children,
@@ -13,6 +15,19 @@ export default function GraficoSobDemanda({
 }) {
   const elemento = useRef<HTMLDivElement>(null);
   const [pronto, setPronto] = useState(false);
+  const aquecer = useContext(AquecimentoGraficos);
+  useEffect(() => {
+    if (!aquecer || pronto) return;
+    // Em tempo ocioso, para a montagem não competir com o gesto de rolagem; o limite de
+    // tempo evita que uma página sempre ocupada nunca aqueça o vizinho.
+    const montar = () => setPronto(true);
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(montar, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(montar, 200);
+    return () => window.clearTimeout(id);
+  }, [aquecer, pronto]);
   useEffect(() => {
     const alvo = elemento.current;
     if (pronto || !alvo) return;

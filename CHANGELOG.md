@@ -55,6 +55,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Painel, gráficos no celular: uma seta no canto superior direito do painel avança para o próximo gráfico e, no último, volta ao primeiro, sem criar seletor nem botões novos. Os gráficos vizinhos ao em exibição montam em tempo ocioso e a leitura da posição durante o deslize deixa de medir o layout e de criar temporizadores a cada evento, o que reduz os picos de quadro na troca de gráfico. Em medição com o processador 4 vezes mais lento (8 passadas frias de cada versão no Chromium), as tarefas longas caíram de 15 para 6 e o tempo de script, em mediana, cerca de 21%.
+
 - Relatórios, Por aluno: a lista se agrupa em séries e turmas recolhíveis, com a contagem de alunos e os totais do mês na turma, e os seletores de série e turma dão lugar aos botões Série e Turma, que recolhem ou expandem todos os grupos do nível. A busca mantém abertos os grupos com resultado. O novo botão Emitir relatório fica ao lado, por enquanto só com um aviso de que a geração do relatório em PDF virá em breve.
 
 - Horários: a edição passa para Gestão, Configurações, categoria Horários, e a aba Horários fica só para consulta, inclusive para a administração. Intervalo da manhã (09:00 às 09:20), almoço (11:50 às 13:00) e intervalo da tarde (14:40 às 14:55) aparecem como linhas na ordem do horário, na consulta diária, nos cartões por dia e na tabela da semana, no lugar do cartão separado do almoço.
