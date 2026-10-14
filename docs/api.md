@@ -601,31 +601,43 @@ Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na 
 - `POST /api/planilha/google/iniciar`: recebe `{ "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL", "reconectar"?: boolean, "mes"?: "YYYY-MM" }`, cria estado assinado e URL de autorização para a administração. Retorna `{ "url": string }` e define cookie de curta duração. Reconexão exige arquivo e autorização anteriores; o estado assinado vincula a configuração atual e o mês opcional.
 - `GET /api/planilha/google/retorno`: recebe o código OAuth, confere estado e sessão, guarda o token de atualização cifrado e redireciona ao aplicativo. Na reconexão, confirma acesso ao mesmo arquivo e recusa conexão alterada durante o OAuth; atualiza apenas a credencial, preservando mapa e preferências. Retorna `google=reconectado` ou `google=erro_reconexao`, com `googleFinalidade` e o `googleMes` assinado quando informado. Nenhuma escrita na planilha é disparada pelo retorno.
 - `GET /api/planilha/google/acesso?finalidade=FREQUENCIA|SAIDAS|PARCIAL`: entrega ao administrador um token de acesso breve e a configuração pública do Google Picker; nunca entrega o token de atualização. A conta já conectada à frequência pode selecionar os arquivos de saídas e chamadas parciais.
-- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API e guarda a planilha da finalidade. Trocar de arquivo desliga essa integração e invalida o mapa anterior; selecionar o mesmo arquivo preserva a estrutura. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
+- `POST /api/planilha/google/selecionar`: recebe `{ "id": string, "finalidade": "FREQUENCIA" | "SAIDAS" | "PARCIAL" }`, confere acesso pela Sheets API e guarda a planilha da finalidade. Trocar de arquivo desliga a integração e `envioAutomatico`, invalida o mapa anterior e redefine o modo para conservador com `modoCompletoAte: null`; selecionar o mesmo arquivo preserva a estrutura e as opções. A finalidade `PARCIAL` exige arquivo distinto dos arquivos das outras duas finalidades; a mesma restrição vale ao trocar o arquivo de frequência ou saídas.
 
 Erros externos de autorização usam `{ "error": string, "codigo": string }`: `GOOGLE_RECONECTAR` (409), `GOOGLE_CONFIGURACAO` (503) ou `GOOGLE_TEMPORARIO` (502/503). A leitura de planilhas também identifica `GOOGLE_ACESSO` (403) e classifica como `GOOGLE_TEMPORARIO` o limite de leituras (429 do Google, respondido como 503), as falhas 5xx e a falta de resposta do Google (502). Assim o preparo mensal interrompe o lote uma vez, mantém as turmas restantes como não preparadas e oferece "Tentar pendentes". Respostas de leitura que antes saíam como 429 ou sem código passam a sair com esse código. O status 401 permanece reservado à sessão do aplicativo.
 
 ### GET /api/planilha/estado
 
-- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. `alteradasDepois` conta chamadas ainda pendentes, considerando confirmação por dia e por origem. Qualquer sessão.
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. `alteradasDepois` conta chamadas ainda pendentes, considerando confirmação por dia, origem e destino atual. Qualquer sessão.
 
 ### GET /api/planilha e PATCH /api/planilha
 
-Leitura e edição da configuração: `{ ativa?, envioAutomatico? }`. `envioAutomatico` liga o envio da chamada à planilha logo depois de salva (ADR-025); começa desligado. Apenas administração. A resposta informa a conexão Google e o arquivo selecionado, sem credenciais. Ativar exige conta Google e arquivo selecionados. Campos antigos como `endpoint` são recusados.
+Leitura e edição da configuração: `{ ativa?, envioAutomatico? }`. `envioAutomatico` liga o envio da chamada à planilha logo depois de salva (ADR-025); começa desligado. Apenas administração. A resposta informa a conexão Google e o arquivo selecionado, sem credenciais. Ativar exige conta Google e arquivo selecionados. Habilitar a automação da frequência, ou reativar uma integração que a mantinha ligada, exige integração ativa, modo conservador e mapa salvo não vazio com vínculos válidos e únicos por turma e período. Condição não atendida ou conexão alterada durante a operação responde 409. Desligar a integração ou a automação continua permitido. Campos antigos como `endpoint` são recusados.
 
-- 200 `{"integracao": {...}}`; 400 configuração inválida ou conexão Google incompleta; 403 sem papel de administração.
+- 200 `{"integracao": {...}}`; 400 configuração inválida ou conexão Google incompleta; 403 sem papel de administração; 409 para configuração incompatível com automação ou conexão alterada.
 
 ### POST /api/planilha/estrutura
 
-Lê o esquema de todas as abas e sugere o mapa por turma de origem.
+Corpo opcional e estrito: `{ "mes"?: "YYYY-MM" }`; corpo ausente também é aceito. Lê o esquema de todas as abas e sugere o mapa por turma de origem. Com mês informado, relê os cabeçalhos das abas desse mês e das abas legadas; os demais meses podem reutilizar a estrutura salva quando a identidade corresponde. Sem mês, mantém essa reutilização para as abas mensais. Um mês inválido responde 400. Retorna `conferenciaHash`, assinatura de 64 caracteres hexadecimais minúsculos que vincula arquivo, credencial, revisão da configuração e estrutura lida. A assinatura não expõe credenciais e não tem prazo fixo; mudanças nesses dados a invalidam.
 
-- 200 `{ "planilha", "abas", "sugestoes", "problemas" }`. Apenas administração.
+- 200 `{ "planilha", "abas", "sugestoes", "problemas", "conferenciaHash" }`. Apenas administração.
 
 ### POST /api/planilha/mapa
 
-Corpo: `{ "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOriginalId", "mes"?, "destino"?}] }`. Salva o esquema e a assinatura.
+Corpo: `{ "conferenciaHash": string, "planilha": {...}, "abas": AbaEsquema[], "mapa": [{"aba", "turmaOriginalId", "mes"?, "destino"?}] }`. Reenviar `planilha` e `abas` exatamente como retornados por `/estrutura`; somente o `mapa` é editável. Salva o esquema e a assinatura após conferir o hash, também dentro da transação. Alteração de arquivo, credencial, opções, revisão ou estrutura salva exige nova leitura. Preparar um mês depois da leitura também invalida a conferência anterior.
 
-- 200 `{"integracao": {...}}`; 400 ou 404 para aba ou turma inválida.
+- 200 `{"integracao": {...}}`; 400 para hash ausente, formato inválido ou aba inválida; 404 para turma inexistente; 409 para conteúdo adulterado ou conferência desatualizada.
+
+### GET /api/planilha/diagnostico
+
+Apenas administração. Query obrigatória `mes=YYYY-MM`, com mês válido. Retorna `{ "diagnostico": DiagnosticoPlanilha }`. A consulta só lê o Google, funciona com a integração pausada e não altera configuração, mapa, abas ou envios.
+
+`DiagnosticoPlanilha` contém `mes`, `conferidoEm`, `conexao: { conectada, verificada, erro }`, `ativa`, `modo`, `envioAutomatico`, `estruturaPronta`, `resumo: { total, prontas, semAba, revisar }`, `turmas`, `alteradasDepois` e `ultimoErro`. Cada turma contém `{ id, rotulo, tipo, aba, situacao, mensagem }`, com `tipo` mensal, legado ou ausente e `situacao` pronta, sem_aba, estrutura_alterada, bloqueada ou indisponivel.
+
+A conferência valida existência da aba, cabeçalho, mesclagens, vínculo e identificação mensal. Limita a leitura a cabeçalhos nas primeiras 12 linhas e até 400 colunas. Turmas que já usam abas mensais não voltam ao legado quando falta o mês escolhido. `estruturaPronta` requer acesso verificado, ao menos uma turma e todas as estruturas conferidas; não comprova gravação de marcas nem resolve nomes ou frequências divergentes. A prévia do envio continua responsável por conferir alunos e células. `alteradasDepois` e `ultimoErro` refletem as pendências da integração, sem recorte pelo mês consultado.
+
+Falhas conhecidas de acesso ao Google ou de leitura de uma aba são apresentadas em `conexao.erro` e nas situações por turma, sem transformar estrutura não lida em pronta. Alteração de arquivo, credencial ou esquema durante a consulta responde 409.
+
+- 200 com diagnóstico; 400 para mês ausente ou inválido; 401 sem sessão; 403 sem administração; 409 para configuração alterada durante a leitura.
 
 ### POST /api/planilha/mensal
 
@@ -659,6 +671,8 @@ Resposta perdida exige conferir a planilha e atualizar a estrutura, sem repetiç
 ### POST /api/planilha/simular
 
 Corpo: `{ "turmaOriginalId"?, "todas"?: boolean, "de", "ate", "somenteAlteradas"?: boolean, "permitirInserirColunas"?, "permitirNovosAlunos"?, "substituirDivergencias"?, "limparCelulas"?, "removerLinhas"?, "removerColunas"? }`. Período de até 92 dias. Com `todas`, monta um plano por destino mapeado. Abas mensais recebem segunda a sexta e sábados com chamada salva daquela origem no mês e retornam `mes` e `aba`; um intervalo entre meses gera vários planos para a mesma turma. O hash inclui a aba e sua identidade. `somenteAlteradas` (padrão verdadeiro) limita cada turma aos dias sem `SUCESSO` que cubra a data e sua atualização, sem células puladas; falso usa o período inteiro, incluindo nas abas mensais somente dias úteis e sábados com chamada salva. Devolve a prévia, o `planoHashGeral` e, por turma, `dias`, `semEnvio` (nada a enviar), `planoHashTurma` (o hash do envio só daquela turma) e `bloqueado` quando a estrutura impede a escrita.
+
+Abas legadas usam destino derivado de arquivo e `abaId`, o identificador estável do Google, também presente no esquema quando disponível. O catálogo é relido antes de calcular dias incrementais. Se o `abaId` salvo já existe e difere do Google, a prévia e o envio respondem 409 até conferir a estrutura e salvar o mapa novamente; uma aba recriada com o mesmo nome é outro destino. Somente estruturas antigas sem `abaId` recebem essa identificação automaticamente. Renomear e mapear novamente a mesma aba conserva sua identidade e as confirmações anteriores. Sucessos antigos sem destino permanecem no histórico, mas não confirmam o arquivo atual; a primeira prévia após a atualização pode exigir nova conferência conservadora. Resultados parciais antigos sem destino bloqueiam automação até conferência manual posterior.
 
 - 200 com planos e resumos; 400 sem estrutura ou período inválido; 429 prévias em excesso; 502 sem resposta da planilha.
 

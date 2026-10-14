@@ -11,6 +11,7 @@ import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
 import { renovarAcesso } from "@/infra/google-oauth";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
+import { mesValido } from "@/domain/planilha-mensal";
 
 /** Arquivos separados de frequência, movimentação e chamada parcial. */
 export type FinalidadeIntegracao = "FREQUENCIA" | "SAIDAS" | "PARCIAL";
@@ -114,6 +115,43 @@ export const esquemaConfiguracao = z
     message: "Nada a atualizar.",
   });
 
+const esquemaParaAutomacao = z.object({
+  abas: z.array(z.object({ nome: z.string().min(1) })).min(1),
+  mapa: z
+    .array(
+      z.object({
+        aba: z.string().min(1),
+        turmaOriginalId: z.string().uuid(),
+        mes: z.string().refine(mesValido).optional(),
+        destino: z.string().min(1).optional(),
+      }),
+    )
+    .min(1),
+});
+
+function conferirEstruturaParaAutomacao(esquema: unknown): void {
+  const leitura = esquemaParaAutomacao.safeParse(esquema);
+  if (!leitura.success) {
+    throw new ErroHttp("Confira e salve a estrutura antes de ligar o envio automático.", 409);
+  }
+  const nomes = new Set(leitura.data.abas.map((aba) => aba.nome));
+  const periodos = new Set<string>();
+  const mapeadas = new Set<string>();
+  for (const item of leitura.data.mapa) {
+    const periodo = `${item.turmaOriginalId}:${item.mes ?? "legado"}`;
+    if (
+      !nomes.has(item.aba) ||
+      (item.mes && !item.destino) ||
+      periodos.has(periodo) ||
+      mapeadas.has(item.aba)
+    ) {
+      throw new ErroHttp("Revise os vínculos das turmas antes de ligar o envio automático.", 409);
+    }
+    periodos.add(periodo);
+    mapeadas.add(item.aba);
+  }
+}
+
 /** Salva as preferências da planilha conectada pela conta Google. */
 export async function salvarConfiguracao(
   admin: { id: string },
@@ -125,14 +163,35 @@ export async function salvarConfiguracao(
     throw new ErroHttp("Configuração inválida. Use a conexão Google na Gestão.", 400);
   }
   const linha = await lerLinha(finalidade);
-  if (
-    (dados.data.ativa || dados.data.envioAutomatico) &&
-    (!linha.googleRefreshToken || !linha.googlePlanilhaId)
-  ) {
-    throw new ErroHttp("Conecte a conta Google e escolha a planilha antes de ativar.", 400);
-  }
   const id = idDaIntegracao(finalidade);
   await comTransacao(async (tx) => {
+    const atual = await tx.integracaoPlanilha.findUnique({ where: { id } });
+    if (!atual)
+      throw new ErroHttp("A configuração mudou. Atualize a página e tente novamente.", 409);
+    if (dados.data.ativa || dados.data.envioAutomatico) {
+      if (!atual.googleRefreshToken || !atual.googlePlanilhaId) {
+        throw new ErroHttp("Conecte a conta Google e escolha a planilha antes de ativar.", 400);
+      }
+      if (
+        atual.googlePlanilhaId !== linha.googlePlanilhaId ||
+        atual.googleRefreshToken !== linha.googleRefreshToken
+      ) {
+        throw new ErroHttp("A conexão mudou. Confira a planilha antes de ativar.", 409);
+      }
+    }
+    if (
+      finalidade === "FREQUENCIA" &&
+      (dados.data.envioAutomatico === true ||
+        (dados.data.ativa === true && (dados.data.envioAutomatico ?? atual.envioAutomatico)))
+    ) {
+      if (!(dados.data.ativa ?? atual.ativa)) {
+        throw new ErroHttp("Ative a integração antes de ligar o envio automático.", 409);
+      }
+      if (modoCompletoAtivo(atual)) {
+        throw new ErroHttp("Encerre o modo completo antes de ligar o envio automático.", 409);
+      }
+      conferirEstruturaParaAutomacao(atual.esquema);
+    }
     await tx.integracaoPlanilha.update({
       where: { id },
       data: { ...dados.data, atualizadoPorId: admin.id },

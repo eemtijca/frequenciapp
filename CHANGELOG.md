@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Configuração assistida da planilha de frequência, com diagnóstico mensal somente de leitura, acesso à conexão, revisão das turmas e do mês e situação da sincronização. A conferência distingue estrutura pronta de frequências efetivamente enviadas e mantém a prévia antes de gravar.
+
 - Presenças parciais (S) visíveis no Painel, no Resumo dos Relatórios e no resumo do período personalizado, com coluna própria na tabela diária; nenhum dia volta a zerar em silêncio.
 
 - FrequenciBI em `/bi`: painel curado, explorador com dez visualizações, painéis personalizáveis por toque e teclado, comparações, metas, notas, destaques locais e dicionário. Chave independente da sessão; preferências locais e retratos offline identificados, com importação e exportação de configurações sem segredo, CSV e PNG confirmados e limpeza por chave.
@@ -106,6 +108,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Conferência do mapa de frequência vinculada ao arquivo, credencial, revisão e estrutura lida, impedindo salvar leituras antigas ou adulteradas. Trocar de arquivo desliga a automação e encerra o modo completo; habilitar o envio automático exige configuração válida.
+- Confirmações de frequência em abas antigas passam a identificar arquivo e aba estável. Trocar de planilha ou recriar uma aba com o mesmo nome mantém os dias pendentes no destino novo; sucessos antigos sem identificação exigem nova conferência conservadora, preservando o histórico.
 
 - Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
 

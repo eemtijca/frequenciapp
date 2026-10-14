@@ -19,7 +19,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 5. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_PICKER_API_KEY` e `GOOGLE_PROJECT_NUMBER` no servidor. O número do projeto é usado pelo Picker para dar acesso apenas aos arquivos escolhidos. Não coloque o segredo OAuth no navegador nem no repositório.
 6. Como administrador, abra Gestão, Configurações, Planilha de frequência. Use Conectar conta Google, autorize a conta e escolha uma planilha no seletor. Ative a integração, confira as abas, salve o mapa e faça uma prévia antes do primeiro envio. Na Planilha de saídas, escolha a planilha da mesma conta ou conecte outra conta, ative e confira a aba do registro.
 
-O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. As três finalidades mantêm seleção e estrutura próprias. A conta da frequência pode ser usada para selecionar os arquivos de saídas e chamada parcial sem uma segunda autorização.
+O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. A troca desliga a integração e o envio automático, encerra o modo completo e invalida a estrutura anterior. Selecionar o mesmo arquivo preserva essas opções; a reativação do arquivo novo é explícita. As três finalidades mantêm seleção e estrutura próprias. A conta da frequência pode ser usada para selecionar os arquivos de saídas e chamada parcial sem uma segunda autorização.
 
 Para renovar uma autorização vencida, usar **Reconectar conta Google** e autorizar a conta que tem acesso à planilha existente. A reconexão confere esse acesso antes de atualizar o token e preserva arquivo, mapa, integração ativa e envio automático. Cancelamento, falha ou alteração da conexão durante a autorização mantêm a configuração anterior. **Trocar conta Google** continua exigindo escolher o arquivo e conferir o mapa; escolher novamente o mesmo arquivo no Picker preserva sua estrutura.
 
@@ -28,6 +28,20 @@ Falhas do Google não encerram a sessão do aplicativo. Autorização expirada o
 O envio pela Sheets API relê valores exibidos, fórmulas, marcadores e assinatura do cabeçalho imediatamente antes do lote. Operações destrutivas e mudanças de desistência no nome não criam abas de backup. A API aplica cada lote de requisições em sequência; se a conexão cair depois do envio, o aplicativo registra resultado parcial e pede conferência manual antes de repetir.
 
 Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `spreadsheets.developerMetadata.search` e também reconhece os campos `developerMetadata` da planilha, da aba e das dimensões em `sheets.data`. A busca por chave evita tratar como ausente um código de aluno que o GET da estrutura omitiu. Se a busca falhar, a prévia para em vez de propor novamente todos os vínculos.
+
+## Configuração assistida
+
+Em Gestão, Configurações, Planilha de frequência, **Configuração assistida** permite escolher o mês e usar **Conferir configuração**. A consulta funciona também com a integração pausada e apenas lê a planilha. O resultado reúne três etapas:
+
+1. **Arquivo e conexão**: confirma o acesso ao arquivo escolhido e oferece acesso à conexão quando houver pendência.
+2. **Turmas e mês**: mostra a aba de cada turma e diferencia estrutura conferida, aba ausente, cabeçalho alterado, vínculo bloqueado e leitura indisponível. Uma turma que já usa abas mensais precisa ter o mês escolhido preparado; a conferência não recorre à aba antiga sem mês.
+3. **Sincronização**: informa automação ligada ou pausada, chamadas sem envio confirmado no arquivo e o último erro ainda pendente. Os botões levam às etapas existentes de conexão, estrutura e envio, mantendo o mês escolhido.
+
+**Estrutura conferida** confirma cabeçalho, vínculo da turma e identificação do mês. Não confirma que as frequências foram enviadas nem resolve homônimos, divergências entre marcas ou conteúdo manual. A **Prévia do envio** continua obrigatória para conferir os alunos e as células antes da escrita manual. Trocar o mês ou fechar a consulta descarta o resultado apresentado; uma configuração alterada durante a leitura exige nova conferência.
+
+Para a primeira configuração ou a troca de arquivo: conferir conexão, preparar as abas do mês ou salvar o mapa, revisar a prévia no modo conservador e confirmar o envio. Depois dessa conferência, a automação pode ser ligada explicitamente. O aplicativo exige integração ativa, conexão, mapa válido e modo conservador para habilitar o envio automático. Pausar a integração ou desligar a automação permanece disponível mesmo quando há pendências.
+
+O diagnóstico não prepara abas, não habilita envios, não apaga conteúdo e não cria cópias de backup. Mantém a política da [ADR-032](adr/032-planilhas-sem-backups-internos.md).
 
 ## Frequência por turma e mês
 
@@ -99,7 +113,11 @@ A leitura devolve o esquema de cada aba: linha de cabeçalho, coluna de aluno, c
 
 - sugere o mapa de cada aba para uma turma de origem pelo nome;
 - lista divergências: nomes repetidos, alunos da planilha que não estão no app, alunos do app sem linha e datas ambíguas;
-- guarda o mapa e uma assinatura do esquema.
+- guarda o mapa e uma assinatura do esquema. A leitura também retorna uma conferência assinada do arquivo, credencial, revisão da configuração e estrutura lida.
+
+**Conferir estrutura** usa o mês selecionado para reler os cabeçalhos das suas abas mensais e das abas antigas sem mês. Os demais meses podem reutilizar a estrutura salva quando a identidade corresponde. Assim, um cabeçalho alterado apontado pelo diagnóstico pode ser conferido e salvo novamente sem reaproveitar a leitura antiga daquele mês.
+
+Ao salvar o mapa, somente os vínculos escolhidos podem ser alterados; a planilha, as abas e a assinatura devem corresponder à leitura. Trocar arquivo ou credencial, mudar opções, preparar outro mês ou salvar uma estrutura concorrente invalida a conferência anterior. O servidor recusa a gravação e pede nova leitura, preservando a configuração mais recente.
 
 Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome da aba ou as mesclagens mudarem, o envio para e pede nova conferência. O cartão guia conexão, estrutura e envio em etapas: conferir a estrutura só libera com a integração ligada e conectada, e salvar só libera depois da leitura.
 
@@ -107,7 +125,9 @@ Antes de cada envio a assinatura é conferida de novo. Se o cabeçalho, o nome d
 
 O envio é manual, com prévia obrigatória, exceto o envio ao salvar a chamada, descrito abaixo. Sem conexão, o botão de envio fica bloqueado com aviso. Na Grade, o botão envia a turma de origem; no card da Gestão, "Enviar todas as turmas" envia todas as turmas mapeadas, com a mesma prévia e as mesmas regras.
 
-**O que vai por padrão.** Só os dias com chamada ainda sem envio confirmado em cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. A confirmação precisa cobrir o próprio dia, ter referência posterior à atualização da chamada e não ter células puladas. O sucesso de outro dia, mês ou turma não elimina essa pendência. Pela Sheets API, uma situação de desistência alterada também inclui o último dia do período para atualizar o nome. Sem envio anterior, valem os dias com chamada do período escolhido e as situações pendentes. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio e sinaliza a desistência no nome.
+**O que vai por padrão.** Só os dias com chamada ainda sem envio confirmado em cada turma original, em qualquer turma atual que tenha aluno dela na lista da chamada. A confirmação precisa cobrir o próprio dia, ter referência posterior à atualização da chamada e não ter células puladas. O sucesso de outro dia, mês, turma, arquivo ou aba não elimina essa pendência. Pela Sheets API, uma situação de desistência alterada também inclui o último dia do período para atualizar o nome. Sem envio anterior, valem os dias com chamada do período escolhido e as situações pendentes. Sem nada alterado, a prévia avisa que não há o que enviar. "O período inteiro" continua disponível no mesmo diálogo, para conferência ou recuperação; no modo conservador ele só preenche o que está vazio e sinaliza a desistência no nome.
+
+**Destino confirmado.** Nas abas antigas sem mês, a identidade do envio combina o arquivo e o identificador estável da aba no Google. Excluir e recriar uma aba com o mesmo nome cria outro destino e exige **Conferir estrutura** e salvar novamente o mapa antes de gerar a prévia ou enviar. Somente esquemas antigos ainda sem identificador recebem essa identificação automaticamente. Renomear e mapear novamente a mesma aba mantém a identidade e as confirmações anteriores. Sucessos anteriores sem essa identificação permanecem no histórico, mas não comprovam envio ao destino atual; a primeira prévia após a atualização pode reapresentar dias para uma nova conferência conservadora. Ela reconhece marcas iguais, preenche vazios e mantém divergências protegidas. Um resultado parcial antigo sem destino também exige conferência manual antes da retomada automática.
 
 **Uma turma por requisição.** A prévia monta o plano de cada turma; o envio faz uma requisição por turma, em sequência, e mostra o andamento de cada uma. A falha de uma turma não impede as seguintes. A leitura da aba se limita às colunas que o plano usa: aluno, turma atual, total e os dias do período que já têm coluna.
 

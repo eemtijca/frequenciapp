@@ -39,6 +39,7 @@ async function limparMassa() {
        esquema = null,
        assinatura_esquema = null,
        esquema_em = null,
+       envio_automatico = false,
        modo = 'CONSERVADOR',
        modo_completo_ate = null,
        atualizado_em = now()`,
@@ -192,6 +193,18 @@ describe("integração com a planilha", () => {
     ).toBe(400);
   });
 
+  it("exige estrutura salva antes de habilitar o envio automático", async () => {
+    const resposta = await autenticado("/api/planilha", {
+      method: "PATCH",
+      body: JSON.stringify({ envioAutomatico: true }),
+    });
+    expect(resposta.status).toBe(409);
+    const estado = await json<{ integracao: { envioAutomatico: boolean } }>(
+      await autenticado("/api/planilha"),
+    );
+    expect(estado.integracao.envioAutomatico).toBe(false);
+  });
+
   it("confere a apresentação sem escrever e aplica só após a confirmação", async () => {
     const corpo = { aba: "QP Ano A" };
     const chamadas = google?.chamadas().filter((acao) => acao === "gravar").length ?? 0;
@@ -231,6 +244,7 @@ describe("integração com a planilha", () => {
     });
     expect(estrutura.status).toBe(200);
     const dados = await json<{
+      conferenciaHash: string;
       planilha: { nome: string; url: string; fuso: string };
       abas: unknown[];
       sugestoes: { aba: string; turmaOriginalId: string | null }[];
@@ -242,6 +256,7 @@ describe("integração com a planilha", () => {
     const repetido = await autenticado("/api/planilha/mapa", {
       method: "POST",
       body: JSON.stringify({
+        conferenciaHash: dados.conferenciaHash,
         planilha: dados.planilha,
         abas: dados.abas,
         mapa: [
@@ -255,12 +270,122 @@ describe("integração com a planilha", () => {
     const salvo = await autenticado("/api/planilha/mapa", {
       method: "POST",
       body: JSON.stringify({
+        conferenciaHash: dados.conferenciaHash,
         planilha: dados.planilha,
         abas: dados.abas,
         mapa: [{ aba: "QP Ano A", turmaOriginalId: turmaAId }],
       }),
     });
     expect(salvo.status).toBe(200);
+  });
+
+  it("exige conferência íntegra e recusa duas gravações da mesma revisão", async () => {
+    const estrutura = await json<{
+      conferenciaHash: string;
+      planilha: { nome: string; url: string; fuso: string };
+      abas: unknown[];
+    }>(await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }));
+    const mapa = [{ aba: "QP Ano A", turmaOriginalId: turmaAId }];
+    const enviar = (corpo: unknown) =>
+      autenticado("/api/planilha/mapa", { method: "POST", body: JSON.stringify(corpo) });
+    expect(
+      (await enviar({ planilha: estrutura.planilha, abas: estrutura.abas, mapa })).status,
+    ).toBe(400);
+    expect((await enviar({ ...estrutura, conferenciaHash: "0".repeat(64), mapa })).status).toBe(
+      409,
+    );
+    expect(
+      (
+        await enviar({
+          ...estrutura,
+          planilha: { ...estrutura.planilha, nome: "Conferência alterada" },
+          mapa,
+        })
+      ).status,
+    ).toBe(409);
+    expect(
+      (await enviar({ ...estrutura, abas: [...estrutura.abas, { nome: "QP Injetada" }], mapa }))
+        .status,
+    ).toBe(409);
+    const respostas = await Promise.all([
+      enviar({ ...estrutura, mapa }),
+      enviar({ ...estrutura, mapa }),
+    ]);
+    expect(respostas.map((resposta) => resposta.status).sort()).toEqual([200, 409]);
+    const atual = await json<{ integracao: { esquema: { mapa: unknown[] } } }>(
+      await autenticado("/api/planilha"),
+    );
+    expect(atual.integracao.esquema.mapa).toEqual(mapa);
+  });
+
+  it("recusa uma conferência anterior à reconexão sem alterar o mapa salvo", async () => {
+    if (!google || !banco) throw new Error("Google sintético indisponível.");
+    const estrutura = await json<Record<string, unknown>>(
+      await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }),
+    );
+    const mapa = [{ aba: "QP Ano A", turmaOriginalId: turmaAId }];
+    await google.conectar(banco);
+    const resposta = await autenticado("/api/planilha/mapa", {
+      method: "POST",
+      body: JSON.stringify({ ...estrutura, mapa }),
+    });
+    expect(resposta.status).toBe(409);
+    const estado = await json<{ integracao: { esquema: { mapa: unknown[] } } }>(
+      await autenticado("/api/planilha"),
+    );
+    expect(estado.integracao.esquema.mapa).toEqual(mapa);
+  });
+
+  it("recusa a conferência de outro arquivo e exige nova leitura após a troca", async () => {
+    const estrutura = await json<Record<string, unknown>>(
+      await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }),
+    );
+    const mapa = [{ aba: "QP Ano A", turmaOriginalId: turmaAId }];
+    const trocar = (id: string) =>
+      autenticado("/api/planilha/google/selecionar", {
+        method: "POST",
+        body: JSON.stringify({ id }),
+      });
+    const ativar = () =>
+      autenticado("/api/planilha", { method: "PATCH", body: JSON.stringify({ ativa: true }) });
+    expect((await trocar("planilha-sintetica-nova")).status).toBe(200);
+    expect((await ativar()).status).toBe(200);
+    expect(
+      (
+        await autenticado("/api/planilha/mapa", {
+          method: "POST",
+          body: JSON.stringify({ ...estrutura, mapa }),
+        })
+      ).status,
+    ).toBe(409);
+    const estado = await json<{ integracao: { esquema: unknown } }>(
+      await autenticado("/api/planilha"),
+    );
+    expect(estado.integracao.esquema).toBeNull();
+    expect((await trocar("planilha-sintetica")).status).toBe(200);
+    expect((await ativar()).status).toBe(200);
+    const conferida = await json<Record<string, unknown>>(
+      await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }),
+    );
+    expect(
+      (
+        await autenticado("/api/planilha/mapa", {
+          method: "POST",
+          body: JSON.stringify({ ...conferida, mapa }),
+        })
+      ).status,
+    ).toBe(200);
+  });
+
+  it("permite pausar a automação e exige integração ativa para retomá-la", async () => {
+    const configurar = (corpo: unknown) =>
+      autenticado("/api/planilha", { method: "PATCH", body: JSON.stringify(corpo) });
+    expect((await configurar({ envioAutomatico: true })).status).toBe(200);
+    expect((await configurar({ ativa: false })).status).toBe(200);
+    expect((await configurar({ envioAutomatico: true })).status).toBe(409);
+    expect((await configurar({ envioAutomatico: false })).status).toBe(200);
+    expect((await configurar({ ativa: true, envioAutomatico: true })).status).toBe(200);
+    expect((await configurar({ envioAutomatico: false })).status).toBe(200);
   });
 
   it("corrige a aba mapeada sem criar backup, conserva fórmulas e relê o esquema sem perder o mapa", async () => {
@@ -392,9 +517,12 @@ describe("integração com a planilha", () => {
       integracao: { esquema: { planilha: unknown; abas: unknown[]; mapa: unknown[] } };
     }>(await autenticado("/api/planilha"));
     expect(estado.integracao.esquema.mapa).toEqual(mapa);
+    const conferida = await json<Record<string, unknown>>(
+      await autenticado("/api/planilha/estrutura", { method: "POST", body: "{}" }),
+    );
     const restaurado = await autenticado("/api/planilha/mapa", {
       method: "POST",
-      body: JSON.stringify({ ...estado.integracao.esquema, mapa: [mapa[0]] }),
+      body: JSON.stringify({ ...conferida, mapa: [mapa[0]] }),
     });
     expect(restaurado.status).toBe(200);
     expect((await autenticado(`/api/turmas/${criada.turma.id}`, { method: "DELETE" })).status).toBe(
@@ -586,6 +714,30 @@ describe("integração com a planilha", () => {
       await autenticado("/api/planilha/estado"),
     );
     expect(estado.estado.modo).toBe("completo");
+  });
+
+  it("permite desligar a automação no modo completo e impede habilitá-la", async () => {
+    const configurar = (envioAutomatico: boolean) =>
+      autenticado("/api/planilha", {
+        method: "PATCH",
+        body: JSON.stringify({ envioAutomatico }),
+      });
+    expect((await configurar(true)).status).toBe(409);
+    expect((await configurar(false)).status).toBe(200);
+    if (!banco) throw new Error("Banco de teste indisponível.");
+    await banco.query(
+      "update integracoes_planilha set ativa = false, envio_automatico = true where id = 'principal'",
+    );
+    const manual = await autenticado("/api/planilha", {
+      method: "PATCH",
+      body: JSON.stringify({ ativa: true, envioAutomatico: false }),
+    });
+    expect(manual.status).toBe(200);
+    expect((await json<{ integracao: unknown }>(manual)).integracao).toMatchObject({
+      ativa: true,
+      envioAutomatico: false,
+      modo: "completo",
+    });
   });
 
   it("substitui divergência no modo completo sem criar cópia", async () => {

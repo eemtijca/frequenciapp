@@ -1,5 +1,6 @@
 // Google Planilhas: casos de uso da integração da frequência. Leitura do
 // esquema, planejamento conservador, envio manual e modo completo.
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { banco, objetoDoBanco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
@@ -74,6 +75,9 @@ export interface EstadoPlanilha {
 }
 
 const esquemaMapa = z.object({
+  conferenciaHash: z
+    .string("Confira a estrutura antes de salvar o mapa.")
+    .regex(/^[a-f0-9]{64}$/, "Confira a estrutura antes de salvar o mapa."),
   planilha: z.object({
     nome: z.string().max(200),
     url: z.string().max(500),
@@ -337,7 +341,8 @@ export async function salvarIntegracao(admin: { id: string }, entrada: unknown) 
 }
 
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
-export async function lerEstrutura() {
+export async function lerEstrutura(mes?: string) {
+  if (mes !== undefined && !mesValido(mes)) throw new ErroHttp("Mês inválido.", 400);
   return comPausasDeLeituraGoogle(async () => {
     const linha = await lerLinha(FINALIDADE);
     const salvo = esquemaSalvo(linha);
@@ -350,13 +355,14 @@ export async function lerEstrutura() {
     const problemas: { aba: string; erro: string }[] = [];
     for (const item of estrutura.abas) {
       try {
-        // O envio relê a assinatura e as células. O catálogo evita reler todo
-        // o histórico mensal apenas para conferir os vínculos na Gestão.
-        const anterior = item.mensal
-          ? salvo?.abas.find(
-              (aba) => aba.nome === item.nome && aba.mensal?.destino === item.mensal?.destino,
-            )
-          : undefined;
+        // Relê o mês em revisão; os demais meses aproveitam a conferência salva
+        // para não consultar todo o histórico ao corrigir uma única estrutura.
+        const anterior =
+          item.mensal && item.mensal.mes !== mes
+            ? salvo?.abas.find(
+                (aba) => aba.nome === item.nome && aba.mensal?.destino === item.mensal?.destino,
+              )
+            : undefined;
         const aba = anterior ?? (await detectarAba(linha, item.nome));
         abas.push({ ...aba, ...(item.mensal ? { mensal: item.mensal } : {}) });
       } catch (erro) {
@@ -372,8 +378,50 @@ export async function lerEstrutura() {
         ? { ...aba.mensal, confianca: "alta" as const }
         : sugerirTurma(aba.nome, turmas)),
     }));
-    return { planilha: estrutura.planilha, abas, sugestoes, problemas };
+    return {
+      planilha: estrutura.planilha,
+      abas,
+      sugestoes,
+      problemas,
+      conferenciaHash: assinarConferencia(linha, estrutura.planilha, abas),
+    };
   });
+}
+
+/** A conferência pertence ao arquivo, à conexão e à versão que foram lidos. */
+function assinarConferencia(
+  linha: LinhaIntegracao,
+  planilha: EsquemaSalvo["planilha"],
+  abas: unknown[],
+): string {
+  return createHmac("sha256", ambiente.authSecret)
+    .update(
+      JSON.stringify([
+        "conferencia-frequencia-v1",
+        linha.googlePlanilhaId,
+        linha.googleRefreshToken,
+        linha.atualizadoEm.toISOString(),
+        linha.esquemaEm?.toISOString() ?? null,
+        linha.assinaturaEsquema,
+        linha.esquema,
+        [planilha.nome, planilha.url, planilha.fuso],
+        abas,
+      ]),
+    )
+    .digest("hex");
+}
+
+function conferirAssinaturaDaEstrutura(
+  linha: LinhaIntegracao,
+  dados: z.infer<typeof esquemaMapa>,
+): void {
+  const esperado = assinarConferencia(linha, dados.planilha, dados.abas);
+  if (!timingSafeEqual(Buffer.from(dados.conferenciaHash, "hex"), Buffer.from(esperado, "hex"))) {
+    throw new ErroHttp(
+      "A configuração ou a estrutura mudou. Confira a estrutura novamente antes de salvar.",
+      409,
+    );
+  }
 }
 
 /** Sugere a turma de origem pelo nome da aba, com confiança. */
@@ -407,6 +455,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
   }
   const turmas = await listarTodasTurmas();
   const linha = await lerLinha(FINALIDADE);
+  conferirAssinaturaDaEstrutura(linha, dados.data);
   const mensais = await chamarIntegracao<{ abas: MapaAba[] }>(linha, { acao: "abasMensais" });
   const mapa: MapaAba[] = [];
   const destinos = new Set<string>();
@@ -465,6 +514,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
     if (!atual || atual.googlePlanilhaId !== linha.googlePlanilhaId) {
       throw new ErroHttp("A conexão mudou. Confira a estrutura novamente.", 409);
     }
+    conferirAssinaturaDaEstrutura(atual, dados.data);
     const vigente = esquemaSalvo(atual);
     const mapaFinal = [...mapa];
     const abasFinais = [...abas];
