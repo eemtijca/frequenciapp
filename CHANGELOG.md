@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Organização das abas sem mês mostra aluno, data e células das pendências, permite conferir homônimos, incluir linhas de alunos históricos e escolher marcas divergentes com nova prévia e senha administrativa. Códigos estáveis reconhecem nomes corrigidos; destinos únicos sem código também são aceitos, sem associar códigos diferentes.
+
 - Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
 
 - Histórico mensal da planilha permanece acessível, inclusive setembro e anos anteriores. A Gestão oferece links diretos por mês e turma e transfere as marcas das abas sem mês para os destinos preparados antes de retirá-las, com prévia, conferência de conteúdo e proteção contra divergências.
