@@ -18,7 +18,7 @@ import { banco } from "@/infra/banco";
 import { carregarFrequencia, listarFrequenciasDoPeriodo } from "@/application/frequencias";
 import { lerEstadoPlanilha } from "@/application/planilha";
 import { montarGrade } from "@/domain/frequencia";
-import { montarTurmaPlanilha } from "@/domain/planilha";
+import { detectarEsquema, hashTexto, montarTurmaPlanilha } from "@/domain/planilha";
 
 const MIGRACAO = "20261013224456_recupera_lista_chamadas_antigas";
 const schema = `QA_presencas_${randomUUID().replaceAll("-", "")}`;
@@ -156,10 +156,29 @@ beforeEach(async () => {
     outra.rows[0]?.id,
     ids.outraLista,
   ]);
+  const arquivo = "QA-planilha-presencas-legadas";
+  const abaId = 7;
+  const nomeAba = "QA Série histórica A";
+  const estrutura = detectarEsquema(
+    { nome: nomeAba, valores: [["Aluno", "15/09/2026"]], formulas: [], linhas: 1, colunas: 2 },
+    2026,
+  );
+  const esquema = {
+    abas: [{ ...estrutura, abaId }],
+    mapa: [{ aba: nomeAba, turmaOriginalId: ids.turma }],
+  };
   await administrador.query(
-    `INSERT INTO sincronizacoes_planilha (turma_original_id,de,ate,modalidade,resultado,plano_hash,criado_em)
-     VALUES ($1,'2026-09-15','2026-09-15','CONSERVADOR','SUCESSO','QA envio anterior','2026-09-30T10:00:00Z')`,
-    [ids.turma],
+    `INSERT INTO integracoes_planilha (id, google_planilha_id, esquema, atualizado_em)
+     VALUES ('principal', $1, $2::jsonb, now())
+     ON CONFLICT (id) DO UPDATE SET google_planilha_id = EXCLUDED.google_planilha_id,
+       esquema = EXCLUDED.esquema, atualizado_em = EXCLUDED.atualizado_em`,
+    [arquivo, JSON.stringify(esquema)],
+  );
+  const destino = `frequencia:${hashTexto(JSON.stringify([arquivo, abaId]))}`;
+  await administrador.query(
+    `INSERT INTO sincronizacoes_planilha (turma_original_id,destino,de,ate,modalidade,resultado,plano_hash,criado_em)
+     VALUES ($1,$2,'2026-09-15','2026-09-15','CONSERVADOR','SUCESSO','QA envio anterior','2026-09-30T10:00:00Z')`,
+    [ids.turma, destino],
   );
 });
 

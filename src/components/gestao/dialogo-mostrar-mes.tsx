@@ -4,6 +4,12 @@
 import { useState } from "react";
 import { CalendarDays, ExternalLink, LoaderCircle } from "lucide-react";
 import { rotuloMes } from "@/domain/frequencia";
+import {
+  chaveResolucaoAntiga,
+  type PreviaAntiga,
+  type ResolucaoAntiga,
+} from "@/domain/planilha-legado";
+import { PendenciasAbaAntiga } from "./pendencias-aba-antiga";
 import { corpoJson, pedir, ErroApi } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -22,25 +28,16 @@ interface Catalogo {
   abas: { aba: string; mes: string; url: string; oculta: boolean }[];
   legadas: { aba: string }[];
 }
-interface Previa {
-  aba: string;
+interface Previa extends PreviaAntiga {
   planoHash: string;
-  preenchidas: number;
-  conferidas: number;
-  destinos: { aba: string; mes: string }[];
-  urlAntiga: string;
-  complementos: {
-    formulas: number;
-    notas: number;
-    totais: number;
-    amostras: { celula: string; tipo: "fórmula" | "nota" | "total" }[];
-  };
 }
 interface Conferencia {
   aba: string;
   previa?: Previa;
   erro?: string;
   concluida?: boolean;
+  resolucoes?: ResolucaoAntiga[];
+  alterada?: boolean;
 }
 
 function temComplementos(previa: Previa): boolean {
@@ -69,7 +66,10 @@ export function DialogoMostrarMes({
   const [senha, setSenha] = useState("");
   const acoes = useAcoesPorChave();
   const ocupado = acoes.chaveAtiva !== null;
-  async function executar(tipo: "abrir" | "liberar" | "conferir" | "aplicar") {
+  async function executar(
+    tipo: "abrir" | "liberar" | "conferir" | "rever" | "aplicar",
+    aba?: string,
+  ) {
     return acoes.executar("meses", async () => {
       setMensagem("");
       try {
@@ -93,23 +93,32 @@ export function DialogoMostrarMes({
           setMensagem("Todos os meses preparados estão acessíveis.");
           await onAtualizar();
         }
-        if (tipo === "conferir") {
+        if (tipo === "conferir" || tipo === "rever") {
           setDescartarComplementos(false);
           setSenha("");
-          const resultados: Conferencia[] = [];
-          for (const antiga of catalogo?.legadas ?? []) {
+          const resultados: Conferencia[] =
+            tipo === "rever"
+              ? [...(conferencias ?? [])]
+              : (catalogo?.legadas ?? []).map((antiga) => ({ aba: antiga.aba }));
+          for (const [indice, antiga] of resultados.entries()) {
+            if (tipo === "rever" && antiga.aba !== aba) continue;
             setAndamento(antiga.aba);
             try {
               const dados = await pedir<{ previa: Previa }>(
                 "/api/planilha/mensal/legado",
-                corpoJson({ aba: antiga.aba }),
+                corpoJson({ aba: antiga.aba, resolucoes: antiga.resolucoes ?? [] }),
               );
-              resultados.push({ aba: antiga.aba, previa: dados.previa });
-            } catch (erro) {
-              resultados.push({
+              resultados[indice] = {
                 aba: antiga.aba,
+                previa: dados.previa,
+                resolucoes: antiga.resolucoes,
+              };
+            } catch (erro) {
+              resultados[indice] = {
+                aba: antiga.aba,
+                resolucoes: antiga.resolucoes,
                 erro: mensagemAmigavel(erro, "Não foi possível conferir esta aba."),
-              });
+              };
             }
             setConferencias([...resultados]);
           }
@@ -117,9 +126,17 @@ export function DialogoMostrarMes({
         if (tipo === "aplicar") {
           const resultados = [...(conferencias ?? [])];
           for (const [indice, item] of resultados.entries()) {
-            if (!item.previa || item.concluida || item.erro) continue;
+            if (
+              !item.previa ||
+              item.concluida ||
+              item.erro ||
+              item.alterada ||
+              item.previa.totalPendencias > 0
+            )
+              continue;
             const descartar = temComplementos(item.previa);
             if (descartar && (!descartarComplementos || !senha)) continue;
+            if (item.previa.resolucoesAplicadas > 0 && !senha) continue;
             setAndamento(item.aba);
             try {
               await pedir(
@@ -127,7 +144,9 @@ export function DialogoMostrarMes({
                 corpoJson({
                   aba: item.aba,
                   planoHash: item.previa.planoHash,
-                  ...(descartar ? { descartarComplementos: true, senha } : {}),
+                  resolucoes: item.resolucoes ?? [],
+                  ...(descartar ? { descartarComplementos: true } : {}),
+                  ...(descartar || item.previa.resolucoesAplicadas > 0 ? { senha } : {}),
                 }),
               );
               resultados[indice] = { ...item, concluida: true };
@@ -165,11 +184,44 @@ export function DialogoMostrarMes({
         item.previa &&
         !item.erro &&
         !item.concluida &&
-        (!temComplementos(item.previa) || (descartarComplementos && Boolean(senha))),
+        !item.alterada &&
+        !(item.previa.totalPendencias > 0) &&
+        (!temComplementos(item.previa) || (descartarComplementos && Boolean(senha))) &&
+        (!item.previa.resolucoesAplicadas || Boolean(senha)),
     ).length ?? 0;
   const revisadas =
-    conferencias?.filter((item) => item.previa && !item.erro && !item.concluida) ?? [];
+    conferencias?.filter(
+      (item) =>
+        item.previa &&
+        !item.erro &&
+        !item.concluida &&
+        !item.alterada &&
+        !(item.previa.totalPendencias > 0),
+    ) ?? [];
   const comComplementos = revisadas.some((item) => item.previa && temComplementos(item.previa));
+  const comEscolhas = revisadas.some((item) => (item.previa?.resolucoesAplicadas ?? 0) > 0);
+  function escolher(aba: string, escolhas: ResolucaoAntiga[], remover?: string) {
+    setSenha("");
+    setDescartarComplementos(false);
+    setConferencias(
+      (anteriores) =>
+        anteriores?.map((item) => {
+          if (item.aba !== aba) return item;
+          const mapa = new Map(
+            (item.resolucoes ?? []).map((escolha) => [chaveResolucaoAntiga(escolha), escolha]),
+          );
+          if (remover) mapa.delete(remover);
+          for (const escolha of escolhas) {
+            if (escolha.tipo !== "frequencia") {
+              for (const [id, anterior] of mapa)
+                if (anterior.tipo === "frequencia" && anterior.mes === escolha.mes) mapa.delete(id);
+            }
+            mapa.set(chaveResolucaoAntiga(escolha), escolha);
+          }
+          return { ...item, resolucoes: [...mapa.values()], alterada: true };
+        }) ?? null,
+    );
+  }
   return (
     <>
       <Button
@@ -286,6 +338,28 @@ export function DialogoMostrarMes({
                               <p className="text-muted-foreground">
                                 {item.previa.destinos.map((destino) => destino.aba).join(", ")}
                               </p>
+                              {(item.previa.substituidas > 0 || item.previa.mantidas > 0) && (
+                                <p className="mt-2">
+                                  Marcas mensais: {item.previa.substituidas} a substituir ·{" "}
+                                  {item.previa.mantidas} a manter
+                                </p>
+                              )}
+                              {item.previa.totalPendencias > 0 && (
+                                <PendenciasAbaAntiga
+                                  pendencias={item.previa.pendencias}
+                                  total={item.previa.totalPendencias}
+                                  resolucoes={item.resolucoes ?? []}
+                                  disabled={ocupado}
+                                  onEscolher={(escolhas, remover) =>
+                                    escolher(item.aba, escolhas, remover)
+                                  }
+                                />
+                              )}
+                              {item.previa.alunosIncluidos > 0 && (
+                                <p className="mt-2">
+                                  Linhas de alunos a incluir: {item.previa.alunosIncluidos}
+                                </p>
+                              )}
                               {temComplementos(item.previa) && (
                                 <>
                                   <p className="mt-2">
@@ -333,6 +407,18 @@ export function DialogoMostrarMes({
                             </>
                           )
                         )}
+                        {!item.concluida && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="mt-3"
+                            disabled={ocupado}
+                            onClick={() => void executar("rever", item.aba)}
+                          >
+                            {item.alterada ? "Conferir escolhas" : "Conferir esta aba novamente"}
+                          </Button>
+                        )}
                       </div>
                     ))}
                     {comComplementos && (
@@ -351,19 +437,25 @@ export function DialogoMostrarMes({
                           />
                           Autorizo descartar os totais e notas antigos listados
                         </label>
-                        {descartarComplementos && (
-                          <div className="flex flex-col gap-1.5">
-                            <label htmlFor="senha-descarte-abas">Senha administrativa</label>
-                            <Input
-                              id="senha-descarte-abas"
-                              type="password"
-                              autoComplete="current-password"
-                              value={senha}
-                              disabled={ocupado}
-                              onChange={(evento) => setSenha(evento.target.value)}
-                            />
-                          </div>
+                      </div>
+                    )}
+                    {(comEscolhas || (comComplementos && descartarComplementos)) && (
+                      <div className="flex flex-col gap-1.5 rounded-lg border p-3 text-sm">
+                        {comEscolhas && (
+                          <p>
+                            As escolhas de alunos e marcas foram conferidas. Confirme a retirada com
+                            a senha administrativa.
+                          </p>
                         )}
+                        <label htmlFor="senha-descarte-abas">Senha administrativa</label>
+                        <Input
+                          id="senha-descarte-abas"
+                          type="password"
+                          autoComplete="current-password"
+                          value={senha}
+                          disabled={ocupado}
+                          onChange={(evento) => setSenha(evento.target.value)}
+                        />
                       </div>
                     )}
                     {revisadas.length > 0 && (

@@ -666,12 +666,16 @@ export async function aplicarGoogle(
   operacoes: unknown,
   modoCompleto: boolean,
   mensal?: Omit<AbaMensalPlanilha, "aba">,
+  abaId?: number,
 ) {
   let doc: DocumentoGoogle;
   let leitura: Awaited<ReturnType<typeof lerGoogle>>;
   try {
     doc = await lerDocumentoGoogle(id, acesso);
     leitura = await lerGoogle(id, acesso, nome, undefined, undefined, doc);
+    if (abaId !== undefined && leitura.abaId !== abaId) {
+      throw new ErroHttp("A aba foi substituída. Confira a estrutura antes de enviar.", 409);
+    }
     if (
       mensal &&
       (leitura.mensal?.mes !== mensal.mes ||

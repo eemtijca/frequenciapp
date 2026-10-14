@@ -2,10 +2,14 @@
 
 // Card da planilha de frequência: etapas de conexão, estrutura e envio, modo
 // completo e zona de risco. Restrito à administração.
+import {
+  DialogoConfigurarPlanilha,
+  type EtapaConfiguracaoPlanilha,
+} from "@/components/gestao/dialogo-configurar-planilha";
 import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilha";
 import { DialogoMostrarMes } from "@/components/gestao/dialogo-mostrar-mes";
 import { DialogoPrepararMes } from "@/components/gestao/dialogo-preparar-mes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
@@ -89,6 +93,9 @@ export default function IntegracaoPlanilha({
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
   const [lendo, setLendo] = useState(false);
+  const [conferenciaHash, setConferenciaHash] = useState("");
+  const [problemas, setProblemas] = useState<{ aba: string; erro: string }[]>([]);
+  const etapas = useRef<Partial<Record<EtapaConfiguracaoPlanilha, HTMLDivElement | null>>>({});
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [abas, setAbas] = useState<AbaEsquema[]>([]);
   const [planilha, setPlanilha] = useState<{
@@ -111,6 +118,8 @@ export default function IntegracaoPlanilha({
     try {
       const dados = await pedir<{ integracao: IntegracaoAdmin }>("/api/planilha");
       setIntegracao(dados.integracao);
+      setConferenciaHash("");
+      setProblemas([]);
       if (dados.integracao.esquema) {
         setPlanilha({
           nome: dados.integracao.esquema.planilha.nome,
@@ -154,6 +163,17 @@ export default function IntegracaoPlanilha({
     (turma) => !Object.values(mapa).some((item) => item.turmaOriginalId === turma.id),
   );
   const diasEnvio = diasDoMes(mesEnvio);
+  const vinculosNaoLidos = Object.values(mapa).filter(
+    (item) => item.turmaOriginalId && !abas.some((aba) => aba.nome === item.aba),
+  );
+
+  function irParaEtapa(etapa: EtapaConfiguracaoPlanilha) {
+    if (etapa === "estrutura") setEditandoEstrutura(true);
+    requestAnimationFrame(() => {
+      etapas.current[etapa]?.focus({ preventScroll: true });
+      etapas.current[etapa]?.scrollIntoView({ block: "start" });
+    });
+  }
 
   async function alternarAtiva(valor: boolean) {
     await executarPorChave("alternar-ativa", async () => {
@@ -164,6 +184,7 @@ export default function IntegracaoPlanilha({
           corpoAlteracao("PATCH", { ativa: valor }),
         );
         setIntegracao(dados.integracao);
+        setConferenciaHash("");
         toast.success(valor ? "Integração ativada." : "Integração desativada.");
       } catch (excecao) {
         toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
@@ -182,6 +203,7 @@ export default function IntegracaoPlanilha({
           corpoAlteracao("PATCH", { envioAutomatico: valor }),
         );
         setIntegracao(dados.integracao);
+        setConferenciaHash("");
         toast.success(valor ? "Envio ao salvar ligado." : "Envio ao salvar desligado.");
       } catch (excecao) {
         toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
@@ -195,14 +217,19 @@ export default function IntegracaoPlanilha({
     const aviso = "planilha-estrutura";
     await executarPorChave(aviso, async () => {
       setLendo(true);
+      setConferenciaHash("");
       toast.loading("Lendo as abas da planilha...", { id: aviso });
       try {
         const dados = await pedir<{
           planilha: { nome: string; url: string; fuso: string };
           abas: AbaEsquema[];
           sugestoes: Sugestao[];
-        }>("/api/planilha/estrutura", corpoJson({}));
+          conferenciaHash: string;
+          problemas: { aba: string; erro: string }[];
+        }>("/api/planilha/estrutura", corpoJson({ mes: mesEnvio }));
         setAbas(dados.abas);
+        setConferenciaHash(dados.conferenciaHash);
+        setProblemas(dados.problemas);
         setSugestoes(dados.sugestoes);
         setPlanilha(dados.planilha);
         const idsValidos = new Set(turmas.map((turma) => turma.id));
@@ -231,7 +258,9 @@ export default function IntegracaoPlanilha({
         });
         avisarSucesso(
           `${dados.abas.length} ${dados.abas.length === 1 ? "aba lida" : "abas lidas"}.`,
-          "Confira o mapa de turmas antes de salvar.",
+          dados.problemas.length
+            ? "Há abas que precisam de conferência."
+            : "Confira o mapa de turmas antes de salvar.",
           aviso,
         );
       } catch (excecao) {
@@ -248,23 +277,24 @@ export default function IntegracaoPlanilha({
   }
 
   async function salvarMapa() {
-    if (!planilha) return;
+    if (!planilha || !conferenciaHash || vinculosNaoLidos.length > 0) return;
     const itens = Object.values(mapa).filter((item) => item.turmaOriginalId !== "");
     if (itens.length === 0) {
       toast.error("Escolha ao menos uma aba.");
       return;
     }
-    setSalvando(true);
     const aviso = "planilha-mapa";
-    toast.loading("Salvando a estrutura...", { id: aviso });
     await executarPorChave(aviso, async () => {
+      setSalvando(true);
+      toast.loading("Salvando a estrutura...", { id: aviso });
       try {
         const dados = await pedir<{ integracao: IntegracaoAdmin }>(
           "/api/planilha/mapa",
-          corpoJson({ planilha, abas, mapa: itens }),
+          corpoJson({ planilha, abas, mapa: itens, conferenciaHash }),
         );
         setIntegracao(dados.integracao);
         setEditandoEstrutura(false);
+        setConferenciaHash("");
         avisarSucesso(
           "Estrutura salva.",
           "Agora a Grade pode enviar as faltas para esta planilha.",
@@ -345,159 +375,235 @@ export default function IntegracaoPlanilha({
         />
       }
     >
-      <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
-        <SeletorPlanilhaGoogle
-          conectado={integracao?.googleConectado ?? false}
-          planilha={integracao?.googlePlanilha ?? null}
-          mes={mesEnvio}
-          onAtualizar={carregar}
-        />
-      </EtapaPlanilha>
-
-      <EtapaPlanilha
-        numero={2}
-        titulo="Estrutura e mapa por turma de origem"
-        estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
-        resumo={
-          estruturaSalva && !estruturaEmEdicao
-            ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
-            : podeEnviar
-              ? "Vincule as abas às turmas de origem."
-              : "Conecte e ative a integração."
-        }
-        acoes={
-          estruturaEmEdicao ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10"
-              onClick={() => void lerEstrutura()}
-              disabled={lendo || !podeEnviar}
-              title={podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."}
-            >
-              {lendo ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : (
-                <RotateCcw size={16} />
-              )}
-              Conferir estrutura
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10"
-              onClick={() => setEditandoEstrutura(true)}
-            >
-              Revisar estrutura
-            </Button>
-          )
-        }
+      <DialogoConfigurarPlanilha
+        mes={mesEnvio}
+        mesMaximo={diaCorrente.slice(0, 7)}
+        onMes={setMesEnvio}
+        onEtapa={irParaEtapa}
+      />
+      <div
+        ref={(elemento) => {
+          etapas.current.conexao = elemento;
+        }}
+        tabIndex={-1}
+        className="scroll-mt-4 outline-none"
       >
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <DialogoPrepararMes
-            turmas={turmas}
+        <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
+          <SeletorPlanilhaGoogle
+            conectado={integracao?.googleConectado ?? false}
+            planilha={integracao?.googlePlanilha ?? null}
             mes={mesEnvio}
-            onMes={setMesEnvio}
-            mesMaximo={diaCorrente.slice(0, 7)}
-            disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
             onAtualizar={carregar}
           />
-          <DialogoMostrarMes
-            mesAtual={diaCorrente.slice(0, 7)}
-            disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
-            onAtualizar={carregar}
-          />
-        </div>
-        {estruturaEmEdicao ? (
-          <>
-            {planilha && (
-              <p className="text-muted-foreground text-xs">
-                {planilha.nome} · fuso {planilha.fuso}
-              </p>
-            )}
-            {abas.length > 0 && (
-              <div className="flex flex-col gap-2">
-                {abas.map((aba) => {
-                  const vinculo = mapa[aba.nome];
-                  const mensal = aba.mensal ?? (vinculo?.mes ? vinculo : undefined);
-                  return (
-                    <div
-                      key={aba.nome}
-                      className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+        </EtapaPlanilha>
+      </div>
+
+      <div
+        ref={(elemento) => {
+          etapas.current.estrutura = elemento;
+        }}
+        tabIndex={-1}
+        className="scroll-mt-4 outline-none"
+      >
+        <EtapaPlanilha
+          numero={2}
+          titulo="Estrutura e mapa por turma de origem"
+          estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
+          resumo={
+            estruturaSalva && !estruturaEmEdicao
+              ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
+              : podeEnviar
+                ? "Vincule as abas às turmas de origem."
+                : "Conecte e ative a integração."
+          }
+          acoes={
+            estruturaEmEdicao ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => void lerEstrutura()}
+                disabled={lendo || salvando || !podeEnviar}
+                title={podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."}
+              >
+                {lendo ? (
+                  <LoaderCircle size={16} className="animate-spin" />
+                ) : (
+                  <RotateCcw size={16} />
+                )}
+                Conferir estrutura
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setEditandoEstrutura(true)}
+              >
+                Revisar estrutura
+              </Button>
+            )
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <DialogoPrepararMes
+              turmas={turmas}
+              mes={mesEnvio}
+              onMes={setMesEnvio}
+              mesMaximo={diaCorrente.slice(0, 7)}
+              disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+              onAtualizar={carregar}
+            />
+            <DialogoMostrarMes
+              mesAtual={diaCorrente.slice(0, 7)}
+              disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+              onAtualizar={carregar}
+            />
+          </div>
+          {estruturaEmEdicao ? (
+            <>
+              {planilha && (
+                <p className="text-muted-foreground text-xs">
+                  {planilha.nome} · fuso {planilha.fuso}
+                </p>
+              )}
+              {problemas.length > 0 && (
+                <ul aria-label="Problemas na leitura das abas" className="flex flex-col gap-2">
+                  {problemas.map((item) => (
+                    <li
+                      key={item.aba}
+                      className="border-falta/30 bg-falta-fraca rounded-xl border p-3 text-sm"
                     >
-                      <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        cabeçalho {aba.cabecalho} ·{" "}
-                        {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
-                      </span>
-                      <div className="w-full sm:w-56">
-                        {mensal ? (
-                          <p className="text-muted-foreground text-sm">
-                            {turmas.find((turma) => turma.id === mensal.turmaOriginalId)?.rotulo ??
-                              "Turma de origem"}
-                            {" · "}
-                            {rotuloMes(mensal.mes ?? "")}
-                          </p>
-                        ) : (
-                          <Selecionar
-                            id={`mapa-${aba.nome}`}
-                            value={vinculo?.turmaOriginalId ?? ""}
-                            onValueChange={(valor) =>
+                      <p className="font-medium wrap-anywhere">{item.aba}</p>
+                      <p className="text-falta-texto">{item.erro}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {vinculosNaoLidos.length > 0 && (
+                <div role="alert" className="border-falta/30 rounded-xl border p-3 text-sm">
+                  <p>Há vínculos fora da leitura atual. Confira novamente antes de salvar.</p>
+                  <ul className="text-muted-foreground mt-2 flex flex-col gap-2">
+                    {vinculosNaoLidos.map((item) => (
+                      <li
+                        key={item.aba}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span className="wrap-anywhere">{item.aba}</span>
+                        {!item.mes && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={lendo || salvando}
+                            onClick={() =>
                               setMapa((atual) => ({
                                 ...atual,
-                                [aba.nome]: { aba: aba.nome, turmaOriginalId: valor },
+                                [item.aba]: { ...item, turmaOriginalId: "" },
                               }))
                             }
-                            placeholder="Ignorar aba"
-                            ariaLabel={`Turma de origem da aba ${aba.nome}`}
-                            opcoes={turmas.map((turma) => ({
-                              valor: turma.id,
-                              rotulo: turma.rotulo,
-                            }))}
-                          />
+                          >
+                            Ignorar vínculo
+                          </Button>
                         )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    Ignorar retira o vínculo da configuração. A aba e seus dados permanecem no
+                    Google.
+                  </p>
+                </div>
+              )}
+              {abas.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  {abas.map((aba) => {
+                    const vinculo = mapa[aba.nome];
+                    const mensal = aba.mensal ?? (vinculo?.mes ? vinculo : undefined);
+                    return (
+                      <div
+                        key={aba.nome}
+                        className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm">{aba.nome}</span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          cabeçalho {aba.cabecalho} ·{" "}
+                          {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
+                        </span>
+                        <div className="w-full sm:w-56">
+                          {mensal ? (
+                            <p className="text-muted-foreground text-sm">
+                              {turmas.find((turma) => turma.id === mensal.turmaOriginalId)
+                                ?.rotulo ?? "Turma de origem"}
+                              {" · "}
+                              {rotuloMes(mensal.mes ?? "")}
+                            </p>
+                          ) : (
+                            <Selecionar
+                              id={`mapa-${aba.nome}`}
+                              value={vinculo?.turmaOriginalId ?? ""}
+                              onValueChange={(valor) =>
+                                setMapa((atual) => ({
+                                  ...atual,
+                                  [aba.nome]: { aba: aba.nome, turmaOriginalId: valor },
+                                }))
+                              }
+                              disabled={lendo || salvando}
+                              placeholder="Ignorar aba"
+                              ariaLabel={`Turma de origem da aba ${aba.nome}`}
+                              opcoes={turmas.map((turma) => ({
+                                valor: turma.id,
+                                rotulo: turma.rotulo,
+                              }))}
+                            />
+                          )}
+                        </div>
                       </div>
+                    );
+                  })}
+                  <Button
+                    type="button"
+                    className="h-11 self-start"
+                    onClick={() => void salvarMapa()}
+                    disabled={
+                      salvando ||
+                      lendo ||
+                      !temMapa ||
+                      !conferenciaHash ||
+                      vinculosNaoLidos.length > 0
+                    }
+                  >
+                    Salvar estrutura
+                  </Button>
+                </div>
+              )}
+              {planilha && turmasSemAba.length > 0 && (
+                <div className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
+                  {turmasSemAba.map((turma) => (
+                    <div key={turma.id} className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate">{turma.rotulo}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8"
+                        onClick={() => void criarAba(turma.rotulo)}
+                        disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
+                      >
+                        {chaveAtiva === `criar-aba-${turma.rotulo}` ? "Criando..." : "Criar aba"}
+                      </Button>
                     </div>
-                  );
-                })}
-                <Button
-                  type="button"
-                  className="h-11 self-start"
-                  onClick={() => void salvarMapa()}
-                  disabled={salvando || !temMapa}
-                >
-                  Salvar estrutura
-                </Button>
-              </div>
-            )}
-            {planilha && turmasSemAba.length > 0 && (
-              <div className="flex flex-col gap-1 text-xs">
-                <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
-                {turmasSemAba.map((turma) => (
-                  <div key={turma.id} className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate">{turma.rotulo}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-8"
-                      onClick={() => void criarAba(turma.rotulo)}
-                      disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
-                    >
-                      {chaveAtiva === `criar-aba-${turma.rotulo}` ? "Criando..." : "Criar aba"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {sugestoes.length > 0 && (
-              <p className="text-muted-foreground text-xs">
-                Confira os vínculos sugeridos antes de salvar.
-              </p>
-            )}
-          </>
-        ) : null}
-      </EtapaPlanilha>
+                  ))}
+                </div>
+              )}
+              {sugestoes.length > 0 && (
+                <p className="text-muted-foreground text-xs">
+                  Confira os vínculos sugeridos antes de salvar.
+                </p>
+              )}
+            </>
+          ) : null}
+        </EtapaPlanilha>
+      </div>
 
       {conectada && abas.some((aba) => !aba.oculta) && (
         <div className="superficie-vidro flex flex-col gap-2 p-3">
@@ -538,79 +644,90 @@ export default function IntegracaoPlanilha({
         </div>
       )}
 
-      <EtapaPlanilha
-        numero={3}
-        titulo="Envio"
-        estado={estruturaSalva ? "atual" : "pendente"}
-        resumo={
-          estruturaSalva
-            ? "Envia alterações com prévia. O mês vale para o período inteiro."
-            : "Salve a estrutura antes de enviar."
-        }
+      <div
+        ref={(elemento) => {
+          etapas.current.envio = elemento;
+        }}
+        tabIndex={-1}
+        className="scroll-mt-4 outline-none"
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="w-full sm:w-64">
-            <SeletorPeriodo
-              id="planilha-mes-envio"
-              modo="mes"
-              valor={mesEnvio}
-              max={diaCorrente.slice(0, 7)}
-              rotuloAcessivel="Mês do envio para a planilha"
-              rotulo={rotuloMes(mesEnvio)}
-              onValor={setMesEnvio}
+        <EtapaPlanilha
+          numero={3}
+          titulo="Envio"
+          estado={estruturaSalva ? "atual" : "pendente"}
+          resumo={
+            estruturaSalva
+              ? "Envia alterações com prévia. O mês vale para o período inteiro."
+              : "Salve a estrutura antes de enviar."
+          }
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="w-full sm:w-64">
+              <SeletorPeriodo
+                id="planilha-mes-envio"
+                modo="mes"
+                valor={mesEnvio}
+                max={diaCorrente.slice(0, 7)}
+                rotuloAcessivel="Mês do envio para a planilha"
+                rotulo={rotuloMes(mesEnvio)}
+                onValor={setMesEnvio}
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-11"
+              disabled={!estruturaSalva || !podeEnviar}
+              title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
+              onClick={() => setEnvioAberto(true)}
+            >
+              Enviar todas as turmas
+            </Button>
+          </div>
+          <div className="superficie-vidro mt-3 flex items-start justify-between gap-3 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
+              <p className="text-muted-foreground text-xs">
+                Preenche células vazias. Pendências seguem para o envio manual.
+              </p>
+            </div>
+            <Switch
+              checked={integracao?.envioAutomatico ?? false}
+              disabled={
+                salvando ||
+                (!integracao?.envioAutomatico && (!podeEnviar || !estruturaSalva || completoAtivo))
+              }
+              onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
+              aria-label="Enviar ao salvar a chamada"
             />
           </div>
-          <Button
-            type="button"
-            className="h-11"
-            disabled={!estruturaSalva}
-            title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
-            onClick={() => setEnvioAberto(true)}
-          >
-            Enviar todas as turmas
-          </Button>
-        </div>
-        <div className="superficie-vidro mt-3 flex items-start justify-between gap-3 p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
-            <p className="text-muted-foreground text-xs">
-              Preenche células vazias. Pendências seguem para o envio manual.
-            </p>
-          </div>
-          <Switch
-            checked={integracao?.envioAutomatico ?? false}
-            disabled={salvando || !podeEnviar || !estruturaSalva}
-            onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
-            aria-label="Enviar ao salvar a chamada"
-          />
-        </div>
 
-        <div className="flex flex-col gap-1 text-xs">
-          <p className="text-muted-foreground">
-            {integracao?.alteradasDepois ?? 0}{" "}
-            {integracao?.alteradasDepois === 1
-              ? "chamada pendente de envio"
-              : "chamadas pendentes de envio"}
-          </p>
-          {integracao?.ultimoErro && (
-            <p className="text-falta-texto">
-              {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
-              {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
-              {integracao.ultimoErro.erro ?? "sem detalhe"}
+          <div className="flex flex-col gap-1 text-xs">
+            <p className="text-muted-foreground">
+              {integracao?.alteradasDepois ?? 0}{" "}
+              {integracao?.alteradasDepois === 1
+                ? "chamada pendente de envio"
+                : "chamadas pendentes de envio"}
             </p>
-          )}
-          {integracao && integracao.sincronizacoes.length > 0 && (
-            <ul className="text-muted-foreground flex flex-col gap-0.5">
-              {integracao.sincronizacoes.slice(0, 5).map((item) => (
-                <li key={item.id}>
-                  {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()} ·{" "}
-                  {item.preenchidas} células · {item.resultado.toLowerCase()}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </EtapaPlanilha>
+            {integracao?.ultimoErro && (
+              <p className="text-falta-texto">
+                {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
+                {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
+                {integracao.ultimoErro.erro ?? "sem detalhe"}
+              </p>
+            )}
+            {integracao && integracao.sincronizacoes.length > 0 && (
+              <ul className="text-muted-foreground flex flex-col gap-0.5">
+                {integracao.sincronizacoes.slice(0, 5).map((item) => (
+                  <li key={item.id}>
+                    {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()}{" "}
+                    · {item.preenchidas} células · {item.resultado.toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </EtapaPlanilha>
+      </div>
 
       <BlocoModoCompletoPlanilha
         idPrefixo="planilha"

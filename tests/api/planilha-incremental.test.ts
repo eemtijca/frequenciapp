@@ -142,8 +142,7 @@ beforeAll(async () => {
     await chamar("/api/planilha/estrutura", {}),
   );
   const mapa = await chamar("/api/planilha/mapa", {
-    planilha: estrutura.planilha,
-    abas: estrutura.abas,
+    ...estrutura,
     mapa: [
       { aba: "QN Ano A", turmaOriginalId: turmas.A },
       { aba: "QN Ano B", turmaOriginalId: turmas.B },

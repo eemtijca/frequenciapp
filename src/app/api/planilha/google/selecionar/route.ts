@@ -72,6 +72,9 @@ export async function POST(requisicao: Request): Promise<Response> {
           ...(!mesmoArquivo
             ? {
                 ativa: false,
+                envioAutomatico: false,
+                modo: "CONSERVADOR",
+                modoCompletoAte: null,
                 esquema: Prisma.DbNull,
                 assinaturaEsquema: null,
                 esquemaEm: null,

@@ -6,6 +6,7 @@ import { detectarEsquema } from "@/domain/planilha";
 import type { Aluno, Frequencia, Turma } from "@/domain/frequencia";
 
 const dubl = vi.hoisted(() => ({
+  transacao: vi.fn(),
   integracao: vi.fn(),
   atualizarIntegracao: vi.fn(),
   frequencia: vi.fn(),
@@ -24,6 +25,7 @@ const dubl = vi.hoisted(() => ({
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
+    $transaction: dubl.transacao,
     integracaoPlanilha: {
       findUnique: dubl.integracao,
       update: dubl.atualizarIntegracao,
@@ -53,7 +55,7 @@ vi.mock("@/infra/trava-planilha-frequencia", () => ({
   controleTravaPlanilhaFrequencia: () => undefined,
 }));
 
-import { enviarAposSalvar, simularEnvio } from "@/application/planilha";
+import { atualizarEsquemaDaAba, enviarAposSalvar, simularEnvio } from "@/application/planilha";
 
 const turmaId = "00000000-0000-4000-8000-000000000101";
 const alunoId = "00000000-0000-4000-8000-000000000102";
@@ -137,7 +139,7 @@ function usarAbaMensal() {
     2026,
   );
   linha.esquema = {
-    abas: [{ ...estrutura, mensal: identidadeMensal }],
+    abas: [{ ...estrutura, abaId: 7, mensal: identidadeMensal }],
     mapa: [{ aba: nomeAba, ...identidadeMensal }],
   };
 }
@@ -256,7 +258,7 @@ beforeEach(() => {
     googlePlanilhaId: "planilha-google-sintetica",
     googlePlanilhaNome: "QA Frequência",
     esquema: {
-      abas: [esquema],
+      abas: [{ ...esquema, abaId: 7 }],
       mapa: [{ aba: nomeAba, turmaOriginalId: turmaId }],
     },
     assinaturaEsquema: esquema.assinatura,
@@ -267,6 +269,25 @@ beforeEach(() => {
     atualizadoEm: new Date("2026-10-02T11:00:00Z"),
   };
   dubl.integracao.mockImplementation(async () => linha);
+  dubl.transacao.mockImplementation(
+    async (
+      operacao: (tx: {
+        integracaoPlanilha: {
+          findUnique: typeof dubl.integracao;
+          update: typeof dubl.atualizarIntegracao;
+        };
+      }) => Promise<unknown>,
+    ) =>
+      operacao({
+        integracaoPlanilha: { findUnique: dubl.integracao, update: dubl.atualizarIntegracao },
+      }),
+  );
+  dubl.atualizarIntegracao.mockImplementation(
+    async ({ data }: { data: Partial<LinhaIntegracao> }) => {
+      Object.assign(linha, data);
+      return linha;
+    },
+  );
   dubl.acesso.mockResolvedValue("acesso-sintetico");
   dubl.feriados.mockResolvedValue([]);
   dubl.feriado.mockResolvedValue(null);
@@ -300,6 +321,48 @@ afterEach(() => {
 });
 
 describe("enviar ao salvar com a conta Google", () => {
+  it.each(["arquivo", "conexão", "turma"])(
+    "não grava a estrutura lida quando a configuração de %s muda durante a consulta",
+    async (mudanca) => {
+      const referencia = structuredClone(linha);
+      if (mudanca === "arquivo") linha.googlePlanilhaId = "outro-arquivo-sintetico";
+      if (mudanca === "conexão") linha.googleRefreshToken = "outro-refresh-sintetico";
+      if (mudanca === "turma") linha.esquema = { abas: [], mapa: [] };
+      await expect(atualizarEsquemaDaAba(referencia, nomeAba)).rejects.toMatchObject({
+        message: "A configuração mudou. Confira a estrutura novamente.",
+      });
+      expect(dubl.atualizarIntegracao).not.toHaveBeenCalled();
+      expect(lotes).toHaveLength(0);
+    },
+  );
+
+  it("completa a identidade de esquemas antigos antes de confirmar um envio", async () => {
+    const antiga = detectarEsquema(
+      {
+        nome: nomeAba,
+        valores: [cabecalho, [aluno.nome, ""]],
+        formulas: [],
+        linhas: 2,
+        colunas: 2,
+      },
+      2026,
+    );
+    linha.esquema = { abas: [antiga], mapa: [{ aba: nomeAba, turmaOriginalId: turmaId }] };
+    const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
+    expect(situacoes.get(turmaId)).toBe("enviado");
+    expect(dubl.atualizarIntegracao).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          esquema: expect.objectContaining({ abas: [expect.objectContaining({ abaId: 7 })] }),
+        }),
+      }),
+    );
+    expect(registros).toMatchObject([
+      { destino: expect.stringMatching(/^frequencia:/), resultado: "SUCESSO" },
+    ]);
+    expect(celula).toBe("P");
+  });
+
   it("envia uma chamada sem Apps Script e não duplica a gravação ao salvar novamente", async () => {
     const situacoes = await enviarAposSalvar({ id: "coordenacao-sintetica" }, turmaId, dia);
     expect(situacoes.get(turmaId)).toBe("enviado");
