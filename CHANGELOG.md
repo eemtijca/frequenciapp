@@ -61,7 +61,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Painel externo sai da Gestão, mantendo o acesso ao FrequenciBI na navegação lateral.
 
-- Painel, gráficos no celular: uma seta no canto superior direito do painel avança para o próximo gráfico e, no último, volta ao primeiro, sem criar seletor nem botões novos. Os gráficos vizinhos ao em exibição montam em tempo ocioso e a leitura da posição durante o deslize deixa de medir o layout e de criar temporizadores a cada evento, o que reduz os picos de quadro na troca de gráfico. Em medição com o processador 4 vezes mais lento (8 passadas frias de cada versão no Chromium), as tarefas longas caíram de 15 para 6 e o tempo de script, em mediana, cerca de 21%.
+- Painel, gráficos no celular: duas setas acima dos cartões, à direita, voltam e avançam um gráfico, com bloqueio nos extremos e sem cobrir os textos, sem criar seletor nem botões novos. Os gráficos vizinhos ao em exibição montam em tempo ocioso e a leitura da posição durante o deslize deixa de medir o layout e de criar temporizadores a cada evento, o que reduz os picos de quadro na troca de gráfico. Em medição com o processador 4 vezes mais lento (8 passadas frias de cada versão no Chromium), as tarefas longas caíram de 15 para 6 e o tempo de script, em mediana, cerca de 21%.
 
 - Relatórios, Por aluno: a lista se agrupa em séries e turmas recolhíveis, com a contagem de alunos e os totais do mês na turma, e os seletores de série e turma dão lugar aos botões Série e Turma, que recolhem ou expandem todos os grupos do nível. A busca mantém abertos os grupos com resultado. O novo botão Emitir relatório fica ao lado, por enquanto só com um aviso de que a geração do relatório em PDF virá em breve.
 
@@ -116,6 +116,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Painel, gráficos no celular: o deslize para os lados que começava sobre um campo ou botão do cartão, como no gráfico personalizado, não movia a faixa, que voltava ao cartão de origem e dava a impressão de engasgo ao tentar voltar. O arrasto horizontal passa a valer como gesto pelos eventos de toque, e o teste de navegador cobre o deslize iniciado sobre o seletor de data.
 
 - Conferência do mapa de frequência vinculada ao arquivo, credencial, revisão e estrutura lida, impedindo salvar leituras antigas ou adulteradas. Trocar de arquivo desliga a automação e encerra o modo completo; habilitar o envio automático exige configuração válida.
 - Confirmações de frequência em abas antigas passam a identificar arquivo e aba estável. Trocar de planilha ou recriar uma aba com o mesmo nome mantém os dias pendentes no destino novo; sucessos antigos sem identificação exigem nova conferência conservadora, preservando o histórico.
