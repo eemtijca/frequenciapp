@@ -21,6 +21,14 @@ As turmas da 3ª série foram reorganizadas: cada aluno tem a turma atual, onde 
 - **Painel e Chamada pela turma atual; Grade, CSV, planilha e diretor de turma pela turma original.** Na turma reorganizada (com algum aluno de outra turma original), a Chamada mostra a turma original de cada aluno em um círculo ao lado do nome.
 - **Histórico existente.** A migração preenche a lista das chamadas já salvas com quem tem falta nelas e com os alunos ativos que hoje estão na turma da chamada e já existiam no dia. Ela precisa rodar antes de mover alunos entre turmas.
 
+### Recuperação do preenchimento inicial
+
+A migração `20261013224456_recupera_lista_chamadas_antigas` complementa chamadas cujo último salvamento é anterior ao início da migração da lista. A data de cadastro do aluno é comparada ao salvamento ou à importação, não ao dia civil da chamada: um registro retroativo pode preceder o cadastro no aplicativo. A turma de origem identifica a relação antiga mesmo após remanejamento.
+
+Só entram alunos ativos cadastrados até o salvamento e sem desistência naquele dia. Uma lista existente em outra turma na mesma data impede a inclusão. Chamadas alteradas depois da criação da lista, feriados, domingos e dias sem chamada não são reconstruídos. Nenhuma falta, justificativa, aula ou confirmação existente é removida ou substituída; novas inclusões começam sem confirmação Seduc.
+
+A recuperação incrementa a revisão e atualiza a data somente das chamadas complementadas, para invalidar rascunhos antigos e gerar pendência de reenvio. A auditoria registra `frequencia.recuperar_lista_legada` com o identificador da chamada e sem usuário. Repetir a migração não reaplica a correção. Schemas sem registro próprio da migração da lista permanecem intactos.
+
 ## Alternativas
 
 - Copiar a turma original para cada falta: não resolve a presença, que não gera linha, e congelaria um valor que a escola precisa poder corrigir.

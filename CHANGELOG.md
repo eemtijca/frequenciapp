@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Presenças omitidas no preenchimento inicial das listas históricas: a nova migração recupera alunos da turma de origem cadastrados até o salvamento ou a importação, sem reinterpretar chamadas posteriores nem remover faltas e confirmações. Os dias corrigidos ganham revisão e auditoria e ficam pendentes de reenvio às planilhas.
+
 - Indicadores deixam de zerar quando a grade da turma ganha aulas depois do registro da chamada. Cada chamada guarda o retrato congelado das aulas previstas no dia, gravado no primeiro salvamento, e a derivação das marcas usa esse retrato em vez da grade atual; a migração reconstrói o retrato das chamadas existentes e o histórico não é reclassificado por edições de grade.
 
 - Build da documentação interativa prepara o JavaScript e o CSS do Swagger UI também na Vercel, independentemente do postinstall em cache. A instalação usa a sintaxe do pnpm 12 e inclui as dependências de desenvolvimento; arquivos ausentes interrompem a compilação e o teste de navegador confere a renderização real da API.
