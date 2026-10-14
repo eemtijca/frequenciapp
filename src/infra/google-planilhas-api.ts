@@ -1,6 +1,7 @@
 // Cliente da Sheets API para a planilha escolhida: leitura de células,
 // estrutura e marcadores da integração autorizada pela conta Google.
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
@@ -449,6 +450,8 @@ export interface BlocoGoogle {
   formula: boolean[][];
   ocupado?: boolean[][];
   notas?: boolean[][];
+  valorInformado?: boolean[][];
+  conteudoHash?: string;
 }
 
 /** Lê somente as faixas pedidas, com valores exibidos e fórmula separada. */
@@ -483,6 +486,7 @@ export async function lerBlocosGoogle(
     const formula: boolean[][] = [];
     const ocupado: boolean[][] | undefined = opcoes.conferirConteudo ? [] : undefined;
     const notas: boolean[][] | undefined = opcoes.conferirNotas ? [] : undefined;
+    const valorInformado: boolean[][] | undefined = opcoes.conferirNotas ? [] : undefined;
     for (let linha = 0; linha < linhas; linha += 1) {
       const itens = trecho?.rowData?.[linha]?.values ?? [];
       valores.push(
@@ -495,6 +499,12 @@ export async function lerBlocosGoogle(
       );
       notas?.push(
         Array.from({ length: pedido.colunas }, (_, coluna) => Boolean(itens[coluna]?.note)),
+      );
+      valorInformado?.push(
+        Array.from(
+          { length: pedido.colunas },
+          (_, coluna) => Object.keys(itens[coluna]?.userEnteredValue ?? {}).length > 0,
+        ),
       );
       ocupado?.push(
         Array.from({ length: pedido.colunas }, (_, coluna) => {
@@ -513,6 +523,14 @@ export async function lerBlocosGoogle(
       formula,
       ...(ocupado ? { ocupado } : {}),
       ...(notas ? { notas } : {}),
+      ...(valorInformado
+        ? {
+            valorInformado,
+            conteudoHash: createHash("sha256")
+              .update(JSON.stringify(trecho?.rowData ?? []))
+              .digest("hex"),
+          }
+        : {}),
     };
   });
 }
@@ -688,6 +706,7 @@ export async function executarAcaoGoogle(
           .string()
           .regex(/^[a-f0-9]{64}$/)
           .optional(),
+        descartarComplementos: z.boolean().default(false),
       })
       .safeParse(corpo);
     if (!dados.success || (corpo.acao === "moverAbaAntiga" && !dados.data.impressao))

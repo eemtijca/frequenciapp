@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
+
 - Histórico mensal da planilha permanece acessível, inclusive setembro e anos anteriores. A Gestão oferece links diretos por mês e turma e transfere as marcas das abas sem mês para os destinos preparados antes de retirá-las, com prévia, conferência de conteúdo e proteção contra divergências.
 
 - Presenças omitidas no preenchimento inicial das listas históricas: a nova migração recupera alunos da turma de origem cadastrados até o salvamento ou a importação, sem reinterpretar chamadas posteriores nem remover faltas e confirmações. Os dias corrigidos ganham revisão e auditoria e ficam pendentes de reenvio às planilhas.

@@ -995,15 +995,30 @@ describe("frequência organizada por turma e mês", () => {
     expect(
       (await chamar("/api/planilha/mensal/legado", "POST", { aba: "QA Não mapeada" })).status,
     ).toBe(409);
-    expect((await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA })).status).toBe(409);
+    const { previa } = await dados<{
+      previa: { planoHash: string; complementos: { formulas: number } };
+    }>(await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA }));
+    expect(previa.complementos.formulas).toBe(1);
+    expect(
+      (
+        await chamar("/api/planilha/mensal/legado", "POST", {
+          aba: LEGADA,
+          planoHash: previa.planoHash,
+        })
+      ).status,
+    ).toBe(409);
     expect(google.abas()).toContain(LEGADA);
   });
   it("move duas datas antigas para seus meses e só então retira a aba sem mês", async () => {
     // Um vínculo explícito permite conferir o legado anterior ao OAuth, sem autoria.
-    google.definirAba(LEGADA, [
-      ["Aluno", "30/09/2026", "01/10/2026"],
-      ["QA Mensal Aluno A", "FJ", "P"],
-    ]);
+    google.definirAba(
+      LEGADA,
+      [
+        ["Aluno", "30/09/2026", "01/10/2026", "Total"],
+        ["QA Mensal Aluno A", "FJ", "P", "1"],
+      ],
+      { formulas: { D2: '=COUNTIF(B2:C2;"FJ")' }, notas: { A2: "QA Nota original" } },
+    );
     const setembro = mensais["2026-09"]?.aba ?? "";
     const outubro = mensais["2026-10"]?.aba ?? "";
     google.definirValor(setembro, 2, cabecalho(setembro).indexOf("30/09/2026") + 1, "");
@@ -1016,6 +1031,24 @@ describe("frequência organizada por turma e mês", () => {
     expect(previa.destinos).toHaveLength(2);
     expect(google.abas()).toContain(LEGADA);
     expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+    const confirmar = (planoHash: string, opcoes: object = {}) =>
+      chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA, planoHash, ...opcoes });
+    expect((await confirmar(previa.planoHash)).status).toBe(409);
+    expect((await confirmar(previa.planoHash, { descartarComplementos: true })).status).toBe(400);
+    expect(
+      (
+        await confirmar(previa.planoHash, {
+          descartarComplementos: true,
+          senha: "QA senha incorreta",
+        })
+      ).status,
+    ).toBe(400);
+    expect(google.abas()).toContain(LEGADA);
+    google.definirNota(LEGADA, 2, 1, "QA Nota corrigida sem mudar a posição");
+    expect(
+      (await confirmar(previa.planoHash, { descartarComplementos: true, senha: SENHA_ADMIN }))
+        .status,
+    ).toBe(409);
     google.definirValor(LEGADA, 2, 2, "F");
     expect(
       (
@@ -1029,9 +1062,9 @@ describe("frequência organizada por turma e mês", () => {
       await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA }),
     );
     await dados(
-      await chamar("/api/planilha/mensal/legado", "POST", {
-        aba: LEGADA,
-        planoHash: atualizada.previa.planoHash,
+      await confirmar(atualizada.previa.planoHash, {
+        descartarComplementos: true,
+        senha: SENHA_ADMIN,
       }),
     );
     expect(google.abas()).not.toContain(LEGADA);

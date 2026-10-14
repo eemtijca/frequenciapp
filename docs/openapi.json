@@ -10790,7 +10790,7 @@
       "post": {
         "operationId": "organizarAbaAntigaDaPlanilha",
         "summary": "Transferir frequências de uma aba sem mês",
-        "description": "Apenas administração e origem confiável. Sem planoHash devolve prévia assinada. A confirmação relê e confere os dados, copia marcas para células mensais vazias e retira a aba de origem em um lote atômico. Exige vínculo salvo; o título sozinho não autoriza a retirada. Fórmulas, notas, mesclagens, gráficos, datas ou alunos ambíguos e valores divergentes impedem a exclusão. A leitura completa aceita até 2.000 linhas e 400 colunas por aba, com blocos de até 20.000 células. Resposta perdida exige conferência, sem repetição automática.",
+        "description": "Apenas administração e origem confiável. Sem planoHash devolve prévia assinada com contagens e coordenadas dos complementos antigos. A confirmação relê, copia marcas para células mensais vazias e retira a origem no mesmo lote atômico. Havendo totais ou notas, exige autorização explícita de descarte e senha administrativa. Fórmulas nos nomes ou datas, mesclagens, gráficos, alunos ambíguos e divergências continuam protegidos. A assinatura considera o conteúdo real das notas e fórmulas mesmo sem mudança do resultado exibido. Não há repetição automática de escrita com resposta perdida.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -10807,6 +10807,18 @@
                     "type": "string",
                     "minLength": 64,
                     "maxLength": 64
+                  },
+                  "descartarComplementos": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Autorização explícita para descartar somente os totais e notas identificados na prévia."
+                  },
+                  "senha": {
+                    "type": "string",
+                    "minLength": 1,
+                    "format": "password",
+                    "writeOnly": true,
+                    "description": "Senha administrativa exigida na confirmação do descarte de complementos."
                   }
                 },
                 "required": ["aba"],
@@ -10824,6 +10836,15 @@
                   "value": {
                     "aba": "1º A",
                     "planoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                  }
+                },
+                "Descarte": {
+                  "summary": "Confirmação após conferência dos complementos",
+                  "value": {
+                    "aba": "1º A",
+                    "planoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "descartarComplementos": true,
+                    "senha": "[senha administrativa]"
                   }
                 }
               }
@@ -10875,6 +10896,46 @@
                                 },
                                 "required": ["aba", "mes"]
                               }
+                            },
+                            "urlAntiga": {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            "complementos": {
+                              "type": "object",
+                              "required": ["formulas", "notas", "totais", "amostras"],
+                              "properties": {
+                                "formulas": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "notas": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "totais": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "amostras": {
+                                  "type": "array",
+                                  "maxItems": 18,
+                                  "items": {
+                                    "type": "object",
+                                    "required": ["celula", "tipo"],
+                                    "properties": {
+                                      "celula": {
+                                        "type": "string",
+                                        "pattern": "^[A-Z]+[0-9]+$"
+                                      },
+                                      "tipo": {
+                                        "type": "string",
+                                        "enum": ["fórmula", "nota", "total"]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
                             }
                           },
                           "required": [
@@ -10884,7 +10945,9 @@
                             "preenchidas",
                             "conferidas",
                             "destinos",
-                            "removida"
+                            "removida",
+                            "complementos",
+                            "urlAntiga"
                           ]
                         }
                       },
@@ -10926,7 +10989,7 @@
             "$ref": "#/components/responses/Erro403"
           },
           "409": {
-            "description": "Conteúdo inseguro, conexão alterada ou prévia vencida.",
+            "description": "Conteúdo protegido, prévia vencida ou falta de autorização explícita de descarte.",
             "content": {
               "application/json": {
                 "schema": {

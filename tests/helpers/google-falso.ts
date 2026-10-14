@@ -8,6 +8,7 @@ type Objeto = Record<string, unknown>;
 interface Celula {
   valor: string;
   formula: string;
+  nota?: string;
 }
 interface Aba {
   id: number;
@@ -43,6 +44,7 @@ export interface GoogleFalso {
     valores: string[][],
     opcoes?: {
       formulas?: Record<string, string>;
+      notas?: Record<string, string>;
       mesclagens?: string[];
       mensal?: {
         turmaOriginalId: string;
@@ -56,6 +58,7 @@ export interface GoogleFalso {
   removerAba(nome: string): void;
   valor(nome: string, linha: number, coluna: number): string;
   definirValor(nome: string, linha: number, coluna: number, valor: string): void;
+  definirNota(nome: string, linha: number, coluna: number, nota: string): void;
   formulaDe(nome: string, linha: number, coluna: number): string;
   apresentacao(nome: string): { congeladasLinhas: number; faixas: Objeto[] };
   vinculos(nome: string): { linha: number; alunoId: string }[];
@@ -209,6 +212,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
                         const celula = item.celulas[faixa.linha + l]?.[faixa.coluna + c];
                         return {
                           formattedValue,
+                          ...(celula?.nota ? { note: celula.nota } : {}),
                           ...(celula?.formula
                             ? { userEnteredValue: { formulaValue: celula.formula } }
                             : formattedValue
@@ -579,6 +583,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
         const match = /^([A-Z]+)(\d+)$/.exec(a1);
         if (match) garantir(item, Number(match[2]), coluna(match[1] ?? "A")).formula = formula;
       }
+      for (const [a1, nota] of Object.entries(opcoes?.notas ?? {})) {
+        const match = /^([A-Z]+)(\d+)$/.exec(a1);
+        if (match) garantir(item, Number(match[2]), coluna(match[1] ?? "A")).nota = nota;
+      }
       item.mesclagens = (opcoes?.mesclagens ?? []).map((a1) => {
         const faixa = intervalo(`'${nome}'!${a1}`);
         return {
@@ -602,6 +610,10 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     definirValor: (nome, linha, indice, valor) => {
       const item = aba(nome);
       if (item) garantir(item, linha, indice).valor = valor;
+    },
+    definirNota: (nome, linha, indice, nota) => {
+      const item = aba(nome);
+      if (item) garantir(item, linha, indice).nota = nota;
     },
     formulaDe: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.formula ?? "",
     apresentacao: (nome) => ({

@@ -11,6 +11,8 @@ import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
 import { comTravaPlanilhaFrequencia } from "@/infra/trava-planilha-frequencia";
 import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { hashTexto } from "@/domain/planilha";
+import type { ComplementosAntigos } from "@/infra/google-planilhas-legado";
+import { conferirSenhaDoAdmin } from "./confirmacao-admin";
 import { listarTodasTurmas } from "./turmas";
 import { listarTodosAlunos } from "./alunos";
 import { listarFeriados } from "./calendario-letivo";
@@ -181,7 +183,12 @@ export async function listarMesesDaFrequencia() {
 /** Prévia assinada por aba e conexão; a confirmação relê antes de copiar e excluir. */
 export async function organizarAbaAntiga(admin: { id: string }, entrada: unknown) {
   const dados = z
-    .object({ aba: z.string().min(1).max(200), planoHash: z.string().length(64).optional() })
+    .object({
+      aba: z.string().min(1).max(200),
+      planoHash: z.string().length(64).optional(),
+      descartarComplementos: z.boolean().default(false),
+      senha: z.string().min(1).optional(),
+    })
     .strict()
     .safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Escolha uma aba antiga e confira a prévia.", 400);
@@ -200,6 +207,8 @@ export async function organizarAbaAntiga(admin: { id: string }, entrada: unknown
         conferidas: number;
         destinos: { mes: string; aba: string }[];
         removida: boolean;
+        complementos: ComplementosAntigos;
+        urlAntiga: string;
       }>(linha, {
         acao: "preverAbaAntiga",
         aba: vinculo.aba,
@@ -219,11 +228,23 @@ export async function organizarAbaAntiga(admin: { id: string }, entrada: unknown
       if (!dados.data.planoHash) return { previa: { ...previa, planoHash } };
       if (dados.data.planoHash !== planoHash)
         throw new ErroHttp("A planilha ou a conexão mudou. Confira uma nova prévia.", 409);
+      const complementos = previa.complementos;
+      if (complementos.formulas + complementos.notas + complementos.totais > 0) {
+        if (!dados.data.descartarComplementos)
+          throw new ErroHttp(
+            "Confirme o descarte dos totais e notas antigos antes de retirar a aba.",
+            409,
+          );
+        if (!dados.data.senha)
+          throw new ErroHttp("Informe a senha administrativa para confirmar o descarte.", 400);
+        await conferirSenhaDoAdmin(admin.id, dados.data.senha, "planilha:descartar_complementos");
+      }
       await chamarIntegracao(linha, {
         acao: "moverAbaAntiga",
         aba: vinculo.aba,
         turmaOriginalId: vinculo.turmaOriginalId,
         impressao: previa.impressao,
+        descartarComplementos: dados.data.descartarComplementos,
       });
       await comTransacao(async (tx) => {
         const atual = await tx.integracaoPlanilha.findUnique({
@@ -255,7 +276,12 @@ export async function organizarAbaAntiga(admin: { id: string }, entrada: unknown
             atualizadoPorId: admin.id,
           },
         });
-        await auditar(tx, admin.id, "planilha.organizar_aba_antiga", `aba:${vinculo.aba}`);
+        await auditar(
+          tx,
+          admin.id,
+          "planilha.organizar_aba_antiga",
+          `aba:${vinculo.aba};formulas:${complementos.formulas};notas:${complementos.notas};totais:${complementos.totais}`,
+        );
       });
       return { removida: true, aba: vinculo.aba };
     }),
