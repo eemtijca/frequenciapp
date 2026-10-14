@@ -1,5 +1,6 @@
 // Google Planilhas: casos de uso da integração da frequência. Leitura do
 // esquema, planejamento conservador, envio manual e modo completo.
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { banco, objetoDoBanco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
@@ -74,6 +75,9 @@ export interface EstadoPlanilha {
 }
 
 const esquemaMapa = z.object({
+  conferenciaHash: z
+    .string("Confira a estrutura antes de salvar o mapa.")
+    .regex(/^[a-f0-9]{64}$/, "Confira a estrutura antes de salvar o mapa."),
   planilha: z.object({
     nome: z.string().max(200),
     url: z.string().max(500),
@@ -121,12 +125,25 @@ export function esquemaSalvo(linha: Pick<LinhaIntegracao, "esquema">): EsquemaSa
   return candidato;
 }
 
+/** Identifica o destino real sem reaproveitar sucesso de outro arquivo ou aba. */
+function destinoDoVinculo(linha: LinhaIntegracao, vinculo: MapaAba): string | null {
+  if (vinculo.mes) return vinculo.destino ?? null;
+  const aba = esquemaSalvo(linha)?.abas.find((item) => item.nome === vinculo.aba);
+  if (!linha.googlePlanilhaId || aba?.abaId === undefined) return null;
+  return `frequencia:${hashTexto(JSON.stringify([linha.googlePlanilhaId, aba.abaId]))}`;
+}
+
 /**
  * Chamadas sem sucesso completo posterior que cubra o dia de cada origem
  * da lista. Cada chamada conta uma vez, mesmo com alunos de várias origens.
  */
 async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
-  const mensais = JSON.stringify((esquemaSalvo(linha)?.mapa ?? []).filter((item) => item.mes));
+  const vinculos = JSON.stringify(
+    (esquemaSalvo(linha)?.mapa ?? []).map((item) => ({
+      ...item,
+      destino: destinoDoVinculo(linha, item),
+    })),
+  );
   const contagem = await banco().$queryRaw<{ total: bigint }[]>`
     SELECT COUNT(*) AS total
     FROM ${objetoDoBanco("frequencias")} AS frequencia
@@ -141,8 +158,9 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
         AND (
           EXTRACT(ISODOW FROM frequencia.dia) <= 6
           OR NOT EXISTS (
-            SELECT 1 FROM jsonb_array_elements(${mensais}::jsonb) AS mensal
+            SELECT 1 FROM jsonb_array_elements(${vinculos}::jsonb) AS mensal
             WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
+              AND mensal->>'mes' IS NOT NULL
           )
         )
         AND NOT EXISTS (
@@ -156,17 +174,18 @@ async function contarAlteradasDepois(linha: LinhaIntegracao): Promise<number> {
             AND envio.de <= frequencia.dia
             AND envio.ate >= frequencia.dia
             AND envio.criado_em > frequencia.atualizado_em
-            AND (
-              (envio.destino IS NULL AND NOT EXISTS (
-                SELECT 1 FROM jsonb_array_elements(${mensais}::jsonb) AS mensal
-                WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
-              ))
-              OR EXISTS (
-                SELECT 1 FROM jsonb_array_elements(${mensais}::jsonb) AS mensal
-                WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
-                  AND mensal->>'mes' = to_char(frequencia.dia, 'YYYY-MM')
-                  AND mensal->>'destino' = envio.destino
-              )
+            AND EXISTS (
+              SELECT 1 FROM jsonb_array_elements(${vinculos}::jsonb) AS vinculo
+              WHERE vinculo->>'turmaOriginalId' = aluno.turma_original_id::text
+                AND vinculo->>'destino' = envio.destino
+                AND (
+                  vinculo->>'mes' = to_char(frequencia.dia, 'YYYY-MM')
+                  OR (vinculo->>'mes' IS NULL AND NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(${vinculos}::jsonb) AS mensal
+                    WHERE mensal->>'turmaOriginalId' = aluno.turma_original_id::text
+                      AND mensal->>'mes' IS NOT NULL
+                  ))
+                )
             )
         )
     )
@@ -220,7 +239,7 @@ export async function lerIntegracaoAdmin() {
       criadoEm: true,
     },
   });
-  const ultimoErro = await lerErroVigente();
+  const ultimoErro = await lerErroVigente(linha);
   return {
     ativa: linha.ativa,
     googleConectado: Boolean(linha.googleRefreshToken),
@@ -260,10 +279,22 @@ export async function lerIntegracaoAdmin() {
  * Erro vigente por turma e destino: um mês concluído não encobre a pendência
  * de outro mês. Duas consultas mantêm a leitura limitada aos envios recentes.
  */
-async function lerErroVigente() {
+async function lerErroVigente(linha: LinhaIntegracao) {
+  const mapa = esquemaSalvo(linha)?.mapa ?? [];
+  const destinos = mapa
+    .filter(
+      (item) =>
+        item.mes || !mapa.some((par) => par.turmaOriginalId === item.turmaOriginalId && par.mes),
+    )
+    .map((item) => ({ ...item, destino: destinoDoVinculo(linha, item) }));
+  const filtros = destinos.flatMap((item) => [
+    ...(item.destino ? [{ turmaOriginalId: item.turmaOriginalId, destino: item.destino }] : []),
+    ...(!item.mes ? [{ turmaOriginalId: item.turmaOriginalId, destino: null }] : []),
+  ]);
+  if (filtros.length === 0) return null;
   const ultimos = await banco().sincronizacaoPlanilha.groupBy({
     by: ["turmaOriginalId", "destino"],
-    where: { finalidade: FINALIDADE, turmaOriginalId: { not: null } },
+    where: { finalidade: FINALIDADE, OR: filtros },
     _max: { criadoEm: true },
   });
   const limites = ultimos.flatMap((item) =>
@@ -289,7 +320,16 @@ async function lerErroVigente() {
       turmaOriginal: { select: { nome: true, serie: { select: { nome: true } } } },
     },
   });
-  return erroVigente(registros, (registro) =>
+  const atuais = registros.flatMap((registro) =>
+    registro.destino !== null
+      ? [registro]
+      : registro.resultado === "SUCESSO"
+        ? []
+        : destinos
+            .filter((item) => !item.mes && item.turmaOriginalId === registro.turmaOriginalId)
+            .map((item) => ({ ...registro, destino: item.destino })),
+  );
+  return erroVigente(atuais, (registro) =>
     registro.turmaOriginalId ? `${registro.turmaOriginalId}:${registro.destino ?? "legado"}` : null,
   );
 }
@@ -301,7 +341,8 @@ export async function salvarIntegracao(admin: { id: string }, entrada: unknown) 
 }
 
 /** Lê o esquema de todas as abas e sugere o mapa por turma de origem. */
-export async function lerEstrutura() {
+export async function lerEstrutura(mes?: string) {
+  if (mes !== undefined && !mesValido(mes)) throw new ErroHttp("Mês inválido.", 400);
   return comPausasDeLeituraGoogle(async () => {
     const linha = await lerLinha(FINALIDADE);
     const salvo = esquemaSalvo(linha);
@@ -314,13 +355,14 @@ export async function lerEstrutura() {
     const problemas: { aba: string; erro: string }[] = [];
     for (const item of estrutura.abas) {
       try {
-        // O envio relê a assinatura e as células. O catálogo evita reler todo
-        // o histórico mensal apenas para conferir os vínculos na Gestão.
-        const anterior = item.mensal
-          ? salvo?.abas.find(
-              (aba) => aba.nome === item.nome && aba.mensal?.destino === item.mensal?.destino,
-            )
-          : undefined;
+        // Relê o mês em revisão; os demais meses aproveitam a conferência salva
+        // para não consultar todo o histórico ao corrigir uma única estrutura.
+        const anterior =
+          item.mensal && item.mensal.mes !== mes
+            ? salvo?.abas.find(
+                (aba) => aba.nome === item.nome && aba.mensal?.destino === item.mensal?.destino,
+              )
+            : undefined;
         const aba = anterior ?? (await detectarAba(linha, item.nome));
         abas.push({ ...aba, ...(item.mensal ? { mensal: item.mensal } : {}) });
       } catch (erro) {
@@ -336,8 +378,50 @@ export async function lerEstrutura() {
         ? { ...aba.mensal, confianca: "alta" as const }
         : sugerirTurma(aba.nome, turmas)),
     }));
-    return { planilha: estrutura.planilha, abas, sugestoes, problemas };
+    return {
+      planilha: estrutura.planilha,
+      abas,
+      sugestoes,
+      problemas,
+      conferenciaHash: assinarConferencia(linha, estrutura.planilha, abas),
+    };
   });
+}
+
+/** A conferência pertence ao arquivo, à conexão e à versão que foram lidos. */
+function assinarConferencia(
+  linha: LinhaIntegracao,
+  planilha: EsquemaSalvo["planilha"],
+  abas: unknown[],
+): string {
+  return createHmac("sha256", ambiente.authSecret)
+    .update(
+      JSON.stringify([
+        "conferencia-frequencia-v1",
+        linha.googlePlanilhaId,
+        linha.googleRefreshToken,
+        linha.atualizadoEm.toISOString(),
+        linha.esquemaEm?.toISOString() ?? null,
+        linha.assinaturaEsquema,
+        linha.esquema,
+        [planilha.nome, planilha.url, planilha.fuso],
+        abas,
+      ]),
+    )
+    .digest("hex");
+}
+
+function conferirAssinaturaDaEstrutura(
+  linha: LinhaIntegracao,
+  dados: z.infer<typeof esquemaMapa>,
+): void {
+  const esperado = assinarConferencia(linha, dados.planilha, dados.abas);
+  if (!timingSafeEqual(Buffer.from(dados.conferenciaHash, "hex"), Buffer.from(esperado, "hex"))) {
+    throw new ErroHttp(
+      "A configuração ou a estrutura mudou. Confira a estrutura novamente antes de salvar.",
+      409,
+    );
+  }
 }
 
 /** Sugere a turma de origem pelo nome da aba, com confiança. */
@@ -371,6 +455,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
   }
   const turmas = await listarTodasTurmas();
   const linha = await lerLinha(FINALIDADE);
+  conferirAssinaturaDaEstrutura(linha, dados.data);
   const mensais = await chamarIntegracao<{ abas: MapaAba[] }>(linha, { acao: "abasMensais" });
   const mapa: MapaAba[] = [];
   const destinos = new Set<string>();
@@ -429,6 +514,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
     if (!atual || atual.googlePlanilhaId !== linha.googlePlanilhaId) {
       throw new ErroHttp("A conexão mudou. Confira a estrutura novamente.", 409);
     }
+    conferirAssinaturaDaEstrutura(atual, dados.data);
     const vigente = esquemaSalvo(atual);
     const mapaFinal = [...mapa];
     const abasFinais = [...abas];
@@ -466,7 +552,7 @@ export async function salvarMapa(admin: { id: string }, entrada: unknown) {
 /** Plano de uma turma, ou nulo quando não há dia a enviar. */
 interface PlanoDaTurma {
   mes?: string;
-  destino?: string;
+  destino: string;
   turmaOriginalId: string;
   aba: string;
   rotulo: string;
@@ -516,14 +602,14 @@ async function diasDoEnvio(
   turmaOriginalId: string,
   entrada: EntradaEnvio,
   incluirSituacao: boolean,
-  destino?: string,
+  destino: string,
 ): Promise<{ dias: string[]; incremental: boolean }> {
   const periodo = diasEntre(entrada.de, entrada.ate);
   if (entrada.somenteAlteradas === false) return { dias: periodo, incremental: false };
   const de = new Date(`${entrada.de}T12:00:00Z`);
   const ate = new Date(`${entrada.ate}T12:00:00Z`);
   const sucessoCompleto = {
-    destino: destino ?? null,
+    destino,
     finalidade: FINALIDADE,
     turmaOriginalId,
     resultado: "SUCESSO" as const,
@@ -571,6 +657,7 @@ async function diasDoEnvio(
 }
 
 type LeituraPlanilha = {
+  abaId: number;
   valores: string[][];
   formula: boolean[][];
   linhaInicial: number;
@@ -603,6 +690,9 @@ async function lerParaPlano(
     blocos: blocosDeColunas(colunas),
     cabecalhoLinha: esquema.cabecalho,
   });
+  if (esquema.abaId !== undefined && leitura.abaId !== esquema.abaId) {
+    throw new ErroHttp("A aba foi substituída. Confira a estrutura antes de enviar.", 409);
+  }
   if (
     esquema.mensal &&
     (leitura.mensal?.destino !== esquema.mensal.destino ||
@@ -640,6 +730,7 @@ export async function detectarAba(linha: LinhaIntegracao, nome: string): Promise
   const estrutura = await chamarIntegracao<{
     abas: {
       nome: string;
+      abaId: number;
       oculta: boolean;
       criada: boolean;
       linhas: number;
@@ -675,18 +766,27 @@ export async function detectarAba(linha: LinhaIntegracao, nome: string): Promise
     },
     new Date().getFullYear(),
   );
-  return { ...esquema, ...(item.mensal ? { mensal: item.mensal } : {}) };
+  return { ...esquema, abaId: item.abaId, ...(item.mensal ? { mensal: item.mensal } : {}) };
 }
 
 /** Troca o esquema de uma aba no esquema salvo, mantendo o mapa. */
-async function salvarEsquemaDaAba(aba: AbaEsquema): Promise<void> {
+async function salvarEsquemaDaAba(aba: AbaEsquema, referencia: LinhaIntegracao): Promise<void> {
   await comTransacao(async (tx) => {
     const linha = await tx.integracaoPlanilha.findUnique({
       where: { id: idDaIntegracao(FINALIDADE) },
     });
-    if (!linha) return;
-    const salvo = esquemaSalvo(linha);
-    if (!salvo) return;
+    const salvo = linha ? esquemaSalvo(linha) : null;
+    const esperado = esquemaSalvo(referencia);
+    if (
+      !linha ||
+      !salvo ||
+      linha.googlePlanilhaId !== referencia.googlePlanilhaId ||
+      linha.googleRefreshToken !== referencia.googleRefreshToken ||
+      JSON.stringify(salvo.mapa.filter((item) => item.aba === aba.nome)) !==
+        JSON.stringify(esperado?.mapa.filter((item) => item.aba === aba.nome))
+    ) {
+      throw new ErroHttp("A configuração mudou. Confira a estrutura novamente.", 409);
+    }
     const abas = salvo.abas.map((item) => (item.nome === aba.nome ? aba : item));
     await tx.integracaoPlanilha.update({
       where: { id: linha.id },
@@ -701,7 +801,7 @@ async function salvarEsquemaDaAba(aba: AbaEsquema): Promise<void> {
 
 /** Relê o cabeçalho após correção sem alterar o mapa das turmas. */
 export async function atualizarEsquemaDaAba(linha: LinhaIntegracao, nome: string): Promise<void> {
-  await salvarEsquemaDaAba(await detectarAba(linha, nome));
+  await salvarEsquemaDaAba(await detectarAba(linha, nome), linha);
 }
 
 /** Monta os planos de todas as turmas mapeadas para o período. */
@@ -755,7 +855,7 @@ async function montarSimulacao(
   if (pares.length === 0) {
     throw new ErroHttp("Nenhuma aba preparada para a turma e o período do envio.", 400);
   }
-  const diasPorAba = new Map<string, { dias: string[]; incremental: boolean }>();
+  const diasPermitidosPorAba = new Map<string, Set<string>>();
   for (const par of pares) {
     const diasMensais = par.mes
       ? new Set(
@@ -766,9 +866,52 @@ async function montarSimulacao(
           ),
         )
       : null;
-    const diasPermitidos = (dia: string) =>
-      !feriados.has(dia) && (!diasMensais || diasMensais.has(dia));
-    const diasDoDestino = periodo.filter(diasPermitidos);
+    diasPermitidosPorAba.set(
+      par.aba,
+      new Set(
+        periodo.filter((dia) => !feriados.has(dia) && (!diasMensais || diasMensais.has(dia))),
+      ),
+    );
+  }
+  const catalogo = [...diasPermitidosPorAba.values()].some((dias) => dias.size > 0)
+    ? await chamarIntegracao<{
+        abas: { nome: string; abaId: number; mensal?: AbaEsquema["mensal"] }[];
+      }>(linha, { acao: "catalogoFrequencia" })
+    : { abas: [] };
+  const destinos = new Map<string, string>();
+  for (const par of pares) {
+    if (!diasPermitidosPorAba.get(par.aba)?.size) {
+      destinos.set(par.aba, destinoDoVinculo(linha, par) ?? "sem-envio");
+      continue;
+    }
+    const atual = catalogo.abas.find((aba) => aba.nome === par.aba);
+    if (!atual) throw new ErroHttp(`A aba ${par.aba} não foi encontrada na planilha.`, 409);
+    if (
+      Boolean(par.mes) !== Boolean(atual.mensal) ||
+      (par.mes && atual.mensal?.destino !== par.destino)
+    ) {
+      throw new ErroHttp("A identificação da aba mudou. Confira a estrutura na Gestão.", 409);
+    }
+    const indice = salvo.abas.findIndex((aba) => aba.nome === par.aba);
+    const anterior = salvo.abas[indice];
+    if (!anterior) throw new ErroHttp(`A aba ${par.aba} não está mais na estrutura salva.`, 409);
+    if (anterior.abaId !== undefined && anterior.abaId !== atual.abaId) {
+      throw new ErroHttp("A aba foi substituída. Confira a estrutura antes de enviar.", 409);
+    }
+    if (anterior.abaId === undefined) {
+      const detectada = await detectarAba(linha, par.aba);
+      salvo.abas[indice] = detectada;
+      await salvarEsquemaDaAba(detectada, linha);
+    }
+    const destino = destinoDoVinculo({ ...linha, esquema: salvo }, par);
+    if (!destino) throw new ErroHttp("Confira a estrutura da planilha antes de enviar.", 409);
+    destinos.set(par.aba, destino);
+  }
+  const diasPorAba = new Map<string, { dias: string[]; incremental: boolean }>();
+  for (const par of pares) {
+    const permitidos = diasPermitidosPorAba.get(par.aba) ?? new Set<string>();
+    const diasPermitidos = (dia: string) => permitidos.has(dia);
+    const diasDoDestino = [...permitidos];
     if (diasDoDestino.length === 0) {
       diasPorAba.set(par.aba, { dias: [], incremental: entrada.somenteAlteradas !== false });
       continue;
@@ -781,7 +924,7 @@ async function montarSimulacao(
         ate: diasDoDestino.at(-1) ?? entrada.ate,
       },
       true,
-      par.destino,
+      destinos.get(par.aba) ?? "",
     );
     // O calendário vale também para o envio incremental e para abas legadas.
     diasPorAba.set(par.aba, {
@@ -819,7 +962,15 @@ async function montarSimulacao(
     };
     const rotulo = rotuloDaTurma(par.turmaOriginalId) || par.aba;
     if (dias.length === 0) {
-      planos.push({ plano: null, esquema: esquemaAba, dias, incremental, rotulo, ...par });
+      planos.push({
+        plano: null,
+        esquema: esquemaAba,
+        dias,
+        incremental,
+        rotulo,
+        ...par,
+        destino: destinos.get(par.aba) ?? "",
+      });
       continue;
     }
     const turmaPlanilha = montarTurmaPlanilha(
@@ -838,7 +989,7 @@ async function montarSimulacao(
     let estruturaAtualizada = false;
     if (leitura.assinatura && leitura.assinatura !== esquemaAba.assinatura) {
       esquemaAba = await detectarAba(linha, par.aba);
-      await salvarEsquemaDaAba(esquemaAba);
+      await salvarEsquemaDaAba(esquemaAba, linha);
       leitura = await lerParaPlano(linha, esquemaAba, dias);
       estruturaAtualizada = true;
     }
@@ -867,7 +1018,15 @@ async function montarSimulacao(
         "A estrutura da aba mudou desde a última conferência; a prévia já usa a atual.",
       );
     }
-    planos.push({ plano, esquema: esquemaAba, dias, incremental, rotulo, ...par });
+    planos.push({
+      plano,
+      esquema: esquemaAba,
+      dias,
+      incremental,
+      rotulo,
+      ...par,
+      destino: destinos.get(par.aba) ?? "",
+    });
   }
   return {
     modalidade,
@@ -969,16 +1128,6 @@ async function enviarTurmaAutomatico(
   dia: string,
 ): Promise<SituacaoEnvioAutomatico> {
   try {
-    const vinculos =
-      esquemaSalvo(linha)?.mapa.filter((par) => par.turmaOriginalId === turmaOriginalId) ?? [];
-    const destino = vinculos.find((par) => par.mes === dia.slice(0, 7))?.destino ?? null;
-    // Envio anterior sem confirmação no mesmo destino nunca se repete sozinho.
-    const ultimo = await banco().sincronizacaoPlanilha.findFirst({
-      where: { finalidade: FINALIDADE, turmaOriginalId, destino },
-      orderBy: { criadoEm: "desc" },
-      select: { resultado: true },
-    });
-    if (ultimo?.resultado === "PARCIAL") return "sem_confirmacao";
     const entrada: EntradaEnvio = {
       turmaOriginalId,
       de: dia,
@@ -990,6 +1139,21 @@ async function enviarTurmaAutomatico(
     const simulacao = await montarSimulacao(linha, entrada);
     const item = simulacao.planos[0];
     if (!item?.plano || simulacao.modalidade !== "conservador") return "pendente_manual";
+    // O legado sem destino não permite deduzir onde a tentativa foi aplicada.
+    // Só uma conferência manual posterior libera o envio automático.
+    const ultimo = await banco().sincronizacaoPlanilha.findFirst({
+      where: {
+        finalidade: FINALIDADE,
+        turmaOriginalId,
+        OR: [
+          { destino: item.destino },
+          ...(!item.mes ? [{ destino: null, resultado: { not: "SUCESSO" as const } }] : []),
+        ],
+      },
+      orderBy: { criadoEm: "desc" },
+      select: { resultado: true },
+    });
+    if (ultimo?.resultado === "PARCIAL") return "sem_confirmacao";
     const { resumo } = item.plano;
     const naoSeguro =
       resumo.substituir + resumo.limpar + resumo.removerLinhas + resumo.removerColunas > 0 ||
@@ -1161,6 +1325,7 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
         acao: "aplicar",
         aba: plano.aba,
         cabecalhoLinha: esquema.cabecalho,
+        abaId: esquema.abaId,
         assinatura: plano.assinatura,
         ...(esquema.mensal ? { mensal: esquema.mensal } : {}),
         modoCompleto: destrutiva,
@@ -1171,7 +1336,7 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
       // para o próximo envio não pedir nova conferência de estrutura.
       if (Number(contagens.colunasCriadas ?? 0) > 0 || Number(contagens.linhasCriadas ?? 0) > 0) {
         try {
-          await salvarEsquemaDaAba(await detectarAba(linha, plano.aba));
+          await salvarEsquemaDaAba(await detectarAba(linha, plano.aba), linha);
         } catch {
           // A prévia seguinte detecta a mudança pela assinatura e reconfere.
         }
@@ -1321,7 +1486,7 @@ async function criarRegistro(
   const criado = await banco().sincronizacaoPlanilha.create({
     data: {
       turmaOriginalId: plano.turmaOriginalId,
-      destino: item.destino ?? null,
+      destino: item.destino,
       de: new Date(`${de}T12:00:00Z`),
       ate: new Date(`${ate}T12:00:00Z`),
       modalidade: modalidade === "completo" ? "COMPLETO" : "CONSERVADOR",

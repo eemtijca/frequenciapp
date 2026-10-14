@@ -172,8 +172,7 @@ beforeAll(async () => {
     await chamar("/api/planilha/estrutura", "POST", {}),
   );
   const mapa = await chamar("/api/planilha/mapa", "POST", {
-    planilha: estrutura.planilha,
-    abas: estrutura.abas,
+    ...estrutura,
     mapa: [{ aba: "QS Ano A", turmaOriginalId: turmas.A }],
   });
   expect(mapa.status).toBe(200);

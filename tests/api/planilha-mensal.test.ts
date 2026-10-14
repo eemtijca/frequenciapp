@@ -374,23 +374,31 @@ describe("frequência organizada por turma e mês", () => {
 
   it("salva a mesma turma em meses distintos e recusa duplicidade do mesmo período", async () => {
     const esquema = await lerEsquema();
+    const estrutura = await dados<Record<string, unknown>>(
+      await chamar("/api/planilha/estrutura", "POST", {}),
+    );
     const setembro = esquema.mapa.find((item) => item.mes === "2026-09");
     const outubro = esquema.mapa.find((item) => item.mes === "2026-10");
     expect(setembro?.turmaOriginalId).toBe(turmas.A);
     expect(outubro?.turmaOriginalId).toBe(turmas.A);
-    expect((await chamar("/api/planilha/mapa", "POST", esquema)).status).toBe(200);
     expect(
       (
         await chamar("/api/planilha/mapa", "POST", {
-          ...esquema,
+          ...estrutura,
           mapa: [...esquema.mapa, setembro],
         })
       ).status,
     ).toBe(400);
+    expect(
+      (await chamar("/api/planilha/mapa", "POST", { ...estrutura, mapa: esquema.mapa })).status,
+    ).toBe(200);
   });
 
   it("mantém uma única aba ao preparar o mesmo mês simultaneamente", async () => {
-    const estruturaAnterior = await lerEsquema();
+    const esquemaAnterior = await lerEsquema();
+    const estruturaAnterior = await dados<Record<string, unknown>>(
+      await chamar("/api/planilha/estrutura", "POST", {}),
+    );
     const respostas = await Promise.all([
       preparar("2026-10", turmas.B),
       preparar("2026-10", turmas.B),
@@ -400,8 +408,15 @@ describe("frequência organizada por turma e mês", () => {
     expect(repetida).toMatchObject({ criada: false, turmaOriginalId: turmas.B, mes: "2026-10" });
     expect(google.abas().filter((nome) => nome === repetida.aba)).toHaveLength(1);
     expect(google.vinculos(repetida.aba)).toEqual([{ linha: 2, alunoId: alunos.B }]);
-    // Outra sessão ainda pode salvar a estrutura conferida antes do preparo.
-    expect((await chamar("/api/planilha/mapa", "POST", estruturaAnterior)).status).toBe(200);
+    // A leitura antiga não sobrescreve o mês preparado por outra sessão.
+    expect(
+      (
+        await chamar("/api/planilha/mapa", "POST", {
+          ...estruturaAnterior,
+          mapa: esquemaAnterior.mapa,
+        })
+      ).status,
+    ).toBe(409);
     const preservado = await lerEsquema();
     expect(preservado.mapa).toContainEqual({
       aba: repetida.aba,
@@ -451,7 +466,11 @@ describe("frequência organizada por turma e mês", () => {
       [turmas.A],
     );
     expect(historico.rows.map((item) => item.destino)).toEqual(
-      expect.arrayContaining([null, setembro.destino, outubro.destino]),
+      expect.arrayContaining([
+        expect.stringMatching(/^frequencia:/),
+        setembro.destino,
+        outubro.destino,
+      ]),
     );
   });
 

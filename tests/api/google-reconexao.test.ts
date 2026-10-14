@@ -293,6 +293,43 @@ describe("reconexão Google com destinos mensais existentes", () => {
     expect(await vinculo()).toEqual(antes);
   });
 
+  it("encerra a automação e o modo completo ao trocar o arquivo", async () => {
+    await dados(
+      await chamar("/api/planilha/modo-completo", {
+        frase: "EDITAR PLANILHA",
+        senha: process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026",
+        duracaoMinutos: 5,
+      }),
+    );
+    const antes = await vinculo();
+    expect(antes).toMatchObject({ envio_automatico: true, modo: "COMPLETO" });
+    await dados(
+      await chamar("/api/planilha/google/selecionar", {
+        id: "planilha-sintetica",
+        finalidade: "FREQUENCIA",
+      }),
+    );
+    expect(await vinculo()).toEqual(antes);
+    const gravacoes = google.chamadas().filter((acao) => acao === "gravar").length;
+    await dados(
+      await chamar("/api/planilha/google/selecionar", {
+        id: "planilha-sintetica-nova",
+        finalidade: "FREQUENCIA",
+      }),
+    );
+    expect(await vinculo()).toMatchObject({
+      google_planilha_id: "planilha-sintetica-nova",
+      ativa: false,
+      envio_automatico: false,
+      modo: "CONSERVADOR",
+      modo_completo_ate: null,
+      esquema: null,
+      assinatura_esquema: null,
+      esquema_em: null,
+    });
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(gravacoes);
+  });
+
   it("mantém a troca de conta explícita com seleção de arquivo pendente", async () => {
     const destino = await retornar(await iniciar({}));
     expect(destino.searchParams.get("google")).toBe("conectado");

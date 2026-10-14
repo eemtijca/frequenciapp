@@ -219,6 +219,8 @@ export interface ColunaEsquema {
 }
 
 export interface AbaEsquema {
+  /** Identificador estável da aba dentro do arquivo Google. */
+  abaId?: number;
   mensal?: { mes: string; turmaOriginalId: string; destino: string };
   nome: string;
   oculta: boolean;

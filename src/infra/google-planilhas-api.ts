@@ -570,6 +570,7 @@ export async function estruturaGoogle(
         );
         return {
           nome: aba.properties.title,
+          abaId: aba.properties.sheetId,
           ...(mensal
             ? {
                 mensal: {
@@ -612,6 +613,7 @@ export async function catalogoFrequenciaGoogle(id: string, acesso: string) {
         const mensal = mensalDaAbaGoogle(doc, aba);
         return {
           nome: aba.properties.title,
+          abaId: aba.properties.sheetId,
           oculta: aba.properties.hidden ?? false,
           criada: metadadosDaAba(doc, aba).some((item) => item.metadataKey === "frequenciapp.aba"),
           congeladasLinhas: aba.properties.gridProperties?.frozenRowCount ?? 0,
@@ -661,6 +663,7 @@ export async function lerGoogle(
   }
   return {
     aba: nome,
+    abaId: aba.properties.sheetId,
     ...(mensal
       ? {
           mensal: {
@@ -765,6 +768,7 @@ export async function executarAcaoGoogle(
       .object({
         aba: z.string().min(1),
         cabecalhoLinha: z.number().int().positive(),
+        abaId: z.number().int().nonnegative().optional(),
         assinatura: z.string(),
         operacoes: z.unknown(),
         modoCompleto: z.boolean(),
@@ -788,6 +792,7 @@ export async function executarAcaoGoogle(
       dados.data.operacoes,
       dados.data.modoCompleto,
       dados.data.mensal,
+      dados.data.abaId,
     );
   }
   if (corpo.acao === "listarCopias") {

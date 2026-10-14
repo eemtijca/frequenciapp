@@ -5758,7 +5758,7 @@
       "post": {
         "operationId": "selecionarPlanilha",
         "summary": "Selecionar a planilha da finalidade",
-        "description": "Administração e origem confiável. Trocar de arquivo desliga a integração e invalida o mapa anterior; a finalidade PARCIAL exige arquivo distinto.",
+        "description": "Administração e origem confiável. Trocar de arquivo desliga a integração e invalida o mapa anterior; a finalidade PARCIAL exige arquivo distinto. Trocar de arquivo desliga integração e automação, invalida estrutura e encerra modo completo. Escolher novamente o mesmo arquivo preserva opções e estrutura.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -5915,7 +5915,7 @@
       "patch": {
         "operationId": "atualizarPlanilha",
         "summary": "Editar a configuração da planilha",
-        "description": "Apenas administração, com origem confiável. Ativar exige conta Google e arquivo selecionados; campos antigos como endpoint são recusados.",
+        "description": "Apenas administração, com origem confiável. Ativar exige conta Google e arquivo selecionados; campos antigos como endpoint são recusados. Habilitar automação da frequência exige integração ativa e conectada, mapa não vazio com vínculos válidos e modo conservador. Uma configuração incompatível responde 409; desligar permanece permitido.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -5992,6 +5992,9 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
           }
         }
       }
@@ -6000,7 +6003,7 @@
       "post": {
         "operationId": "obterEstruturaPlanilha",
         "summary": "Ler a estrutura das abas da planilha",
-        "description": "Apenas administração. Lê o esquema de todas as abas e sugere o mapa por turma de origem.",
+        "description": "Apenas administração. Lê o esquema das abas, sugere o mapa por turma de origem e retorna conferenciaHash vinculada ao arquivo, credencial, revisão e conteúdo da estrutura. Mudanças nesses dados invalidam a conferência. O corpo opcional aceita mes em YYYY-MM: nesse caso, relê os cabeçalhos das abas desse mês e das legadas. Outros meses podem reutilizar a estrutura salva quando a identidade corresponde. Sem mes, mantém essa reutilização para as abas mensais.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -6017,7 +6020,8 @@
                       "planilha": {},
                       "abas": [],
                       "sugestoes": [],
-                      "problemas": []
+                      "problemas": [],
+                      "conferenciaHash": "7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f"
                     }
                   }
                 }
@@ -6039,6 +6043,34 @@
           "503": {
             "$ref": "#/components/responses/Erro503"
           }
+        },
+        "requestBody": {
+          "required": false,
+          "description": "Mês opcional cujos cabeçalhos mensais devem ser relidos. Abas legadas são relidas em todos os casos.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mes": {
+                    "type": "string",
+                    "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+                    "description": "Mês válido, no formato YYYY-MM.",
+                    "example": "2026-10"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "examples": {
+                "Mes": {
+                  "summary": "Renova a conferência de outubro",
+                  "value": {
+                    "mes": "2026-10"
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -6046,7 +6078,7 @@
       "post": {
         "operationId": "salvarMapaPlanilha",
         "summary": "Salvar o mapa da planilha",
-        "description": "Apenas administração. Guarda o esquema das abas e a associação por turma de origem.",
+        "description": "Apenas administração. Exige conferenciaHash de /estrutura, com planilha e abas exatamente como lidas; somente o mapa pode ser editado. Confere a assinatura também dentro da transação. Troca de arquivo, credencial, opções, revisão ou estrutura, inclusive após preparar outro mês, exige nova conferência.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -6068,7 +6100,8 @@
                         "turmaOriginalId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
                         "mes": "2026-10"
                       }
-                    ]
+                    ],
+                    "conferenciaHash": "7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f"
                   }
                 }
               }
@@ -6104,7 +6137,8 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/Erro400"
+            "$ref": "#/components/responses/Erro400",
+            "description": "Hash ausente ou inválido, aba ou vínculo inválido."
           },
           "401": {
             "$ref": "#/components/responses/Erro401"
@@ -6117,6 +6151,98 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          }
+        }
+      }
+    },
+    "/api/planilha/diagnostico": {
+      "get": {
+        "operationId": "diagnosticarPlanilha",
+        "summary": "Conferir a configuração da frequência no mês",
+        "description": "Apenas administração. Lê o arquivo e os cabeçalhos sem escrever, também com a integração pausada. Confere vínculos e identidade mensal, com cabeçalhos nas primeiras 12 linhas e até 400 colunas. Não volta ao legado quando falta a aba de uma turma que já usa meses. Erros conhecidos de conexão ou leitura aparecem no diagnóstico; arquivo, credencial ou esquema alterados durante a consulta respondem 409. A prévia do envio continua necessária para conferir alunos e marcas.",
+        "tags": ["planilhas"],
+        "parameters": [
+          {
+            "name": "mes",
+            "in": "query",
+            "required": true,
+            "description": "Mês válido da conferência, no formato YYYY-MM.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+              "example": "2026-10"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conferência da conexão, estruturas e pendências de envio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["diagnostico"],
+                  "properties": {
+                    "diagnostico": {
+                      "$ref": "#/components/schemas/DiagnosticoPlanilha"
+                    }
+                  }
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Estrutura conferida e automação desligada",
+                    "value": {
+                      "diagnostico": {
+                        "mes": "2026-10",
+                        "conferidoEm": "2026-10-14T15:00:00.000Z",
+                        "conexao": {
+                          "conectada": true,
+                          "verificada": true,
+                          "erro": null
+                        },
+                        "ativa": true,
+                        "modo": "conservador",
+                        "envioAutomatico": false,
+                        "estruturaPronta": true,
+                        "resumo": {
+                          "total": 1,
+                          "prontas": 1,
+                          "semAba": 0,
+                          "revisar": 0
+                        },
+                        "turmas": [
+                          {
+                            "id": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                            "rotulo": "1º ano A",
+                            "tipo": "mensal",
+                            "aba": "1º ano A · Outubro",
+                            "situacao": "pronta",
+                            "mensagem": null
+                          }
+                        ],
+                        "alteradasDepois": 2,
+                        "ultimoErro": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
           }
         }
       }
@@ -6416,7 +6542,7 @@
       "post": {
         "operationId": "simularPlanilha",
         "summary": "Simular o envio da frequência",
-        "description": "Sessão da operação. Devolve a prévia, o planoHashGeral e, por turma, dias, semEnvio, planoHashTurma e bloqueio.",
+        "description": "Sessão da operação. Devolve a prévia, o planoHashGeral e, por turma, dias, semEnvio, planoHashTurma e bloqueio. Abas legadas têm identidade derivada do arquivo e do identificador estável da aba no Google. A prévia relê o catálogo antes de calcular os dias incrementais. Sucessos antigos sem destino não comprovam gravação no destino atual; a primeira prévia após a atualização pode reapresentar dias para conferência conservadora. Resultado parcial antigo sem destino exige conferência manual antes da automação. AbaId salvo diferente do catálogo responde 409 na prévia ou envio até conferir a estrutura e salvar novamente o mapa. Somente esquemas antigos sem abaId recebem a identificação automaticamente; renomear e mapear novamente a mesma aba preserva a identidade.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -6525,6 +6651,9 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
           }
         }
       }
@@ -14518,15 +14647,27 @@
           "assinatura": {
             "type": "string",
             "example": "a1b2c3d4"
+          },
+          "abaId": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Identificador estável da aba no Google. Uma aba recriada com o mesmo nome possui outro identificador. Opcional em estruturas antigas.",
+            "example": 123456
           }
         }
       },
       "MapaPlanilha": {
         "type": "object",
         "title": "Mapa da planilha",
-        "description": "Esquema das abas e associação por turma de origem.",
-        "required": ["planilha", "abas", "mapa"],
+        "description": "Conferência assinada, esquema exato da leitura e associação editável por turma de origem. Alteração concorrente exige nova leitura.",
+        "required": ["conferenciaHash", "planilha", "abas", "mapa"],
         "properties": {
+          "conferenciaHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Assinatura da leitura vinculada a arquivo, credencial, revisão da configuração e estrutura. Deve ser reenviada sem alterações ao salvar o mapa.",
+            "example": "7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f"
+          },
           "planilha": {
             "type": "object",
             "additionalProperties": true
@@ -16741,6 +16882,12 @@
         "title": "Estrutura da planilha",
         "description": "Leitura do esquema de todas as abas com sugestão de mapa por turma de origem.",
         "properties": {
+          "conferenciaHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Assinatura da leitura vinculada a arquivo, credencial, revisão da configuração e estrutura. Deve ser reenviada sem alterações ao salvar o mapa.",
+            "example": "7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f7a2c9e014d8b306f"
+          },
           "planilha": {
             "type": "object",
             "additionalProperties": true
@@ -16766,7 +16913,8 @@
             },
             "example": []
           }
-        }
+        },
+        "required": ["conferenciaHash"]
       },
       "ParametrosAcessoCorpo": {
         "type": "object",
@@ -17107,6 +17255,146 @@
           "ativo": {
             "type": "boolean",
             "example": false
+          }
+        }
+      },
+      "TurmaDiagnosticoPlanilha": {
+        "type": "object",
+        "title": "Turma no diagnóstico mensal",
+        "description": "Vínculo e conferência estrutural da turma. Não confirma conteúdo ou envio de frequências.",
+        "required": ["id", "rotulo", "tipo", "aba", "situacao", "mensagem"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rotulo": {
+            "type": "string",
+            "example": "1º ano A"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": ["mensal", "legado", "ausente"]
+          },
+          "aba": {
+            "type": ["string", "null"]
+          },
+          "situacao": {
+            "type": "string",
+            "enum": ["pronta", "sem_aba", "estrutura_alterada", "bloqueada", "indisponivel"]
+          },
+          "mensagem": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "DiagnosticoPlanilha": {
+        "type": "object",
+        "title": "Diagnóstico mensal da planilha",
+        "description": "Conferência administrativa somente de leitura. A situação pronta valida a estrutura, não os alunos, marcas ou gravações. As pendências de sincronização abrangem a integração, sem recorte pelo mês consultado.",
+        "required": [
+          "mes",
+          "conferidoEm",
+          "conexao",
+          "ativa",
+          "modo",
+          "envioAutomatico",
+          "estruturaPronta",
+          "resumo",
+          "turmas",
+          "alteradasDepois",
+          "ultimoErro"
+        ],
+        "properties": {
+          "mes": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+            "example": "2026-10"
+          },
+          "conferidoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "conexao": {
+            "type": "object",
+            "required": ["conectada", "verificada", "erro"],
+            "properties": {
+              "conectada": {
+                "type": "boolean"
+              },
+              "verificada": {
+                "type": "boolean"
+              },
+              "erro": {
+                "type": ["string", "null"]
+              }
+            }
+          },
+          "ativa": {
+            "type": "boolean"
+          },
+          "modo": {
+            "type": "string",
+            "enum": ["conservador", "completo"]
+          },
+          "envioAutomatico": {
+            "type": "boolean"
+          },
+          "estruturaPronta": {
+            "type": "boolean",
+            "description": "Verdadeiro quando o acesso foi verificado, existe ao menos uma turma e todas as estruturas estão prontas. Não comprova envio."
+          },
+          "resumo": {
+            "type": "object",
+            "required": ["total", "prontas", "semAba", "revisar"],
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "prontas": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "semAba": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "revisar": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "turmas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TurmaDiagnosticoPlanilha"
+            }
+          },
+          "alteradasDepois": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Chamadas sem envio confirmado no destino atual, em todos os períodos."
+          },
+          "ultimoErro": {
+            "type": ["object", "null"],
+            "required": ["erro", "resultado", "criadoEm", "turma"],
+            "properties": {
+              "erro": {
+                "type": ["string", "null"]
+              },
+              "resultado": {
+                "type": "string"
+              },
+              "criadoEm": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "turma": {
+                "type": ["string", "null"]
+              }
+            }
           }
         }
       },

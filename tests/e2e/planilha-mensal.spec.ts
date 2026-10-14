@@ -167,6 +167,11 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
 
   await cartao.getByRole("button", { name: "Revisar estrutura", exact: true }).click();
+  await expect(
+    cartao.getByRole("button", { name: "Salvar estrutura", exact: true }),
+  ).toBeDisabled();
+  await cartao.getByRole("button", { name: "Conferir estrutura", exact: true }).click();
+  await expect(cartao.getByRole("button", { name: "Salvar estrutura", exact: true })).toBeEnabled();
   for (const aba of abasMensais) {
     const vinculo = cartao.getByText(aba, { exact: true }).locator("..");
     await expect(vinculo).toContainText(rotuloMes(mes));
