@@ -1,6 +1,7 @@
 // Cliente da Sheets API para a planilha escolhida: leitura de células,
 // estrutura e marcadores da integração autorizada pela conta Google.
 import { z } from "zod";
+import { esquemaResolucoesAntigas } from "@/domain/planilha-legado";
 import { createHash } from "node:crypto";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
@@ -707,6 +708,7 @@ export async function executarAcaoGoogle(
           .regex(/^[a-f0-9]{64}$/)
           .optional(),
         descartarComplementos: z.boolean().default(false),
+        resolucoes: esquemaResolucoesAntigas.default([]),
       })
       .safeParse(corpo);
     if (!dados.success || (corpo.acao === "moverAbaAntiga" && !dados.data.impressao))

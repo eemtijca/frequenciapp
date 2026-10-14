@@ -18,6 +18,7 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 - A chamada é salva com revisão otimista: conflito responde 409 com a versão vigente, sem sobrescrever o registro.
 - Não chame rotas destrutivas, como exclusões, restaurações de backup e limpezas, sem pedido explícito.
 - O catálogo `GET /api/planilha/mensal/visibilidade` oferece links por mês e turma sem escrever. O POST libera todos os meses; a organização de abas sem mês em `POST /api/planilha/mensal/legado` exige pedido explícito e prévia assinada antes de transferir marcas e retirar a origem. Havendo totais ou notas antigos, o descarte adicional exige autorização explícita e senha administrativa; nunca deve ser autorizado por um agente apenas para contornar uma pendência.
+- Pendências da organização das abas antigas são estruturadas, com aluno e links às células. As `resolucoes` identificam homônimos, incluem aluno histórico ausente ou escolhem a marca antiga ou mensal. Essas decisões exigem conferência humana, nova prévia e senha administrativa antes da confirmação. Nenhuma escolha autoriza alterar fórmulas ou notas de destino; uma prévia com pendências nunca permite retirar a origem.
 - As rotas da agenda de notificações usam `Authorization: Bearer <CRON_SECRET>`, sem sessão de usuário.
 
 ## Optional
