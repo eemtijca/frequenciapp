@@ -314,6 +314,14 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
+  // Elementos posicionados dentro dos cartões não podem escapar do recorte da faixa e alargar o painel.
+  await expect
+    .poll(() =>
+      page
+        .getByRole("group", { name: "Painel", exact: true })
+        .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+    )
+    .toBe(true);
   await expect
     .poll(() =>
       page.getByRole("group", { name: "Cartões de gráficos" }).evaluate((elemento) => {

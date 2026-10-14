@@ -252,6 +252,8 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
       <p id={ajudaId} className="sr-only">
         Deslize para os lados para ver os gráficos. Com o teclado, use as setas esquerda e direita.
       </p>
+      {/* A faixa também é `relative`: sem isso, elementos posicionados dentro dos cartões tomariam
+          este contêiner como referência, escapariam do recorte da faixa e alargariam a página. */}
       <div className="relative min-w-0">
         {/* No celular não há seletor: uma seta no canto do painel avança para o próximo gráfico. */}
         <Button
@@ -273,7 +275,7 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
           aria-describedby={`${ajudaId} ${posicaoId}`}
           tabIndex={0}
           style={altura === undefined ? undefined : { height: altura }}
-          className="focus-visible:ring-ring flex min-w-0 snap-x snap-mandatory items-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-lg pb-2 focus-visible:ring-2 focus-visible:outline-none"
+          className="focus-visible:ring-ring relative flex min-w-0 snap-x snap-mandatory items-start gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-lg pb-2 focus-visible:ring-2 focus-visible:outline-none"
           onPointerDown={(evento) => {
             if (alvoInterativo(evento.target)) return;
             renovarIntencao(evento.currentTarget);
