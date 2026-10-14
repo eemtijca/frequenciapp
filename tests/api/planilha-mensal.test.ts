@@ -450,7 +450,11 @@ describe("frequência organizada por turma e mês", () => {
       [turmas.A],
     );
     expect(historico.rows.map((item) => item.destino)).toEqual(
-      expect.arrayContaining([null, setembro.destino, outubro.destino]),
+      expect.arrayContaining([
+        expect.stringMatching(/^frequencia:/),
+        setembro.destino,
+        outubro.destino,
+      ]),
     );
   });
 
