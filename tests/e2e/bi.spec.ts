@@ -221,7 +221,9 @@ test("construtor filtra a tabela e exige confirmação antes de CSV e PNG sem in
     .getByRole("article")
     .filter({ has: page.getByRole("heading", { name: "Minha análise", exact: true }) });
   await cartao.scrollIntoViewIfNeeded();
-  await expect(cartao.getByRole("cell", { name: "QA Aluna", exact: true })).toBeVisible();
+  await expect(
+    cartao.getByRole("button", { name: "Filtrar: QA Aluna", exact: true }),
+  ).toBeVisible();
   await cartao.getByRole("button", { name: "Exportar CSV de Minha análise" }).click();
   const dialogo = page.getByRole("alertdialog");
   await expect(dialogo).toContainText("dados pessoais");

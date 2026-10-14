@@ -8,6 +8,7 @@ import type { LinhaBi, RecursoBi } from "@/domain/bi";
 import { ROTULOS_RECURSOS_BI } from "@/domain/bi";
 import { csvBi, textoBi } from "@/domain/bi-analise";
 import { baixarBi } from "@/lib/bi-exportacao";
+import { paginaTabelaBi } from "@/lib/bi-visualizacao";
 import type { ConfirmarExportacaoBi } from "./cartao-grafico";
 export function TabelaApoioBi({
   recurso,
@@ -35,7 +36,7 @@ export function TabelaApoioBi({
     [linhas, busca, ordem, desc],
   );
   const colunas = useMemo(() => [...new Set(linhas.flatMap((l) => Object.keys(l)))], [linhas]);
-  const atual = Math.min(pagina, Math.max(0, Math.ceil(filtradas.length / 50) - 1));
+  const atual = paginaTabelaBi(pagina, filtradas.length);
   return (
     <section className="superficie-vidro mt-4 p-4">
       <h2 className="mb-3 font-semibold">{ROTULOS_RECURSOS_BI[recurso]}</h2>
@@ -65,8 +66,18 @@ export function TabelaApoioBi({
           Exportar CSV
         </Button>
       </div>
-      <div className="max-h-96 overflow-auto">
-        <table className="w-full text-left text-xs">
+      {filtradas.length === 0 && (
+        <p role="status" className="text-muted-foreground p-4 text-sm">
+          Nenhum registro corresponde à busca.
+        </p>
+      )}
+      <div
+        className="max-h-96 overflow-auto print:max-h-none print:overflow-visible"
+        role="region"
+        aria-label={`Tabela de ${ROTULOS_RECURSOS_BI[recurso]}`}
+        tabIndex={0}
+      >
+        <table className="w-full text-left text-xs print:table-fixed">
           <caption className="sr-only">Dados escolares de apoio</caption>
           <thead>
             <tr>
@@ -75,13 +86,13 @@ export function TabelaApoioBi({
                   key={c}
                   scope="col"
                   aria-sort={ordem === c ? (desc ? "descending" : "ascending") : "none"}
-                  className="bg-background sticky top-0 p-2"
+                  className="bg-background sticky top-0 p-2 print:static print:wrap-anywhere"
                 >
                   <button
                     className="min-h-11"
                     onClick={() => {
                       setOrdem(c);
-                      setDesc(!desc);
+                      setDesc(ordem === c ? !desc : false);
                     }}
                   >
                     {c}
@@ -94,7 +105,7 @@ export function TabelaApoioBi({
             {filtradas.slice(atual * 50, (atual + 1) * 50).map((l) => (
               <tr key={l.id} className="border-border border-b">
                 {colunas.map((c) => (
-                  <td key={c} className="max-w-80 p-2 break-words">
+                  <td key={c} className="max-w-80 p-2 break-words print:wrap-anywhere">
                     {textoBi(l[c])}
                   </td>
                 ))}
@@ -103,6 +114,11 @@ export function TabelaApoioBi({
           </tbody>
         </table>
       </div>
+      <p className="mt-2 hidden text-xs print:block">
+        Página {atual + 1} de {Math.max(1, Math.ceil(filtradas.length / 50))}. Exibidos{" "}
+        {Math.min(50, Math.max(0, filtradas.length - atual * 50))} de {filtradas.length} registros.
+        {filtradas.length > 50 && " O CSV inclui todos os registros filtrados."}
+      </p>
       <div className="mt-2 flex items-center justify-between gap-2 print:hidden">
         <Button size="sm" variant="ghost" disabled={!atual} onClick={() => setPagina(atual - 1)}>
           Anterior
