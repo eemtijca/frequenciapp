@@ -12,7 +12,7 @@ export class LimiteGrafico extends Component<{ children: ReactNode }, { falhou: 
 
   render() {
     return this.state.falhou ? (
-      <p role="status" className="text-muted-foreground p-4 text-sm">
+      <p role="note" className="text-muted-foreground p-4 text-sm">
         Gráfico indisponível neste dispositivo. Consulte a tabela ou reabra a tela com conexão.
       </p>
     ) : (

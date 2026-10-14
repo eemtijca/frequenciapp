@@ -75,7 +75,31 @@ export function useDadosBi() {
         const id = await identificadorCacheBi(chave);
         let pagina: PaginaBi;
         try {
-          pagina = await rede(chave, new URLSearchParams({ recurso: "acesso" }), ctrl.signal);
+          let tentativas = 0;
+          for (;;) {
+            try {
+              pagina = await rede(chave, new URLSearchParams({ recurso: "acesso" }), ctrl.signal);
+              break;
+            } catch (e) {
+              const falhaDeRede =
+                e instanceof TypeError || (e instanceof ErroApi && e.status === 503);
+              if (ctrl.signal.aborted || !navigator.onLine || !falhaDeRede || tentativas >= 2)
+                throw e;
+              tentativas++;
+              await new Promise<void>((resolve, reject) => {
+                const abortar = () => {
+                  clearTimeout(timer);
+                  reject(new DOMException("Consulta interrompida", "AbortError"));
+                };
+                const timer = setTimeout(() => {
+                  ctrl.signal.removeEventListener("abort", abortar);
+                  resolve();
+                }, 500 * tentativas);
+                if (ctrl.signal.aborted) abortar();
+                else ctrl.signal.addEventListener("abort", abortar, { once: true });
+              });
+            }
+          }
           setOffline(false);
           try {
             const antiga = await cacheBi<PaginaBi>("ler", `${id}:acesso`);

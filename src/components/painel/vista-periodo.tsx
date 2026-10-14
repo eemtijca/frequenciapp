@@ -103,7 +103,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
 
   return (
     <section aria-label="Infrequência personalizada" className="superficie-vidro space-y-5 p-4">
-      <header>
+      <header className="pr-12 lg:pr-0">
         <h2 className="font-medium">Infrequência por período</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Escolha as datas e o recorte para comparar as faltas das chamadas salvas.
