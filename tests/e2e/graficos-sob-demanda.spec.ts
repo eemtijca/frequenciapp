@@ -47,7 +47,7 @@ async function medirBiblioteca(page: Page, recusar = false) {
   return arquivos;
 }
 
-test("baixa a biblioteca após abrir o painel e monta somente o cartão em exibição", async ({
+test("baixa a biblioteca após abrir o painel e monta o cartão em exibição e só o vizinho", async ({
   page,
 }) => {
   const arquivos = await medirBiblioteca(page);
@@ -61,8 +61,8 @@ test("baixa a biblioteca após abrir o painel e monta somente o cartão em exibi
   await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
   expect(arquivos.size).toBeGreaterThan(0);
   const serie = page.getByRole("article", { name: /: E2E Ano$/, includeHidden: true });
-  await expect(serie.locator('[data-grafico-sob-demanda="aguardando"]')).toHaveCount(1);
-  await expect(serie.locator(".recharts-wrapper")).toHaveCount(0);
+  // O vizinho do cartão em exibição monta em tempo ocioso, para o gesto de rolagem não esperar.
+  await expect(serie.locator(".recharts-wrapper")).toHaveCount(1);
   const baixados = arquivos.size;
   await rolarAteGrafico(page, "E2E Ano");
   await expect(serie.locator(".recharts-wrapper")).toHaveCount(1);
