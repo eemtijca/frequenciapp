@@ -1,6 +1,6 @@
 "use client";
 
-// Gráficos sob demanda com filtros cruzados; a tabela acessível acompanha todas as visualizações.
+// Gráficos configuráveis com lacunas preservadas, mapa acessível e filtros cruzados.
 import { useMemo } from "react";
 import {
   ResponsiveContainer,
@@ -21,9 +21,17 @@ import {
   Scatter,
   ReferenceLine,
   Legend,
+  LabelList,
 } from "recharts";
-import type { GraficoBi, PontoBi } from "@/domain/bi-analise";
-const CORES = ["#37ad84", "#c84b50", "#559cd6", "#ab81d0", "#d7ab51", "#7fac9b"];
+import { NOMES_MEDIDAS, type GraficoBi, type PontoBi } from "@/domain/bi-analise";
+import {
+  CORES_BI,
+  formatarValorBi,
+  prepararCalorBi,
+  rotularPontosBi,
+  rotuloEixoBi,
+} from "@/lib/bi-visualizacao";
+
 export default function VistaGrafico({
   config,
   pontos: originais,
@@ -33,30 +41,10 @@ export default function VistaGrafico({
   pontos: PontoBi[];
   onFiltrar: (p: PontoBi) => void;
 }) {
-  const pontos = useMemo(() => {
-    const referencias = new Map<string, Set<string>>();
-    const grupos = new Map<string, Set<string>>();
-    for (const p of originais) {
-      const r = referencias.get(p.nome) ?? new Set<string>();
-      r.add(p.referencia);
-      referencias.set(p.nome, r);
-      const g = grupos.get(p.grupo) ?? new Set<string>();
-      g.add(p.grupoReferencia);
-      grupos.set(p.grupo, g);
-    }
-    return originais.map((p) => ({
-      ...p,
-      nome:
-        (referencias.get(p.nome)?.size ?? 0) > 1
-          ? `${p.nome} [${p.referencia.slice(0, 8)}]`
-          : p.nome,
-      grupo:
-        (grupos.get(p.grupo)?.size ?? 0) > 1
-          ? `${p.grupo} [${p.grupoReferencia.slice(0, 8)}]`
-          : p.grupo,
-    }));
-  }, [originais]);
-  const visiveis = pontos.filter((p) => p.valor !== null).slice(0, 100);
+  const pontos = useMemo(() => rotularPontosBi(originais), [originais]);
+  const cores = CORES_BI[config.paleta];
+  const cor = cores[0];
+  const visiveis = pontos.slice(0, 100);
   const grupos = useMemo(() => [...new Set(pontos.map((p) => p.grupo))].slice(0, 12), [pontos]);
   const agrupados = useMemo(() => {
     const linhas = new Map<string, Record<string, string | number | null>>();
@@ -66,10 +54,20 @@ export default function VistaGrafico({
         l = { nome: p.nome };
         linhas.set(p.nome, l);
       }
-      l[p.grupo] = p.valor;
+      const indice = grupos.indexOf(p.grupo);
+      if (indice !== -1) l[`grupo${indice}`] = p.valor;
     }
     return [...linhas.values()].slice(0, 100);
-  }, [pontos]);
+  }, [pontos, grupos]);
+  const calor = useMemo(() => prepararCalorBi(pontos), [pontos]);
+  const formatar = (valor: unknown) =>
+    formatarValorBi(typeof valor === "number" ? valor : null, config.medida);
+  const filtrar = (p: PontoBi) => {
+    const original = originais.find(
+      (o) => o.referencia === p.referencia && o.grupoReferencia === p.grupoReferencia,
+    );
+    if (original) onFiltrar(original);
+  };
   const clique = (item: unknown) => {
     if (item && typeof item === "object") {
       const obj = "payload" in item ? item.payload : item;
@@ -77,111 +75,201 @@ export default function VistaGrafico({
         const p = pontos.find(
           (p) => p.nome === obj.nome && (!("referencia" in obj) || p.referencia === obj.referencia),
         );
-        if (p) onFiltrar(p);
+        if (p) filtrar(p);
       }
     }
   };
   const cliqueEixo = (e: unknown) => {
     if (e && typeof e === "object" && "activeLabel" in e) {
       const p = pontos.find((p) => p.nome === String(e.activeLabel));
-      if (p) onFiltrar(p);
+      if (p) filtrar(p);
     }
   };
+  const tooltip = (
+    <Tooltip
+      formatter={(v, nome) =>
+        nome === "Registros"
+          ? formatarValorBi(typeof v === "number" ? v : null, "registros")
+          : formatar(v)
+      }
+      contentStyle={{
+        background: "var(--background)",
+        color: "var(--foreground)",
+        borderColor: "var(--border)",
+        borderRadius: 12,
+      }}
+      labelStyle={{ color: "var(--foreground)" }}
+    />
+  );
+  const valores = config.mostrarValores ? (
+    <LabelList
+      dataKey="valor"
+      position="top"
+      formatter={formatar}
+      fill="currentColor"
+      fontSize={11}
+    />
+  ) : null;
   const base = (
     <>
       <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-      <Tooltip
-        contentStyle={{
-          background: "var(--background)",
-          borderColor: "var(--border)",
-          borderRadius: 12,
-        }}
-      />
-      <YAxis width={48} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+      {tooltip}
+      <YAxis width={54} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
       <XAxis
         dataKey="nome"
-        tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+        tickFormatter={rotuloEixoBi}
+        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
         interval="preserveStartEnd"
       />
       {config.meta !== null && (
-        <ReferenceLine y={config.meta} stroke="#c84b50" strokeDasharray="4 4" label="Referência" />
+        <ReferenceLine
+          y={config.meta}
+          stroke="var(--falta-texto)"
+          strokeDasharray="4 4"
+          label="Referência"
+        />
       )}
     </>
   );
-  if (config.tipo === "calor") {
-    const xs = [...new Set(visiveis.map((p) => p.nome))].slice(0, 20);
-    const ys = [...new Set(visiveis.map((p) => p.grupo))].slice(0, 12);
-    const max = Math.max(1, ...visiveis.map((p) => p.valor ?? 0));
+  if (!pontos.some((p) => p.valor !== null))
     return (
-      <svg
-        data-grafico
-        viewBox={`0 0 ${Math.max(400, xs.length * 45 + 120)} ${ys.length * 34 + 55}`}
-        className="h-full w-full"
-        aria-label="Mapa de calor"
+      <p className="text-muted-foreground flex h-full items-center justify-center p-5 text-center text-sm">
+        Sem base de cálculo neste recorte.
+      </p>
+    );
+
+  if (config.tipo === "calor") {
+    const largura = Math.max(400, calor.colunas.length * 64 + 170);
+    return (
+      <div
+        className="h-full overflow-auto print:h-auto print:overflow-visible"
+        role="region"
+        aria-label="Mapa de calor com rolagem"
+        tabIndex={0}
       >
-        <text x={5} y={15} fill="currentColor" fontSize={10}>
-          Intensidade proporcional ao valor; até 20 colunas e 12 linhas
-        </text>
-        {xs.map((x, i) => (
-          <text key={x} x={130 + i * 45} y={35} fill="currentColor" fontSize={8}>
-            {x.slice(0, 8)}
-          </text>
-        ))}
-        {ys.map((y, j) => (
-          <g key={y}>
-            <text x={0} y={58 + j * 34} fill="currentColor" fontSize={9}>
-              {y.slice(0, 18)}
+        <svg
+          data-grafico
+          viewBox={`0 0 ${largura} ${calor.linhas.length * 48 + 70}`}
+          width={largura}
+          height={calor.linhas.length * 48 + 70}
+          className="max-w-none print:h-auto print:w-full print:max-w-full"
+          aria-label={`Mapa de calor: ${config.titulo}`}
+        >
+          {config.mostrarLegenda && (
+            <text x={5} y={18} fill="currentColor" fontSize={12}>
+              Maior intensidade indica maior valor
             </text>
-            {xs.map((x, i) => {
-              const p = visiveis.find((p) => p.nome === x && p.grupo === y);
-              return (
-                <rect
-                  key={x}
-                  x={125 + i * 45}
-                  y={42 + j * 34}
-                  width={41}
-                  height={30}
-                  rx={5}
-                  fill={
-                    p ? `rgba(200,75,80,${0.12 + ((p.valor ?? 0) / max) * 0.88})` : "var(--muted)"
-                  }
-                  onClick={() => {
-                    if (p) onFiltrar(p);
-                  }}
-                >
-                  <title>
-                    {x} | {y}: {p?.valor ?? "Sem registro"}
-                  </title>
-                </rect>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
+          )}
+          {calor.colunas.map((x, i) => (
+            <text
+              key={x}
+              x={170 + i * 64}
+              y={48}
+              fill="currentColor"
+              fontSize={11}
+              textAnchor="middle"
+            >
+              <title>{x}</title>
+              {rotuloEixoBi(x).slice(0, 9)}
+            </text>
+          ))}
+          {calor.linhas.map((y, j) => (
+            <g key={y}>
+              <text x={0} y={86 + j * 48} fill="currentColor" fontSize={12}>
+                <title>{y}</title>
+                {rotuloEixoBi(y)}
+              </text>
+              {calor.colunas.map((x, i) => {
+                const p = calor.celulas.get(JSON.stringify([x, y]));
+                const descricao = `${x} | ${y}: ${p ? formatar(p.valor) : "Sem registro"}`;
+                return (
+                  <g key={x}>
+                    <rect
+                      x={140 + i * 64}
+                      y={58 + j * 48}
+                      width={60}
+                      height={44}
+                      rx={7}
+                      fill={p && p.valor !== null ? cor : "var(--muted)"}
+                      fillOpacity={
+                        p && p.valor !== null
+                          ? 0.15 + Math.max(0, p.valor / calor.maximo) * 0.85
+                          : 1
+                      }
+                      stroke={p?.valor === null ? "var(--muted-foreground)" : "none"}
+                      strokeDasharray={p?.valor === null ? "3 3" : undefined}
+                      role={p ? "button" : "img"}
+                      tabIndex={p ? 0 : undefined}
+                      aria-label={descricao}
+                      className="focus:stroke-foreground focus:stroke-2 focus:outline-none"
+                      onClick={() => {
+                        if (p) filtrar(p);
+                      }}
+                      onKeyDown={(e) => {
+                        if (p && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          filtrar(p);
+                        }
+                      }}
+                    >
+                      <title>{descricao}</title>
+                    </rect>
+                    {config.mostrarValores && p && (
+                      <text
+                        x={170 + i * 64}
+                        y={85 + j * 48}
+                        textAnchor="middle"
+                        fill="currentColor"
+                        fontSize={11}
+                        pointerEvents="none"
+                        aria-hidden="true"
+                      >
+                        {p.valor === null ? "N/D" : formatar(p.valor)}
+                      </text>
+                    )}
+                  </g>
+                );
+              })}
+            </g>
+          ))}
+        </svg>
+        {calor.omitidos > 0 && (
+          <p className="text-muted-foreground mt-2 text-xs">
+            Exibidos até 20 colunas e 12 linhas. {calor.omitidos} grupos adicionais na tabela e no
+            CSV.
+          </p>
+        )}
+      </div>
     );
   }
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={160}>
       {config.tipo === "rosca" ? (
         <PieChart>
-          <Tooltip />
+          {tooltip}
           <Pie
-            data={visiveis}
+            data={visiveis.filter((p) => p.valor !== null)}
             dataKey="valor"
             nameKey="nome"
             innerRadius="45%"
-            outerRadius="75%"
+            outerRadius={config.mostrarValores ? "65%" : "75%"}
+            label={config.mostrarValores ? (p) => formatar(p.value) : false}
+            labelLine={config.mostrarValores}
             onClick={clique}
             isAnimationActive={false}
           >
-            {visiveis.map((p, i) => (
-              <Cell key={`${p.referencia}:${p.nome}:${p.grupo}`} fill={CORES[i % CORES.length]} />
-            ))}
+            {visiveis
+              .filter((p) => p.valor !== null)
+              .map((p, i) => (
+                <Cell key={`${p.referencia}:${p.nome}:${p.grupo}`} fill={cores[i % cores.length]} />
+              ))}
           </Pie>
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          {config.mostrarLegenda && (
+            <Legend wrapperStyle={{ fontSize: 11, maxHeight: 80, overflowY: "auto" }} />
+          )}
         </PieChart>
       ) : config.tipo === "dispersao" ? (
-        <ScatterChart>
+        <ScatterChart margin={{ top: 24, right: 24, bottom: 5, left: 0 }}>
           <CartesianGrid stroke="var(--border)" />
           <XAxis
             type="number"
@@ -192,79 +280,134 @@ export default function VistaGrafico({
           <YAxis
             type="number"
             dataKey="valor"
-            name="Valor"
+            name={NOMES_MEDIDAS[config.medida]}
             tick={{ fill: "var(--muted-foreground)" }}
           />
-          <Tooltip cursor={{ strokeDasharray: "3 3" }} />
-          <Scatter data={visiveis} fill={CORES[0]} onClick={clique} isAnimationActive={false} />
+          {tooltip}
+          <Scatter
+            data={visiveis.filter((p) => p.valor !== null)}
+            fill={cor}
+            onClick={clique}
+            isAnimationActive={false}
+          >
+            {valores}
+          </Scatter>
         </ScatterChart>
       ) : config.tipo === "linha" ? (
-        <LineChart data={visiveis} onClick={cliqueEixo}>
+        <LineChart
+          data={visiveis}
+          onClick={cliqueEixo}
+          margin={{ top: 24, right: 24, bottom: 5, left: 0 }}
+        >
           {base}
           <Line
             dataKey="valor"
-            stroke={CORES[0]}
+            name={NOMES_MEDIDAS[config.medida]}
+            stroke={cor}
             strokeWidth={2}
-            dot={false}
+            dot={visiveis.length <= 30}
+            connectNulls={false}
             activeDot={{ onClick: (_e, p) => clique(p) }}
             isAnimationActive={false}
-          />
+          >
+            {valores}
+          </Line>
         </LineChart>
       ) : config.tipo === "area" ? (
-        <AreaChart data={visiveis} onClick={cliqueEixo}>
+        <AreaChart
+          data={visiveis}
+          onClick={cliqueEixo}
+          margin={{ top: 24, right: 24, bottom: 5, left: 0 }}
+        >
           {base}
           <Area
             dataKey="valor"
-            stroke={CORES[0]}
-            fill={CORES[0]}
+            name={NOMES_MEDIDAS[config.medida]}
+            stroke={cor}
+            fill={cor}
             fillOpacity={0.2}
+            connectNulls={false}
             isAnimationActive={false}
-          />
+          >
+            {valores}
+          </Area>
         </AreaChart>
       ) : config.tipo === "agrupadas" ? (
-        <BarChart data={agrupados}>
+        <BarChart data={agrupados} margin={{ top: 24, right: 24, bottom: 5, left: 0 }}>
           {base}
-          <Legend />
+          {config.mostrarLegenda && (
+            <Legend wrapperStyle={{ fontSize: 11, maxHeight: 80, overflowY: "auto" }} />
+          )}
           {grupos.map((g, i) => (
             <Bar
               key={g}
-              dataKey={g}
-              fill={CORES[i % CORES.length]}
+              dataKey={`grupo${i}`}
+              name={g}
+              fill={cores[i % cores.length]}
               radius={[5, 5, 0, 0]}
               onClick={clique}
               isAnimationActive={false}
-            />
+            >
+              {config.mostrarValores && (
+                <LabelList
+                  dataKey={`grupo${i}`}
+                  position="top"
+                  formatter={formatar}
+                  fill="currentColor"
+                  fontSize={11}
+                />
+              )}
+            </Bar>
           ))}
         </BarChart>
       ) : config.tipo === "horizontal" ? (
-        <BarChart data={visiveis} layout="vertical">
+        <BarChart
+          data={visiveis}
+          layout="vertical"
+          margin={{ top: 5, right: config.mostrarValores ? 65 : 24, bottom: 5, left: 0 }}
+        >
           <CartesianGrid stroke="var(--border)" />
           <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
           <YAxis
             dataKey="nome"
             type="category"
-            width={115}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+            width={105}
+            tickFormatter={rotuloEixoBi}
+            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
           />
-          <Tooltip />
+          {tooltip}
           <Bar
             dataKey="valor"
-            fill={CORES[0]}
+            name={NOMES_MEDIDAS[config.medida]}
+            fill={cor}
             onClick={clique}
             radius={[0, 5, 5, 0]}
             isAnimationActive={false}
-          />
+          >
+            {config.mostrarValores && (
+              <LabelList
+                dataKey="valor"
+                position="right"
+                formatter={formatar}
+                fill="currentColor"
+                fontSize={11}
+              />
+            )}
+          </Bar>
         </BarChart>
       ) : (
-        <BarChart data={visiveis}>
+        <BarChart data={visiveis} margin={{ top: 24, right: 24, bottom: 5, left: 0 }}>
           {base}
           <Bar
             dataKey="valor"
-            fill={CORES[0]}
+            name={NOMES_MEDIDAS[config.medida]}
+            fill={cor}
             radius={[5, 5, 0, 0]}
             onClick={clique}
             isAnimationActive={false}
-          />
+          >
+            {valores}
+          </Bar>
         </BarChart>
       )}
     </ResponsiveContainer>

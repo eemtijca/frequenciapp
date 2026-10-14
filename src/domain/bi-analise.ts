@@ -59,6 +59,7 @@ export const TIPOS_GRAFICO_BI = [
   "tabela",
   "indicador",
 ] as const;
+export const PALETAS_GRAFICO_BI = ["escola", "verde", "azul", "vermelho", "violeta"] as const;
 export type DimensaoBi = (typeof DIMENSOES_BI)[number];
 export type MedidaBi = (typeof MEDIDAS_BI)[number];
 export const NOMES_MEDIDAS: Record<MedidaBi, string> = {
@@ -109,6 +110,9 @@ export const esquemaGraficoBi = z
     segundaDimensao: z.enum(DIMENSOES_BI).default("tipo"),
     largura: z.number().int().min(3).max(12).default(6),
     altura: z.number().int().min(260).max(900).default(360),
+    paleta: z.enum(PALETAS_GRAFICO_BI).default("escola"),
+    mostrarLegenda: z.boolean().default(true),
+    mostrarValores: z.boolean().default(false),
     meta: z.number().finite().nullable().default(null),
     anotacao: z.string().max(1000).default(""),
   })
