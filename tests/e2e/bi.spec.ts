@@ -282,6 +282,37 @@ test("revogação remove chave e cache, preservando as visões locais", async ({
   );
   expect(contagem).toBe(0);
 });
+
+test("reconexão repete falha temporária antes de aceitar o cache e encerra chave revogada", async ({
+  page,
+}) => {
+  await abrir(page);
+  let conferencias = 0;
+  let limitar = true;
+  await page.route("**/api/bi?recurso=acesso", async (rota) => {
+    conferencias++;
+    if (limitar) {
+      await rota.fulfill({ status: 429, json: { error: "Muitas consultas. Aguarde um minuto." } });
+      return;
+    }
+    await rota.fulfill({
+      status: conferencias === 1 ? 503 : 401,
+      json: {
+        error: conferencias === 1 ? "Conexão temporariamente indisponível." : "Chave revogada.",
+      },
+    });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByRole("alert").filter({ hasText: "Aguarde um minuto" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toBeVisible();
+  expect(conferencias).toBe(1);
+  limitar = false;
+  conferencias = 0;
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByRole("button", { name: "Testar e entrar", exact: true })).toBeVisible();
+  expect(conferencias).toBe(2);
+  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+});
 test("erro em página intermediária não vira total parcial e permite nova leitura", async ({
   page,
 }) => {

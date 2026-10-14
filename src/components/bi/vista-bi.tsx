@@ -754,6 +754,14 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 : "Ainda sem retrato completo"}
               {carregando && <span>{fonte.progresso || "Carregando conjuntos..."}</span>}
             </div>
+            {fonte.erro && (
+              <p
+                role="alert"
+                className="bg-falta-fraca text-falta-texto mb-4 rounded-2xl p-3 text-sm"
+              >
+                {fonte.erro}
+              </p>
+            )}
             {retrato?.id === assinatura && retrato.falhas.length > 0 && (
               <div
                 role="alert"

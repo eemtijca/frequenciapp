@@ -109,6 +109,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- FrequenciBI repete de forma limitada a conferência de acesso após falhas temporárias de rede, sem repetir recusas de chave ou limites de consultas. Falhas de revalidação também ficam visíveis durante uma consulta aberta.
+
 - FrequenciBI corrige categorias duplicadas, ordem semanal, taxas por aluno, cobertura restrita ao escopo e atualização da comparação. Tabelas ajustam a paginação, mapas de calor preservam células após o centésimo grupo, séries mantêm lacunas sem base e PNG inclui legenda e resumo. A impressão aguarda os gráficos fora da tela.
 
 - Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
