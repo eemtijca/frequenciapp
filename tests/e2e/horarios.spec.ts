@@ -331,7 +331,9 @@ test("no celular, a semana e a edição cabem na tela com os campos acessíveis"
   await aguardarHidratacao(page);
   const navegacao = await abrirNavegacao(page);
   const secoes = await navegacao.getByRole("button").allTextContents();
-  expect(secoes.indexOf("Horários")).toBe(secoes.indexOf("Chamada") + 1);
+  // A Chamada Parcial é item próprio logo abaixo de Chamada, e Horários vem em seguida.
+  expect(secoes.indexOf("Chamada Parcial")).toBe(secoes.indexOf("Chamada") + 1);
+  expect(secoes.indexOf("Horários")).toBe(secoes.indexOf("Chamada Parcial") + 1);
   const vista = await abrirHorarios(page);
   await escolherDia(page, vista, "Semana completa");
   await expect(

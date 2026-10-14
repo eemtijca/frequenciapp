@@ -47,18 +47,8 @@ export async function abrirNavegacao(page: Page): Promise<Locator> {
   return menu.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
 }
 
-/** Troca de visão com um clique; a Chamada Parcial abre pelo ícone da Chamada. */
+/** Troca de visão pelo mesmo menu no desktop e no celular. */
 export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
-  // A Chamada Parcial não tem item na navegação: abre pelo ícone da Chamada.
-  if (visao === "chamada-parcial") {
-    await trocarVisao(page, "Chamada", "chamada");
-    const icone = page
-      .locator('section[aria-label="Fazer chamada"]')
-      .getByRole("button", { name: "Chamada Parcial", exact: true });
-    await icone.click();
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada-parcial");
-    return;
-  }
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);

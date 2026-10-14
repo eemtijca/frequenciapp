@@ -386,19 +386,12 @@ export default function Aplicacao({
   );
   const itens = useMemo<ItemNav[]>(() => {
     const lista = [...ITENS_INICIAIS];
-    if (podeOperar) lista.push(ITEM_CHAMADA_PARCIAL);
+    if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
     lista.push(ITEM_RELATORIOS);
     if (itemFinal) lista.push(itemFinal);
     return lista;
   }, [configuracoes.saidaAntecipada, itemFinal, podeOperar]);
-  // A Chamada Parcial abre pelo botão de ícone da Chamada: continua entre os
-  // painéis, mas sem item próprio no menu, e a Chamada fica ativa nela.
-  const itensNavegacao = useMemo(
-    () => itens.filter((item) => item.visao !== "chamada-parcial"),
-    [itens],
-  );
-  const visaoNavegacao: Visao = visao === "chamada-parcial" ? "chamada" : visao;
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
   const posicoes = useRef(new Map<Visao, number>());
@@ -710,7 +703,6 @@ export default function Aplicacao({
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={registrarPendenciasChamada}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
-            onAbrirParcial={podeOperar ? () => trocarVisao("chamada-parcial") : undefined}
           />
         )}
         {alvoVisao === "chamada-parcial" && podeOperar && (
@@ -839,14 +831,13 @@ export default function Aplicacao({
             aria-label="Seções do aplicativo"
             className="flex shrink-0 flex-col gap-1.5 px-3 pb-3"
           >
-            {itensNavegacao.map((item) => (
+            {itens.map((item) => (
               <ItemNavegacao
                 key={item.visao}
                 item={item}
-                ativo={visaoNavegacao === item.visao}
+                ativo={visao === item.visao}
                 pendente={
                   pendencias.includes(item.visao) ||
-                  (item.visao === "chamada" && pendencias.includes("chamada-parcial")) ||
                   (item.visao === "gestao" && pendencias.includes("horarios"))
                 }
                 indicador={movel ? undefined : "indicador-lateral"}

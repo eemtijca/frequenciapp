@@ -288,4 +288,4 @@ Falha do envio nunca desfaz o registro. A consulta de saídas por período tamb�
 
 ## Fontes externas de indicadores
 
-Gestão, Configurações, Planilhas inclui a seção recolhida Painel externo. Ela cria um arquivo separado usando a conta Google da frequência e agrega as contagens, sem nomes ou textos livres. O endereço do painel aceita uma visualização privada do Zoho Analytics ou um relatório do Looker Studio. As planilhas operacionais e seus mapas continuam independentes. Preparação, painel restrito e automação estão em [looker-studio.md](looker-studio.md).
+A análise estatística fica no FrequenciBI, acessível pela barra lateral. A seção Painel externo foi retirada da Gestão. As fontes externas preparadas anteriormente mantêm a referência histórica em [looker-studio.md](looker-studio.md); as APIs legadas e as configurações existentes permanecem compatíveis.

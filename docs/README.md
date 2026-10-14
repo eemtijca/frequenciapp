@@ -40,7 +40,7 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 - [ADR-038](adr/038-automacao-do-schema-de-preview.md): schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal.
 - [ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md): fila FIFO durável dos envios automáticos às planilhas, com retentativas e agenda.
 
-- [Painel externo no Zoho Analytics ou Looker Studio](looker-studio.md): preparação de fontes agregadas, painel privado e atualização.
+- [Referência histórica do painel externo](looker-studio.md): fontes agregadas já preparadas no Zoho Analytics ou Looker Studio. A análise atual fica no FrequenciBI.
 - [ADR-040: indicadores para Looker Studio](adr/040-indicadores-looker-studio.md): minimização e substituição atômica.
 - [ADR-041: sincronização de feriados](adr/041-sincronizacao-de-feriados.md): base externa opcional, gravação única e senha para repetir.
 
