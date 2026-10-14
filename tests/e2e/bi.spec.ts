@@ -60,6 +60,7 @@ const massa: Partial<Record<RecursoBi, PaginaBi["linhas"]>> = {
   lista: [
     {
       id: "l",
+      frequenciaId: "c",
       dia,
       alunoId: "a",
       aluno: "QA Aluna",
@@ -88,7 +89,7 @@ const massa: Partial<Record<RecursoBi, PaginaBi["linhas"]>> = {
   entradas: [],
   feriados: [],
 };
-async function preparar(page: Page) {
+async function preparar(page: Page, dados = massa) {
   await page.context().clearCookies();
   await page
     .context()
@@ -119,7 +120,7 @@ async function preparar(page: Page) {
       json: valida
         ? {
             recurso,
-            linhas: recurso === "acesso" ? [] : (massa[recurso] ?? []),
+            linhas: recurso === "acesso" ? [] : (dados[recurso] ?? []),
             pagina: 1,
             proximaPagina: null,
             consultadoEm: `${dia}T12:00:00Z`,
@@ -221,7 +222,9 @@ test("construtor filtra a tabela e exige confirmação antes de CSV e PNG sem in
     .getByRole("article")
     .filter({ has: page.getByRole("heading", { name: "Minha análise", exact: true }) });
   await cartao.scrollIntoViewIfNeeded();
-  await expect(cartao.getByRole("cell", { name: "QA Aluna", exact: true })).toBeVisible();
+  await expect(
+    cartao.getByRole("button", { name: "Filtrar: QA Aluna", exact: true }),
+  ).toBeVisible();
   await cartao.getByRole("button", { name: "Exportar CSV de Minha análise" }).click();
   const dialogo = page.getByRole("alertdialog");
   await expect(dialogo).toContainText("dados pessoais");
@@ -278,6 +281,37 @@ test("revogação remove chave e cache, preservando as visões locais", async ({
       }),
   );
   expect(contagem).toBe(0);
+});
+
+test("reconexão repete falha temporária antes de aceitar o cache e encerra chave revogada", async ({
+  page,
+}) => {
+  await abrir(page);
+  let conferencias = 0;
+  let limitar = true;
+  await page.route("**/api/bi?recurso=acesso", async (rota) => {
+    conferencias++;
+    if (limitar) {
+      await rota.fulfill({ status: 429, json: { error: "Muitas consultas. Aguarde um minuto." } });
+      return;
+    }
+    await rota.fulfill({
+      status: conferencias === 1 ? 503 : 401,
+      json: {
+        error: conferencias === 1 ? "Conexão temporariamente indisponível." : "Chave revogada.",
+      },
+    });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByRole("alert").filter({ hasText: "Aguarde um minuto" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toBeVisible();
+  expect(conferencias).toBe(1);
+  limitar = false;
+  conferencias = 0;
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect(page.getByRole("button", { name: "Testar e entrar", exact: true })).toBeVisible();
+  expect(conferencias).toBe(2);
+  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
 });
 test("erro em página intermediária não vira total parcial e permite nova leitura", async ({
   page,
@@ -469,4 +503,220 @@ test("renderiza as dez visualizações e organiza o painel por puxadores de arra
       ),
     )
     .toBe(420);
+});
+
+test("personaliza modelo, preserva filtros do painel e aplica link sem alterar o painel salvo", async ({
+  page,
+}) => {
+  await abrir(page);
+  await page.getByRole("button", { name: "Personalizar este painel", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Nome do painel", exact: true })).toHaveValue(
+    "Visão geral",
+  );
+  await page.getByLabel("Início da análise", { exact: true }).fill("2026-09-01");
+  await page.getByLabel("Fim da análise", { exact: true }).fill("2026-09-30");
+  await page.getByRole("button", { name: "Aplicar período", exact: true }).click();
+  await aba(page, "Explorador");
+  await page.getByRole("textbox", { name: "Título da análise" }).fill("QA Adicional");
+  await escolher(page, "Turma", "QA A");
+  await page.getByRole("button", { name: "Adicionar ao painel", exact: true }).click();
+  await aba(page, "Meus painéis");
+  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-09-01");
+  await expect(page.locator("[data-painel-item]")).toHaveCount(5);
+  await page.goto("/bi?inicio=2026-10-01&fim=2026-10-31");
+  await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
+  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-10-01");
+  await expect(page.getByRole("combobox", { name: "Turma", exact: true })).toHaveText("Todos");
+  await aba(page, "Meus painéis");
+  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-09-01");
+});
+
+test("atualiza visão sem duplicar e recupera aparência e análise após recarga", async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await abrir(page);
+  await aba(page, "Explorador");
+  await page.getByRole("textbox", { name: "Título da análise" }).fill("QA Personalizado");
+  await escolher(page, "Visualização", "Rosca");
+  await page.getByText("Aparência e tamanho", { exact: true }).click();
+  await escolher(page, "Paleta de cores", "Azul");
+  await page.getByRole("switch", { name: "Mostrar valores", exact: true }).check();
+  await page.getByRole("switch", { name: "Mostrar legenda", exact: true }).uncheck();
+  await page.getByRole("slider", { name: /Altura do gráfico/ }).press("End");
+  await page.getByRole("button", { name: "Salvar visão", exact: true }).click();
+  await page.getByRole("textbox", { name: "Título da análise" }).fill("QA Revisado");
+  await page.getByRole("button", { name: "Atualizar visão", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const p = JSON.parse(localStorage.getItem("frequencibi:personalizacao") ?? "{}");
+        return [p.visoes.length, p.visoes[0].titulo, p.preferencias.explorador.paleta];
+      }),
+    )
+    .toEqual([1, "QA Revisado", "azul"]);
+  await page.reload();
+  await expect(page.getByRole("textbox", { name: "Título da análise" })).toHaveValue("QA Revisado");
+  await page.getByText("Aparência e tamanho", { exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Paleta de cores" })).toContainText("Azul");
+  await expect(page.getByRole("switch", { name: "Mostrar valores" })).toBeChecked();
+  await expect(page.getByRole("switch", { name: "Mostrar legenda" })).not.toBeChecked();
+  await expect(page.getByRole("slider", { name: /Altura do gráfico/ })).toHaveValue("900");
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+    .toBe(true);
+  await test.info().attach("frequencibi-personalizacao", {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: "image/png",
+  });
+});
+
+test("recorte por aluno calcula a presença histórica e atualizar renova também a comparação", async ({
+  page,
+}) => {
+  await abrir(page);
+  await page.getByText("Mais filtros", { exact: true }).click();
+  await escolher(page, "Aluno", "QA Aluna");
+  const indicador = page
+    .getByRole("region", { name: "Indicadores gerais" })
+    .getByRole("article")
+    .filter({ has: page.getByText("Infrequência", { exact: true }) });
+  await expect(indicador).toContainText("0%");
+  await page.getByRole("button", { name: "Limpar recortes", exact: true }).click();
+  await escolher(page, "Comparar infrequência", "Período anterior");
+  let comparacoes = 0;
+  await page.route("**/api/bi?*", async (rota) => {
+    const url = new URL(rota.request().url());
+    if (
+      url.searchParams.get("recurso") !== "chamadas" ||
+      url.searchParams.get("inicio") === filtros.inicio
+    )
+      return rota.fallback();
+    comparacoes++;
+    await rota.fulfill({
+      json: {
+        recurso: "chamadas",
+        linhas: [{ ...massa.chamadas?.[0], dia: "2026-09-15", ausencias: 5 }],
+        pagina: 1,
+        proximaPagina: null,
+        consultadoEm: `${dia}T12:00:00Z`,
+        escopo: {},
+        recursos: RECURSOS_BI,
+      },
+    });
+  });
+  await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+  await expect.poll(() => comparacoes).toBeGreaterThan(0);
+  await expect(page.getByText(/Variação: -30 pontos percentuais/)).toBeVisible();
+});
+
+test("mapa de calor mantém células depois do centésimo grupo e tabela ajusta a página ao recorte", async ({
+  page,
+}) => {
+  const faltas = Array.from({ length: 120 }, (_, i) => ({
+    id: `f${i}`,
+    dia: `2026-10-${String(Math.floor(i / 6) + 1).padStart(2, "0")}`,
+    turma: `QA Turma ${(i % 6) + 1}`,
+    turmaId: `t${i % 6}`,
+    serieId: "s",
+    alunoId: `a${i}`,
+    aluno: `QA Aluno ${i}`,
+    tipo: "F",
+    aula: 1,
+  }));
+  const turmas = Array.from({ length: 6 }, (_, i) => ({
+    id: `t${i}`,
+    turmaId: `t${i}`,
+    nome: `QA Turma ${i + 1}`,
+    turma: `QA Turma ${i + 1}`,
+    serieId: "s",
+    serie: "QA Série",
+  }));
+  await preparar(page, { ...massa, faltas, turmas });
+  await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
+  await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
+  await aba(page, "Faltas");
+  const mapa = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Mapa por turma", exact: true }) });
+  await mapa.scrollIntoViewIfNeeded();
+  const celula = mapa.getByRole("button", { name: "2026-10-20 | QA Turma 6: 1", exact: true });
+  await celula.scrollIntoViewIfNeeded();
+  await expect(celula).toBeVisible();
+  const caixa = await celula.boundingBox();
+  expect(caixa?.height).toBeGreaterThanOrEqual(44);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+    .toBe(true);
+  await test
+    .info()
+    .attach("frequencibi-mapa", { body: await mapa.screenshot(), contentType: "image/png" });
+  const tabela = page
+    .getByRole("article")
+    .filter({ has: page.getByRole("heading", { name: "Faltas por aluno", exact: true }) });
+  await tabela.scrollIntoViewIfNeeded();
+  await tabela.getByRole("button", { name: "Próxima", exact: true }).click();
+  await tabela.getByRole("button", { name: "Próxima", exact: true }).click();
+  await expect(tabela).toContainText("3/3");
+  await page.emulateMedia({ media: "print" });
+  await expect(tabela.getByRole("region", { name: "Tabela de Faltas por aluno" })).toHaveCSS(
+    "max-height",
+    "none",
+  );
+  await expect(tabela).toContainText("Exibidos 20 de 120 registros.");
+  await expect
+    .poll(() =>
+      mapa.locator("svg[data-grafico]").evaluate((svg) => {
+        const largura = svg.parentElement?.getBoundingClientRect().width;
+        return largura !== undefined && svg.getBoundingClientRect().width <= largura + 1;
+      }),
+    )
+    .toBe(true);
+  await page.emulateMedia({ media: "screen" });
+  await escolher(page, "Turma", "QA Turma 6");
+  await expect(tabela).toContainText("1/1");
+  await celula.press("Enter");
+  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-10-20");
+  await tabela.scrollIntoViewIfNeeded();
+  await expect(tabela).toContainText("1/1");
+  await expect(
+    tabela.getByRole("button", { name: "Filtrar: QA Aluno 119", exact: true }),
+  ).toBeVisible();
+});
+
+test("impressão prepara gráficos fora da tela e editor informa título inválido", async ({
+  page,
+}) => {
+  await abrir(page);
+  await page.evaluate(() => {
+    window.print = () => {
+      localStorage.setItem(
+        "QA:impressao",
+        JSON.stringify({
+          cartoes: document.querySelectorAll("article[data-grafico-id]").length,
+          pendentes: document.querySelectorAll(
+            'article[data-bi-carregando="true"], article[data-grafico-id] [data-bi-modulo-carregando]',
+          ).length,
+        }),
+      );
+    };
+  });
+  await page.getByRole("button", { name: "Imprimir", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("QA:impressao") ?? "null")))
+    .toEqual({ cartoes: 4, pendentes: 0 });
+  await page.getByRole("button", { name: "Personalizar este painel", exact: true }).click();
+  await page
+    .locator("[data-painel-item]")
+    .first()
+    .getByRole("button", { name: "Editar", exact: true })
+    .click();
+  const dialogo = page.getByRole("dialog");
+  await dialogo.getByLabel("Título da análise", { exact: true }).fill("");
+  await dialogo.getByRole("button", { name: "Salvar análise", exact: true }).click();
+  await expect(dialogo.getByRole("alert").filter({ hasText: "Confira o título" })).toBeVisible();
+  await dialogo.getByLabel("Título da análise", { exact: true }).fill("QA Modelo editado");
+  await dialogo.getByRole("button", { name: "Salvar análise", exact: true }).click();
+  await expect(dialogo).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "QA Modelo editado", exact: true })).toBeVisible();
 });

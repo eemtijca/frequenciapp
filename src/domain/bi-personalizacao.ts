@@ -27,6 +27,7 @@ export const esquemaPersonalizacaoBi = z
           .enum(["geral", "faltas", "movimentos", "parciais", "explorador", "paineis", "ajuda"])
           .default("geral"),
         painelPadrao: z.string().max(80).default(""),
+        explorador: esquemaGraficoBi.optional(),
       })
       .strict(),
   })
