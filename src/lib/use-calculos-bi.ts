@@ -2,15 +2,10 @@
 
 // Worker exclusivo do BI: cada base é transferida uma vez e o agrupamento fica fora da interface.
 import { useCallback, useEffect, useRef } from "react";
-import {
-  agregarBi,
-  type DadosBi,
-  type FiltrosBi,
-  type GraficoBi,
-  type PontoBi,
-} from "@/domain/bi-analise";
+import { agregarBi, type GraficoBi, type PontoBi } from "@/domain/bi-analise";
 import type { LinhaBi, RecursoBi } from "@/domain/bi";
-export function useCalculosBi(dados: DadosBi, identidade: string) {
+import type { RecorteBi } from "@/domain/bi-recortes";
+export function useCalculosBi(recortes: Partial<Record<RecursoBi, RecorteBi>>, identidade: string) {
   const worker = useRef<Worker | null>(null);
   const bases = useRef(new Map<RecursoBi, LinhaBi[]>());
   const contador = useRef(0);
@@ -51,9 +46,12 @@ export function useCalculosBi(dados: DadosBi, identidade: string) {
     };
   }, [identidade]);
   return useCallback(
-    async (config: GraficoBi, filtros: FiltrosBi) => {
-      const linhas = dados[config.recurso] ?? [];
-      if (!worker.current) return agregarBi(linhas, config, filtros);
+    async (config: GraficoBi) => {
+      const recorte = recortes[config.recurso];
+      if (!recorte) throw new Error("Esta base não está disponível neste recorte.");
+      if (!recorte.disponivel) throw new Error(recorte.motivo);
+      const { linhas, filtros: filtrosCalculo } = recorte;
+      if (!worker.current) return agregarBi(linhas, config, filtrosCalculo);
       if (bases.current.get(config.recurso) !== linhas) {
         worker.current.postMessage({ recurso: config.recurso, linhas, id: 0 });
         bases.current.set(config.recurso, linhas);
@@ -61,9 +59,14 @@ export function useCalculosBi(dados: DadosBi, identidade: string) {
       const id = ++contador.current;
       return new Promise<PontoBi[]>((resolve, reject) => {
         pedidos.current.set(id, { resolve, reject });
-        worker.current?.postMessage({ id, recurso: config.recurso, config, filtros });
+        worker.current?.postMessage({
+          id,
+          recurso: config.recurso,
+          config,
+          filtros: filtrosCalculo,
+        });
       });
     },
-    [dados],
+    [recortes],
   );
 }

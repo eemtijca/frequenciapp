@@ -5,13 +5,17 @@ import { useRef } from "react";
 import { GripVertical, MoveDown, MoveUp, Expand, Copy, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CartaoGrafico, type CalcularBi, type ConfirmarExportacaoBi } from "./cartao-grafico";
-import type { DadosBi, GraficoBi, PontoBi } from "@/domain/bi-analise";
+import type { GraficoBi, PontoBi } from "@/domain/bi-analise";
 import type { PainelBi } from "@/domain/bi-personalizacao";
+import type { LinhaBi, RecursoBi } from "@/domain/bi";
+import type { RecorteBi } from "@/domain/bi-recortes";
 import estilos from "./grade-paineis.module.css";
+const LINHAS_VAZIAS: LinhaBi[] = [];
 export function GradePaineisBi({
   painel,
   onAlterar,
-  dados,
+  recortes,
+  prepararImpressao = false,
   calcular,
   onFiltrar,
   confirmar,
@@ -19,7 +23,8 @@ export function GradePaineisBi({
 }: {
   painel: PainelBi;
   onAlterar: (p: PainelBi) => void;
-  dados: DadosBi;
+  recortes: Partial<Record<RecursoBi, RecorteBi>>;
+  prepararImpressao?: boolean;
   calcular: CalcularBi;
   onFiltrar: (g: GraficoBi, p: PontoBi) => void;
   confirmar: ConfirmarExportacaoBi;
@@ -115,9 +120,18 @@ export function GradePaineisBi({
       if (destino >= 0) mover(g.id, destino);
     }
   };
+  const graficos = painel.graficos.map((grafico) => ({
+    grafico,
+    recorte:
+      recortes[grafico.recurso] ??
+      ({
+        disponivel: false,
+        motivo: "Base indisponível para esta chave ou recorte.",
+      } satisfies RecorteBi),
+  }));
   return (
     <div ref={grade} className={estilos.grade} aria-label="Gráficos do painel">
-      {painel.graficos.map((g, i) => (
+      {graficos.map(({ grafico: g, recorte }, i) => (
         <div
           key={g.id}
           className={estilos.item}
@@ -126,8 +140,11 @@ export function GradePaineisBi({
         >
           <CartaoGrafico
             config={g}
+            prepararImpressao={prepararImpressao}
             filtros={painel.filtros}
-            linhas={dados[g.recurso] ?? []}
+            filtrosDados={recorte.disponivel ? recorte.filtros : painel.filtros}
+            linhas={recorte.disponivel ? recorte.linhas : LINHAS_VAZIAS}
+            indisponivel={recorte.disponivel ? undefined : recorte.motivo}
             calcular={calcular}
             onFiltrar={onFiltrar}
             confirmar={confirmar}
@@ -228,7 +245,10 @@ export function GradePaineisBi({
                   variant="ghost"
                   aria-label={`Excluir ${g.titulo}`}
                   onClick={() =>
-                    onAlterar({ ...painel, graficos: painel.graficos.filter((v) => v.id !== g.id) })
+                    onAlterar({
+                      ...painel,
+                      graficos: painel.graficos.filter((v) => v.id !== g.id),
+                    })
                   }
                 >
                   <Trash2 size={15} />
