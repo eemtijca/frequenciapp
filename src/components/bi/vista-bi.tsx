@@ -16,6 +16,7 @@ import {
   Trash2,
   LoaderCircle,
   WifiOff,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -55,11 +56,11 @@ import {
   type PersonalizacaoBi,
 } from "@/domain/bi-personalizacao";
 import {
+  BASES_ANALISE,
   compararPeriodoBi,
   coberturaBi,
   destaquesBi,
   enriquecerBi,
-  esquemaFiltrosBi,
   esquemaGraficoBi,
   filtrarBi,
   totalBi,
@@ -69,6 +70,8 @@ import {
   type PontoBi,
 } from "@/domain/bi-analise";
 import { graficoBi, painelCuradoBi } from "@/domain/bi-painel";
+import { CAMPOS_LINK_BI, receberFiltrosBi } from "@/domain/bi-compartilhamento";
+import { exigeListaBi, resolverRecorteBi, type RecorteBi } from "@/domain/bi-recortes";
 import { ROTULOS_RECURSOS_BI, type RecursoBi } from "@/domain/bi";
 import { CartaoGrafico, type ConfirmarExportacaoBi } from "./cartao-grafico";
 import { EditorGraficoBi } from "./editor-grafico";
@@ -89,23 +92,13 @@ const ABAS = [
 type AbaBi = PersonalizacaoBi["preferencias"]["aba"];
 const VAZIOS: DadosBi = {};
 const RECURSOS_VAZIOS: RecursoBi[] = [];
-const CAMPOS_LINK = [
-  "inicio",
-  "fim",
-  "serieId",
-  "turmaId",
-  "alunoId",
-  "tipo",
-  "turno",
-  "situacao",
-] as const;
 interface RetratoVista {
   id: string;
   dados: DadosBi;
   datas: string[];
   falhas: string[];
 }
-export default function VistaBi() {
+export default function VistaBi({ fuso }: { fuso: string }) {
   const fonte = useDadosBi();
   const { acesso, carregar, entrar, esquecer, armazenamentoFalhou } = fonte;
   const [personalizacao, setPersonalizacao] = useState<PersonalizacaoBi>(personalizacaoVaziaBi);
@@ -114,21 +107,26 @@ export default function VistaBi() {
   const [chave, setChave] = useState("");
   const [erro, setErro] = useState("");
   const [apresentacao, setApresentacao] = useState(false);
+  const [prepararImpressao, setPrepararImpressao] = useState(false);
   const [config, setConfig] = useState(() =>
     graficoBi("chamadas", "turma", "infrequencia", "barras", "Minha análise"),
   );
+  const ultimaAnaliseValida = useRef(config);
   const [nomePainel, setNomePainel] = useState("");
   const [nomeVisao, setNomeVisao] = useState("");
   const [editando, setEditando] = useState<GraficoBi | null>(null);
+  const [erroEdicao, setErroEdicao] = useState("");
   const [retrato, setRetrato] = useState<RetratoVista | null>(null);
   const [atualizacao, setAtualizacao] = useState(0);
   const forcar = useRef(false);
   const [extra, setExtra] = useState<RecursoBi | null>(null);
   const [comparacao, setComparacao] = useState<"nenhuma" | "anterior" | "ano">("nenhuma");
   const [comparativo, setComparativo] = useState<{
+    id: string;
     valor: number | null;
     inicio: string;
     fim: string;
+    erro?: string;
   } | null>(null);
   const [confirmacao, setConfirmacao] = useState<{
     titulo: string;
@@ -141,16 +139,19 @@ export default function VistaBi() {
     try {
       const p = lerPersonalizacaoBi();
       const parametros = new URLSearchParams(window.location.search);
-      const compartilhados = Object.fromEntries(
-        CAMPOS_LINK.filter((c) => parametros.has(c)).map((c) => [c, parametros.get(c)]),
+      const { temCompartilhados, resultado: filtros } = receberFiltrosBi(
+        p.preferencias.filtros,
+        parametros,
       );
-      const filtros = esquemaFiltrosBi.safeParse({ ...p.preferencias.filtros, ...compartilhados });
       if (
         filtros.success &&
         (!filtros.data.inicio || !filtros.data.fim || filtros.data.inicio <= filtros.data.fim)
-      )
+      ) {
         p.preferencias.filtros = filtros.data;
+        if (temCompartilhados) p.preferencias.aba = "geral";
+      }
       setPersonalizacao(p);
+      if (p.preferencias.explorador) setConfig(p.preferencias.explorador);
     } catch {
       setArmazenar(false);
       setErro(
@@ -163,11 +164,19 @@ export default function VistaBi() {
   useEffect(() => {
     if (!prontoLocal || !armazenar) return;
     try {
-      guardarPersonalizacaoBi(personalizacao);
+      const valida = esquemaGraficoBi.safeParse(config);
+      if (valida.success) ultimaAnaliseValida.current = valida.data;
+      guardarPersonalizacaoBi({
+        ...personalizacao,
+        preferencias: {
+          ...personalizacao.preferencias,
+          explorador: ultimaAnaliseValida.current,
+        },
+      });
     } catch {
       armazenamentoFalhou();
     }
-  }, [personalizacao, prontoLocal, armazenar, armazenamentoFalhou]);
+  }, [personalizacao, config, prontoLocal, armazenar, armazenamentoFalhou]);
   const aba = personalizacao.preferencias.aba;
   const painel =
     personalizacao.paineis.find((p) => p.id === personalizacao.preferencias.painelPadrao) ??
@@ -176,6 +185,7 @@ export default function VistaBi() {
     aba === "paineis" && painel ? painel.filtros : personalizacao.preferencias.filtros;
   const curados = useMemo(() => painelCuradoBi(aba), [aba]);
   const recursos = acesso?.pagina.recursos ?? RECURSOS_VAZIOS;
+  const precisaLista = exigeListaBi("chamadas", filtros);
   const necessarios = useMemo(() => {
     let bases: RecursoBi[] = [];
     if (aba === "geral")
@@ -185,11 +195,12 @@ export default function VistaBi() {
     else if (aba === "parciais") bases = ["parciais", "lista"];
     else if (aba === "explorador") bases = [config.recurso];
     else if (aba === "paineis") bases = painel?.graficos.map((g) => g.recurso) ?? [];
+    if (bases.includes("chamadas") && precisaLista) bases.push("lista");
     if (extra) bases.push(extra);
     return [...new Set<RecursoBi>(["series", "turmas", "alunos", ...bases])].filter((r) =>
       recursos.includes(r),
     );
-  }, [aba, config.recurso, painel, extra, recursos]);
+  }, [aba, config.recurso, painel, extra, recursos, precisaLista]);
   const assinatura = JSON.stringify([
     acesso?.id,
     acesso?.pagina.escopo,
@@ -236,7 +247,14 @@ export default function VistaBi() {
     () => enriquecerBi(retrato?.id === assinatura ? retrato.dados : VAZIOS),
     [retrato, assinatura],
   );
-  const calcular = useCalculosBi(dados, acesso?.id ?? "");
+  const recortes = useMemo(
+    () =>
+      Object.fromEntries(
+        BASES_ANALISE.map((r) => [r, resolverRecorteBi(dados, r, filtros)]),
+      ) as Record<(typeof BASES_ANALISE)[number], RecorteBi>,
+    [dados, filtros],
+  );
+  const calcular = useCalculosBi(recortes, acesso?.id ?? "");
   useEffect(() => {
     if (acesso) return;
     const frame = requestAnimationFrame(() => {
@@ -278,6 +296,7 @@ export default function VistaBi() {
     if (Object.keys(campo).length) alterarFiltros({ ...filtros, ...campo });
   };
   const aprofundar = (g: GraficoBi) => {
+    setPersonalizacao((p) => ({ ...p, preferencias: { ...p.preferencias, filtros } }));
     setConfig({
       ...g,
       id: "explorador",
@@ -297,6 +316,29 @@ export default function VistaBi() {
     });
   const confirmarLocal = (titulo: string, descricao: string, acao: () => Promise<void> | void) =>
     setConfirmacao({ titulo, descricao, acao });
+  const { executando: imprimindo, executar: imprimir } = useAcaoUnica(async () => {
+    setPrepararImpressao(true);
+    try {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      let pronto = false;
+      for (let tentativa = 0; tentativa < 150; tentativa++) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const pendente = document.querySelector(
+          'article[data-bi-carregando="true"], article[data-grafico-id] [data-bi-modulo-carregando]',
+        );
+        if (!pendente && pronto) {
+          window.print();
+          return;
+        }
+        pronto = !pendente;
+      }
+      setErro("Os gráficos ainda estão sendo preparados. Tente imprimir novamente.");
+    } finally {
+      setPrepararImpressao(false);
+    }
+  });
   const { executando: entrando, executar: entrarAgora } = useAcaoUnica(() => entrar(chave.trim()));
   const { executando: confirmando, executar: confirmarAgora } = useAcaoUnica(async () => {
     if (!confirmacao) return;
@@ -307,23 +349,34 @@ export default function VistaBi() {
       avisarErro(e, { contexto: "Não foi possível concluir a ação no BI." });
     }
   });
-  const guardarVisao = () => {
+  const visaoAtual = personalizacao.visoes.find((v) => v.id === config.id);
+  const guardarVisao = (atualizarExistente = false) => {
     const g = esquemaGraficoBi.safeParse({
       ...config,
-      id: crypto.randomUUID(),
+      id: atualizarExistente && visaoAtual ? visaoAtual.id : crypto.randomUUID(),
       titulo: nomeVisao.trim() || config.titulo,
     });
     if (!g.success) {
       setErro("Confira o título e os valores da análise.");
       return;
     }
-    if (personalizacao.visoes.length >= 200) {
+    if (!atualizarExistente && personalizacao.visoes.length >= 200) {
       setErro("O limite é de 200 visões. Exclua uma antes de salvar.");
       return;
     }
-    setPersonalizacao((p) => ({ ...p, visoes: [...p.visoes, g.data] }));
+    setPersonalizacao((p) => ({
+      ...p,
+      visoes:
+        atualizarExistente && visaoAtual
+          ? p.visoes.map((v) => (v.id === visaoAtual.id ? g.data : v))
+          : [...p.visoes, g.data],
+    }));
+    setConfig({ ...config, id: g.data.id });
+    setErro("");
     setNomeVisao("");
-    avisarSucesso("Visão salva neste navegador.");
+    avisarSucesso(
+      atualizarExistente ? "Visão atualizada neste navegador." : "Visão salva neste navegador.",
+    );
   };
   const criarPainel = () => {
     const nome = nomePainel.trim();
@@ -350,8 +403,30 @@ export default function VistaBi() {
       setErro("O painel já tem 40 gráficos.");
       return;
     }
-    alterarPainel({ ...painel, graficos: [...painel.graficos, g.data], filtros });
+    alterarPainel({ ...painel, graficos: [...painel.graficos, g.data] });
+    setErro("");
     avisarSucesso("Gráfico adicionado ao painel.");
+  };
+  const personalizarModelo = () => {
+    if (personalizacao.paineis.length >= 50) {
+      setErro("O limite é de 50 painéis. Exclua um antes de criar.");
+      return;
+    }
+    const novo: PainelBi = {
+      id: crypto.randomUUID(),
+      nome: ABAS.find((a) => a.id === aba)?.nome ?? "Meu painel",
+      graficos: curados
+        .filter((g) => recursos.includes(g.recurso))
+        .map((g) => ({ ...g, id: crypto.randomUUID() })),
+      filtros: { ...filtros },
+      anotacao: "",
+    };
+    setPersonalizacao((p) => ({
+      ...p,
+      paineis: [...p.paineis, novo],
+      preferencias: { ...p.preferencias, painelPadrao: novo.id, aba: "paineis" },
+    }));
+    avisarSucesso("Painel criado. Os gráficos já podem ser personalizados.");
   };
   const atualizar = () => {
     if (carregando) return;
@@ -361,7 +436,7 @@ export default function VistaBi() {
   };
   const compartilhar = async () => {
     const url = new URL("/bi", window.location.origin);
-    for (const c of CAMPOS_LINK) if (filtros[c]) url.searchParams.set(c, filtros[c]);
+    for (const c of CAMPOS_LINK_BI) if (filtros[c]) url.searchParams.set(c, filtros[c]);
     try {
       await navigator.clipboard.writeText(url.toString());
       avisarSucesso("Link copiado, sem chave ou anotações.");
@@ -380,57 +455,135 @@ export default function VistaBi() {
         "O arquivo substituirá visões, painéis e preferências. A chave e os dados baixados serão preservados.",
         () => {
           setPersonalizacao(novo);
+          setConfig(
+            novo.preferencias.explorador ??
+              graficoBi("chamadas", "turma", "infrequencia", "barras", "Minha análise"),
+          );
           setArmazenar(true);
+          setErro("");
         },
       );
     } catch {
       setErro("Arquivo inválido ou incompatível. A configuração atual foi preservada.");
     }
   };
+  const geracaoComparada = useRef(0);
+  const idComparacao = JSON.stringify([comparacao, filtros, atualizacao]);
+  const alunosComparacao = dados.alunos;
   useEffect(() => {
     if (comparacao === "nenhuma" || !acesso || aba !== "geral" || !recursos.includes("chamadas"))
       return;
     let atual = true;
     setComparativo(null);
     const f = compararPeriodoBi(filtros, comparacao);
-    void carregar("chamadas", { inicio: f.inicio, fim: f.fim })
+    const base = exigeListaBi("chamadas", f) ? "lista" : "chamadas";
+    const renovar = atualizacao !== geracaoComparada.current;
+    geracaoComparada.current = atualizacao;
+    void carregar(base, { inicio: f.inicio, fim: f.fim }, renovar)
       .then((r) => {
-        if (atual)
+        const recorte = resolverRecorteBi(
+          enriquecerBi({ [base]: r.linhas, alunos: alunosComparacao }),
+          "chamadas",
+          f,
+        );
+        if (atual) {
           setComparativo({
-            valor: totalBi(r.linhas, "infrequencia", f),
+            id: idComparacao,
+            valor: recorte.disponivel
+              ? totalBi(recorte.linhas, "infrequencia", recorte.filtros)
+              : null,
             inicio: f.inicio,
             fim: f.fim,
+            erro: recorte.disponivel ? undefined : recorte.motivo,
           });
+        }
       })
       .catch(() => {
-        if (atual) setErro("A comparação não pôde ser carregada; o recorte atual foi preservado.");
+        if (atual)
+          setComparativo({
+            id: idComparacao,
+            valor: null,
+            inicio: f.inicio,
+            fim: f.fim,
+            erro: "Comparação indisponível. Tente atualizar os dados.",
+          });
       });
     return () => {
       atual = false;
     };
-  }, [comparacao, acesso, aba, recursos, carregar, filtros]);
+  }, [
+    comparacao,
+    acesso,
+    aba,
+    recursos,
+    carregar,
+    filtros,
+    atualizacao,
+    idComparacao,
+    alunosComparacao,
+  ]);
+  const comparacaoVisivel = comparativo?.id === idComparacao ? comparativo : null;
   const numero = (v: number | null) =>
     v === null ? "Sem dados" : v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-  const infrequencia = dados.chamadas ? totalBi(dados.chamadas, "infrequencia", filtros) : null;
-  const cobertura = coberturaBi(dados, filtros);
+  const chamadaRecortada = recortes.chamadas;
+  const infrequencia = chamadaRecortada.disponivel
+    ? totalBi(chamadaRecortada.linhas, "infrequencia", chamadaRecortada.filtros)
+    : null;
+  const filtrosTurmas = {
+    ...filtros,
+    alunoId: "",
+    busca: "",
+    situacao: "",
+    tipo: "",
+    turno: "",
+    justificativa: "",
+  };
+  const cobertura = coberturaBi(dados, filtrosTurmas, acesso?.pagina.escopo);
   const pendencias = ["lista", "parciais"] as const;
-  const metrica = (recurso: RecursoBi, medida: Parameters<typeof totalBi>[1]) =>
-    dados[recurso] ? totalBi(dados[recurso], medida, filtros) : null;
-  const ultimaData = retrato?.datas.filter(Boolean).sort()[0];
+  const metrica = (
+    recurso: (typeof BASES_ANALISE)[number],
+    medida: Parameters<typeof totalBi>[1],
+  ) => {
+    const recorte = recortes[recurso];
+    return recorte.disponivel ? totalBi(recorte.linhas, medida, recorte.filtros) : null;
+  };
+  const ultimaData =
+    retrato?.id === assinatura ? retrato.datas.filter(Boolean).sort()[0] : undefined;
   const destaques = useMemo(() => destaquesBi(dados, filtros), [dados, filtros]);
-  const mostrarGrafico = (g: GraficoBi) =>
-    dados[g.recurso] ? (
+  const mostrarGrafico = (g: GraficoBi) => {
+    if (!recursos.includes(g.recurso)) return null;
+    const recorte = recortes[g.recurso];
+    return (
       <CartaoGrafico
         key={g.id}
         config={g}
         filtros={filtros}
-        linhas={dados[g.recurso] ?? []}
+        linhas={recorte.disponivel ? recorte.linhas : []}
+        filtrosDados={recorte.disponivel ? recorte.filtros : filtros}
+        indisponivel={recorte.disponivel ? undefined : recorte.motivo}
         calcular={calcular}
         onFiltrar={filtrarGrafico}
         onAprofundar={aprofundar}
         confirmar={confirmarExportacao}
+        prepararImpressao={prepararImpressao}
+        acoes={
+          <Button
+            size="sm"
+            variant="ghost"
+            className="print:hidden"
+            aria-label={`Personalizar ${g.titulo}`}
+            onClick={() => {
+              setConfig({ ...g, id: "explorador" });
+              trocarAba("explorador");
+            }}
+          >
+            <Pencil size={15} />
+            Personalizar
+          </Button>
+        }
       />
-    ) : null;
+    );
+  };
   return (
     <div className={`${estilos.raiz} ${apresentacao ? estilos.apresentacao : ""}`}>
       <RegistroPwa />
@@ -440,7 +593,12 @@ export default function VistaBi() {
         </Button>
       )}
       <header className={`superficie-vidro ${estilos.cabecalho} print:hidden`}>
-        <Link href="/" prefetch={false} className="flex min-h-11 items-center gap-2 text-sm">
+        <Link
+          href="/"
+          prefetch={false}
+          aria-label="Voltar ao FrequenciApp"
+          className="flex min-h-11 min-w-11 items-center gap-2 text-sm"
+        >
           <ArrowLeft size={18} />
           <span className="hidden sm:inline">FrequenciApp</span>
         </Link>
@@ -530,6 +688,12 @@ export default function VistaBi() {
                     size="sm"
                     aria-current={aba === a.id ? "page" : undefined}
                     onClick={() => trocarAba(a.id)}
+                    ref={(el) => {
+                      if (el && aba === a.id) {
+                        const nav = el.parentElement;
+                        if (nav) nav.scrollLeft = el.offsetLeft - nav.offsetLeft - 8;
+                      }
+                    }}
                     className="shrink-0"
                   >
                     {a.nome}
@@ -554,13 +718,19 @@ export default function VistaBi() {
                   <Maximize size={15} />
                   {apresentacao ? "Sair da apresentação" : "Apresentar"}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => window.print()}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={carregando || imprimindo}
+                  onClick={() => void imprimir()}
+                >
                   <Printer size={15} />
-                  Imprimir
+                  {imprimindo ? "Preparando impressão..." : "Imprimir"}
                 </Button>
               </div>
             </div>
             <SeletorFiltrosBi
+              fuso={fuso}
               key={`${aba}-${painel?.id ?? "global"}-${filtros.inicio}-${filtros.fim}`}
               filtros={filtros}
               onAlterar={alterarFiltros}
@@ -584,6 +754,14 @@ export default function VistaBi() {
                 : "Ainda sem retrato completo"}
               {carregando && <span>{fonte.progresso || "Carregando conjuntos..."}</span>}
             </div>
+            {fonte.erro && (
+              <p
+                role="alert"
+                className="bg-falta-fraca text-falta-texto mb-4 rounded-2xl p-3 text-sm"
+              >
+                {fonte.erro}
+              </p>
+            )}
             {retrato?.id === assinatura && retrato.falhas.length > 0 && (
               <div
                 role="alert"
@@ -617,27 +795,32 @@ export default function VistaBi() {
                         [
                           "Alunos ativos",
                           dados.alunos
-                            ? filtrarBi(dados.alunos, filtros).filter(
-                                (l) => l.ativo === true && !l.desistenteEm,
-                              ).length
+                            ? filtrarBi(dados.alunos, {
+                                ...filtros,
+                                justificativa: "",
+                                tipo: "",
+                                turno: "",
+                              }).filter((l) => l.ativo === true && !l.desistenteEm).length
                             : "Indisponível",
                         ],
                         [
                           "Turmas",
-                          dados.turmas ? filtrarBi(dados.turmas, filtros).length : "Indisponível",
+                          dados.turmas
+                            ? filtrarBi(dados.turmas, filtrosTurmas).length
+                            : "Indisponível",
                         ],
                         ["Ausências", numero(metrica("chamadas", "ausencias"))],
                         ["Saídas", numero(metrica("saidas", "registros"))],
                         ["Entradas", numero(metrica("entradas", "registros"))],
                         [
                           "Pendências Seduc",
-                          pendencias.every((r) => dados[r])
+                          pendencias.every((r) => metrica(r, "pendentes") !== null)
                             ? pendencias.reduce((n, r) => n + (metrica(r, "pendentes") ?? 0), 0)
                             : "Conjuntos indisponíveis",
                         ],
                         ["Dias com chamada", numero(metrica("chamadas", "diasChamada"))],
                         [
-                          "Cobertura estimada",
+                          "Cobertura das turmas",
                           cobertura?.taxa === null || !cobertura
                             ? "Sem base de cálculo"
                             : `${numero(cobertura.taxa)}%`,
@@ -645,7 +828,9 @@ export default function VistaBi() {
                       ].map(([titulo, valor]) => (
                         <article key={titulo} className="superficie-vidro p-4">
                           <p className="text-muted-foreground text-xs">{titulo}</p>
-                          <strong className="mt-2 block text-2xl tabular-nums">{valor}</strong>
+                          <strong className="mt-2 block text-xl break-words tabular-nums sm:text-2xl">
+                            {valor}
+                          </strong>
                         </article>
                       ))}
                     </section>
@@ -665,8 +850,9 @@ export default function VistaBi() {
                       </div>
                       {comparacao !== "nenhuma" && (
                         <p className="text-sm">
-                          {comparativo
-                            ? `${comparativo.inicio} a ${comparativo.fim}: ${comparativo.valor === null ? "sem base de cálculo" : `${numero(comparativo.valor)}%`}${infrequencia === null || comparativo.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparativo.valor)} pontos percentuais`}`
+                          {comparacaoVisivel
+                            ? (comparacaoVisivel.erro ??
+                              `${comparacaoVisivel.inicio} a ${comparacaoVisivel.fim}: ${comparacaoVisivel.valor === null ? "sem base de cálculo" : `${numero(comparacaoVisivel.valor)}%`}${infrequencia === null || comparacaoVisivel.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparacaoVisivel.valor)} pontos percentuais`}`)
                             : "Preparando comparação..."}
                         </p>
                       )}
@@ -674,7 +860,15 @@ export default function VistaBi() {
                   </>
                 )}
                 {["geral", "faltas", "movimentos", "parciais"].includes(aba) && (
-                  <div className="grid gap-4 lg:grid-cols-2">{curados.map(mostrarGrafico)}</div>
+                  <>
+                    <div className="mb-3 flex justify-end print:hidden">
+                      <Button variant="outline" size="sm" onClick={personalizarModelo}>
+                        <Pencil size={15} />
+                        Personalizar este painel
+                      </Button>
+                    </div>
+                    <div className="grid gap-4 lg:grid-cols-2">{curados.map(mostrarGrafico)}</div>
+                  </>
                 )}
                 {aba === "explorador" && (
                   <div className="space-y-4">
@@ -688,10 +882,39 @@ export default function VistaBi() {
                         maxLength={100}
                         onChange={(e) => setNomeVisao(e.target.value)}
                       />
-                      <Button onClick={guardarVisao}>Salvar visão</Button>
-                      <Button variant="outline" onClick={adicionar}>
+                      {visaoAtual && (
+                        <Button onClick={() => guardarVisao(true)}>Atualizar visão</Button>
+                      )}
+                      <Button
+                        variant={visaoAtual ? "outline" : "default"}
+                        onClick={() => guardarVisao()}
+                      >
+                        {visaoAtual ? "Salvar como nova" : "Salvar visão"}
+                      </Button>
+                      {personalizacao.paineis.length > 0 && (
+                        <div className="w-full min-w-0 sm:w-64">
+                          <Selecionar
+                            ariaLabel="Painel de destino"
+                            value={painel?.id ?? ""}
+                            opcoes={personalizacao.paineis.map((p) => ({
+                              valor: p.id,
+                              rotulo: p.nome,
+                            }))}
+                            onValueChange={(id) =>
+                              setPersonalizacao((p) => ({
+                                ...p,
+                                preferencias: { ...p.preferencias, painelPadrao: id },
+                              }))
+                            }
+                          />
+                        </div>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={painel ? adicionar : () => trocarAba("paineis")}
+                      >
                         <Plus size={15} />
-                        Adicionar ao painel
+                        {painel ? "Adicionar ao painel" : "Criar painel"}
                       </Button>
                     </div>
                     {recursos.includes(config.recurso) ? (
@@ -708,8 +931,20 @@ export default function VistaBi() {
                       )}
                       <div className="flex flex-wrap gap-2">
                         {personalizacao.visoes.map((v) => (
-                          <div key={v.id} className="controle-vidro flex items-center gap-1 p-1">
-                            <Button size="sm" variant="ghost" onClick={() => setConfig(v)}>
+                          <div
+                            key={v.id}
+                            className="controle-vidro flex max-w-full min-w-0 items-center gap-1 p-1"
+                          >
+                            <Button
+                              className="h-auto min-h-11 min-w-0 break-words whitespace-normal"
+                              size="sm"
+                              variant={config.id === v.id ? "secondary" : "ghost"}
+                              aria-pressed={config.id === v.id}
+                              onClick={() => {
+                                setConfig(v);
+                                setNomeVisao("");
+                              }}
+                            >
                               {v.titulo}
                             </Button>
                             <Button
@@ -717,10 +952,15 @@ export default function VistaBi() {
                               variant="ghost"
                               aria-label={`Excluir visão ${v.titulo}`}
                               onClick={() =>
-                                setPersonalizacao((p) => ({
-                                  ...p,
-                                  visoes: p.visoes.filter((g) => g.id !== v.id),
-                                }))
+                                confirmarLocal(
+                                  "Excluir visão?",
+                                  "A visão será removida deste navegador. Os gráficos já adicionados aos painéis serão preservados.",
+                                  () =>
+                                    setPersonalizacao((p) => ({
+                                      ...p,
+                                      visoes: p.visoes.filter((g) => g.id !== v.id),
+                                    })),
+                                )
                               }
                             >
                               <Trash2 size={15} />
@@ -837,11 +1077,15 @@ export default function VistaBi() {
                         <GradePaineisBi
                           painel={painel}
                           onAlterar={alterarPainel}
-                          dados={dados}
+                          recortes={recortes}
+                          prepararImpressao={prepararImpressao}
                           calcular={calcular}
                           onFiltrar={filtrarGrafico}
                           confirmar={confirmarExportacao}
-                          onEditar={setEditando}
+                          onEditar={(g) => {
+                            setErroEdicao("");
+                            setEditando(g);
+                          }}
                         />
                         {!painel.graficos.length && (
                           <p className="text-muted-foreground py-6 text-sm">
@@ -904,9 +1148,20 @@ export default function VistaBi() {
                   onClick={() =>
                     confirmarExportacao(() =>
                       baixarBi(
-                        new Blob([exportarPersonalizacaoBi(personalizacao)], {
-                          type: "application/json",
-                        }),
+                        new Blob(
+                          [
+                            exportarPersonalizacaoBi({
+                              ...personalizacao,
+                              preferencias: {
+                                ...personalizacao.preferencias,
+                                explorador: ultimaAnaliseValida.current,
+                              },
+                            }),
+                          ],
+                          {
+                            type: "application/json",
+                          },
+                        ),
                         "frequencibi-configuracoes.json",
                       ),
                     )
@@ -966,6 +1221,9 @@ export default function VistaBi() {
                         await esquecer();
                         await limparTudoBi();
                         setPersonalizacao(personalizacaoVaziaBi());
+                        setConfig(
+                          graficoBi("chamadas", "turma", "infrequencia", "barras", "Minha análise"),
+                        );
                         setArmazenar(true);
                         setRetrato(null);
                         setChave("");
@@ -1032,7 +1290,19 @@ export default function VistaBi() {
           </DialogHeader>
           {editando && (
             <>
-              <EditorGraficoBi config={editando} onAlterar={setEditando} recursos={recursos} />
+              <EditorGraficoBi
+                config={editando}
+                onAlterar={(g) => {
+                  setEditando(g);
+                  setErroEdicao("");
+                }}
+                recursos={recursos}
+              />
+              {erroEdicao && (
+                <p role="alert" className="text-falta-texto text-sm">
+                  {erroEdicao}
+                </p>
+              )}
               <Button
                 onClick={() => {
                   const valido = esquemaGraficoBi.safeParse(editando);
@@ -1044,7 +1314,7 @@ export default function VistaBi() {
                       ),
                     });
                     setEditando(null);
-                  }
+                  } else setErroEdicao("Confira o título e os valores da análise antes de salvar.");
                 }}
               >
                 Salvar análise

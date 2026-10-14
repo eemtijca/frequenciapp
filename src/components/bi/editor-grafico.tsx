@@ -5,12 +5,14 @@ import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Selecionar } from "@/components/ui/selecionar";
+import { Switch } from "@/components/ui/switch";
 import {
   BASES_ANALISE,
   dimensoesRecursoBi,
   medidasRecursoBi,
   NOMES_DIMENSOES,
   NOMES_MEDIDAS,
+  PALETAS_GRAFICO_BI,
   TIPOS_GRAFICO_BI,
   type GraficoBi,
 } from "@/domain/bi-analise";
@@ -27,6 +29,13 @@ const TIPOS: Record<GraficoBi["tipo"], string> = {
   tabela: "Tabela detalhada",
   indicador: "Indicadores",
 };
+const PALETAS: Record<GraficoBi["paleta"], string> = {
+  escola: "Padrão da escola",
+  verde: "Verde",
+  azul: "Azul",
+  vermelho: "Vermelho",
+  violeta: "Violeta",
+};
 export function EditorGraficoBi({
   config,
   onAlterar,
@@ -37,6 +46,8 @@ export function EditorGraficoBi({
   recursos: RecursoBi[];
 }) {
   const id = useId();
+  const visual = !["tabela", "indicador"].includes(config.tipo);
+  const largura = Math.round((config.largura / 12) * 100);
   const campo = (
     nome: string,
     value: string,
@@ -58,15 +69,22 @@ export function EditorGraficoBi({
   );
   return (
     <section className="superficie-vidro p-4 print:hidden" aria-label="Construtor de gráficos">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <div className="col-span-2 lg:col-span-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="sm:col-span-2 lg:col-span-3">
           <Label htmlFor={`${id}-titulo`}>Título da análise</Label>
           <Input
             id={`${id}-titulo`}
             value={config.titulo}
             maxLength={100}
+            aria-invalid={!config.titulo.trim()}
+            aria-describedby={!config.titulo.trim() ? `${id}-titulo-erro` : undefined}
             onChange={(e) => onAlterar({ ...config, titulo: e.target.value })}
           />
+          {!config.titulo.trim() && (
+            <p id={`${id}-titulo-erro`} role="alert" className="text-falta-texto mt-1 text-xs">
+              Informe um título para a análise.
+            </p>
+          )}
         </div>
         {campo(
           "Base",
@@ -78,14 +96,18 @@ export function EditorGraficoBi({
           (r) => {
             const recurso = r as GraficoBi["recurso"];
             const dimensoes = dimensoesRecursoBi(recurso);
+            const medidas = medidasRecursoBi(recurso);
+            const dimensao = dimensoes.includes(config.dimensao)
+              ? config.dimensao
+              : (dimensoes[0] ?? "dia");
             onAlterar({
               ...config,
               recurso,
-              medida: "registros",
-              dimensao: dimensoes.includes(config.dimensao)
-                ? config.dimensao
-                : (dimensoes[0] ?? "dia"),
-              segundaDimensao: dimensoes[0] ?? "dia",
+              medida: medidas.includes(config.medida) ? config.medida : "registros",
+              dimensao,
+              segundaDimensao: dimensoes.includes(config.segundaDimensao)
+                ? config.segundaDimensao
+                : (dimensoes.find((d) => d !== dimensao) ?? dimensao),
             });
           },
         )}
@@ -140,7 +162,75 @@ export function EditorGraficoBi({
         </div>
       </div>
       <details className="mt-3">
-        <summary className="cursor-pointer text-sm">Anotação local</summary>
+        <summary className="cursor-pointer py-2 text-sm">Aparência e tamanho</summary>
+        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {visual &&
+            campo(
+              "Paleta de cores",
+              config.paleta,
+              PALETAS_GRAFICO_BI.map((p) => ({ valor: p, rotulo: PALETAS[p] })),
+              (p) => onAlterar({ ...config, paleta: p as GraficoBi["paleta"] }),
+            )}
+          {visual && (
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <Label htmlFor={`${id}-valores`}>Mostrar valores</Label>
+              <Switch
+                id={`${id}-valores`}
+                checked={config.mostrarValores}
+                onCheckedChange={(mostrarValores) => onAlterar({ ...config, mostrarValores })}
+              />
+            </div>
+          )}
+          {["rosca", "agrupadas", "calor"].includes(config.tipo) && (
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <Label htmlFor={`${id}-legenda`}>Mostrar legenda</Label>
+              <Switch
+                id={`${id}-legenda`}
+                checked={config.mostrarLegenda}
+                onCheckedChange={(mostrarLegenda) => onAlterar({ ...config, mostrarLegenda })}
+              />
+            </div>
+          )}
+          <div className="min-w-0">
+            <Label htmlFor={`${id}-largura`} className="flex justify-between gap-2">
+              Largura no painel <span className="tabular-nums">{largura}%</span>
+            </Label>
+            <input
+              id={`${id}-largura`}
+              type="range"
+              min={3}
+              max={12}
+              step={1}
+              value={config.largura}
+              aria-valuetext={`${largura}% da linha no desktop`}
+              aria-describedby={`${id}-largura-ajuda`}
+              className="accent-primary focus-visible:ring-ring/50 min-h-11 w-full cursor-pointer rounded-md focus-visible:ring-2"
+              onChange={(e) => onAlterar({ ...config, largura: Number(e.target.value) })}
+            />
+            <p id={`${id}-largura-ajuda`} className="text-muted-foreground text-xs">
+              No celular, ocupa toda a largura.
+            </p>
+          </div>
+          <div className="min-w-0">
+            <Label htmlFor={`${id}-altura`} className="flex justify-between gap-2">
+              Altura do gráfico <span className="tabular-nums">{config.altura} px</span>
+            </Label>
+            <input
+              id={`${id}-altura`}
+              type="range"
+              min={260}
+              max={900}
+              step={1}
+              value={config.altura}
+              aria-valuetext={`${config.altura} pixels`}
+              className="accent-primary focus-visible:ring-ring/50 min-h-11 w-full cursor-pointer rounded-md focus-visible:ring-2"
+              onChange={(e) => onAlterar({ ...config, altura: Number(e.target.value) })}
+            />
+          </div>
+        </div>
+      </details>
+      <details className="mt-3">
+        <summary className="cursor-pointer py-2 text-sm">Anotação local</summary>
         <textarea
           aria-label="Anotação do gráfico"
           className="controle-vidro mt-2 min-h-20 w-full p-3 text-sm"

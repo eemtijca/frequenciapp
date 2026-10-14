@@ -10919,11 +10919,11 @@
       "post": {
         "operationId": "organizarAbaAntigaDaPlanilha",
         "summary": "Transferir frequências de uma aba sem mês",
-        "description": "Apenas administração e origem confiável. Sem planoHash devolve prévia assinada com contagens e coordenadas dos complementos antigos. A confirmação relê, copia marcas para células mensais vazias e retira a origem no mesmo lote atômico. Havendo totais ou notas, exige autorização explícita de descarte e senha administrativa. Fórmulas nos nomes ou datas, mesclagens, gráficos, alunos ambíguos e divergências continuam protegidos. A assinatura considera o conteúdo real das notas e fórmulas mesmo sem mudança do resultado exibido. Não há repetição automática de escrita com resposta perdida.",
+        "description": "Apenas administração e origem confiável. Sem planoHash devolve prévia assinada, pendências por aluno e célula e coordenadas dos complementos antigos. Escolhas de homônimos, inclusão de aluno histórico ou marcas divergentes exigem nova prévia e senha administrativa antes da confirmação. Sem escolha, marcas só preenchem células vazias. A confirmação relê, verifica todas as pendências e reúne inclusões, marcas e retirada em um único lote atômico. Fórmulas, notas e conteúdo não visível no destino continuam protegidos. A assinatura inclui escolhas e conteúdo real das abas. Escrita com resposta perdida nunca é repetida automaticamente.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
-          "description": "Aba antiga e hash da prévia para confirmar.",
+          "description": "Aba antiga, escolhas conferidas e hash da prévia para confirmar. Corpo limitado a 1.000.000 bytes.",
           "content": {
             "application/json": {
               "schema": {
@@ -10947,7 +10947,16 @@
                     "minLength": 1,
                     "format": "password",
                     "writeOnly": true,
-                    "description": "Senha administrativa exigida na confirmação do descarte de complementos."
+                    "description": "Senha administrativa exigida quando a prévia aplica escolhas ou descarta complementos."
+                  },
+                  "resolucoes": {
+                    "type": "array",
+                    "maxItems": 5000,
+                    "default": [],
+                    "description": "Escolhas únicas por aluno ou célula. Repetir as mesmas escolhas na confirmação; alterar escolhas exige nova prévia.",
+                    "items": {
+                      "$ref": "#/components/schemas/ResolucaoAbaAntiga"
+                    }
                   }
                 },
                 "required": ["aba"],
@@ -10974,6 +10983,20 @@
                     "planoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                     "descartarComplementos": true,
                     "senha": "[senha administrativa]"
+                  }
+                },
+                "Escolhas": {
+                  "summary": "Nova prévia após conferir uma divergência",
+                  "value": {
+                    "aba": "1º A",
+                    "resolucoes": [
+                      {
+                        "tipo": "frequencia",
+                        "mes": "2026-09",
+                        "celulaAntiga": "B2",
+                        "manter": "mensal"
+                      }
+                    ]
                   }
                 }
               }
@@ -11065,6 +11088,34 @@
                                   }
                                 }
                               }
+                            },
+                            "substituidas": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "mantidas": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "alunosIncluidos": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "resolucoesAplicadas": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalPendencias": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "pendencias": {
+                              "type": "array",
+                              "maxItems": 200,
+                              "description": "Primeiros detalhes pendentes. A contagem completa permanece em totalPendencias; qualquer pendência impede a retirada.",
+                              "items": {
+                                "$ref": "#/components/schemas/PendenciaAbaAntiga"
+                              }
                             }
                           },
                           "required": [
@@ -11076,7 +11127,13 @@
                             "destinos",
                             "removida",
                             "complementos",
-                            "urlAntiga"
+                            "urlAntiga",
+                            "substituidas",
+                            "mantidas",
+                            "alunosIncluidos",
+                            "resolucoesAplicadas",
+                            "totalPendencias",
+                            "pendencias"
                           ]
                         }
                       },
@@ -11118,7 +11175,7 @@
             "$ref": "#/components/responses/Erro403"
           },
           "409": {
-            "description": "Conteúdo protegido, prévia vencida ou falta de autorização explícita de descarte.",
+            "description": "Conteúdo protegido, pendência não resolvida, escolha incompatível, prévia vencida ou falta de autorização de descarte.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11149,6 +11206,19 @@
                       "error": "Muitas conferências em sequência. Aguarde alguns minutos."
                     }
                   }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Corpo acima de 1.000.000 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "O conteúdo enviado é grande demais para processar."
                 }
               }
             }
@@ -17327,6 +17397,220 @@
             }
           }
         }
+      },
+      "ResolucaoAbaAntiga": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "const": "aluno"
+              },
+              "mes": {
+                "type": "string",
+                "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$"
+              },
+              "linhaAntiga": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 2000
+              },
+              "linhaMensal": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 2000
+              }
+            },
+            "required": ["tipo", "mes", "linhaAntiga", "linhaMensal"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "const": "adicionar-aluno"
+              },
+              "mes": {
+                "type": "string",
+                "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$"
+              },
+              "linhaAntiga": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 2000
+              }
+            },
+            "required": ["tipo", "mes", "linhaAntiga"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "tipo": {
+                "type": "string",
+                "const": "frequencia"
+              },
+              "mes": {
+                "type": "string",
+                "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$"
+              },
+              "celulaAntiga": {
+                "type": "string",
+                "pattern": "^[A-Z]{1,3}[1-9][0-9]{0,3}$"
+              },
+              "manter": {
+                "type": "string",
+                "enum": ["antiga", "mensal"]
+              }
+            },
+            "required": ["tipo", "mes", "celulaAntiga", "manter"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "LocalAbaAntiga": {
+        "type": "object",
+        "properties": {
+          "aba": {
+            "type": "string"
+          },
+          "celula": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["aba", "celula", "url"],
+        "additionalProperties": false
+      },
+      "PendenciaAbaAntiga": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "mes": {
+                "type": "string",
+                "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$"
+              },
+              "aluno": {
+                "type": "string"
+              },
+              "mensagem": {
+                "type": "string"
+              },
+              "origem": {
+                "$ref": "#/components/schemas/LocalAbaAntiga"
+              },
+              "destino": {
+                "$ref": "#/components/schemas/LocalAbaAntiga"
+              },
+              "tipo": {
+                "type": "string",
+                "const": "aluno"
+              },
+              "linhaAntiga": {
+                "type": "integer",
+                "minimum": 2,
+                "maximum": 2000
+              },
+              "opcoes": {
+                "type": "array",
+                "maxItems": 20,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "linha": {
+                      "type": "integer",
+                      "minimum": 2,
+                      "maximum": 2000
+                    },
+                    "nome": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "required": ["linha", "nome", "url"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "mes",
+              "aluno",
+              "mensagem",
+              "origem",
+              "destino",
+              "tipo",
+              "linhaAntiga",
+              "opcoes"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "mes": {
+                "type": "string",
+                "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$"
+              },
+              "aluno": {
+                "type": "string"
+              },
+              "mensagem": {
+                "type": "string"
+              },
+              "origem": {
+                "$ref": "#/components/schemas/LocalAbaAntiga"
+              },
+              "destino": {
+                "$ref": "#/components/schemas/LocalAbaAntiga"
+              },
+              "tipo": {
+                "type": "string",
+                "const": "frequencia"
+              },
+              "dia": {
+                "type": "string",
+                "format": "date"
+              },
+              "antiga": {
+                "type": "string",
+                "enum": ["P", "F", "FJ", "S"]
+              },
+              "mensal": {
+                "type": "string",
+                "enum": ["P", "F", "FJ", "S"]
+              }
+            },
+            "required": [
+              "id",
+              "mes",
+              "aluno",
+              "mensagem",
+              "origem",
+              "destino",
+              "tipo",
+              "dia",
+              "antiga",
+              "mensal"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     }
   }

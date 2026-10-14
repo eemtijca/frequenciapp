@@ -18,10 +18,15 @@ import {
 } from "@/domain/bi-analise";
 import type { LinhaBi } from "@/domain/bi";
 import { baixarBi, pngBi } from "@/lib/bi-exportacao";
+import { CORES_BI, formatarValorBi, paginaTabelaBi, rotularPontosBi } from "@/lib/bi-visualizacao";
 import { LimiteGrafico } from "./limite-grafico";
 const VistaGrafico = dynamic(() => import("./vista-grafico"), {
   ssr: false,
-  loading: () => <span className="text-muted-foreground text-sm">Preparando gráfico...</span>,
+  loading: () => (
+    <span role="status" data-bi-modulo-carregando className="text-muted-foreground text-sm">
+      Preparando gráfico...
+    </span>
+  ),
 });
 const PONTOS_VAZIOS: PontoBi[] = [];
 export type CalcularBi = (config: GraficoBi, filtros: FiltrosBi) => Promise<PontoBi[]>;
@@ -35,6 +40,9 @@ export function CartaoGrafico({
   onAprofundar,
   confirmar,
   acoes,
+  indisponivel,
+  filtrosDados,
+  prepararImpressao = false,
 }: {
   config: GraficoBi;
   filtros: FiltrosBi;
@@ -44,9 +52,13 @@ export function CartaoGrafico({
   onAprofundar?: (config: GraficoBi) => void;
   confirmar: ConfirmarExportacaoBi;
   acoes?: React.ReactNode;
+  indisponivel?: string;
+  filtrosDados?: FiltrosBi;
+  prepararImpressao?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [visivel, setVisivel] = useState(false);
+  const ativado = visivel || prepararImpressao;
   const consulta = useMemo(() => ({ config, filtros, linhas }), [config, filtros, linhas]);
   const [resultado, setResultado] = useState<{
     consulta: typeof consulta;
@@ -55,7 +67,7 @@ export function CartaoGrafico({
   } | null>(null);
   const pontos = resultado?.consulta === consulta ? resultado.pontos : PONTOS_VAZIOS;
   const erro = resultado?.consulta === consulta ? resultado.erro : "";
-  const calculando = !visivel || resultado?.consulta !== consulta;
+  const calculando = !ativado || resultado?.consulta !== consulta;
   const [detalhes, setDetalhes] = useState(config.tipo === "tabela");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState("valor");
@@ -82,7 +94,7 @@ export function CartaoGrafico({
     return () => o.disconnect();
   }, []);
   useEffect(() => {
-    if (!visivel) return;
+    if (!ativado || indisponivel) return;
     let ativo = true;
     void calcular(consulta.config, consulta.filtros)
       .then((pontos) => {
@@ -99,10 +111,10 @@ export function CartaoGrafico({
     return () => {
       ativo = false;
     };
-  }, [consulta, calcular, visivel]);
-  const linhasTabela = useMemo(() => {
+  }, [consulta, calcular, ativado, indisponivel]);
+  const linhasBase = useMemo(() => {
     const base: Record<string, unknown>[] = completos
-      ? filtrarBi(linhas, filtros)
+      ? filtrarBi(linhas, filtrosDados ?? filtros)
       : pontos.map((p) => ({
           Grupo: p.nome,
           Referencia: p.referencia,
@@ -112,8 +124,11 @@ export function CartaoGrafico({
           Registros: p.registros,
           Alunos: p.alunos,
         }));
+    return base;
+  }, [pontos, linhas, filtros, filtrosDados, completos]);
+  const linhasTabela = useMemo(() => {
     const chave = ordem === "valor" ? "Valor" : ordem;
-    return base
+    return linhasBase
       .filter((l) =>
         Object.values(l).some((v) => textoBi(v).toLowerCase().includes(busca.toLowerCase())),
       )
@@ -126,22 +141,24 @@ export function CartaoGrafico({
             : textoBi(x).localeCompare(textoBi(y), "pt-BR", { numeric: true });
         return desc ? -n : n;
       });
-  }, [pontos, linhas, filtros, completos, ordem, desc, busca]);
+  }, [linhasBase, ordem, desc, busca]);
   const colunas = useMemo(
-    () => [...new Set(linhasTabela.flatMap((l) => Object.keys(l)))],
-    [linhasTabela],
+    () => [...new Set(linhasBase.flatMap((l) => Object.keys(l)))],
+    [linhasBase],
   );
-  const percentual = ["infrequencia", "taxaPresenca", "taxaSeduc"].includes(config.medida);
-  const formatar = (v: number | null) =>
-    v === null
-      ? "Sem base de cálculo"
-      : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}${percentual ? "%" : ""}`;
+  const formatar = (v: number | null) => formatarValorBi(v, config.medida);
+  const atual = paginaTabelaBi(pagina, linhasTabela.length);
+  const podeFiltrar = ["serie", "turma", "aluno", "justificativa", "tipo", "turno", "dia"].includes(
+    config.dimensao,
+  );
+  const pontosRotulados = useMemo(() => rotularPontosBi(pontos), [pontos]);
   const valor = pontos.length === 1 ? (pontos[0]?.valor ?? null) : null;
   return (
     <article
       ref={ref}
       className="superficie-vidro flex h-full min-w-0 flex-col gap-3 p-4"
       data-grafico-id={config.id}
+      data-bi-carregando={!indisponivel && calculando ? "true" : undefined}
     >
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -150,7 +167,11 @@ export function CartaoGrafico({
         </div>
         {acoes}
       </header>
-      {erro ? (
+      {indisponivel ? (
+        <p role="note" className="text-muted-foreground py-10 text-center text-sm">
+          {indisponivel}
+        </p>
+      ) : erro ? (
         <p role="alert" className="text-falta-texto text-sm">
           {erro}
         </p>
@@ -173,14 +194,19 @@ export function CartaoGrafico({
                   className="flex flex-wrap items-center justify-between gap-3"
                 >
                   <span className="text-muted-foreground text-sm">{p.nome}</span>
-                  <strong className="text-2xl tabular-nums">{formatar(p.valor)}</strong>
+                  <strong
+                    className="text-2xl tabular-nums"
+                    style={{ color: CORES_BI[config.paleta][0] }}
+                  >
+                    {formatar(p.valor)}
+                  </strong>
                 </div>
               ))}
             </div>
           ) : (
             config.tipo !== "tabela" && (
               <div
-                className="min-h-40 flex-1"
+                className={`min-h-40 flex-1 ${config.tipo === "calor" ? "print:h-auto!" : ""}`}
                 style={{ height: Math.max(160, config.altura - 150) }}
               >
                 <LimiteGrafico>
@@ -205,11 +231,19 @@ export function CartaoGrafico({
                 ` | ${pontos.filter((p) => metaBi(p.valor, config.meta)).length} grupos no limiar ou acima`}
             </p>
           )}
-          {pontos.length > 100 && (
-            <p className="text-muted-foreground text-xs">
-              Gráfico limitado aos primeiros 100 grupos. A tabela e o CSV incluem todos.
-            </p>
-          )}
+          {pontos.length > (config.tipo === "indicador" ? 12 : 100) &&
+            !["tabela", "calor", "agrupadas"].includes(config.tipo) && (
+              <p className="text-muted-foreground text-xs">
+                Exibidos os primeiros {config.tipo === "indicador" ? 12 : 100} grupos. A tabela e o
+                CSV incluem todos.
+              </p>
+            )}
+          {config.tipo === "agrupadas" &&
+            new Set(pontos.map((p) => p.grupoReferencia)).size > 12 && (
+              <p className="text-muted-foreground text-xs">
+                Exibidos até 12 subgrupos. A tabela e o CSV incluem todos.
+              </p>
+            )}
           <div className="flex flex-wrap gap-1 print:hidden">
             <Button
               size="sm"
@@ -252,7 +286,27 @@ export function CartaoGrafico({
                       await pngBi(
                         ref.current,
                         config.titulo,
-                        pontos.map((p) => `${p.nome}: ${formatar(p.valor)}`),
+                        pontosRotulados.map(
+                          (p) => `${p.nome}${p.grupo ? ` | ${p.grupo}` : ""}: ${formatar(p.valor)}`,
+                        ),
+                        {
+                          contexto: `${NOMES_MEDIDAS[config.medida]} | ${filtros.inicio} a ${filtros.fim}`,
+                          legenda:
+                            config.mostrarLegenda && ["rosca", "agrupadas"].includes(config.tipo)
+                              ? (config.tipo === "rosca"
+                                  ? pontosRotulados
+                                      .slice(0, 100)
+                                      .filter((p) => p.valor !== null)
+                                      .map((p) => p.nome)
+                                  : [...new Set(pontosRotulados.map((p) => p.grupo))].slice(0, 12)
+                                ).map((nome, i) => ({
+                                  nome,
+                                  cor:
+                                    CORES_BI[config.paleta][i % CORES_BI[config.paleta].length] ??
+                                    CORES_BI[config.paleta][0],
+                                }))
+                              : [],
+                        },
                       ),
                       "frequencibi-grafico.png",
                     );
@@ -287,18 +341,39 @@ export function CartaoGrafico({
                   {completos ? "Ver agregados" : "Ver registros"}
                 </Button>
               </div>
-              <div className="max-h-96 overflow-auto">
-                <table className="w-full text-left text-xs">
+              {linhasTabela.length === 0 && (
+                <p role="note" aria-live="polite" className="text-muted-foreground p-4 text-sm">
+                  Nenhum registro corresponde à busca.
+                </p>
+              )}
+              <div
+                className="max-h-96 overflow-auto print:max-h-none print:overflow-visible"
+                role="region"
+                aria-label={`Tabela de ${config.titulo}`}
+                tabIndex={0}
+              >
+                <table className="w-full text-left text-xs print:table-fixed">
                   <caption className="sr-only">Dados de {config.titulo}</caption>
                   <thead>
                     <tr>
                       {colunas.map((c) => (
-                        <th key={c} scope="col" className="bg-background sticky top-0 p-2">
+                        <th
+                          key={c}
+                          scope="col"
+                          aria-sort={
+                            (ordem === "valor" ? "Valor" : ordem) === c
+                              ? desc
+                                ? "descending"
+                                : "ascending"
+                              : "none"
+                          }
+                          className="bg-background sticky top-0 p-2 print:static print:wrap-anywhere"
+                        >
                           <button
                             className="min-h-11"
                             onClick={() => {
                               setOrdem(c);
-                              setDesc(!desc);
+                              setDesc(ordem === c ? !desc : false);
                               setPagina(0);
                             }}
                             aria-label={`Ordenar por ${c}`}
@@ -310,11 +385,30 @@ export function CartaoGrafico({
                     </tr>
                   </thead>
                   <tbody>
-                    {linhasTabela.slice(pagina * 50, (pagina + 1) * 50).map((l, i) => (
+                    {linhasTabela.slice(atual * 50, (atual + 1) * 50).map((l, i) => (
                       <tr key={i} className="border-border border-b">
                         {colunas.map((c) => (
-                          <td key={c} className="max-w-80 p-2 break-words">
-                            {textoBi(l[c])}
+                          <td key={c} className="max-w-80 p-2 break-words print:wrap-anywhere">
+                            {!completos && c === "Grupo" && podeFiltrar ? (
+                              <button
+                                className="text-primary min-h-11 text-left underline-offset-4 hover:underline"
+                                aria-label={`Filtrar: ${textoBi(l[c])}`}
+                                onClick={() => {
+                                  const ponto = pontos.find(
+                                    (p) =>
+                                      p.referencia === l.Referencia &&
+                                      p.grupoReferencia === l.ReferenciaGrupo,
+                                  );
+                                  if (ponto) onFiltrar(config, ponto);
+                                }}
+                              >
+                                {textoBi(l[c])}
+                              </button>
+                            ) : !completos && c === "Valor" ? (
+                              formatar(typeof l[c] === "number" ? l[c] : null)
+                            ) : (
+                              textoBi(l[c])
+                            )}
                           </td>
                         ))}
                       </tr>
@@ -322,39 +416,33 @@ export function CartaoGrafico({
                   </tbody>
                 </table>
               </div>
+              <p className="mt-2 hidden text-xs print:block">
+                Página {atual + 1} de {Math.max(1, Math.ceil(linhasTabela.length / 50))}. Exibidos{" "}
+                {Math.min(50, Math.max(0, linhasTabela.length - atual * 50))} de{" "}
+                {linhasTabela.length} registros.
+                {linhasTabela.length > 50 && " O CSV inclui todos os registros filtrados."}
+              </p>
               <div className="mt-2 flex items-center justify-between gap-2 print:hidden">
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={!pagina}
-                  onClick={() => setPagina(pagina - 1)}
+                  disabled={!atual}
+                  onClick={() => setPagina(atual - 1)}
                 >
                   Anterior
                 </Button>
                 <span className="text-muted-foreground text-xs">
-                  {linhasTabela.length} registros | {pagina + 1}/
+                  {linhasTabela.length} registros | {atual + 1}/
                   {Math.max(1, Math.ceil(linhasTabela.length / 50))}
                 </span>
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={(pagina + 1) * 50 >= linhasTabela.length}
-                  onClick={() => setPagina(pagina + 1)}
+                  disabled={(atual + 1) * 50 >= linhasTabela.length}
+                  onClick={() => setPagina(atual + 1)}
                 >
                   Próxima
                 </Button>
-              </div>
-              <div className="flex flex-wrap gap-1 print:hidden">
-                {pontos.slice(0, 20).map((p) => (
-                  <Button
-                    key={`${p.referencia}:${p.nome}:${p.grupo}`}
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onFiltrar(config, p)}
-                  >
-                    Filtrar: {p.nome}
-                  </Button>
-                ))}
               </div>
             </div>
           )}

@@ -597,3 +597,124 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
     google.valor(mensal, nomes.indexOf("E2E Aluno Um") + 1, cabecalho.indexOf("29/09/2026") + 1),
   ).toBe("FJ");
 });
+
+test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de retirar a aba", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  google.removerAba("E2E Ano A");
+  const headers = { Origin: new URL(page.url()).origin };
+  expect(
+    (
+      await page.request.post("/api/planilha/criar-aba", {
+        headers,
+        data: { nome: "E2E Ano A", cabecalho: ["Aluno", "29/09/2026"] },
+      })
+    ).status(),
+  ).toBe(200);
+  google.definirAba("E2E Ano A", [
+    ["Aluno", "29/09/2026"],
+    ["E2E Aluno Um", "FJ"],
+    ["E2E Aluno Histórico", "P"],
+  ]);
+  await comBanco(async (cliente) => {
+    const { rows } = await cliente.query<{ id: string }>(
+      "select id from turmas where nome = 'A' and serie_id in (select id from series where nome = 'E2E Ano')",
+    );
+    expect(
+      (
+        await page.request.post("/api/planilha/mensal", {
+          headers,
+          data: { turmaOriginalId: rows[0]?.id, mes: "2026-09" },
+        })
+      ).status(),
+    ).toBe(200);
+  });
+  const mensal = "E2E Ano A · Setembro";
+  const nomes = Array.from({ length: 4 }, (_, i) => google.valor(mensal, i + 1, 1));
+  const linhaAluno = nomes.indexOf("E2E Aluno Um") + 1;
+  const cabecalho = Array.from({ length: 31 }, (_, i) => google.valor(mensal, 1, i + 1));
+  const coluna = cabecalho.indexOf("29/09/2026") + 1;
+  expect(linhaAluno).toBeGreaterThan(1);
+  expect(coluna).toBeGreaterThan(1);
+  const alunoId = google.vinculos(mensal).find((item) => item.linha === linhaAluno)?.alunoId;
+  expect(alunoId).toBeTruthy();
+  google.definirValor(mensal, linhaAluno, coluna, "P");
+  google.definirValor(mensal, 4, 1, "E2E Aluno Um");
+  google.definirValor(mensal, 4, coluna, "F");
+  const cartao = await abrirPlanilha(page);
+  const revisar = cartao.getByRole("button", { name: "Revisar estrutura", exact: true });
+  const conferir = cartao.getByRole("button", { name: "Conferir estrutura", exact: true });
+  await expect(revisar.or(conferir)).toBeVisible();
+  if (await revisar.isVisible()) await revisar.click();
+  await cartao.getByRole("button", { name: "Conferir estrutura", exact: true }).click();
+  await cartao.getByRole("button", { name: "Salvar estrutura", exact: true }).click();
+  await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
+  const dialogo = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
+  await dialogo.getByText("Abas sem mês", { exact: true }).click();
+  await dialogo.getByRole("button", { name: "Conferir abas antigas", exact: true }).click();
+  await dialogo.getByText("Resolver 2 pendências", { exact: true }).click();
+  await expect(dialogo.getByRole("link", { name: "Antiga: A2", exact: true })).toHaveAttribute(
+    "href",
+    /&range=A2$/,
+  );
+  await dialogo
+    .getByRole("combobox", { name: "Destino de E2E Aluno Um, linha 2, 2026-09", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: `Linha ${linhaAluno}: E2E Aluno Um`, exact: true })
+    .click();
+  await dialogo
+    .getByRole("combobox", {
+      name: "Inclusão de E2E Aluno Histórico, linha 3, 2026-09",
+      exact: true,
+    })
+    .click();
+  await page.getByRole("option", { name: "Incluir aluno neste mês", exact: true }).click();
+  const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+  await dialogo.getByRole("button", { name: "Conferir escolhas", exact: true }).click();
+  const resolver = dialogo.getByText("Resolver 1 pendência", { exact: true });
+  await expect(resolver).toBeVisible();
+  if (
+    !(await dialogo
+      .getByRole("combobox", { name: "Marca para E2E Aluno Um, B2, 2026-09", exact: true })
+      .isVisible())
+  )
+    await resolver.click();
+  await expect(dialogo).toContainText("Antiga: FJ · Mensal: P");
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1))
+    .toBe(true);
+  await testInfo.attach("pendencias-da-aba", {
+    body: await dialogo.screenshot(),
+    contentType: "image/png",
+  });
+  await dialogo
+    .getByRole("combobox", { name: "Marca para E2E Aluno Um, B2, 2026-09", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Usar antiga: FJ", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Conferir escolhas", exact: true }).click();
+  const confirmar = dialogo.getByRole("button", { name: /^Transferir e retirar/ });
+  await expect(confirmar).toBeVisible();
+  await expect(confirmar).toBeDisabled();
+  expect(google.abas()).toContain("E2E Ano A");
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas);
+  expect(google.valor(mensal, linhaAluno, coluna)).toBe("P");
+  await dialogo.getByLabel("Senha administrativa", { exact: true }).fill("DirecaoFrequencia2026");
+  await confirmar.click();
+  await expect(dialogo.getByText("Transferida e retirada", { exact: true })).toBeVisible();
+  expect(google.abas()).not.toContain("E2E Ano A");
+  const linhaAtual = google.vinculos(mensal).find((item) => item.alunoId === alunoId)?.linha ?? 0;
+  expect(linhaAtual).toBeGreaterThan(1);
+  expect(google.valor(mensal, linhaAtual, coluna)).toBe("FJ");
+  expect(google.valor(mensal, 4, coluna)).toBe("F");
+  const linhaHistorico =
+    Array.from({ length: 8 }, (_, i) => google.valor(mensal, i + 1, 1)).indexOf(
+      "E2E Aluno Histórico",
+    ) + 1;
+  expect(linhaHistorico).toBeGreaterThan(1);
+  expect(google.valor(mensal, linhaHistorico, coluna)).toBe("P");
+  expect(linhaHistorico).toBeLessThan(linhaAtual);
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+});

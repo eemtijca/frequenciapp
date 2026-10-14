@@ -1,6 +1,6 @@
 // Análise local do BI: dimensões, taxas ponderadas, filtros e agrupamento linear.
 import { z } from "zod";
-import { type LinhaBi, type RecursoBi, esquemaDiaBi } from "./bi";
+import { type EscopoBi, type LinhaBi, type RecursoBi, esquemaDiaBi, periodoBi } from "./bi";
 export const BASES_ANALISE = [
   "chamadas",
   "faltas",
@@ -59,6 +59,7 @@ export const TIPOS_GRAFICO_BI = [
   "tabela",
   "indicador",
 ] as const;
+export const PALETAS_GRAFICO_BI = ["escola", "verde", "azul", "vermelho", "violeta"] as const;
 export type DimensaoBi = (typeof DIMENSOES_BI)[number];
 export type MedidaBi = (typeof MEDIDAS_BI)[number];
 export const NOMES_MEDIDAS: Record<MedidaBi, string> = {
@@ -109,6 +110,9 @@ export const esquemaGraficoBi = z
     segundaDimensao: z.enum(DIMENSOES_BI).default("tipo"),
     largura: z.number().int().min(3).max(12).default(6),
     altura: z.number().int().min(260).max(900).default(360),
+    paleta: z.enum(PALETAS_GRAFICO_BI).default("escola"),
+    mostrarLegenda: z.boolean().default(true),
+    mostrarValores: z.boolean().default(false),
     meta: z.number().finite().nullable().default(null),
     anotacao: z.string().max(1000).default(""),
   })
@@ -199,6 +203,26 @@ function dimensao(l: LinhaBi, d: DimensaoBi) {
     return l.desistenteEm ? "Desistente" : l.ativo === false ? "Inativo" : "Ativo";
   return textoBi(l[d]);
 }
+function compararDimensaoBi(a: string, b: string, dimensao: DimensaoBi) {
+  if (dimensao === "diaSemana") {
+    const dias = [
+      "Segunda-feira",
+      "Terça-feira",
+      "Quarta-feira",
+      "Quinta-feira",
+      "Sexta-feira",
+      "Sábado",
+      "Domingo",
+    ];
+    const ordem = (nome: string) => {
+      const indice = dias.indexOf(nome);
+      return indice < 0 ? dias.length : indice;
+    };
+    const diferenca = ordem(a) - ordem(b);
+    if (diferenca) return diferenca;
+  }
+  return a.localeCompare(b, "pt-BR", { numeric: true });
+}
 interface Acumulador {
   registros: number;
   alunos: Set<string>;
@@ -216,25 +240,22 @@ export function agregarBi(
 ): PontoBi[] {
   const grupos = new Map<string, { nome: string; grupo: string; a: Acumulador }>();
   const filtradas = filtrarBi(linhas, filtros);
+  const usaSegundaDimensao = config.tipo === "agrupadas" || config.tipo === "calor";
   const porAula =
-    config.dimensao === "aula" ||
-    ((config.tipo === "agrupadas" || config.tipo === "calor") && config.segundaDimensao === "aula");
+    config.dimensao === "aula" || (usaSegundaDimensao && config.segundaDimensao === "aula");
   for (const l of porAula
     ? filtradas.flatMap((l) =>
         Array.isArray(l.aulas) ? l.aulas.map((aula) => ({ ...l, aula, aulas: 1 })) : [l],
       )
     : filtradas) {
     const nome = dimensao(l, config.dimensao);
-    const grupo =
-      config.tipo === "agrupadas" || config.tipo === "calor"
-        ? dimensao(l, config.segundaDimensao)
-        : "";
+    const grupo = usaSegundaDimensao ? dimensao(l, config.segundaDimensao) : "";
     const referencia = textoBi(l[`${config.dimensao}Id`] ?? l[config.dimensao] ?? "");
     const chave = JSON.stringify([
       nome,
       grupo,
       ["serie", "turma", "aluno"].includes(config.dimensao) ? referencia : "",
-      ["serie", "turma", "aluno"].includes(config.segundaDimensao)
+      usaSegundaDimensao && ["serie", "turma", "aluno"].includes(config.segundaDimensao)
         ? l[`${config.segundaDimensao}Id`]
         : "",
     ]);
@@ -251,9 +272,9 @@ export function agregarBi(
           valores: {},
           confirmados: 0,
           referencia,
-          grupoReferencia: textoBi(
-            l[`${config.segundaDimensao}Id`] ?? l[config.segundaDimensao] ?? "",
-          ),
+          grupoReferencia: usaSegundaDimensao
+            ? textoBi(l[`${config.segundaDimensao}Id`] ?? l[config.segundaDimensao] ?? "")
+            : "",
         },
       };
       grupos.set(chave, g);
@@ -325,8 +346,8 @@ export function agregarBi(
     })
     .sort(
       (a, b) =>
-        a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }) ||
-        a.grupo.localeCompare(b.grupo, "pt-BR"),
+        compararDimensaoBi(a.nome, b.nome, config.dimensao) ||
+        compararDimensaoBi(a.grupo, b.grupo, config.segundaDimensao),
     );
 }
 export function totalBi(linhas: LinhaBi[], medida: MedidaBi, filtros: FiltrosBi): number | null {
@@ -543,8 +564,11 @@ export function metaBi(valor: number | null, meta: number | null) {
 }
 
 /** Estimativa por turma-dia, sem reconstruir matrículas ou sábados sem chamada. */
-export function coberturaBi(dados: DadosBi, f: FiltrosBi) {
+export function coberturaBi(dados: DadosBi, f: FiltrosBi, escopo: EscopoBi = {}) {
   if (!dados.chamadas || !dados.alunos || !dados.feriados || !f.inicio || !f.fim) return null;
+  const periodo = periodoBi(escopo, f.inicio, f.fim);
+  if (periodo.vazio || !periodo.inicio || !periodo.fim) return null;
+  const filtrosEfetivos = { ...f, inicio: periodo.inicio, fim: periodo.fim };
   const turmas = new Set(
     filtrarBi(dados.alunos, {
       ...f,
@@ -560,12 +584,12 @@ export function coberturaBi(dados: DadosBi, f: FiltrosBi) {
   );
   const feriados = new Set(dados.feriados.map((l) => String(l.dia)));
   const salvas = new Set(
-    filtrarBi(dados.chamadas, f)
+    filtrarBi(dados.chamadas, filtrosEfetivos)
       .filter((l) => turmas.has(String(l.turmaId)))
       .map((l) => `${l.turmaId}:${l.dia}`),
   );
-  const dias = new Date(`${f.inicio}T12:00:00Z`);
-  const fim = new Date(`${f.fim}T12:00:00Z`);
+  const dias = new Date(`${periodo.inicio}T12:00:00Z`);
+  const fim = new Date(`${periodo.fim}T12:00:00Z`);
   let uteis = 0;
   while (dias <= fim) {
     const dia = dias.toISOString().slice(0, 10);

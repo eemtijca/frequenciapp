@@ -12,6 +12,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Configuração assistida da planilha de frequência, com diagnóstico mensal somente de leitura, acesso à conexão, revisão das turmas e do mês e situação da sincronização. A conferência distingue estrutura pronta de frequências efetivamente enviadas e mantém a prévia antes de gravar.
 
+- FrequenciBI permite personalizar os painéis predefinidos, atualizar visões salvas, recuperar a análise do Explorador e escolher paleta, valores, legenda e dimensões. Atalhos de período usam o fuso da escola; painéis mantêm recortes independentes e a edição se adapta ao celular.
+
 - Presenças parciais (S) visíveis no Painel, no Resumo dos Relatórios e no resumo do período personalizado, com coluna própria na tabela diária; nenhum dia volta a zerar em silêncio.
 
 - FrequenciBI em `/bi`: painel curado, explorador com dez visualizações, painéis personalizáveis por toque e teclado, comparações, metas, notas, destaques locais e dicionário. Chave independente da sessão; preferências locais e retratos offline identificados, com importação e exportação de configurações sem segredo, CSV e PNG confirmados e limpeza por chave.
@@ -54,6 +56,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Capturas do README com dados: o Painel e a Chamada passam a exigir a semente aplicada e a mostrar o último dia letivo com chamada, e entram o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão.
 
 ### Alterado
+
+- Painel, gráficos no celular: uma seta no canto superior direito do painel avança para o próximo gráfico e, no último, volta ao primeiro, sem criar seletor nem botões novos. Os gráficos vizinhos ao em exibição montam em tempo ocioso e a leitura da posição durante o deslize deixa de medir o layout e de criar temporizadores a cada evento, o que reduz os picos de quadro na troca de gráfico. Em medição com o processador 4 vezes mais lento (8 passadas frias de cada versão no Chromium), as tarefas longas caíram de 15 para 6 e o tempo de script, em mediana, cerca de 21%.
 
 - Relatórios, Por aluno: a lista se agrupa em séries e turmas recolhíveis, com a contagem de alunos e os totais do mês na turma, e os seletores de série e turma dão lugar aos botões Série e Turma, que recolhem ou expandem todos os grupos do nível. A busca mantém abertos os grupos com resultado. O novo botão Emitir relatório fica ao lado, por enquanto só com um aviso de que a geração do relatório em PDF virá em breve.
 
@@ -111,6 +115,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Conferência do mapa de frequência vinculada ao arquivo, credencial, revisão e estrutura lida, impedindo salvar leituras antigas ou adulteradas. Trocar de arquivo desliga a automação e encerra o modo completo; habilitar o envio automático exige configuração válida.
 - Confirmações de frequência em abas antigas passam a identificar arquivo e aba estável. Trocar de planilha ou recriar uma aba com o mesmo nome mantém os dias pendentes no destino novo; sucessos antigos sem identificação exigem nova conferência conservadora, preservando o histórico.
+
+- Organização das abas sem mês mostra aluno, data e células das pendências, permite conferir homônimos, incluir linhas de alunos históricos e escolher marcas divergentes com nova prévia e senha administrativa. Códigos estáveis reconhecem nomes corrigidos; destinos únicos sem código também são aceitos, sem associar códigos diferentes.
+
+- FrequenciBI repete de forma limitada a conferência de acesso após falhas temporárias de rede, sem repetir recusas de chave ou limites de consultas. Falhas de revalidação também ficam visíveis durante uma consulta aberta.
+
+- FrequenciBI corrige categorias duplicadas, ordem semanal, taxas por aluno, cobertura restrita ao escopo e atualização da comparação. Tabelas ajustam a paginação, mapas de calor preservam células após o centésimo grupo, séries mantêm lacunas sem base e PNG inclui legenda e resumo. A impressão aguarda os gráficos fora da tela.
 
 - Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
 

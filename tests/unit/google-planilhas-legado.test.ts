@@ -227,7 +227,18 @@ describe("organização das abas antigas", () => {
       antiga.notas = [[], [], [], [false, false, false, true]];
       antiga.valorInformado = [[], [], [], [false, false, false, true]];
     }
-    await expect(prever()).rejects.toThrow();
+    if (["divergência", "aluno ausente", "homônimo"].includes(caso)) {
+      const previa = await prever();
+      expect(previa.totalPendencias).toBeGreaterThan(0);
+      await expect(
+        organizarAbaAntigaGoogle(
+          "arquivo",
+          "acesso",
+          { ...entrada, impressao: previa.impressao },
+          true,
+        ),
+      ).rejects.toThrow("Resolva as pendências");
+    } else await expect(prever()).rejects.toThrow();
     expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
   });
   it("lista totais e notas sem escrever e exige confirmação do descarte", async () => {
@@ -263,6 +274,258 @@ describe("organização das abas antigas", () => {
       true,
     );
     expect(enviarLoteAtomicoGoogle).toHaveBeenCalledOnce();
+  });
+  it.each(["antiga", "mensal"] as const)(
+    "permite conferir e manter a marca %s sem decidir silenciosamente",
+    async (manter) => {
+      const destino = grades.get("QA A · Outubro");
+      if (!destino?.valores[1]) throw new Error("Massa ausente.");
+      destino.valores[1][1] = "F";
+      const bloqueada = await prever();
+      expect(bloqueada.pendencias).toMatchObject([
+        {
+          tipo: "frequencia",
+          aluno: "QA Aluno",
+          dia: "2026-10-01",
+          antiga: "P",
+          mensal: "F",
+          origem: { celula: "C2", url: expect.stringContaining("gid=1&range=C2") },
+          destino: { celula: "B2", url: expect.stringContaining("gid=3&range=B2") },
+        },
+      ]);
+      const resolucoes = [
+        { tipo: "frequencia" as const, mes: "2026-10", celulaAntiga: "C2", manter },
+      ];
+      const previa = await organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, resolucoes },
+        false,
+      );
+      expect(previa).toMatchObject({
+        totalPendencias: 0,
+        resolucoesAplicadas: 1,
+        substituidas: manter === "antiga" ? 1 : 0,
+        mantidas: manter === "mensal" ? 1 : 0,
+      });
+      expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+      await expect(
+        organizarAbaAntigaGoogle(
+          "arquivo",
+          "acesso",
+          { ...entrada, resolucoes, impressao: bloqueada.impressao },
+          true,
+        ),
+      ).rejects.toThrow("A planilha mudou");
+      await organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, resolucoes, impressao: previa.impressao },
+        true,
+      );
+      const pedidos = vi.mocked(enviarLoteAtomicoGoogle).mock.calls[0]?.[2] ?? [];
+      expect(pedidos.filter((pedido) => pedido.updateCells)).toHaveLength(
+        manter === "antiga" ? 1 : 0,
+      );
+      expect(pedidos.at(-1)).toEqual({ deleteSheet: { sheetId: 1 } });
+    },
+  );
+  it("mostra homônimos, exige uma linha compatível e nunca aceita duas origens no mesmo destino", async () => {
+    grades.get("QA A · Outubro")?.valores.push(["QA Aluno"]);
+    const bloqueada = await prever();
+    expect(bloqueada.pendencias).toMatchObject([
+      {
+        tipo: "aluno",
+        linhaAntiga: 2,
+        opcoes: [{ linha: 2 }, { linha: 3 }],
+      },
+    ]);
+    const resolucoes = [{ tipo: "aluno" as const, mes: "2026-10", linhaAntiga: 2, linhaMensal: 3 }];
+    const previa = await organizarAbaAntigaGoogle(
+      "arquivo",
+      "acesso",
+      { ...entrada, resolucoes },
+      false,
+    );
+    expect(previa).toMatchObject({ totalPendencias: 0, resolucoesAplicadas: 1 });
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        {
+          ...entrada,
+          resolucoes: [
+            { ...resolucoes[0], tipo: "aluno", mes: "2026-10", linhaAntiga: 2, linhaMensal: 4 },
+          ],
+        },
+        false,
+      ),
+    ).rejects.toThrow("não corresponde");
+    grades.get(entrada.aba)?.valores.push(["QA Aluno", "", "P"]);
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        {
+          ...entrada,
+          resolucoes: [
+            ...resolucoes,
+            { tipo: "aluno", mes: "2026-10", linhaAntiga: 3, linhaMensal: 3 },
+          ],
+        },
+        false,
+      ),
+    ).rejects.toThrow("Duas linhas antigas");
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+  });
+  it("usa o código estável após correção do nome e aceita nome único sem código de destino", async () => {
+    const alunoId = randomUUID();
+    const antiga = doc.sheets[0];
+    const setembro = doc.sheets[1];
+    const fonte = grades.get(entrada.aba);
+    const destino = grades.get("QA A · Setembro");
+    if (!antiga || !setembro || !fonte?.valores[1] || !destino?.valores[1])
+      throw new Error("Massa ausente.");
+    for (const aba of [antiga, setembro])
+      aba.developerMetadata?.push({
+        metadataId: 1000 + aba.properties.sheetId,
+        metadataKey: "frequenciapp.aluno",
+        metadataValue: alunoId,
+        location: {
+          dimensionRange: {
+            sheetId: aba.properties.sheetId,
+            startRowIndex: 1,
+            endRowIndex: 2,
+          },
+        },
+      });
+    destino.valores[1][0] = "QA Nome corrigido";
+    const outubro = grades.get("QA A · Outubro");
+    if (!outubro?.valores[1]) throw new Error("Massa ausente.");
+    outubro.valores[1][0] = "  qa   aluno  ";
+    expect(await prever()).toMatchObject({
+      totalPendencias: 1,
+      pendencias: [
+        { tipo: "aluno", mensagem: "O código coincide, mas o nome mudou. Confira as duas linhas." },
+      ],
+    });
+    const resolucoes = [{ tipo: "aluno" as const, mes: "2026-09", linhaAntiga: 2, linhaMensal: 2 }];
+    expect(
+      await organizarAbaAntigaGoogle("arquivo", "acesso", { ...entrada, resolucoes }, false),
+    ).toMatchObject({ totalPendencias: 0, conferidas: 1, preenchidas: 1 });
+    doc.sheets[2]?.developerMetadata?.push({
+      metadataId: 1003,
+      metadataKey: "frequenciapp.aluno",
+      metadataValue: randomUUID(),
+      location: {
+        dimensionRange: { sheetId: 3, startRowIndex: 1, endRowIndex: 2 },
+      },
+    });
+    expect(
+      await organizarAbaAntigaGoogle("arquivo", "acesso", { ...entrada, resolucoes }, false),
+    ).toMatchObject({
+      totalPendencias: 1,
+      pendencias: [{ tipo: "aluno", opcoes: [] }],
+    });
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+  });
+  it("não deixa uma escolha substituir fórmula ou nota de destino", async () => {
+    const destino = grades.get("QA A · Outubro");
+    if (!destino?.valores[1]) throw new Error("Massa ausente.");
+    destino.valores[1][1] = "F";
+    const resolucoes = [
+      {
+        tipo: "frequencia" as const,
+        mes: "2026-10",
+        celulaAntiga: "C2",
+        manter: "antiga" as const,
+      },
+    ];
+    const previa = await organizarAbaAntigaGoogle(
+      "arquivo",
+      "acesso",
+      { ...entrada, resolucoes },
+      false,
+    );
+    destino.notas = [[], [false, true]];
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, resolucoes, impressao: previa.impressao },
+        true,
+      ),
+    ).rejects.toThrow("Há fórmula ou nota");
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+  });
+  it("inclui um aluno ausente somente após escolha e preserva a linha ocupada e suas marcas", async () => {
+    const destino = grades.get("QA A · Outubro");
+    if (!destino?.valores[1]) throw new Error("Massa ausente.");
+    destino.valores[1] = ["QA Outro aluno", "F"];
+    const bloqueada = await prever();
+    expect(bloqueada.pendencias).toMatchObject([{ tipo: "aluno", opcoes: [] }]);
+    const resolucoes = [{ tipo: "adicionar-aluno" as const, mes: "2026-10", linhaAntiga: 2 }];
+    const previa = await organizarAbaAntigaGoogle(
+      "arquivo",
+      "acesso",
+      { ...entrada, resolucoes },
+      false,
+    );
+    expect(previa).toMatchObject({
+      alunosIncluidos: 1,
+      totalPendencias: 0,
+      resolucoesAplicadas: 1,
+      preenchidas: 1,
+    });
+    expect(destino.valores[1]).toEqual(["QA Outro aluno", "F"]);
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
+    await organizarAbaAntigaGoogle(
+      "arquivo",
+      "acesso",
+      { ...entrada, resolucoes, impressao: previa.impressao },
+      true,
+    );
+    const pedidos = vi.mocked(enviarLoteAtomicoGoogle).mock.calls[0]?.[2] ?? [];
+    const alteracoes = pedidos.flatMap((pedido) =>
+      pedido.updateCells ? [pedido.updateCells] : [],
+    );
+    expect(alteracoes).toMatchObject([
+      {
+        range: { sheetId: 3, startRowIndex: 2, startColumnIndex: 0 },
+        rows: [{ values: [{ userEnteredValue: { stringValue: "QA Aluno" } }] }],
+      },
+      {
+        range: { sheetId: 3, startRowIndex: 2, startColumnIndex: 1 },
+        rows: [{ values: [{ userEnteredValue: { stringValue: "P" } }] }],
+      },
+    ]);
+  });
+  it("limita os detalhes a 200 pendências, mas mantém a contagem e o bloqueio do conjunto completo", async () => {
+    const fonte = grades.get(entrada.aba);
+    const destino = grades.get("QA A · Outubro");
+    if (!fonte || !destino) throw new Error("Massa ausente.");
+    fonte.valores = [
+      ["Aluno", "01/10/2026"],
+      ...Array.from({ length: 205 }, (_, i) => [`QA Aluno ${i}`, "P"]),
+    ];
+    destino.valores = [
+      ["Aluno", "01/10/2026"],
+      ...Array.from({ length: 205 }, (_, i) => [`QA Aluno ${i}`, "F"]),
+    ];
+    for (const aba of doc.sheets)
+      if (aba.properties.gridProperties) aba.properties.gridProperties.rowCount = 210;
+    const previa = await prever();
+    expect(previa.totalPendencias).toBe(205);
+    expect(previa.pendencias).toHaveLength(200);
+    await expect(
+      organizarAbaAntigaGoogle(
+        "arquivo",
+        "acesso",
+        { ...entrada, impressao: previa.impressao },
+        true,
+      ),
+    ).rejects.toThrow("Resolva as pendências");
+    expect(enviarLoteAtomicoGoogle).not.toHaveBeenCalled();
   });
   it("invalida a prévia quando o conteúdo muda sem mudar os indicadores visuais", async () => {
     const antiga = grades.get(entrada.aba);

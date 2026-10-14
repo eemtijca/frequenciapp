@@ -307,11 +307,20 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
+  // O seletor e as setas em grupo ficam só no computador; no celular há uma seta no canto do painel.
   await expect(page.getByRole("group", { name: "Navegação dos gráficos" })).toHaveCount(0);
   await rolarAteGrafico(page, "Personalizado");
   await rolarAteGrafico(page, "Desistentes");
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
+    .toBe(true);
+  // Elementos posicionados dentro dos cartões não podem escapar do recorte da faixa e alargar o painel.
+  await expect
+    .poll(() =>
+      page
+        .getByRole("group", { name: "Painel", exact: true })
+        .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+    )
     .toBe(true);
   await expect
     .poll(() =>
@@ -336,6 +345,32 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
     await expect.poll(() => pagina.evaluate((elemento) => elemento.scrollTop)).toBeGreaterThan(0);
     await expect.poll(() => faixa.evaluate((elemento) => elemento.scrollTop)).toBe(0);
   }
+});
+
+test("no celular, a seta do canto avança pelos gráficos e volta ao primeiro no último", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "A seta do canto aparece só abaixo da largura de computador.");
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel");
+  const total = await page.getByRole("article", { includeHidden: true }).count();
+  const seta = page.getByRole("button", { name: "Próximo gráfico", exact: true });
+  const caixa = await seta.boundingBox();
+  const largura = page.viewportSize()?.width ?? 0;
+  expect((caixa?.x ?? -1) + (caixa?.width ?? Infinity)).toBeLessThanOrEqual(largura);
+  for (let posicao = 2; posicao <= total; posicao += 1) {
+    await seta.click();
+    await expect(
+      page.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
+    ).toBeInViewport();
+  }
+  const voltar = page.getByRole("button", { name: "Voltar ao primeiro gráfico", exact: true });
+  await expect(voltar).toBeVisible();
+  await voltar.click();
+  await expect(page.getByRole("article", { name: /^1 de \d+: Toda a escola$/ })).toBeInViewport();
+  await expect(seta).toBeVisible();
 });
 
 test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserName, isMobile }) => {

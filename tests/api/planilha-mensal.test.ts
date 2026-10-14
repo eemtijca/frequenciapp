@@ -6,6 +6,7 @@ import { rotuloData } from "../../src/domain/frequencia";
 import { diasDaPlanilhaMensal } from "../../src/domain/planilha-mensal";
 import { CHAVE_TRAVA_FREQUENCIA } from "../../src/infra/trava-planilha-frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
+import type { PreviaAntiga, ResolucaoAntiga } from "../../src/domain/planilha-legado";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -1098,5 +1099,93 @@ describe("frequência organizada por turma e mês", () => {
         })
       ).status,
     ).toBe(409);
+  });
+
+  it("resolve homônimo e marcas divergentes com nova prévia, senha e confirmação atômica", async () => {
+    google.definirAba(LEGADA, [
+      ["Aluno", "30/09/2026", "01/10/2026"],
+      ["QA Mensal Aluno A", "FJ", "P"],
+    ]);
+    const estrutura = await dados<{ planilha: unknown; abas: unknown[] }>(
+      await chamar("/api/planilha/estrutura", "POST", {}),
+    );
+    const esquema = await lerEsquema();
+    await dados(
+      await chamar("/api/planilha/mapa", "POST", {
+        ...estrutura,
+        mapa: [...esquema.mapa, { aba: LEGADA, turmaOriginalId: turmas.A }],
+      }),
+    );
+    const setembro = mensais["2026-09"]?.aba ?? "";
+    const outubro = mensais["2026-10"]?.aba ?? "";
+    const colunaSetembro = cabecalho(setembro).indexOf("30/09/2026") + 1;
+    const colunaOutubro = cabecalho(outubro).indexOf("01/10/2026") + 1;
+    google.definirValor(setembro, 2, colunaSetembro, "F");
+    google.definirValor(outubro, 2, colunaOutubro, "F");
+    google.definirValor(outubro, 3, 1, "QA Mensal Aluno A");
+    google.definirValor(outubro, 3, colunaOutubro, "FJ");
+    type Previa = PreviaAntiga & { planoHash: string };
+    const conferir = async (resolucoes: ResolucaoAntiga[] = []) =>
+      (
+        await dados<{ previa: Previa }>(
+          await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA, resolucoes }),
+        )
+      ).previa;
+    const bloqueada = await conferir();
+    expect(bloqueada.totalPendencias).toBe(2);
+    expect(bloqueada.pendencias).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tipo: "aluno",
+          aluno: "QA Mensal Aluno A",
+          opcoes: [expect.objectContaining({ linha: 2 }), expect.objectContaining({ linha: 3 })],
+        }),
+        expect.objectContaining({
+          tipo: "frequencia",
+          dia: "2026-09-30",
+          antiga: "FJ",
+          mensal: "F",
+        }),
+      ]),
+    );
+    expect(
+      (
+        await chamar("/api/planilha/mensal/legado", "POST", {
+          aba: LEGADA,
+          planoHash: bloqueada.planoHash,
+        })
+      ).status,
+    ).toBe(409);
+    const resolucoes: ResolucaoAntiga[] = [
+      { tipo: "aluno", mes: "2026-10", linhaAntiga: 2, linhaMensal: 2 },
+      { tipo: "frequencia", mes: "2026-09", celulaAntiga: "B2", manter: "antiga" },
+      { tipo: "frequencia", mes: "2026-10", celulaAntiga: "C2", manter: "mensal" },
+    ];
+    const previa = await conferir(resolucoes);
+    expect(previa).toMatchObject({
+      totalPendencias: 0,
+      substituidas: 1,
+      mantidas: 1,
+      resolucoesAplicadas: 3,
+    });
+    const confirmar = (extra: object = {}) =>
+      chamar("/api/planilha/mensal/legado", "POST", {
+        aba: LEGADA,
+        planoHash: previa.planoHash,
+        resolucoes,
+        ...extra,
+      });
+    expect((await confirmar()).status).toBe(400);
+    expect((await confirmar({ resolucoes: [] })).status).toBe(409);
+    expect((await confirmar({ resolucoes: [...resolucoes, resolucoes[0]] })).status).toBe(400);
+    expect((await confirmar({ senha: "QA Incorreta" })).status).toBe(400);
+    expect(google.abas()).toContain(LEGADA);
+    const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+    await dados(await confirmar({ senha: SENHA_ADMIN }));
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+    expect(google.abas()).not.toContain(LEGADA);
+    expect(google.valor(setembro, 2, colunaSetembro)).toBe("FJ");
+    expect(google.valor(outubro, 2, colunaOutubro)).toBe("F");
+    expect(google.valor(outubro, 3, colunaOutubro)).toBe("FJ");
   });
 });
