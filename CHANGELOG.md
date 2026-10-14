@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- FrequenciBI permite personalizar os painéis predefinidos, atualizar visões salvas, recuperar a análise do Explorador e escolher paleta, valores, legenda e dimensões. Atalhos de período usam o fuso da escola; painéis mantêm recortes independentes e a edição se adapta ao celular.
+
 - Presenças parciais (S) visíveis no Painel, no Resumo dos Relatórios e no resumo do período personalizado, com coluna própria na tabela diária; nenhum dia volta a zerar em silêncio.
 
 - FrequenciBI em `/bi`: painel curado, explorador com dez visualizações, painéis personalizáveis por toque e teclado, comparações, metas, notas, destaques locais e dicionário. Chave independente da sessão; preferências locais e retratos offline identificados, com importação e exportação de configurações sem segredo, CSV e PNG confirmados e limpeza por chave.
@@ -106,6 +108,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- FrequenciBI corrige categorias duplicadas, ordem semanal, taxas por aluno, cobertura restrita ao escopo e atualização da comparação. Tabelas ajustam a paginação, mapas de calor preservam células após o centésimo grupo, séries mantêm lacunas sem base e PNG inclui legenda e resumo. A impressão aguarda os gráficos fora da tela.
 
 - Retirada de abas antigas identifica as células com totais calculados e notas e mantém o botão de conclusão visível. A confirmação pode descartar esses complementos com autorização explícita e senha administrativa, preservando as frequências nos meses e bloqueando fórmulas em nomes ou datas. A prévia também vence quando notas ou fórmulas mudam sem alterar o resultado exibido.
 
