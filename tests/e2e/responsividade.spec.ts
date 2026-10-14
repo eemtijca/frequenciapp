@@ -151,7 +151,7 @@ test.describe("responsividade", () => {
     expect(campo?.width ?? 0).toBeLessThanOrEqual(330);
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
   });
-  // A Chamada Parcial abre pelo ícone da Chamada, que só existe com turmas cadastradas.
+  // A massa permite conferir a largura das listas de frequência.
   test.describe("com turmas cadastradas", () => {
     test.beforeAll(criarMassaE2E);
     test.afterAll(limparMassaE2E);

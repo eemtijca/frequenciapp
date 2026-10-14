@@ -93,7 +93,7 @@ test.describe("navegação", () => {
       "page",
     );
   });
-  // A Chamada Parcial abre pelo ícone da Chamada, que só existe com turmas cadastradas.
+  // A massa permite conferir os registros ao alternar entre as seções.
   test.describe("com turmas cadastradas", () => {
     test.beforeAll(criarMassaE2E);
     test.afterAll(limparMassaE2E);
@@ -117,67 +117,51 @@ test.describe("navegação", () => {
       await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
       navegacao = await abrirNavegacao(page);
       await expect(gestao).not.toHaveAttribute("aria-current", "page");
-      await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
-      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
+      await expect(
+        navegacao.getByRole("button", { name: "Chamada", exact: true }),
+      ).not.toHaveAttribute("aria-current", "page");
+      await expect(
+        navegacao.getByRole("button", { name: "Chamada Parcial", exact: true }),
+      ).toHaveAttribute("aria-current", "page");
       await trocarVisao(page, "Gestão", "gestao");
       await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
     });
 
-    test("a Chamada Parcial abre por um ícone ao lado do Resumo, sem item na navegação", async ({
-      page,
-    }) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      await page.goto("/");
-      await aguardarHidratacao(page);
-      let navegacao = await abrirNavegacao(page);
-      await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
-      await trocarVisao(page, "Chamada", "chamada");
-      const chamada = page.locator('section[aria-label="Fazer chamada"]');
-      const icone = chamada.getByRole("button", { name: "Chamada Parcial", exact: true });
-      const resumo = chamada.getByRole("button", { name: /^Resumo d/ });
-      await expect(icone).toBeVisible();
-      await expect(icone).toHaveText("");
-      const [caixaResumo, caixaIcone] = await Promise.all([
-        resumo.boundingBox(),
-        icone.boundingBox(),
-      ]);
-      expect(caixaResumo).not.toBeNull();
-      expect(caixaIcone).not.toBeNull();
-      if (caixaResumo && caixaIcone) {
-        // Aos sábados o resumo divide a linha com a liberação e o ícone desce para a linha seguinte.
-        const sabado = await chamada
-          .getByRole("button", { name: /^(Desbloquear sábado letivo|Sábado letivo)$/ })
-          .count();
-        if (sabado > 0) {
-          expect(caixaIcone.y).toBeGreaterThanOrEqual(caixaResumo.y + caixaResumo.height - 1);
-        } else {
-          expect(Math.abs(caixaResumo.y - caixaIcone.y)).toBeLessThan(8);
-          expect(caixaIcone.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
-        }
-        expect(caixaIcone.x + caixaIcone.width).toBeLessThanOrEqual(390);
+    test("a Chamada Parcial tem item próprio logo abaixo de Chamada", async ({ page }, info) => {
+      for (const largura of [1280, 390, 360]) {
+        await page.setViewportSize({ width: largura, height: 844 });
+        await page.goto("/");
+        await aguardarHidratacao(page);
+        let navegacao = await abrirNavegacao(page);
+        const rotulos = await navegacao.getByRole("button").allTextContents();
+        const indice = rotulos.indexOf("Chamada");
+        expect(rotulos[indice + 1]).toBe("Chamada Parcial");
+        expect(rotulos[indice + 2]).toBe("Horários");
+        await trocarVisao(page, "Chamada", "chamada");
+        await expect(
+          page
+            .locator('section[aria-label="Fazer chamada"]')
+            .getByRole("button", { name: "Chamada Parcial", exact: true }),
+        ).toHaveCount(0);
+        await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
+        await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
+        navegacao = await abrirNavegacao(page);
+        await expect(
+          navegacao.getByRole("button", { name: "Chamada Parcial", exact: true }),
+        ).toHaveAttribute("aria-current", "page");
+        await expect(
+          navegacao.getByRole("button", { name: "Chamada", exact: true }),
+        ).not.toHaveAttribute("aria-current", "page");
+        await expect(navegacao.locator("[aria-current=page]")).toHaveCount(1);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+        await info.attach(`chamada-parcial-menu-${largura}`, {
+          body: await page.screenshot({ animations: "disabled" }),
+          contentType: "image/png",
+        });
+        await trocarVisao(page, "Chamada", "chamada");
       }
-      await page.setViewportSize({ width: 360, height: 780 });
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      );
-      await page.setViewportSize({ width: 390, height: 844 });
-
-      await icone.click();
-      await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada-parcial");
-      navegacao = await abrirNavegacao(page);
-      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
-      await trocarVisao(page, "Chamada", "chamada");
-      navegacao = await abrirNavegacao(page);
-      await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
-        "aria-current",
-        "page",
-      );
     });
   });
 });

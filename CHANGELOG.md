@@ -55,6 +55,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada Parcial volta à barra lateral, logo abaixo de Chamada, com seleção e aviso de alterações próprios no desktop e no celular.
+
 - Painel externo sai da Gestão, mantendo o acesso ao FrequenciBI na navegação lateral.
 
 - Painel, gráficos no celular: uma seta no canto superior direito do painel avança para o próximo gráfico e, no último, volta ao primeiro, sem criar seletor nem botões novos. Os gráficos vizinhos ao em exibição montam em tempo ocioso e a leitura da posição durante o deslize deixa de medir o layout e de criar temporizadores a cada evento, o que reduz os picos de quadro na troca de gráfico. Em medição com o processador 4 vezes mais lento (8 passadas frias de cada versão no Chromium), as tarefas longas caíram de 15 para 6 e o tempo de script, em mediana, cerca de 21%.

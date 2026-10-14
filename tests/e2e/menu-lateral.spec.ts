@@ -102,7 +102,7 @@ test.describe("menu lateral", () => {
     await page.setViewportSize({ width: 1023, height: 800 });
     navegacao = await abrirNavegacao(page);
     expect(await navegacao.getByRole("button").allTextContents()).toEqual(secoes);
-    await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
+    await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toBeVisible();
     await page.setViewportSize({ width: 1024, height: 800 });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
@@ -209,7 +209,7 @@ test.describe("menu da coordenação", () => {
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toBeVisible();
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
-    await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toHaveCount(0);
+    await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toBeVisible();
     const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     await expect(menu.getByText("Demo", { exact: true })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Trocar senha", exact: true })).toBeVisible();
