@@ -767,7 +767,7 @@ describe("frequência organizada por turma e mês", () => {
     await dados<Mensal>(await preparar("2026-09"));
     expect(marca(setembro.aba, "26/09/2026")).toBe("F");
   });
-  it("alterna o mês visível, preserva o legado e mantém o envio histórico disponível", async () => {
+  it("mantém todos os meses visíveis, preserva o legado e mantém o envio histórico disponível", async () => {
     google.definirAba("QA Anotações", [["Anotações"], ["Preservar"]]);
     for (const [corpo, cookie, status] of [
       [{ mes: "2026-10" }, cookieCoordenacao, 403],
@@ -797,9 +797,7 @@ describe("frequência organizada por turma e mês", () => {
     const outubro = mensais["2026-10"]?.aba ?? "";
     const setembro = mensais["2026-09"]?.aba ?? "";
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
-    expect(google.abasVisiveis().sort()).toEqual(
-      [outubro, "QA Mensal B · Outubro", "QA Mensal A · Novembro", "QA Anotações"].sort(),
-    );
+    expect(google.abasVisiveis().sort()).toEqual([...google.abas()].sort());
     expect(marca(LEGADA, "30/09/2026")).toBe("F");
     expect(google.formulaDe(LEGADA, 2, 4)).toBe('=COUNTIF(C2:C2;"F")');
     const previa = await dados<{ planos: Plano[] }>(
@@ -832,11 +830,9 @@ describe("frequência organizada por turma e mês", () => {
       ).resultados,
     ).toMatchObject([{ aba: setembro, resultado: "sucesso" }]);
     expect(marca(setembro, "30/09/2026")).toBe("F");
-    expect(google.abasVisiveis()).not.toContain(setembro);
+    expect(google.abasVisiveis()).toContain(setembro);
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-09" }));
-    expect(google.abasVisiveis().sort()).toEqual(
-      [setembro, "QA Mensal A · Novembro", "QA Anotações"].sort(),
-    );
+    expect(google.abasVisiveis().sort()).toEqual([...google.abas()].sort());
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
     google.removerAba("QA Anotações");
   });
@@ -950,5 +946,105 @@ describe("frequência organizada por turma e mês", () => {
     } finally {
       if (feriadoCriado) await dados(await chamar(`/api/calendario-letivo/${dia}`, "DELETE"));
     }
+  });
+  it("lista meses com links diretos sem escrever e protege o acesso administrativo", async () => {
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    const catalogo = await dados<{
+      abas: { mes: string; url: string }[];
+      legadas: { aba: string }[];
+    }>(await chamar("/api/planilha/mensal/visibilidade", "GET"));
+    expect(catalogo.abas.some((aba) => aba.mes === "2026-09")).toBe(true);
+    expect(
+      catalogo.abas.every((aba) =>
+        /^https:\/\/docs.google.com\/spreadsheets\/d\/planilha-sintetica\/edit#gid=\d+$/.test(
+          aba.url,
+        ),
+      ),
+    ).toBe(true);
+    expect(catalogo.legadas).toEqual(
+      expect.arrayContaining([expect.objectContaining({ aba: LEGADA })]),
+    );
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+    for (const [cookie, status] of [
+      ["", 401],
+      [cookieCoordenacao, 403],
+    ] as const) {
+      expect(
+        (await chamar("/api/planilha/mensal/visibilidade", "GET", undefined, cookie)).status,
+      ).toBe(status);
+      expect(
+        (await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA }, cookie)).status,
+      ).toBe(status);
+    }
+    expect(
+      (await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA, impressao: "injetada" }))
+        .status,
+    ).toBe(400);
+    const negada = await fetch(`${APP_URL}/api/planilha/mensal/legado`, {
+      method: "POST",
+      headers: {
+        Origin: "https://origem-invalida.exemplo",
+        Cookie: cookieAdmin,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ aba: LEGADA }),
+    });
+    expect(negada.status).toBe(403);
+  });
+  it("preserva conteúdo especial e abas sem vínculo", async () => {
+    expect(
+      (await chamar("/api/planilha/mensal/legado", "POST", { aba: "QA Não mapeada" })).status,
+    ).toBe(409);
+    expect((await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA })).status).toBe(409);
+    expect(google.abas()).toContain(LEGADA);
+  });
+  it("move duas datas antigas para seus meses e só então retira a aba sem mês", async () => {
+    // Um vínculo explícito permite conferir o legado anterior ao OAuth, sem autoria.
+    google.definirAba(LEGADA, [
+      ["Aluno", "30/09/2026", "01/10/2026"],
+      ["QA Mensal Aluno A", "FJ", "P"],
+    ]);
+    const setembro = mensais["2026-09"]?.aba ?? "";
+    const outubro = mensais["2026-10"]?.aba ?? "";
+    google.definirValor(setembro, 2, cabecalho(setembro).indexOf("30/09/2026") + 1, "");
+    google.definirValor(outubro, 2, cabecalho(outubro).indexOf("01/10/2026") + 1, "");
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    const { previa } = await dados<{
+      previa: { planoHash: string; preenchidas: number; destinos: unknown[] };
+    }>(await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA }));
+    expect(previa.preenchidas).toBe(2);
+    expect(previa.destinos).toHaveLength(2);
+    expect(google.abas()).toContain(LEGADA);
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+    google.definirValor(LEGADA, 2, 2, "F");
+    expect(
+      (
+        await chamar("/api/planilha/mensal/legado", "POST", {
+          aba: LEGADA,
+          planoHash: previa.planoHash,
+        })
+      ).status,
+    ).toBe(409);
+    const atualizada = await dados<{ previa: { planoHash: string } }>(
+      await chamar("/api/planilha/mensal/legado", "POST", { aba: LEGADA }),
+    );
+    await dados(
+      await chamar("/api/planilha/mensal/legado", "POST", {
+        aba: LEGADA,
+        planoHash: atualizada.previa.planoHash,
+      }),
+    );
+    expect(google.abas()).not.toContain(LEGADA);
+    expect(marca(setembro, "30/09/2026")).toBe("F");
+    expect(marca(outubro, "01/10/2026")).toBe("P");
+    expect((await lerEsquema()).mapa.some((aba) => aba.aba === LEGADA)).toBe(false);
+    expect(
+      (
+        await chamar("/api/planilha/mensal/legado", "POST", {
+          aba: LEGADA,
+          planoHash: atualizada.previa.planoHash,
+        })
+      ).status,
+    ).toBe(409);
   });
 });

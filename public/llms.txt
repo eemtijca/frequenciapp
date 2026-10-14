@@ -17,6 +17,7 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 - Faça login em `POST /api/auth/entrar` para obter o cookie de sessão; o diretor de turma usa identificador e palavra-chave.
 - A chamada é salva com revisão otimista: conflito responde 409 com a versão vigente, sem sobrescrever o registro.
 - Não chame rotas destrutivas, como exclusões, restaurações de backup e limpezas, sem pedido explícito.
+- O catálogo `GET /api/planilha/mensal/visibilidade` oferece links por mês e turma sem escrever. O POST libera todos os meses; a organização de abas sem mês em `POST /api/planilha/mensal/legado` exige pedido explícito e prévia assinada antes de transferir marcas e retirar a origem.
 - As rotas da agenda de notificações usam `Authorization: Bearer <CRON_SECRET>`, sem sessão de usuário.
 
 ## Optional

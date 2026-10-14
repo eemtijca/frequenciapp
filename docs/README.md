@@ -46,3 +46,5 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 
 - [ADR-042: FrequenciBI interno](adr/042-frequencibi.md).
 - [FrequenciBI](frequencibi.md): análise curada, explorador, painéis locais e uso offline.
+
+A organização do histórico mensal e a retirada conferida de abas antigas estão no [ADR-045](adr/045-acesso-aos-meses-da-planilha.md).

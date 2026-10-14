@@ -636,13 +636,25 @@ Feriados são lidos no servidor sob a mesma trava e omitidos das datas mensais. 
 - 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira apenas quando a aba existente foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
 - Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
 
+### GET /api/planilha/mensal/visibilidade
+
+Apenas administração. Retorna `{ "abas": [{"aba", "mes", "turmaOriginalId", "destino", "oculta", "url"}], "legadas": [{"aba", "turmaOriginalId"}] }`. Os links apontam diretamente para a turma no Google Planilhas. Os meses incluem o ano e são ordenados do mais recente ao mais antigo; abrir o catálogo não grava nada.
+
 ### POST /api/planilha/mensal/visibilidade
 
-Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Mostra as abas mensais reconhecidas do mês escolhido, incluindo o ano, e oculta os outros meses e as abas legadas do mapa cuja turma já tem esse mês. Preserva conteúdo e abas sem vínculo. Usa a mesma trava do preparo e envio; não repete automaticamente uma escrita com resposta perdida.
+Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Libera todos os meses preparados e as abas legadas reconhecidas no mapa. Nenhum mês é ocultado. Abas manuais sem vínculo e cópias antigas permanecem intactas. Usa a mesma trava do preparo e envio; não repete automaticamente uma escrita com resposta perdida.
 
-- 200 `{ "mes", "visiveis": string[], "ocultadas": string[] }`; `ocultadas` contém somente as abas que mudaram de visibilidade nesta operação.
-- 400 mês inválido; 409 mês sem abas preparadas ou alteração concorrente; 429 excesso de alterações. Falhas Google seguem os códigos de conexão e resultado incerto da integração.
-- O diálogo Preparar mês chama esta operação depois de concluir todas as turmas. Uma falha de visibilidade não desfaz o preparo e pode ser conferida pelo botão Mostrar mês na planilha.
+- 200 `{ "mes", "visiveis": string[], "ocultadas": [] }`. O campo `ocultadas` permanece por compatibilidade.
+- 400 mês inválido; 409 mês sem abas preparadas ou alteração concorrente; 429 excesso de alterações.
+- Preparar mês chama esta operação ao concluir todas as turmas. Falha não desfaz o preparo; Meses da frequência permite conferir e liberar o acesso depois.
+
+### POST /api/planilha/mensal/legado
+
+Corpo: `{ "aba": string, "planoHash"?: string }`. Apenas administração e origem confiável. Sem hash, retorna `{ "previa": {"aba", "impressao", "planoHash", "preenchidas", "conferidas", "destinos", "removida": false} }`, sem escrever. A assinatura vincula a conferência ao administrador, conexão e turma. Com hash válido, relê as abas, copia somente marcas P, F, FJ e S que faltam em células mensais vazias e retira a origem no mesmo lote atômico. Retorna `{ "removida": true, "aba" }` e atualiza o mapa e a auditoria.
+
+A origem precisa ter vínculo salvo e cabeçalho Aluno na primeira coluna e linha. Datas usam ano completo. Alunos são conferidos pelos vínculos; sem código, apenas nomes exatos e únicos nas duas abas são aceitos. Todos os nomes da origem devem estar preservados nos destinos. Turma atual é redundante e pode ser descartada; colunas não reconhecidas impedem a transferência. Fórmulas ou notas na origem, gráficos, mesclagens, homônimos sem código, datas sem destino e valores divergentes respondem 409. Notas e fórmulas nas células de destino também impedem a escrita. Cada aba aceita até 2.000 linhas e 400 colunas, lidas integralmente em blocos de até 20.000 células. A prévia vencida ou conexão alterada exige nova conferência; 429 limita a repetição de pedidos.
+
+Resposta perdida exige conferir a planilha e atualizar a estrutura, sem repetição automática. A Google Sheets API não oferece comparação e gravação condicionais: uma edição externa depois da última leitura ainda pode competir com o lote. A transferência não altera chamadas no aplicativo nem cria abas de backup.
 
 ### POST /api/planilha/simular
 
