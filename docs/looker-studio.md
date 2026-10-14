@@ -1,6 +1,6 @@
 # Painel externo no Zoho Analytics ou Looker Studio
 
-Indicadores agregados do FrequenciApp em um painel privado da gestão, alimentado pela planilha Google de indicadores.
+Referência histórica da integração externa por Google Planilhas. A seção Painel externo foi retirada da Gestão; a análise atual fica no FrequenciBI, acessível pela barra lateral. Os procedimentos de interface abaixo descrevem versões anteriores. Fontes já preparadas e APIs legadas permanecem disponíveis.
 
 ## Ativação
 
