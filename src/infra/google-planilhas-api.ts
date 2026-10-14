@@ -19,7 +19,7 @@ const CHAVES_METADADOS = [
   "frequenciapp.copia",
 ];
 const CAMPOS_ESTRUTURA =
-  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
+  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),charts(chartId),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
   "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue))))";
 const CAMPOS_CELULAS_COM_NOTAS =
@@ -81,6 +81,7 @@ const documento = z.object({
   sheets: z.array(
     z.object({
       properties: propriedades,
+      charts: z.array(z.object({ chartId: z.number() })).optional(),
       bandedRanges: z.array(z.object({ bandedRangeId: z.number(), range: faixa })).optional(),
       merges: z.array(faixa).optional(),
       developerMetadata: z.array(metadado).optional(),
@@ -447,6 +448,7 @@ export interface BlocoGoogle {
   valores: string[][];
   formula: boolean[][];
   ocupado?: boolean[][];
+  notas?: boolean[][];
 }
 
 /** Lê somente as faixas pedidas, com valores exibidos e fórmula separada. */
@@ -456,7 +458,7 @@ export async function lerBlocosGoogle(
   nome: string,
   linhas: number,
   pedidos: { coluna: number; colunas: number }[],
-  opcoes: { conferirConteudo?: boolean } = {},
+  opcoes: { conferirConteudo?: boolean; conferirNotas?: boolean } = {},
 ): Promise<BlocoGoogle[]> {
   if (linhas * pedidos.reduce((total, item) => total + item.colunas, 0) > 20_000) {
     throw new ErroHttp("Intervalo grande demais para uma leitura.", 400);
@@ -465,7 +467,7 @@ export async function lerBlocosGoogle(
   url.searchParams.set("includeGridData", "true");
   url.searchParams.set(
     "fields",
-    opcoes.conferirConteudo ? CAMPOS_CELULAS_COM_NOTAS : CAMPOS_CELULAS,
+    opcoes.conferirConteudo || opcoes.conferirNotas ? CAMPOS_CELULAS_COM_NOTAS : CAMPOS_CELULAS,
   );
   for (const pedido of pedidos) {
     const inicio = letra(pedido.coluna);
@@ -480,6 +482,7 @@ export async function lerBlocosGoogle(
     const valores: string[][] = [];
     const formula: boolean[][] = [];
     const ocupado: boolean[][] | undefined = opcoes.conferirConteudo ? [] : undefined;
+    const notas: boolean[][] | undefined = opcoes.conferirNotas ? [] : undefined;
     for (let linha = 0; linha < linhas; linha += 1) {
       const itens = trecho?.rowData?.[linha]?.values ?? [];
       valores.push(
@@ -489,6 +492,9 @@ export async function lerBlocosGoogle(
         Array.from({ length: pedido.colunas }, (_, coluna) =>
           Boolean(itens[coluna]?.userEnteredValue?.formulaValue),
         ),
+      );
+      notas?.push(
+        Array.from({ length: pedido.colunas }, (_, coluna) => Boolean(itens[coluna]?.note)),
       );
       ocupado?.push(
         Array.from({ length: pedido.colunas }, (_, coluna) => {
@@ -506,6 +512,7 @@ export async function lerBlocosGoogle(
       valores,
       formula,
       ...(ocupado ? { ocupado } : {}),
+      ...(notas ? { notas } : {}),
     };
   });
 }
@@ -672,6 +679,22 @@ export async function executarAcaoGoogle(
   acesso: string,
   corpo: Record<string, unknown>,
 ): Promise<unknown> {
+  if (corpo.acao === "preverAbaAntiga" || corpo.acao === "moverAbaAntiga") {
+    const dados = z
+      .object({
+        aba: z.string().min(1),
+        turmaOriginalId: z.string().uuid(),
+        impressao: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+      })
+      .safeParse(corpo);
+    if (!dados.success || (corpo.acao === "moverAbaAntiga" && !dados.data.impressao))
+      throw new ErroHttp("Confira a prévia da aba antiga.", 400);
+    const { organizarAbaAntigaGoogle } = await import("./google-planilhas-legado");
+    return organizarAbaAntigaGoogle(id, acesso, dados.data, corpo.acao === "moverAbaAntiga");
+  }
   if (corpo.acao === "catalogoFrequencia") return catalogoFrequenciaGoogle(id, acesso);
   if (corpo.acao === "abasMensais") {
     const { listarAbasMensaisGoogle } = await import("./google-planilhas-mensal");

@@ -158,7 +158,7 @@ export function DialogoPrepararMes({
           setInterrupcao({
             mensagem: mensagemAmigavel(
               erro,
-              "As abas estão preparadas, mas a exibição do mês não foi confirmada. Use Mostrar mês na planilha para conferir.",
+              "As abas estão preparadas, mas o acesso não foi confirmado. Use Meses da frequência para conferir.",
             ),
             reconectar: interrupcaoDoPreparo(erro)?.reconectar ?? false,
           });

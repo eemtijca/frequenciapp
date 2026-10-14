@@ -1,5 +1,6 @@
 // Prepara o destino mensal da frequência e preserva vínculos já salvos de outras turmas.
 import { z } from "zod";
+import { createHmac } from "node:crypto";
 import { ambiente } from "@/infra/ambiente";
 import { diasDoMes } from "@/domain/frequencia";
 import { ErroHttp } from "@/infra/erros";
@@ -127,7 +128,7 @@ export async function prepararMesDaFrequencia(admin: { id: string }, entrada: un
   );
 }
 
-/** Mostra o mês escolhido e oculta somente os destinos reconhecidos da frequência. */
+/** Revela o histórico mensal sem esconder as outras datas já preparadas. */
 export async function mostrarMesDaFrequencia(admin: { id: string }, entrada: unknown) {
   const dados = z
     .object({ mes: z.string().refine(mesValido) })
@@ -152,6 +153,111 @@ export async function mostrarMesDaFrequencia(admin: { id: string }, entrada: unk
         await auditar(tx, admin.id, "planilha.mostrar_mes", `mes:${dados.data.mes}`);
       });
       return resultado;
+    }),
+  );
+}
+
+/** Catálogo leve com links diretos; abrir o seletor não escreve na planilha. */
+export async function listarMesesDaFrequencia() {
+  const linha = await lerLinha("FREQUENCIA");
+  const resultado = await chamarIntegracao<{ abas: (AbaMensalPlanilha & { oculta: boolean })[] }>(
+    linha,
+    { acao: "abasMensais" },
+  );
+  return {
+    abas: resultado.abas
+      .sort(
+        (a, b) =>
+          b.mes.localeCompare(a.mes) || a.aba.localeCompare(b.aba, "pt-BR", { numeric: true }),
+      )
+      .map((aba) => ({
+        ...aba,
+        url: `https://docs.google.com/spreadsheets/d/${linha.googlePlanilhaId}/edit#gid=${aba.destino.split(":")[1]}`,
+      })),
+    legadas: (esquemaSalvo(linha)?.mapa ?? []).filter((aba) => !aba.mes),
+  };
+}
+
+/** Prévia assinada por aba e conexão; a confirmação relê antes de copiar e excluir. */
+export async function organizarAbaAntiga(admin: { id: string }, entrada: unknown) {
+  const dados = z
+    .object({ aba: z.string().min(1).max(200), planoHash: z.string().length(64).optional() })
+    .strict()
+    .safeParse(entrada);
+  if (!dados.success) throw new ErroHttp("Escolha uma aba antiga e confira a prévia.", 400);
+  if (!(await limiteDeTentativas(`planilha:antigas:${admin.id}`, 60)))
+    throw new ErroHttp("Muitas conferências em sequência. Aguarde alguns minutos.", 429);
+  return comTravaPlanilhaFrequencia(() =>
+    comPausasDeLeituraGoogle(async () => {
+      const linha = await lerLinha("FREQUENCIA");
+      const esquema = esquemaSalvo(linha);
+      const vinculo = esquema?.mapa.find((aba) => aba.aba === dados.data.aba && !aba.mes);
+      if (!vinculo) throw new ErroHttp("Escolha uma aba antiga vinculada à turma na Gestão.", 409);
+      const previa = await chamarIntegracao<{
+        aba: string;
+        impressao: string;
+        preenchidas: number;
+        conferidas: number;
+        destinos: { mes: string; aba: string }[];
+        removida: boolean;
+      }>(linha, {
+        acao: "preverAbaAntiga",
+        aba: vinculo.aba,
+        turmaOriginalId: vinculo.turmaOriginalId,
+      });
+      const planoHash = createHmac("sha256", ambiente.authSecret)
+        .update(
+          JSON.stringify([
+            admin.id,
+            linha.googlePlanilhaId,
+            linha.googleRefreshToken,
+            vinculo,
+            previa.impressao,
+          ]),
+        )
+        .digest("hex");
+      if (!dados.data.planoHash) return { previa: { ...previa, planoHash } };
+      if (dados.data.planoHash !== planoHash)
+        throw new ErroHttp("A planilha ou a conexão mudou. Confira uma nova prévia.", 409);
+      await chamarIntegracao(linha, {
+        acao: "moverAbaAntiga",
+        aba: vinculo.aba,
+        turmaOriginalId: vinculo.turmaOriginalId,
+        impressao: previa.impressao,
+      });
+      await comTransacao(async (tx) => {
+        const atual = await tx.integracaoPlanilha.findUnique({
+          where: { id: idDaIntegracao("FREQUENCIA") },
+        });
+        const salvo = atual && esquemaSalvo(atual);
+        if (
+          !atual ||
+          !salvo ||
+          atual.googlePlanilhaId !== linha.googlePlanilhaId ||
+          atual.googleRefreshToken !== linha.googleRefreshToken
+        )
+          throw new ErroHttp(
+            "A conexão mudou. Confira a planilha e atualize a estrutura na Gestão.",
+            409,
+          );
+        const abas = salvo.abas.filter((aba) => aba.nome !== vinculo.aba);
+        await tx.integracaoPlanilha.update({
+          where: { id: atual.id },
+          data: {
+            esquema: {
+              ...salvo,
+              abas,
+              mapa: salvo.mapa.filter((aba) => aba.aba !== vinculo.aba),
+              atualizadoEm: new Date().toISOString(),
+            } as unknown as object,
+            assinaturaEsquema: hashTexto(JSON.stringify(abas.map((aba) => aba.assinatura))),
+            esquemaEm: new Date(),
+            atualizadoPorId: admin.id,
+          },
+        });
+        await auditar(tx, admin.id, "planilha.organizar_aba_antiga", `aba:${vinculo.aba}`);
+      });
+      return { removida: true, aba: vinculo.aba };
     }),
   );
 }

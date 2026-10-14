@@ -73,7 +73,15 @@ function abasDoDocumento(doc: DocumentoGoogle): AbaMensalPlanilha[] {
 
 /** Lê somente estrutura e metadados, sem percorrer as células das abas. */
 export async function listarAbasMensaisGoogle(id: string, acesso: string) {
-  return { abas: abasDoDocumento(await lerDocumentoGoogle(id, acesso)) };
+  const doc = await lerDocumentoGoogle(id, acesso);
+  return {
+    abas: abasDoDocumento(doc).map((aba) => ({
+      ...aba,
+      oculta: Boolean(
+        doc.sheets.find((item) => item.properties.title === aba.aba)?.properties.hidden,
+      ),
+    })),
+  };
 }
 
 function marcador(
@@ -460,7 +468,7 @@ export async function prepararAbaMensalGoogle(
   return { aba: nome, mes, turmaOriginalId, destino, criada: true, atualizada: false };
 }
 
-/** Alterna a navegação entre meses sem apagar nem reescrever células. */
+/** Mantém todo o histórico preparado acessível, inclusive ao consultar outro mês. */
 export async function mostrarMesGoogle(
   id: string,
   acesso: string,
@@ -470,43 +478,23 @@ export async function mostrarMesGoogle(
   if (!mesValido(mes)) throw new ErroHttp("Informe um mês válido.", 400);
   const doc = await lerDocumentoGoogle(id, acesso);
   const mensais = abasDoDocumento(doc);
-  const selecionadas = mensais.filter((aba) => aba.mes === mes);
-  if (!selecionadas.length)
+  if (!mensais.some((aba) => aba.mes === mes))
     throw new ErroHttp("Prepare as abas deste mês antes de mostrá-lo na planilha.", 409);
-  const turmas = new Set(selecionadas.map((aba) => aba.turmaOriginalId));
-  const ocultar = new Set([
-    ...mensais.filter((aba) => aba.mes !== mes).map((aba) => aba.aba),
-    ...legadas.filter((aba) => turmas.has(aba.turmaOriginalId)).map((aba) => aba.aba),
-  ]);
-  const mostrar = new Set(selecionadas.map((aba) => aba.aba));
-  const pedidos: Record<string, unknown>[] = [];
-  const visiveis: string[] = [];
-  const ocultadas: string[] = [];
-  // Primeiro revela o mês solicitado: a planilha nunca fica sem aba visível.
-  for (const [nomes, hidden] of [
-    [mostrar, false],
-    [ocultar, true],
-  ] as const) {
-    for (const aba of doc.sheets) {
-      const propriedades = aba.properties;
-      if (
-        !nomes.has(propriedades.title) ||
-        (hidden && mostrar.has(propriedades.title)) ||
-        propriedades.title.startsWith("_frequenciapp_backup_") ||
-        (propriedades.sheetType && propriedades.sheetType !== "GRID")
-      )
-        continue;
-      if (!hidden) visiveis.push(propriedades.title);
-      if (Boolean(propriedades.hidden) === hidden) continue;
-      if (hidden) ocultadas.push(propriedades.title);
-      pedidos.push({
-        updateSheetProperties: {
-          properties: { sheetId: propriedades.sheetId, hidden },
-          fields: "hidden",
-        },
-      });
-    }
-  }
+  const nomes = new Set([...mensais.map((aba) => aba.aba), ...legadas.map((aba) => aba.aba)]);
+  const reconhecidas = doc.sheets.filter(
+    (aba) =>
+      nomes.has(aba.properties.title) &&
+      !aba.properties.title.startsWith("_frequenciapp_backup_") &&
+      (!aba.properties.sheetType || aba.properties.sheetType === "GRID"),
+  );
+  const pedidos = reconhecidas
+    .filter((aba) => aba.properties.hidden)
+    .map((aba) => ({
+      updateSheetProperties: {
+        properties: { sheetId: aba.properties.sheetId, hidden: false },
+        fields: "hidden",
+      },
+    }));
   if (pedidos.length) await enviarLoteAtomicoGoogle(id, acesso, pedidos);
-  return { mes, visiveis, ocultadas };
+  return { mes, visiveis: reconhecidas.map((aba) => aba.properties.title), ocultadas: [] };
 }

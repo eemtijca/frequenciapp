@@ -6231,8 +6231,8 @@
     "/api/planilha/mensal/visibilidade": {
       "post": {
         "operationId": "definirVisibilidadePlanilha",
-        "summary": "Mostrar o mês escolhido na planilha",
-        "description": "Apenas administração e origem confiável. Mostra as abas mensais do mês e oculta os outros, sem repetir escrita com resposta perdida.",
+        "summary": "Liberar o histórico mensal na planilha",
+        "description": "Apenas administração e origem confiável. Revela todos os meses preparados e as abas legadas vinculadas, sem ocultar o histórico. O mês informado precisa estar preparado. Não repete escrita com resposta perdida.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -6255,7 +6255,7 @@
         },
         "responses": {
           "200": {
-            "description": "Abas mostradas e ocultadas.",
+            "description": "Abas acessíveis. A lista ocultadas permanece vazia por compatibilidade.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6266,8 +6266,8 @@
                     "summary": "Exemplo",
                     "value": {
                       "mes": "2026-10",
-                      "visiveis": ["1º A - Outubro"],
-                      "ocultadas": ["2º B - Setembro"]
+                      "visiveis": ["1º A · Setembro", "1º A · Outubro"],
+                      "ocultadas": []
                     }
                   }
                 }
@@ -6324,6 +6324,90 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listarMesesDaPlanilha",
+        "summary": "Consultar os meses preparados",
+        "description": "Apenas administração. Retorna links diretos por mês e turma, incluindo anos anteriores e abas ocultas. A consulta não escreve no Google.",
+        "tags": ["planilhas"],
+        "responses": {
+          "200": {
+            "description": "Catálogo de meses e abas antigas vinculadas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "abas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "aba": {
+                            "type": "string"
+                          },
+                          "mes": {
+                            "type": "string"
+                          },
+                          "turmaOriginalId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "destino": {
+                            "type": "string"
+                          },
+                          "oculta": {
+                            "type": "boolean"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": ["aba", "mes", "turmaOriginalId", "destino", "oculta", "url"]
+                      }
+                    },
+                    "legadas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "aba": {
+                            "type": "string"
+                          },
+                          "turmaOriginalId": {
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["aba", "turmaOriginalId"]
+                      }
+                    }
+                  },
+                  "required": ["abas", "legadas"]
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "abas": [],
+                      "legadas": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
           }
         }
       }
@@ -10698,6 +10782,184 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/planilha/mensal/legado": {
+      "post": {
+        "operationId": "organizarAbaAntigaDaPlanilha",
+        "summary": "Transferir frequências de uma aba sem mês",
+        "description": "Apenas administração e origem confiável. Sem planoHash devolve prévia assinada. A confirmação relê e confere os dados, copia marcas para células mensais vazias e retira a aba de origem em um lote atômico. Exige vínculo salvo; o título sozinho não autoriza a retirada. Fórmulas, notas, mesclagens, gráficos, datas ou alunos ambíguos e valores divergentes impedem a exclusão. A leitura completa aceita até 2.000 linhas e 400 colunas por aba, com blocos de até 20.000 células. Resposta perdida exige conferência, sem repetição automática.",
+        "tags": ["planilhas"],
+        "requestBody": {
+          "required": true,
+          "description": "Aba antiga e hash da prévia para confirmar.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "aba": {
+                    "type": "string"
+                  },
+                  "planoHash": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 64
+                  }
+                },
+                "required": ["aba"],
+                "additionalProperties": false
+              },
+              "examples": {
+                "Previa": {
+                  "summary": "Conferência",
+                  "value": {
+                    "aba": "1º A"
+                  }
+                },
+                "Confirmacao": {
+                  "summary": "Confirmação",
+                  "value": {
+                    "aba": "1º A",
+                    "planoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prévia conferida ou transferência concluída.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "previa": {
+                          "type": "object",
+                          "properties": {
+                            "aba": {
+                              "type": "string"
+                            },
+                            "impressao": {
+                              "type": "string"
+                            },
+                            "planoHash": {
+                              "type": "string"
+                            },
+                            "preenchidas": {
+                              "type": "integer"
+                            },
+                            "conferidas": {
+                              "type": "integer"
+                            },
+                            "removida": {
+                              "type": "boolean"
+                            },
+                            "destinos": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "aba": {
+                                    "type": "string"
+                                  },
+                                  "mes": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["aba", "mes"]
+                              }
+                            }
+                          },
+                          "required": [
+                            "aba",
+                            "impressao",
+                            "planoHash",
+                            "preenchidas",
+                            "conferidas",
+                            "destinos",
+                            "removida"
+                          ]
+                        }
+                      },
+                      "required": ["previa"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "removida": {
+                          "type": "boolean"
+                        },
+                        "aba": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["removida", "aba"]
+                    }
+                  ]
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "removida": true,
+                      "aba": "1º A"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "description": "Conteúdo inseguro, conexão alterada ou prévia vencida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "error": "A planilha mudou. Confira uma nova prévia."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Limite de conferências atingido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "error": "Muitas conferências em sequência. Aguarde alguns minutos."
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

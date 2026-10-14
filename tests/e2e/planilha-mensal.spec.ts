@@ -134,7 +134,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
       Array.from({ length: diasUteis.length + 1 }, (_, indice) => google.valor(aba, 1, indice + 1)),
     ).toEqual(["Aluno", ...diasUteis]);
   }
-  expect(google.abasVisiveis().sort()).toEqual(abasMensais.slice().sort());
+  expect(google.abasVisiveis().sort()).toEqual(["E2E Ano A", ...abasMensais].sort());
   expect(preparos).toHaveLength(2);
   expect(new Set(preparos.map((item) => item.turmaOriginalId)).size).toBe(2);
   expect(preparos.every((item) => item.mes === mes)).toBe(true);
@@ -419,14 +419,15 @@ test("atualiza abas antigas pelo preparo do mês e preserva marcas úteis e vín
   expect(google.vinculos(nova)).toEqual([{ linha: 2, alunoId }]);
 });
 
-test("consulta outro mês e retorna ao corrente sem apagar chamadas", async ({ page }) => {
+test("abre turmas por mês sem esconder o histórico", async ({ page }, testInfo) => {
+  const anterior = mesSeguinte(mes, -1);
   await comBanco(async (cliente) => {
     const { rows } = await cliente.query<{ id: string }>(
-      "select id from turmas where nome = 'A' and serie_id in (select id from series where nome like 'E2E%')",
+      "select id from turmas where nome = 'A' and serie_id in (select id from series where nome = 'E2E Ano')",
     );
     const turma = rows[0];
-    if (!turma) throw new Error("Turma sintética ausente.");
-    for (const periodo of [mes, mesSeguinte(mes, -1)]) {
+    if (!turma) throw new Error("Turma ausente.");
+    for (const periodo of [mes, anterior])
       google.definirAba(
         nomeAbaMensal("E2E Ano A", periodo),
         [
@@ -437,43 +438,38 @@ test("consulta outro mês e retorna ao corrente sem apagar chamadas", async ({ p
           mensal: { turmaOriginalId: turma.id, mes: periodo, geracao: randomUUID(), vinculos: [] },
         },
       );
-    }
   });
   const cartao = await abrirPlanilha(page);
-  const acao = cartao.getByRole("button", { name: "Mostrar mês na planilha", exact: true });
-  await acao.click();
-  const dialogo = page.getByRole("alertdialog");
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
-  expect(google.abasVisiveis()).toHaveLength(3);
-  await acao.click();
-  await dialogo.getByRole("button", { name: "Mostrar mês", exact: true }).evaluate((elemento) => {
+  const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+  await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
+  const dialogo = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
+  await expect(
+    dialogo.getByRole("link", { name: `Abrir ${nomeAbaMensal("E2E Ano A", mes)}`, exact: true }),
+  ).toHaveAttribute("href", /#gid=\d+$/);
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas);
+  await dialogo.getByRole("combobox", { name: "Mês das frequências" }).click();
+  await page.getByRole("option", { name: rotuloMes(anterior), exact: true }).click();
+  await expect(
+    dialogo.getByRole("link", {
+      name: `Abrir ${nomeAbaMensal("E2E Ano A", anterior)}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  await dialogo.getByRole("button", { name: "Liberar meses", exact: true }).evaluate((elemento) => {
     (elemento as HTMLButtonElement).click();
     (elemento as HTMLButtonElement).click();
   });
-  await expect(dialogo.getByRole("status")).toContainText("Histórico preservado");
-  expect(google.abasVisiveis()).toContain(abasMensais[0]);
-  const anterior = mesSeguinte(mes, -1);
-  const abaAnterior = nomeAbaMensal("E2E Ano A", anterior);
-  expect(google.abasVisiveis()).not.toContain(abaAnterior);
-  await dialogo.getByRole("button", { name: /Mês visível na planilha/ }).click();
-  const calendario = page.getByRole("dialog", { name: "Mês visível na planilha", exact: true });
-  if (anterior.slice(0, 4) !== mes.slice(0, 4))
-    await calendario.getByRole("button", { name: "Ano anterior", exact: true }).click();
-  await calendario.getByRole("button", { name: nomeDoMes(anterior), exact: true }).click();
-  await dialogo.getByRole("button", { name: "Mostrar mês", exact: true }).click();
-  await expect(dialogo.getByRole("status")).toContainText(rotuloMes(anterior).toLowerCase());
-  expect(google.abasVisiveis()).toContain(abaAnterior);
-  expect(google.abasVisiveis()).not.toContain(abasMensais[0]);
-  expect(google.valor(abaAnterior, 2, 2)).toBe("FJ");
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
-  await acao.click();
-  await dialogo.getByRole("button", { name: /Mês visível na planilha/ }).click();
-  await expect(calendario).toBeVisible();
-  await calendario.getByRole("button", { name: nomeDoMes(mes), exact: true }).click();
-  await dialogo.getByRole("button", { name: "Mostrar mês", exact: true }).click();
-  await expect(dialogo.getByRole("status")).toContainText(rotuloMes(mes).toLowerCase());
-  expect(google.abasVisiveis()).toContain(abasMensais[0]);
-  expect(google.valor(abasMensais[0] ?? "", 2, 2)).toBe("FJ");
+  await expect(dialogo.getByRole("status")).toContainText(
+    "Todos os meses preparados estão acessíveis",
+  );
+  expect(google.abasVisiveis()).toEqual(
+    expect.arrayContaining([nomeAbaMensal("E2E Ano A", mes), nomeAbaMensal("E2E Ano A", anterior)]),
+  );
+  expect(google.valor(nomeAbaMensal("E2E Ano A", anterior), 2, 2)).toBe("FJ");
+  await dialogo.screenshot({ path: testInfo.outputPath("meses-da-frequencia.png") });
+  expect(await dialogo.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth)).toBe(
+    true,
+  );
 });
 
 test("mantém o preparo quando a organização das abas falha e permite concluí-la depois", async ({
@@ -499,8 +495,68 @@ test("mantém o preparo quando a organização das abas falha e permite concluí
   expect(google.abasVisiveis()).toHaveLength(3);
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   await page.unroute("**/api/planilha/mensal/visibilidade");
-  await cartao.getByRole("button", { name: "Mostrar mês na planilha", exact: true }).click();
-  await dialogo.getByRole("button", { name: "Mostrar mês", exact: true }).click();
-  await expect(dialogo.getByRole("status")).toContainText("Histórico preservado");
-  expect(google.abasVisiveis().sort()).toEqual(abasMensais.slice().sort());
+  await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
+  const acesso = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
+  await acesso.getByRole("button", { name: "Liberar meses", exact: true }).click();
+  await expect(acesso.getByRole("status")).toContainText(
+    "Todos os meses preparados estão acessíveis",
+  );
+  expect(google.abasVisiveis().sort()).toEqual(["E2E Ano A", ...abasMensais].sort());
+});
+
+test("confere e transfere uma aba antiga sem perder as frequências", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  google.removerAba("E2E Ano A");
+  const headers = { Origin: new URL(page.url()).origin };
+  const criada = await page.request.post("/api/planilha/criar-aba", {
+    headers,
+    data: { nome: "E2E Ano A", cabecalho: ["Aluno", "29/09/2026"] },
+  });
+  expect(criada.status()).toBe(200);
+  google.definirValor("E2E Ano A", 2, 1, "E2E Aluno Um");
+  google.definirValor("E2E Ano A", 2, 2, "FJ");
+  await comBanco(async (cliente) => {
+    const { rows } = await cliente.query<{ id: string }>(
+      "select id from turmas where nome = 'A' and serie_id in (select id from series where nome = 'E2E Ano')",
+    );
+    const preparada = await page.request.post("/api/planilha/mensal", {
+      headers,
+      data: { turmaOriginalId: rows[0]?.id, mes: "2026-09" },
+    });
+    expect(preparada.status()).toBe(200);
+  });
+  const cartao = await abrirPlanilha(page);
+  const revisar = cartao.getByRole("button", { name: "Revisar estrutura", exact: true });
+  const conferir = cartao.getByRole("button", { name: "Conferir estrutura", exact: true });
+  await expect(revisar.or(conferir)).toBeVisible();
+  if (await revisar.isVisible()) await revisar.click();
+  await cartao.getByRole("button", { name: "Conferir estrutura", exact: true }).click();
+  await cartao.getByRole("button", { name: "Salvar estrutura", exact: true }).click();
+  await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
+  await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
+  const dialogo = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
+  await dialogo.getByText("Abas sem mês", { exact: true }).click();
+  await dialogo.getByRole("button", { name: "Conferir abas antigas", exact: true }).click();
+  const confirmar = dialogo.getByRole("button", {
+    name: "Transferir e retirar 1 aba",
+    exact: true,
+  });
+  await expect(confirmar).toBeVisible();
+  expect(google.abas()).toContain("E2E Ano A");
+  await dialogo.screenshot({ path: testInfo.outputPath("previa-aba-sem-mes.png") });
+  const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+  await confirmar.evaluate((elemento) => {
+    (elemento as HTMLButtonElement).click();
+    (elemento as HTMLButtonElement).click();
+  });
+  await expect(dialogo.getByText("Transferida e retirada", { exact: true })).toBeVisible();
+  expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+  expect(google.abas()).not.toContain("E2E Ano A");
+  const mensal = "E2E Ano A · Setembro";
+  const cabecalho = Array.from({ length: 31 }, (_, indice) => google.valor(mensal, 1, indice + 1));
+  const nomes = Array.from({ length: 4 }, (_, indice) => google.valor(mensal, indice + 1, 1));
+  expect(
+    google.valor(mensal, nomes.indexOf("E2E Aluno Um") + 1, cabecalho.indexOf("29/09/2026") + 1),
+  ).toBe("FJ");
 });

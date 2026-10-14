@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Histórico mensal da planilha permanece acessível, inclusive setembro e anos anteriores. A Gestão oferece links diretos por mês e turma e transfere as marcas das abas sem mês para os destinos preparados antes de retirá-las, com prévia, conferência de conteúdo e proteção contra divergências.
+
 - Presenças omitidas no preenchimento inicial das listas históricas: a nova migração recupera alunos da turma de origem cadastrados até o salvamento ou a importação, sem reinterpretar chamadas posteriores nem remover faltas e confirmações. Os dias corrigidos ganham revisão e auditoria e ficam pendentes de reenvio às planilhas.
 
 - Indicadores deixam de zerar quando a grade da turma ganha aulas depois do registro da chamada. Cada chamada guarda o retrato congelado das aulas previstas no dia, gravado no primeiro salvamento, e a derivação das marcas usa esse retrato em vez da grade atual; a migração reconstrói o retrato das chamadas existentes e o histórico não é reclassificado por edições de grade.
