@@ -55,7 +55,8 @@ export function paginaDocumentacao(nonce: string): string {
         displayRequestDuration: true,
         docExpansion: "list",
         filter: true,
-        persistAuthorization: true,
+        // Chaves digitadas em Authorize não ficam no navegador, que pode ser compartilhado.
+        persistAuthorization: false,
         tryItOutEnabled: true,
         withCredentials: true,
       });
