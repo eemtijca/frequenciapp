@@ -59,6 +59,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Seletores da Chamada mais compactos, com seleção discreta e anéis que mantêm os segmentos por turma mesmo em 100%. As fatias concluídas ficam verdes e as pendentes vermelhas.
+
 - Chamada Parcial volta à barra lateral, logo abaixo de Chamada, com seleção e aviso de alterações próprios no desktop e no celular.
 
 - Painel externo sai da Gestão, mantendo o acesso ao FrequenciBI na navegação lateral.

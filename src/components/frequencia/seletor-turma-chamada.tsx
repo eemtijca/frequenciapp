@@ -80,7 +80,6 @@ function AnelSerie({
   progresso: number;
 }) {
   const total = turmas.reduce((soma, item) => soma + item.esperados, 0);
-  const concluida = total > 0 && turmas.every((item) => item.concluida);
   let inicio = 0;
   return (
     <svg
@@ -89,7 +88,7 @@ function AnelSerie({
       className="absolute inset-0 size-full"
       data-progresso={disponivel && total > 0 ? progresso : undefined}
     >
-      {!disponivel || total === 0 || concluida ? (
+      {!disponivel || total === 0 ? (
         <circle
           cx="50"
           cy="50"
@@ -97,13 +96,13 @@ function AnelSerie({
           fill="none"
           stroke="currentColor"
           strokeWidth="3"
-          className={disponivel && concluida ? "text-primary" : "text-muted-foreground opacity-20"}
-          data-situacao={disponivel && concluida ? "concluida" : "indisponivel"}
+          className="text-muted-foreground opacity-20"
+          data-situacao="indisponivel"
         />
       ) : (
         turmas.map((item) => {
           const tamanho = (item.esperados * 100) / total;
-          const intervalo = turmas.length > 1 ? Math.min(1.5, tamanho / 8) : 0;
+          const intervalo = turmas.length > 1 ? Math.min(3, tamanho / 8) : 0;
           const posicao = inicio + intervalo / 2;
           inicio += tamanho;
           return (
@@ -115,6 +114,7 @@ function AnelSerie({
               fill="none"
               stroke="currentColor"
               strokeWidth="3"
+              strokeLinecap="round"
               pathLength="100"
               strokeDasharray={`${tamanho - intervalo} ${100 - tamanho + intervalo}`}
               strokeDashoffset={-posicao}
