@@ -18,13 +18,29 @@ const PUBLICAS: Record<string, string> = {
 };
 
 const GUARDA = /\bexigir(?:Capacidade|Sessao|Admin)\(/;
+/** A guarda só protege quando a recusa é devolvida antes do restante do corpo. */
+const RECUSA = /if \(!\w+\.ok\)/;
+const METODOS = "GET|HEAD|OPTIONS|POST|PUT|PATCH|DELETE";
+/** Formas de exportar manipulador que o recorte por `export async function` não enxerga. */
+const OUTRAS_FORMAS = new RegExp(
+  `\\bexport\\s+(?:(?:const|let|var)\\s+(?:${METODOS})\\b|function\\s+(?:${METODOS})\\b|\\{[^}]*\\b(?:${METODOS})\\b[^}]*\\})`,
+);
 
-function rotas(diretorio: string): string[] {
+/** Comentários não contam como guarda. */
+function semComentarios(codigo: string): string {
+  return codigo.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+function arquivosDeRota(diretorio: string): string[] {
   return readdirSync(diretorio).flatMap((nome) => {
     const caminho = path.join(diretorio, nome);
-    if (statSync(caminho).isDirectory()) return rotas(caminho);
-    return nome === "route.ts" ? [caminho] : [];
+    if (statSync(caminho).isDirectory()) return arquivosDeRota(caminho);
+    return /^route\.[cm]?[jt]sx?$/.test(nome) ? [caminho] : [];
   });
+}
+
+function rotas(diretorio: string): string[] {
+  return arquivosDeRota(diretorio).filter((caminho) => path.basename(caminho) === "route.ts");
 }
 
 interface Manipulador {
@@ -33,7 +49,7 @@ interface Manipulador {
 }
 
 function manipuladores(arquivo: string): Manipulador[] {
-  const codigo = readFileSync(arquivo, "utf8");
+  const codigo = semComentarios(readFileSync(arquivo, "utf8"));
   const rota = path.relative(RAIZ, path.dirname(arquivo)).split(path.sep).join("/");
   const partes = codigo.split(/export async function (GET|POST|PATCH|PUT|DELETE)\b/);
   const saida: Manipulador[] = [];
@@ -76,8 +92,38 @@ describe("guardas das rotas da API", () => {
         return;
       }
       expect(GUARDA.test(item.corpo)).toBe(true);
+      expect(RECUSA.test(item.corpo)).toBe(true);
     },
   );
+
+  it("declara rotas só em route.ts e manipuladores só como export async function", () => {
+    const raizApp = path.resolve("src/app");
+    const outrosArquivos = arquivosDeRota(raizApp).filter(
+      (caminho) => path.basename(caminho) !== "route.ts",
+    );
+    expect(outrosArquivos).toEqual([]);
+    const outrasFormas = arquivosDeRota(raizApp).filter((caminho) =>
+      OUTRAS_FORMAS.test(semComentarios(readFileSync(caminho, "utf8"))),
+    );
+    expect(outrasFormas.map((caminho) => path.relative(raizApp, caminho))).toEqual([]);
+  });
+
+  it("não usa server actions, que ficariam fora desta conferência", () => {
+    const pendentes: string[] = [];
+    const varrer = (diretorio: string) => {
+      for (const nome of readdirSync(diretorio)) {
+        const caminho = path.join(diretorio, nome);
+        if (statSync(caminho).isDirectory()) varrer(caminho);
+        else if (
+          /\.[jt]sx?$/.test(nome) &&
+          /^\s*["']use server["']/m.test(readFileSync(caminho, "utf8"))
+        )
+          pendentes.push(path.relative(path.resolve("src"), caminho));
+      }
+    };
+    varrer(path.resolve("src"));
+    expect(pendentes).toEqual([]);
+  });
 
   it("não decide acesso pelo papel dentro das rotas", () => {
     const porPapel = todos.filter((item) => /\.papel\s*[!=]==/.test(item.corpo));
