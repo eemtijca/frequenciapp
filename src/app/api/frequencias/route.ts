@@ -1,5 +1,6 @@
 // Frequências: consulta por dia, turma, período ou mês, e salvamento
 // compartilhado com revisão, justificativa e proteção de duplicata.
+import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
 import { after } from "next/server";
 import { feriadoDoDia } from "@/application/calendario-letivo";
 import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
@@ -78,13 +79,21 @@ export async function GET(requisicao: Request): Promise<Response> {
         listarFrequenciasDoPeriodo(dia, dia),
         feriadoDoDia(dia),
       ]);
-      return json({ frequencias, feriado });
+      return json({
+        frequencias,
+        feriado,
+        justificativasAntecipadas: feriado ? [] : await listarJustificativasAntecipadas(dia),
+      });
     }
     const [frequencia, feriado] = await Promise.all([
       carregarFrequencia(turmaId, dia),
       feriadoDoDia(dia),
     ]);
-    return json({ frequencia, feriado });
+    return json({
+      frequencia,
+      feriado,
+      justificativasAntecipadas: feriado ? [] : await listarJustificativasAntecipadas(dia, turmaId),
+    });
   });
 }
 

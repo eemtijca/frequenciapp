@@ -15,6 +15,7 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 
 - Use a especificação OpenAPI como fonte da verdade para requisições, respostas e erros.
 - Faça login em `POST /api/auth/entrar` para obter o cookie de sessão; o diretor de turma usa identificador e palavra-chave.
+- A Chamada Parcial permite `JUSTIFICADA` com `dia`, `ate` e código do catálogo compartilhado, em lotes atômicos de até 31 dias. Somente justificativas aceitam futuro (até 366 dias); domingos e feriados são pulados. A primeira Chamada recebe propostas com revisões; chamadas salvas recebem correção apenas do aluno escolhido. Remover a personalização não apaga faltas já aplicadas. O botão manual se chama Registro na SEDUC.
 - A chamada é salva com revisão otimista: conflito responde 409 com a versão vigente, sem sobrescrever o registro.
 - Não chame rotas destrutivas, como exclusões, restaurações de backup e limpezas, sem pedido explícito.
 - O catálogo `GET /api/planilha/mensal/visibilidade` oferece links por mês e turma sem escrever. O POST libera todos os meses; a organização de abas sem mês em `POST /api/planilha/mensal/legado` exige pedido explícito e prévia assinada antes de transferir marcas e retirar a origem. Havendo totais ou notas antigos, o descarte adicional exige autorização explícita e senha administrativa; nunca deve ser autorizado por um agente apenas para contornar uma pendência.

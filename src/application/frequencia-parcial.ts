@@ -1,16 +1,24 @@
-// Registro independente de presenças personalizadas, com revisão otimista e
-// confirmação manual do lançamento na Seduc invalidada após uma correção.
+// Presenças personalizadas e justificativas por período, com revisão otimista
+// e confirmação manual do lançamento na SEDUC invalidada após correções.
+import { aplicarJustificativaEmChamadasSalvas } from "@/application/justificativas-antecipadas";
 import { z } from "zod";
-import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
+import type { Prisma, FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
-import { diaLocal, ehDiaValido, ehDomingo } from "@/domain/frequencia";
-import type { Identidade } from "@/domain/usuarios";
-import { exigirDiaLetivo } from "@/application/calendario-letivo";
 import {
+  diaLocal,
+  ehDiaValido,
+  ehDomingo,
+  diasEntre,
+  JUSTIFICATIVA_OUTROS,
+} from "@/domain/frequencia";
+import type { Identidade } from "@/domain/usuarios";
+import { exigirDiaLetivo, travarCalendario } from "@/application/calendario-letivo";
+import {
+  limiteAgendamentoParcial,
   LIMITE_AULAS_PARCIAL,
   LIMITE_OBSERVACAO_PARCIAL,
   normalizarAulas,
@@ -22,9 +30,11 @@ export const esquemaRegistroParcial = z
     alunoId: z.uuid("Aluno inválido."),
     turmaId: z.uuid("Turma inválida.").optional(),
     dia: z.string().refine(ehDiaValido, "Data inválida."),
+    ate: z.string().refine(ehDiaValido, "Data final inválida.").optional(),
+    justificativa: z.string().trim().min(1).max(10).nullable().optional(),
     tipo: z.enum(
-      ["DIA_INTEIRO", "TURNO", "AULAS"],
-      "Escolha o dia inteiro, turno ou as aulas frequentadas.",
+      ["DIA_INTEIRO", "TURNO", "AULAS", "JUSTIFICADA"],
+      "Escolha a presença personalizada ou a justificativa.",
     ),
     turno: z.enum(["MANHA", "TARDE"]).nullable().optional(),
     aulas: z
@@ -40,6 +50,33 @@ export const esquemaRegistroParcial = z
   })
   .strict()
   .superRefine((dados, ctx) => {
+    if (
+      dados.tipo === "JUSTIFICADA" &&
+      (!dados.justificativa ||
+        dados.turno ||
+        dados.aulas.length ||
+        (dados.observacao?.length ?? 0) > 200)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Escolha a justificativa do dia inteiro, com observação de até 200 caracteres.",
+      });
+    if (
+      dados.tipo !== "JUSTIFICADA" &&
+      (dados.justificativa || (dados.ate && dados.ate !== dados.dia))
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "O período e a justificativa são exclusivos da ausência justificada.",
+      });
+    if (
+      dados.ate &&
+      (dados.ate < dados.dia || (Date.parse(dados.ate) - Date.parse(dados.dia)) / 86_400_000 > 30)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Escolha um período de até 31 dias, em ordem de data.",
+      });
     if (dados.tipo === "DIA_INTEIRO" && (dados.turno || dados.aulas.length))
       ctx.addIssue({
         code: "custom",
@@ -83,6 +120,7 @@ function apresentar(linha: LinhaParcial): FrequenciaParcial {
     turmaNome: linha.turmaNome,
     dia: linha.dia.toISOString().slice(0, 10),
     tipo: linha.tipo,
+    justificativa: linha.justificativa,
     turno: linha.turno,
     aulas: linha.aulas,
     observacao: linha.observacao,
@@ -114,6 +152,124 @@ export async function listarFrequenciasParciais(
   return linhas.map(apresentar);
 }
 
+function validarDataParcial(dados: z.output<typeof esquemaRegistroParcial>) {
+  const hoje = diaLocal(new Date(), ambiente.fuso);
+  if (dados.dia > hoje && dados.tipo !== "JUSTIFICADA")
+    throw new ErroHttp(
+      "Datas futuras permitem apenas justificativas, sem antecipar presenças.",
+      400,
+    );
+  if ((dados.ate ?? dados.dia) > limiteAgendamentoParcial(hoje))
+    throw new ErroHttp("Agende justificativas para até um ano à frente.", 400);
+}
+async function conferirJustificativa(tx: Prisma.TransactionClient, codigo: string | null) {
+  if (
+    codigo &&
+    !(await tx.justificativa.findFirst({ where: { codigo }, select: { codigo: true } }))
+  )
+    throw new ErroHttp("A justificativa não está no catálogo. Recarregue a lista e confira.", 400);
+}
+
+/** Grava o intervalo inteiro ou nada, sem sobrescrever registros já existentes. */
+export async function salvarPeriodoParcial(
+  identidade: Identidade,
+  entrada: unknown,
+): Promise<FrequenciaParcial[]> {
+  const validacao = esquemaRegistroParcial.safeParse(entrada);
+  if (!validacao.success)
+    throw new ErroHttp(validacao.error.issues[0]?.message ?? "Registro inválido.", 400);
+  const dados = validacao.data;
+  if (!dados.ate || dados.ate === dados.dia)
+    return [await salvarFrequenciaParcial(identidade, entrada)];
+  validarDataParcial(dados);
+  if (dados.tipo !== "JUSTIFICADA" || !dados.justificativa || dados.revisao || dados.baseChamada)
+    throw new ErroHttp(
+      "Crie o período como uma nova justificativa; edite registros existentes por dia.",
+      400,
+    );
+  try {
+    const linhas = await comTransacao(
+      async (tx) => {
+        // A trava compartilhada cobre todo o intervalo e vem antes das consultas.
+        await travarCalendario(tx, "SHARE");
+        await conferirJustificativa(tx, dados.justificativa ?? null);
+        const aluno = await tx.aluno.findUnique({
+          where: { id: dados.alunoId },
+          include: { turma: { include: { serie: true } } },
+        });
+        if (!aluno) throw new ErroHttp("Aluno não encontrado.", 404);
+        if (!aluno.ativo || (dados.turmaId && aluno.turmaId !== dados.turmaId))
+          throw new ErroHttp("O cadastro do aluno mudou. Recarregue a lista.", 409);
+        const feriados = new Set(
+          (
+            await tx.feriado.findMany({
+              where: {
+                dia: {
+                  gte: new Date(`${dados.dia}T12:00:00Z`),
+                  lte: new Date(`${dados.ate}T12:00:00Z`),
+                },
+              },
+              select: { dia: true },
+            })
+          ).map((f) => f.dia.toISOString().slice(0, 10)),
+        );
+        const dias = diasEntre(dados.dia, dados.ate ?? dados.dia).filter(
+          (dia) => !ehDomingo(dia) && !feriados.has(dia),
+        );
+        if (!dias.length)
+          throw new ErroHttp("O período não tem dias disponíveis para justificar.", 400);
+        const desistenteEm = aluno.desistenteEm?.toISOString().slice(0, 10);
+        if (desistenteEm && dias.some((dia) => dia >= desistenteEm))
+          throw new ErroHttp("O aluno está desistente em parte do período. Confira as datas.", 409);
+        const datas = dias.map((dia) => new Date(`${dia}T12:00:00Z`));
+        if (await tx.frequenciaParcial.count({ where: { alunoId: aluno.id, dia: { in: datas } } }))
+          throw new ErroHttp(
+            "Já há registros no período. Ajuste as datas ou edite cada dia, sem sobrescrever o histórico.",
+            409,
+          );
+        const criadas = await tx.frequenciaParcial.createManyAndReturn({
+          data: datas.map((dia) => ({
+            alunoId: aluno.id,
+            dia,
+            turmaId: aluno.turmaId,
+            alunoNome: aluno.nome,
+            turmaNome: `${aluno.turma.serie.nome} ${aluno.turma.nome}`,
+            tipo: "JUSTIFICADA",
+            justificativa: dados.justificativa,
+            turno: null,
+            aulas: [],
+            observacao:
+              dados.justificativa === JUSTIFICATIVA_OUTROS ? dados.observacao || null : null,
+            criadoPorId: identidade.id,
+            atualizadoPorId: identidade.id,
+          })),
+        });
+        await aplicarJustificativaEmChamadasSalvas(
+          tx,
+          aluno.id,
+          datas,
+          dados.justificativa ?? "",
+          dados.justificativa === JUSTIFICATIVA_OUTROS ? dados.observacao || null : null,
+          identidade.id,
+        );
+        await auditar(
+          tx,
+          identidade.id,
+          "parcial.justificarPeriodo",
+          `aluno:${aluno.id}:${dados.dia}:${dados.ate}`,
+        );
+        return criadas;
+      },
+      { timeout: 15_000 },
+    );
+    return linhas.sort((a, b) => a.dia.getTime() - b.dia.getTime()).map(apresentar);
+  } catch (erro) {
+    if (ehDuplicidade(erro))
+      throw new ErroHttp("O período recebeu outro registro. Recarregue antes de continuar.", 409);
+    throw erro;
+  }
+}
+
 export async function salvarFrequenciaParcial(
   identidade: Identidade,
   entrada: unknown,
@@ -122,18 +278,23 @@ export async function salvarFrequenciaParcial(
   if (!dados.success)
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Registro inválido.", 400);
   if (ehDomingo(dados.data.dia)) throw new ErroHttp("Domingo não tem aula nem chamada.", 400);
-  if (dados.data.dia > diaLocal(new Date(), ambiente.fuso))
-    throw new ErroHttp("Não é possível registrar frequência parcial em dia futuro.", 400);
+  validarDataParcial(dados.data);
+
   const valores = {
     tipo: dados.data.tipo,
+    justificativa: dados.data.tipo === "JUSTIFICADA" ? (dados.data.justificativa ?? null) : null,
     turno: dados.data.tipo === "TURNO" ? (dados.data.turno ?? null) : null,
     aulas: dados.data.tipo === "AULAS" ? normalizarAulas(dados.data.aulas) : [],
-    observacao: dados.data.observacao || null,
+    observacao:
+      dados.data.tipo === "JUSTIFICADA" && dados.data.justificativa !== JUSTIFICATIVA_OUTROS
+        ? null
+        : dados.data.observacao || null,
   };
   const dia = new Date(`${dados.data.dia}T12:00:00Z`);
   try {
     const salva = await comTransacao(async (tx) => {
       await exigirDiaLetivo(dados.data.dia, tx);
+      await conferirJustificativa(tx, valores.justificativa);
       const existente = await tx.frequenciaParcial.findUnique({
         where: { alunoId_dia: { alunoId: dados.data.alunoId, dia } },
       });
@@ -144,6 +305,7 @@ export async function salvarFrequenciaParcial(
           throw new ErroHttp("A turma do registro mudou. Recarregue a lista.", 409);
         if (
           existente.tipo === valores.tipo &&
+          existente.justificativa === valores.justificativa &&
           existente.turno === valores.turno &&
           JSON.stringify(existente.aulas) === JSON.stringify(valores.aulas) &&
           existente.observacao === valores.observacao
@@ -161,6 +323,15 @@ export async function salvarFrequenciaParcial(
             registradoSeducPorNome: null,
           },
         });
+        if (valores.justificativa)
+          await aplicarJustificativaEmChamadasSalvas(
+            tx,
+            existente.alunoId,
+            [dia],
+            valores.justificativa,
+            valores.observacao,
+            identidade.id,
+          );
         await auditar(tx, identidade.id, "parcial.corrigir", `parcial:${existente.id}`);
         return atualizada;
       }
@@ -227,6 +398,15 @@ export async function salvarFrequenciaParcial(
           atualizadoPorId: identidade.id,
         },
       });
+      if (valores.justificativa)
+        await aplicarJustificativaEmChamadasSalvas(
+          tx,
+          aluno.id,
+          [dia],
+          valores.justificativa,
+          valores.observacao,
+          identidade.id,
+        );
       await auditar(tx, identidade.id, "parcial.criar", `parcial:${criada.id}`);
       return criada;
     });

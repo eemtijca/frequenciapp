@@ -2832,7 +2832,7 @@
             "$ref": "#/components/responses/Erro404"
           },
           "409": {
-            "description": "Duplicata ou revisão obsoleta, com a versão vigente.",
+            "description": "Revisão obsoleta com a versão vigente, ou propostas alteradas com codigo JUSTIFICATIVAS_ALTERADAS, sem gravação.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3176,12 +3176,12 @@
       },
       "post": {
         "operationId": "salvarFrequenciaParcial",
-        "summary": "Salvar uma presença personalizada",
-        "description": "Sessão da equipe, com origem confiável. Para corrigir um registro existente por aluno e dia, a revisão vigente é obrigatória.",
+        "summary": "Salvar presença personalizada ou justificativa por período",
+        "description": "Sessão da equipe, com origem confiável. JUSTIFICADA usa o catálogo da Chamada. Aplica FJ ao aluno em chamadas existentes, com nova revisão, ou fornece propostas para a primeira Chamada sem antecipar presenças. Lote é atômico; remover a personalização preserva a falta já aplicada na Chamada.",
         "tags": ["frequencias-parciais"],
         "requestBody": {
           "required": true,
-          "description": "Presença personalizada.",
+          "description": "Personalização individual ou novo período de justificativa.",
           "content": {
             "application/json": {
               "schema": {
@@ -3205,6 +3205,16 @@
                     "tipo": "AULAS",
                     "aulas": [1, 2],
                     "observacao": "Chegou após o intervalo."
+                  }
+                },
+                "Justificativa por período": {
+                  "summary": "Justificativa por período",
+                  "value": {
+                    "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                    "dia": "2026-10-13",
+                    "ate": "2026-10-16",
+                    "tipo": "JUSTIFICADA",
+                    "justificativa": "CM"
                   }
                 }
               }
@@ -11476,7 +11486,7 @@
           },
           "codigo": {
             "type": "string",
-            "description": "Código estável, usado pelos erros da integração com o Google.",
+            "description": "Código estável dos erros da integração ou JUSTIFICATIVAS_ALTERADAS quando as propostas da primeira Chamada mudaram.",
             "example": "GOOGLE_RECONECTAR"
           },
           "conflito": {
@@ -13053,6 +13063,14 @@
                 }
               ]
             }
+          },
+          "justificativasAntecipadas": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/components/schemas/RevisaoJustificativaAntecipada"
+            },
+            "description": "Na primeira chamada, revisões das propostas conferidas. Divergência responde 409 JUSTIFICATIVAS_ALTERADAS. Lista atual autoriza a edição explícita; omissão aplica as propostas automaticamente para clientes legados."
           }
         }
       },
@@ -13162,7 +13180,7 @@
       "FrequenciaParcial": {
         "type": "object",
         "title": "Frequência parcial",
-        "description": "Presença personalizada de um aluno em um dia, com nomes históricos do momento da criação.",
+        "description": "Presença personalizada ou ausência justificada por aluno e dia, com nomes históricos.",
         "required": ["id", "alunoId", "dia", "turmaId", "tipo", "revisao"],
         "properties": {
           "id": {
@@ -13197,7 +13215,7 @@
           },
           "tipo": {
             "type": "string",
-            "enum": ["DIA_INTEIRO", "TURNO", "AULAS"],
+            "enum": ["DIA_INTEIRO", "TURNO", "AULAS", "JUSTIFICADA"],
             "example": "AULAS"
           },
           "turno": {
@@ -13273,6 +13291,24 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-10-13T17:30:00.000Z"
+          },
+          "justificativa": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Código estável do catálogo compartilhado com a Chamada. Obrigatório para JUSTIFICADA.",
+            "example": "CM"
+          },
+          "justificativaRotulo": {
+            "type": ["string", "null"],
+            "description": "Rótulo do catálogo, incluído na consulta de frequências personalizadas.",
+            "example": "Consulta Médica"
           }
         }
       },
@@ -13376,6 +13412,24 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-10-13T17:30:00.000Z"
+          },
+          "justificativa": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Código estável do catálogo compartilhado com a Chamada. Obrigatório para JUSTIFICADA.",
+            "example": "CM"
+          },
+          "observacao": {
+            "type": ["string", "null"],
+            "description": "Observação única das faltas da base; null se houver motivos diferentes.",
+            "example": null
           }
         }
       },
@@ -13394,7 +13448,7 @@
       "FrequenciaParcialCorpo": {
         "type": "object",
         "title": "Corpo de frequência parcial",
-        "description": "Presença personalizada por dia inteiro, turno ou aulas. A revisão é obrigatória para corrigir um registro existente.",
+        "description": "Presença personalizada até hoje ou justificativa por período de até 31 dias, limitada a 366 dias à frente. Domingos e feriados são pulados no período. Sobreposição recusa o lote inteiro; correções individuais exigem revisão vigente.",
         "required": ["alunoId", "dia", "tipo"],
         "properties": {
           "alunoId": {
@@ -13415,7 +13469,7 @@
           },
           "tipo": {
             "type": "string",
-            "enum": ["DIA_INTEIRO", "TURNO", "AULAS"],
+            "enum": ["DIA_INTEIRO", "TURNO", "AULAS", "JUSTIFICADA"],
             "example": "TURNO"
           },
           "turno": {
@@ -13450,7 +13504,8 @@
                 "type": "null"
               }
             ],
-            "example": "Chegou após o intervalo."
+            "example": "Chegou após o intervalo.",
+            "description": "Até 300 caracteres em presenças; até 200 em JUSTIFICADA, guardada somente para Outros."
           },
           "revisao": {
             "type": "integer",
@@ -13472,6 +13527,25 @@
                 "example": 3
               }
             }
+          },
+          "justificativa": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Código estável do catálogo compartilhado com a Chamada. Obrigatório para JUSTIFICADA.",
+            "example": "CM"
+          },
+          "ate": {
+            "type": "string",
+            "format": "date",
+            "description": "Fim inclusivo, somente para criar um período JUSTIFICADA. Sem este campo, salva apenas dia.",
+            "example": "2026-10-16"
           }
         }
       },
@@ -16670,6 +16744,13 @@
                 "type": "null"
               }
             ]
+          },
+          "justificativasAntecipadas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JustificativaAntecipada"
+            },
+            "description": "Propostas da data até hoje, pela turma atual do aluno. Vazio em feriados ou datas futuras; não grava chamada."
           }
         }
       },
@@ -16696,6 +16777,13 @@
                 "type": "null"
               }
             ]
+          },
+          "justificativasAntecipadas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JustificativaAntecipada"
+            },
+            "description": "Propostas da data até hoje, pela turma atual do aluno. Vazio em feriados ou datas futuras; não grava chamada."
           }
         }
       },
@@ -16748,6 +16836,18 @@
         "properties": {
           "registro": {
             "$ref": "#/components/schemas/FrequenciaParcial"
+          },
+          "registros": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrequenciaParcial"
+            },
+            "description": "Todos os dias salvos no POST por período, em ordem. registro preserva o primeiro para compatibilidade."
+          },
+          "aviso": {
+            "type": "string",
+            "description": "Justificativa já salva; falha posterior ao preparar a fila exige conferir o envio, sem repetir o registro.",
+            "example": "Justificativa salva. Confira o envio automático em Gestão e reenvie pela prévia se necessário."
           }
         }
       },
@@ -17614,6 +17714,60 @@
             "additionalProperties": false
           }
         ]
+      },
+      "RevisaoJustificativaAntecipada": {
+        "type": "object",
+        "title": "Revisão da justificativa antecipada",
+        "additionalProperties": false,
+        "required": ["id", "revisao"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b9c"
+          },
+          "revisao": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          }
+        }
+      },
+      "JustificativaAntecipada": {
+        "type": "object",
+        "title": "Justificativa proposta para a Chamada",
+        "required": ["id", "revisao", "alunoId", "turmaId", "justificativa", "observacao"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b9c"
+          },
+          "revisao": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 1
+          },
+          "alunoId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          },
+          "turmaId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "justificativa": {
+            "type": "string",
+            "example": "CM"
+          },
+          "observacao": {
+            "type": ["string", "null"],
+            "maxLength": 200,
+            "example": null
+          }
+        }
       }
     }
   }

@@ -236,13 +236,21 @@ describe("calendário escolar por ano", () => {
         cookieEquipe,
       );
       expect(leitura.status).toBe(200);
-      expect(await leitura.json()).toEqual({ frequencia: null, feriado });
+      expect(await leitura.json()).toEqual({
+        frequencia: null,
+        feriado,
+        justificativasAntecipadas: [],
+      });
     }
     expect(
       (await chamar("/api/frequencias-parciais", "POST", parcial(), cookieEquipe)).status,
     ).toBe(400);
     const escola = await chamar(`/api/frequencias?dia=${dia}`, "GET", undefined, cookieEquipe);
-    expect(await escola.json()).toEqual({ frequencias: [], feriado });
+    expect(await escola.json()).toEqual({
+      frequencias: [],
+      feriado,
+      justificativasAntecipadas: [],
+    });
     expect(
       (await banco.query("select id from frequencias where dia = $1", [dia])).rows,
     ).toHaveLength(0);
@@ -302,7 +310,11 @@ describe("calendário escolar por ano", () => {
       undefined,
       cookieEquipe,
     );
-    expect(await leitura.json()).toEqual({ frequencia: original, feriado: null });
+    expect(await leitura.json()).toEqual({
+      frequencia: original,
+      feriado: null,
+      justificativasAntecipadas: [],
+    });
     expect((await listar()).some((item) => item.dia === original.dia)).toBe(false);
   });
 

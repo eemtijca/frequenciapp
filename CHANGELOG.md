@@ -12,6 +12,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Seletores da Chamada passam a usar retângulos com cantos arredondados, nome, porcentagem e barra de progresso, sem contagem visível de alunos. A série avança conforme as turmas são salvas; cada turma indica pendência ou conclusão. Seleção azul, temas, teclado e estados neutros permanecem acessíveis.
 
+- Chamada Parcial agenda justificativas por início e fim com o catálogo da Chamada e calendário futuro exclusivo. Períodos de até 31 dias pulam domingos e feriados e recusam sobreposição sem gravar parte do lote. Motivos aparecem na primeira Chamada e corrigem apenas o aluno em chamadas salvas, com revisão e histórico preservados. A confirmação manual passa a se chamar Registro na SEDUC. A cópia JSON preserva os novos registros.
+
 - A série selecionada na Chamada recebe anel externo azul de 2 pixels, com foco de teclado destacado e respeito ao alto contraste, preservando as cores dos segmentos de progresso.
 
 - Seção Proteção de dados e LGPD em Sobre, com aprovação institucional e consentimento informados pela escola, salvaguardas existentes, orientação para solicitações e link para o tratamento dos dados.

@@ -86,7 +86,7 @@ O registro trata aluno, turma do registro, data, horário, momento, motivo, resp
 
 ## Chamada Parcial
 
-A presença parcial trata identificação do aluno, data, turno ou aulas frequentadas, nome e turma históricos, observação curta, revisão e autoria. A confirmação manual "Registrado na Seduc" acrescenta data e nome da conta que confirmou o lançamento externo. Corrigir presença ou observação limpa a confirmação e exige nova conferência pela equipe. Administração e coordenação operam esses registros; diretores de turma não consultam nem alteram a Chamada Parcial.
+A presença parcial trata identificação do aluno, data, turno ou aulas frequentadas, nome e turma históricos, observação curta, revisão e autoria. A confirmação manual "Registro na SEDUC" acrescenta data e nome da conta que confirmou o lançamento externo. Corrigir presença ou observação limpa a confirmação e exige nova conferência pela equipe. Administração e coordenação operam esses registros; diretores de turma não consultam nem alteram a Chamada Parcial.
 
 Nome do aluno e turma são preservados para interpretar o registro depois de transferência ou renomeação. A exclusão do aluno remove seus registros parciais em cascata. A exclusão da conta anula suas referências, preservando o nome histórico da confirmação conforme a política de retenção da escola. A auditoria recebe somente ação e identificador do registro, sem nomes ou observações de alunos.
 
@@ -102,4 +102,10 @@ A integração Looker Studio exporta somente contagens agregadas para arquivo se
 
 Finalidade: acompanhamento escolar e análise interna de frequência e movimentações. O BI disponibiliza à equipe autorizada nomes de alunos, observações, motivos, autoria e confirmação Seduc. A administração controla acesso por chaves nomeadas, escopos e validade; nenhuma publicação pública é criada. O painel externo agregado continua separado.
 
-Personalização e chave permanecem no navegador da pessoa autorizada. Dados consultados são retidos no IndexedDB até a limpeza explícita, sem envio a terceiros. O dispositivo e os arquivos exportados devem permanecer sob guarda da equipe. Exportações pessoais exigem confirmação e saem sem ZIP. Revogação impede consultas novas, sem apagar arquivos e retratos offline já baixados. A interface mostra a data do retrato e permite esquecer a chave, limpar dados e limpar toda a personalização. Solicitações de acesso, correção e eliminação seguem os procedimentos da escola e as limitações legais de preservação do histórico descritas neste documento.
+Personalização e chave permanecem no navegador da pessoa autorizada. Dados consultados são retidos no IndexedDB até a limpeza explícita, sem envio a terceiros. O dispositivo e os arquivos exportados devem permanecer sob guarda da equipe. Exportações pessoais exigem confirmação. Revogação impede consultas novas, sem apagar arquivos e retratos offline já baixados. A interface mostra a data do retrato e permite esquecer a chave, limpar dados e limpar toda a personalização. Solicitações de acesso, correção e eliminação seguem os procedimentos da escola e as limitações legais de preservação do histórico descritas neste documento.
+
+### Justificativas antecipadas
+
+A Chamada Parcial compartilha o catálogo da chamada diária e permite agendar uma ausência justificada por período. Guarda código do motivo e, somente em Outros, observação de até 200 caracteres. Justificativas podem revelar informação sensível; a equipe deve registrar apenas o necessário, sem diagnóstico, laudos ou detalhes clínicos. O registro tem as mesmas permissões, auditoria e política de retenção das frequências, incluindo a cópia escolar.
+
+A integração não cria destinos externos nem acesso de IA. Quando a sincronização existente está habilitada, motivos e observações seguem as regras já documentadas da planilha escolar. O agendamento não cria presenças nem chamadas antecipadas. Justificativas aplicadas ao histórico permanecem até correção explícita na Chamada, mesmo após remoção da personalização, evitando apagar histórico sem conferência.

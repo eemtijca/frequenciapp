@@ -13,6 +13,8 @@ export interface FrequenciaDaChamada {
   marca: Marca;
   descricao: string;
   justificativas: string[];
+  justificativa?: string | null;
+  observacao?: string | null;
   registradoSeduc: boolean;
   registradoSeducEm: string | null;
   registradoSeducPorNome: string | null;

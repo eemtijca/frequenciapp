@@ -215,3 +215,9 @@ A migração `saida_horario` acrescenta `saidas_antecipadas.horario` (`VARCHAR(5
 A migração `20261003011539_confirmacao_seduc_chamada` acrescenta confirmação, data, nome e referência do responsável e revisão própria a `alunos_chamada`. As chamadas existentes começam sem confirmação. A chave composta de frequência e aluno mantém a confirmação vinculada à lista histórica, independente da presença ou falta. Remover a conta preserva o nome do responsável, com a referência anulada.
 
 A operação usa transação serializável e confere tanto a revisão da frequência como `revisao_seduc`. Corrigir a frequência invalida apenas os alunos afetados. A revisão e o horário da chamada não mudam ao confirmar a Seduc. A interface de confirmação fica na Chamada Parcial; os dados existentes continuam nesta tabela quando não há personalização. Uma personalização ou outra chamada mais recente usada como base impede confirmar a versão diária anterior. Detalhes na [ADR-035](adr/035-seduc-na-chamada-normal.md).
+
+## Justificativas por período
+
+A migração `20261015140013_justificativas_antecipadas` acrescenta `JUSTIFICADA` ao enum `tipo_frequencia_parcial` e a coluna anulável `justificativa` (varchar de 10) em `frequencias_parciais`. Registros anteriores mantêm o significado e a coluna nula. Aplicar pelo fluxo de migrações antes de usar a nova opção; o build da Vercel não migra o banco.
+
+A gravação de um intervalo é serializável e atômica, com trava compartilhada do calendário antes das leituras. Sobreposição não sobrescreve personalizações. A correção da Chamada preserva o retrato e a lista, muda apenas faltas do aluno escolhido e incrementa a revisão. A exclusão de um motivo consulta também as justificativas parciais dentro da transação. A cópia JSON guarda o novo código e continua aceitando cópias antigas sem esse campo. Ver [ADR-046](adr/046-justificativas-antecipadas.md).

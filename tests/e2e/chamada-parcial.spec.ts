@@ -1,8 +1,20 @@
 // Chamada parcial independente, confirmação manual na Seduc e revisão de conflitos.
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { diaDeChamada } from "./helpers/dia";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { diaCorrente, diaDeChamada } from "./helpers/dia";
+import {
+  aguardarHidratacao,
+  trocarVisao,
+  escolherTurmaNaChamada,
+  liberarSabadoSeNecessario,
+} from "./helpers/pagina";
+import {
+  diaDeChamadaVizinho,
+  diasEntre,
+  ehDomingo,
+  nomeDoMes,
+  rotuloMes,
+} from "@/domain/frequencia";
 
 test.use({ serviceWorkers: "block" });
 
@@ -231,7 +243,7 @@ test("confirma a Seduc, mantém a confirmação após recarga e exige novo lanç
   const antes = await (
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
   ).json();
-  await linha.getByRole("switch", { name: "RS, Registrado na Seduc: E2E Parcial Um" }).click();
+  await linha.getByRole("switch", { name: "Registro na SEDUC: E2E Parcial Um" }).click();
   await expect(linha.getByRole("switch")).toBeChecked();
   await expect(linha.getByText(/Confirmado por/)).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.registradoSeducEm).not.toBeNull();
@@ -279,10 +291,14 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   const dia = salvo?.dia ?? "";
   const diariaAntes = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
   expect(diariaAntes.ok()).toBe(true);
-  expect(await diariaAntes.json()).toEqual({ frequencia: null, feriado: null });
+  expect(await diariaAntes.json()).toEqual({
+    frequencia: null,
+    feriado: null,
+    justificativasAntecipadas: [],
+  });
 
   const confirmacao = linha.getByRole("switch", {
-    name: "RS, Registrado na Seduc: E2E Parcial Um",
+    name: "Registro na SEDUC: E2E Parcial Um",
     exact: true,
   });
   await confirmacao.click();
@@ -312,7 +328,11 @@ test("registra o dia inteiro sem chamada diária e exige reconfirmação ao ajus
   });
   const diariaDepois = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
   expect(diariaDepois.ok()).toBe(true);
-  expect(await diariaDepois.json()).toEqual({ frequencia: null, feriado: null });
+  expect(await diariaDepois.json()).toEqual({
+    frequencia: null,
+    feriado: null,
+    justificativasAntecipadas: [],
+  });
 });
 
 test("marca um intervalo e permite retirar aulas específicas antes de salvar", async ({ page }) => {
@@ -510,4 +530,147 @@ test("refaz a prévia ao incluir atualizações de registros já enviados", asyn
   await expect(enviar).toBeHidden();
   expect(simulacoes).toBe(2);
   expect(corpoEnviado).toMatchObject({ atualizarExistentes: true, planoHash: "b".repeat(64) });
+});
+
+async function escolherData(page: Page, id: string, rotulo: string, de: string, para: string) {
+  await page.locator(`#${id}`).click();
+  const calendario = page.getByRole("dialog", { name: rotulo, exact: true });
+  let mes = de.slice(0, 7);
+  while (mes !== para.slice(0, 7)) {
+    const passo = mes < para.slice(0, 7) ? 1 : -1;
+    await calendario
+      .getByRole("button", { name: passo > 0 ? "Mês seguinte" : "Mês anterior", exact: true })
+      .click();
+    const data = new Date(`${mes}-15T12:00:00Z`);
+    data.setUTCMonth(data.getUTCMonth() + passo);
+    mes = data.toISOString().slice(0, 7);
+  }
+  await expect(
+    calendario.getByRole("group", { name: `Dias de ${rotuloMes(mes)}`, exact: true }),
+  ).toBeVisible();
+  await calendario
+    .getByRole("button", {
+      name: new RegExp(
+        `^${Number(para.slice(8))} de ${nomeDoMes(mes).toLowerCase()} de ${para.slice(0, 4)}`,
+      ),
+    })
+    .click();
+  await expect(calendario).toBeHidden();
+}
+
+test("agenda uma justificativa futura por início e fim, sem criar presenças e com calendário responsivo", async ({
+  page,
+}, info) => {
+  await page.setViewportSize({
+    width: info.project.name === "mobile-chrome" ? 320 : 1280,
+    height: 850,
+  });
+  const secao = await abrirParcial(page);
+  const de = diaDeChamadaVizinho(diaCorrente(), 1);
+  const ate = diaDeChamadaVizinho(diaDeChamadaVizinho(de, 1), 1);
+  await escolherData(page, "dia-chamada-parcial", "Data da chamada parcial", diaDeChamada(), de);
+  await secao
+    .getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um", exact: true })
+    .click();
+  const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial", exact: true });
+  await expect(dialogo.getByRole("radio", { name: "Dia inteiro", exact: true })).toBeDisabled();
+  await expect(dialogo.getByRole("radio", { name: "Justificativa", exact: true })).toBeChecked();
+  await escolherData(page, "parcial-justificativa-ate", "Data final da justificativa", de, ate);
+  await dialogo.locator("#parcial-justificativa").click();
+  await page.getByRole("option", { name: "Outros", exact: true }).click();
+  await dialogo.locator("#parcial-observacao").fill("E2E Motivo do período");
+  const largura = await dialogo.evaluate((e) => ({
+    caixa: e.getBoundingClientRect().width,
+    interna: e.scrollWidth,
+    tela: innerWidth,
+  }));
+  expect(largura.caixa).toBeLessThanOrEqual(largura.tela);
+  expect(largura.interna).toBeLessThanOrEqual(Math.ceil(largura.caixa));
+  await dialogo.screenshot({ path: info.outputPath("justificativa-por-periodo.png") });
+  await dialogo.getByRole("button", { name: "Salvar justificativa", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+  const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
+  await expect(linha.getByText("Outros: E2E Motivo do período", { exact: true })).toBeVisible();
+  await expect(
+    linha.getByRole("switch", { name: "Registro na SEDUC: E2E Parcial Um", exact: true }),
+  ).toBeVisible();
+  const r = await page.request.get(
+    `/api/frequencias-parciais?de=${de}&ate=${ate}&turmaId=${turmaId}`,
+  );
+  const registros = (await r.json()).registros as {
+    dia: string;
+    tipo: string;
+    justificativa: string;
+  }[];
+  expect(registros.map((item) => item.dia)).toEqual(
+    diasEntre(de, ate).filter((dia) => !ehDomingo(dia)),
+  );
+  expect(registros.every((item) => item.tipo === "JUSTIFICADA" && item.justificativa === "O")).toBe(
+    true,
+  );
+  await comBanco(async (cliente) => {
+    expect(
+      (await cliente.query("select id from frequencias where turma_id=$1", [turmaId])).rowCount,
+    ).toBe(0);
+  });
+  await secao.locator("#dia-chamada-parcial").click();
+  await page
+    .getByRole("dialog", { name: "Data da chamada parcial", exact: true })
+    .getByRole("button", { name: "Hoje", exact: true })
+    .click();
+  await expect(secao.locator("#dia-chamada-parcial")).toHaveAttribute(
+    "aria-label",
+    new RegExp(diaDeChamada().split("-").reverse().join("/")),
+  );
+});
+
+test("preenche a primeira Chamada com o motivo agendado e mantém datas futuras bloqueadas na Chamada", async ({
+  page,
+}) => {
+  const dia = diaDeChamada();
+  const salva = await page.request.post("/api/frequencias-parciais", {
+    data: {
+      alunoId,
+      turmaId,
+      dia,
+      tipo: "JUSTIFICADA",
+      justificativa: "O",
+      observacao: "E2E Justificativa antecipada",
+    },
+  });
+  expect(salva.ok()).toBe(true);
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Chamada", "chamada");
+  const chamada = page.getByRole("region", { name: "Fazer chamada", exact: true });
+  await escolherTurmaNaChamada(chamada, /E2E Parcial A/);
+  await liberarSabadoSeNecessario(chamada);
+  await expect(chamada.locator(`#justificativa-${alunoId}`)).toContainText("Outros");
+  await expect(
+    chamada.getByRole("textbox", { name: "Observação da falta de E2E Parcial Um", exact: true }),
+  ).toHaveValue("E2E Justificativa antecipada");
+  const antes = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
+  expect((await antes.json()).frequencia).toBeNull();
+  await chamada.locator("#dia-frequencia").click();
+  const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
+  const futuro = diaDeChamadaVizinho(dia, 1);
+  if (futuro.slice(0, 7) === dia.slice(0, 7)) {
+    await expect(
+      calendario.getByRole("button", { name: new RegExp(`^${Number(futuro.slice(8))} de `) }),
+    ).toBeDisabled();
+  } else
+    await expect(
+      calendario.getByRole("button", { name: "Mês seguinte", exact: true }),
+    ).toBeDisabled();
+  await calendario.getByRole("button", { name: "Fechar", exact: true }).click();
+  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
+  const depois = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
+  expect((await depois.json()).frequencia.faltas).toEqual([
+    expect.objectContaining({
+      alunoId,
+      justificativa: "O",
+      observacao: "E2E Justificativa antecipada",
+    }),
+  ]);
 });

@@ -133,18 +133,19 @@ export async function atualizarJustificativa(
 export async function removerJustificativa(admin: { id: string }, codigo: string): Promise<void> {
   const existente = await buscarPorCodigo(codigo);
   if (!existente) throw new ErroHttp("Justificativa não encontrada.", 404);
-  const [faltas, saidas] = await Promise.all([
-    banco().falta.count({ where: { justificativa: existente.codigo } }),
-    banco().saidaAntecipada.count({ where: { justificativa: existente.codigo } }),
-  ]);
-  const total = faltas + saidas;
-  if (total > 0) {
-    throw new ErroHttp(
-      `Esta justificativa está em uso em ${total} ${total === 1 ? "registro" : "registros"}. Desative em vez de excluir para preservar o histórico.`,
-      409,
-    );
-  }
   await comTransacao(async (tx) => {
+    const [faltas, saidas, parciais] = await Promise.all([
+      tx.falta.count({ where: { justificativa: existente.codigo } }),
+      tx.saidaAntecipada.count({ where: { justificativa: existente.codigo } }),
+      tx.frequenciaParcial.count({ where: { justificativa: existente.codigo } }),
+    ]);
+    const total = faltas + saidas + parciais;
+    if (total > 0) {
+      throw new ErroHttp(
+        `Esta justificativa está em uso em ${total} ${total === 1 ? "registro" : "registros"}. Desative em vez de excluir para preservar o histórico.`,
+        409,
+      );
+    }
     await tx.justificativa.delete({ where: { id: existente.id } });
     await auditar(tx, admin.id, "justificativa.excluir", existente.codigo);
   });

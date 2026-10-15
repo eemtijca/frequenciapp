@@ -373,6 +373,8 @@ Semântica da `revisao`:
 - `0` cria a primeira versão. Se já existe frequência do dia e turma, responde 409 com a versão vigente.
 - `N` atualiza apenas se a versão vigente for `N`; a divergência responde 409 com a versão vigente.
 
+A consulta por dia inclui `justificativasAntecipadas: [{ id, revisao, alunoId, turmaId, justificativa, observacao }]`; datas futuras e feriados retornam lista vazia. São propostas, sem gravação. O aluno segue sua turma atual após transferência. Na primeira Chamada, o cliente pode enviar `justificativasAntecipadas: [{ id, revisao }]` para confirmar a leitura e permitir correções explícitas da equipe. Qualquer alteração da lista ou revisão responde 409 com `codigo: "JUSTIFICATIVAS_ALTERADAS"`, sem salvar. Clientes antigos que omitem o campo recebem as justificativas automaticamente. Chamadas já salvas seguem sua própria revisão e não reaplicam propostas sobre correções manuais.
+
 Validações: o dia não pode ser futuro (fuso da escola); as aulas precisam pertencer à turma, estar ativas e acontecer no dia da semana; a lista de alunos é revalidada contra os alunos ativos da turma dentro da transação, aceitando quem já tinha falta registrada naquela frequência. O salvamento roda em transação serializável (ADR-007).
 
 Respostas:
@@ -403,7 +405,7 @@ Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta s
 
 ## Frequências personalizadas e parciais
 
-As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. A Chamada Parcial não cria nem altera frequências regulares, faltas, saídas ou entradas. A confirmação manual usa o registro efetivo, seja a base diária ou a personalização.
+As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. Presenças personalizadas não alteram a chamada regular. Justificativas são propostas para a primeira Chamada ou corrigem somente o aluno escolhido em chamadas existentes, sem alterar saídas ou entradas. A confirmação manual usa o registro efetivo, seja a base diária ou a personalização.
 
 ### GET /api/frequencias-personalizadas
 
@@ -414,7 +416,7 @@ Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` opcional. Sem data
 
 Quando `dia` é informado, a resposta inclui também `feriado: Feriado | null`, consultado no servidor. Consultas por período preservam o formato sem esse campo.
 
-FrequenciaDaChamada: `{ tipo: "CHAMADA", id, alunoId, dia, turmaId, alunoNome, turmaNome, marca, descricao, justificativas, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, revisaoSeduc, criadoEm, atualizadoEm }`. O identificador é `chamada:<alunoId>:<dia>`. `revisao` pertence à chamada; `revisaoSeduc` pertence à confirmação individual. `marca` preserva P, F, FJ ou S; P tem descrição Dia inteiro. `justificativas` contém motivos únicos do catálogo, incluindo os inativos e o complemento de Outros quando preenchido; presença e falta sem justificativa retornam uma lista vazia. Saídas e entradas não inferem aulas frequentadas.
+FrequenciaDaChamada: `{ tipo: "CHAMADA", id, alunoId, dia, turmaId, alunoNome, turmaNome, marca, descricao, justificativas, justificativa, observacao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, revisaoSeduc, criadoEm, atualizadoEm }`. O identificador é `chamada:<alunoId>:<dia>`. `revisao` pertence à chamada; `revisaoSeduc` pertence à confirmação individual. `marca` preserva P, F, FJ ou S; P tem descrição Dia inteiro. `justificativas` contém motivos únicos do catálogo, incluindo os inativos e o complemento de Outros quando preenchido; presença e falta sem justificativa retornam uma lista vazia. Saídas e entradas não inferem aulas frequentadas.
 
 A consulta combina chamadas salvas com personalizações sem copiar nem gravar dados. A personalização prevalece por aluno e dia antes do filtro de turma. Se o aluno integrou mais de uma chamada no dia, vale a mais recentemente atualizada, com desempate pelo identificador. A lista histórica da chamada define os alunos da base, usando seus nomes e os nomes da turma na consulta; sem chamada salva nem personalização, não há registro de presença. Nomes e turma de personalizações existentes continuam históricos.
 
@@ -429,20 +431,24 @@ Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` histórico opciona
 - 200 `{ "registros": FrequenciaParcial[] }`, em ordem de dia e nome histórico.
 - 400 datas inválidas, período incompleto ou invertido, uso simultâneo de dia e período ou turma inválida.
 
-FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, turno, aulas, observacao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, criadoEm, atualizadoEm }`. Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601. Os nomes e a turma retratam a criação, mesmo depois de transferência ou renomeação. Identificadores internos de autoria não são expostos.
+FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, justificativa, turno, aulas, observacao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, criadoEm, atualizadoEm }`. Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601. Os nomes e a turma retratam a criação, mesmo depois de transferência ou renomeação. Identificadores internos de autoria não são expostos.
 
 ### POST /api/frequencias-parciais
 
-Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "DIA_INTEIRO" | "TURNO" | "AULAS", turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number, baseChamada?: { turmaId: uuid, revisao: number } }`.
+Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "DIA_INTEIRO" | "TURNO" | "AULAS" | "JUSTIFICADA", ate?: "YYYY-MM-DD", justificativa?: string | null, turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number, baseChamada?: { turmaId: uuid, revisao: number } }`.
 
-`DIA_INTEIRO` exige turno nulo ou ausente e lista de aulas vazia; `TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Observação tem até 300 caracteres; data futura é recusada. Feriado cadastrado também responde 400, em conferência dentro da transação, inclusive ao corrigir um registro ou personalizar a base da Chamada. As aulas são números da presença personalizada, independentes da configuração de chamada por aula.
+`DIA_INTEIRO` exige turno nulo ou ausente e lista de aulas vazia; `TURNO` exige Manhã ou Tarde, sem aulas; `AULAS` exige ao menos uma aula entre 1 e 30, sem turno. A aplicação elimina repetições e ordena as aulas. Presenças mantêm observação de até 300 caracteres e recusam data futura. Feriado cadastrado também responde 400, em conferência dentro da transação, inclusive ao corrigir um registro ou personalizar a base da Chamada. As aulas são números da presença personalizada, independentes da configuração de chamada por aula.
 
 Ao criar a partir da base, `baseChamada` confere a revisão, a participação do aluno e a vigência da chamada usada como base e preserva sua turma, inclusive após transferência ou desativação. Se informado, `turmaId` deve corresponder à turma da base. Sem `baseChamada`, registro novo exige aluno ativo e não desistente na data; `turmaId` protege contra transferência concorrente. A personalização guarda nome do aluno e rótulo da turma no momento da criação.
 
-- 200 `{ "registro": FrequenciaParcial }`.
+`JUSTIFICADA` exige código do mesmo catálogo da Chamada, sem turno nem aulas. Aceita data futura até 366 dias à frente e observação de até 200 caracteres, guardada somente para Outros. `ate` cria um intervalo inclusivo de até 31 dias civis; domingos e feriados cadastrados são pulados, e a resposta traz os dias efetivamente gravados. O intervalo exige aluno ativo na mesma turma, sem desistência nas datas e sem personalizações sobrepostas; conflito em qualquer dia recusa o lote inteiro. Correções de registros existentes continuam individuais e com revisão.
+
+Sem Chamada salva, a justificativa não cria frequência nem presume presenças. No dia correspondente, aparece na primeira Chamada como FJ em todas as aulas. Havendo chamada salva, corrige somente esse aluno, preserva lista, aulas e colegas, incrementa a revisão e invalida apenas sua confirmação na SEDUC. A fila existente de frequência é acionada quando ligada; falha após a gravação retorna `aviso`, sem transformar um salvamento confirmado em erro. Remover a personalização ou convertê-la em presença não apaga FJ já aplicada: a correção do histórico é feita na Chamada.
+
+- 200 `{ "registro": FrequenciaParcial, "registros": FrequenciaParcial[], "aviso"?: string }` no POST; `registro` é o primeiro dia, preservado para compatibilidade.
 - Para criar, a revisão pode ser omitida ou zero. Para corrigir um registro já existente por aluno e dia, é obrigatória a revisão vigente.
 - Correção efetiva incrementa revisão e limpa a confirmação da Seduc. Repetir o mesmo conteúdo não altera a confirmação nem a revisão. Nome e turma históricos continuam preservados.
-- 400 conteúdo inválido, dia futuro ou domingo ("Domingo não tem aula nem chamada."); 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
+- 400 conteúdo inválido, presença futura, período maior que 31 dias, data além do limite de agendamento ou domingo isolado ("Domingo não tem aula nem chamada."); 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
 
 ### POST /api/frequencias-parciais/{id}/seduc
 

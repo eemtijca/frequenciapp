@@ -26,6 +26,7 @@ interface Props {
   modo: "dia" | "mes";
   valor: string;
   max: string;
+  atual?: string;
   disabled?: boolean;
   rotuloAcessivel: string;
   rotulo: string;
@@ -53,6 +54,7 @@ export function SeletorPeriodo({
   modo,
   valor,
   max,
+  atual,
   disabled,
   rotuloAcessivel,
   rotulo,
@@ -72,8 +74,9 @@ export function SeletorPeriodo({
   // inclusive o limite: se hoje é domingo, o último dia escolhível é o sábado.
   const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
   const limite = aprumar(max);
+  const corrente = atual ?? max;
   const referencia = aprumar(valor > max ? max : valor);
-  const selo = mostrarSelo && valor === max ? (modo === "dia" ? "Hoje" : "Este mês") : "";
+  const selo = mostrarSelo && valor === corrente ? (modo === "dia" ? "Hoje" : "Este mês") : "";
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
   function aoAbrir(abertoNovo: boolean) {
@@ -236,7 +239,7 @@ export function SeletorPeriodo({
                   );
                 const selecionado = dia === valor;
                 const futuro = dia > max;
-                const corrente = dia === max;
+                const noDiaAtual = dia === corrente;
                 const numero = Number(dia.slice(8));
                 return (
                   <button
@@ -246,11 +249,11 @@ export function SeletorPeriodo({
                     tabIndex={dia === foco ? 0 : -1}
                     disabled={futuro}
                     aria-pressed={selecionado}
-                    aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${corrente ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
+                    aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${noDiaAtual ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
                     onClick={() => escolher(dia)}
                     className={cn(
                       "aspect-square w-full",
-                      classeCelula(selecionado, futuro, corrente),
+                      classeCelula(selecionado, futuro, noDiaAtual),
                     )}
                   >
                     {numero}
@@ -271,7 +274,7 @@ export function SeletorPeriodo({
             const mes = `${anoVisivel}-${String(numero).padStart(2, "0")}`;
             const selecionado = mes === valor;
             const futuro = mes > max;
-            const corrente = mes === max;
+            const noMesAtual = mes === corrente;
             return (
               <button
                 key={mes}
@@ -281,7 +284,7 @@ export function SeletorPeriodo({
                 disabled={futuro}
                 aria-pressed={selecionado}
                 onClick={() => escolher(mes)}
-                className={cn("h-11 w-full", classeCelula(selecionado, futuro, corrente))}
+                className={cn("h-11 w-full", classeCelula(selecionado, futuro, noMesAtual))}
               >
                 {nomeDoMes(mes)}
               </button>
@@ -293,8 +296,8 @@ export function SeletorPeriodo({
       <div className="flex items-center justify-between gap-2 border-t pt-3">
         <button
           type="button"
-          disabled={valor === limite}
-          onClick={() => escolher(limite)}
+          disabled={valor === aprumar(corrente)}
+          onClick={() => escolher(aprumar(corrente))}
           className="vidro-discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
         >
           {modo === "dia" ? "Hoje" : "Este mês"}
