@@ -380,7 +380,8 @@ export function csvBi(linhas: Record<string, unknown>[]) {
   const colunas = [...new Set(linhas.flatMap((l) => Object.keys(l)))];
   const celula = (v: unknown) => {
     let s = textoBi(v);
-    if (typeof v === "string" && /^[\s]*[=+@-]/.test(s)) s = `'${s}`;
+    // Listas viram texto e também passam pela neutralização; números mantêm o sinal.
+    if (typeof v !== "number" && /^[\s]*[=+@-]/.test(s)) s = `'${s}`;
     return `"${s.replaceAll('"', '""')}"`;
   };
   return (
