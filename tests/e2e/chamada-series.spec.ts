@@ -185,12 +185,12 @@ test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ pa
     );
     expect(estouro).toBe(false);
     if (largura === 320) {
-      await testInfo.attach("Seletores circulares em 320px", {
+      await testInfo.attach("Seletores com barras em 320px", {
         body: await grupo.screenshot(),
         contentType: "image/png",
       });
     }
-    // O nome customizado, a contagem e o progresso cabem sem se sobrepor.
+    // Nomes longos, percentuais e barras cabem sem contagem visível ou sobreposição.
     for (const nome of [...series, "Faixa Um E2E Serie A", "Faixa Um E2E Serie B"]) {
       const botao = grupo.getByRole("button", { name: nome, exact: true });
       const caixa = await botao.boundingBox();
@@ -198,26 +198,29 @@ test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ pa
       expect(caixa?.x ?? -1).toBeGreaterThanOrEqual(0);
       expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(largura);
       expect(caixa?.height ?? 0).toBeGreaterThanOrEqual(44);
-      expect(caixa?.width ?? 0).toBeLessThanOrEqual(series.includes(nome) ? 88 : 76);
-      expect(Math.abs((caixa?.width ?? 0) - (caixa?.height ?? 0))).toBeLessThan(1);
+      const arredondamento = await botao.evaluate((elemento) =>
+        parseFloat(getComputedStyle(elemento).borderTopLeftRadius),
+      );
+      expect(arredondamento).toBeGreaterThan(0);
+      expect(arredondamento).toBeLessThan((caixa?.height ?? 0) / 2);
       const linhas = botao.locator(':scope > span[aria-hidden="true"]');
       await expect(linhas).toHaveCount(3);
-      const rotulo = linhas.nth(0).locator("span").first();
-      const [nomeCaixa, alunosCaixa, progressoCaixa] = await Promise.all([
-        rotulo.boundingBox(),
+      await expect(linhas.nth(1)).toHaveText("0%");
+      await expect(linhas.nth(2)).toHaveAttribute("data-progresso", "0");
+      expect((await linhas.allTextContents()).join(" ")).not.toMatch(/alunos?/i);
+      const [nomeCaixa, percentualCaixa, barraCaixa] = await Promise.all([
+        linhas.nth(0).boundingBox(),
         linhas.nth(1).boundingBox(),
         linhas.nth(2).boundingBox(),
       ]);
       expect(nomeCaixa).not.toBeNull();
-      expect(alunosCaixa).not.toBeNull();
-      expect(progressoCaixa).not.toBeNull();
-      if (caixa && nomeCaixa && alunosCaixa && progressoCaixa) {
+      expect(percentualCaixa).not.toBeNull();
+      expect(barraCaixa).not.toBeNull();
+      if (caixa && nomeCaixa && percentualCaixa && barraCaixa) {
         expect(nomeCaixa.y).toBeGreaterThanOrEqual(caixa.y);
-        expect(nomeCaixa.y + nomeCaixa.height).toBeLessThanOrEqual(alunosCaixa.y + 1);
-        expect(alunosCaixa.y + alunosCaixa.height).toBeLessThanOrEqual(progressoCaixa.y + 1);
-        expect(progressoCaixa.y + progressoCaixa.height).toBeLessThanOrEqual(
-          caixa.y + caixa.height,
-        );
+        expect(nomeCaixa.y + nomeCaixa.height).toBeLessThanOrEqual(percentualCaixa.y + 1);
+        expect(percentualCaixa.y + percentualCaixa.height).toBeLessThanOrEqual(barraCaixa.y + 1);
+        expect(barraCaixa.y + barraCaixa.height).toBeLessThanOrEqual(caixa.y + caixa.height);
       }
     }
   }
@@ -231,17 +234,17 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   const serie = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   const turmaA = grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true });
   const turmaB = grupo.getByRole("button", { name: "Faixa Um E2E Serie B", exact: true });
-  const anel = serie.locator("svg[data-progresso]");
+  const barra = serie.locator("[data-progresso]");
 
   await expect(serie).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaA).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB).toHaveAttribute("data-situacao", "pendente");
-  await expect(anel).toHaveAttribute("data-progresso", "0");
-  await expect(serie.locator("[data-turma-id]")).toHaveCount(2);
+  await expect(barra).toHaveAttribute("data-progresso", "0");
   for (const nome of ["C", "D"]) {
     const neutra = grupo.getByRole("button", { name: `Faixa Um E2E Serie ${nome}`, exact: true });
     await expect(neutra).toHaveAttribute("data-situacao", "sem-alunos");
-    await expect(serie.locator(`[data-turma-id="${turmasDoProgresso.get(nome)}"]`)).toHaveCount(0);
+    await expect(neutra.locator("[data-progresso]")).toHaveCount(0);
+    await expect(neutra.locator(':scope > span[aria-hidden="true"]').nth(1)).toHaveText("-");
   }
   await expect(turmaB).toHaveAccessibleDescription(/3 alunos.*pendente/i);
 
@@ -249,21 +252,23 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(turmaA).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "pendente");
-  await expect(anel).toHaveAttribute("data-progresso", "25");
+  await expect(barra).toHaveAttribute("data-progresso", "25");
   await expect(serie.getByText("25%", { exact: true })).toBeVisible();
-  await expect(serie.locator(`[data-turma-id="${turmasDoProgresso.get("A")}"]`)).toHaveAttribute(
-    "data-situacao",
-    "concluida",
-  );
-  await expect(serie.locator(`[data-turma-id="${turmasDoProgresso.get("B")}"]`)).toHaveAttribute(
-    "data-situacao",
-    "pendente",
-  );
+  await expect(turmaA.locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
+  await expect(turmaB.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
+  await expect
+    .poll(() =>
+      barra.evaluate((elemento) => {
+        const preenchimento = elemento.firstElementChild?.getBoundingClientRect().width ?? 0;
+        return preenchimento / elemento.getBoundingClientRect().width;
+      }),
+    )
+    .toBeCloseTo(0.25, 2);
   // Registra os dois temas na largura de cada projeto, sem incluir dados reais.
   for (const tema of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: tema });
     await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
-    await testInfo.attach(`Seletores circulares ${tema}`, {
+    await testInfo.attach(`Seletores com barras ${tema}`, {
       body: await grupo.screenshot(),
       contentType: "image/png",
     });
@@ -275,11 +280,17 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(turmaB).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "concluida");
-  await expect(anel).toHaveAttribute("data-progresso", "100");
-  await expect(serie.locator("[data-turma-id]")).toHaveCount(2);
-  await expect(anel.locator('[data-situacao="concluida"]')).toHaveCount(2);
-  await expect(anel.locator('[data-situacao="pendente"]')).toHaveCount(0);
-  await testInfo.attach("Anel segmentado com chamadas concluídas", {
+  await expect(barra).toHaveAttribute("data-progresso", "100");
+  await expect(turmaB.locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
+  await expect
+    .poll(() =>
+      barra.evaluate((elemento) => {
+        const preenchimento = elemento.firstElementChild?.getBoundingClientRect().width ?? 0;
+        return preenchimento / elemento.getBoundingClientRect().width;
+      }),
+    )
+    .toBeCloseTo(1, 2);
+  await testInfo.attach("Barras com chamadas concluídas", {
     body: await grupo.screenshot({ animations: "disabled" }),
     contentType: "image/png",
   });
@@ -287,7 +298,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await secao.getByRole("button", { name: "Dia anterior", exact: true }).click();
   await expect(turmaA).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB).toHaveAttribute("data-situacao", "pendente");
-  await expect(anel).toHaveAttribute("data-progresso", "0");
+  await expect(barra).toHaveAttribute("data-progresso", "0");
   await expect(serie.getByText("100%", { exact: true })).toHaveCount(0);
   await secao.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
   await expect(serie).toHaveAttribute("data-situacao", "concluida");
@@ -306,7 +317,9 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await secao.getByRole("button", { name: /^E2E Serie 1A:/ }).click();
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
-  await expect(serie().locator("svg[data-progresso]")).toHaveAttribute("data-progresso", "75");
+  await expect(turmaA().locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
+  await expect(turmaB().locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
+  await expect(serie().locator("[data-progresso]")).toHaveAttribute("data-progresso", "75");
   await expect(turmaB()).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Dia anterior", exact: true })).toBeDisabled();
   await expect
@@ -337,7 +350,7 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(turmaB()).toBeDisabled();
   await recarregar.click();
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");
-  await expect(serie().locator("svg[data-progresso]")).toHaveAttribute("data-progresso", "100");
+  await expect(serie().locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
 });
 
 test("Chamada: carregamento e falha de leitura mostram estado neutro até a recuperação", async ({
@@ -360,14 +373,14 @@ test("Chamada: carregamento e falha de leitura mostram estado neutro até a recu
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
   const serie = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   await expect(serie).toHaveAttribute("data-situacao", "carregando");
-  await expect(serie.locator("svg[data-progresso]")).toHaveCount(0);
+  await expect(serie.locator("[data-progresso]")).toHaveCount(0);
   liberarLeitura?.();
   await expect(serie).toHaveAttribute("data-situacao", "indisponivel");
-  await expect(serie.locator("svg[data-progresso]")).toHaveCount(0);
+  await expect(serie.locator("[data-progresso]")).toHaveCount(0);
   falhar = false;
   await secao.getByRole("button", { name: "Tentar novamente", exact: true }).click();
   await expect(serie).toHaveAttribute("data-situacao", "pendente");
-  await expect(serie.locator("svg[data-progresso]")).toHaveAttribute("data-progresso", "0");
+  await expect(serie.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
 });
 
 test("Gestão: as turmas específicas da origem ficam numa seção recolhível", async ({ page }) => {

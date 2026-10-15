@@ -286,7 +286,7 @@ test("feriado deixa a cobertura neutra e bloqueia Chamada e Parcial, inclusive n
       "data-situacao",
       "feriado",
     );
-    await expect(grupo.locator("svg[data-progresso]")).toHaveCount(0);
+    await expect(grupo.locator("[data-progresso]")).toHaveCount(0);
     const liberarSabado = secao.getByRole("button", {
       name: "Desbloquear sábado letivo",
       exact: true,
