@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Seletores da Chamada passam a usar retângulos com cantos arredondados, nome, porcentagem e barra de progresso, sem contagem visível de alunos. A série avança conforme as turmas são salvas; cada turma indica pendência ou conclusão. Seleção azul, temas, teclado e estados neutros permanecem acessíveis.
+
 - A série selecionada na Chamada recebe anel externo azul de 2 pixels, com foco de teclado destacado e respeito ao alto contraste, preservando as cores dos segmentos de progresso.
 
 - Seção Proteção de dados e LGPD em Sobre, com aprovação institucional e consentimento informados pela escola, salvaguardas existentes, orientação para solicitações e link para o tratamento dos dados.
