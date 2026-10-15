@@ -125,7 +125,12 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
           `/api/usuarios/${emEdicao.id}`,
           corpoAlteracao("PATCH", corpo),
         );
-        avisarSucesso("Conta atualizada.", "Os dados novos valem no próximo acesso.");
+        avisarSucesso(
+          "Conta atualizada.",
+          corpo.senha !== undefined
+            ? "Os acessos abertos foram encerrados; a pessoa entra de novo com a senha nova."
+            : "Os dados novos valem no próximo acesso.",
+        );
       } else {
         await pedir<{ usuario: UsuarioDTO }>("/api/usuarios", corpoJson(formulario));
         avisarSucesso("Conta criada.", "A pessoa entra com o e-mail e a senha cadastrados.");
@@ -377,33 +382,41 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                 className="h-11"
               />
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="senha-usuario">
-                {emEdicao ? "Nova senha (opcional)" : "Senha inicial"}
-              </Label>
-              <div className="relative">
-                <KeyRound
-                  size={15}
-                  aria-hidden="true"
-                  className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
-                />
-                <CampoSenha
-                  id="senha-usuario"
-                  value={formulario.senha}
-                  autoComplete="new-password"
-                  minLength={emEdicao ? 0 : 8}
-                  required={emEdicao === null}
-                  onChange={(evento) =>
-                    setFormulario((atual) => ({ ...atual, senha: evento.target.value }))
-                  }
-                  placeholder="Mínimo 8 caracteres, com letra e número"
-                  className="h-11 rounded-lg pl-9"
-                />
-              </div>
+            {emEdicao?.id === usuarioId ? (
               <p className="text-muted-foreground text-xs">
-                A pessoa troca a senha depois, no ícone de senha do cabeçalho.
+                A sua própria senha muda no ícone de senha do cabeçalho, com a senha atual.
               </p>
-            </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="senha-usuario">
+                  {emEdicao ? "Nova senha (opcional)" : "Senha inicial"}
+                </Label>
+                <div className="relative">
+                  <KeyRound
+                    size={15}
+                    aria-hidden="true"
+                    className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+                  />
+                  <CampoSenha
+                    id="senha-usuario"
+                    value={formulario.senha}
+                    autoComplete="new-password"
+                    minLength={emEdicao ? 0 : 8}
+                    required={emEdicao === null}
+                    onChange={(evento) =>
+                      setFormulario((atual) => ({ ...atual, senha: evento.target.value }))
+                    }
+                    placeholder="Mínimo 8 caracteres, com letra e número"
+                    className="h-11 rounded-lg pl-9"
+                  />
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {emEdicao
+                    ? "Redefinir a senha encerra os acessos abertos da pessoa."
+                    : "A pessoa troca a senha depois, no ícone de senha do cabeçalho."}
+                </p>
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="papel-usuario">Papel</Label>
               <Selecionar
