@@ -387,7 +387,7 @@
       "post": {
         "operationId": "trocarSenha",
         "summary": "Trocar a própria senha",
-        "description": "Exige a capacidade alterarPropriaSenha e encerra as outras sessões do usuário. A nova senha segue a política mínima.",
+        "description": "Exige a capacidade alterarPropriaSenha e encerra as outras sessões do usuário. A nova senha segue a política mínima. A senha atual é conferida com até cinco tentativas em 15 minutos por conta.",
         "tags": ["conta"],
         "requestBody": {
           "required": true,
@@ -466,6 +466,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "$ref": "#/components/responses/Erro429"
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -2488,7 +2491,7 @@
       "patch": {
         "operationId": "atualizarUsuario",
         "summary": "Editar uma conta da equipe",
-        "description": "Corpo parcial. Desativar encerra as sessões; a escola não pode ficar sem administrador ativo.",
+        "description": "Corpo parcial. Desativar ou redefinir a senha encerra as sessões e as assinaturas de aviso da conta; a escola não pode ficar sem administrador ativo. A própria senha não é redefinida por aqui.",
         "tags": ["usuarios"],
         "parameters": [
           {

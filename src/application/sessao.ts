@@ -163,10 +163,16 @@ export async function trocarSenha(
   const problema = problemaDeSenha(dados.data.senhaNova);
   if (problema) throw new ErroHttp(problema, 400);
 
+  // Sem limite, uma sessão roubada testaria senhas à vontade até tomar a conta.
+  const chaveLimite = `conta:senha:${identidade.id}`;
+  if (!(await limiteDeTentativas(chaveLimite, 5))) {
+    throw new ErroHttp("Muitas tentativas incorretas. Aguarde alguns minutos.", 429);
+  }
   const usuario = await banco().usuario.findUnique({ where: { id: identidade.id } });
   if (!usuario || !(await conferirSenha(dados.data.senhaAtual, usuario.senhaHash))) {
     throw new ErroHttp("A senha atual está incorreta.", 400);
   }
+  await limparTentativas(chaveLimite);
   const ehDiretor = identidade.papel === "DIRETOR_TURMA";
   if (ehDiretor && dados.data.senhaNova === dados.data.senhaAtual) {
     throw new ErroHttp("A nova palavra-chave precisa ser diferente da atual.", 400);

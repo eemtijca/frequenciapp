@@ -149,6 +149,11 @@ export async function atualizarUsuario(
     if (pretendidoAtivo === false) {
       throw new ErroHttp("Você não pode desativar a sua própria conta.", 400);
     }
+    // Redefinir a própria senha pela Gestão dispensaria a senha atual e abriria
+    // as ações que pedem a senha do administrador a quem só tem a sessão.
+    if ((entrada as Record<string, unknown>).senha !== undefined) {
+      throw new ErroHttp("Para trocar a sua própria senha, use Trocar senha na sua conta.", 400);
+    }
   }
 
   const dados = esquemaAtualizarUsuario.safeParse(entrada);
@@ -195,7 +200,11 @@ export async function atualizarUsuario(
         ...(senhaHash !== undefined ? { senhaHash } : {}),
       },
     });
-    if (dados.data.ativo === false) {
+    // Desativar ou redefinir a senha encerra todos os acessos abertos da conta,
+    // inclusive os avisos dos aparelhos, para a redefinição servir de resposta a
+    // uma conta comprometida.
+    if (dados.data.ativo === false || senhaHash !== undefined) {
+      await tx.assinaturaPush.deleteMany({ where: { usuarioId: id } });
       await tx.sessao.deleteMany({ where: { usuarioId: id } });
     }
     const mudancas = [

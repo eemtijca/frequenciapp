@@ -189,6 +189,24 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Leitura dos marcadores nativos de linha e coluna da Sheets API, preservando identificação do aluno e das dimensões criadas pela integração.
 
+### Segurança
+
+- A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.
+
+- Redefinir a senha de uma conta pela Gestão encerra todas as sessões e assinaturas de aviso dela, como já fazia a desativação, que passa a remover também as assinaturas. Antes, um acesso comprometido continuava valendo por até 30 dias depois da redefinição.
+
+- A troca da própria senha confere a senha atual com até cinco tentativas em 15 minutos por conta.
+
+- O limite de tentativas de entrada por dispositivo usa o último endereço de `X-Forwarded-For`, escrito pelo proxy, e não mais o primeiro, que o cliente podia trocar a cada tentativa.
+
+- O PostgreSQL do Docker Compose é publicado só no loopback do host, sem expor a senha fixa na rede; em produção, o `AUTH_SECRET` de exemplo do `.env.example` é recusado na partida; a documentação interativa deixa de guardar no navegador as credenciais digitadas em Authorize.
+
+- No FrequenciBI, chave com lista vazia de séries ou turmas recusa também os catálogos (justificativas, liberadores e feriados), e o CSV neutraliza fórmulas também nas células de lista.
+
+- O teste das guardas da API passa a recusar rotas fora de `route.ts`, manipuladores exportados de outra forma, guarda só em comentário, guarda sem a recusa e server actions.
+
+- Documentação LGPD alinhada ao código: código do aluno nas planilhas, terceiro arquivo com a frequência por aluno e dia, e-mails da equipe na auditoria, IP nas tentativas de entrada, nomes históricos retidos, exclusão de diretores e exportações do FrequenciBI sem ZIP.
+
 ### Adicionado
 
 - Fila FIFO durável dos envios automáticos às planilhas (ADR-039): chamada salva, saída e entrada registradas entram na tabela `fila_planilha` antes da resposta e são processadas na ordem de chegada, um consumidor por vez, com retentativas (até cinco, com espera crescente) para falhas confirmadas, sem repetir envio sem confirmação. Agenda de cinco minutos pelo GitHub Actions (`fila-planilha.yml`, com `CRON_SECRET`) e seção Fila de envios automáticos na Gestão, com Processar agora, Descartar e Reenfileirar. Exige aplicar a migração `fila_planilha`.

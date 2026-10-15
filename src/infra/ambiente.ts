@@ -158,6 +158,16 @@ if (
 }
 
 const ehProducao = resultado.data.NODE_ENV === "production";
+// O valor do .env.example é público: em produção, quem o conhece decifra o
+// token Google guardado no banco e forja o estado do OAuth.
+if (
+  ehProducao &&
+  resultado.data.AUTH_SECRET === "troque-este-segredo-por-um-aleatorio-de-32-bytes"
+) {
+  throw new Error(
+    "AUTH_SECRET ainda é o valor de exemplo do .env.example. Gere outro com openssl rand -base64 32.",
+  );
+}
 const permitirHttp = resultado.data.PERMITIR_HTTP;
 const cookiesSeguros = cookiesSegurosDe(ehProducao, permitirHttp);
 // Aviso único na partida: sem TLS o tráfego fica em texto puro e o PWA não
