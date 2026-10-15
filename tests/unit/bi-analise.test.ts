@@ -184,6 +184,7 @@ describe("análises do BI", () => {
     const csv = csvBi([
       { Aluno: '\t=HYPERLINK("x")', Nota: "Linha 1\nLinha 2", Valor: -2 },
       { Aluno: "+QA", Nota: "@QA", Valor: 0 },
+      { Aluno: ["=QA()", "QA"], Nota: "QA", Valor: 1 },
     ]);
     expect(csv.startsWith("\uFEFF")).toBe(true);
     expect(csv).toContain("'\t=HYPERLINK");
@@ -191,6 +192,7 @@ describe("análises do BI", () => {
     expect(csv).toContain('"-2"');
     expect(csv).toContain("'+QA");
     expect(csv).toContain("'@QA");
+    expect(csv).toContain(`"'=QA(), QA"`);
   });
   it("agrupa uma massa de vários anos sem perder contagens distintas", () => {
     const ls = Array.from({ length: 100_000 }, (_, i) => ({

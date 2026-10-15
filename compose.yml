@@ -11,8 +11,10 @@ services:
       POSTGRES_USER: frequencia
       POSTGRES_PASSWORD: frequencia
       POSTGRES_DB: frequencia
+    # Só o próprio host alcança o banco: a senha fixa abaixo não pode ficar
+    # exposta na rede. Os comandos do host e o CI usam localhost.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

@@ -27,7 +27,7 @@ As URLs dentro do contêiner usam o host `db`:
 postgresql://frequencia:frequencia@db:5432/frequencia
 ```
 
-O `.env` do host usa `localhost`, para permitir executar `pnpm run criar-admin`, `pnpm run criar-coordenacao`, `pnpm run seed` e a suíte de API contra o banco publicado.
+O banco é publicado só no loopback do host (`127.0.0.1:5432`), porque usa a senha fixa do Compose; não o exponha na rede. O `.env` do host usa `localhost`, para permitir executar `pnpm run criar-admin`, `pnpm run criar-coordenacao`, `pnpm run seed` e a suíte de API contra o banco publicado.
 
 Ao preencher `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`, o entrypoint cria o administrador inicial na partida. O modo de bootstrap é não destrutivo: se a conta já existir, ele não regrava a senha nem altera o nome. Para criar ou atualizar a senha explicitamente, use o comando abaixo (que sempre aplica os valores):
 

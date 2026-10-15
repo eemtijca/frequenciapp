@@ -195,6 +195,16 @@ describe("FrequenciBI", () => {
     }
     expect((await pagina(c.segredo, "recurso=chamadas&inicio=1992-01-01")).linhas).toEqual([]);
   });
+  it("lista vazia de turmas recusa também os catálogos da escola", async () => {
+    const recursos: EscopoBi["recursos"] = ["justificativas", "liberadores", "feriados"];
+    const aberta = await criar({ recursos });
+    expect((await pagina(aberta.segredo, "recurso=justificativas")).linhas.length).toBeGreaterThan(
+      0,
+    );
+    const vazia = await criar({ turmas: [], recursos });
+    for (const recurso of recursos ?? [])
+      expect((await pagina(vazia.segredo, `recurso=${recurso}`)).linhas).toEqual([]);
+  });
   it("as métricas respeitam a chamada histórica e a presença implícita", async () => {
     const c = await criar({ turmas: [turmaA, turmaB] });
     const p = await pagina(c.segredo, "recurso=chamadas&inicio=1991-05-06&fim=1991-05-06");

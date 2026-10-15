@@ -122,13 +122,14 @@ export function ehUuid(valor: string): boolean {
 }
 
 /**
- * IP do cliente para limitadores. Usa o primeiro item de x-forwarded-for,
- * que o proxy confiável precisa sobrescrever, ou x-real-ip. Sem cabeçalhos,
- * devolve "local" para não misturar origens desconhecidas em uma só chave.
+ * IP do cliente para limitadores. Usa o último item de x-forwarded-for, o
+ * único escrito pelo proxy diante do aplicativo: os anteriores vêm do
+ * cliente, que os inventaria para zerar o limite. Sem o cabeçalho, usa
+ * x-real-ip ou devolve "local" para não misturar origens desconhecidas.
  */
 export function ipDoPedido(requisicao: Request): string {
   const encaminhado = requisicao.headers.get("x-forwarded-for");
-  const primeiro = encaminhado?.split(",")[0]?.trim();
-  if (primeiro) return primeiro;
+  const ultimo = encaminhado?.split(",").at(-1)?.trim();
+  if (ultimo) return ultimo;
   return requisicao.headers.get("x-real-ip")?.trim() || "local";
 }

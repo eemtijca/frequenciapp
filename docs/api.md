@@ -73,6 +73,7 @@ Troca a própria senha. Corpo: `{ "senhaAtual": string, "senhaNova": string }`. 
 
 - 200 `{"ok": true}`.
 - 400 quando a senha atual não confere, a nova está fora da política (mínimo 8 caracteres, uma letra e um número) ou o corpo é inválido.
+- 429 depois de cinco tentativas em 15 minutos para a mesma conta; o contador é limpo quando a senha atual confere.
 
 ## Diretores de turma (administração)
 
@@ -303,10 +304,10 @@ Corpo: `{ "nome": string, "email": string, "senha": string, "papel"?: "ADMIN" | 
 
 ### PATCH /api/usuarios/{id}
 
-Corpo parcial: `{ nome?, email?, senha?, papel?, ativo? }`. `ativo: false` encerra as sessões da conta.
+Corpo parcial: `{ nome?, email?, senha?, papel?, ativo? }`. `ativo: false` ou `senha` encerram as sessões e as assinaturas de aviso da conta.
 
 - 200 `{"usuario": Usuario}`.
-- 400 quando o alvo é a própria conta com rebaixamento ou desativação.
+- 400 quando o alvo é a própria conta com rebaixamento, desativação ou `senha`; a própria senha muda por `POST /api/conta/senha`.
 - 409 quando a escola ficaria sem administrador ativo, ou o e-mail já é usado.
 
 ### DELETE /api/usuarios/{id}

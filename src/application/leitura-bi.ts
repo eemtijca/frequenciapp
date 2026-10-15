@@ -195,6 +195,8 @@ async function lerRecurso(
 ): Promise<LinhaBi[]> {
   const { turmaId, dia, paginacao } = r;
   const porId = { id: "asc" as const };
+  // Chave com séries ou turmas vazias recusa tudo, inclusive os catálogos da escola.
+  const negaTudo = r.escopo.series?.length === 0 || r.escopo.turmas?.length === 0;
   const dataTurma = (id: string) => {
     const t = r.turmas.find((t) => t.id === id);
     return t ? dimensoes(t) : {};
@@ -223,10 +225,13 @@ async function lerRecurso(
         (h) => ({ ...linha(h), ...dataTurma(h.turmaId), aula: h.ordem }),
       );
     case "justificativas":
+      if (negaTudo) return [];
       return (await tx.justificativa.findMany({ orderBy: porId, ...paginacao })).map(linha);
     case "liberadores":
+      if (negaTudo) return [];
       return (await tx.liberador.findMany({ orderBy: porId, ...paginacao })).map(linha);
     case "feriados":
+      if (negaTudo) return [];
       return (
         await tx.feriado.findMany({
           where: { dia },

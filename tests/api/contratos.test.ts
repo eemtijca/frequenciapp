@@ -530,6 +530,30 @@ describe("gestão de equipe (admin)", () => {
       body: JSON.stringify({ ativo: false }),
     });
     expect(desativa.status).toBe(400);
+    // A própria senha muda só pela troca com a senha atual, que as reconfirmações exigem.
+    const redefine = await autenticado(cookieAdmin, `/api/usuarios/${eu?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ senha: "QaTomada2026" }),
+    });
+    expect(redefine.status).toBe(400);
+  });
+
+  it("redefinir a senha pela Gestão encerra os acessos abertos da conta", async () => {
+    const aberta = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
+    expect(aberta.status).toBe(200);
+    const redefine = await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ senha: "QaRedefinida2026" }),
+    });
+    expect(redefine.status).toBe(200);
+    const sessao = await autenticado(aberta.cookie, "/api/auth/sessao");
+    expect(((await sessao.json()) as { usuario: unknown | null }).usuario).toBe(null);
+
+    const volta = await autenticado(cookieAdmin, `/api/usuarios/${coordQA?.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ senha: "QaEquipe2026" }),
+    });
+    expect(volta.status).toBe(200);
   });
 
   it("conta desativada não entra e volta ao reativar", async () => {
@@ -546,6 +570,19 @@ describe("gestão de equipe (admin)", () => {
     });
     const reativada = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
     expect(reativada.status).toBe(200);
+  });
+
+  it("limita as tentativas de senha atual na troca de senha", async () => {
+    const sessao = await entrar("qa-equipe@escola.exemplo", "QaEquipe2026");
+    expect(sessao.status).toBe(200);
+    const trocar = (senhaAtual: string) =>
+      autenticado(sessao.cookie, "/api/conta/senha", {
+        method: "POST",
+        body: JSON.stringify({ senhaAtual, senhaNova: "QaEquipe2027" }),
+      });
+    for (let i = 0; i < 5; i++) expect((await trocar("QaErrada2026")).status).toBe(400);
+    // Bloqueada a janela, nem a senha certa passa: a sessão não vira oráculo.
+    expect((await trocar("QaEquipe2026")).status).toBe(429);
   });
 });
 

@@ -132,6 +132,20 @@ test.describe("abas da Gestão", () => {
     await expect(campo).toHaveAttribute("type", "password");
   });
 
+  test("a edição da própria conta não oferece redefinir a senha", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await page.getByRole("tab", { name: "Equipe" }).click();
+    const propria = page.locator(".superficie-vidro").filter({ hasText: "Você" });
+    await propria.getByRole("button", { name: /^Editar conta de / }).click();
+
+    const dialogo = page.getByRole("dialog");
+    await expect(dialogo.getByText("A sua própria senha muda no ícone de senha")).toBeVisible();
+    await expect(dialogo.locator("#senha-usuario")).toHaveCount(0);
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+  });
+
   test("a seleção vai direto à aba tocada", async ({ page }) => {
     await page.setViewportSize({ width: 412, height: 915 });
     await page.goto("/");
