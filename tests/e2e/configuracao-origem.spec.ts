@@ -96,12 +96,20 @@ async function conferir(
   turma: "A" | "B",
   exibe: boolean,
 ): Promise<void> {
+  // O aviso é temporário e cobre os controles superiores no celular.
+  // Aguarda antes de mover o ponteiro para lá, para não pausar o aviso por hover.
+  await expect(page.getByText("Indicação de origem atualizada.", { exact: true })).toHaveCount(0);
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
   const grupo = chamada.getByRole("group", { name: "Turma atual", exact: true });
-  // Cada série é um botão que mostra só as suas turmas; ativa a série se preciso.
-  const serie = grupo.getByRole("button", { name: series[indice] ?? "", exact: true });
-  if ((await serie.getAttribute("aria-pressed")) !== "true") await serie.click();
+  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
+  if ((await gatilho.getAttribute("aria-label")) !== `Selecionar série: ${series[indice]}`) {
+    await gatilho.click();
+    await page
+      .getByRole("dialog", { name: "Escolher série", exact: true })
+      .getByRole("button", { name: series[indice] ?? "", exact: true })
+      .click();
+  }
   await grupo.getByRole("button", { name: `${series[indice]} ${turma}`, exact: true }).click();
   const nome = `E2E Config ${nomes[indice]} ${turma}`;
   const linha = chamada.locator("ul li").filter({ hasText: nome });
