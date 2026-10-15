@@ -198,6 +198,7 @@ test("Chamada: no celular, as séries ficam lado a lado sem cortar", async ({ pa
       expect(caixa?.x ?? -1).toBeGreaterThanOrEqual(0);
       expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(largura);
       expect(caixa?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(caixa?.width ?? 0).toBeLessThanOrEqual(series.includes(nome) ? 88 : 76);
       expect(Math.abs((caixa?.width ?? 0) - (caixa?.height ?? 0))).toBeLessThan(1);
       const linhas = botao.locator(':scope > span[aria-hidden="true"]');
       await expect(linhas).toHaveCount(3);
@@ -275,8 +276,13 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await expect(turmaB).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "concluida");
   await expect(anel).toHaveAttribute("data-progresso", "100");
-  await expect(serie.locator("[data-turma-id]")).toHaveCount(0);
-  await expect(anel.locator('[data-situacao="concluida"]')).toHaveCount(1);
+  await expect(serie.locator("[data-turma-id]")).toHaveCount(2);
+  await expect(anel.locator('[data-situacao="concluida"]')).toHaveCount(2);
+  await expect(anel.locator('[data-situacao="pendente"]')).toHaveCount(0);
+  await testInfo.attach("Anel segmentado com chamadas concluídas", {
+    body: await grupo.screenshot({ animations: "disabled" }),
+    contentType: "image/png",
+  });
 
   await secao.getByRole("button", { name: "Dia anterior", exact: true }).click();
   await expect(turmaA).toHaveAttribute("data-situacao", "pendente");
