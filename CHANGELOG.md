@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A série selecionada na Chamada recebe anel externo azul de 2 pixels, com foco de teclado destacado e respeito ao alto contraste, preservando as cores dos segmentos de progresso.
+
 - Seção Proteção de dados e LGPD em Sobre, com aprovação institucional e consentimento informados pela escola, salvaguardas existentes, orientação para solicitações e link para o tratamento dos dados.
 
 - Configuração assistida da planilha de frequência, com diagnóstico mensal somente de leitura, acesso à conexão, revisão das turmas e do mês e situação da sincronização. A conferência distingue estrutura pronta de frequências efetivamente enviadas e mantém a prévia antes de gravar.
