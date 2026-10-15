@@ -1,29 +1,24 @@
-/* Seletores circulares de vidro com cor de situação e seleção independente do progresso. */
+/* Seletores compactos de vidro com seleção azul e progresso confirmado por barra. */
 .faixa {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: start;
-  justify-items: center;
+  align-items: stretch;
   width: 100%;
-  max-width: 296px;
-  align-self: center;
   gap: 8px;
   padding: 5px;
 }
 
 .serie,
 .turma {
-  position: relative;
   width: 100%;
   height: auto;
-  aspect-ratio: 1;
   min-width: 0;
-  min-height: 0;
+  min-height: 72px;
   flex-direction: column;
-  gap: 2px;
-  border-radius: 50%;
+  gap: 5px;
+  border-radius: var(--radius);
   border-color: var(--vidro-borda);
-  padding: 8px;
+  padding: 10px;
   white-space: normal;
   color: var(--foreground);
   background-color: var(--card);
@@ -32,94 +27,88 @@
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
-    box-shadow 180ms ease,
-    scale 180ms ease;
-}
-
-.serie {
-  max-width: 88px;
-  font-size: 12px;
+    box-shadow 180ms ease;
 }
 
 .serie:where([data-situacao="concluida"]),
 .turma:where([data-situacao="concluida"]) {
   border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
   background-color: color-mix(in oklab, var(--primary) 10%, var(--card));
-  color: var(--primary);
 }
 
 .serie:where([data-situacao="pendente"]),
 .turma:where([data-situacao="pendente"]) {
   border-color: color-mix(in oklab, var(--falta) 45%, var(--border));
-  background-color: color-mix(in oklab, var(--falta) 10%, var(--card));
-  color: var(--falta-texto);
+  background-color: color-mix(in oklab, var(--falta) 6%, var(--card));
 }
 
-.serie:where([aria-pressed="true"]) {
-  outline: 2px solid var(--justificada);
-  outline-offset: 2px;
-}
-
+.serie:where([aria-pressed="true"]),
 .turma:where([aria-pressed="true"]) {
-  outline: 1px solid color-mix(in oklab, var(--foreground) 50%, transparent);
+  outline: 2px solid var(--justificada);
   outline-offset: 2px;
 }
 
 .serie:focus-visible,
 .turma:focus-visible {
-  outline: 3px solid var(--ring);
+  outline: 3px solid var(--justificada);
   outline-offset: 5px;
 }
 
-.serie:where([aria-pressed="true"]):focus-visible {
-  outline-color: var(--justificada);
-}
-
-.turma {
-  max-width: 76px;
-}
-
-.nome,
-.nomeTurma {
-  position: relative;
-  display: flex;
+.nome {
+  display: -webkit-box;
   width: 100%;
-  min-width: 0;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  line-height: 13px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 17px;
 }
 
-.nomeTurma {
-  font-size: 18px;
-  line-height: 20px;
-}
-
-.contagem {
-  position: relative;
+.percentual {
   color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
 
-.situacao {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 14px;
-  font-size: 11px;
-  line-height: 12px;
-  font-variant-numeric: tabular-nums;
+.serie:where([data-situacao="concluida"]) .percentual,
+.turma:where([data-situacao="concluida"]) .percentual {
+  color: var(--primary);
+}
+
+.serie:where([data-situacao="pendente"]) .percentual,
+.turma:where([data-situacao="pendente"]) .percentual {
+  color: var(--falta-texto);
+}
+
+.barra {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: color-mix(in oklab, var(--falta-texto) 38%, var(--card));
+}
+
+.barra:where([data-disponivel="false"]) {
+  background-color: var(--border);
+}
+
+.preenchimento {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--primary);
+  transition: width 180ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .serie,
-  .turma {
+  .turma,
+  .preenchimento {
     transition: none;
   }
 }
@@ -140,7 +129,17 @@
     outline-color: Highlight;
   }
 
-  .contagem {
+  .percentual {
     color: CanvasText;
+  }
+
+  .barra {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    forced-color-adjust: none;
+  }
+
+  .preenchimento {
+    background: Highlight;
   }
 }

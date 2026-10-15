@@ -1,21 +1,12 @@
 "use client";
 
-// Seletores circulares com situação das chamadas e progresso por série na data consultada.
+// Seletores com barras de progresso das chamadas salvas por série e turma.
 // A seleção continua independente da conclusão, com nomes e estados acessíveis.
 import { useId, useMemo, useState } from "react";
-import {
-  CalendarOff,
-  CheckCircle2,
-  ChevronDown,
-  CircleMinus,
-  Clock3,
-  LoaderCircle,
-} from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
-import { coberturaDoDia, type CoberturaTurmaDia } from "@/domain/relatorios";
+import { coberturaDoDia } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import estilos from "./seletor-turma-chamada.module.css";
 
 interface Props {
@@ -48,87 +39,16 @@ function nomeDaSerie(nome: string): string {
   return nome.replace(/^(\d+)[º°]?\s+ano$/i, "$1ª série");
 }
 
-function IconeSituacao({ situacao }: { situacao: Situacao }) {
-  const Icone =
-    situacao === "feriado"
-      ? CalendarOff
-      : situacao === "concluida"
-        ? CheckCircle2
-        : situacao === "pendente"
-          ? Clock3
-          : situacao === "carregando"
-            ? LoaderCircle
-            : CircleMinus;
+function BarraProgresso({ progresso }: { progresso: number | null }) {
   return (
-    <Icone
+    <span
       aria-hidden="true"
-      className={cn(
-        "size-3.5 shrink-0",
-        situacao === "carregando" && "animate-spin motion-reduce:animate-none",
-      )}
-    />
-  );
-}
-
-function AnelSerie({
-  turmas,
-  disponivel,
-  progresso,
-}: {
-  turmas: CoberturaTurmaDia[];
-  disponivel: boolean;
-  progresso: number;
-}) {
-  const total = turmas.reduce((soma, item) => soma + item.esperados, 0);
-  let inicio = 0;
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      aria-hidden="true"
-      className="absolute inset-0 size-full"
-      data-progresso={disponivel && total > 0 ? progresso : undefined}
+      className={estilos.barra}
+      data-disponivel={progresso !== null}
+      data-progresso={progresso ?? undefined}
     >
-      {!disponivel || total === 0 ? (
-        <circle
-          cx="50"
-          cy="50"
-          r="46"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          className="text-muted-foreground opacity-20"
-          data-situacao="indisponivel"
-        />
-      ) : (
-        turmas.map((item) => {
-          const tamanho = (item.esperados * 100) / total;
-          const intervalo = turmas.length > 1 ? Math.min(3, tamanho / 8) : 0;
-          const posicao = inicio + intervalo / 2;
-          inicio += tamanho;
-          return (
-            <circle
-              key={item.turma.id}
-              cx="50"
-              cy="50"
-              r="46"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              pathLength="100"
-              strokeDasharray={`${tamanho - intervalo} ${100 - tamanho + intervalo}`}
-              strokeDashoffset={-posicao}
-              transform="rotate(-90 50 50)"
-              className={item.concluida ? "text-primary" : "text-falta-texto"}
-              data-turma-id={item.turma.id}
-              data-situacao={item.concluida ? "concluida" : "pendente"}
-            >
-              <title>{`${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`}</title>
-            </circle>
-          );
-        })
-      )}
-    </svg>
+      <span className={estilos.preenchimento} style={{ width: `${progresso ?? 0}%` }} />
+    </span>
   );
 }
 
@@ -225,6 +145,7 @@ export function SeletorTurmaChamada({
             total,
             turmasDaSerie.every((item) => item.concluida),
           );
+          const percentual = !feriado && coberturaDisponivel && total > 0 ? progresso : null;
           const nome = nomeDaSerie(grupo.nome);
           const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
           return (
@@ -243,31 +164,13 @@ export function SeletorTurmaChamada({
               onClick={() => aoTocarSerie(grupo.id)}
               className={estilos.serie}
             >
-              <AnelSerie
-                turmas={turmasDaSerie}
-                disponivel={coberturaDisponivel && !feriado}
-                progresso={progresso}
-              />
               <span className={estilos.nome} aria-hidden="true">
-                <span className="line-clamp-2 min-w-0 font-semibold">{nome}</span>
-                {ehAtiva && (
-                  <ChevronDown
-                    size={14}
-                    aria-hidden="true"
-                    className={cn(
-                      "size-3.5 shrink-0 transition-transform motion-reduce:transition-none",
-                      !recolhido && "rotate-180",
-                    )}
-                  />
-                )}
+                {nome}
               </span>
-              <span aria-hidden="true" className={estilos.contagem}>
-                {total} {total === 1 ? "aluno" : "alunos"}
+              <span className={estilos.percentual} aria-hidden="true">
+                {percentual === null ? "-" : `${percentual}%`}
               </span>
-              <span className={estilos.situacao} aria-hidden="true">
-                <IconeSituacao situacao={situacao} />
-                {!feriado && coberturaDisponivel && total > 0 && <span>{progresso}%</span>}
-              </span>
+              <BarraProgresso progresso={percentual} />
               <span id={`${id}-serie-${grupo.id}`} className="sr-only">
                 {descricao}
               </span>
@@ -292,6 +195,7 @@ export function SeletorTurmaChamada({
             const total = contagem.get(opcao.id) ?? 0;
             const salva = cobertura.find((item) => item.turma.id === opcao.id)?.concluida ?? false;
             const situacao = situacaoDe(total, salva);
+            const progresso = situacao === "concluida" ? 100 : situacao === "pendente" ? 0 : null;
             return (
               <Button
                 key={opcao.id}
@@ -306,17 +210,16 @@ export function SeletorTurmaChamada({
                 onClick={() => onEscolher(opcao.id)}
                 className={estilos.turma}
               >
-                <span className={estilos.nomeTurma} aria-hidden="true">
-                  <span className="line-clamp-2 min-w-0 font-semibold">{opcao.nome}</span>
+                <span className={estilos.nome} aria-hidden="true">
+                  {opcao.nome}
                 </span>
-                <span aria-hidden="true" className={estilos.contagem}>
-                  {total} {total === 1 ? "aluno" : "alunos"}
+                <span className={estilos.percentual} aria-hidden="true">
+                  {progresso === null ? "-" : `${progresso}%`}
                 </span>
-                <span className={estilos.situacao} aria-hidden="true">
-                  <IconeSituacao situacao={situacao} />
-                </span>
+                <BarraProgresso progresso={progresso} />
                 <span id={`${id}-turma-${opcao.id}`} className="sr-only">
                   {total} {total === 1 ? "aluno" : "alunos"}. {ROTULOS[situacao]}
+                  {progresso !== null ? `. ${progresso}% concluído` : ""}
                   {feriado
                     ? `. ${feriado}.`
                     : temAlteracoes && ativo
