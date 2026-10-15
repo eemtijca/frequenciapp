@@ -2,6 +2,14 @@
 
 Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Dados. O objetivo é documentar de forma transparente o que existe, por que existe e como o titular pode exercer direitos.
 
+## Informação institucional no aplicativo
+
+O diálogo Sobre apresenta o compromisso com a proteção de dados, a aprovação do uso institucional pela escola e a existência de documento de consentimento assinado e verificado por assinatura gov.br, conforme informação fornecida pela escola. O documento assinado permanece sob guarda institucional e não é publicado pelo aplicativo nem incluído no repositório.
+
+A seção descreve salvaguardas existentes: acesso por conta e permissão, controle de alterações, registro de operações administrativas e gestão do compartilhamento nas integrações. O link "Como os dados são tratados" abre este documento; solicitações sobre dados pessoais são encaminhadas à gestão da escola.
+
+A aprovação institucional e o consentimento informado não constituem certificação jurídica ou auditoria independente de conformidade. A escola, como controladora, continua responsável por definir as bases legais aplicáveis, as finalidades, a retenção e as condições de cada integração. A declaração não autoriza novos envios de dados a serviços externos.
+
 ## Dados tratados
 
 | Dado                                                                  | Finalidade                                                                        | Retenção                                                                            |
