@@ -17,7 +17,10 @@ import { ambiente } from "@/infra/ambiente";
 import { ErroHttp } from "@/infra/erros";
 import { comTransacao } from "@/infra/transacoes";
 
-function apresentarPersonalizacao(linha: LinhaParcial): FrequenciaParcial {
+function apresentarPersonalizacao(
+  linha: LinhaParcial,
+  catalogo: ReadonlyMap<string, string>,
+): FrequenciaParcial {
   return {
     id: linha.id,
     alunoId: linha.alunoId,
@@ -26,6 +29,10 @@ function apresentarPersonalizacao(linha: LinhaParcial): FrequenciaParcial {
     turmaNome: linha.turmaNome,
     dia: linha.dia.toISOString().slice(0, 10),
     tipo: linha.tipo,
+    justificativa: linha.justificativa,
+    ...(linha.justificativa
+      ? { justificativaRotulo: catalogo.get(linha.justificativa) ?? linha.justificativa }
+      : {}),
     turno: linha.turno,
     aulas: linha.aulas,
     observacao: linha.observacao,
@@ -110,7 +117,7 @@ export async function listarFrequenciasPersonalizadas(
     );
     const porAlunoDia = new Map<string, RegistroPersonalizado>();
     for (const personalizada of personalizadas) {
-      const registro = apresentarPersonalizacao(personalizada);
+      const registro = apresentarPersonalizacao(personalizada, catalogo);
       porAlunoDia.set(`${registro.alunoId}:${registro.dia}`, registro);
     }
     for (const chamada of chamadas) {
@@ -136,6 +143,14 @@ export async function listarFrequenciasPersonalizadas(
             dia,
           ),
           justificativas: motivosDasFaltas(faltas, catalogo),
+          justificativa:
+            new Set(faltas.map((f) => f.justificativa)).size === 1
+              ? (faltas[0]?.justificativa ?? null)
+              : null,
+          observacao:
+            new Set(faltas.map((f) => f.observacao)).size === 1
+              ? (faltas[0]?.observacao ?? null)
+              : null,
           registradoSeduc: aluno.registradoSeduc,
           registradoSeducEm: aluno.registradoSeducEm?.toISOString() ?? null,
           registradoSeducPorNome: aluno.registradoSeducPorNome,

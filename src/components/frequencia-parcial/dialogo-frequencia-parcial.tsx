@@ -1,15 +1,19 @@
 "use client";
 
-// Edição da presença por dia, turno ou aulas exatas, sem alterar a chamada diária.
+// Presenças personalizadas e justificativas por intervalo, com conferência das datas.
 import { useMemo, useState } from "react";
 import { LoaderCircle } from "lucide-react";
-import type { Aluno, Turma } from "@/domain/frequencia";
+import type { Aluno, Turma, JustificativaConfigurada } from "@/domain/frequencia";
 import type { FrequenciaParcial, TipoFrequenciaParcial } from "@/domain/frequencia-parcial";
 import {
+  limiteAgendamentoParcial,
   LIMITE_AULAS_PARCIAL,
   LIMITE_OBSERVACAO_PARCIAL,
   normalizarAulas,
 } from "@/domain/frequencia-parcial";
+import { diasEntre, ehDiaValido, ehDomingo, JUSTIFICATIVA_OUTROS } from "@/domain/frequencia";
+import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +34,9 @@ export interface EdicaoParcial {
   turno: "MANHA" | "TARDE";
   aulas: number[];
   observacao: string;
+  justificativa: string;
+  de: string;
+  ate: string;
 }
 
 export function edicaoDoRegistro(registro?: FrequenciaParcial): EdicaoParcial {
@@ -39,6 +46,9 @@ export function edicaoDoRegistro(registro?: FrequenciaParcial): EdicaoParcial {
     turno: registro?.turno ?? "MANHA",
     aulas: registro?.aulas ?? [],
     observacao: registro?.observacao ?? "",
+    justificativa: registro?.justificativa ?? "",
+    de: registro?.dia ?? "",
+    ate: registro?.dia ?? "",
   };
 }
 
@@ -49,6 +59,9 @@ export function assinaturaDaEdicao(edicao: EdicaoParcial): string {
     turno: edicao.tipo === "TURNO" ? edicao.turno : null,
     aulas: edicao.tipo === "AULAS" ? normalizarAulas(edicao.aulas) : [],
     observacao: edicao.observacao.trim(),
+    justificativa: edicao.tipo === "JUSTIFICADA" ? edicao.justificativa : null,
+    de: edicao.tipo === "JUSTIFICADA" ? edicao.de : null,
+    ate: edicao.tipo === "JUSTIFICADA" ? edicao.ate : null,
   });
 }
 
@@ -59,6 +72,9 @@ interface Props {
   turma: Turma | undefined;
   alunos: Aluno[];
   dia: string;
+  hoje: string;
+  justificativas: JustificativaConfigurada[];
+  feriados: Feriado[];
   sujo: boolean;
   salvando: boolean;
   bloqueado?: boolean;
@@ -77,6 +93,9 @@ export function DialogoFrequenciaParcial({
   turma,
   alunos,
   dia,
+  hoje,
+  justificativas,
+  feriados,
   sujo,
   salvando,
   bloqueado = false,
@@ -99,6 +118,18 @@ export function DialogoFrequenciaParcial({
     );
     return Array.from({ length: total }, (_, indice) => indice + 1);
   }, [edicao.aulas, limiteAulas, turma]);
+
+  const justificando = edicao.tipo === "JUSTIFICADA";
+  const intervaloValido =
+    ehDiaValido(edicao.de) &&
+    ehDiaValido(edicao.ate) &&
+    edicao.ate >= edicao.de &&
+    (Date.parse(edicao.ate) - Date.parse(edicao.de)) / 86_400_000 <= 30;
+  const dias = intervaloValido
+    ? diasEntre(edicao.de, edicao.ate).filter((d) => !ehDomingo(d) && !feriadoNaData(feriados, d))
+    : [];
+  const futuro = dia > hoje;
+  const limite = limiteAgendamentoParcial(hoje);
 
   function alternarAula(aula: number) {
     const marcadas = edicao.aulas.includes(aula)
@@ -143,17 +174,18 @@ export function DialogoFrequenciaParcial({
             </p>
           </div>
           <fieldset disabled={salvando} className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">Presença registrada</legend>
+            <legend className="mb-2 text-sm font-medium">Registro da frequência</legend>
             <div
               role="radiogroup"
               aria-label="Forma da frequência parcial"
-              className="grid grid-cols-3 gap-2"
+              className="grid grid-cols-2 gap-2"
             >
               {(
                 [
                   ["DIA_INTEIRO", "Dia inteiro"],
                   ["TURNO", "Turno inteiro"],
                   ["AULAS", "Por aulas"],
+                  ["JUSTIFICADA", "Justificativa"],
                 ] as const
               ).map(([tipo, rotulo]) => (
                 <button
@@ -161,15 +193,82 @@ export function DialogoFrequenciaParcial({
                   type="button"
                   role="radio"
                   aria-checked={edicao.tipo === tipo}
+                  disabled={futuro && tipo !== "JUSTIFICADA"}
                   onClick={() => onEdicao({ ...edicao, tipo })}
-                  className="controle-vidro pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium"
+                  className="controle-vidro pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {rotulo}
                 </button>
               ))}
             </div>
           </fieldset>
-          {edicao.tipo === "TURNO" ? (
+          {justificando ? (
+            <div className="flex flex-col gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <Label>Data inicial</Label>
+                  <SeletorPeriodo
+                    id="parcial-justificativa-de"
+                    modo="dia"
+                    valor={edicao.de || dia}
+                    max={limite}
+                    atual={hoje}
+                    semDomingo
+                    mostrarSelo={false}
+                    rotulo={(edicao.de || dia).split("-").reverse().join("/")}
+                    rotuloAcessivel="Data inicial da justificativa"
+                    onValor={(de) =>
+                      onEdicao({ ...edicao, de, ate: edicao.ate < de ? de : edicao.ate })
+                    }
+                    disabled={salvando || registro !== null}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Data final</Label>
+                  <SeletorPeriodo
+                    id="parcial-justificativa-ate"
+                    modo="dia"
+                    valor={edicao.ate || dia}
+                    max={limite}
+                    atual={hoje}
+                    semDomingo
+                    mostrarSelo={false}
+                    rotulo={(edicao.ate || dia).split("-").reverse().join("/")}
+                    rotuloAcessivel="Data final da justificativa"
+                    onValor={(ate) => onEdicao({ ...edicao, ate })}
+                    disabled={salvando || registro !== null}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="parcial-justificativa">Justificativa</Label>
+                <Selecionar
+                  id="parcial-justificativa"
+                  value={edicao.justificativa}
+                  onValueChange={(justificativa) =>
+                    onEdicao({
+                      ...edicao,
+                      justificativa,
+                      observacao: justificativa === JUSTIFICATIVA_OUTROS ? edicao.observacao : "",
+                    })
+                  }
+                  opcoes={justificativas
+                    .filter((j) => j.ativo || j.codigo === edicao.justificativa)
+                    .map((j) => ({ valor: j.codigo, rotulo: j.rotulo }))}
+                  disabled={salvando}
+                  placeholder="Selecione"
+                />
+              </div>
+              <p className="text-muted-foreground text-sm" role="status">
+                {intervaloValido
+                  ? `${dias.length} ${dias.length === 1 ? "dia incluído" : "dias incluídos"}. Domingos e feriados ficam fora.`
+                  : "Escolha um período de até 31 dias, em ordem de data."}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                Dia inteiro. Em chamadas salvas, altera apenas a justificativa deste aluno.
+              </p>
+            </div>
+          ) : edicao.tipo === "TURNO" ? (
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="parcial-turno">Turno frequentado</Label>
               <Selecionar
@@ -257,18 +356,20 @@ export function DialogoFrequenciaParcial({
           ) : (
             <p className="text-muted-foreground text-sm">Presença em todas as aulas do dia.</p>
           )}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="parcial-observacao">Observação</Label>
-            <Input
-              id="parcial-observacao"
-              value={edicao.observacao}
-              onChange={(evento) => onEdicao({ ...edicao, observacao: evento.target.value })}
-              maxLength={LIMITE_OBSERVACAO_PARCIAL}
-              disabled={salvando}
-              placeholder="Opcional"
-              className="h-11"
-            />
-          </div>
+          {(!justificando || edicao.justificativa === JUSTIFICATIVA_OUTROS) && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="parcial-observacao">Observação</Label>
+              <Input
+                id="parcial-observacao"
+                value={edicao.observacao}
+                onChange={(evento) => onEdicao({ ...edicao, observacao: evento.target.value })}
+                maxLength={justificando ? 200 : LIMITE_OBSERVACAO_PARCIAL}
+                disabled={salvando}
+                placeholder="Opcional"
+                className="h-11"
+              />
+            </div>
+          )}
           {registro?.registradoSeduc && sujo && (
             <p role="status" className="text-muted-foreground rounded-lg border p-3 text-sm">
               A alteração deixará este registro pendente de conferência na Seduc.
@@ -302,6 +403,7 @@ export function DialogoFrequenciaParcial({
                 salvando ||
                 bloqueado ||
                 !edicao.alunoId ||
+                (justificando && (!edicao.justificativa || !intervaloValido || !dias.length)) ||
                 (edicao.tipo === "AULAS" && edicao.aulas.length === 0) ||
                 conflito ||
                 (registro !== null && !sujo)
@@ -309,7 +411,7 @@ export function DialogoFrequenciaParcial({
               className="h-11"
             >
               {salvando && <LoaderCircle size={16} className="animate-spin" />}
-              Salvar frequência parcial
+              {justificando ? "Salvar justificativa" : "Salvar frequência parcial"}
             </Button>
           </DialogFooter>
         </form>

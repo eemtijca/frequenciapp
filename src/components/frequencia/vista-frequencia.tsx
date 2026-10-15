@@ -3,6 +3,11 @@
 // Chamada diária: todos presentes por padrão; toque no aluno para marcar
 // falta e de novo para voltar. A falta pode receber uma justificativa do
 // catálogo (FJ). Rascunho local e proteção de conflito.
+import {
+  mesmasJustificativasAntecipadas,
+  type JustificativaAntecipada,
+  type RevisaoJustificativaAntecipada,
+} from "@/domain/justificativas-antecipadas";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -98,6 +103,7 @@ interface Rascunho {
   faltas: FaltaAluno[];
   revisao: number;
   sabadoLetivo?: boolean;
+  justificativasAntecipadas?: RevisaoJustificativaAntecipada[];
 }
 
 /** Converte as faltas agrupadas do servidor em mapa por aluno. */
@@ -175,6 +181,7 @@ export default function VistaFrequencia({
   const [conflito, setConflito] = useState(false);
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
+  const justificativasAntecipadasRef = useRef<RevisaoJustificativaAntecipada[]>([]);
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
   const semMovimento = useReducedMotion() ?? false;
@@ -240,15 +247,33 @@ export default function VistaFrequencia({
     setAtualizadoEm("");
     chaveCarregada.current = chave;
 
-    pedir<{ frequencias: Frequencia[]; feriado?: Feriado | null }>(`/api/frequencias?dia=${dia}`)
+    pedir<{
+      frequencias: Frequencia[];
+      feriado?: Feriado | null;
+      justificativasAntecipadas?: JustificativaAntecipada[];
+    }>(`/api/frequencias?dia=${dia}`)
       .then((dados) => {
         if (!viva) return;
         const frequencias = dados.frequencias.filter((item) => item.dia === dia);
         const frequencia = frequencias.find((item) => item.turmaId === turmaId) ?? null;
         setFrequenciasDoDia({ chave, frequencias, feriado: dados.feriado, nomeFeriadoNoCadastro });
-        setAusencias(paraAusencias(frequencia?.faltas ?? []));
-        setJustificativas(paraJustificativas(frequencia?.faltas ?? []));
-        setObservacoes(paraObservacoes(frequencia?.faltas ?? []));
+        const agendadas = frequencia
+          ? []
+          : (dados.justificativasAntecipadas ?? []).filter((j) => j.turmaId === turmaId);
+        justificativasAntecipadasRef.current = agendadas.map(({ id, revisao }) => ({
+          id,
+          revisao,
+        }));
+        const propostas = agendadas.map((j) => ({
+          alunoId: j.alunoId,
+          horarios: turma ? horariosDaChamada(turma.horarios, dia, true).map((h) => h.id) : [],
+          justificativa: j.justificativa,
+          observacao: j.observacao ?? undefined,
+        }));
+        const faltasIniciais = frequencia?.faltas ?? propostas;
+        setAusencias(paraAusencias(faltasIniciais));
+        setJustificativas(paraJustificativas(faltasIniciais));
+        setObservacoes(paraObservacoes(faltasIniciais));
         setRevisaoSalva(frequencia?.revisao ?? 0);
         setListaGravada(frequencia?.alunos ?? null);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
@@ -264,8 +289,15 @@ export default function VistaFrequencia({
               setJustificativas(paraJustificativas(rascunho.faltas));
               setObservacoes(paraObservacoes(rascunho.faltas));
               if (rascunho.sabadoLetivo && diaDaSemanaIso(dia) === 6) setSabadoDesbloqueado(chave);
+              const agendasIguais =
+                frequencia ||
+                mesmasJustificativasAntecipadas(
+                  rascunho.justificativasAntecipadas ?? [],
+                  justificativasAntecipadasRef.current,
+                );
+              justificativasAntecipadasRef.current = rascunho.justificativasAntecipadas ?? [];
               setSujo(true);
-              if (rascunho.revisao === (frequencia?.revisao ?? 0)) {
+              if (rascunho.revisao === (frequencia?.revisao ?? 0) && agendasIguais) {
                 toast(
                   frequencia
                     ? "Rascunho recuperado. Desbloqueie a chamada, confira e salve."
@@ -274,7 +306,9 @@ export default function VistaFrequencia({
               } else {
                 setConflito(true);
                 setErro(
-                  "Há um rascunho neste dispositivo e uma versão mais nova salva. Confira antes de recarregar.",
+                  agendasIguais
+                    ? "Há um rascunho neste dispositivo e uma versão mais nova salva. Confira antes de recarregar."
+                    : "As justificativas antecipadas mudaram desde o rascunho. Recarregue a chamada e confira as marcações.",
                 );
               }
             }
@@ -297,7 +331,7 @@ export default function VistaFrequencia({
     return () => {
       viva = false;
     };
-  }, [chave, recarregar, usuario.id, dia, turmaId, nomeFeriadoNoCadastro]);
+  }, [chave, recarregar, usuario.id, dia, turmaId, turma, nomeFeriadoNoCadastro]);
 
   // Grava rascunho enquanto houver marcação não salva.
   useEffect(() => {
@@ -305,6 +339,7 @@ export default function VistaFrequencia({
     try {
       const rascunho: Rascunho = {
         versao: 3,
+        justificativasAntecipadas: justificativasAntecipadasRef.current,
         faltas: [...ausencias.entries()].map(([alunoId, horarios]) => ({
           alunoId,
           horarios: [...horarios],
@@ -581,6 +616,7 @@ export default function VistaFrequencia({
                 : null,
           })),
           revisao: revisaoSalva,
+          justificativasAntecipadas: justificativasAntecipadasRef.current,
           ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
         }),
       );
@@ -624,8 +660,10 @@ export default function VistaFrequencia({
       await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
       const falha = excecao instanceof ErroApi ? excecao : null;
-      if (falha?.conflito) {
-        const vigente = (falha.corpo as { frequencia?: Frequencia }).frequencia;
+      const agendasMudaram =
+        (falha?.corpo as { codigo?: string } | undefined)?.codigo === "JUSTIFICATIVAS_ALTERADAS";
+      if (falha?.conflito || agendasMudaram) {
+        const vigente = (falha?.corpo as { frequencia?: Frequencia } | undefined)?.frequencia;
         if (vigente) {
           setRevisaoSalva(vigente.revisao);
           setAtualizadoEm(vigente.atualizadoEm);
@@ -633,7 +671,7 @@ export default function VistaFrequencia({
         setConflito(true);
       }
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
-      setErroVariante(falha?.conflito ? "conflito" : estadoDeErro(excecao));
+      setErroVariante(falha?.conflito || agendasMudaram ? "conflito" : estadoDeErro(excecao));
       if (falha?.status !== 401) {
         toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
           description: falha?.conflito

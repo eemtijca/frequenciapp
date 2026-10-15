@@ -1,5 +1,7 @@
 // Frequência diária: uma por turma e dia, compartilhada pela coordenação,
 // com faltas por aula, proteção de duplicata e conflito por revisão.
+import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
+import { mesmasJustificativasAntecipadas } from "@/domain/justificativas-antecipadas";
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -45,6 +47,10 @@ export const esquemaSalvarFrequencia = z.object({
   ]),
   revisao: z.number().int().min(0, "Revisão inválida.").max(999999),
   sabadoLetivo: z.boolean().optional(),
+  justificativasAntecipadas: z
+    .array(z.object({ id: z.uuid(), revisao: z.number().int().min(1) }).strict())
+    .max(500)
+    .optional(),
 });
 
 interface LinhaFrequencia {
@@ -488,6 +494,36 @@ export async function salvarFrequencia(
       if (revisao === 0) {
         if (existente) {
           return { situacao: "conflito" as const, frequencia: paraFrequencia(existente) };
+        }
+        const agendadas = (await listarJustificativasAntecipadas(dia, turmaId, tx)).filter((j) =>
+          lista.has(j.alunoId),
+        );
+        if (
+          dados.data.justificativasAntecipadas &&
+          !mesmasJustificativasAntecipadas(dados.data.justificativasAntecipadas, agendadas)
+        )
+          throw new ErroHttp(
+            "As justificativas antecipadas mudaram. Recarregue a chamada e confira as marcações antes de salvar.",
+            409,
+            "JUSTIFICATIVAS_ALTERADAS",
+          );
+        // Clientes que leram as propostas podem corrigi-las explicitamente; clientes antigos recebem a base automática.
+        if (!dados.data.justificativasAntecipadas && agendadas.length) {
+          const alunosAgendados = new Set(agendadas.map((j) => j.alunoId));
+          const preservadas = faltasParaGravar.filter((f) => !alunosAgendados.has(f.alunoId));
+          faltasParaGravar.splice(
+            0,
+            faltasParaGravar.length,
+            ...preservadas,
+            ...agendadas.flatMap((j) =>
+              idsDeAulaAtiva.map((horarioId) => ({
+                alunoId: j.alunoId,
+                horarioId,
+                justificativa: j.justificativa,
+                observacao: j.observacao,
+              })),
+            ),
+          );
         }
         const criada = await tx.frequencia.create({
           data: {

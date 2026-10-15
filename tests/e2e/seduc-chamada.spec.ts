@@ -155,11 +155,11 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
 
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
-    name: `RS, Registrado na Seduc: ${prefixo} Um`,
+    name: `Registro na SEDUC: ${prefixo} Um`,
     exact: true,
   });
   const segundo = secao.getByRole("switch", {
-    name: `RS, Registrado na Seduc: ${prefixo} Dois`,
+    name: `Registro na SEDUC: ${prefixo} Dois`,
     exact: true,
   });
   await expect(secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Presente")).toBeVisible();
@@ -216,7 +216,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
-    name: `RS, Registrado na Seduc: ${prefixo} Um`,
+    name: `Registro na SEDUC: ${prefixo} Um`,
     exact: true,
   });
   await expect(primeiro).toBeEnabled();
@@ -257,7 +257,7 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const confirmacao = linha.getByRole("switch", {
-    name: `RS, Registrado na Seduc: ${prefixo} Um`,
+    name: `Registro na SEDUC: ${prefixo} Um`,
     exact: true,
   });
   await expect(linha.getByText("Presente", { exact: true })).toBeVisible();

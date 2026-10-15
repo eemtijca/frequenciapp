@@ -63,7 +63,8 @@ const esquemaParcial = z
     dia,
     alunoNome: z.string().trim().min(2).max(200),
     turmaNome: z.string().trim().min(1).max(200),
-    tipo: z.enum(["DIA_INTEIRO", "TURNO", "AULAS"]),
+    tipo: z.enum(["DIA_INTEIRO", "TURNO", "AULAS", "JUSTIFICADA"]),
+    justificativa: justificativa.nullish(),
     turno: z.enum(["MANHA", "TARDE"]).nullish(),
     aulas: z.array(z.number().int().min(1).max(30)).max(30),
     observacao: z.string().trim().max(300).nullish(),
@@ -78,6 +79,14 @@ const esquemaParcial = z
     atualizadoEm: instante.optional(),
   })
   .refine((item) => {
+    if (item.tipo === "JUSTIFICADA")
+      return (
+        Boolean(item.justificativa) &&
+        item.turno == null &&
+        item.aulas.length === 0 &&
+        (item.observacao?.length ?? 0) <= 200
+      );
+    if (item.justificativa) return false;
     if (item.tipo === "DIA_INTEIRO") return item.turno == null && item.aulas.length === 0;
     if (item.tipo === "TURNO") return item.turno != null && item.aulas.length === 0;
     return item.turno == null && item.aulas.length > 0;
@@ -377,6 +386,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         alunoNome: true,
         turmaNome: true,
         tipo: true,
+        justificativa: true,
         turno: true,
         aulas: true,
         observacao: true,
@@ -926,7 +936,11 @@ async function mesclarCopia(
         resultado.conflitos += 1;
         continue;
       }
-      if (!idsAlunos.has(parcial.alunoId) || !idsTurmas.has(parcial.turmaId)) {
+      if (
+        !idsAlunos.has(parcial.alunoId) ||
+        !idsTurmas.has(parcial.turmaId) ||
+        (parcial.justificativa && !codigosDeJustificativa.has(parcial.justificativa))
+      ) {
         resultado.conflitos += 1;
         continue;
       }
@@ -937,6 +951,7 @@ async function mesclarCopia(
         ...parcial,
         dia: diaRepositorio,
         turno: parcial.turno ?? null,
+        justificativa: parcial.justificativa ?? null,
         observacao: parcial.observacao ?? null,
         registradoSeducEm: parcial.registradoSeducEm ? new Date(parcial.registradoSeducEm) : null,
         registradoSeducPorId: usuarioExistente(parcial.registradoSeducPorId),
@@ -962,6 +977,7 @@ async function mesclarCopia(
           atual.alunoNome === data.alunoNome &&
           atual.turmaNome === data.turmaNome &&
           atual.tipo === data.tipo &&
+          (atual.justificativa ?? null) === data.justificativa &&
           atual.turno === data.turno &&
           atual.aulas.join(",") === data.aulas.join(",") &&
           atual.observacao === data.observacao &&

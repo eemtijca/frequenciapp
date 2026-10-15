@@ -18,11 +18,14 @@ function pausar(ms: number): Promise<void> {
  * isolamento Serializable. Em caso de conflito de serialização, tenta
  * de novo (até três vezes) antes de devolver o erro.
  */
-export async function comTransacao<T>(operacao: Transacao<T>): Promise<T> {
+export async function comTransacao<T>(
+  operacao: Transacao<T>,
+  opcoes: { timeout?: number } = {},
+): Promise<T> {
   let ultimoErro: unknown = null;
   for (let tentativa = 1; tentativa <= MAXIMO_TENTATIVAS; tentativa += 1) {
     try {
-      return await banco().$transaction(operacao, { isolationLevel: "Serializable" });
+      return await banco().$transaction(operacao, { isolationLevel: "Serializable", ...opcoes });
     } catch (erro) {
       ultimoErro = erro;
       if (!ehConflitoDeSerializacao(erro)) throw erro;

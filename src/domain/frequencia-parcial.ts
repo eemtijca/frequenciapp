@@ -1,6 +1,6 @@
-// Presença por dia inteiro, turno ou aulas, separada das faltas da chamada regular.
+// Presença personalizada e justificativas antecipadas para a primeira chamada do dia.
 // A confirmação manual na Seduc identifica a revisão que já foi lançada.
-export type TipoFrequenciaParcial = "TURNO" | "AULAS" | "DIA_INTEIRO";
+export type TipoFrequenciaParcial = "TURNO" | "AULAS" | "DIA_INTEIRO" | "JUSTIFICADA";
 export type TurnoParcial = "MANHA" | "TARDE";
 export const LIMITE_OBSERVACAO_PARCIAL = 300;
 export const LIMITE_AULAS_PARCIAL = 30;
@@ -13,6 +13,8 @@ export interface FrequenciaParcial {
   alunoNome: string;
   turmaNome: string;
   tipo: TipoFrequenciaParcial;
+  justificativa?: string | null;
+  justificativaRotulo?: string | null;
   turno: TurnoParcial | null;
   aulas: number[];
   observacao: string | null;
@@ -31,8 +33,13 @@ export function normalizarAulas(aulas: readonly number[]): number[] {
 
 /** Descrição usada na lista e na planilha, sem inferir horários não cadastrados. */
 export function rotuloFrequenciaParcial(
-  registro: Pick<FrequenciaParcial, "tipo" | "turno" | "aulas">,
+  registro: Pick<
+    FrequenciaParcial,
+    "tipo" | "turno" | "aulas" | "justificativa" | "justificativaRotulo"
+  >,
 ): string {
+  if (registro.tipo === "JUSTIFICADA")
+    return registro.justificativaRotulo ?? registro.justificativa ?? "Falta justificada";
   if (registro.tipo === "DIA_INTEIRO") return "Dia inteiro";
   if (registro.tipo === "TURNO") return registro.turno === "MANHA" ? "Manhã" : "Tarde";
   const aulas = normalizarAulas(registro.aulas);
@@ -40,4 +47,11 @@ export function rotuloFrequenciaParcial(
   if (aulas.length > 1 && aulas.every((aula, indice) => aula === (aulas[0] ?? 0) + indice))
     return `${aulas[0]}ª à ${aulas.at(-1)}ª aula`;
   return `Aulas ${aulas.join(", ")}`;
+}
+
+/** Limite de agendamento civil, sem mudar a regra de futuro da Chamada normal. */
+export function limiteAgendamentoParcial(hoje: string): string {
+  const limite = new Date(`${hoje}T12:00:00Z`);
+  limite.setUTCDate(limite.getUTCDate() + 366);
+  return limite.toISOString().slice(0, 10);
 }

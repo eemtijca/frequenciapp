@@ -13,15 +13,22 @@ import {
   Trash2,
   CalendarOff,
 } from "lucide-react";
-import type { Aluno, ConfirmacaoSeducAluno, Serie, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  ConfirmacaoSeducAluno,
+  Serie,
+  Turma,
+  JustificativaConfigurada,
+} from "@/domain/frequencia";
 import {
+  JUSTIFICATIVA_OUTROS,
   alunoDesistenteNoDia,
   diaDeChamadaVizinho,
   ultimoDiaDeChamada,
   normalizar,
   rotuloDiaSemana,
 } from "@/domain/frequencia";
-import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
+import { limiteAgendamentoParcial, type FrequenciaParcial } from "@/domain/frequencia-parcial";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import {
   rotuloFrequenciaPersonalizada,
@@ -29,7 +36,7 @@ import {
   type FrequenciaDaChamada,
 } from "@/domain/frequencia-personalizada";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { cn } from "@/lib/utils";
@@ -66,6 +73,8 @@ interface Props {
   ativa: boolean;
   fuso: string;
   feriados: Feriado[];
+  justificativas: JustificativaConfigurada[];
+  onFrequenciasMudaram?: () => Promise<void>;
   onPendencia?: (pendente: boolean) => void;
 }
 
@@ -84,8 +93,21 @@ interface CargaParcial {
 
 const REGISTROS_VAZIOS: RegistroPersonalizado[] = [];
 
-function resumoDoRegistro(registro: RegistroPersonalizado | undefined): string {
+function resumoDoRegistro(
+  registro: RegistroPersonalizado | undefined,
+  catalogo: JustificativaConfigurada[],
+): string {
   if (!registro) return "Sem registro";
+  if (registro.tipo === "JUSTIFICADA") {
+    const motivo =
+      catalogo.find((j) => j.codigo === registro.justificativa)?.rotulo ??
+      registro.justificativaRotulo ??
+      registro.justificativa ??
+      "Falta justificada";
+    return registro.justificativa === JUSTIFICATIVA_OUTROS && registro.observacao
+      ? `${motivo}: ${registro.observacao}`
+      : motivo;
+  }
   if (registro.tipo !== "CHAMADA") {
     return registro.tipo === "DIA_INTEIRO"
       ? "Presente"
@@ -115,6 +137,8 @@ export default function VistaFrequenciaParcial({
   ativa,
   fuso,
   feriados,
+  justificativas,
+  onFrequenciasMudaram,
   onPendencia,
 }: Props) {
   // Domingo não tem chamada: abrir num domingo mostra o sábado anterior.
@@ -301,7 +325,15 @@ export default function VistaFrequenciaParcial({
     const base = registro?.tipo === "CHAMADA" ? registro : null;
     const personalizado = registro?.tipo === "CHAMADA" ? null : registro;
     const inicial: EdicaoParcial = { ...edicaoDoRegistro(personalizado ?? undefined), alunoId };
-    if (base) inicial.tipo = base.marca === "P" ? "DIA_INTEIRO" : "AULAS";
+    inicial.de = dia;
+    inicial.ate = dia;
+    if (base) {
+      inicial.tipo =
+        base.marca === "P" ? "DIA_INTEIRO" : base.marca === "FJ" ? "JUSTIFICADA" : "AULAS";
+      inicial.justificativa = base.justificativa ?? "";
+      inicial.observacao = base.observacao ?? "";
+    }
+    if (dia > diaInicial) inicial.tipo = "JUSTIFICADA";
     setBaseEdicao(base);
     setRegistroEditado(personalizado);
     setEdicao(inicial);
@@ -320,25 +352,45 @@ export default function VistaFrequenciaParcial({
     if (!edicao.alunoId || conflito || feriado) return;
     setErroEdicao("");
     try {
-      const dados = await pedir<{ registro: FrequenciaParcial }>(
+      const dados = await pedir<{
+        registro: FrequenciaParcial;
+        registros?: FrequenciaParcial[];
+        aviso?: string;
+      }>(
         "/api/frequencias-parciais",
         corpoJson({
           alunoId: edicao.alunoId,
-          dia,
+          dia: edicao.tipo === "JUSTIFICADA" ? edicao.de : dia,
+          ...(edicao.tipo === "JUSTIFICADA"
+            ? { ate: edicao.ate, justificativa: edicao.justificativa }
+            : {}),
           turmaId: registroEditado?.turmaId ?? turmaId,
           tipo: edicao.tipo,
           turno: edicao.tipo === "TURNO" ? edicao.turno : null,
           aulas: edicao.tipo === "AULAS" ? edicao.aulas : [],
           observacao: edicao.observacao.trim() || null,
           revisao: registroEditado?.revisao ?? 0,
-          ...(baseEdicao
+          ...(baseEdicao &&
+          (edicao.tipo !== "JUSTIFICADA" || (edicao.de === dia && edicao.ate === dia))
             ? { baseChamada: { turmaId: baseEdicao.turmaId, revisao: baseEdicao.revisao } }
             : {}),
         }),
       );
       atualizarRegistro(dados.registro);
       setEditorAberto(false);
-      avisarSucesso("Frequência parcial salva.");
+      if (dados.aviso) avisarInfo(dados.aviso);
+      if (edicao.tipo === "JUSTIFICADA") {
+        setDia(dados.registro.dia);
+        setRecarregar((v) => v + 1);
+        avisarSucesso(
+          `${dados.registros?.length ?? 1} ${(dados.registros?.length ?? 1) === 1 ? "dia justificado" : "dias justificados"}.`,
+        );
+        void onFrequenciasMudaram?.().catch((excecao) =>
+          avisarErro(excecao, {
+            contexto: "A justificativa foi salva. Não foi possível atualizar os indicadores.",
+          }),
+        );
+      } else avisarSucesso("Frequência parcial salva.");
     } catch (excecao) {
       setErroEdicao(mensagemAmigavel(excecao, "Não foi possível salvar a frequência parcial."));
       setConflito(excecao instanceof ErroApi && excecao.status === 409);
@@ -472,7 +524,8 @@ export default function VistaFrequenciaParcial({
             id="dia-chamada-parcial"
             modo="dia"
             valor={dia}
-            max={diaInicial}
+            max={limiteAgendamentoParcial(diaInicial)}
+            atual={diaInicial}
             semDomingo
             rotulo={dia.split("-").reverse().join("/")}
             detalhe={rotuloDiaSemana(dia)}
@@ -487,7 +540,7 @@ export default function VistaFrequenciaParcial({
           size="icon"
           aria-label="Dia seguinte da chamada parcial"
           onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
-          disabled={ocupado || editorAberto || dia >= diaPadrao}
+          disabled={ocupado || editorAberto || dia >= limiteAgendamentoParcial(diaInicial)}
           className="size-11 shrink-0"
         >
           <ChevronRight size={18} />
@@ -589,14 +642,16 @@ export default function VistaFrequenciaParcial({
                             "mt-2 w-fit max-w-full rounded-xl border px-3 py-1.5 text-xs leading-relaxed font-medium wrap-anywhere",
                             !registro
                               ? "bg-muted/30 text-muted-foreground"
-                              : registro.tipo !== "CHAMADA" || registro.marca === "P"
-                                ? "border-primary/25 bg-primary/10 text-primary"
-                                : registro.marca === "FJ"
-                                  ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                  : "border-falta/25 bg-falta-fraca text-falta-texto",
+                              : registro.tipo === "JUSTIFICADA"
+                                ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                : registro.tipo !== "CHAMADA" || registro.marca === "P"
+                                  ? "border-primary/25 bg-primary/10 text-primary"
+                                  : registro.marca === "FJ"
+                                    ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                    : "border-falta/25 bg-falta-fraca text-falta-texto",
                           )}
                         >
-                          {resumoDoRegistro(registro)}
+                          {resumoDoRegistro(registro, justificativas)}
                         </p>
                       </div>
                     </div>
@@ -604,14 +659,14 @@ export default function VistaFrequenciaParcial({
                       <Label
                         htmlFor={`parcial-seduc-${aluno.id}`}
                         className="min-h-11 text-xs"
-                        title="Registrado na Seduc"
+                        title="Registro na SEDUC"
                       >
-                        RS
+                        Registro na SEDUC
                       </Label>
                       <Switch
                         id={`parcial-seduc-${aluno.id}`}
-                        aria-label={`RS, Registrado na Seduc: ${aluno.nome}`}
-                        title="Registrado na Seduc"
+                        aria-label={`Registro na SEDUC: ${aluno.nome}`}
+                        title="Registro na SEDUC"
                         checked={registro?.registradoSeduc ?? false}
                         disabled={!registro || ocupado || editorAberto}
                         onCheckedChange={(valor) => registro && confirmarSeduc(registro, valor)}
@@ -624,11 +679,13 @@ export default function VistaFrequenciaParcial({
                             ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`
                             : "Pendente de lançamento na Seduc"}
                         </p>
-                        {registro.tipo !== "CHAMADA" && registro.observacao && (
-                          <p className="text-muted-foreground mt-2 text-sm break-words">
-                            {registro.observacao}
-                          </p>
-                        )}
+                        {registro.tipo !== "CHAMADA" &&
+                          registro.tipo !== "JUSTIFICADA" &&
+                          registro.observacao && (
+                            <p className="text-muted-foreground mt-2 text-sm break-words">
+                              {registro.observacao}
+                            </p>
+                          )}
                       </>
                     )}
                     <div className="mt-2 flex justify-end gap-2">
@@ -688,6 +745,9 @@ export default function VistaFrequenciaParcial({
         turma={turma}
         alunos={alunosDaEdicao}
         dia={dia}
+        hoje={diaInicial}
+        justificativas={justificativas}
+        feriados={feriados}
         sujo={sujo}
         salvando={salvando || recarregandoEdicao}
         bloqueado={Boolean(feriado)}
@@ -728,8 +788,11 @@ export default function VistaFrequenciaParcial({
             <AlertDialogTitle>Remover a frequência parcial?</AlertDialogTitle>
             <AlertDialogDescription>
               O registro de {registroRemover?.alunoNome} em {dia.split("-").reverse().join("/")}{" "}
-              será removido. A base da Chamada, quando disponível, voltará a aparecer com RS
-              pendente. Confira também os lançamentos na Seduc e na planilha.
+              será removido.{" "}
+              {registroRemover?.tipo === "JUSTIFICADA"
+                ? "Justificativas já aplicadas na Chamada serão preservadas. Para corrigir essas faltas, altere também a Chamada do dia."
+                : "A base da Chamada, quando disponível, voltará a aparecer com Registro na SEDUC pendente."}{" "}
+              Confira também os lançamentos na Seduc e na planilha.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
