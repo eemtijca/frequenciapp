@@ -123,6 +123,9 @@ export default function IntegracaoSaidas({
   }, []);
 
   useEffect(() => {
+    // O carregamento é assíncrono e só toca no estado depois do await. A regra
+    // set-state-in-effect não distingue o caso, registrado no ADR 047.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- carregamento assíncrono (ADR 047)
     void carregar();
   }, [carregar]);
 
