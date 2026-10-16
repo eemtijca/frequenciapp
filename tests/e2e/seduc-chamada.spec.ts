@@ -110,6 +110,22 @@ async function chamadaSalva(page: Page) {
   };
 }
 
+async function salvarJustificadas(page: Page) {
+  const base = await chamadaSalva(page);
+  const justificadas = await page.request.post("/api/frequencias", {
+    data: {
+      dia: diaAtual(),
+      turmaId,
+      revisao: base.frequencia.revisao,
+      faltas: [
+        { alunoId, justificativa: "O", observacao: "E2E Justificativa inicial" },
+        { alunoId: segundoAlunoId, justificativa: "O", observacao: "E2E Justificativa inicial" },
+      ],
+    },
+  });
+  expect(justificadas.ok()).toBe(true);
+}
+
 test("mostra presença e motivo completo sob o nome, sem selo da origem e sem corte no celular", async ({
   page,
 }, testInfo) => {
@@ -130,6 +146,9 @@ test("mostra presença e motivo completo sob o nome, sem selo da origem e sem co
   const presente = secao.getByTestId(`parcial-aluno-${segundoAlunoId}`);
   await expect(justificada.getByText(`Outros: ${motivo}`, { exact: true })).toBeVisible();
   await expect(presente.getByText("Presente", { exact: true })).toBeVisible();
+  await expect(presente.getByRole("switch")).toHaveCount(0);
+  await expect(justificada.getByRole("switch")).toBeEnabled();
+  await expect(secao.getByText("Pendente de lançamento na Seduc", { exact: true })).toHaveCount(0);
   await expect(secao.getByText("Chamada", { exact: true })).toHaveCount(0);
   await expect(secao.getByText("Personalizada", { exact: true })).toHaveCount(0);
   for (const tema of ["light", "dark"] as const) {
@@ -153,6 +172,7 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await expect(chamada.getByRole("switch")).toHaveCount(0);
 
+  await salvarJustificadas(page);
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
     name: `Registro na SEDUC: ${prefixo} Um`,
@@ -162,9 +182,13 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
     name: `Registro na SEDUC: ${prefixo} Dois`,
     exact: true,
   });
-  await expect(secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Presente")).toBeVisible();
   await expect(
-    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Presente"),
+    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Outros: E2E Justificativa inicial"),
+  ).toBeVisible();
+  await expect(
+    secao
+      .getByTestId(`parcial-aluno-${segundoAlunoId}`)
+      .getByText("Outros: E2E Justificativa inicial"),
   ).toBeVisible();
   await expect(primeiro).toBeEnabled();
   await expect(segundo).toBeEnabled();
@@ -174,8 +198,8 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await segundo.click();
   await expect(segundo).toBeChecked();
   const antes = await chamadaSalva(page);
-  expect(antes.frequencia.revisao).toBe(1);
-  expect(antes.frequencia.faltas).toEqual([]);
+  expect(antes.frequencia.revisao).toBe(2);
+  expect(antes.frequencia.faltas).toHaveLength(2);
   await abrirParcial(page);
   await expect(primeiro).toBeChecked();
   await expect(segundo).toBeChecked();
@@ -188,24 +212,27 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
     fullPage: true,
   });
 
-  await abrirChamada(page);
-  await chamada.getByRole("button", { name: /Desbloquear chamada de E2E Seduc Normal A/ }).click();
-  await expect(chamada.getByRole("switch")).toHaveCount(0);
-  await chamada.getByRole("button", { name: new RegExp(`${prefixo} Um: presente`) }).click();
-  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
-  await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
+  const corrigida = await page.request.post("/api/frequencias", {
+    data: {
+      dia: diaAtual(),
+      turmaId,
+      revisao: antes.frequencia.revisao,
+      faltas: [
+        { alunoId },
+        { alunoId: segundoAlunoId, justificativa: "O", observacao: "E2E Justificativa inicial" },
+      ],
+    },
+  });
+  expect(corrigida.ok()).toBe(true);
   await abrirParcial(page);
   await expect(
     secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta", { exact: true }),
   ).toBeVisible();
-  await expect(primeiro).toBeEnabled();
-  await expect(primeiro).not.toBeChecked();
+  await expect(primeiro).toHaveCount(0);
   await expect(segundo).toBeChecked();
-  await primeiro.click();
-  await expect(primeiro).toBeChecked();
   await segundo.click();
   await expect(segundo).not.toBeChecked();
-  await expect(secao.getByText(/Confirmado por/)).toHaveCount(1);
+  await expect(secao.getByText(/Confirmado por/)).toHaveCount(0);
 });
 
 test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a versão salva", async ({
@@ -214,6 +241,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   const chamada = await abrirChamada(page);
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
+  await salvarJustificadas(page);
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
     name: `Registro na SEDUC: ${prefixo} Um`,
@@ -226,7 +254,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
       dia: dados.frequencia.dia,
       turmaId,
       revisao: dados.frequencia.revisao,
-      faltas: [alunoId],
+      faltas: [{ alunoId, justificativa: "O", observacao: "E2E Motivo corrigido" }],
     },
   });
   expect(alteracao.ok()).toBe(true);
@@ -242,25 +270,28 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   await expect(primeiro).toBeEnabled();
   await expect(primeiro).not.toBeChecked();
   await expect(
-    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Falta", { exact: true }),
+    secao
+      .getByTestId(`parcial-aluno-${alunoId}`)
+      .getByText("Outros: E2E Motivo corrigido", { exact: true }),
   ).toBeVisible();
   await primeiro.click();
   await expect(primeiro).toBeChecked();
 });
 
-test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada da coordenação", async ({
+test("personaliza como presença sem controle da Seduc e preserva a chamada justificada da coordenação", async ({
   page,
 }) => {
   const chamada = await abrirChamada(page);
   await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
+  await salvarJustificadas(page);
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const confirmacao = linha.getByRole("switch", {
     name: `Registro na SEDUC: ${prefixo} Um`,
     exact: true,
   });
-  await expect(linha.getByText("Presente", { exact: true })).toBeVisible();
+  await expect(linha.getByText("Outros: E2E Justificativa inicial", { exact: true })).toBeVisible();
   await confirmacao.click();
   await expect(confirmacao).toBeChecked();
   const antes = await chamadaSalva(page);
@@ -276,14 +307,12 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
   await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
-  await expect(confirmacao).not.toBeChecked();
-  await confirmacao.click();
-  await expect(confirmacao).toBeChecked();
+  await expect(confirmacao).toHaveCount(0);
   expect(await chamadaSalva(page)).toEqual(antes);
 
   await abrirParcial(page);
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
-  await expect(confirmacao).toBeChecked();
+  await expect(confirmacao).toHaveCount(0);
   const resposta = await page.request.get(
     `/api/frequencias-parciais?dia=${diaAtual()}&turmaId=${turmaId}`,
   );
@@ -296,7 +325,7 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
     alunoId,
     tipo: "TURNO",
     turno: "TARDE",
-    registradoSeduc: true,
+    registradoSeduc: false,
   });
   const lista = await page.request.get(
     `/api/frequencias-personalizadas?dia=${diaAtual()}&turmaId=${turmaId}`,
@@ -308,16 +337,18 @@ test("personaliza a frequência diária e confirma a Seduc sem alterar a chamada
   expect(personalizada.registros).toHaveLength(2);
   expect(personalizada.registros).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ alunoId, tipo: "TURNO", registradoSeduc: true }),
+      expect.objectContaining({ alunoId, tipo: "TURNO", registradoSeduc: false }),
       expect.objectContaining({ alunoId: segundoAlunoId, tipo: "CHAMADA" }),
     ]),
   );
   await expect(
-    secao.getByTestId(`parcial-aluno-${segundoAlunoId}`).getByText("Presente", { exact: true }),
+    secao
+      .getByTestId(`parcial-aluno-${segundoAlunoId}`)
+      .getByText("Outros: E2E Justificativa inicial", { exact: true }),
   ).toBeVisible();
   await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);
   await expect(
-    chamada.getByRole("button", { name: new RegExp(`${prefixo} Um: presente`) }),
+    chamada.getByRole("button", { name: new RegExp(`${prefixo} Um: falta em`) }),
   ).toBeVisible();
 });

@@ -1,4 +1,4 @@
-/* Seletores compactos de vidro com seleção azul e progresso confirmado por barra. */
+/* Série em linha compacta, opções recolhíveis e turmas com progresso por barra. */
 .faixa {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8,6 +8,7 @@
   padding: 5px;
 }
 
+.gatilho,
 .serie,
 .turma {
   width: 100%;
@@ -30,12 +31,14 @@
     box-shadow 180ms ease;
 }
 
+.gatilho:where([data-situacao="concluida"]),
 .serie:where([data-situacao="concluida"]),
 .turma:where([data-situacao="concluida"]) {
   border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
   background-color: color-mix(in oklab, var(--primary) 10%, var(--card));
 }
 
+.gatilho:where([data-situacao="pendente"]),
 .serie:where([data-situacao="pendente"]),
 .turma:where([data-situacao="pendente"]) {
   border-color: color-mix(in oklab, var(--falta) 45%, var(--border));
@@ -48,6 +51,7 @@
   outline-offset: 2px;
 }
 
+.gatilho:focus-visible,
 .serie:focus-visible,
 .turma:focus-visible {
   outline: 3px solid var(--justificada);
@@ -74,11 +78,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+.gatilho:where([data-situacao="concluida"]) .percentual,
 .serie:where([data-situacao="concluida"]) .percentual,
 .turma:where([data-situacao="concluida"]) .percentual {
   color: var(--primary);
 }
 
+.gatilho:where([data-situacao="pendente"]) .percentual,
 .serie:where([data-situacao="pendente"]) .percentual,
 .turma:where([data-situacao="pendente"]) .percentual {
   color: var(--falta-texto);
@@ -106,6 +112,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .gatilho,
   .serie,
   .turma,
   .preenchimento {
@@ -124,6 +131,7 @@
 
   .serie:where([aria-pressed="true"]),
   .turma:where([aria-pressed="true"]),
+  .gatilho:focus-visible,
   .serie:focus-visible,
   .turma:focus-visible {
     outline-color: Highlight;
@@ -141,5 +149,73 @@
 
   .preenchimento {
     background: Highlight;
+  }
+}
+
+.seletor {
+  padding: 5px;
+  min-width: 0;
+}
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+}
+.gatilho,
+.serie {
+  min-height: 44px;
+  flex-direction: row;
+  gap: 12px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  text-align: left;
+}
+.gatilho .nome,
+.serie .nome {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.gatilho .percentual,
+.serie .percentual {
+  flex-shrink: 0;
+}
+.gatilho {
+  border-color: var(--justificada);
+}
+.gatilho .percentual {
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: color-mix(in oklab, currentColor 10%, transparent);
+}
+.seta,
+.indicador {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.seta {
+  color: var(--muted-foreground);
+  transition: transform 150ms ease;
+}
+.gatilho[data-state="open"] .seta {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .seta {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .gatilho {
+    box-shadow: none;
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+  .gatilho .percentual {
+    background: Canvas;
+    color: CanvasText;
   }
 }

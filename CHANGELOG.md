@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Chamada reúne as séries em um único seletor fino, com extremidades arredondadas e porcentagem dentro. A escolha fecha a lista e mostra abaixo as turmas com barras de progresso, preservando seleção, cores, rascunhos e acesso por toque e teclado.
+
 - Seletores da Chamada passam a usar retângulos com cantos arredondados, nome, porcentagem e barra de progresso, sem contagem visível de alunos. A série avança conforme as turmas são salvas; cada turma indica pendência ou conclusão. Seleção azul, temas, teclado e estados neutros permanecem acessíveis.
 
 - Chamada Parcial agenda justificativas por início e fim com o catálogo da Chamada e calendário futuro exclusivo. Períodos de até 31 dias pulam domingos e feriados e recusam sobreposição sem gravar parte do lote. Motivos aparecem na primeira Chamada e corrigem apenas o aluno em chamadas salvas, com revisão e histórico preservados. A confirmação manual passa a se chamar Registro na SEDUC. A cópia JSON preserva os novos registros.
@@ -126,6 +128,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Chamada Parcial exibe Registro na SEDUC somente para faltas com justificativa e aplica a mesma regra aos filtros de pendência e confirmação. A mensagem de lançamento pendente deixa de ocupar as linhas dos alunos; confirmações anteriores e observações permanecem preservadas.
 
 - Painel, gráficos no celular: o deslize para os lados que começava sobre um campo ou botão do cartão, como no gráfico personalizado, não movia a faixa, que voltava ao cartão de origem e dava a impressão de engasgo ao tentar voltar. O arrasto horizontal passa a valer como gesto pelos eventos de toque, e o teste de navegador cobre o deslize iniciado sobre o seletor de data.
 

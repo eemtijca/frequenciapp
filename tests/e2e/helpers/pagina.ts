@@ -119,17 +119,22 @@ export async function rolarAteGrafico(page: Page, nome: string) {
 }
 
 /**
- * Escolhe uma turma na Chamada. As turmas ficam em botões de série que
- * mostram só as turmas da série ativa; percorre as séries até a turma aparecer.
+ * Escolhe uma turma na Chamada. O seletor único abre as séries e
+ * mostra as turmas da escolha; percorre as opções até a turma aparecer.
  */
 export async function escolherTurmaNaChamada(secao: Locator, nome: RegExp): Promise<void> {
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
   const turma = grupo.getByRole("button", { name: nome }).first();
-  // O primeiro bloco do grupo é o controle de séries; tocar numa série mostra as turmas dela.
-  const seriesBotoes = grupo.locator(":scope > div").first().getByRole("button");
-  const total = await seriesBotoes.count();
-  for (let indice = 0; indice < total && !(await turma.isVisible().catch(() => false)); indice++) {
-    await seriesBotoes.nth(indice).click();
+  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
+  if (!(await turma.isVisible().catch(() => false))) {
+    await gatilho.click();
+    const escolhas = secao.page().getByRole("dialog", { name: "Escolher série", exact: true });
+    const total = await escolhas.getByRole("button").count();
+    for (let indice = 0; indice < total; indice++) {
+      if (indice > 0) await gatilho.click();
+      await escolhas.getByRole("button").nth(indice).click();
+      if (await turma.isVisible().catch(() => false)) break;
+    }
   }
   await turma.click();
 }
