@@ -3,7 +3,12 @@
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { hojeEDomingo } from "./helpers/dia";
-import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "./helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  rolarAteGrafico,
+  trocarVisao,
+} from "./helpers/pagina";
 
 // A desistência marcada hoje aparece na chamada a partir de hoje; aos domingos
 // a chamada abre no sábado anterior e o fluxo não pode ser conferido.
@@ -73,8 +78,7 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
 
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
-  const turmaB = chamada.getByRole("button", { name: /E2E Desistencia B/ }).first();
-  if (await turmaB.isVisible().catch(() => false)) await turmaB.click();
+  await escolherTurmaNaChamada(chamada, /^E2E Desistencia B$/);
   await chamada.getByLabel("Buscar aluno ou turma de origem").fill("E2E Desistente Um");
   const aluno = chamada.getByRole("button", { name: /E2E Desistente Um.*desistente/ });
   await expect(aluno).toBeVisible();

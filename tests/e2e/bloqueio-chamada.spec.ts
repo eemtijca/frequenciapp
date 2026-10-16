@@ -2,7 +2,12 @@
 // sem editar nem reenviar uma frequência por toque acidental.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "./helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "./helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -63,10 +68,7 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
   const secao = page.locator('section[aria-label="Fazer chamada"]');
-  const turmas = secao.getByRole("group", { name: "Turma atual" });
-  const turmaA = turmas.getByRole("button", { name: /E2E Bloqueio A/ });
-  const turmaB = turmas.getByRole("button", { name: /E2E Bloqueio B/ });
-  await turmaA.click();
+  await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
   await liberarSabadoSeNecessario(secao);
   const aluno = secao.getByRole("button", { name: /^E2E Bloqueio Um:/ });
   await expect(aluno).toBeEnabled();
@@ -101,10 +103,10 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1280, height: 720 });
 
-  await turmaB.click();
+  await escolherTurmaNaChamada(secao, /^E2E Bloqueio B$/);
   await liberarSabadoSeNecessario(secao);
   await expect(secao.getByRole("button", { name: /^E2E Bloqueio Dois:/ })).toBeEnabled();
-  await turmaA.click();
+  await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
   await expect(aluno).toBeDisabled();
 
   const desbloquear = secao.getByRole("button", { name: /Desbloquear chamada de E2E Bloqueio A/ });
@@ -127,6 +129,6 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await page.reload();
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
-  await turmaA.click();
+  await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
   await expect(aluno).toBeDisabled();
 });
