@@ -50,3 +50,4 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 A organização do histórico mensal e a retirada conferida de abas antigas estão no [ADR-045](adr/045-acesso-aos-meses-da-planilha.md).
 
 - [ADR-046](adr/046-justificativas-antecipadas.md): justificativas por período na Chamada Parcial, propostas para a Chamada e preservação das revisões.
+- [ADR-047](adr/047-regras-do-react-compiler.md): regras do React Compiler no lint, correções reais e exceções pontuais justificadas.
