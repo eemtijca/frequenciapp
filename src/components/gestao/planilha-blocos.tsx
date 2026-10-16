@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useMinutoCorrente } from "@/lib/use-relogio";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
@@ -56,9 +57,13 @@ export function BlocoModoCompletoPlanilha({
   const [destravando, setDestravando] = useState(false);
   const [senha, setSenha] = useState("");
   const { executar: executarPorChave } = useAcoesPorChave();
+  const minutoCorrente = useMinutoCorrente();
 
+  // O prazo é comparado com o minuto do cliente, nunca com o relógio no render.
   const restanteMinutos =
-    ativo && ate ? Math.max(0, Math.ceil((new Date(ate).getTime() - Date.now()) / 60_000)) : null;
+    ativo && ate && minutoCorrente !== null
+      ? Math.max(0, Math.ceil((new Date(ate).getTime() - minutoCorrente * 60_000) / 60_000))
+      : null;
   const hora = ate
     ? new Date(ate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
     : "";
