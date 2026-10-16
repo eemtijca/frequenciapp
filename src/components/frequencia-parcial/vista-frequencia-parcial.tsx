@@ -121,6 +121,16 @@ function resumoDoRegistro(
     .join(" · ");
 }
 
+function temFaltaJustificada(
+  registro: RegistroPersonalizado | undefined,
+): registro is RegistroPersonalizado {
+  return (
+    registro?.tipo === "JUSTIFICADA" ||
+    (registro?.tipo === "CHAMADA" &&
+      (registro.marca === "FJ" || registro.justificativas.length > 0))
+  );
+}
+
 function momentoDaConfirmacao(
   registro: RegistroPersonalizado,
   formatador: Intl.DateTimeFormat,
@@ -257,8 +267,8 @@ export default function VistaFrequenciaParcial({
           (filtro === "sem-registro"
             ? !aluno.registro
             : filtro === "pendentes"
-              ? aluno.registro && !aluno.registro.registradoSeduc
-              : aluno.registro?.registradoSeduc)),
+              ? temFaltaJustificada(aluno.registro) && !aluno.registro.registradoSeduc
+              : temFaltaJustificada(aluno.registro) && aluno.registro.registradoSeduc)),
     );
   }, [listaAlunos, nomesParaBusca, busca, filtro]);
 
@@ -424,6 +434,7 @@ export default function VistaFrequenciaParcial({
 
   const { chaveAtiva, executar: alterarPorChave } = useAcoesPorChave();
   function confirmarSeduc(registro: RegistroPersonalizado, registrado: boolean) {
+    if (!temFaltaJustificada(registro)) return;
     void alterarPorChave(registro.id, async () => {
       try {
         if (registro.tipo === "CHAMADA") {
@@ -655,39 +666,40 @@ export default function VistaFrequenciaParcial({
                         </p>
                       </div>
                     </div>
-                    <div className="mt-2 flex items-center gap-2 pl-10">
-                      <Label
-                        htmlFor={`parcial-seduc-${aluno.id}`}
-                        className="min-h-11 text-xs"
-                        title="Registro na SEDUC"
-                      >
-                        Registro na SEDUC
-                      </Label>
-                      <Switch
-                        id={`parcial-seduc-${aluno.id}`}
-                        aria-label={`Registro na SEDUC: ${aluno.nome}`}
-                        title="Registro na SEDUC"
-                        checked={registro?.registradoSeduc ?? false}
-                        disabled={!registro || ocupado || editorAberto}
-                        onCheckedChange={(valor) => registro && confirmarSeduc(registro, valor)}
-                      />
-                    </div>
-                    {registro && (
+                    {temFaltaJustificada(registro) && (
                       <>
-                        <p className="mt-3 text-xs" role="status">
-                          {registro.registradoSeduc
-                            ? `Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`
-                            : "Pendente de lançamento na Seduc"}
-                        </p>
-                        {registro.tipo !== "CHAMADA" &&
-                          registro.tipo !== "JUSTIFICADA" &&
-                          registro.observacao && (
-                            <p className="text-muted-foreground mt-2 text-sm break-words">
-                              {registro.observacao}
-                            </p>
-                          )}
+                        <div className="mt-2 flex items-center gap-2 pl-10">
+                          <Label
+                            htmlFor={`parcial-seduc-${aluno.id}`}
+                            className="min-h-11 text-xs"
+                            title="Registro na SEDUC"
+                          >
+                            Registro na SEDUC
+                          </Label>
+                          <Switch
+                            id={`parcial-seduc-${aluno.id}`}
+                            aria-label={`Registro na SEDUC: ${aluno.nome}`}
+                            title="Registro na SEDUC"
+                            checked={registro.registradoSeduc}
+                            disabled={ocupado || editorAberto}
+                            onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
+                          />
+                        </div>
+                        {registro.registradoSeduc && (
+                          <p className="mt-3 text-xs" role="status">
+                            {`Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`}
+                          </p>
+                        )}
                       </>
                     )}
+                    {registro &&
+                      registro.tipo !== "CHAMADA" &&
+                      registro.tipo !== "JUSTIFICADA" &&
+                      registro.observacao && (
+                        <p className="text-muted-foreground mt-2 text-sm break-words">
+                          {registro.observacao}
+                        </p>
+                      )}
                     <div className="mt-2 flex justify-end gap-2">
                       <Button
                         type="button"

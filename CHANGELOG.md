@@ -129,6 +129,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Chamada Parcial exibe Registro na SEDUC somente para faltas com justificativa e aplica a mesma regra aos filtros de pendência e confirmação. A mensagem de lançamento pendente deixa de ocupar as linhas dos alunos; confirmações anteriores e observações permanecem preservadas.
+
 - Painel, gráficos no celular: o deslize para os lados que começava sobre um campo ou botão do cartão, como no gráfico personalizado, não movia a faixa, que voltava ao cartão de origem e dava a impressão de engasgo ao tentar voltar. O arrasto horizontal passa a valer como gesto pelos eventos de toque, e o teste de navegador cobre o deslize iniciado sobre o seletor de data.
 
 - Conferência do mapa de frequência vinculada ao arquivo, credencial, revisão e estrutura lida, impedindo salvar leituras antigas ou adulteradas. Trocar de arquivo desliga a automação e encerra o modo completo; habilitar o envio automático exige configuração válida.
