@@ -208,13 +208,18 @@ export async function listarFrequenciasDoPeriodo(
 }
 
 /**
- * Acumulado por aluno desde a primeira chamada salva até o dia informado:
+ * Acumulado por aluno até o dia informado, com início opcional do período:
  * dias distintos com falta simples, com falta justificada e com registro.
  * Um dia parcial no modo por aula conta como falta simples.
  */
-export async function resumoAcumulado(ate: string): Promise<ResumoAcumulado> {
+export async function resumoAcumulado(ate: string, de?: string): Promise<ResumoAcumulado> {
   const linhas = await banco().frequencia.findMany({
-    where: { dia: { lte: new Date(`${ate}T12:00:00Z`) } },
+    where: {
+      dia: {
+        lte: new Date(`${ate}T12:00:00Z`),
+        ...(de ? { gte: new Date(`${de}T12:00:00Z`) } : {}),
+      },
+    },
     select: {
       dia: true,
       faltas: { select: { alunoId: true, justificativa: true } },
