@@ -1,11 +1,11 @@
-/* Série em linha compacta, opções recolhíveis e turmas com progresso por barra. */
+/* Painel compacto com turmas contidas em cada série e progresso em degradê. */
 .faixa {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   width: 100%;
   gap: 8px;
-  padding: 5px;
+  padding: 10px;
 }
 
 .gatilho,
@@ -107,7 +107,11 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background-color: var(--primary);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--primary) 70%, var(--foreground)),
+    var(--primary)
+  );
   transition: width 180ms ease;
 }
 
@@ -199,7 +203,8 @@
   color: var(--muted-foreground);
   transition: transform 150ms ease;
 }
-.gatilho[data-state="open"] .seta {
+.gatilho[data-state="open"] .seta,
+.serie[data-state="open"] .seta {
   transform: rotate(180deg);
 }
 @media (prefers-reduced-motion: reduce) {
@@ -217,5 +222,47 @@
   .gatilho .percentual {
     background: Canvas;
     color: CanvasText;
+  }
+}
+
+.gatilho .barra {
+  flex: 1;
+  min-width: 24px;
+  max-width: 160px;
+  height: 6px;
+}
+.gatilho .nome {
+  flex: 0 1 auto;
+}
+.blocoSerie {
+  min-width: 0;
+  border: 1px solid var(--vidro-borda);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--vidro-elevacao);
+}
+.blocoSerie[data-selecionada="true"] {
+  border-color: var(--justificada);
+}
+.serie {
+  border: 0;
+  border-radius: inherit;
+  box-shadow: none;
+}
+.serie[aria-pressed="true"] {
+  outline: none;
+}
+.serie:focus-visible {
+  outline: 3px solid var(--justificada);
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  .blocoSerie {
+    border-color: ButtonText;
+    background: Canvas;
+    box-shadow: none;
+  }
+  .blocoSerie[data-selecionada="true"] {
+    border-color: Highlight;
   }
 }

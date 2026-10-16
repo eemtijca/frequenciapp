@@ -278,9 +278,10 @@ test("feriado deixa a cobertura neutra e bloqueia Chamada e Parcial, inclusive n
     await expect(secao.getByRole("status").filter({ hasText: `Feriado · ${nome}` })).toBeVisible();
     await expect(aluno).toBeDisabled();
     await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
-    await expect(
-      grupo.getByRole("button", { name: `Selecionar série: ${PREFIXO}`, exact: true }),
-    ).toHaveAttribute("data-situacao", "feriado");
+    await expect(grupo.getByRole("button", { name: "Turmas", exact: true })).toHaveAttribute(
+      "data-situacao",
+      "feriado",
+    );
     await expect(grupo.getByRole("button", { name: `${PREFIXO} A`, exact: true })).toHaveAttribute(
       "data-situacao",
       "feriado",

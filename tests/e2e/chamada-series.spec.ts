@@ -1,4 +1,4 @@
-// Chamada com seletor único de séries, progresso das turmas e bloqueios de edição.
+// Painel Turmas com séries recolhíveis, progresso e bloqueios de edição.
 // Gestão mantém a seleção de origem recolhível. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaDeChamada } from "./helpers/dia";
@@ -26,15 +26,10 @@ async function abrirChamada(page: Page): Promise<Locator> {
 
 async function abrirPrimeiraSerie(secao: Locator): Promise<Locator> {
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
-  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
-  if ((await gatilho.getAttribute("aria-label")) !== `Selecionar série: ${series[0]}`) {
-    await gatilho.click();
-    await secao
-      .page()
-      .getByRole("dialog", { name: "Escolher série", exact: true })
-      .getByRole("button", { name: series[0] ?? "", exact: true })
-      .click();
-  }
+  const gatilho = grupo.getByRole("button", { name: "Turmas", exact: true });
+  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
+  const serie = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
+  if ((await serie.getAttribute("aria-expanded")) !== "true") await serie.click();
   return grupo;
 }
 
@@ -116,74 +111,59 @@ test.afterAll(async () => {
   await limpar();
 });
 
-test("Chamada: seletor único fecha ao escolher uma série e preserva a turma ao reabrir", async ({
+test("Chamada: Turmas recolhe todo o painel e cada série contém suas turmas", async ({
   page,
   isMobile,
 }) => {
   const secao = await abrirChamada(page);
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
-  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
-  const escolhas = page.getByRole("dialog", { name: "Escolher série", exact: true });
+  const gatilho = grupo.getByRole("button", { name: "Turmas", exact: true });
+  const segunda = grupo.getByRole("button", { name: series[1] ?? "", exact: true });
   const turmaA = grupo.getByRole("button", { name: "Faixa Dois E2E Serie A", exact: true });
   const turmaB = grupo.getByRole("button", { name: "Faixa Dois E2E Serie B", exact: true });
   await expect(gatilho).toHaveAttribute("aria-expanded", "false");
-  await expect(escolhas).toBeHidden();
+  await expect(segunda).toBeHidden();
   await gatilho.click();
-  await expect(gatilho).toHaveAttribute("aria-expanded", "true");
-  await escolhas.getByRole("button", { name: series[1] ?? "", exact: true }).click();
-  await expect(escolhas).toBeHidden();
-  await expect(gatilho).toHaveAttribute("aria-label", `Selecionar série: ${series[1]}`);
-  await expect(gatilho).toHaveAccessibleDescription(/2 alunos.*pendente/i);
+  await segunda.click();
+  await expect(segunda).toHaveAttribute("aria-expanded", "true");
   await expect(turmaA).toHaveAttribute("aria-pressed", "true");
+  const bloco = segunda.locator("..");
   await expect(
-    grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true }),
-  ).toHaveCount(0);
+    bloco.getByRole("button", { name: "Faixa Dois E2E Serie B", exact: true }),
+  ).toBeVisible();
   if (isMobile) await turmaB.click();
   else {
     await turmaB.focus();
     await page.keyboard.press("Enter");
   }
   await expect(turmaB).toHaveAttribute("aria-pressed", "true");
-  await gatilho.click();
-  const selecionada = escolhas.getByRole("button", { name: series[1] ?? "", exact: true });
-  await expect(selecionada).toBeFocused();
-  await expect(selecionada).toHaveAttribute("aria-pressed", "true");
-  await page.keyboard.press("Escape");
-  await expect(escolhas).toBeHidden();
-  await expect(gatilho).toBeFocused();
+  await segunda.click();
+  await expect(turmaB).toBeHidden();
+  await segunda.click();
   await expect(turmaB).toHaveAttribute("aria-pressed", "true");
-  // O mesmo botão fecha as opções e mantém as turmas visíveis.
   await gatilho.click();
-  await gatilho.click();
-  await expect(escolhas).toBeHidden();
-  await expect(turmaB).toBeVisible();
-  // Escolher de novo a série ativa preserva a turma B.
-  await gatilho.click();
-  await selecionada.click();
-  await expect(escolhas).toBeHidden();
-  await expect(turmaB).toHaveAttribute("aria-pressed", "true");
+  await expect(segunda).toBeHidden();
+  await expect(turmaB).toBeHidden();
   await gatilho.focus();
-  await page.keyboard.press("Enter");
-  const primeira = escolhas.getByRole("button", { name: series[0] ?? "", exact: true });
-  await primeira.focus();
   await page.keyboard.press("Space");
-  await expect(escolhas).toBeHidden();
-  await expect(
-    grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(turmaB).toHaveCount(0);
+  await expect(turmaB).toHaveAttribute("aria-pressed", "true");
+  await turmaB.focus();
+  await page.keyboard.press("Escape");
+  await expect(gatilho).toBeFocused();
+  await expect(turmaB).toBeHidden();
+  await page.keyboard.press("Enter");
+  await expect(turmaB).toBeVisible();
+  await expect(page.getByText("E2E Serie 2B", { exact: true }).first()).toBeVisible();
 });
 
-test("Chamada: seletor fino, opções e turmas cabem em telas pequenas e ampliadas", async ({
+test("Chamada: painel compacto e degradê cabem em telas pequenas e ampliadas", async ({
   page,
 }, testInfo) => {
   const secao = await abrirChamada(page);
   const grupo = await abrirPrimeiraSerie(secao);
-  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
-  const escolhas = page.getByRole("dialog", { name: "Escolher série", exact: true });
+  const gatilho = grupo.getByRole("button", { name: "Turmas", exact: true });
   for (const largura of [320, 360, 768, 1280]) {
     await page.setViewportSize({ width: largura, height: 800 });
-    await expect(gatilho).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -193,29 +173,19 @@ test("Chamada: seletor fino, opções e turmas cabem em telas pequenas e ampliad
     expect(caixa?.height).toBeGreaterThanOrEqual(44);
     expect(caixa?.height).toBeLessThanOrEqual(64);
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0)).toBeLessThanOrEqual(largura);
-    await expect(gatilho.getByText("0%", { exact: true })).toBeVisible();
-    await expect(gatilho.locator("[data-progresso]")).toHaveCount(0);
-    await gatilho.click();
-    const painel = await escolhas.boundingBox();
-    expect(painel?.x).toBeGreaterThanOrEqual(0);
-    expect((painel?.x ?? 0) + (painel?.width ?? 0)).toBeLessThanOrEqual(largura);
-    for (const nome of series) {
-      const opcao = escolhas.getByRole("button", { name: nome, exact: true });
-      await expect(opcao).toBeVisible();
-      await expect(opcao.getByText("0%", { exact: true })).toBeVisible();
-    }
-    if (largura === 320)
-      await testInfo.attach("Séries abertas em 320px", {
-        body: await page.screenshot({ animations: "disabled" }),
-        contentType: "image/png",
-      });
-    await page.keyboard.press("Escape");
-    await expect(escolhas).toBeHidden();
+    await expect(gatilho.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
+    for (const nome of series)
+      await expect(grupo.getByRole("button", { name: nome, exact: true })).toBeVisible();
+    const serie = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
+    const bloco = serie.locator("..");
     for (const nome of ["A", "B"]) {
-      const turma = grupo.getByRole("button", { name: `Faixa Um E2E Serie ${nome}`, exact: true });
+      const turma = bloco.getByRole("button", { name: `Faixa Um E2E Serie ${nome}`, exact: true });
       await expect(turma.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
+      const retangulo = await turma.boundingBox();
+      expect(retangulo?.height).toBeGreaterThanOrEqual(44);
+      expect((retangulo?.x ?? 0) + (retangulo?.width ?? 0)).toBeLessThanOrEqual(largura);
     }
-    await testInfo.attach(`Seletor compacto ${largura}px`, {
+    await testInfo.attach(`Turmas agrupadas ${largura}px`, {
       body: await grupo.screenshot({ animations: "disabled" }),
       contentType: "image/png",
     });
@@ -227,7 +197,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
 }, testInfo) => {
   const secao = await abrirChamada(page);
   const grupo = await abrirPrimeiraSerie(secao);
-  const serie = grupo.getByRole("button", { name: /^Selecionar série:/ });
+  const serie = grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   const turmaA = grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true });
   const turmaB = grupo.getByRole("button", { name: "Faixa Um E2E Serie B", exact: true });
   const percentual = serie.locator(':scope > span[aria-hidden="true"]').nth(1);
@@ -289,7 +259,7 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await salvarPelaApi(page, "B");
   let secao = await abrirChamada(page);
   let grupo = await abrirPrimeiraSerie(secao);
-  const serie = () => grupo.getByRole("button", { name: /^Selecionar série:/ });
+  const serie = () => grupo.getByRole("button", { name: series[0] ?? "", exact: true });
   const turmaA = () => grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true });
   const turmaB = () => grupo.getByRole("button", { name: "Faixa Um E2E Serie B", exact: true });
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");
@@ -301,10 +271,11 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(turmaB().locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
   await expect(serie().getByText("75%", { exact: true })).toBeVisible();
   await expect(turmaB()).toBeDisabled();
-  await serie().click();
-  const escolhas = page.getByRole("dialog", { name: "Escolher série", exact: true });
-  await expect(escolhas.getByRole("button", { name: series[1] ?? "", exact: true })).toBeDisabled();
-  await page.keyboard.press("Escape");
+  await expect(grupo.getByRole("button", { name: series[1] ?? "", exact: true })).toBeDisabled();
+  const gatilho = grupo.getByRole("button", { name: "Turmas", exact: true });
+  await gatilho.click();
+  await gatilho.click();
+  await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(secao.getByRole("button", { name: "Dia anterior", exact: true })).toBeDisabled();
   await expect
     .poll(() =>
@@ -319,6 +290,13 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
   secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
+  // Aguarda o aviso antes de tocar no cabeçalho; o hover do teste pausa o aviso.
+  const aviso = page.getByText("Rascunho recuperado. Desbloqueie a chamada, confira e salve.", {
+    exact: true,
+  });
+  await expect(aviso).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(aviso).toHaveCount(0);
   grupo = await abrirPrimeiraSerie(secao);
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
@@ -355,7 +333,7 @@ test("Chamada: carregamento e falha de leitura mostram estado neutro até a recu
   });
   const secao = await abrirChamada(page);
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
-  const serie = grupo.getByRole("button", { name: /^Selecionar série:/ });
+  const serie = grupo.getByRole("button", { name: "Turmas", exact: true });
   await expect(serie).toHaveAttribute("data-situacao", "carregando");
   await expect(serie.locator("[data-progresso]")).toHaveCount(0);
   liberarLeitura?.();
