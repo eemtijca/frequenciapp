@@ -118,21 +118,18 @@ export async function rolarAteGrafico(page: Page, nome: string) {
   return faixa;
 }
 
-/**
- * Escolhe uma turma na Chamada. O seletor único abre as séries e
- * mostra as turmas da escolha; percorre as opções até a turma aparecer.
- */
+/** Escolhe a turma dentro da série, abrindo o painel Turmas quando necessário. */
 export async function escolherTurmaNaChamada(secao: Locator, nome: RegExp): Promise<void> {
   const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
+  const gatilho = grupo.getByRole("button", { name: "Turmas", exact: true });
+  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
   const turma = grupo.getByRole("button", { name: nome }).first();
-  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
   if (!(await turma.isVisible().catch(() => false))) {
-    await gatilho.click();
-    const escolhas = secao.page().getByRole("dialog", { name: "Escolher série", exact: true });
-    const total = await escolhas.getByRole("button").count();
+    const series = grupo.locator("button[aria-expanded][aria-pressed]");
+    const total = await series.count();
     for (let indice = 0; indice < total; indice++) {
-      if (indice > 0) await gatilho.click();
-      await escolhas.getByRole("button").nth(indice).click();
+      const serie = series.nth(indice);
+      if ((await serie.getAttribute("aria-expanded")) !== "true") await serie.click();
       if (await turma.isVisible().catch(() => false)) break;
     }
   }

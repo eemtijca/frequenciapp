@@ -3,7 +3,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
 
 let inicial: ConfiguracaoOrigem;
 const series = ["Ciclo Alfa E2E Config", "Ciclo Beta E2E Config", "3º ano E2E Config"];
@@ -101,16 +101,7 @@ async function conferir(
   await expect(page.getByText("Indicação de origem atualizada.", { exact: true })).toHaveCount(0);
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
-  const grupo = chamada.getByRole("group", { name: "Turma atual", exact: true });
-  const gatilho = grupo.getByRole("button", { name: /^Selecionar série:/ });
-  if ((await gatilho.getAttribute("aria-label")) !== `Selecionar série: ${series[indice]}`) {
-    await gatilho.click();
-    await page
-      .getByRole("dialog", { name: "Escolher série", exact: true })
-      .getByRole("button", { name: series[indice] ?? "", exact: true })
-      .click();
-  }
-  await grupo.getByRole("button", { name: `${series[indice]} ${turma}`, exact: true }).click();
+  await escolherTurmaNaChamada(chamada, new RegExp(`^${series[indice]} ${turma}$`));
   const nome = `E2E Config ${nomes[indice]} ${turma}`;
   const linha = chamada.locator("ul li").filter({ hasText: nome });
   await expect(linha.getByText(`${nome}${exibe ? "*" : ""}`, { exact: true })).toBeVisible();
