@@ -39,10 +39,14 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
   const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(null);
   const [sobreAberto, setSobreAberto] = useState(false);
 
-  // Preenche o e-mail lembrado neste dispositivo, se houver.
+  // Preenche o e-mail lembrado neste dispositivo, se houver. O armazenamento
+  // local só existe no cliente, depois da hidratação, e semear o campo durante
+  // a renderização do servidor divergiria a hidratação: exceção registrada no
+  // ADR 047.
   useEffect(() => {
     try {
       const salvo = window.localStorage.getItem(CHAVE_EMAIL);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura única do armazenamento local (ADR 047)
       if (salvo) setEmail(salvo);
     } catch {
       // Sem armazenamento local: segue sem lembrar.
@@ -50,9 +54,11 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
   }, []);
 
   // Aviso deixado pelo shell quando a sessão expira, mostrado uma única vez.
+  // Mesma exceção da linha lembrada: consumo único do armazenamento da sessão.
   useEffect(() => {
     try {
       if (window.sessionStorage.getItem(CHAVE_AVISO) === "sessao_expirada") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- consumo único do armazenamento da sessão (ADR 047)
         setAvisoEntrada("sessao_expirada");
         window.sessionStorage.removeItem(CHAVE_AVISO);
       }
