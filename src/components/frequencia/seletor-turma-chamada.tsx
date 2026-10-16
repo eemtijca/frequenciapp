@@ -1,9 +1,11 @@
 "use client";
 
-// Seletores com barras de progresso das chamadas salvas por série e turma.
+// Série em seletor único recolhível e turmas com barras das chamadas salvas.
 // A seleção continua independente da conclusão, com nomes e estados acessíveis.
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { Check, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
@@ -67,7 +69,8 @@ export function SeletorTurmaChamada({
 }: Props) {
   const reduzir = useReducedMotion();
   const id = useId();
-  const [recolhido, setRecolhido] = useState(false);
+  const [aberto, setAberto] = useState(false);
+  const opcaoSelecionada = useRef<HTMLButtonElement>(null);
 
   const series = useMemo(() => {
     const grupos: { id: string; nome: string; turmas: Turma[] }[] = [];
@@ -115,71 +118,110 @@ export function SeletorTurmaChamada({
 
   const ativa = series.find((grupo) => grupo.turmas.some((opcao) => opcao.id === turmaId));
 
+  const resumos = series.map((grupo) => {
+    const total = grupo.turmas.reduce((soma, opcao) => soma + (contagem.get(opcao.id) ?? 0), 0);
+    const turmasDaSerie = cobertura.filter((item) => item.turma.serieId === grupo.id);
+    const registrados = turmasDaSerie.reduce(
+      (soma, item) => soma + (item.concluida ? item.esperados : 0),
+      0,
+    );
+    const progresso = total > 0 ? Math.floor((registrados * 100) / total) : 0;
+    const situacao = situacaoDe(
+      total,
+      turmasDaSerie.every((item) => item.concluida),
+    );
+    const percentual = !feriado && coberturaDisponivel && total > 0 ? progresso : null;
+    const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
+    return { grupo, nome: nomeDaSerie(grupo.nome), percentual, situacao, descricao };
+  });
+  const selecionada = resumos.find((resumo) => resumo.grupo.id === ativa?.id);
+
   function aoTocarSerie(grupoId: string) {
-    if (grupoId === ativa?.id) {
-      setRecolhido((atual) => !atual);
-      return;
-    }
+    if (travado && grupoId !== ativa?.id) return;
+    setAberto(false);
+    if (grupoId === ativa?.id) return;
     const primeira = series.find((grupo) => grupo.id === grupoId)?.turmas[0];
-    if (!primeira) return;
-    setRecolhido(false);
-    onEscolher(primeira.id);
+    if (primeira) onEscolher(primeira.id);
   }
 
   return (
-    <div role="group" aria-label="Turma atual" className="flex flex-col gap-3">
-      <div className={estilos.faixa}>
-        {series.map((grupo) => {
-          const ehAtiva = grupo.id === ativa?.id;
-          const total = grupo.turmas.reduce(
-            (soma, opcao) => soma + (contagem.get(opcao.id) ?? 0),
-            0,
-          );
-          const turmasDaSerie = cobertura.filter((item) => item.turma.serieId === grupo.id);
-          const registrados = turmasDaSerie.reduce(
-            (soma, item) => soma + (item.concluida ? item.esperados : 0),
-            0,
-          );
-          const progresso = total > 0 ? Math.floor((registrados * 100) / total) : 0;
-          const situacao = situacaoDe(
-            total,
-            turmasDaSerie.every((item) => item.concluida),
-          );
-          const percentual = !feriado && coberturaDisponivel && total > 0 ? progresso : null;
-          const nome = nomeDaSerie(grupo.nome);
-          const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
-          return (
+    <div role="group" aria-label="Turma atual" className="flex flex-col gap-2">
+      <div className={estilos.seletor}>
+        <Popover open={aberto} onOpenChange={setAberto}>
+          <PopoverTrigger asChild>
             <Button
-              key={grupo.id}
               type="button"
               variant="outline"
-              aria-label={nome}
-              aria-describedby={`${id}-serie-${grupo.id}`}
-              title={`${nome}: ${ROTULOS[situacao]}`}
-              data-situacao={situacao}
-              aria-pressed={ehAtiva}
-              aria-expanded={ehAtiva ? !recolhido : undefined}
-              aria-controls={ehAtiva ? `${id}-turmas` : undefined}
-              disabled={travado && !ehAtiva}
-              onClick={() => aoTocarSerie(grupo.id)}
-              className={estilos.serie}
+              aria-label={`Selecionar série: ${selecionada?.nome ?? "Séries"}`}
+              aria-describedby={selecionada ? `${id}-serie-atual` : undefined}
+              data-situacao={selecionada?.situacao}
+              disabled={series.length === 0}
+              className={estilos.gatilho}
             >
               <span className={estilos.nome} aria-hidden="true">
-                {nome}
+                {selecionada?.nome ?? "Séries"}
               </span>
               <span className={estilos.percentual} aria-hidden="true">
-                {percentual === null ? "-" : `${percentual}%`}
+                {selecionada?.percentual == null ? "-" : `${selecionada.percentual}%`}
               </span>
-              <BarraProgresso progresso={percentual} />
-              <span id={`${id}-serie-${grupo.id}`} className="sr-only">
-                {descricao}
-              </span>
+              <ChevronDown aria-hidden="true" className={estilos.seta} />
+              {selecionada && (
+                <span id={`${id}-serie-atual`} className="sr-only">
+                  {selecionada.descricao}
+                </span>
+              )}
             </Button>
-          );
-        })}
+          </PopoverTrigger>
+          <PopoverContent
+            aria-label="Escolher série"
+            align="start"
+            collisionPadding={12}
+            className="max-h-[min(20rem,var(--radix-popover-content-available-height))] w-[min(var(--radix-popover-trigger-width),calc(100vw-1.5rem))] overflow-y-auto p-2"
+            onOpenAutoFocus={(evento) => {
+              if (opcaoSelecionada.current) {
+                evento.preventDefault();
+                opcaoSelecionada.current.focus();
+              }
+            }}
+          >
+            <div role="group" aria-label="Séries" className={estilos.lista}>
+              {resumos.map(({ grupo, nome, situacao, percentual, descricao }) => {
+                const ehAtiva = grupo.id === ativa?.id;
+                return (
+                  <Button
+                    key={grupo.id}
+                    ref={ehAtiva ? opcaoSelecionada : undefined}
+                    type="button"
+                    variant="outline"
+                    aria-label={nome}
+                    aria-describedby={`${id}-serie-${grupo.id}`}
+                    aria-pressed={ehAtiva}
+                    data-situacao={situacao}
+                    disabled={travado && !ehAtiva}
+                    onClick={() => aoTocarSerie(grupo.id)}
+                    className={estilos.serie}
+                  >
+                    <span className={estilos.nome} aria-hidden="true">
+                      {nome}
+                    </span>
+                    <span className={estilos.percentual} aria-hidden="true">
+                      {percentual === null ? "-" : `${percentual}%`}
+                    </span>
+                    <span className={estilos.indicador} aria-hidden="true">
+                      {ehAtiva && <Check size={16} />}
+                    </span>
+                    <span id={`${id}-serie-${grupo.id}`} className="sr-only">
+                      {descricao}
+                    </span>
+                  </Button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
-      {ativa && !recolhido && (
+      {ativa && (
         <motion.div
           key={ativa.id}
           id={`${id}-turmas`}
