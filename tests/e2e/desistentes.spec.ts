@@ -79,7 +79,6 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
   await escolherTurmaNaChamada(chamada, /^E2E Desistencia B$/);
-  await chamada.getByLabel("Buscar aluno ou turma de origem").fill("E2E Desistente Um");
   const aluno = chamada.getByRole("button", { name: /E2E Desistente Um.*desistente/ });
   await expect(aluno).toBeVisible();
   await expect(aluno).toBeDisabled();

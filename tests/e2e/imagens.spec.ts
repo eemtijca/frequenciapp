@@ -25,9 +25,7 @@ async function abrirChamadaComDados(page: Page) {
   const secao = page.locator('section[aria-label="Fazer chamada"]');
   for (let tentativa = 0; tentativa < 8; tentativa += 1) {
     const feriado = await secao.getByText(/^Feriado ·/).count();
-    const lista = await secao
-      .getByRole("searchbox", { name: "Buscar aluno ou turma de origem" })
-      .count();
+    const lista = await secao.getByRole("list", { name: "Alunos da chamada", exact: true }).count();
     if (lista > 0 && feriado === 0) {
       // Chamada salva abre bloqueada: a captura mostra a correção liberada.
       const desbloquear = secao.getByRole("button", { name: /^Desbloquear chamada de / });

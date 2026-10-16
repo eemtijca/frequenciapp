@@ -140,7 +140,6 @@ test.describe("interface compartilhada", () => {
           await expect(chamada.getByText("E2E Aluno Um", { exact: true })).toBeVisible();
           await conferirFonte(page, [
             chamada.getByRole("button", { name: tituloResumoDoDia(), exact: true }),
-            chamada.getByPlaceholder("Buscar aluno ou turma de origem"),
           ]);
           const data = chamada
             .getByRole("button", { name: /^Data da chamada:/ })

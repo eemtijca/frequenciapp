@@ -42,12 +42,12 @@ import type {
 import {
   alunoDesistenteNoDia,
   diaDaSemanaIso,
+  diasDoMes,
   diaDeChamadaVizinho,
   exibirOrigemNaChamada,
   horaNoFuso,
   horariosDaChamada,
   JUSTIFICATIVA_OUTROS,
-  normalizar,
   nomeNaChamada,
   rotuloCurtoDeTurma,
   rotuloDiaSemana,
@@ -58,7 +58,6 @@ import {
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
-import { BarraBusca } from "@/components/ui/barra-busca";
 import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -88,7 +87,7 @@ interface Props {
   alvo: { dia: string; turmaId: string } | null;
   configuracoes: Configuracoes;
   catalogoJustificativas: JustificativaConfigurada[];
-  resumo: ResumoAcumulado | null;
+  versaoFrequencias: number;
   onFrequenciasMudaram: (mes: string) => Promise<void>;
   onPendencia: (visoes: "chamada"[]) => void;
   onAbrirGestao?: () => void;
@@ -145,7 +144,7 @@ export default function VistaFrequencia({
   alvo,
   configuracoes,
   catalogoJustificativas,
-  resumo,
+  versaoFrequencias,
   onFrequenciasMudaram,
   onPendencia,
   onAbrirGestao,
@@ -179,7 +178,6 @@ export default function VistaFrequencia({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
-  const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const justificativasAntecipadasRef = useRef<RevisaoJustificativaAntecipada[]>([]);
   const [recarregar, setRecarregar] = useState(0);
@@ -242,7 +240,6 @@ export default function VistaFrequencia({
     setErro("");
     setConflito(false);
     setSujo(false);
-    setBusca("");
     setFiltro("todos");
     setAusencias(new Map());
     setJustificativas(new Map());
@@ -424,6 +421,30 @@ export default function VistaFrequencia({
     return frequencia?.aulas && frequencia.aulas.length > 0 ? frequencia.aulas : null;
   }, [leituraConfirmada, frequenciasDoDia, turmaId]);
   const totalAulasDoDia = aulasRegistradas?.length ?? aulasDoDia.length;
+  const mesDaChamada = dia.slice(0, 7);
+  const chaveResumo = `${mesDaChamada}|${versaoFrequencias}|${recarregar}`;
+  const [cargaResumo, setCargaResumo] = useState<{
+    chave: string;
+    resumo: ResumoAcumulado | null;
+  } | null>(null);
+  const resumo = cargaResumo?.chave === chaveResumo ? cargaResumo.resumo : null;
+  useEffect(() => {
+    let atual = true;
+    const dias = diasDoMes(mesDaChamada);
+    const ate = dias[dias.length - 1];
+    if (!ate) return;
+    pedir<{ resumo: ResumoAcumulado }>(`/api/frequencias/resumo?de=${mesDaChamada}-01&ate=${ate}`)
+      .then((dados) => {
+        if (atual) setCargaResumo({ chave: chaveResumo, resumo: dados.resumo });
+      })
+      .catch(() => {
+        if (atual) setCargaResumo({ chave: chaveResumo, resumo: null });
+      });
+    return () => {
+      atual = false;
+    };
+  }, [mesDaChamada, chaveResumo]);
+
   const acumuladoDe = useMemo(() => {
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
     return (alunoId: string): AcumuladoAluno | null => mapa.get(alunoId) ?? null;
@@ -458,41 +479,18 @@ export default function VistaFrequencia({
   }, [participantes, ausencias, justificativas, totalAulasDoDia]);
   const contagemPresencas = participantes.length - contagemFaltas;
 
-  const nomesParaBusca = useMemo(
-    () => new Map(ativosDaTurma.map((aluno) => [aluno.id, normalizar(aluno.nome)])),
-    [ativosDaTurma],
+  const visiveis = useMemo(
+    () =>
+      ativosDaTurma.filter(
+        (aluno) =>
+          filtro === "todos" ||
+          (!desistentesDaTurma.has(aluno.id) &&
+            ((filtro === "faltas" && ausencias.has(aluno.id)) ||
+              (filtro === "justificadas" && justificativas.has(aluno.id)) ||
+              (filtro === "presentes" && !ausencias.has(aluno.id)))),
+      ),
+    [ativosDaTurma, filtro, ausencias, justificativas, desistentesDaTurma],
   );
-  const origensParaBusca = useMemo(
-    () => new Map(turmas.map((item) => [item.id, normalizar(item.rotulo)])),
-    [turmas],
-  );
-
-  const visiveis = useMemo(() => {
-    const termo = normalizar(busca);
-    return ativosDaTurma.filter((aluno) => {
-      const origem = origensParaBusca.get(aluno.turmaOriginalId) ?? "";
-      const combinaBusca =
-        termo === "" ||
-        (nomesParaBusca.get(aluno.id) ?? "").includes(termo) ||
-        (origem !== "" && origem.includes(termo));
-      const combinaFiltro =
-        filtro === "todos" ||
-        (!desistentesDaTurma.has(aluno.id) &&
-          ((filtro === "faltas" && ausencias.has(aluno.id)) ||
-            (filtro === "justificadas" && justificativas.has(aluno.id)) ||
-            (filtro === "presentes" && !ausencias.has(aluno.id))));
-      return combinaBusca && combinaFiltro;
-    });
-  }, [
-    ativosDaTurma,
-    busca,
-    filtro,
-    ausencias,
-    justificativas,
-    nomesParaBusca,
-    origensParaBusca,
-    desistentesDaTurma,
-  ]);
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
   const ocupado = carregando || salvando || conflito;
@@ -1076,10 +1074,12 @@ export default function VistaFrequencia({
                                     faltas={acumulado.faltas}
                                     justificadas={acumulado.faltasJustificadas}
                                   />
-                                  <span className="text-muted-foreground text-xs">acumulado</span>
+                                  <span className="text-muted-foreground text-xs">no mês</span>
                                 </>
                               ) : (
-                                <span className="text-muted-foreground text-xs">sem acumulado</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {resumo ? "sem faltas no mês" : "-"}
+                                </span>
                               )}
                             </span>
                           </li>
@@ -1093,41 +1093,17 @@ export default function VistaFrequencia({
           </section>
 
           <div className="superficie-vidro overflow-hidden">
-            <BarraBusca
-              id="busca-aluno"
-              valor={busca}
-              onValor={setBusca}
-              placeholder="Buscar aluno ou turma de origem"
-              className="rounded-none border-0 border-b px-3 py-1.5"
-            />
-
-            <div className="text-muted-foreground flex items-center justify-between px-4 py-2 text-xs">
-              <span className="numerais-tabulares">
-                {carregando
-                  ? ""
-                  : `${visiveis.length} ${
-                      filtro === "faltas"
-                        ? "com falta"
-                        : filtro === "justificadas"
-                          ? "justificadas"
-                          : filtro === "presentes"
-                            ? "presentes"
-                            : "alunos"
-                    }`}
-              </span>
-              {(filtro !== "todos" || busca !== "") && (
+            {filtro !== "todos" && (
+              <div className="flex justify-end px-4 py-2 text-xs">
                 <button
                   type="button"
                   className="text-primary pressionavel font-medium hover:underline"
-                  onClick={() => {
-                    setFiltro("todos");
-                    setBusca("");
-                  }}
+                  onClick={() => setFiltro("todos")}
                 >
                   Ver todos
                 </button>
-              )}
-            </div>
+              </div>
+            )}
 
             {carregando ? (
               <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
@@ -1146,24 +1122,21 @@ export default function VistaFrequencia({
             ) : visiveis.length === 0 ? (
               <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
                 <p className="font-medium">
-                  {filtro === "faltas" && busca === ""
+                  {filtro === "faltas"
                     ? "Nenhuma falta nesta chamada."
                     : "Nenhum aluno neste filtro."}
                 </p>
                 <button
                   type="button"
                   className="text-primary pressionavel text-sm font-medium hover:underline"
-                  onClick={() => {
-                    setFiltro("todos");
-                    setBusca("");
-                  }}
+                  onClick={() => setFiltro("todos")}
                 >
                   Mostrar todos
                 </button>
               </div>
             ) : (
-              <ul className="divide-y">
-                {visiveis.map((aluno) => {
+              <ul aria-label="Alunos da chamada" className="divide-y">
+                {visiveis.map((aluno, indice) => {
                   const nomeExibido = nomeNaChamada(
                     aluno.nome,
                     mostrarOrigem,
@@ -1174,6 +1147,12 @@ export default function VistaFrequencia({
                   const marcadas = ausencias.get(aluno.id)?.size ?? 0;
                   const parcial = faltando && totalAulasDoDia > 0 && marcadas < totalAulasDoDia;
                   const codigo = justificativas.get(aluno.id) ?? "";
+                  const mostrarJustificativa = faltando && (!chamadaBloqueada || Boolean(codigo));
+                  const mostrarAulas =
+                    faltando &&
+                    configuracoes.frequenciaPorAula &&
+                    aulasAbertas === aluno.id &&
+                    aulasDoDia.length > 1;
                   const acumulado = acumuladoDe(aluno.id);
                   const temAcumulado = Boolean(
                     acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
@@ -1181,9 +1160,17 @@ export default function VistaFrequencia({
                   return (
                     <li
                       key={aluno.id}
-                      className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                      className={`last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${indice % 2 === 0 ? "bg-card" : "bg-secondary/60"}`}
                     >
-                      <div className={faltando ? "bg-falta-fraca" : ""}>
+                      <div
+                        className={
+                          faltando
+                            ? indice % 2 === 0
+                              ? "bg-falta-fraca/65"
+                              : "bg-falta-fraca"
+                            : ""
+                        }
+                      >
                         <div className="flex items-stretch">
                           <button
                             type="button"
@@ -1201,7 +1188,7 @@ export default function VistaFrequencia({
                                   : "presente. Toque para marcar falta."
                             }${
                               temAcumulado && acumulado
-                                ? ` ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
+                                ? ` No mês. ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
                                 : ""
                             }`}
                             onClick={() => alternarFalta(aluno.id)}
@@ -1237,7 +1224,7 @@ export default function VistaFrequencia({
                                 </span>
                               ) : temAcumulado && acumulado ? (
                                 <span className="mt-0.5 flex flex-wrap items-center gap-1">
-                                  <span className="text-muted-foreground text-xs">Acumulado</span>
+                                  <span className="text-muted-foreground text-xs">No mês</span>
                                   <CirculosAcumulado
                                     faltas={acumulado.faltas}
                                     justificadas={acumulado.faltasJustificadas}
@@ -1283,90 +1270,90 @@ export default function VistaFrequencia({
                           )}
                         </div>
                       </div>
-                      {faltando && (
+                      {(mostrarJustificativa || mostrarAulas) && (
                         <div className="border-t px-4 py-2.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-muted-foreground text-xs font-medium">
-                              Justificativa
-                            </span>
-                            <Selecionar
-                              id={`justificativa-${aluno.id}`}
-                              value={codigo}
-                              onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
-                              disabled={bloqueado}
-                              ariaLabel={`Justificativa da falta de ${nomeExibido}`}
-                              opcoes={opcoesJustificativa}
-                              className="h-9 max-w-64"
-                            />
-                            {codigo === JUSTIFICATIVA_OUTROS && (
-                              <Input
-                                value={observacoes.get(aluno.id) ?? ""}
-                                maxLength={200}
+                          {mostrarJustificativa && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-muted-foreground text-xs font-medium">
+                                Justificativa
+                              </span>
+                              <Selecionar
+                                id={`justificativa-${aluno.id}`}
+                                value={codigo}
+                                onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
                                 disabled={bloqueado}
-                                onChange={(evento) =>
-                                  definirObservacao(aluno.id, evento.target.value)
-                                }
-                                placeholder="Observação"
-                                aria-label={`Observação da falta de ${nomeExibido}`}
+                                ariaLabel={`Justificativa da falta de ${nomeExibido}`}
+                                opcoes={opcoesJustificativa}
                                 className="h-9 max-w-64"
                               />
-                            )}
-                            {codigo && (
-                              <span className="text-primary text-xs font-medium">
-                                {rotuloJustificativa(codigo, catalogoJustificativas)}
-                              </span>
-                            )}
-                          </div>
-                          {configuracoes.frequenciaPorAula &&
-                            aulasAbertas === aluno.id &&
-                            aulasDoDia.length > 1 && (
-                              <div className="mt-2.5">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {aulasDoDia.map((aula) => {
-                                    const marcada = ausencias.get(aluno.id)?.has(aula.id) ?? false;
-                                    return (
-                                      <button
-                                        key={aula.id}
-                                        type="button"
-                                        aria-pressed={marcada}
-                                        disabled={bloqueado}
-                                        onClick={() => alternarAula(aluno.id, aula.id)}
-                                        className={`numerais-tabulares pressionavel h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                                          marcada
-                                            ? "border-falta bg-falta text-falta-foreground"
-                                            : "text-muted-foreground hover:border-foreground/30"
-                                        }`}
-                                      >
-                                        {aula.ordem}ª {aula.inicio}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                                  <button
-                                    type="button"
-                                    disabled={bloqueado}
-                                    className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
-                                    onClick={() =>
-                                      definirAulas(
-                                        aluno.id,
-                                        aulasDoDia.map((aula) => aula.id),
-                                      )
-                                    }
-                                  >
-                                    Todas
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={bloqueado}
-                                    className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
-                                    onClick={() => definirAulas(aluno.id, [])}
-                                  >
-                                    Nenhuma
-                                  </button>
-                                </div>
+                              {codigo === JUSTIFICATIVA_OUTROS && (
+                                <Input
+                                  value={observacoes.get(aluno.id) ?? ""}
+                                  maxLength={200}
+                                  disabled={bloqueado}
+                                  onChange={(evento) =>
+                                    definirObservacao(aluno.id, evento.target.value)
+                                  }
+                                  placeholder="Observação"
+                                  aria-label={`Observação da falta de ${nomeExibido}`}
+                                  className="h-9 max-w-64"
+                                />
+                              )}
+                              {codigo && (
+                                <span className="text-primary text-xs font-medium">
+                                  {rotuloJustificativa(codigo, catalogoJustificativas)}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {mostrarAulas && (
+                            <div className="mt-2.5">
+                              <div className="flex flex-wrap gap-1.5">
+                                {aulasDoDia.map((aula) => {
+                                  const marcada = ausencias.get(aluno.id)?.has(aula.id) ?? false;
+                                  return (
+                                    <button
+                                      key={aula.id}
+                                      type="button"
+                                      aria-pressed={marcada}
+                                      disabled={bloqueado}
+                                      onClick={() => alternarAula(aluno.id, aula.id)}
+                                      className={`numerais-tabulares pressionavel h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                                        marcada
+                                          ? "border-falta bg-falta text-falta-foreground"
+                                          : "text-muted-foreground hover:border-foreground/30"
+                                      }`}
+                                    >
+                                      {aula.ordem}ª {aula.inicio}
+                                    </button>
+                                  );
+                                })}
                               </div>
-                            )}
+                              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                                <button
+                                  type="button"
+                                  disabled={bloqueado}
+                                  className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
+                                  onClick={() =>
+                                    definirAulas(
+                                      aluno.id,
+                                      aulasDoDia.map((aula) => aula.id),
+                                    )
+                                  }
+                                >
+                                  Todas
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={bloqueado}
+                                  className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
+                                  onClick={() => definirAulas(aluno.id, [])}
+                                >
+                                  Nenhuma
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </li>
