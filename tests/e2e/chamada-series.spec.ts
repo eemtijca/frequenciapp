@@ -181,9 +181,11 @@ test("Chamada: painel compacto e degradê cabem em telas pequenas e ampliadas", 
     for (const nome of ["A", "B"]) {
       const turma = bloco.getByRole("button", { name: `Faixa Um E2E Serie ${nome}`, exact: true });
       await expect(turma.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
-      const retangulo = await turma.boundingBox();
-      expect(retangulo?.height).toBeGreaterThanOrEqual(44);
-      expect((retangulo?.x ?? 0) + (retangulo?.width ?? 0)).toBeLessThanOrEqual(largura);
+      const circulo = await turma.boundingBox();
+      expect(circulo?.height).toBeGreaterThanOrEqual(44);
+      expect(Math.abs((circulo?.width ?? 0) - (circulo?.height ?? 0))).toBeLessThanOrEqual(1);
+      expect((circulo?.x ?? 0) + (circulo?.width ?? 0)).toBeLessThanOrEqual(largura);
+      await expect(turma.locator('[aria-hidden="true"]').filter({ hasText: /%/ })).toHaveCount(0);
     }
     await testInfo.attach(`Turmas agrupadas ${largura}px`, {
       body: await grupo.screenshot({ animations: "disabled" }),
@@ -210,7 +212,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
     const neutra = grupo.getByRole("button", { name: `Faixa Um E2E Serie ${nome}`, exact: true });
     await expect(neutra).toHaveAttribute("data-situacao", "sem-alunos");
     await expect(neutra.locator("[data-progresso]")).toHaveCount(0);
-    await expect(neutra.locator(':scope > span[aria-hidden="true"]').nth(1)).toHaveText("-");
+    await expect(neutra.locator('[aria-hidden="true"]').filter({ hasText: /%/ })).toHaveCount(0);
   }
   await expect(turmaB).toHaveAccessibleDescription(/3 alunos.*pendente/i);
 
@@ -221,6 +223,14 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await expect(percentual).toHaveText("25%");
   await expect(serie.getByText("25%", { exact: true })).toBeVisible();
   await expect(turmaA.locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
+  const corPendente = await turmaB
+    .locator("[data-progresso]")
+    .evaluate((anel) => getComputedStyle(anel).borderTopColor);
+  await expect
+    .poll(() =>
+      turmaA.locator("[data-progresso]").evaluate((anel) => getComputedStyle(anel).borderTopColor),
+    )
+    .not.toBe(corPendente);
   await expect(turmaB.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
   // Registra os dois temas na largura de cada projeto, sem incluir dados reais.
   for (const tema of ["light", "dark"] as const) {

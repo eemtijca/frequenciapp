@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Turmas da Chamada passam a usar círculos compactos, somente com o nome e anel verde após salvar a chamada. A seleção mantém contorno azul, pendências e estados neutros continuam identificados, e os percentuais permanecem nos cabeçalhos de série e em Turmas.
+
 - Chamada agrupa as turmas dentro de cada série em um painel recolhível chamado Turmas. O cabeçalho mantém porcentagem geral e barra em degradê; abrir e fechar preserva a seleção, os rascunhos e os percentuais por série e turma, com acesso por toque e teclado.
 
 - Chamada reúne as séries em um único seletor fino, com extremidades arredondadas e porcentagem dentro. A escolha fecha a lista e mostra abaixo as turmas com barras de progresso, preservando seleção, cores, rascunhos e acesso por toque e teclado.

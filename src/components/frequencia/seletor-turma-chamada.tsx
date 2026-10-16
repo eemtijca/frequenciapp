@@ -266,10 +266,11 @@ export function SeletorTurmaChamada({
                           <span className={estilos.nome} aria-hidden="true">
                             {opcao.nome}
                           </span>
-                          <span className={estilos.percentual} aria-hidden="true">
-                            {progresso === null ? "-" : `${progresso}%`}
-                          </span>
-                          <BarraProgresso progresso={progresso} />
+                          <span
+                            aria-hidden="true"
+                            className={estilos.anel}
+                            data-progresso={progresso ?? undefined}
+                          />
                           <span id={`${id}-turma-${opcao.id}`} className="sr-only">
                             {total} {total === 1 ? "aluno" : "alunos"}. {ROTULOS[situacao]}
                             {progresso !== null ? `. ${progresso}% concluído` : ""}

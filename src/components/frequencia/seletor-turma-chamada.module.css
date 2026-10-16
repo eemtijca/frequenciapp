@@ -266,3 +266,52 @@
     border-color: Highlight;
   }
 }
+
+.turma {
+  position: relative;
+  width: min(100%, 88px);
+  min-height: 44px;
+  aspect-ratio: 1;
+  align-self: start;
+  justify-self: center;
+  border-radius: 50%;
+  padding: 12px;
+}
+.turma .nome {
+  position: relative;
+}
+.anel {
+  position: absolute;
+  inset: 4px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  pointer-events: none;
+  transition: border-color 180ms ease;
+}
+.turma:where([data-situacao="pendente"]) .anel {
+  border-color: color-mix(in oklab, var(--falta-texto) 60%, var(--border));
+}
+.turma:where([data-situacao="concluida"]) .anel {
+  border-width: 3px;
+  border-color: var(--primary);
+}
+.anel:not([data-progresso]) {
+  border-style: dashed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anel {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .anel {
+    border-color: CanvasText;
+  }
+  .turma:where([data-situacao="pendente"]) .anel {
+    border-color: CanvasText;
+    border-style: dashed;
+  }
+  .turma:where([data-situacao="concluida"]) .anel {
+    border-color: Highlight;
+  }
+}
