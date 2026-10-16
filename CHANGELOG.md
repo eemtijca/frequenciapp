@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Chamada apresenta linhas com fundos alternados, sem busca ou contagem de alunos no cabeçalho. Na chamada bloqueada, faltas comuns deixam de mostrar o seletor de justificativa; faltas justificadas mantêm o motivo. O acumulado passa a considerar apenas o mês consultado, preservando o histórico dos relatórios.
+
 - Círculos das turmas ficam menores, limitados a 64 pixels, preservando área confortável de toque. Os anéis passam a ter oito segmentos mais espessos, verdes após salvar a chamada.
 
 - Turmas da Chamada passam a usar círculos compactos, somente com o nome e anel verde após salvar a chamada. A seleção mantém contorno azul, pendências e estados neutros continuam identificados, e os percentuais permanecem nos cabeçalhos de série e em Turmas.

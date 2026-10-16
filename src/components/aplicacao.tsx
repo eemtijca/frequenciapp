@@ -699,7 +699,7 @@ export default function Aplicacao({
             alvo={alvo}
             configuracoes={configuracoes}
             catalogoJustificativas={justificativas}
-            resumo={resumo}
+            versaoFrequencias={versaoFrequencias}
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={registrarPendenciasChamada}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}

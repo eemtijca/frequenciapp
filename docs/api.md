@@ -396,10 +396,10 @@ A Chamada Parcial usa esta rota para confirmar alunos cuja origem ainda é a cha
 
 ### GET /api/frequencias/resumo?ate=YYYY-MM-DD
 
-Acumulado desde a primeira chamada salva até a data informada.
+Acumulado até a data informada. O parâmetro opcional `de=YYYY-MM-DD` limita a data inicial, inclusive; sem ele, mantém o histórico desde a primeira chamada. A Chamada consulta do primeiro ao último dia do mês exibido.
 
 - 200 `{"resumo": {"primeiroDia": string | null, "diasLetivos": number, "porAluno": [{"alunoId", "faltas", "faltasJustificadas", "diasComRegistro"}]}}`.
-- 400 quando a data é inválida.
+- 400 quando uma data é inválida ou `de` é posterior a `ate`.
 
 Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta simples ou parcial conta em `faltas`.
 

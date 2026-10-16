@@ -97,5 +97,7 @@ test("isola uma falha no download do gráfico sem bloquear a chamada", async ({ 
   await expect(escola.getByRole("alert")).toContainText("Não foi possível carregar o gráfico");
   expect(arquivos.size).toBeGreaterThan(0);
   await trocarVisao(page, "Chamada", "chamada");
-  await expect(page.getByPlaceholder("Buscar aluno ou turma de origem")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^Resumo (de hoje|do dia)$/, exact: true }),
+  ).toBeVisible();
 });

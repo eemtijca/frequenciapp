@@ -114,15 +114,15 @@ test.describe("consulta por origem (coordenação)", () => {
     await expect(secao.getByText("Atual 3º ano E2E Origem A").first()).toBeVisible();
   });
 
-  test("busca na Chamada pela turma de origem e mostra a origem na linha", async ({ page }) => {
+  test("mostra a origem na Chamada sem campo de busca", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
     const secao = page.locator('section[aria-label="Fazer chamada"]');
     await escolherTurmaNaChamada(secao, /E2E Origem A/);
-    await page.getByLabel("Buscar aluno ou turma de origem").fill("E2E Origem B");
+    await expect(secao.getByRole("searchbox")).toHaveCount(0);
     await expect(secao.getByText("E2E Origem Um")).toBeVisible();
-    await expect(secao.getByText("E2E Origem Dois")).toBeHidden();
+    await expect(secao.getByText("E2E Origem Dois")).toBeVisible();
     const circulo = secao.getByRole("img", { name: "Turma original 3º ano E2E Origem B" });
     await expect(circulo).toHaveText("3º B");
   });

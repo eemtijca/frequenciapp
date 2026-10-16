@@ -308,7 +308,7 @@ export const CONFIGURACOES_PADRAO: Configuracoes = {
   feriados: [],
 };
 
-/** Acumulado de um aluno desde a primeira chamada salva. */
+/** Acumulado de um aluno dentro do período consultado. */
 export interface AcumuladoAluno {
   alunoId: string;
   faltas: number;
@@ -316,7 +316,7 @@ export interface AcumuladoAluno {
   diasComRegistro: number;
 }
 
-/** Resumo acumulado da escola, usado na Chamada e no Painel. */
+/** Resumo acumulado da escola no período consultado. */
 export interface ResumoAcumulado {
   primeiroDia: string | null;
   diasLetivos: number;

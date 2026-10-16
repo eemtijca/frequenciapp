@@ -2941,10 +2941,20 @@
     "/api/frequencias/resumo": {
       "get": {
         "operationId": "obterResumoFrequencias",
-        "summary": "Consultar o acumulado desde a primeira chamada",
-        "description": "Qualquer sessão da operação. Um dia com faltas justificadas conta em faltasJustificadas; falta simples ou parcial conta em faltas.",
+        "summary": "Consultar o acumulado de faltas",
+        "description": "Qualquer sessão da operação. O parâmetro de limita a data inicial; sem ele, considera a primeira chamada salva. Um dia com faltas justificadas conta em faltasJustificadas; falta simples ou parcial conta em faltas.",
         "tags": ["frequencias"],
         "parameters": [
+          {
+            "name": "de",
+            "in": "query",
+            "description": "Data inicial opcional, inclusiva. A Chamada usa o primeiro dia do mês consultado.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
           {
             "name": "ate",
             "in": "query",
