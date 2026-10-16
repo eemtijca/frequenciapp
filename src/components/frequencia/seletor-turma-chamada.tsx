@@ -270,7 +270,21 @@ export function SeletorTurmaChamada({
                             aria-hidden="true"
                             className={estilos.anel}
                             data-progresso={progresso ?? undefined}
-                          />
+                          >
+                            <svg viewBox="0 0 64 64" focusable="false" className="size-full">
+                              <circle
+                                cx="32"
+                                cy="32"
+                                r="27"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                pathLength="100"
+                                strokeDasharray="8.5 4"
+                              />
+                            </svg>
+                          </span>
                           <span id={`${id}-turma-${opcao.id}`} className="sr-only">
                             {total} {total === 1 ? "aluno" : "alunos"}. {ROTULOS[situacao]}
                             {progresso !== null ? `. ${progresso}% concluído` : ""}

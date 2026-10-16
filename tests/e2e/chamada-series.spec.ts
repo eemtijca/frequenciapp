@@ -183,6 +183,9 @@ test("Chamada: painel compacto e degradê cabem em telas pequenas e ampliadas", 
       await expect(turma.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
       const circulo = await turma.boundingBox();
       expect(circulo?.height).toBeGreaterThanOrEqual(44);
+      expect(circulo?.width).toBeLessThanOrEqual(64);
+      const anel = await turma.locator("svg").boundingBox();
+      expect(anel?.width).toBeGreaterThanOrEqual((circulo?.width ?? 0) - 10);
       expect(Math.abs((circulo?.width ?? 0) - (circulo?.height ?? 0))).toBeLessThanOrEqual(1);
       expect((circulo?.x ?? 0) + (circulo?.width ?? 0)).toBeLessThanOrEqual(largura);
       await expect(turma.locator('[aria-hidden="true"]').filter({ hasText: /%/ })).toHaveCount(0);
@@ -225,11 +228,9 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await expect(turmaA.locator("[data-progresso]")).toHaveAttribute("data-progresso", "100");
   const corPendente = await turmaB
     .locator("[data-progresso]")
-    .evaluate((anel) => getComputedStyle(anel).borderTopColor);
+    .evaluate((anel) => getComputedStyle(anel).color);
   await expect
-    .poll(() =>
-      turmaA.locator("[data-progresso]").evaluate((anel) => getComputedStyle(anel).borderTopColor),
-    )
+    .poll(() => turmaA.locator("[data-progresso]").evaluate((anel) => getComputedStyle(anel).color))
     .not.toBe(corPendente);
   await expect(turmaB.locator("[data-progresso]")).toHaveAttribute("data-progresso", "0");
   // Registra os dois temas na largura de cada projeto, sem incluir dados reais.
