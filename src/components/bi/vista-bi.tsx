@@ -150,6 +150,11 @@ export default function VistaBi({ fuso }: { fuso: string }) {
         p.preferencias.filtros = filtros.data;
         if (temCompartilhados) p.preferencias.aba = "geral";
       }
+      // Semente única das preferências: o armazenamento local só existe no
+      // cliente, depois da hidratação, e a partir daqui o estado é editável.
+      // O restante do efeito só toca no estado depois desta semente, por isso
+      // a exceção cobre a leitura inteira. Ver ADR 047.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- leitura única do armazenamento local (ADR 047)
       setPersonalizacao(p);
       if (p.preferencias.explorador) setConfig(p.preferencias.explorador);
     } catch {
@@ -474,7 +479,6 @@ export default function VistaBi({ fuso }: { fuso: string }) {
     if (comparacao === "nenhuma" || !acesso || aba !== "geral" || !recursos.includes("chamadas"))
       return;
     let atual = true;
-    setComparativo(null);
     const f = compararPeriodoBi(filtros, comparacao);
     const base = exigeListaBi("chamadas", f) ? "lista" : "chamadas";
     const renovar = atualizacao !== geracaoComparada.current;

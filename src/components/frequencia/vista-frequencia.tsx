@@ -187,16 +187,20 @@ export default function VistaFrequencia({
   const semMovimento = useReducedMotion() ?? false;
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
-  useEffect(() => {
-    if (!alvo) return;
-    setTurmaId(alvo.turmaId);
-    setDia(ultimoDiaDeChamada(alvo.dia));
-  }, [alvo]);
+  // A prop é comparada durante o render, como o React recomenda para estado
+  // derivado, em vez de um efeito que marca o estado depois da pintura.
+  const [alvoAnterior, setAlvoAnterior] = useState(alvo);
+  if (alvo !== alvoAnterior) {
+    setAlvoAnterior(alvo);
+    if (alvo) {
+      setTurmaId(alvo.turmaId);
+      setDia(ultimoDiaDeChamada(alvo.dia));
+    }
+  }
 
-  useEffect(() => {
-    const primeira = turmas[0];
-    if (turmaId === "" && primeira !== undefined) setTurmaId(primeira.id);
-  }, [turmaId, turmas]);
+  // Seleciona a primeira turma quando nada foi escolhido ainda.
+  const primeiraTurma = turmas[0];
+  if (turmaId === "" && primeiraTurma !== undefined) setTurmaId(primeiraTurma.id);
 
   const turma = turmas.find((t) => t.id === turmaId);
   const chave = `${dia}|${turmaId}`;
@@ -220,6 +224,10 @@ export default function VistaFrequencia({
       frequenciasDoDia.frequencias.some((item) => item.turmaId === turmaId));
 
   // Carrega as chamadas do dia, seleciona a turma e recupera o rascunho local.
+  // O reinício do estado e o aviso de carregando vêm antes da busca: nenhuma
+  // marca do dia anterior pode aparecer enquanto a chamada nova não chega.
+  // A regra set-state-in-effect não distingue esse caso, registrado no ADR 047.
+  /* eslint-disable react-hooks/set-state-in-effect -- reinício do estado antes da busca da chamada (ADR 047) */
   useEffect(() => {
     if (!dia || !turmaId) {
       setCarregando(false);
@@ -332,6 +340,7 @@ export default function VistaFrequencia({
       viva = false;
     };
   }, [chave, recarregar, usuario.id, dia, turmaId, turma, nomeFeriadoNoCadastro]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Grava rascunho enquanto houver marcação não salva.
   useEffect(() => {

@@ -21,10 +21,6 @@ updates:
       - dependency-name: "*"
         update-types:
           - version-update:semver-major
-      # Segurado em 16.3.8 enquanto o lint não se adapta ao plugin
-      # eslint-plugin-react-hooks 7.1, exigido a partir do 16.4.0.
-      # Retirar esta entrada quando a issue #264 for concluída.
-      - dependency-name: "eslint-config-next"
 
   - package-ecosystem: github-actions
     directory: /

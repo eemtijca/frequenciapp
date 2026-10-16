@@ -87,8 +87,7 @@ export default function VistaSaidas({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
-  const [doDia, setDoDia] = useState<SaidaAntecipada[] | null>(null);
-  const [carregandoDia, setCarregandoDia] = useState(false);
+  const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
 
@@ -119,38 +118,35 @@ export default function VistaSaidas({
 
   const compartilhado = dia.startsWith(mes);
   const duranteAula = ehMomentoDeAula(momento);
+  // Enquanto a leitura do dia escolhido não chega, a lista fica carregando.
+  const carregandoDia = !compartilhado && doDia?.dia !== dia;
 
   useEffect(() => {
-    if (compartilhado) {
-      setDoDia(null);
-      return;
-    }
+    if (compartilhado) return;
     let viva = true;
-    setCarregandoDia(true);
     pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`)
       .then((dados) => {
-        if (viva) setDoDia(dados.saidas);
+        if (viva) setDoDia({ dia, saidas: dados.saidas });
       })
       .catch((excecao: unknown) => {
         if (viva) {
+          setDoDia({ dia, saidas: [] });
           setErro(
             excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar as saídas.",
           );
           setErroVariante(estadoDeErro(excecao));
         }
-      })
-      .finally(() => {
-        if (viva) setCarregandoDia(false);
       });
     return () => {
       viva = false;
     };
   }, [compartilhado, dia, recarregarDia]);
 
-  const saidasDoDia = useMemo(
-    () => (compartilhado ? saidas.filter((saida) => saida.dia === dia) : (doDia ?? [])),
-    [compartilhado, dia, saidas, doDia],
-  );
+  const saidasDoDia = useMemo(() => {
+    if (compartilhado) return saidas.filter((saida) => saida.dia === dia);
+    // A lista só é exibida quando pertence ao dia escolhido.
+    return doDia?.dia === dia ? doDia.saidas : [];
+  }, [compartilhado, dia, saidas, doDia]);
 
   const opcoesTurma = useMemo(() => {
     const comAlunos = new Set(alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaId));
