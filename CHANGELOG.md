@@ -135,6 +135,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Saídas: com a leitura do dia falhando, a lista deixa de exibir as saídas do dia anterior sob a data escolhida; a mensagem de falha aparece sozinha, com o dia vazio.
+
+- Gestão, planilhas: o tempo restante do modo completo acompanha o relógio do navegador minuto a minuto e não depende mais do relógio do servidor na primeira pintura.
+
 - Chamada Parcial exibe Registro na SEDUC somente para faltas com justificativa e aplica a mesma regra aos filtros de pendência e confirmação. A mensagem de lançamento pendente deixa de ocupar as linhas dos alunos; confirmações anteriores e observações permanecem preservadas.
 
 - Painel, gráficos no celular: o deslize para os lados que começava sobre um campo ou botão do cartão, como no gráfico personalizado, não movia a faixa, que voltava ao cartão de origem e dava a impressão de engasgo ao tentar voltar. O arrasto horizontal passa a valer como gesto pelos eventos de toque, e o teste de navegador cobre o deslize iniciado sobre o seletor de data.

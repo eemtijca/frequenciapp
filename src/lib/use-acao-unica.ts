@@ -2,13 +2,18 @@
 
 // Trava de ação única: ignora o segundo toque antes de o disabled do React
 // chegar ao DOM e devolve o estado ocupado para o controle.
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useAcaoUnica<T>(acao: () => Promise<T> | T) {
   const [executando, setExecutando] = useState(false);
   const emAndamento = useRef(false);
   const acaoAtual = useRef(acao);
-  acaoAtual.current = acao;
+
+  // O ref só recebe a ação fora do render: a escrita durante o render é
+  // impura e o React Compiler a reprova.
+  useEffect(() => {
+    acaoAtual.current = acao;
+  });
 
   const executar = useCallback(async () => {
     if (emAndamento.current) return undefined;

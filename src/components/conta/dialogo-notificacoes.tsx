@@ -2,7 +2,7 @@
 
 // Preferência de push do dispositivo atual. A permissão só é pedida após
 // toque explícito; falhas de ativação desfazem a assinatura recém-criada.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LoaderCircle } from "lucide-react";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -44,6 +44,16 @@ function chaveDoServidor(chave: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(texto, (caractere) => caractere.charCodeAt(0));
 }
 
+function suportaNotificacoes(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.isSecureContext &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window &&
+    "Notification" in window
+  );
+}
+
 async function registroPronto(): Promise<ServiceWorkerRegistration> {
   await navigator.serviceWorker.register("/sw.js", { scope: "/" });
   let alarme: ReturnType<typeof setTimeout> | undefined;
@@ -63,7 +73,13 @@ async function registroPronto(): Promise<ServiceWorkerRegistration> {
 }
 
 export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }: Props) {
-  const [suportado, setSuportado] = useState(false);
+  // O suporte é uma leitura do navegador, não um estado: vem do cliente depois
+  // da hidratação e evita o estado escrito dentro de um efeito de montagem.
+  const suportado = useSyncExternalStore(
+    () => () => undefined,
+    suportaNotificacoes,
+    () => false,
+  );
   const [carregando, setCarregando] = useState(true);
   const [estado, setEstado] = useState<Estado | null>(null);
   const [assinatura, setAssinatura] = useState<PushSubscription | null>(null);
@@ -72,20 +88,24 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
   const acaoDesejada = useRef<"ativar" | "desativar" | "testar" | "salvar">("ativar");
   const preferenciaDesejada = useRef<Partial<PreferenciasNotificacoes>>({});
 
+  // O diálogo é limpo ao abrir. A comparação durante o render substitui o
+  // reinício dentro do efeito, que a regra set-state-in-effect reprova.
+  const [abertoAnterior, setAbertoAnterior] = useState(aberto);
+  if (aberto !== abertoAnterior) {
+    setAbertoAnterior(aberto);
+    if (aberto) {
+      setCarregando(true);
+      setEstado(null);
+      setAssinatura(null);
+      setErro("");
+    }
+  }
+
   useEffect(() => {
     if (!aberto) return;
     let cancelado = false;
-    const suporta =
-      window.isSecureContext &&
-      "serviceWorker" in navigator &&
-      "PushManager" in window &&
-      "Notification" in window;
-    setSuportado(suporta);
-    setCarregando(true);
-    setEstado(null);
-    setAssinatura(null);
-    setErro("");
     async function carregar() {
+      const suporta = suportaNotificacoes();
       try {
         const atual = suporta ? await (await registroPronto()).pushManager.getSubscription() : null;
         const dados = await pedir<Estado>(

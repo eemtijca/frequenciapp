@@ -154,6 +154,9 @@ export function useDadosBi() {
   useEffect(() => {
     try {
       const chave = lerSegredoBi();
+      // A abertura com a chave guardada é assíncrona e só toca no estado depois
+      // do await; a regra set-state-in-effect não distingue o caso (ADR 047).
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- abertura assíncrona (ADR 047)
       if (chave) void entrar(chave);
     } catch {
       armazenamentoFalhou();
