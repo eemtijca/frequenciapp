@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Chamada remove a orientação repetida abaixo dos alunos e simplifica a barra de salvamento para uma linha, com status curto, botão Salvar e descarte por ícone com confirmação. O horário salvo, os avisos de falha e conflito e as áreas de toque são preservados.
+
 - Chamada apresenta linhas com fundos alternados, sem busca ou contagem de alunos no cabeçalho. Na chamada bloqueada, faltas comuns deixam de mostrar o seletor de justificativa; faltas justificadas mantêm o motivo. O acumulado passa a considerar apenas o mês consultado, preservando o histórico dos relatórios.
 
 - Círculos das turmas ficam menores, limitados a 64 pixels, preservando área confortável de toque. Os anéis passam a ter oito segmentos mais espessos, verdes após salvar a chamada.

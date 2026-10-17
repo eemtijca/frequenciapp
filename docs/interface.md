@@ -65,7 +65,7 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 - PWA: instalável na tela inicial, atalhos para Chamada e Painel, página própria quando a internet cai, faixa de offline dentro do aplicativo e aviso com botão Atualizar quando há versão nova.
 - Notificações: sino no cabeçalho para diretores e equipe no celular, com tipos por papel e preferências compartilhadas entre dispositivos da conta. A equipe também usa Configurar notificações na barra lateral ou no menu do aplicativo. Ativação, desativação e teste continuam por dispositivo, e a permissão só é pedida após Ativar notificações. Gestão, Configurações, Notificações define tipos disponíveis e horários de resumo e pendências. Ver [notificacoes.md](notificacoes.md).
 - Carregamento com esqueleto do shell na primeira visita e mensagens locais nas regiões, sem bloquear a visão inteira.
-- Salvamento com estado explícito na barra fixa: nova chamada, alterações por salvar, salvando, salva na nuvem com hora e autoria.
+- Salvamento em barra compacta de uma linha, com status curto e botão Salvar. A confirmação mostra o horário; alterações pendentes mantêm a ação Descartar em ícone, com nome acessível e confirmação. A barra preserva estados de carregamento, envio, falha e conflito, sem instruções repetidas abaixo da lista.
 - Erros em painel inline com ação de tentar de novo; conflito de revisão com a versão vigente e recarga assistida; sessão expirada volta para a tela de entrada.
 - Rascunho em `sessionStorage` enquanto houver marcações não salvas, recuperado ao voltar para o mesmo dia e turma, com aviso quando o rascunho é mais antigo que a versão salva.
 - Aviso de saída da página quando há marcações por salvar e confirmação ao sair da conta nessa situação. A Chamada Parcial também pede confirmação antes de mudar de visão com registros pendentes, inclusive ao abrir Gestão; a mudança preserva o rascunho para salvamento ao voltar.
@@ -100,7 +100,7 @@ Animações discretas, todas com propósito de confirmar estado:
 - Abas da Gestão e dos Relatórios: troca por toque, botões e teclado; no desktop o conteúdo faz um deslize curto de 0,15 s.
 - Marca P/F/FJ da chamada troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
 - Botões, chips, abas e controles respondem ao toque encolhendo de leve por 150 ms; com movimento reduzido, a escala some e só a cor responde.
-- Diálogos seguem as animações padrão do Radix; a barra de salvamento da Chamada flutua como um painel arredondado com sombra no fim da rolagem, para o cartão da lista terminar visível e arredondado.
+- Diálogos seguem as animações padrão do Radix; a barra de salvamento da Chamada flutua com cantos arredondados e sombra suave no fim da rolagem. Controles mantêm pelo menos 44 pixels de altura para toque; o cartão da lista termina visível e arredondado.
 
 Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo, o movimento só explica o que mudou.
 

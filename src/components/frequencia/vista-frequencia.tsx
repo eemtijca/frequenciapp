@@ -710,36 +710,20 @@ export default function VistaFrequencia({
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
 
   const tituloEstado = carregando
-    ? "Carregando chamada"
+    ? "Carregando..."
     : conflito
-      ? "Confira o conflito"
+      ? "Conflito"
       : salvando
-        ? "Salvando chamada"
+        ? "Salvando..."
         : erro
           ? sujo
             ? "Falha ao salvar"
             : "Falha ao carregar"
           : sujo
-            ? "Alterações por salvar"
+            ? "Pendente"
             : atualizadoEm
-              ? "Salva na nuvem"
+              ? `Salva às ${horaSalva}`
               : "Nova chamada";
-
-  const detalheEstado = carregando
-    ? "Buscando o registro salvo."
-    : conflito
-      ? "Recarregue para resolver."
-      : salvando
-        ? "Enviando as marcações."
-        : sujo
-          ? `Turma ${turma?.rotulo ?? ""} · ${rotuloDia}`
-          : atualizadoEm
-            ? `Às ${horaSalva} · ${
-                contagemFaltas === 0
-                  ? "todos presentes"
-                  : `${contagemFaltas} ${contagemFaltas === 1 ? "falta" : "faltas"}`
-              }`
-            : "Confira as faltas e toque em Salvar.";
 
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
   if (turmas.length === 0) {
@@ -1362,70 +1346,55 @@ export default function VistaFrequencia({
               </ul>
             )}
           </div>
-          {!chamadaBloqueada && !feriado && (
-            <p className="text-muted-foreground text-xs">
-              Toque de novo em um aluno marcado para voltar a presente. Escolha a justificativa para
-              registrar falta justificada (FJ).
-            </p>
-          )}
-
           <div
             aria-label="Barra de salvamento"
-            className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 px-4 py-3"
+            className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 flex items-center gap-2 rounded-2xl p-2"
           >
-            <div className="flex items-center justify-between gap-3 xl:flex-col xl:items-stretch">
-              <div aria-live="polite" className="min-w-0 flex-1 xl:flex-none">
-                <p className="truncate text-sm font-medium">{feriado ? "Feriado" : tituloEstado}</p>
-                <p className="text-muted-foreground truncate text-xs">
-                  {feriado?.nome ?? detalheEstado}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 xl:w-full">
-                {sujo && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="lg"
-                        className="h-11 xl:flex-1"
-                        disabled={salvando}
-                      >
-                        <RotateCcw size={16} />
-                        Descartar
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          As marcações não salvas serão descartadas e a última versão salva será
-                          recarregada.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
-                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                <Button
-                  size="lg"
-                  className="h-11 px-6 xl:flex-1 xl:px-0"
-                  onClick={salvar}
-                  disabled={!podeSalvar}
-                >
-                  {salvando ? (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  ) : atualizadoEm && !sujo ? (
-                    <CloudCheck size={16} />
-                  ) : (
-                    <Save size={16} />
-                  )}
-                  {salvando ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </div>
+            <p
+              aria-live="polite"
+              className="text-muted-foreground min-w-0 flex-1 truncate px-2 text-xs font-medium"
+              title={feriado?.nome}
+            >
+              {feriado ? "Feriado" : tituloEstado}
+            </p>
+            {sujo && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Descartar"
+                    title="Descartar alterações"
+                    disabled={salvando}
+                  >
+                    <RotateCcw size={16} aria-hidden="true" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      As marcações não salvas serão descartadas e a última versão salva será
+                      recarregada.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
+                    <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+            <Button className="px-4" onClick={salvar} disabled={!podeSalvar}>
+              {salvando ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : atualizadoEm && !sujo ? (
+                <CloudCheck size={16} />
+              ) : (
+                <Save size={16} />
+              )}
+              {salvando ? "Salvando..." : "Salvar"}
+            </Button>
           </div>
         </div>
       </div>
