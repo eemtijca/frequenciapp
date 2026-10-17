@@ -1232,7 +1232,7 @@ export default function VistaFrequencia({
                                     ? codigo
                                       ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                                       : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                                    : "text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
+                                    : "border-primary/25 bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
                               }
                             >
                               {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
