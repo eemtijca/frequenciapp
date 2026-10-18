@@ -112,7 +112,6 @@ test("um único botão reorganiza todas as turmas e atualiza a chamada sem dupli
   const nomes = chamada.locator("ul li");
   await expect(nomes).toHaveCount(2);
   await expect(nomes.nth(0)).toContainText(`${prefixo} A Álvaro`);
-  await expect(nomes.nth(0)).toContainText("01");
   await expect(nomes.nth(1)).toContainText(`${prefixo} A Zoé`);
   await page.reload();
   await aguardarHidratacao(page);

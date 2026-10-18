@@ -155,8 +155,8 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await expect(linhas).toHaveCount(3);
   await expect(linhas.nth(0).getByRole("heading")).toHaveText("E2E Parcial Um");
   await expect(linhas.nth(1).getByRole("heading")).toHaveText("E2E Parcial Dois");
-  await expect(linhas.nth(0).getByText("01", { exact: true })).toBeVisible();
-  await expect(linhas.nth(1).getByText("02", { exact: true })).toBeVisible();
+  // A ordem da chamada continua, sem o número ocupando espaço do nome.
+  await expect(linhas.nth(0).getByText("01", { exact: true })).toHaveCount(0);
   const primeiro = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const segundo = secao.getByTestId(`parcial-aluno-${segundoAlunoId}`);
   await expect(primeiro.getByText("Sem registro", { exact: true })).toBeVisible();

@@ -1180,9 +1180,6 @@ export default function VistaFrequencia({
                               faltando ? "" : "hover:bg-secondary/60"
                             }`}
                           >
-                            <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                              {String(aluno.ordem).padStart(2, "0")}
-                            </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex min-w-0 items-center gap-2">
                                 <span
