@@ -640,9 +640,6 @@ export default function VistaFrequenciaParcial({
                     data-testid={`parcial-aluno-${aluno.id}`}
                   >
                     <div className="flex items-start gap-3">
-                      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
-                        {aluno.ordem === null ? "-" : String(aluno.ordem).padStart(2, "0")}
-                      </span>
                       <div className="min-w-0 flex-1">
                         <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
                         {aluno.desistente && (

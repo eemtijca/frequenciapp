@@ -79,6 +79,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada e Chamada Parcial deixam de mostrar o número do aluno à esquerda do nome, o que libera espaço para os nomes no celular. A lista continua na ordem da chamada.
+
 - Seletores da Chamada mais compactos, com seleção discreta e anéis que mantêm os segmentos por turma mesmo em 100%. As fatias concluídas ficam verdes e as pendentes vermelhas.
 
 - Chamada Parcial volta à barra lateral, logo abaixo de Chamada, com seleção e aviso de alterações próprios no desktop e no celular.
