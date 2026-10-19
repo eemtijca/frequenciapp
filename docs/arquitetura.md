@@ -102,7 +102,7 @@ src/
     page.tsx                página única: sessão, pré-busca e shell
     error.tsx               fronteira de erro amigável
     not-found.tsx           404
-    icon.svg                ícone do aplicativo
+    icon.svg                favicon vetorial do aplicativo (aluno de mochila no portão, com o oiti)
     layout.tsx              metadados, manifest da PWA e fontes
   components/
     aplicacao.tsx           shell com visões, barra lateral e menu responsivo
@@ -163,9 +163,10 @@ src/
 prisma/                     schema e migrações
 prisma.config.ts            configuração do CLI do Prisma 7
 generated/                  cliente Prisma gerado (fora do git)
-public/                     manifest, service worker, offline e ícones
+public/                     manifest, service worker, offline e ícones em PNG (gerados)
+design/icone/               desenho mestre do ícone em SVG; `pnpm run icones:gerar` produz os PNGs de `public/`
 docker/                     entrypoint e migrador do contêiner
-scripts/                    criar-admin, criar-coordenacao e seed
+scripts/                    criar-admin, criar-coordenacao, seed e gerar-icones
 docs/                       esta documentação
 tests/                      Vitest (unidade e contratos)
 ```

@@ -32,6 +32,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - `pnpm run test:pwa` roda o próprio `pnpm run build && pnpm start`, porque o service worker precisa ser o de produção.
 - Banco: `pnpm run db:migrate` em desenvolvimento, `pnpm run db:deploy` em produção. Nunca edite uma migração aplicada; crie uma nova com `pnpm exec prisma migrate dev --name ajuste`. O cliente Prisma em `generated/` fica fora do Git; `pnpm run db:generate` ou o `postinstall` o regenera.
 - Etiquetas: `pnpm run etiquetas:sync` cria ou atualiza as etiquetas do GitHub conforme `.github/labels.json`.
+- Ícones: o desenho mestre é `design/icone/mestre.svg` e os PNGs de `public/` saem dele por `pnpm run icones:gerar`; não edite os PNGs à mão. Ao trocar qualquer ícone, suba a `VERSAO` em `public/sw.js`.
 - Capturas do README: `pnpm run capturas:readme` ou `pnpm run capturas:readme:docker`, com o aplicativo no ar e a semente aplicada. Os PNGs ficam em `docs/imagens/` e não são editados à mão; capturas locais vão para `docs/imagens/locais/`.
 
 ## Ferramentas externas
