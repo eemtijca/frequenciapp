@@ -79,6 +79,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Ícone do aplicativo novo, em duas cores sólidas, verde da marca e branco: um aluno de mochila entra entre as duas folhas abertas de um portão em arco, e um pé de oiti de copa grande fica ao lado, sobre fundo verde uniforme. O desenho vem da conversão em SVG da imagem de referência da revisão, usada como traçado sem retoques de forma, e fica em `design/icone/mestre.svg` com fundo sangrado e tudo o que importa dentro da zona segura do recorte redondo do Android. Os PNGs `any`, `maskable` e o ícone da tela inicial do iOS saem dele por `pnpm run icones:gerar`, e o favicon vetorial em `src/app/icon.svg` usa o mesmo traçado com contorno branco mais grosso, para 16 e 32 pixels. Os ícones `any` passam a ter cantos arredondados transparentes, no lugar do canto branco. A versão do service worker sobe para renovar o cache.
+
 - Chamada e Chamada Parcial deixam de mostrar o número do aluno à esquerda do nome, o que libera espaço para os nomes no celular. A lista continua na ordem da chamada.
 
 - Seletores da Chamada mais compactos, com seleção discreta e anéis que mantêm os segmentos por turma mesmo em 100%. As fatias concluídas ficam verdes e as pendentes vermelhas.
