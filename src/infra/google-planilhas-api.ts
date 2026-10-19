@@ -19,6 +19,8 @@ const CHAVES_METADADOS = [
   "frequenciapp.feriado",
   "frequenciapp.geracao",
   "frequenciapp.copia",
+  "frequenciapp.saidas.turma",
+  "frequenciapp.saidas.esquema",
 ];
 const CAMPOS_ESTRUTURA =
   "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),charts(chartId),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
@@ -570,6 +572,11 @@ export async function estruturaGoogle(
         );
         return {
           nome: aba.properties.title,
+          ...(metadadosDaAba(doc, aba).some(
+            (item) => item.metadataKey === "frequenciapp.saidas.turma",
+          )
+            ? { consultaSaidas: true }
+            : {}),
           abaId: aba.properties.sheetId,
           ...(mensal
             ? {

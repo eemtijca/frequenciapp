@@ -497,7 +497,9 @@ export function planejarSaidas(
   const pedidas = new Set(opcoes.removerLinhas ?? []);
   const remover = candidatosRemocao.filter((item) => pedidas.has(item.linha));
   if (colunasMapeadas.some((coluna) => coluna.atributo === "turma")) {
-    avisos.push("Registros enviados pelo app serão ordenados por turma, aluno e data.");
+    avisos.push(
+      "Serão preparadas abas de consulta por turma, mantendo a aba original e o histórico.",
+    );
   }
 
   const resumo: ResumoPlanoSaidas = {

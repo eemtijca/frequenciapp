@@ -242,6 +242,7 @@ export async function lerEstruturaSaidas() {
     planilha: { nome: string; url: string; fuso: string };
     abas: {
       nome: string;
+      consultaSaidas?: boolean;
       oculta: boolean;
       criada: boolean;
       linhas: number;
@@ -280,6 +281,9 @@ export async function lerEstruturaSaidas() {
         mesclagens: item.mesclagens,
       };
       const detectada = detectarEsquemaSaida(bruta);
+      if (item.consultaSaidas)
+        detectada.bloqueio =
+          "Esta aba é uma consulta por turma. Selecione a aba original de saídas.";
       if (bruta.nome === ABA_ENTRADAS)
         detectada.bloqueio =
           "A aba Entradas é reservada às chegadas atrasadas. Escolha outra aba para as saídas.";
@@ -353,6 +357,7 @@ interface SimulacaoSaidas {
   modalidade: "conservador" | "completo";
   plano: PlanoSaidas;
   esquema: AbaSaidaEsquema;
+  turmas: string[];
 }
 
 /** Monta o plano da aba única para o período informado. */
@@ -434,8 +439,13 @@ async function montarSimulacaoSaidas(
     anoReferencia: new Date().getFullYear(),
     removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
   });
-  plano.planoHash = hashTexto(JSON.stringify([linha.googlePlanilhaId, plano.planoHash]));
-  return { modalidade, plano, esquema: esquemaAtual };
+  const rotulosTurmas = turmas
+    .map((turma) => turma.rotulo)
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  plano.planoHash = hashTexto(
+    JSON.stringify([linha.googlePlanilhaId, plano.planoHash, rotulosTurmas]),
+  );
+  return { modalidade, plano, esquema: esquemaAtual, turmas: rotulosTurmas };
 }
 
 /** Prévia do envio das saídas, sem gravar nada. */
@@ -463,7 +473,7 @@ export async function simularEnvioSaidas(usuario: { id: string }, entrada: unkno
   };
 }
 
-function operacoesDoPlanoSaidas(plano: PlanoSaidas, esquema: AbaSaidaEsquema) {
+function operacoesDoPlanoSaidas(plano: PlanoSaidas, esquema: AbaSaidaEsquema, turmas: string[]) {
   const operacoes: Record<string, unknown>[] = [];
   if (plano.criar.length > 0) {
     operacoes.push({
@@ -504,6 +514,7 @@ function operacoesDoPlanoSaidas(plano: PlanoSaidas, esquema: AbaSaidaEsquema) {
       colunaTurma,
       colunaData,
       anoReferencia: new Date().getFullYear(),
+      turmas,
     });
   }
   return operacoes;
@@ -536,7 +547,7 @@ async function aplicarEnvioSaidasProtegido(usuario: { id: string }, entrada: unk
   }
   if (simulacao.plano.bloqueado || simulacao.plano.resumo.ambiguidades > 0)
     throw new ErroHttp(simulacao.plano.avisos[0] ?? "Confira a aba de saídas.", 409);
-  const operacoes = operacoesDoPlanoSaidas(simulacao.plano, simulacao.esquema);
+  const operacoes = operacoesDoPlanoSaidas(simulacao.plano, simulacao.esquema, simulacao.turmas);
   const registroId = await iniciarEnvioMovimentacao(
     usuario.id,
     linha,

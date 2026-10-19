@@ -109,7 +109,7 @@ describe("plano da aba de saídas", () => {
     ]);
     expect(saidas[0]?.turma).toBe("10º ano A");
     expect(plano.avisos).toContain(
-      "Registros enviados pelo app serão ordenados por turma, aluno e data.",
+      "Serão preparadas abas de consulta por turma, mantendo a aba original e o histórico.",
     );
   });
 

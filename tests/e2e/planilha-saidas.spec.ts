@@ -111,11 +111,19 @@ test.describe("Google Planilhas de saídas", () => {
     await expect.poll(() => google.valor(ABA, 2, 2)).toBe("E2E Aluno Um");
     expect(google.valor(ABA, 2, 1)).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
     expect(google.valor(ABA, 2, 5)).toBe("Consulta");
+    const abasTurmas = google.abas().filter((nome) => nome.startsWith(`${ABA} · `));
+    expect(abasTurmas.length).toBeGreaterThan(0);
+    expect(abasTurmas.every((nome) => google.formulaDe(nome, 1, 1).startsWith("=VSTACK("))).toBe(
+      true,
+    );
+    expect(abasTurmas.every((nome) => google.apresentacao(nome).congeladasLinhas === 1)).toBe(true);
 
     // O segundo envio do mesmo mês não duplica linhas.
     await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
     // Saídas e Entradas (já preparada) mostram, cada uma, zero linhas novas.
     await expect(page.getByRole("dialog").getByText(/0 linhas novas/)).toHaveCount(2);
-    await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Enviar" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(google.abas().filter((nome) => nome.startsWith(`${ABA} · `))).toEqual(abasTurmas);
   });
 });
