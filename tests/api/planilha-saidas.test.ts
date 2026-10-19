@@ -384,6 +384,185 @@ describe("planilha de saídas", () => {
     expect(resposta.status).toBe(400);
   });
 
+  it("organiza registros antigos e novos por turma, aluno e data preservando linhas completas", async () => {
+    const testeBanco = banco;
+    const testeGoogle = google;
+    if (!testeBanco || !testeGoogle) throw new Error("Ambiente sintético ausente.");
+    const abaOrdenacao = "QA Saídas por turma";
+    const configuracao = await testeBanco.query<{
+      esquema: unknown;
+      assinatura_esquema: string | null;
+      esquema_em: Date | null;
+    }>(
+      "select esquema, assinatura_esquema, esquema_em from integracoes_planilha where id = 'saidas'",
+    );
+    const anterior = configuracao.rows[0];
+    if (!anterior) throw new Error("Configuração sintética ausente.");
+    const cabecalho = [...CABECALHO, "Conferência"];
+    const zuleica = [
+      "03/09/2026",
+      "QS Zuleica",
+      "QS Ano B",
+      "09:10 · 2ª aula",
+      "Consulta",
+      "QS Observação Zuleica",
+      "QS Responsável Zuleica",
+      "3",
+    ];
+    const erica = [
+      "03/08/2026",
+      "QS Érica",
+      "QS Ano A",
+      "09:20 · 2ª aula",
+      "Consulta",
+      "QS Observação Érica",
+      "QS Responsável Érica",
+      "9",
+    ];
+    const agataAgosto = [
+      "03/08/2026",
+      "QS Ágata",
+      "QS Ano A",
+      "10:10 · 3ª aula",
+      "Outros",
+      "QS Observação agosto",
+      "QS Responsável agosto",
+      "QS Conferência agosto",
+    ];
+    const agataJulho = [
+      "31/07/2026",
+      "QS Ágata",
+      "QS Ano A",
+      "10:20 · 3ª aula",
+      "Outros",
+      "QS Observação julho",
+      "QS Responsável julho",
+      "QS Conferência julho",
+    ];
+    const manual = ["QS Conferência manual", "", "", "", "", "", "", "QS Total manual"];
+    testeGoogle.definirAba(
+      abaOrdenacao,
+      [cabecalho, zuleica, manual, erica, agataAgosto, agataJulho],
+      { formulas: { H2: "=1+2", H4: "=4+5" }, notas: { H2: "QS Nota Zuleica" } },
+    );
+    for (const linha of [2, 4, 5, 6]) testeGoogle.marcarLinha(abaOrdenacao, linha);
+    const linhas = (quantidade: number) =>
+      Array.from({ length: quantidade }, (_, linha) =>
+        cabecalho.map((_, coluna) => testeGoogle.valor(abaOrdenacao, linha + 1, coluna + 1)),
+      );
+    const gravacoes = () => testeGoogle.chamadas().filter((chamada) => chamada === "gravar").length;
+    const lerComplementos = async () => {
+      const credencial = testeGoogle.codigoAutorizacao();
+      const endereco = Buffer.from(
+        credencial.slice("frequenciapp-teste:".length),
+        "base64url",
+      ).toString();
+      const url = new URL("/v4/spreadsheets/planilha-sintetica", endereco);
+      url.searchParams.set("includeGridData", "true");
+      url.searchParams.set("ranges", `'${abaOrdenacao}'!A1:H20`);
+      const resposta = await fetch(url, { headers: { Authorization: `Bearer ${credencial}` } });
+      expect(resposta.status).toBe(200);
+      const documento = await json<{
+        sheets: {
+          developerMetadata: {
+            metadataId: number;
+            metadataKey: string;
+            location: { dimensionRange: { startIndex: number } };
+          }[];
+          data: { rowData: { values: { note?: string }[] }[] }[];
+        }[];
+      }>(resposta);
+      const aba = documento.sheets[0];
+      if (!aba) throw new Error("Aba sintética ausente.");
+      return {
+        marcadores: aba.developerMetadata.map((item) => ({
+          id: item.metadataId,
+          chave: item.metadataKey,
+          linha: item.location.dimensionRange.startIndex + 1,
+        })),
+        notas: aba.data[0]?.rowData.map((linha) => linha.values[7]?.note ?? "") ?? [],
+      };
+    };
+    const enviarPeriodo = async (de: string, ate: string) => {
+      const simulacao = await autenticado("/api/planilha-saidas/simular", {
+        method: "POST",
+        body: JSON.stringify({ de, ate }),
+      });
+      expect(simulacao.status).toBe(200);
+      const previa = await json<{ planoHash: string; resumo: { criar: number } }>(simulacao);
+      const aplicacao = await autenticado("/api/planilha-saidas/aplicar", {
+        method: "POST",
+        body: JSON.stringify({ de, ate, planoHash: previa.planoHash }),
+      });
+      expect(aplicacao.status).toBe(200);
+      expect(await aplicacao.json()).toMatchObject({ resultado: "sucesso" });
+      return previa;
+    };
+    try {
+      const complementosAntes = await lerComplementos();
+      const estrutura = await json<{ planilha: unknown; abas: unknown[] }>(
+        await autenticado("/api/planilha-saidas/estrutura", { method: "POST", body: "{}" }),
+      );
+      const mapa = await autenticado("/api/planilha-saidas/mapa", {
+        method: "POST",
+        body: JSON.stringify({ ...estrutura, aba: abaOrdenacao }),
+      });
+      expect(mapa.status).toBe(200);
+
+      // O envio sem saídas novas organiza também os registros de outros meses.
+      expect((await enviarPeriodo("2026-06-01", "2026-06-30")).resumo.criar).toBe(0);
+      expect(linhas(6)).toEqual([cabecalho, agataJulho, manual, agataAgosto, erica, zuleica]);
+      expect(testeGoogle.formulaDe(abaOrdenacao, 5, 8)).toBe("=4+5");
+      expect(testeGoogle.formulaDe(abaOrdenacao, 6, 8)).toBe("=1+2");
+
+      expect((await enviarPeriodo(DE, ATE)).resumo.criar).toBe(1);
+      const ana = CABECALHO.map((_, coluna) => testeGoogle.valor(ABA, 3, coluna + 1));
+      expect(linhas(7)).toEqual([
+        cabecalho,
+        agataJulho,
+        manual,
+        agataAgosto,
+        [...ana, ""],
+        erica,
+        zuleica,
+      ]);
+      expect(testeGoogle.formulaDe(abaOrdenacao, 6, 8)).toBe("=4+5");
+      expect(testeGoogle.formulaDe(abaOrdenacao, 7, 8)).toBe("=1+2");
+      const complementosDepois = await lerComplementos();
+      const novasPosicoes = new Map([
+        [2, 7],
+        [4, 6],
+        [5, 4],
+        [6, 2],
+      ]);
+      expect(complementosDepois.marcadores).toEqual(
+        expect.arrayContaining(
+          complementosAntes.marcadores.map((item) => ({
+            ...item,
+            linha: novasPosicoes.get(item.linha),
+          })),
+        ),
+      );
+      expect(complementosDepois.marcadores).toHaveLength(5);
+      expect(complementosDepois.marcadores.some((item) => item.linha === 5)).toBe(true);
+      expect(complementosDepois.notas.filter(Boolean)).toEqual(["QS Nota Zuleica"]);
+      expect(complementosDepois.notas[6]).toBe("QS Nota Zuleica");
+
+      const quantidadeGravacoes = gravacoes();
+      const linhasAntesDoReenvio = linhas(8);
+      expect((await enviarPeriodo(DE, ATE)).resumo.criar).toBe(0);
+      expect(gravacoes()).toBe(quantidadeGravacoes);
+      expect(linhas(8)).toEqual(linhasAntesDoReenvio);
+      expect(await lerComplementos()).toEqual(complementosDepois);
+    } finally {
+      testeGoogle.removerAba(abaOrdenacao);
+      await testeBanco.query(
+        "update integracoes_planilha set esquema = $1::jsonb, assinatura_esquema = $2, esquema_em = $3 where id = 'saidas'",
+        [JSON.stringify(anterior.esquema), anterior.assinatura_esquema, anterior.esquema_em],
+      );
+    }
+  });
+
   it("preserva a entrada após resposta perdida e retoma a automação após conferência manual", async () => {
     const testeBanco = banco;
     const testeGoogle = google;

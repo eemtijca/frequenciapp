@@ -208,3 +208,234 @@ describe("escrita com ordenação de alunos", () => {
     },
   );
 });
+
+describe("escrita com ordenação de saídas por turma", () => {
+  const cabecalho = ["Data", "Aluno", "Turma", "Observação"];
+  const ordenar = {
+    tipo: "ordenarSaidas",
+    colunaAluno: 2,
+    colunaTurma: 3,
+    colunaData: 1,
+    anoReferencia: 2026,
+  };
+  function documentoSaidas(
+    linhas: number[],
+    merges?: DocumentoGoogle["sheets"][number]["merges"],
+  ): DocumentoGoogle {
+    return {
+      spreadsheetId: "qa-saidas",
+      properties: { title: "QA Saídas" },
+      sheets: [
+        {
+          properties: {
+            sheetId: 7,
+            title: "Saídas",
+            gridProperties: { rowCount: 100, columnCount: 26 },
+          },
+          merges,
+          developerMetadata: linhas.map((linha) => ({
+            metadataId: linha,
+            metadataKey: "frequenciapp.linha",
+            metadataValue: "1",
+            location: {
+              dimensionRange: {
+                sheetId: 7,
+                startRowIndex: linha - 1,
+                endRowIndex: linha,
+              },
+            },
+          })),
+        },
+      ],
+    };
+  }
+  function planejar(
+    valores: string[][],
+    linhas: number[],
+    formulas: boolean[][] = [],
+    operacoes: unknown[] = [ordenar],
+  ) {
+    return planejarEscritaGoogle(
+      documentoSaidas(linhas),
+      "Saídas",
+      valores,
+      formulas,
+      1,
+      assinarAba("Saídas", cabecalho, []),
+      operacoes,
+      true,
+    );
+  }
+  function mover(valores: string[][], requests: Record<string, unknown>[]) {
+    const resultado = valores.map((linha) => [...linha]);
+    for (const pedido of requests) {
+      if (!pedido.moveDimension) continue;
+      const { source, destinationIndex } = pedido.moveDimension as {
+        source: { startIndex: number; endIndex: number };
+        destinationIndex: number;
+      };
+      const removidas = resultado.splice(source.startIndex, source.endIndex - source.startIndex);
+      resultado.splice(
+        destinationIndex > source.startIndex
+          ? destinationIndex - removidas.length
+          : destinationIndex,
+        0,
+        ...removidas,
+      );
+    }
+    return resultado;
+  }
+
+  it("agrupa turmas numericamente, alunos alfabeticamente e datas entre meses sem mover linhas manuais", () => {
+    const valores = [
+      cabecalho,
+      ["01/09/2026", "Ana", "10º ano A", "Dez"],
+      ["01/10/2026", "Érica", "2º ano B", "Outubro"],
+      ["Conferência manual"],
+      ["30/09/2026", "Érica", "2º ano B", "Setembro"],
+      ["05/10/2026", "Ágata", "2º ano B", "Ágata"],
+      ["01/09/2026", "Zélia", "2º ano A", "A"],
+    ];
+    const linhas = [2, 3, 5, 6, 7];
+    const plano = planejar(valores, linhas);
+    const resultado = mover(valores, plano.requests);
+    expect(resultado).toEqual([
+      valores[0],
+      valores[6],
+      valores[5],
+      valores[3],
+      valores[4],
+      valores[2],
+      valores[1],
+    ]);
+    expect(plano.destrutiva).toBe(false);
+    expect(plano.requests.every((pedido) => pedido.moveDimension)).toBe(true);
+    expect(planejar(resultado, linhas).requests).toEqual([]);
+  });
+
+  it("preserva nomes, turmas e datas com fórmula, campos ausentes e linhas apenas vinculadas", () => {
+    const valores = [
+      cabecalho,
+      ["01/10/2026", "Zélia", "2º ano B"],
+      ["01/10/2026", "Ana", "1º ano A"],
+      ["01/10/2026", "Bruna", "1º ano A"],
+      ["01/10/2026", "Carla", "1º ano A"],
+      ["", "Daniela", "1º ano A"],
+      ["01/10/2026", "Eva", ""],
+      ["Inválida", "Flávia", "1º ano A"],
+      ["01/10/2026", "Gabriela", "1º ano A"],
+    ];
+    const doc = documentoSaidas([2, 3, 4, 5, 6, 7, 8]);
+    doc.sheets[0]?.developerMetadata?.push({
+      metadataId: 99,
+      metadataKey: "frequenciapp.aluno",
+      metadataValue: alunoId,
+      location: {
+        dimensionRange: { sheetId: 7, startRowIndex: 8, endRowIndex: 9 },
+      },
+    });
+    const plano = planejarEscritaGoogle(
+      doc,
+      "Saídas",
+      valores,
+      [[], [], [false, true], [false, false, true], [true]],
+      1,
+      assinarAba("Saídas", cabecalho, []),
+      [ordenar],
+      false,
+    );
+    expect(plano.requests).toEqual([]);
+  });
+
+  it("ordena depois de criar, preencher e excluir linhas sem reutilizar posições antigas", () => {
+    const valores = [
+      cabecalho,
+      ["01/10/2026", "Zélia", "3º ano A"],
+      ["01/10/2026", "Bruna", "2º ano A"],
+      ["Manual"],
+    ];
+    const plano = planejar(
+      valores,
+      [2, 3],
+      [],
+      [
+        {
+          tipo: "criarLinhas",
+          itens: [
+            {
+              linha: 5,
+              celulas: [
+                { coluna: 1, valor: "02/10/2026" },
+                { coluna: 2, valor: "Ana" },
+              ],
+            },
+          ],
+        },
+        { tipo: "preencher", linha: 5, coluna: 3, valor: "1º ano A" },
+        { tipo: "removerLinhas", linhas: [2] },
+        ordenar,
+      ],
+    );
+    const depoisDaEscrita = [
+      cabecalho,
+      valores[2] ?? [],
+      valores[3] ?? [],
+      ["02/10/2026", "Ana", "1º ano A"],
+    ];
+    expect(mover(depoisDaEscrita, plano.requests)).toEqual([
+      cabecalho,
+      ["02/10/2026", "Ana", "1º ano A"],
+      valores[3],
+      valores[2],
+    ]);
+    expect(plano.requests.at(-1)).toHaveProperty("moveDimension");
+  });
+
+  it("recusa operações posteriores à ordenação", () => {
+    expect(() =>
+      planejar(
+        [cabecalho],
+        [],
+        [],
+        [ordenar, { tipo: "preencher", linha: 2, coluna: 2, valor: "Ana" }],
+      ),
+    ).toThrow("A ordenação deve concluir o envio da planilha.");
+  });
+
+  it("reencontra Data, Aluno e Turma após inserir uma coluna antes delas", () => {
+    const valores = [
+      cabecalho,
+      ["01/10/2026", "Ana", "3º ano A"],
+      ["01/10/2026", "Zélia", "2º ano A"],
+    ];
+    const plano = planejar(
+      valores,
+      [2, 3],
+      [],
+      [{ tipo: "inserirColunas", antesDe: 1, cabecalhoLinha: 1, rotulos: ["Auxiliar"] }, ordenar],
+    );
+    expect(mover(valores, plano.requests)).toEqual([valores[0], valores[2], valores[1]]);
+    expect(plano.requests.at(-1)).toHaveProperty("moveDimension");
+  });
+
+  it("recusa mesclagens verticais antes de escrever ou movimentar as saídas", () => {
+    const doc = documentoSaidas(
+      [2, 3],
+      [{ sheetId: 7, startRowIndex: 1, endRowIndex: 3, startColumnIndex: 3, endColumnIndex: 4 }],
+    );
+    const aba = doc.sheets[0];
+    if (!aba) throw new Error("Aba sintética ausente.");
+    expect(() =>
+      planejarEscritaGoogle(
+        doc,
+        "Saídas",
+        [cabecalho, ["01/10/2026", "Zélia", "2º ano A"], ["01/10/2026", "Ana", "1º ano A"]],
+        [],
+        1,
+        assinarAba("Saídas", cabecalho, mesclagensDaAssinatura(aba)),
+        [ordenar],
+        false,
+      ),
+    ).toThrow("Confira as células mescladas na tabela antes de ordenar as saídas.");
+  });
+});

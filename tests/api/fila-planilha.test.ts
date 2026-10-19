@@ -342,7 +342,9 @@ describe("falhas e retentativas", () => {
     const liberada = await processar();
     expect(liberada.processados).toBe(2);
     expect((await fila()).map((item) => item.estado)).toEqual(["CONCLUIDO", "CONCLUIDO"]);
-    expect(ultimaLinhaDe("QF Davi")).toBe(linhaDe("QF Fabio") + 1);
+    // A fila preserva a vez do envio; a aba termina em ordem alfabética na turma.
+    expect(ultimaLinhaDe("QF Davi")).toBeGreaterThan(0);
+    expect(linhaDe("QF Fabio")).toBeGreaterThan(ultimaLinhaDe("QF Davi"));
   });
 
   it("esgotadas as tentativas o item vai a falhou e a fila segue", async () => {

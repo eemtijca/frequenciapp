@@ -136,7 +136,12 @@ beforeEach(() => {
     expect(dubl.criar).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ resultado: "PARCIAL" }) }),
     );
-    return { linhasCriadas: 1, preenchidas: 0, substituidas: 0, removidasLinhas: 0 };
+    return {
+      linhasCriadas: preenchida ? 0 : 1,
+      preenchidas: 0,
+      substituidas: 0,
+      removidasLinhas: 0,
+    };
   });
 });
 
@@ -204,7 +209,7 @@ it("a troca de arquivo invalida a prévia de saídas mesmo com conteúdo idênti
   expect(dubl.criar).not.toHaveBeenCalled();
 });
 
-it("a conferência manual de saídas registra sucesso mesmo sem escrita", async () => {
+it("a conferência manual de saídas ordena a aba mesmo sem novos registros", async () => {
   preenchida = true;
   const periodo = { de: dia, ate: dia };
   const previa = await simularEnvioSaidas(usuario, periodo);
@@ -217,5 +222,41 @@ it("a conferência manual de saídas registra sucesso mesmo sem escrita", async 
       data: expect.objectContaining({ resultado: "SUCESSO", erro: null }),
     }),
   );
+  expect(dubl.chamar).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      acao: "aplicar",
+      modoCompleto: false,
+      operacoes: [
+        {
+          tipo: "ordenarSaidas",
+          colunaAluno: 2,
+          colunaTurma: 3,
+          colunaData: 1,
+          anoReferencia: expect.any(Number),
+        },
+      ],
+    }),
+  );
+});
+
+it("o envio automático de saídas conclui com a organização por turma", async () => {
+  expect(await enviarSaidasAposRegistro(usuario, dia)).toBe("enviado");
+  const operacoes = dubl.chamar.mock.calls.find((args) => args[1].acao === "aplicar")?.[1]
+    .operacoes as { tipo: string }[];
+  expect(operacoes[0]?.tipo).toBe("criarLinhas");
+  expect(operacoes.at(-1)?.tipo).toBe("ordenarSaidas");
+});
+
+it("mantém a conferência de abas antigas sem a coluna Turma", async () => {
+  preenchida = true;
+  const configuracao = await dubl.linha();
+  const esquema = detectarEsquemaSaida({ nome: "Saídas", valores: [["Data", "Aluno"]] });
+  dubl.linha.mockResolvedValue({ ...configuracao, esquema: { aba: "Saídas", abas: [esquema] } });
+  const periodo = { de: dia, ate: dia };
+  const previa = await simularEnvioSaidas(usuario, periodo);
+  expect(
+    await aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }),
+  ).toMatchObject({ resultado: "sucesso" });
   expect(dubl.chamar.mock.calls.some((args) => args[1].acao === "aplicar")).toBe(false);
 });
