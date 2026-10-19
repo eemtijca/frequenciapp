@@ -11,6 +11,7 @@ import {
   type LeituraAba,
 } from "@/domain/planilha";
 import { normalizar, rotuloData } from "@/domain/frequencia";
+import { compararSaidasDaPlanilha } from "@/domain/ordenacao-planilha";
 
 /** Colunas reconhecidas no cabeçalho da aba de saídas. */
 export type AtributoSaida =
@@ -408,9 +409,7 @@ export function planejarSaidas(
   let puladasFormula = 0;
   let ambiguidades = 0;
   let proximaLinha = Math.max(esquema.ultimaLinhaDados, esquema.cabecalho) + 1;
-  const ordenadas = saidas
-    .slice()
-    .sort((a, b) => a.dia.localeCompare(b.dia) || a.nome.localeCompare(b.nome, "pt-BR"));
+  const ordenadas = saidas.slice().sort(compararSaidasDaPlanilha);
 
   for (const saida of ordenadas) {
     const chave = chaveSaida(saida.nome, saida.dia);
@@ -497,6 +496,9 @@ export function planejarSaidas(
   }
   const pedidas = new Set(opcoes.removerLinhas ?? []);
   const remover = candidatosRemocao.filter((item) => pedidas.has(item.linha));
+  if (colunasMapeadas.some((coluna) => coluna.atributo === "turma")) {
+    avisos.push("Registros enviados pelo app serão ordenados por turma, aluno e data.");
+  }
 
   const resumo: ResumoPlanoSaidas = {
     criar: criar.length,

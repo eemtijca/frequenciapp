@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Planilha de saídas agrupa os registros por turma e aluno, com desempate por data. Envios manuais e automáticos movem linhas completas criadas pelo app, preservando os demais campos e as posições de linhas manuais. Um envio sem registros novos também organiza a aba existente.
+
 - O marcador P da Chamada passa a usar verde no texto e na borda, com fundo suave, no mesmo padrão dos indicadores de presença da aplicação.
 
 - Chamada remove a orientação repetida abaixo dos alunos e simplifica a barra de salvamento para uma linha, com status curto, botão Salvar e descarte por ícone com confirmação. O horário salvo, os avisos de falha e conflito e as áreas de toque são preservados.

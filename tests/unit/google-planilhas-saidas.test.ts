@@ -2,10 +2,47 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assinarAba } from "@/domain/planilha";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
+import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("planilha de saídas pela Sheets API", () => {
+  it("mantém a ordenação inteira no mesmo lote ao atingir o limite de pedidos", async () => {
+    const lotes: unknown[][] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, opcoes: RequestInit) => {
+        const corpo = JSON.parse(String(opcoes.body)) as { requests: unknown[] };
+        lotes.push(corpo.requests);
+        return Response.json({ replies: [] });
+      }),
+    );
+    const anteriores = Array.from({ length: 499 }, (_, indice) => ({
+      updateDimensionProperties: {
+        range: { sheetId: 1, dimension: "ROWS", startIndex: indice, endIndex: indice + 1 },
+        properties: { pixelSize: 30 },
+        fields: "pixelSize",
+      },
+    }));
+    const movimentos = [
+      {
+        moveDimension: {
+          source: { sheetId: 1, dimension: "ROWS", startIndex: 3, endIndex: 4 },
+          destinationIndex: 1,
+        },
+      },
+      {
+        moveDimension: {
+          source: { sheetId: 1, dimension: "ROWS", startIndex: 2, endIndex: 3 },
+          destinationIndex: 4,
+        },
+      },
+    ];
+    await enviarLotesGoogle("qa-planilha", "qa-acesso", [...anteriores, ...movimentos]);
+    expect(lotes).toHaveLength(1);
+    expect(lotes[0]?.slice(-2)).toEqual(movimentos);
+  });
+
   it("cria a linha e o marcador sem exigir vínculo de aluno", async () => {
     const lotes: unknown[][] = [];
     vi.stubGlobal(

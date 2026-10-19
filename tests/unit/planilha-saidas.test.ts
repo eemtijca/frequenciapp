@@ -87,6 +87,32 @@ describe("esquema da aba de saídas", () => {
 });
 
 describe("plano da aba de saídas", () => {
+  it("apresenta as novas linhas por turma, aluno e data na prévia", () => {
+    const valores = [CABECALHO];
+    const saidas = [
+      saida({ nome: "Ana", turma: "10º ano A", dia: "2026-09-01" }),
+      saida({ nome: "Zélia", turma: "2º ano A", dia: "2026-10-01" }),
+      saida({ nome: "Ágata", turma: "2º ano A", dia: "2026-10-01" }),
+      saida({ nome: "Ágata", turma: "2º ano A", dia: "2026-09-30" }),
+    ];
+    const plano = planejarSaidas(esquemaComValores(valores), saidas, leitura(valores), {
+      modo: "conservador",
+      de: "2026-09-01",
+      ate: "2026-10-31",
+      anoReferencia: 2026,
+    });
+    expect(plano.criar.map((linha) => [linha.nome, linha.dia])).toEqual([
+      ["Ágata", "2026-09-30"],
+      ["Ágata", "2026-10-01"],
+      ["Zélia", "2026-10-01"],
+      ["Ana", "2026-09-01"],
+    ]);
+    expect(saidas[0]?.turma).toBe("10º ano A");
+    expect(plano.avisos).toContain(
+      "Registros enviados pelo app serão ordenados por turma, aluno e data.",
+    );
+  });
+
   it("cria linha nova para saída sem correspondência", () => {
     const valores = [
       CABECALHO,

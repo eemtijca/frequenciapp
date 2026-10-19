@@ -2,8 +2,11 @@
 // preserva fórmulas e células ocupadas e marca linhas e colunas criadas.
 import { z } from "zod";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
-import { assinarAba } from "@/domain/planilha";
-import { planejarOrdenacaoLinhasPlanilha } from "@/domain/ordenacao-planilha";
+import { assinarAba, dataDoRotulo } from "@/domain/planilha";
+import {
+  compararSaidasDaPlanilha,
+  planejarOrdenacaoLinhasPlanilha,
+} from "@/domain/ordenacao-planilha";
 import type { AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { controleTravaPlanilhaFrequencia } from "./trava-planilha-frequencia";
 import { controleTravaPlanilhaMovimentacoes } from "./trava-planilha-movimentacoes";
@@ -63,6 +66,13 @@ const operacao = z.discriminatedUnion("tipo", [
   z.object({ tipo: z.literal("removerColunas"), colunas: z.array(numero) }),
   z.object({ tipo: z.literal("removerLinhas"), linhas: z.array(numero) }),
   z.object({ tipo: z.literal("ordenarAlunos"), coluna: numero }),
+  z.object({
+    tipo: z.literal("ordenarSaidas"),
+    colunaAluno: numero,
+    colunaTurma: numero,
+    colunaData: numero,
+    anoReferencia: z.number().int().min(1900).max(9999),
+  }),
 ]);
 
 type PedidoGoogle = Record<string, unknown>;
@@ -279,7 +289,9 @@ export function planejarEscritaGoogle(
   if (!lidas.success) throw new ErroHttp("Operações da planilha inválidas.", 400);
   if (
     lidas.data.some(
-      (item, indice) => item.tipo === "ordenarAlunos" && indice !== lidas.data.length - 1,
+      (item, indice) =>
+        (item.tipo === "ordenarAlunos" || item.tipo === "ordenarSaidas") &&
+        indice !== lidas.data.length - 1,
     )
   ) {
     throw new ErroHttp("A ordenação deve concluir o envio da planilha.", 400);
@@ -317,7 +329,7 @@ export function planejarEscritaGoogle(
     sinalizadas: 0,
   };
   const metadados = metadadosDaAba(doc, aba);
-  const linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
+  let linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
   const colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
   const vinculos = metadados.filter((item) => item.metadataKey === "frequenciapp.aluno");
   let linhasOrdenaveis = new Set([
@@ -541,7 +553,11 @@ export function planejarEscritaGoogle(
         });
         valores.splice(linha - 1, 1);
         formulas.splice(linha - 1, 1);
-        linhasCriadas.delete(linha);
+        linhasCriadas = new Set(
+          [...linhasCriadas]
+            .filter((atual) => atual !== linha)
+            .map((atual) => (atual > linha ? atual - 1 : atual)),
+        );
         linhasOrdenaveis = new Set(
           [...linhasOrdenaveis]
             .filter((atual) => atual !== linha)
@@ -550,15 +566,40 @@ export function planejarEscritaGoogle(
         capacidadeLinhas -= 1;
         contar("removidasLinhas");
       }
-    } else if (item.tipo === "ordenarAlunos") {
-      const coluna = posicoesColunas.indexOf(item.coluna) + 1;
+    } else if (item.tipo === "ordenarAlunos" || item.tipo === "ordenarSaidas") {
+      const coluna =
+        posicoesColunas.indexOf(item.tipo === "ordenarAlunos" ? item.coluna : item.colunaAluno) + 1;
       if (coluna === 0) continue;
-      const movimentos = planejarOrdenacaoLinhasPlanilha(
-        [...linhasOrdenaveis]
-          .filter((linha) => linha > cabecalhoLinha && !temFormula(formulas, linha, coluna))
-          .map((linha) => ({ linha, nome: texto(celulaAtual(valores, linha, coluna)) }))
-          .filter((linha) => linha.nome !== ""),
-      );
+      const alunos = [...linhasOrdenaveis]
+        .filter((linha) => linha > cabecalhoLinha && !temFormula(formulas, linha, coluna))
+        .map((linha) => ({ linha, nome: texto(celulaAtual(valores, linha, coluna)) }))
+        .filter((linha) => linha.nome !== "");
+      let movimentos;
+      if (item.tipo === "ordenarSaidas") {
+        const colunaTurma = posicoesColunas.indexOf(item.colunaTurma) + 1;
+        const colunaData = posicoesColunas.indexOf(item.colunaData) + 1;
+        if (colunaTurma === 0 || colunaData === 0) continue;
+        const saidas = alunos
+          .filter((aluno) => linhasCriadas.has(aluno.linha))
+          .flatMap((aluno) => {
+            const turma = texto(celulaAtual(valores, aluno.linha, colunaTurma));
+            const dia = dataDoRotulo(
+              texto(celulaAtual(valores, aluno.linha, colunaData)),
+              item.anoReferencia,
+            );
+            if (
+              !turma ||
+              !dia ||
+              temFormula(formulas, aluno.linha, colunaTurma) ||
+              temFormula(formulas, aluno.linha, colunaData)
+            )
+              return [];
+            return [{ ...aluno, turma, dia }];
+          });
+        movimentos = planejarOrdenacaoLinhasPlanilha(saidas, compararSaidasDaPlanilha);
+      } else {
+        movimentos = planejarOrdenacaoLinhasPlanilha(alunos);
+      }
       if (
         movimentos.length > 0 &&
         aba.merges?.some((faixa) => {
@@ -568,7 +609,9 @@ export function planejarEscritaGoogle(
         })
       ) {
         throw new ErroHttp(
-          "Confira as células mescladas na tabela antes de ordenar os alunos.",
+          item.tipo === "ordenarSaidas"
+            ? "Confira as células mescladas na tabela antes de ordenar as saídas."
+            : "Confira as células mescladas na tabela antes de ordenar os alunos.",
           409,
         );
       }
@@ -619,10 +662,18 @@ async function enviarPedidosGoogle(
 ): Promise<void> {
   controle ??= controleTravaPlanilhaFrequencia() ?? controleTravaPlanilhaMovimentacoes();
   const compactadas = compactarAtualizacoesGoogle(requests);
-  for (let inicio = 0; inicio < compactadas.length; inicio += tamanhoDoLote) {
+  const lotes: PedidoGoogle[][] = [];
+  for (let inicio = 0; inicio < compactadas.length;) {
+    let fim = Math.min(inicio + tamanhoDoLote, compactadas.length);
+    // Uma ordenação troca linhas com lacunas em vários movimentos. O Google
+    // precisa aplicar a sequência inteira para manter as linhas manuais no lugar.
+    while (compactadas[fim - 1]?.moveDimension && compactadas[fim]?.moveDimension) fim += 1;
+    lotes.push(compactadas.slice(inicio, fim));
+    inicio = fim;
+  }
+  for (const [indice, parte] of lotes.entries()) {
     controle?.conferir();
-    const parte = compactadas.slice(inicio, inicio + tamanhoDoLote);
-    const posicao = `lote ${Math.floor(inicio / tamanhoDoLote) + 1} de ${Math.ceil(compactadas.length / tamanhoDoLote)}`;
+    const posicao = `lote ${indice + 1} de ${lotes.length}`;
     let resposta: Response;
     try {
       resposta = await fetch(
@@ -649,7 +700,7 @@ async function enviarPedidosGoogle(
         resposta.status === 403
           ? "A conta Google não pode alterar a planilha escolhida."
           : "O Google recusou a alteração da planilha.",
-        inicio === 0,
+        indice === 0,
         detalhe,
       );
     }

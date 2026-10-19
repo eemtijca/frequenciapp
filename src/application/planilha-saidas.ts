@@ -463,7 +463,7 @@ export async function simularEnvioSaidas(usuario: { id: string }, entrada: unkno
   };
 }
 
-function operacoesDoPlanoSaidas(plano: PlanoSaidas) {
+function operacoesDoPlanoSaidas(plano: PlanoSaidas, esquema: AbaSaidaEsquema) {
   const operacoes: Record<string, unknown>[] = [];
   if (plano.criar.length > 0) {
     operacoes.push({
@@ -492,6 +492,18 @@ function operacoesDoPlanoSaidas(plano: PlanoSaidas) {
     operacoes.push({
       tipo: "removerLinhas",
       linhas: plano.remover.map((item) => item.linha).sort((a, b) => b - a),
+    });
+  }
+  const colunaAluno = esquema.colunas.find((coluna) => coluna.atributo === "aluno")?.indice;
+  const colunaTurma = esquema.colunas.find((coluna) => coluna.atributo === "turma")?.indice;
+  const colunaData = esquema.colunas.find((coluna) => coluna.atributo === "data")?.indice;
+  if (colunaAluno && colunaTurma && colunaData) {
+    operacoes.push({
+      tipo: "ordenarSaidas",
+      colunaAluno,
+      colunaTurma,
+      colunaData,
+      anoReferencia: new Date().getFullYear(),
     });
   }
   return operacoes;
@@ -524,7 +536,7 @@ async function aplicarEnvioSaidasProtegido(usuario: { id: string }, entrada: unk
   }
   if (simulacao.plano.bloqueado || simulacao.plano.resumo.ambiguidades > 0)
     throw new ErroHttp(simulacao.plano.avisos[0] ?? "Confira a aba de saídas.", 409);
-  const operacoes = operacoesDoPlanoSaidas(simulacao.plano);
+  const operacoes = operacoesDoPlanoSaidas(simulacao.plano, simulacao.esquema);
   const registroId = await iniciarEnvioMovimentacao(
     usuario.id,
     linha,

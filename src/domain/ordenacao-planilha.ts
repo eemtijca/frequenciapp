@@ -10,12 +10,28 @@ export interface MovimentoLinhaPlanilha {
   destino: number;
 }
 
+const compararTurma = new Intl.Collator("pt-BR", { sensitivity: "base", numeric: true });
+const compararNome = new Intl.Collator("pt-BR", { sensitivity: "base" });
+
+/** Agrupa as saídas por turma e aluno, com datas civis em ordem cronológica. */
+export function compararSaidasDaPlanilha(
+  a: { turma: string; nome: string; dia: string },
+  b: { turma: string; nome: string; dia: string },
+): number {
+  return (
+    compararTurma.compare(a.turma.trim(), b.turma.trim()) ||
+    compararNome.compare(a.nome.trim(), b.nome.trim()) ||
+    a.dia.localeCompare(b.dia)
+  );
+}
+
 /** Troca somente as posições dos alunos; as linhas intermediárias voltam ao lugar. */
-export function planejarOrdenacaoLinhasPlanilha(
-  linhas: readonly { linha: number; nome: string }[],
+export function planejarOrdenacaoLinhasPlanilha<T extends { linha: number; nome: string }>(
+  linhas: readonly T[],
+  comparar?: (a: T, b: T) => number,
 ): MovimentoLinhaPlanilha[] {
   const atuais = [...linhas].sort((a, b) => a.linha - b.linha);
-  const desejadas = ordenarAlunosDaPlanilha(atuais);
+  const desejadas = comparar ? [...atuais].sort(comparar) : ordenarAlunosDaPlanilha(atuais);
   const posicoes = atuais.map((item) => item.linha);
   const movimentos: MovimentoLinhaPlanilha[] = [];
   desejadas.forEach((desejada, indice) => {
