@@ -21,6 +21,17 @@ function marcador(sheetId: number, chave: string, valor: string) {
   };
 }
 
+function nomeDisponivel(base: string, identidade: string, nomes: Set<string>): string {
+  let nome = Array.from(base).slice(0, 100).join("");
+  let sufixo = 0;
+  while (nomes.has(nome.toLocaleLowerCase("pt-BR"))) {
+    sufixo += 1;
+    nome = `${Array.from(base).slice(0, 80).join("")} · ${hashTexto(identidade).slice(0, 8)}-${sufixo}`;
+  }
+  nomes.add(nome.toLocaleLowerCase("pt-BR"));
+  return nome;
+}
+
 /** FILTER mantém o vínculo com a origem; nomes e rótulos são literais escapados. */
 export function formulaSaidasTurma(
   origem: string,
@@ -85,6 +96,7 @@ export function planejarAbasSaidasTurmas(
       throw new ErroHttp("Há consultas repetidas para uma turma. Confira as abas de saídas.", 409);
     const existente = existentes[0];
     const linhas = Math.max(1000, linhasOrigem - cabecalho + 1);
+    const base = rotulo.replace(/[\\/?*:[\]]/g, " ").trim() || "Turma";
     if (existente) {
       if (
         !metadadosDaAba(doc, existente).some(
@@ -97,6 +109,18 @@ export function planejarAbasSaidasTurmas(
         );
       }
       const atuais = existente.properties.gridProperties?.rowCount ?? 0;
+      if (existente.properties.title.startsWith(`${origem.properties.title} · `)) {
+        nomes.delete(existente.properties.title.toLocaleLowerCase("pt-BR"));
+        pedidos.push({
+          updateSheetProperties: {
+            properties: {
+              sheetId: existente.properties.sheetId,
+              title: nomeDisponivel(base, identidade, nomes),
+            },
+            fields: "title",
+          },
+        });
+      }
       if (atuais < linhas)
         pedidos.push({
           appendDimension: {
@@ -110,14 +134,7 @@ export function planejarAbasSaidasTurmas(
     while (ids.has(proximoId)) proximoId += 1;
     const sheetId = proximoId;
     ids.add(sheetId);
-    const base = `${origem.properties.title} · ${rotulo}`.replace(/[\\/?*:[\]]/g, " ").trim();
-    let nome = Array.from(base).slice(0, 100).join("");
-    let sufixo = 0;
-    while (nomes.has(nome.toLocaleLowerCase("pt-BR"))) {
-      sufixo += 1;
-      nome = `${Array.from(base).slice(0, 80).join("")} · ${hashTexto(identidade).slice(0, 8)}-${sufixo}`;
-    }
-    nomes.add(nome.toLocaleLowerCase("pt-BR"));
+    const nome = nomeDisponivel(base, identidade, nomes);
     pedidos.push(
       {
         addSheet: {

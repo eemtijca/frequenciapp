@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- Planilha de saídas cria abas de consulta por turma, com atualização automática a partir da origem, cabeçalho verde e alunos em ordem alfabética. Turmas cadastradas e presentes no histórico recebem abas sem copiar ou apagar registros; consultas existentes e abas manuais são preservadas.
+- Planilha de saídas cria abas de consulta com apenas o nome da turma, com atualização automática a partir da origem, cabeçalho verde e alunos em ordem alfabética. Turmas cadastradas e presentes no histórico recebem abas sem copiar ou apagar registros; consultas existentes e abas manuais são preservadas. Consultas com o prefixo da origem são renomeadas no próximo envio.
 
 - Planilha de saídas agrupa os registros por turma e aluno, com desempate por data. Envios manuais e automáticos movem linhas completas criadas pelo app, preservando os demais campos e as posições de linhas manuais. Um envio sem registros novos também organiza a aba existente.
 

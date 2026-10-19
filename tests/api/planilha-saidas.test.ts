@@ -386,7 +386,7 @@ describe("planilha de saídas", () => {
 
   it("prepara a consulta da turma sem copiar nem apagar o histórico e impede mapear a consulta como origem", async () => {
     if (!google) throw new Error("Google sintético ausente.");
-    const consulta = `${ABA} · QS Ano A`;
+    const consulta = "QS Ano A";
     expect(google.abas()).toContain(consulta);
     expect(google.formulaDe(consulta, 1, 1)).toContain("TRIM('Saiu mais cedo'!C2:C)=\"QS Ano A\"");
     expect(google.formulaDe(consulta, 1, 1)).toContain("SORT(FILTER(");

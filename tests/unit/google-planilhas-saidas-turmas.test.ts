@@ -78,9 +78,9 @@ describe("abas de consulta das saídas por turma", () => {
       .filter((item) => item.addSheet)
       .map((item) => item.addSheet as { properties: { title: string; sheetId: number } });
     expect(criacoes.map((item) => item.properties.title)).toEqual([
-      "Saiu mais cedo · 1º ano A",
-      "Saiu mais cedo · 1º ano B",
-      "Saiu mais cedo · 2º ano A",
+      "1º ano A",
+      "1º ano B",
+      "2º ano A",
     ]);
     expect(new Set(criacoes.map((item) => item.properties.sheetId)).size).toBe(3);
     expect(plano.atomico).toBe(true);
@@ -116,13 +116,13 @@ describe("abas de consulta das saídas por turma", () => {
 
   it("preserva abas manuais com o mesmo título e distingue títulos sanitizados", () => {
     const doc = structuredClone(documento);
-    doc.sheets.push({ properties: { sheetId: 2, title: "Saiu mais cedo · 1º ano A" } });
+    doc.sheets.push({ properties: { sheetId: 2, title: "1º ano A" } });
     const plano = planejar(doc, ["1º ano A", "2º [A]", "2º /A/"]);
     const titulos = plano.requests
       .filter((item) => item.addSheet)
       .map((item) => (item.addSheet as { properties: { title: string } }).properties.title);
     expect(titulos).toHaveLength(4);
-    expect(titulos).not.toContain("Saiu mais cedo · 1º ano A");
+    expect(titulos).not.toContain("1º ano A");
     expect(new Set(titulos).size).toBe(4);
     expect(titulos.every((titulo) => !/[\\/?*:[\]]/.test(titulo) && titulo.length <= 100)).toBe(
       true,
@@ -177,5 +177,25 @@ describe("abas de consulta das saídas por turma", () => {
     expect(planejar(doc).requests).toEqual([
       { appendDimension: { sheetId: consulta.properties.sheetId, dimension: "ROWS", length: 990 } },
     ]);
+  });
+
+  it("retira o prefixo das consultas antigas sem sobrescrever uma aba manual", () => {
+    const doc = refletirPreparacao(planejar().requests);
+    const consulta = doc.sheets[1];
+    if (!consulta) throw new Error("Consulta sintética ausente.");
+    consulta.properties.title = "Saiu mais cedo · 1º ano A";
+    doc.sheets.push({ properties: { sheetId: 100, title: "1º ano A" } });
+    const pedidos = planejar(doc).requests;
+    expect(pedidos).toHaveLength(1);
+    const renomeacao = pedidos[0]?.updateSheetProperties as {
+      properties: { sheetId: number; title: string };
+      fields: string;
+    };
+    expect(renomeacao.properties.sheetId).toBe(consulta.properties.sheetId);
+    expect(renomeacao.properties.title).toMatch(/^1º ano A · /);
+    expect(renomeacao.properties.title).not.toContain("Saiu mais cedo");
+    expect(renomeacao.fields).toBe("title");
+    consulta.properties.title = renomeacao.properties.title;
+    expect(planejar(doc).requests).toEqual([]);
   });
 });
