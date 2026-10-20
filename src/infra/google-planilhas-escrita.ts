@@ -1,6 +1,7 @@
 // Gravação da frequência pela Sheets API: reconfere a aba antes do lote,
 // preserva fórmulas e células ocupadas e marca linhas e colunas criadas.
 import { z } from "zod";
+import { MARCADOR_SAIDAS_TURMA, planejarAbasSaidasTurmas } from "./google-planilhas-saidas-turmas";
 import { colunasDeApresentacao } from "@/domain/planilha-apresentacao";
 import { assinarAba, dataDoRotulo } from "@/domain/planilha";
 import {
@@ -72,6 +73,7 @@ const operacao = z.discriminatedUnion("tipo", [
     colunaTurma: numero,
     colunaData: numero,
     anoReferencia: z.number().int().min(1900).max(9999),
+    turmas: z.array(z.string().min(1).max(200)).max(200).optional(),
   }),
 ]);
 
@@ -181,6 +183,7 @@ export interface PlanoDeEscritaGoogle {
   requests: PedidoGoogle[];
   contagens: Record<string, number>;
   destrutiva: boolean;
+  atomico?: boolean;
 }
 
 const escritaUnica = z.object({
@@ -297,6 +300,11 @@ export function planejarEscritaGoogle(
     throw new ErroHttp("A ordenação deve concluir o envio da planilha.", 400);
   }
   const aba = exigirAbaGoogle(doc, nome);
+  if (metadadosDaAba(doc, aba).some((meta) => meta.metadataKey === MARCADOR_SAIDAS_TURMA))
+    throw new ErroHttp(
+      "Esta aba é uma consulta por turma. Selecione a aba original de saídas.",
+      409,
+    );
   const sheetId = aba.properties.sheetId;
   const valores = valoresOriginais.map((linha) => [...linha]);
   const formulas = formulasOriginais.map((linha) => [...linha]);
@@ -629,9 +637,31 @@ export function planejarEscritaGoogle(
           },
         });
       }
+      if (item.tipo === "ordenarSaidas" && item.turmas) {
+        assegurarLinha(cabecalhoLinha + 1);
+        requests.push(
+          ...planejarAbasSaidasTurmas(
+            doc,
+            aba,
+            valores,
+            cabecalhoLinha,
+            posicoesColunas.indexOf(item.colunaTurma) + 1,
+            coluna,
+            item.turmas,
+            capacidadeLinhas,
+          ),
+        );
+      }
     }
   }
-  return { requests, contagens, destrutiva };
+  return {
+    requests,
+    contagens,
+    destrutiva,
+    ...(lidas.data.some((item) => item.tipo === "ordenarSaidas" && item.turmas)
+      ? { atomico: true }
+      : {}),
+  };
 }
 
 /** Envia lotes sem repetição automática; falha depois do primeiro lote é parcial. */
@@ -758,7 +788,8 @@ export async function aplicarGoogle(
     throw erro;
   }
   try {
-    await enviarLotesGoogle(id, acesso, plano.requests);
+    if (plano.atomico) await enviarLoteAtomicoGoogle(id, acesso, plano.requests);
+    else await enviarLotesGoogle(id, acesso, plano.requests);
   } catch (erro) {
     if (erro instanceof ErroGoogle) throw erro;
     if (erro instanceof ErroHttp) throw new ErroGoogle(erro.message, false);

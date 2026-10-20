@@ -384,6 +384,30 @@ describe("planilha de saídas", () => {
     expect(resposta.status).toBe(400);
   });
 
+  it("prepara a consulta da turma sem copiar nem apagar o histórico e impede mapear a consulta como origem", async () => {
+    if (!google) throw new Error("Google sintético ausente.");
+    const consulta = "QS Ano A";
+    expect(google.abas()).toContain(consulta);
+    expect(google.formulaDe(consulta, 1, 1)).toContain("TRIM('Saiu mais cedo'!C2:C)=\"QS Ano A\"");
+    expect(google.formulaDe(consulta, 1, 1)).toContain("SORT(FILTER(");
+    expect(google.valor(ABA, 3, 2)).toBe("QS Ana");
+    const aparencia = google.apresentacao(consulta);
+    expect(aparencia.congeladasLinhas).toBe(1);
+    expect(aparencia.faixas).toHaveLength(1);
+    const estrutura = await json<{
+      planilha: unknown;
+      abas: { nome: string; bloqueio?: string }[];
+    }>(await autenticado("/api/planilha-saidas/estrutura", { method: "POST", body: "{}" }));
+    expect(estrutura.abas.find((aba) => aba.nome === consulta)?.bloqueio).toContain(
+      "Selecione a aba original",
+    );
+    const mapa = await autenticado("/api/planilha-saidas/mapa", {
+      method: "POST",
+      body: JSON.stringify({ ...estrutura, aba: consulta }),
+    });
+    expect(mapa.status).toBe(400);
+  });
+
   it("organiza registros antigos e novos por turma, aluno e data preservando linhas completas", async () => {
     const testeBanco = banco;
     const testeGoogle = google;

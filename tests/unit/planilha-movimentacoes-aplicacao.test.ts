@@ -209,6 +209,20 @@ it("a troca de arquivo invalida a prévia de saídas mesmo com conteúdo idênti
   expect(dubl.criar).not.toHaveBeenCalled();
 });
 
+it("uma nova turma exige outra prévia antes de preparar consultas", async () => {
+  const periodo = { de: dia, ate: dia };
+  const previa = await simularEnvioSaidas(usuario, periodo);
+  dubl.turmas.mockResolvedValue([
+    { id: "qa-turma", rotulo: "QA Ano A" },
+    { id: "qa-turma-b", rotulo: "QA Ano B" },
+  ]);
+  await expect(
+    aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }),
+  ).rejects.toMatchObject({ status: 409 });
+  expect(dubl.criar).not.toHaveBeenCalled();
+  expect(dubl.chamar.mock.calls.some((args) => args[1].acao === "aplicar")).toBe(false);
+});
+
 it("a conferência manual de saídas ordena a aba mesmo sem novos registros", async () => {
   preenchida = true;
   const periodo = { de: dia, ate: dia };
@@ -234,6 +248,7 @@ it("a conferência manual de saídas ordena a aba mesmo sem novos registros", as
           colunaTurma: 3,
           colunaData: 1,
           anoReferencia: expect.any(Number),
+          turmas: ["QA Ano A"],
         },
       ],
     }),
