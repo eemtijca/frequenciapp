@@ -66,12 +66,26 @@ test.describe("saída durante a aula", () => {
     await expect(lista.getByText("Liberado por Coordenadora E2E").first()).toBeVisible();
   });
 
+  test("bloqueia de novo a remoção das saídas ao tocar em Bloquear", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Saídas e entradas", "saidas");
+    const lista = page.getByRole("list", { name: /^Saídas de / });
+    await page.getByRole("button", { name: /^Desbloquear remoção das saídas de/ }).click();
+    await expect(lista.getByRole("button", { name: /^Remover saída de/ }).first()).toBeVisible();
+    await page.getByRole("button", { name: /^Bloquear remoção das saídas de/ }).click();
+    await expect(lista.getByRole("button", { name: /^Remover saída de/ })).toHaveCount(0);
+  });
+
   test("remove uma saída pela lista do dia para corrigir o registro", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Saídas e entradas", "saidas");
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await expect(lista.getByText("Foi buscar o irmão")).toBeVisible();
+    // A lista abre bloqueada: sem lixeira até desbloquear.
+    await expect(lista.getByRole("button", { name: /^Remover saída de/ })).toHaveCount(0);
+    await page.getByRole("button", { name: /^Desbloquear remoção das saídas de/ }).click();
     await lista.getByRole("button", { name: "Remover saída de E2E Aluno Dois" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Remover" }).click();
     await expect(page.getByText("Saída removida.")).toBeVisible();
