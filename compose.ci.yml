@@ -19,6 +19,8 @@ services:
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
       CRON_SECRET: segredo-ficticio-da-agenda-para-testes-0000
+      # O CI usa dublês da Sheets API; a cota real por minuto não se aplica.
+      GOOGLE_LEITURAS_POR_MINUTO: "100000"
       # O CI usa dublês da Sheets API; não acessa uma conta Google real.
       GOOGLE_CLIENT_ID: "cliente-sintetico"
       GOOGLE_CLIENT_SECRET: "segredo-sintetico"

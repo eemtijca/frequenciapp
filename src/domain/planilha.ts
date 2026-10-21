@@ -680,6 +680,7 @@ export interface ResumoPlano {
   removerColunas: number;
   puladasFormula: number;
   puladasOcupadas: number;
+  jaPresentes: number;
   ambiguidades: number;
 }
 
@@ -701,6 +702,8 @@ export interface PlanoSincronizacao {
   candidatosRemocaoLinhas: RemocaoPlano[];
   candidatosRemocaoColunas: ColunaCriada[];
   bloqueado?: boolean;
+  /** Dias com divergência, fórmula ou linha ausente. Não recebem confirmação parcial. */
+  diasBloqueados: string[];
   resumo: ResumoPlano;
   avisos: string[];
 }
@@ -857,6 +860,7 @@ export function planejarSincronizacao(
       removerColunas: 0,
       puladasFormula: 0,
       puladasOcupadas: 0,
+      jaPresentes: 0,
       ambiguidades: 0,
     };
     const plano: Omit<PlanoSincronizacao, "planoHash"> = {
@@ -876,6 +880,7 @@ export function planejarSincronizacao(
       candidatosRemocaoLinhas: [],
       candidatosRemocaoColunas: [],
       bloqueado: true,
+      diasBloqueados: [],
       resumo,
       avisos: [esquema.bloqueio],
     };
@@ -884,6 +889,7 @@ export function planejarSincronizacao(
 
   const novasColunas: ColunaNovaPlano[] = [];
   const avisos: string[] = [];
+  const diasBloqueados = new Set<string>();
   const baseInsercao = colunaTotal?.indice ?? esquema.ultimaColunaDados + 1;
   const diasComMarca = new Set(
     turma.dias.filter((dia) => turma.linhas.some((linha) => Boolean(linha.marcas[dia]))),
@@ -893,6 +899,7 @@ export function planejarSincronizacao(
     if (colunasDia.has(dia) || !diasComMarca.has(dia)) continue;
     if (!opcoes.permitirInserirColunas) {
       avisos.push(`O dia ${dia} não tem coluna na planilha.`);
+      diasBloqueados.add(dia);
       continue;
     }
     novasColunas.push({
@@ -916,7 +923,11 @@ export function planejarSincronizacao(
   const limparPedidas = new Set(opcoes.limparCelulas ?? []);
   let puladasFormula = 0;
   let puladasOcupadas = 0;
+  let jaPresentes = 0;
   let ambiguidades = 0;
+  const bloquearDias = (marcas: Record<string, Marca | undefined>) => {
+    for (const dia of turma.dias) if (marcas[dia]) diasBloqueados.add(dia);
+  };
 
   const colunasDiaCompletas = new Map(colunasDia);
   const diasNovos = new Set<string>();
@@ -935,6 +946,7 @@ export function planejarSincronizacao(
   for (const linha of turma.linhas) {
     if (casamento.ambiguos.has(linha.alunoId)) {
       ambiguidades += 1;
+      bloquearDias(linha.marcas);
       continue;
     }
     const existente = casamento.porAluno.get(linha.alunoId);
@@ -953,10 +965,12 @@ export function planejarSincronizacao(
         avisos.push(
           `Há uma linha DESISTENTE sem código de aluno na planilha; vincule a linha antes de adicionar ${linha.nome}.`,
         );
+        bloquearDias(linha.marcas);
         continue;
       }
       if (!opcoes.permitirNovosAlunos) {
         avisos.push(`O aluno ${linha.nome} não tem linha na planilha.`);
+        bloquearDias(linha.marcas);
         continue;
       }
       novosAlunos.push({
@@ -977,6 +991,7 @@ export function planejarSincronizacao(
         if (conteudo.formula[relativaLinha]?.[relativaColuna]) {
           puladasFormula += 1;
           avisos.push(`O nome de ${linha.nome} contém fórmula; a situação não será alterada.`);
+          for (const diaMarcado of turma.dias) diasBloqueados.add(diaMarcado);
         } else {
           celulasSinalizar.push({
             linha: numeroLinha,
@@ -1014,6 +1029,7 @@ export function planejarSincronizacao(
         if (atual === "") {
           if (comFormula) {
             puladasFormula += 1;
+            diasBloqueados.add(dia);
             continue;
           }
           celulasPreencher.push({
@@ -1026,23 +1042,25 @@ export function planejarSincronizacao(
             alunoNome: linha.nome,
             dia,
           });
-        } else if (!marcaCombinam(atual, marca)) {
-          if (comFormula) {
-            puladasFormula += 1;
-          } else if (modoCompleto && opcoes.substituirDivergencias) {
-            celulasSubstituir.push({
-              linha: numeroLinha,
-              coluna: coluna.indice,
-              celula,
-              valor: marca,
-              anterior: atual,
-              alunoId: linha.alunoId,
-              alunoNome: linha.nome,
-              dia,
-            });
-          } else {
-            puladasOcupadas += 1;
-          }
+        } else if (marcaCombinam(atual, marca)) {
+          jaPresentes += 1;
+        } else if (comFormula) {
+          puladasFormula += 1;
+          diasBloqueados.add(dia);
+        } else if (modoCompleto && opcoes.substituirDivergencias) {
+          celulasSubstituir.push({
+            linha: numeroLinha,
+            coluna: coluna.indice,
+            celula,
+            valor: marca,
+            anterior: atual,
+            alunoId: linha.alunoId,
+            alunoNome: linha.nome,
+            dia,
+          });
+        } else {
+          puladasOcupadas += 1;
+          diasBloqueados.add(dia);
         }
       } else if (modoCompleto && atual !== "" && limparPedidas.has(celula) && !comFormula) {
         celulasLimpar.push({
@@ -1180,6 +1198,7 @@ export function planejarSincronizacao(
     removerColunas: removerColunas.length,
     puladasFormula,
     puladasOcupadas,
+    jaPresentes,
     ambiguidades,
   };
   const plano: Omit<PlanoSincronizacao, "planoHash"> = {
@@ -1198,6 +1217,7 @@ export function planejarSincronizacao(
     removerColunas,
     candidatosRemocaoLinhas,
     candidatosRemocaoColunas,
+    diasBloqueados: [...diasBloqueados].sort(),
     resumo,
     avisos,
   };

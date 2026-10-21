@@ -50,6 +50,7 @@ const ROTULO_RESULTADO: Record<string, string> = {
   sem_mapa: "Sem aba vinculada",
   pendente_manual: "Conferir no envio manual",
   sem_confirmacao: "Sem confirmação do Google",
+  limite: "Limite do Google, nova tentativa",
   falhou: "Falha no envio",
   sem_autor: "Autor removido",
 };

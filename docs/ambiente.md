@@ -14,13 +14,14 @@ Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, 
 
 Para as planilhas de frequência e de saídas por OAuth, configure as cinco variáveis juntas:
 
-| Variável              | Uso                                                                 |
-| --------------------- | ------------------------------------------------------------------- |
-| GOOGLE_CLIENT_ID      | Cliente OAuth do tipo Aplicativo da Web.                            |
-| GOOGLE_CLIENT_SECRET  | Segredo do cliente, somente no servidor.                            |
-| GOOGLE_REDIRECT_URI   | Endereço público terminado em `/api/planilha/google/retorno`.       |
-| GOOGLE_PICKER_API_KEY | Chave pública restrita à Google Picker API e aos sites autorizados. |
-| GOOGLE_PROJECT_NUMBER | Número do projeto Cloud usado pelo Picker.                          |
+| Variável                   | Uso                                                                                                                    |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| GOOGLE_CLIENT_ID           | Cliente OAuth do tipo Aplicativo da Web.                                                                               |
+| GOOGLE_CLIENT_SECRET       | Segredo do cliente, somente no servidor.                                                                               |
+| GOOGLE_REDIRECT_URI        | Endereço público terminado em `/api/planilha/google/retorno`.                                                          |
+| GOOGLE_PICKER_API_KEY      | Chave pública restrita à Google Picker API e aos sites autorizados.                                                    |
+| GOOGLE_PROJECT_NUMBER      | Número do projeto Cloud usado pelo Picker.                                                                             |
+| GOOGLE_LEITURAS_POR_MINUTO | Teto local de leituras da Sheets API por minuto; o padrão é 45. O CI usa um valor alto porque o dublê não aplica cota. |
 
 O segredo de atualização da conta Google é cifrado com uma chave derivada de `AUTH_SECRET`. Trocar `AUTH_SECRET` exige conectar a conta Google novamente. Consulte [planilha.md](planilha.md) para preparar o projeto Cloud e a planilha.
 

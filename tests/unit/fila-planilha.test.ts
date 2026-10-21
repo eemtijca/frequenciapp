@@ -101,6 +101,16 @@ describe("desfechoDoItem", () => {
       resultado: "falhou",
       proximaTentativaEm: null,
     });
+    expect(desfechoDoItem("limite", 1, AGORA)).toEqual({
+      estado: "AGUARDANDO",
+      resultado: "limite",
+      proximaTentativaEm: depois(30_000),
+    });
+    expect(desfechoDoItem("limite", MAXIMO_TENTATIVAS_FILA, AGORA)).toEqual({
+      estado: "FALHOU",
+      resultado: "limite",
+      proximaTentativaEm: null,
+    });
   });
 
   it("qualquer outra situação encerra o item sem repetir", () => {

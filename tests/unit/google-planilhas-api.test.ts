@@ -154,7 +154,8 @@ describe("leitura pela Sheets API", () => {
       await expect(estruturaGoogle("planilha-de-teste", "acesso")).rejects.toMatchObject({
         status: 503,
         codigo: "GOOGLE_TEMPORARIO",
-        message: "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente.",
+        message:
+          "O Google limitou as leituras da planilha. Nada foi alterado. Tente de novo em instantes.",
       });
     } finally {
       log.mockRestore();

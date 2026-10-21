@@ -10,7 +10,7 @@ import {
 } from "@/infra/http";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 export async function POST(requisicao: Request): Promise<Response> {
   return executarRota(async () => {

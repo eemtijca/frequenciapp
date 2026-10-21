@@ -28,3 +28,12 @@ export function diasSemEnvioConfirmado(
   );
   return [...new Set(pendentes.map((chamada) => chamada.dia.toISOString().slice(0, 10)))].sort();
 }
+
+/** Dias do envio que não tiveram divergência, fórmula ou linha ausente. */
+export function diasLimposDoEnvio(
+  dias: readonly string[],
+  bloqueados: readonly string[],
+): string[] {
+  const bloqueio = new Set(bloqueados);
+  return [...new Set(dias.filter((dia) => !bloqueio.has(dia)))].sort();
+}

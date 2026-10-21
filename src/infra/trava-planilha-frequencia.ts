@@ -10,6 +10,7 @@ export function controleTravaPlanilhaFrequencia(): ControleTravaPlanilha | undef
 }
 
 export function comTravaPlanilhaFrequencia<T>(tarefa: () => Promise<T>): Promise<T> {
+  if (contexto.getStore()) return tarefa();
   return comTravaPlanilha(
     CHAVE_TRAVA_FREQUENCIA,
     "Outra atualização da planilha está em andamento. Aguarde e tente novamente.",

@@ -41,6 +41,7 @@ interface PlanoResumo {
     removerColunas: number;
     puladasFormula: number;
     puladasOcupadas: number;
+    jaPresentes?: number;
     ambiguidades: number;
   };
   avisos: string[];
@@ -119,8 +120,11 @@ function chipsDoPlano(item: PlanoResumo, modoCompleto: boolean): string[] {
     modoCompleto && (r.removerLinhas > 0 || r.removerColunas > 0)
       ? `Excluir: ${plural(r.removerLinhas, "linha", "linhas")} e ${plural(r.removerColunas, "coluna", "colunas")}`
       : "",
+    (r.jaPresentes ?? 0) > 0
+      ? plural(r.jaPresentes ?? 0, "célula já estava na planilha", "células já estavam na planilha")
+      : "",
     r.puladasOcupadas > 0
-      ? plural(r.puladasOcupadas, "célula ocupada ignorada", "células ocupadas ignoradas")
+      ? plural(r.puladasOcupadas, "divergência não sobrescrita", "divergências não sobrescritas")
       : "",
     r.puladasFormula > 0
       ? plural(r.puladasFormula, "fórmula protegida", "fórmulas protegidas")
@@ -237,7 +241,11 @@ export default function DialogoEnvio({
       let detalhe = "";
       try {
         const dados = await pedir<{
-          resultados: { resultado: "sucesso" | "parcial" | "falha" | "sem_envio"; erro?: string }[];
+          resultados: {
+            resultado: "sucesso" | "parcial" | "falha" | "sem_envio";
+            erro?: string;
+            aviso?: string;
+          }[];
         }>(
           "/api/planilha/aplicar",
           corpoJson({
@@ -255,6 +263,8 @@ export default function DialogoEnvio({
         } else if (resultado?.resultado === "falha") {
           final = "falhou";
           detalhe = resultado.erro ?? "Não foi possível enviar para esta aba.";
+        } else if (resultado?.resultado === "sucesso" && resultado.aviso) {
+          detalhe = resultado.aviso;
         }
       } catch (excecao) {
         // Sem resposta do servidor (504, queda de rede): a planilha pode ter

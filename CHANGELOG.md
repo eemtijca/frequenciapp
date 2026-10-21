@@ -161,6 +161,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Alerta de benefícios estima as aulas de chamadas antigas sem retrato pela grade da turma da chamada, em vez de contar zero e distorcer o limite. O painel distingue dias de falta dos contadores e aulas perdidas do cálculo, identifica a projeção mensal e o tratamento de justificadas como configuração, sem afirmar perda do benefício.
 
+- Planilhas, envio da frequência: a prévia lê as abas do envio em lote, as leituras esperam a fila e o limite do Google com pausa crescente, e a prévia, o envio manual e a fila automática não consultam a planilha ao mesmo tempo. Célula já preenchida com a mesma marca sai das pendências. Divergência continua pendente e não é sobrescrita. Limite antes da escrita pede nova tentativa, em vez de confirmação perdida.
+
 - Saídas: com a leitura do dia falhando, a lista deixa de exibir as saídas do dia anterior sob a data escolhida; a mensagem de falha aparece sozinha, com o dia vazio.
 
 - Gestão, planilhas: o tempo restante do modo completo acompanha o relógio do navegador minuto a minuto e não depende mais do relógio do servidor na primeira pintura.

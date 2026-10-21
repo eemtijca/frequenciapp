@@ -21,6 +21,7 @@ import {
   marcadoresDaAba,
   mesclagensDaAssinatura,
   metadadosDaAba,
+  invalidarDocumentoGoogle,
   motivoDoGoogle,
   type DocumentoGoogle,
 } from "@/infra/google-planilhas-api";
@@ -28,7 +29,7 @@ import {
 const numero = z.number().int().positive();
 const celula = z.object({ linha: numero, coluna: numero, valor: z.string() });
 const operacao = z.discriminatedUnion("tipo", [
-  celula.extend({ tipo: z.literal("preencher") }),
+  celula.extend({ tipo: z.literal("preencher"), dia: z.string().max(10).optional() }),
   celula.extend({ tipo: z.literal("substituir"), anterior: z.string().optional() }),
   celula.extend({
     tipo: z.literal("sinalizar"),
@@ -182,6 +183,7 @@ function removerMetadado(metadataId: number): PedidoGoogle {
 export interface PlanoDeEscritaGoogle {
   requests: PedidoGoogle[];
   contagens: Record<string, number>;
+  diasBloqueados: string[];
   destrutiva: boolean;
   atomico?: boolean;
 }
@@ -335,7 +337,9 @@ export function planejarEscritaGoogle(
     vinculadas: 0,
     puladasVinculo: 0,
     sinalizadas: 0,
+    jaPresentes: 0,
   };
+  const diasBloqueados = new Set<string>();
   const metadados = metadadosDaAba(doc, aba);
   let linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
   const colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
@@ -506,11 +510,17 @@ export function planejarEscritaGoogle(
       assegurarColuna(item.coluna);
       if (temFormula(formulas, item.linha, item.coluna)) {
         contar("puladasFormula");
+        if ("dia" in item && item.dia) diasBloqueados.add(item.dia);
         continue;
       }
       const anterior = celulaAtual(valores, item.linha, item.coluna);
       if (item.tipo === "preencher" && texto(anterior) !== "") {
+        if (texto(anterior).toUpperCase() === texto(item.valor).toUpperCase()) {
+          contar("jaPresentes");
+          continue;
+        }
         contar("puladasOcupadas");
+        if (item.dia) diasBloqueados.add(item.dia);
         continue;
       }
       if (
@@ -657,6 +667,7 @@ export function planejarEscritaGoogle(
   return {
     requests,
     contagens,
+    diasBloqueados: [...diasBloqueados].sort(),
     destrutiva,
     ...(lidas.data.some((item) => item.tipo === "ordenarSaidas" && item.turmas)
       ? { atomico: true }
@@ -726,14 +737,20 @@ async function enviarPedidosGoogle(
     if (!resposta.ok) {
       const detalhe = `${posicao}: ${await motivoDoGoogle(resposta)}`;
       console.error(`Sheets API batchUpdate: ${detalhe}`);
+      const limite = resposta.status === 429;
       throw new ErroGoogle(
-        resposta.status === 403
-          ? "A conta Google não pode alterar a planilha escolhida."
-          : "O Google recusou a alteração da planilha.",
+        limite
+          ? indice === 0
+            ? "O Google limitou o envio da planilha. Nada foi alterado. Tente de novo em instantes."
+            : "O Google limitou o envio da planilha. Confira a aba antes de reenviar; o reenvio não sobrescreve o que já foi gravado."
+          : resposta.status === 403
+            ? "A conta Google não pode alterar a planilha escolhida."
+            : "O Google recusou a alteração da planilha.",
         indice === 0,
         detalhe,
       );
     }
+    invalidarDocumentoGoogle(id);
     controle?.conferir();
   }
 }
@@ -795,5 +812,5 @@ export async function aplicarGoogle(
     if (erro instanceof ErroHttp) throw new ErroGoogle(erro.message, false);
     throw erro;
   }
-  return plano.contagens;
+  return Object.assign({}, plano.contagens, { diasBloqueados: plano.diasBloqueados });
 }

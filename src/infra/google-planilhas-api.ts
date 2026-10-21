@@ -6,7 +6,8 @@ import { createHash } from "node:crypto";
 import { ErroHttp } from "@/infra/erros";
 import { assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
-import { aguardarLimiteDeLeituraGoogle } from "./google-planilhas-limites";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { aguardarLimiteDeLeituraGoogle, emFilaDeLeituraGoogle } from "./google-planilhas-limites";
 
 const BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 const CHAVES_METADADOS = [
@@ -250,16 +251,18 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
   let resposta: Response;
   try {
     do {
-      resposta = await fetch(url, {
-        method: corpo === undefined ? "GET" : "POST",
-        headers: {
-          Authorization: `Bearer ${acesso}`,
-          ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
-        },
-        ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(30_000),
-      });
+      resposta = await emFilaDeLeituraGoogle(() =>
+        fetch(url, {
+          method: corpo === undefined ? "GET" : "POST",
+          headers: {
+            Authorization: `Bearer ${acesso}`,
+            ...(corpo === undefined ? {} : { "Content-Type": "application/json" }),
+          },
+          ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(30_000),
+        }),
+      );
       // Este cliente só lê; o POST acima busca metadados e não altera a planilha.
     } while (await aguardarLimiteDeLeituraGoogle(resposta));
   } catch (erro) {
@@ -284,7 +287,7 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
         : resposta.status === 403 || resposta.status === 404
           ? "A conta Google não tem acesso à planilha escolhida."
           : resposta.status === 429
-            ? "O Google limitou as leituras da planilha. Aguarde um minuto e tente novamente."
+            ? "O Google limitou as leituras da planilha. Nada foi alterado. Tente de novo em instantes."
             : temporario
               ? "O Google não respondeu à leitura da planilha agora. Tente novamente em instantes."
               : "O Google recusou a leitura da planilha.";
@@ -314,18 +317,29 @@ async function requisitar(url: URL, acesso: string, corpo?: unknown): Promise<un
   }
 }
 
-export async function lerDocumentoGoogle(id: string, acesso: string): Promise<DocumentoGoogle> {
+const cacheDocumentos = new AsyncLocalStorage<Map<string, Promise<DocumentoGoogle>>>();
+
+/** Reaproveita a estrutura já lida nesta operação, sem cruzar requisições. */
+export function comCacheDeDocumentoGoogle<T>(acao: () => Promise<T>): Promise<T> {
+  if (cacheDocumentos.getStore()) return acao();
+  return cacheDocumentos.run(new Map(), acao);
+}
+
+/** A escrita pode criar aba, linha ou coluna; a próxima leitura busca de novo. */
+export function invalidarDocumentoGoogle(id: string): void {
+  cacheDocumentos.getStore()?.delete(id);
+}
+
+async function carregarDocumentoGoogle(id: string, acesso: string): Promise<DocumentoGoogle> {
   const url = new URL(`${BASE}/${encodeURIComponent(id)}`);
   url.searchParams.set("fields", CAMPOS_ESTRUTURA);
   const busca = new URL(`${BASE}/${encodeURIComponent(id)}/developerMetadata:search`);
-  const [estrutura, marcadores] = await Promise.all([
-    requisitar(url, acesso),
-    requisitar(busca, acesso, {
-      dataFilters: CHAVES_METADADOS.map((metadataKey) => ({
-        developerMetadataLookup: { metadataKey },
-      })),
-    }),
-  ]);
+  const estrutura = await requisitar(url, acesso);
+  const marcadores = await requisitar(busca, acesso, {
+    dataFilters: CHAVES_METADADOS.map((metadataKey) => ({
+      developerMetadataLookup: { metadataKey },
+    })),
+  });
   const lido = documento.safeParse(estrutura);
   if (!lido.success) throw new ErroHttp("A estrutura da planilha não pôde ser lida.", 502);
   const encontrados = resultadoBusca.safeParse(marcadores);
@@ -338,6 +352,19 @@ export async function lerDocumentoGoogle(id: string, acesso: string): Promise<Do
       ...(encontrados.data.matchedDeveloperMetadata ?? []).map((item) => item.developerMetadata),
     ],
   };
+}
+
+export function lerDocumentoGoogle(id: string, acesso: string): Promise<DocumentoGoogle> {
+  const cache = cacheDocumentos.getStore();
+  const guardado = cache?.get(id);
+  if (guardado) return guardado;
+  const promessa = carregarDocumentoGoogle(id, acesso);
+  if (!cache) return promessa;
+  cache.set(id, promessa);
+  return promessa.catch((erro: unknown) => {
+    cache.delete(id);
+    throw erro;
+  });
 }
 
 export function exigirAbaGoogle(doc: DocumentoGoogle, nome: string): AbaGoogle {
@@ -653,18 +680,25 @@ export async function lerGoogle(
   const mensal = mensalDaAbaGoogle(doc, aba);
   const usado = await tamanhoUtilizado(id, acesso, nome);
   const faixas = pedidos?.length ? pedidos : [{ coluna: 1, colunas: Math.max(usado.colunas, 1) }];
-  const blocos = await lerBlocosGoogle(id, acesso, nome, Math.max(usado.linhas, 1), faixas);
+  const faixaCabecalho = { coluna: 1, colunas: Math.max(usado.colunas, 1) };
+  const cobreCabecalho =
+    !cabecalhoLinha ||
+    faixas.some((faixa) => faixa.coluna === 1 && faixa.colunas >= faixaCabecalho.colunas);
+  const pedidosLeitura = cobreCabecalho ? faixas : [...faixas, faixaCabecalho];
+  const lidos = await lerBlocosGoogle(id, acesso, nome, Math.max(usado.linhas, 1), pedidosLeitura);
+  const blocos = cobreCabecalho ? lidos : lidos.slice(0, faixas.length);
   const primeiro = blocos[0];
   if (!primeiro) throw new ErroHttp("Não foi possível ler a aba.", 502);
   const marcadores = metadadosDaAba(doc, aba);
   let assinatura: string | undefined;
   if (cabecalhoLinha) {
-    const cabecalho = await lerBlocosGoogle(id, acesso, nome, cabecalhoLinha, [
-      { coluna: 1, colunas: Math.max(usado.colunas, 1) },
-    ]);
+    const indiceCabecalho = pedidosLeitura.findIndex(
+      (faixa) => faixa.coluna === 1 && faixa.colunas >= faixaCabecalho.colunas,
+    );
+    const origem = lidos[indiceCabecalho] ?? primeiro;
     assinatura = assinarAba(
       nome,
-      cabecalho[0]?.valores[cabecalhoLinha - 1] ?? [],
+      origem.valores[cabecalhoLinha - 1] ?? [],
       mesclagensDaAssinatura(aba),
     );
   }
@@ -702,6 +736,126 @@ export async function lerGoogle(
   };
 }
 
+const loteValores = z.object({
+  valueRanges: z
+    .array(
+      z.object({
+        values: z.array(z.array(z.union([z.string(), z.number(), z.boolean()]))).optional(),
+      }),
+    )
+    .optional(),
+});
+
+function textoDaCelula(valor: string | number | boolean): string {
+  return typeof valor === "string" ? valor : String(valor);
+}
+
+function alinharGrades(exibidos: string[][], formulas: string[][]) {
+  const linhas = Math.max(exibidos.length, formulas.length);
+  const colunas = Math.max(
+    0,
+    ...exibidos.map((linha) => linha.length),
+    ...formulas.map((linha) => linha.length),
+  );
+  return {
+    valores: Array.from({ length: linhas }, (_, linha) =>
+      Array.from({ length: colunas }, (_, coluna) => exibidos[linha]?.[coluna] ?? ""),
+    ),
+    formula: Array.from({ length: linhas }, (_, linha) =>
+      Array.from({ length: colunas }, (_, coluna) =>
+        (formulas[linha]?.[coluna] ?? "").startsWith("="),
+      ),
+    ),
+  };
+}
+
+async function lerValoresEmLote(
+  id: string,
+  acesso: string,
+  nomes: string[],
+  render: "FORMATTED_VALUE" | "FORMULA",
+): Promise<string[][][]> {
+  const url = new URL(`${BASE}/${encodeURIComponent(id)}/values:batchGet`);
+  url.searchParams.set("valueRenderOption", render);
+  url.searchParams.set("majorDimension", "ROWS");
+  for (const nome of nomes) url.searchParams.append("ranges", nomeNoA1(nome));
+  const lido = loteValores.safeParse(await requisitar(url, acesso));
+  const faixas = lido.success ? (lido.data.valueRanges ?? []) : [];
+  if (!lido.success || faixas.length !== nomes.length) {
+    throw new ErroHttp("Não foi possível ler as células da planilha.", 502);
+  }
+  return faixas.map((faixa) => (faixa.values ?? []).map((linha) => linha.map(textoDaCelula)));
+}
+
+function leituraDaAbaEmLote(
+  doc: DocumentoGoogle,
+  nome: string,
+  grade: { valores: string[][]; formula: boolean[][] },
+  cabecalhoLinha?: number,
+) {
+  const aba = exigirAbaGoogle(doc, nome);
+  const mensal = mensalDaAbaGoogle(doc, aba);
+  const marcadores = metadadosDaAba(doc, aba);
+  const assinatura = cabecalhoLinha
+    ? assinarAba(nome, grade.valores[cabecalhoLinha - 1] ?? [], mesclagensDaAssinatura(aba))
+    : undefined;
+  return {
+    aba: nome,
+    abaId: aba.properties.sheetId,
+    ...(mensal
+      ? {
+          mensal: {
+            mes: mensal.mes,
+            turmaOriginalId: mensal.turmaOriginalId,
+            destino: mensal.destino,
+          },
+        }
+      : {}),
+    linhaInicial: 1,
+    colunaInicial: 1,
+    linhas: Math.max(grade.valores.length, 1),
+    colunas: Math.max(grade.valores[0]?.length ?? 0, 1),
+    valores: grade.valores,
+    formula: grade.formula,
+    ultimaLinha: grade.valores.length,
+    linhasCriadas: marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"),
+    colunasCriadas: marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"),
+    alunosDasLinhas: marcadores
+      .filter((item) => item.metadataKey === "frequenciapp.aluno")
+      .flatMap((item) => {
+        const linha = item.location.dimensionRange?.startRowIndex;
+        return linha !== undefined && item.metadataValue
+          ? [{ linha: linha + 1, alunoId: item.metadataValue }]
+          : [];
+      }),
+    ...(assinatura ? { assinatura } : {}),
+  };
+}
+
+/** Uma leitura de valores e outra de fórmulas para todas as abas pedidas. */
+export async function lerAbasEmLote(
+  id: string,
+  acesso: string,
+  pedidos: { nome: string; cabecalhoLinha?: number }[],
+) {
+  const unicos = [...new Map(pedidos.map((pedido) => [pedido.nome, pedido])).values()];
+  const doc = await lerDocumentoGoogle(id, acesso);
+  const nomes = unicos.map((pedido) => pedido.nome);
+  const exibidos = nomes.length ? await lerValoresEmLote(id, acesso, nomes, "FORMATTED_VALUE") : [];
+  const formulas = nomes.length ? await lerValoresEmLote(id, acesso, nomes, "FORMULA") : [];
+  return Object.fromEntries(
+    unicos.map((pedido, indice) => [
+      pedido.nome,
+      leituraDaAbaEmLote(
+        doc,
+        pedido.nome,
+        alinharGrades(exibidos[indice] ?? [], formulas[indice] ?? []),
+        pedido.cabecalhoLinha,
+      ),
+    ]),
+  );
+}
+
 /** Preserva o contrato interno de leitura enquanto a fonte passa à Sheets API. */
 export async function executarAcaoGoogle(
   id: string,
@@ -727,6 +881,23 @@ export async function executarAcaoGoogle(
     return organizarAbaAntigaGoogle(id, acesso, dados.data, corpo.acao === "moverAbaAntiga");
   }
   if (corpo.acao === "catalogoFrequencia") return catalogoFrequenciaGoogle(id, acesso);
+  if (corpo.acao === "lerVarias") {
+    const dados = z
+      .array(
+        z.object({
+          aba: z.string().min(1),
+          cabecalhoLinha: z.number().int().positive().optional(),
+        }),
+      )
+      .max(40)
+      .safeParse(corpo.abas);
+    if (!dados.success || dados.data.length === 0) throw new ErroHttp("Informe as abas.", 400);
+    return lerAbasEmLote(
+      id,
+      acesso,
+      dados.data.map((item) => ({ nome: item.aba, cabecalhoLinha: item.cabecalhoLinha })),
+    );
+  }
   if (corpo.acao === "abasMensais") {
     const { listarAbasMensaisGoogle } = await import("./google-planilhas-mensal");
     return listarAbasMensaisGoogle(id, acesso);
