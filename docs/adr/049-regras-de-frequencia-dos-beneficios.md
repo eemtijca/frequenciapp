@@ -13,6 +13,7 @@ A Chamada passou a avisar a coordenação quando as faltas do mês de um aluno p
 - O alerta passa a ser um alerta de frequência de benefícios: `GET /api/frequencias/alertas-beneficios?mes=` devolve um item por aluno e benefício ativo, com o nome do benefício, o percentual e o limite. O mesmo motor atende benefícios com percentuais e tratamentos de justificadas diferentes.
 - A migração insere uma linha inicial com a regra do Pé-de-Meia (80%, sem contar justificadas). É dado, não código: pode ser editada, desativada ou excluída.
 - A cópia de segurança inclui os benefícios, e a restauração compara por nome.
+- A carga diária opcional por benefício permite projetar nove aulas nos dias úteis com aulas na grade e sem feriado. Nulo preserva o cálculo pela grade. Retratos e faltas salvos não são reescritos; chamadas antigas sem retrato usam a carga configurada como estimativa. O formulário novo sugere nove, mas a API e os benefícios existentes mantêm nulo por compatibilidade. Cópias antigas sem carga não apagam a configuração atual.
 - A Chamada continua montada ao trocar de tela, então a Gestão avisa por um evento do navegador quando muda uma regra, e a Chamada relê os alertas.
 
 ## Alternativas

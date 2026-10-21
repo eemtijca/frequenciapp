@@ -15,6 +15,7 @@ interface Beneficio {
   id: string;
   nome: string;
   percentualMinimoFrequencia: number;
+  aulasPorDia: number | null;
   faltasJustificadasContam: boolean;
   ativo: boolean;
 }
@@ -23,6 +24,7 @@ interface Alerta {
   beneficioId: string;
   beneficioNome: string;
   percentualMinimoFrequencia: number;
+  aulasPorDia: number | null;
   faltasJustificadasContam: boolean;
   alunoId: string;
   aulasFaltadas: number;
@@ -138,6 +140,7 @@ it("cria, lista, edita e exclui um benefício, só pela administração", async 
   const criado = await criarBeneficio({
     nome: "QA Beneficio Crud",
     percentualMinimoFrequencia: 85,
+    aulasPorDia: null,
   });
   expect(criado).toMatchObject({
     nome: "QA Beneficio Crud",
@@ -335,6 +338,43 @@ it("mantém o limite ao consultar chamadas antigas sem retrato de aulas", async 
       [turmaId],
     );
   }
+});
+
+it("salva a carga diária pela Gestão, mantém os retratos e permite voltar à grade", async () => {
+  const beneficio = await criarBeneficio({
+    nome: "QA Beneficio Carga Diaria",
+    percentualMinimoFrequencia: 99,
+    aulasPorDia: 9,
+  });
+  expect(beneficio.aulasPorDia).toBe(9);
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+    aulasPorDia: 9,
+    horasLetivas: 150,
+    limiteFaltas: 1,
+    aulasFaltadas: 5,
+  });
+  const editar = (cookie: string, corpo: unknown) =>
+    enviar("PATCH", `/api/beneficios-frequencia/${beneficio.id}`, cookie, corpo);
+  expect((await editar(cookieCoordenacao, { aulasPorDia: 8 })).status).toBe(403);
+  expect((await editar(cookieAdmin, { nome: "QA Beneficio Carga Renomeada" })).status).toBe(200);
+  const lista = await enviar("GET", "/api/beneficios-frequencia", cookieAdmin);
+  const dados = (await lista.json()) as { beneficios: Beneficio[] };
+  expect(dados.beneficios.find((item) => item.id === beneficio.id)?.aulasPorDia).toBe(9);
+  expect((await editar(cookieAdmin, { aulasPorDia: null })).status).toBe(200);
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+    aulasPorDia: null,
+    horasLetivas: 22,
+    limiteFaltas: 0,
+  });
+});
+
+it.each([0, 31, 9.5, "9", false])("recusa carga diária inválida: %s", async (aulasPorDia) => {
+  const criar = await enviar("POST", "/api/beneficios-frequencia", cookieAdmin, {
+    nome: "QA Beneficio Carga Invalida",
+    percentualMinimoFrequencia: 80,
+    aulasPorDia,
+  });
+  expect(criar.status).toBe(400);
 });
 
 it("distingue dias de falta do resumo e aulas perdidas do alerta, preservando o retrato", async () => {

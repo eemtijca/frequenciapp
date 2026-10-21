@@ -32,6 +32,11 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
         {alertas.map((alerta) => (
           <div key={alerta.beneficioId} className="space-y-1">
             <p className="font-semibold">{alerta.beneficioNome}</p>
+            {alerta.aulasPorDia !== null && (
+              <p className="text-muted-foreground text-xs">
+                Projeção de {alerta.aulasPorDia} aulas por dia, preservando as chamadas salvas.
+              </p>
+            )}
             <p>
               {quantidade(alerta.aulasFaltadas, "aula com falta", "aulas com falta")} em{" "}
               {quantidade(alerta.horasLetivas, "aula prevista", "aulas previstas")} no mês. Para

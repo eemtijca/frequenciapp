@@ -6,6 +6,7 @@ import { LoaderCircle, Pencil, Percent, Plus, Power, Trash2 } from "lucide-react
 import {
   PERCENTUAL_MINIMO_MAIOR,
   PERCENTUAL_MINIMO_MENOR,
+  AULAS_POR_DIA_MAXIMO,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
@@ -43,6 +44,7 @@ interface Formulario {
   id: string | null;
   nome: string;
   percentual: string;
+  aulasPorDia: string;
   justificadasContam: boolean;
   ativo: boolean;
 }
@@ -51,6 +53,7 @@ const FORMULARIO_NOVO: Formulario = {
   id: null,
   nome: "",
   percentual: "",
+  aulasPorDia: "9",
   justificadasContam: false,
   ativo: true,
 };
@@ -89,6 +92,8 @@ export default function SecaoBeneficiosFrequencia() {
   const { executar: salvar, executando: salvando } = useAcaoUnica(async () => {
     if (!formulario) return;
     const percentual = percentualValido(formulario.percentual);
+    const textoAulas = formulario.aulasPorDia.trim();
+    const aulasPorDia = textoAulas === "" ? null : Number(textoAulas);
     if (formulario.nome.trim().length < 2) {
       setErroFormulario("Informe o nome do benefício, com ao menos 2 caracteres.");
       return;
@@ -99,10 +104,18 @@ export default function SecaoBeneficiosFrequencia() {
       );
       return;
     }
+    if (
+      aulasPorDia !== null &&
+      (!/^\d+$/.test(textoAulas) || aulasPorDia < 1 || aulasPorDia > AULAS_POR_DIA_MAXIMO)
+    ) {
+      setErroFormulario(`Informe de 1 a ${AULAS_POR_DIA_MAXIMO} aulas por dia ou deixe vazio.`);
+      return;
+    }
     setErroFormulario("");
     const corpo = {
       nome: formulario.nome.trim(),
       percentualMinimoFrequencia: percentual,
+      aulasPorDia,
       faltasJustificadasContam: formulario.justificadasContam,
       ativo: formulario.ativo,
     };
@@ -164,6 +177,7 @@ export default function SecaoBeneficiosFrequencia() {
             id: beneficio.id,
             nome: beneficio.nome,
             percentual: String(beneficio.percentualMinimoFrequencia),
+            aulasPorDia: beneficio.aulasPorDia === null ? "" : String(beneficio.aulasPorDia),
             justificadasContam: beneficio.faltasJustificadasContam,
             ativo: beneficio.ativo,
           }
@@ -231,6 +245,11 @@ export default function SecaoBeneficiosFrequencia() {
               <p className="text-muted-foreground text-xs">
                 Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência. Faltas justificadas{" "}
                 {beneficio.faltasJustificadasContam ? "contam" : "não contam"}.
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {beneficio.aulasPorDia === null
+                  ? "Projeção pela grade da turma."
+                  : `Projeção de ${beneficio.aulasPorDia} aulas por dia.`}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -324,6 +343,30 @@ export default function SecaoBeneficiosFrequencia() {
                 <p className="text-muted-foreground text-xs">
                   Percentual das aulas do mês em que o aluno precisa estar presente.
                 </p>
+              </div>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex w-full flex-col gap-1.5">
+                  <Label htmlFor="beneficio-aulas-dia">Aulas por dia</Label>
+                  <Input
+                    id="beneficio-aulas-dia"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={AULAS_POR_DIA_MAXIMO}
+                    step={1}
+                    value={formulario.aulasPorDia}
+                    placeholder="Usar grade da turma"
+                    disabled={salvando}
+                    aria-describedby="beneficio-aulas-dia-ajuda"
+                    onChange={(evento) =>
+                      setFormulario({ ...formulario, aulasPorDia: evento.target.value })
+                    }
+                    className="numerais-tabulares"
+                  />
+                  <p id="beneficio-aulas-dia-ajuda" className="text-muted-foreground text-xs">
+                    Vazio usa a grade da turma. Chamadas salvas mantêm as aulas registradas.
+                  </p>
+                </div>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">

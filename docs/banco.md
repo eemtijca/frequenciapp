@@ -4,37 +4,37 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 
 ## Esquema
 
-| Tabela                        | Papel                                                                                            |
-| ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| `usuarios`                    | Contas: login único (e-mail ou identificador do diretor), hash da senha, nome, papel e situação. |
-| `sessoes`                     | Sessões opacas: hash SHA-256 do token, dono e expiração.                                         |
-| `assinaturas_push`            | Preferência voluntária por dispositivo, conta, sessão e chaves de transporte.                    |
-| `entregas_push`               | Reserva e confirmação do aviso diário por assinatura, com retenção de 30 dias.                   |
-| `series`                      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                     |
-| `turmas`                      | Turmas por série, com rótulo composto e unicidade dentro da série.                               |
-| `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.             |
-| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana, disciplinas por dia e situação.           |
-| `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                  |
-| `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.  |
-| `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                    |
-| `aulas_chamada`               | Retrato congelado das aulas previstas no dia de cada chamada.                                    |
-| `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                |
-| `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.       |
-| `configuracoes`               | Linha única com os recursos ligados: chamada por aula, saída antecipada e origem na Chamada.     |
-| `configuracoes_origem_series` | Séries completas selecionadas para exibir a origem na Chamada.                                   |
-| `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                 |
-| `justificativas`              | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.               |
-| `liberadores`                 | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.          |
-| `beneficios_frequencia`       | Regra de frequência mínima de cada benefício: nome, percentual, faltas justificadas e situação.  |
-| `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA`, `SAIDAS` e `PARCIAL`) com token, esquema e modo.         |
-| `sincronizacoes_planilha`     | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                 |
-| `fila_planilha`               | Fila FIFO dos envios automáticos às planilhas: ordem, estado, tentativas e reserva (ADR-039).    |
-| `auditoria`                   | Trilha de ações administrativas: quem, o quê e quando.                                           |
-| `vinculos_diretor`            | Turmas de origem de cada diretor, com início e fim; o fim fica no histórico.                     |
-| `credenciais_diretor`         | Ciclo de vida da palavra-chave do diretor: emissão, validade, primeiro uso e revogação.          |
-| `parametros_acesso`           | Linha única com validade, sessão do diretor, limites de entrada, categorias e risco.             |
-| `tentativas_entrada`          | Contador de tentativas por chave, compartilhado entre instâncias.                                |
-| `feriados`                    | Calendário anual da escola: data, nome e origem manual ou importada.                             |
+| Tabela                        | Papel                                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `usuarios`                    | Contas: login único (e-mail ou identificador do diretor), hash da senha, nome, papel e situação.                       |
+| `sessoes`                     | Sessões opacas: hash SHA-256 do token, dono e expiração.                                                               |
+| `assinaturas_push`            | Preferência voluntária por dispositivo, conta, sessão e chaves de transporte.                                          |
+| `entregas_push`               | Reserva e confirmação do aviso diário por assinatura, com retenção de 30 dias.                                         |
+| `series`                      | Séries escolares, por exemplo 1º ano, com ordem de exibição.                                                           |
+| `turmas`                      | Turmas por série, com rótulo composto e unicidade dentro da série.                                                     |
+| `alunos`                      | Nome do aluno, turma atual, turma de origem, ordem, atividade e data de desistência.                                   |
+| `horarios`                    | Aulas da turma: ordem, janela `HH:MM`, dias da semana, disciplinas por dia e situação.                                 |
+| `frequencias`                 | Uma frequência por turma e dia: revisão, autoria e atualização.                                                        |
+| `frequencias_parciais`        | Presença personalizada por aluno e dia, turma histórica, revisão e confirmação manual da Seduc.                        |
+| `alunos_chamada`              | Lista de cada chamada: quem estava nela, presente ou ausente.                                                          |
+| `aulas_chamada`               | Retrato congelado das aulas previstas no dia de cada chamada.                                                          |
+| `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                                      |
+| `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.                             |
+| `configuracoes`               | Linha única com os recursos ligados: chamada por aula, saída antecipada e origem na Chamada.                           |
+| `configuracoes_origem_series` | Séries completas selecionadas para exibir a origem na Chamada.                                                         |
+| `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                                       |
+| `justificativas`              | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.                                     |
+| `liberadores`                 | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.                                |
+| `beneficios_frequencia`       | Regra de frequência mínima de cada benefício: nome, percentual, carga diária opcional, faltas justificadas e situação. |
+| `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA`, `SAIDAS` e `PARCIAL`) com token, esquema e modo.                               |
+| `sincronizacoes_planilha`     | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                                       |
+| `fila_planilha`               | Fila FIFO dos envios automáticos às planilhas: ordem, estado, tentativas e reserva (ADR-039).                          |
+| `auditoria`                   | Trilha de ações administrativas: quem, o quê e quando.                                                                 |
+| `vinculos_diretor`            | Turmas de origem de cada diretor, com início e fim; o fim fica no histórico.                                           |
+| `credenciais_diretor`         | Ciclo de vida da palavra-chave do diretor: emissão, validade, primeiro uso e revogação.                                |
+| `parametros_acesso`           | Linha única com validade, sessão do diretor, limites de entrada, categorias e risco.                                   |
+| `tentativas_entrada`          | Contador de tentativas por chave, compartilhado entre instâncias.                                                      |
+| `feriados`                    | Calendário anual da escola: data, nome e origem manual ou importada.                                                   |
 
 Restrições de integridade relevantes:
 

@@ -74,6 +74,7 @@ function regra(extras: Partial<RegraFrequenciaBeneficio> = {}): RegraFrequenciaB
     id: "b1",
     nome: "Benefício A",
     percentualMinimoFrequencia: 80,
+    aulasPorDia: null,
     faltasJustificadasContam: false,
     ativo: true,
     ...extras,
@@ -102,6 +103,68 @@ function faltasDe(alunoId: string, total: number, justificadas = 0) {
 }
 
 describe("alertas de frequência no mês", () => {
+  it("projeta nove aulas por dia útil quando a regra define a carga diária", () => {
+    const [alerta] = alertasDeFrequencia(
+      base({ regras: [regra({ aulasPorDia: 9 })], faltas: faltasDe("a1", 40) }),
+    );
+    expect(alerta).toMatchObject({ horasLetivas: 198, limiteFaltas: 39, aulasPorDia: 9 });
+  });
+
+  it("a carga diária preserva os retratos e não cria aulas para quem não estava na chamada", () => {
+    const [alerta] = alertasDeFrequencia(
+      base({
+        regras: [regra({ aulasPorDia: 9 })],
+        chamadas: [
+          { dia: "2026-10-01", turmaId: "t1", aulas: 7, alunoIds: ["a1"] },
+          { dia: "2026-10-02", turmaId: "t1", aulas: 5, alunoIds: [] },
+          { dia: "2026-10-03", turmaId: "t1", aulas: 4, alunoIds: ["a1"] },
+        ],
+        faltas: faltasDe("a1", 50),
+      }),
+    );
+    expect(alerta).toMatchObject({ horasLetivas: 191, limiteFaltas: 38 });
+  });
+
+  it("a carga diária respeita feriados, desistência e dias sem aulas na grade", () => {
+    const [alerta] = alertasDeFrequencia(
+      base({
+        alunos: [aluno("a1", { desistenteEm: "2026-10-16" })],
+        turmas: [
+          {
+            id: "t1",
+            horarios: aulasDaSemana("t1", 5).map((horario) => ({
+              ...horario,
+              diasSemana: [1, 2, 4, 5],
+            })),
+          },
+        ],
+        regras: [regra({ aulasPorDia: 9 })],
+        feriados: [{ dia: "2026-10-12", nome: "QA Feriado" }],
+        faltas: faltasDe("a1", 30),
+      }),
+    );
+    expect(alerta).toMatchObject({ horasLetivas: 72, limiteFaltas: 14 });
+    expect(
+      alertasDeFrequencia(
+        base({ turmas: [], regras: [regra({ aulasPorDia: 9 })], faltas: faltasDe("a1", 30) }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("cada benefício usa a carga diária configurada sem alterar as faltas gravadas", () => {
+    const alertas = alertasDeFrequencia(
+      base({
+        regras: [regra(), regra({ id: "b2", aulasPorDia: 9 })],
+        chamadas: [{ dia: "2026-10-01", turmaId: "t1", aulas: 0, alunoIds: ["a1"] }],
+        faltas: faltasDe("a1", 40),
+      }),
+    );
+    expect(alertas.map((alerta) => [alerta.horasLetivas, alerta.aulasFaltadas])).toEqual([
+      [110, 40],
+      [198, 40],
+    ]);
+  });
+
   it("não alerta até o limite e alerta na falta seguinte", () => {
     expect(alertasDeFrequencia(base({ faltas: faltasDe("a1", 22) }))).toEqual([]);
     expect(alertasDeFrequencia(base({ faltas: faltasDe("a1", 23) }))).toEqual([
@@ -109,6 +172,7 @@ describe("alertas de frequência no mês", () => {
         beneficioId: "b1",
         beneficioNome: "Benefício A",
         percentualMinimoFrequencia: 80,
+        aulasPorDia: null,
         faltasJustificadasContam: false,
         alunoId: "a1",
         aulasFaltadas: 23,

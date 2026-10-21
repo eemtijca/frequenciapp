@@ -6,14 +6,23 @@ O cálculo está em `src/domain/beneficios-frequencia.ts`, os casos de uso em `s
 
 ## A configuração de cada benefício
 
-| Campo                        | Tipo     | Observação                                                                     |
-| ---------------------------- | -------- | ------------------------------------------------------------------------------ |
-| `nome`                       | texto    | De 2 a 60 caracteres, único sem diferenciar caixa.                             |
-| `percentualMinimoFrequencia` | inteiro  | De 1 a 100: percentual das aulas do mês em que o aluno precisa estar presente. |
-| `faltasJustificadasContam`   | booleano | Falso por padrão: só as faltas sem justificativa entram na conta.              |
-| `ativo`                      | booleano | Inativo deixa de gerar alerta, sem perder a regra.                             |
+| Campo                        | Tipo            | Observação                                                                                         |
+| ---------------------------- | --------------- | -------------------------------------------------------------------------------------------------- |
+| `nome`                       | texto           | De 2 a 60 caracteres, único sem diferenciar caixa.                                                 |
+| `percentualMinimoFrequencia` | inteiro         | De 1 a 100: percentual das aulas do mês em que o aluno precisa estar presente.                     |
+| `aulasPorDia`                | inteiro ou nulo | De 1 a 30 para a projeção diária; nulo segue a grade. Chamadas salvas mantêm as aulas registradas. |
+| `faltasJustificadasContam`   | booleano        | Falso por padrão: só as faltas sem justificativa entram na conta.                                  |
+| `ativo`                      | booleano        | Inativo deixa de gerar alerta, sem perder a regra.                                                 |
 
 A migração que criou a tabela insere uma linha inicial para o incentivo-frequência do Pé-de-Meia, com 80% e sem contar faltas justificadas. É dado de configuração como qualquer outro: a administração edita, desativa ou exclui na Gestão. Sem benefício ativo, a Chamada não mostra alerta.
+
+## Quantidade diária de aulas
+
+Em Gestão, Configurações, Benefícios e frequência mínima, a edição de cada benefício tem o campo Aulas por dia. Informar 9 projeta nove aulas em cada dia útil com aulas ativas na grade e sem feriado. Deixar vazio volta à grade da turma. Novos formulários sugerem 9; benefícios existentes continuam seguindo a grade até a administração salvar uma quantidade.
+
+A configuração vale para o mês consultado inteiro, incluindo dias passados sem chamada e dias futuros. Sábados entram apenas com chamada salva. Dias em que o aluno não constava na chamada e dias de desistência não recebem projeção. A quantidade de aulas e as faltas das chamadas salvas permanecem como registradas; uma chamada antiga sem retrato usa a carga diária configurada como estimativa. Não há alteração da grade nem das frequências no banco.
+
+Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 198 aulas e limite de 39 aulas com falta para 80%. Um feriado em dia de aula reduz a projeção para 189. Com seis dias já salvos com sete aulas e 16 dias projetados com nove, o total é 186: os seis retratos continuam respeitados.
 
 ## O cálculo
 
@@ -32,8 +41,8 @@ Um aluno pode aparecer uma vez por benefício ativo, e o painel do botão lista 
 ## Aulas do mês
 
 - Dias com chamada salva usam o retrato das aulas daquela chamada, e valem zero quando o aluno não constava nela.
-- Se uma chamada antiga tem lista de alunos, mas não tem retrato de aulas, a estimativa usa a grade da turma daquela chamada, inclusive o sábado letivo já salvo. Essa aproximação não recupera a grade histórica nem grava alterações no histórico.
-- Os demais dias úteis, sem feriado do calendário e antes de uma eventual desistência, usam a grade da turma atual. Sábados só contam quando há chamada salva (sábado letivo), e domingos nunca.
+- Se uma chamada antiga tem lista de alunos, mas não tem retrato de aulas, a estimativa usa a carga diária configurada ou a grade da turma daquela chamada, inclusive o sábado letivo já salvo. Essa aproximação não recupera a grade histórica nem grava alterações no histórico.
+- Os demais dias úteis, sem feriado do calendário e antes de uma eventual desistência, só somam aulas quando a grade da turma atual prevê aulas. Usam a carga diária configurada ou, se vazia, a quantidade da grade. Sábados só contam quando há chamada salva (sábado letivo), e domingos nunca.
 - O denominador estima o mês inteiro, incluindo dias passados sem chamada e dias futuros. O alerta indica excesso perante essa estimativa, que pode mudar com a grade e o calendário; não comprova perda do benefício.
 - Só alunos ativos entram, e só quem tem alguma falta no mês.
 
@@ -53,3 +62,5 @@ Limite da pesquisa: a regra foi levantada na web em outubro de 2026, e os textos
 - A base de cálculo é sempre as horas letivas (aulas). Outras bases, como dias letivos, exigiriam um novo campo na configuração.
 - O alerta não calcula a média acumulada do período letivo nem determina pagamento ou bloqueio. A exclusão de justificadas segue a configuração da escola e não comprova abono pela rede ou pelo programa.
 - A Chamada relê os alertas ao abrir, ao trocar de mês, depois de salvar e quando a Gestão muda uma regra.
+
+A cópia JSON inclui a quantidade diária por benefício. Cópias antigas sem o campo não apagam a configuração atual, e valores divergentes são conflitos sem sobrescrita.
