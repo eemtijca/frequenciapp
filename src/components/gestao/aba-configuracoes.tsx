@@ -49,6 +49,7 @@ import IntegracaoSaidas from "@/components/gestao/integracao-saidas";
 import IntegracaoParcial from "@/components/gestao/integracao-parcial";
 import SecaoFilaPlanilha from "@/components/gestao/secao-fila-planilha";
 import SecaoCalendarioLetivo from "@/components/gestao/secao-calendario-letivo";
+import SecaoBeneficiosFrequencia from "@/components/gestao/secao-beneficios-frequencia";
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import {
   AlertDialog,
@@ -640,6 +641,8 @@ export default function AbaConfiguracoes({
           onMudanca(dados.configuracoes);
         }}
       />
+
+      <SecaoBeneficiosFrequencia />
 
       <SecaoRecolhivel
         dataSecao="config-justificativas"

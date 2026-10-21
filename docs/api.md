@@ -403,6 +403,22 @@ Acumulado até a data informada. O parâmetro opcional `de=YYYY-MM-DD` limita a 
 
 Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta simples ou parcial conta em `faltas`.
 
+### GET /api/frequencias/alertas-beneficios?mes=YYYY-MM
+
+Permissão: qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício, que é o inteiro de `(100 - percentualMinimoFrequencia)%` das aulas do mês. As aulas do mês somam o retrato das chamadas salvas e as previstas pela grade da turma atual nos demais dias úteis, sem feriados do calendário e sem os dias depois da desistência. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia. A regra e o cálculo estão em [beneficios-frequencia.md](beneficios-frequencia.md).
+
+- 200 `{"mes", "alertas": [{"beneficioId", "beneficioNome", "percentualMinimoFrequencia", "faltasJustificadasContam", "alunoId", "aulasFaltadas", "aulasJustificadas", "horasLetivas", "limiteFaltas"}]}`. `aulasFaltadas` conta o que a regra manda contar, `aulasJustificadas` informa as justificadas de qualquer forma, e exatamente o percentual mínimo de frequência ainda é permitido.
+- 400 quando `mes` falta ou não é um mês válido; 401 sem sessão.
+
+### Benefícios e regras de frequência
+
+Configuração dos benefícios que alimentam o alerta. Leitura por qualquer sessão; escrita só pela administração, com origem confiável e auditoria. Um benefício é `{ "id", "nome", "percentualMinimoFrequencia", "faltasJustificadasContam", "ativo" }`: nome de 2 a 60 caracteres, único sem diferenciar caixa; percentual inteiro de 1 a 100; `faltasJustificadasContam` falso por padrão; `ativo` verdadeiro por padrão. A migração inicial cadastra uma linha com a regra do incentivo-frequência do Pé-de-Meia, editável como qualquer outra.
+
+- `GET /api/beneficios-frequencia`: 200 `{ "beneficios": [...] }` em ordem alfabética pelo nome, ativos e inativos.
+- `POST /api/beneficios-frequencia`: corpo `{ nome, percentualMinimoFrequencia, faltasJustificadasContam?, ativo? }`; 201 `{ "beneficio" }`; 400 em corpo inválido (percentual fora de 1 a 100, fracionado ou em texto, nome curto); 403 sem ser administração; 409 com nome repetido.
+- `PATCH /api/beneficios-frequencia/{id}`: corpo parcial com ao menos um dos campos acima; 200 `{ "beneficio" }`; 400 em identificador ou corpo inválido, 404 quando não existe, 409 com nome repetido.
+- `DELETE /api/beneficios-frequencia/{id}`: 200 `{ "ok": true }`; 404 quando não existe. Nenhum histórico depende do benefício; para só pausar o alerta, desative pelo `PATCH`.
+
 ## Frequências personalizadas e parciais
 
 As rotas exigem sessão da equipe (administração ou coordenação); diretores de turma não operam esses registros. Mutações exigem origem confiável. Presenças personalizadas não alteram a chamada regular. Justificativas são propostas para a primeira Chamada ou corrigem somente o aluno escolhido em chamadas existentes, sem alterar saídas ou entradas. A confirmação manual usa o registro efetivo, seja a base diária ou a personalização.

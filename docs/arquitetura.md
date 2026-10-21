@@ -193,5 +193,6 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-018: texto opcional na saída durante a aula](adr/018-texto-na-saida-durante-a-aula.md)
 - [ADR-019: integração de saídas antecipadas com Google Planilhas](adr/019-integracao-de-saidas-com-google-planilhas.md)
 - [ADR-020: justificativa escrita e catálogo de quem libera a saída](adr/020-justificativa-escrita-e-catalogo-de-liberadores.md)
+- [ADR-049: regras de frequência dos benefícios configuráveis](adr/049-regras-de-frequencia-dos-beneficios.md)
 
 - [ADR-034: Chamada Parcial e confirmação manual da Seduc](adr/034-chamada-parcial-e-confirmacao-seduc.md)
