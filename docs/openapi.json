@@ -3020,7 +3020,7 @@
       "get": {
         "operationId": "obterAlertasBeneficios",
         "summary": "Consultar alunos acima do limite de faltas dos benefícios",
-        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A carga diária opcional projeta os dias com aulas na grade e sem feriado. Chamadas antigas sem retrato de aulas usam a carga diária configurada ou a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas e não determina pagamento. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
+        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A carga diária opcional projeta os dias com aulas na grade e sem feriado. Chamadas antigas sem retrato de aulas usam a carga diária configurada ou a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas, inclui os dias letivos e a carga de referência para traduzir aulas em dias, e não determina pagamento nem verifica a média anual. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -3059,6 +3059,8 @@
                           "aulasJustificadas": 3,
                           "horasLetivas": 110,
                           "limiteFaltas": 22,
+                          "diasLetivos": 22,
+                          "aulasDeReferencia": 5,
                           "aulasPorDia": null
                         }
                       ]
@@ -13481,6 +13483,8 @@
                 "aulasJustificadas",
                 "horasLetivas",
                 "limiteFaltas",
+                "diasLetivos",
+                "aulasDeReferencia",
                 "aulasPorDia"
               ],
               "properties": {
@@ -13525,6 +13529,24 @@
                   "type": "integer",
                   "description": "Máximo de aulas de falta que mantém o percentual mínimo de frequência.",
                   "example": 22
+                },
+                "diasLetivos": {
+                  "type": "integer",
+                  "description": "Dias com aula que compõem as horas letivas do mês.",
+                  "example": 22
+                },
+                "aulasDeReferencia": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Carga de um dia para traduzir aulas em dias. É a carga configurada ou, sem ela, a quantidade comum dos dias contados. Nulo quando os dias divergem, e por isso as horas letivas podem não ser os dias letivos vezes essa carga.",
+                  "example": 5
                 },
                 "aulasPorDia": {
                   "oneOf": [

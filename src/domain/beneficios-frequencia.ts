@@ -87,39 +87,73 @@ export interface AlertaFrequenciaBeneficio {
   /** Aulas do mês: retratos salvos mais a projeção pela carga configurada ou pela grade. */
   horasLetivas: number;
   limiteFaltas: number;
+  /** Dias com aula que entram na conta do mês. */
+  diasLetivos: number;
+  /**
+   * Carga de um dia para traduzir aulas em dias no painel. É a carga configurada
+   * ou, sem ela, a quantidade comum dos dias contados. Nulo quando os dias divergem.
+   */
+  aulasDeReferencia: number | null;
+}
+
+/** Aulas do mês e os dias que as compõem, para o painel explicar a conta. */
+interface ContaMensal {
+  horas: number;
+  dias: number;
+  aulasDeReferencia: number | null;
 }
 
 /**
  * Horas letivas do aluno no mês. Dias com chamada salva usam o retrato das aulas
  * (zero quando o aluno não constava nela). Sem retrato de aulas, a grade da
  * turma da chamada serve de estimativa; dias sem chamada usam a turma atual.
+ * A soma das aulas não muda: os dias e a carga de referência só descrevem essa soma.
  */
-function horasLetivasDoAluno(
+function contaMensalDoAluno(
   aluno: Aluno,
   dias: string[],
   entrada: EntradaAlertasFrequencia,
   aulasPorAlunoDia: Map<string, { salvas: number; previstas: number }[]>,
   turmasComChamada: Set<string>,
   aulasPorDia: number | null,
-): number {
+): ContaMensal {
   const grade = entrada.turmas.find((turma) => turma.id === aluno.turmaId)?.horarios ?? [];
   let horas = 0;
+  let diasContados = 0;
+  const quantidades: number[] = [];
   for (const dia of dias) {
     const registradas = aulasPorAlunoDia.get(`${aluno.id}|${dia}`);
     if (registradas !== undefined) {
-      horas += registradas.reduce(
+      const aulasDoDia = registradas.reduce(
         (total, aulas) => total + (aulas.salvas || aulasPorDia || aulas.previstas),
         0,
       );
+      horas += aulasDoDia;
+      if (aulasDoDia > 0) {
+        diasContados += 1;
+        quantidades.push(aulasDoDia);
+      }
       continue;
     }
     if (turmasComChamada.has(`${aluno.turmaId}|${dia}`)) continue;
     if (diaDaSemanaIso(dia) > 5) continue;
     if (feriadoNaData(entrada.feriados, dia) || alunoDesistenteNoDia(aluno, dia)) continue;
     const previstas = horariosDoDia(grade, dia).length;
-    if (previstas > 0) horas += aulasPorDia ?? previstas;
+    if (previstas > 0) {
+      const usadas = aulasPorDia ?? previstas;
+      horas += usadas;
+      diasContados += 1;
+      quantidades.push(usadas);
+    }
   }
-  return horas;
+  let aulasDeReferencia = aulasPorDia;
+  if (aulasDeReferencia === null && quantidades.length > 0) {
+    const primeira = quantidades[0];
+    if (primeira !== undefined && quantidades.every((quantidade) => quantidade === primeira)) {
+      aulasDeReferencia = primeira;
+    }
+  }
+  return { horas, dias: diasContados, aulasDeReferencia };
 }
 
 /**
@@ -162,7 +196,7 @@ export function alertasDeFrequencia(
     const faltas = faltasPorAluno.get(aluno.id);
     if (!aluno.ativo || !faltas) continue;
     for (const regra of regras) {
-      const horasLetivas = horasLetivasDoAluno(
+      const conta = contaMensalDoAluno(
         aluno,
         dias,
         entrada,
@@ -172,7 +206,7 @@ export function alertasDeFrequencia(
       );
       const aulasFaltadas =
         faltas.simples + (regra.faltasJustificadasContam ? faltas.justificadas : 0);
-      if (!acimaDoLimiteDeFaltas(aulasFaltadas, horasLetivas, regra.percentualMinimoFrequencia)) {
+      if (!acimaDoLimiteDeFaltas(aulasFaltadas, conta.horas, regra.percentualMinimoFrequencia)) {
         continue;
       }
       alertas.push({
@@ -184,8 +218,10 @@ export function alertasDeFrequencia(
         aulasPorDia: regra.aulasPorDia,
         aulasFaltadas,
         aulasJustificadas: faltas.justificadas,
-        horasLetivas,
-        limiteFaltas: limiteDeFaltas(horasLetivas, regra.percentualMinimoFrequencia),
+        horasLetivas: conta.horas,
+        limiteFaltas: limiteDeFaltas(conta.horas, regra.percentualMinimoFrequencia),
+        diasLetivos: conta.dias,
+        aulasDeReferencia: conta.aulasDeReferencia,
       });
     }
   }

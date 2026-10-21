@@ -26,4 +26,4 @@ Manter as constantes no código com um comentário apontando o ponto de mudança
 - Há uma tabela, uma tela e cinco rotas a mais para manter.
 - O nome do programa passa a existir só como dado da linha inicial.
 - Com todos os benefícios desativados ou excluídos, a Chamada não mostra alerta; a administração é a responsável por manter a regra alinhada à norma vigente.
-- O texto da regra do Pé-de-Meia foi levantado por pesquisa, sem abrir os textos oficiais; a conferência com a Portaria MEC 83/2024 fica a cargo de quem administra.
+- A conta do alerta é mensal e em horas letivas. A Portaria MEC 83/2024, a Portaria MEC 916/2024 e o Manual do Sistema Gestão Presente também admitem a média de 80% no ano; essa média não é verificada aqui. A linha inicial desconsidera faltas justificadas por decisão da coordenação. As fontes estão em [beneficios-frequencia.md](../beneficios-frequencia.md).
