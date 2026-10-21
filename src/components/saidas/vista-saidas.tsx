@@ -8,12 +8,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  FileText,
   LoaderCircle,
   LockKeyhole,
   LockKeyholeOpen,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import type { DadosComunicadoSaida } from "@/domain/comunicado-saida";
+import DialogoComunicadoSaida from "./dialogo-comunicado-saida";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -98,6 +101,7 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
+  const [comunicado, setComunicado] = useState<DadosComunicadoSaida | null>(null);
   // Dia cuja lista foi desbloqueada: trocar de dia volta a bloquear.
   const [diaLiberado, setDiaLiberado] = useState<string | null>(null);
 
@@ -537,39 +541,60 @@ export default function VistaSaidas({
               {saidasDoDia.map((saida) => {
                 const aluno = alunosPorId.get(saida.alunoId);
                 const nome = aluno?.nome ?? "Aluno";
+                const turma = turmas.find((item) => item.id === aluno?.turmaId);
                 return (
-                  <li
-                    key={saida.id}
-                    className="superficie-vidro flex items-start justify-between gap-3 p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-semibold break-words">{nome}</p>
-                      <CaixasDeInfo
-                        partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
-                        className="mt-1"
-                      />
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                        {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
-                      </p>
+                  <li key={saida.id} className="superficie-vidro p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold break-words">{nome}</p>
+                        <CaixasDeInfo
+                          partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
+                          className="mt-1"
+                        />
+                        <p className="text-muted-foreground mt-1 text-xs">
+                          Liberado por {saida.liberadoPorNome ?? "registro anterior"}
+                          {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
+                        </p>
+                      </div>
+                      {!listaBloqueada && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Remover saída de ${nome}`}
+                          disabled={removendoId === saida.id}
+                          onClick={() => remover(saida)}
+                        >
+                          <Trash2 size={18} />
+                        </Button>
+                      )}
                     </div>
-                    {!listaBloqueada && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Remover saída de ${nome}`}
-                        disabled={removendoId === saida.id}
-                        onClick={() => remover(saida)}
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      className="mt-3 w-full sm:w-auto"
+                      aria-label={`Gerar comunicado de ${nome}`}
+                      disabled={!aluno || !turma}
+                      onClick={() => {
+                        if (aluno && turma)
+                          setComunicado({
+                            nome: aluno.nome,
+                            turma: turma.rotulo,
+                            dia: saida.dia,
+                            horario: saida.horario,
+                          });
+                      }}
+                    >
+                      <FileText size={16} aria-hidden="true" />
+                      Gerar comunicado
+                    </Button>
                   </li>
                 );
               })}
             </ul>
           </>
         )
+      )}
+      {comunicado && (
+        <DialogoComunicadoSaida dados={comunicado} onFechar={() => setComunicado(null)} />
       )}
       <AlertDialog
         open={saidaRemover !== null}
