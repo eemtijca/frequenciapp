@@ -28,6 +28,7 @@ import {
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
+import { ouvirBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
@@ -64,6 +65,8 @@ import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorTurmaChamada } from "@/components/frequencia/seletor-turma-chamada";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
+import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
+import { AvisoBeneficioFrequencia } from "@/components/frequencia/aviso-beneficio-frequencia";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -444,6 +447,38 @@ export default function VistaFrequencia({
       atual = false;
     };
   }, [mesDaChamada, chaveResumo]);
+
+  // Alunos com faltas do mês acima do limite de algum benefício; falha na leitura apenas omite o aviso.
+  const [cargaAlertas, setCargaAlertas] = useState<{
+    chave: string;
+    alertas: AlertaFrequenciaBeneficio[];
+  } | null>(null);
+  // A Gestão avisa quando as regras dos benefícios mudam, pois esta tela continua montada.
+  const [versaoBeneficios, setVersaoBeneficios] = useState(0);
+  useEffect(() => ouvirBeneficiosMudaram(() => setVersaoBeneficios((versao) => versao + 1)), []);
+  const chaveAlertas = `${chaveResumo}|${versaoBeneficios}`;
+  useEffect(() => {
+    let atual = true;
+    pedir<{ alertas: AlertaFrequenciaBeneficio[] }>(
+      `/api/frequencias/alertas-beneficios?mes=${mesDaChamada}`,
+    )
+      .then((dados) => {
+        if (atual) setCargaAlertas({ chave: chaveAlertas, alertas: dados.alertas });
+      })
+      .catch(() => {
+        if (atual) setCargaAlertas({ chave: chaveAlertas, alertas: [] });
+      });
+    return () => {
+      atual = false;
+    };
+  }, [mesDaChamada, chaveAlertas]);
+  const alertasDoAluno = useMemo(() => {
+    const mapa = new Map<string, AlertaFrequenciaBeneficio[]>();
+    for (const alerta of cargaAlertas?.chave === chaveAlertas ? cargaAlertas.alertas : []) {
+      mapa.set(alerta.alunoId, [...(mapa.get(alerta.alunoId) ?? []), alerta]);
+    }
+    return (alunoId: string): AlertaFrequenciaBeneficio[] => mapa.get(alunoId) ?? [];
+  }, [cargaAlertas, chaveAlertas]);
 
   const acumuladoDe = useMemo(() => {
     const mapa = new Map((resumo?.porAluno ?? []).map((item) => [item.alunoId, item]));
@@ -1141,6 +1176,8 @@ export default function VistaFrequencia({
                   const temAcumulado = Boolean(
                     acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
                   );
+                  const alertasBeneficios = alertasDoAluno(aluno.id);
+                  const esmaecida = bloqueado || desistente;
                   return (
                     <li
                       key={aluno.id}
@@ -1156,60 +1193,82 @@ export default function VistaFrequencia({
                         }
                       >
                         <div className="flex items-stretch">
-                          <button
-                            type="button"
-                            aria-pressed={faltando}
-                            disabled={bloqueado || desistente}
-                            aria-label={`${nomeExibido}${
-                              mostrarOrigem
-                                ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
-                                : ""
-                            }: ${
-                              desistente
-                                ? "desistente. Marcação bloqueada."
-                                : faltando
-                                  ? `falta em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
-                                  : "presente. Toque para marcar falta."
-                            }${
-                              temAcumulado && acumulado
-                                ? ` No mês. ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
-                                : ""
-                            }`}
-                            onClick={() => alternarFalta(aluno.id)}
-                            className={`faixa-toque pressionavel flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left transition-colors disabled:opacity-60 ${
+                          <div
+                            className={`faixa-toque relative flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 transition-colors ${
                               faltando ? "" : "hover:bg-secondary/60"
                             }`}
                           >
                             <span className="min-w-0 flex-1">
-                              <span className="flex min-w-0 items-center gap-2">
-                                <span
-                                  className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                              <span
+                                className={`flex min-w-0 items-center gap-2 ${esmaecida ? "opacity-60" : ""}`}
+                              >
+                                <button
+                                  type="button"
+                                  aria-pressed={faltando}
+                                  disabled={bloqueado || desistente}
+                                  aria-label={`${nomeExibido}${
+                                    mostrarOrigem
+                                      ? `, turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`
+                                      : ""
+                                  }: ${
+                                    desistente
+                                      ? "desistente. Marcação bloqueada."
+                                      : faltando
+                                        ? `falta em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
+                                        : "presente. Toque para marcar falta."
+                                  }${
+                                    temAcumulado && acumulado
+                                      ? ` No mês. ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
+                                      : ""
+                                  }`}
+                                  onClick={() => alternarFalta(aluno.id)}
+                                  className="pressionavel focus-visible:after:ring-ring/50 flex min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-[3px] focus-visible:after:ring-inset"
                                 >
-                                  {nomeExibido}
-                                </span>
-                                {desistente && (
-                                  <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
-                                    DESISTENTE
+                                  <span
+                                    className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                                  >
+                                    {nomeExibido}
                                   </span>
-                                )}
-                                {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
-                                  <CirculoValor
-                                    texto={rotuloCurtoDe(aluno.turmaOriginalId)}
-                                    rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
-                                  />
-                                )}
+                                  {desistente && (
+                                    <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
+                                      DESISTENTE
+                                    </span>
+                                  )}
+                                  {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
+                                    <CirculoValor
+                                      texto={rotuloCurtoDe(aluno.turmaOriginalId)}
+                                      rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
+                                    />
+                                  )}
+                                </button>
                               </span>
-                              {parcial ? (
-                                <span className="text-falta-texto block truncate text-xs">
-                                  saiu em parte das aulas
-                                </span>
-                              ) : temAcumulado && acumulado ? (
+                              {parcial ||
+                              (temAcumulado && acumulado) ||
+                              alertasBeneficios.length > 0 ? (
                                 <span className="mt-0.5 flex flex-wrap items-center gap-1">
-                                  <span className="text-muted-foreground text-xs">No mês</span>
-                                  <CirculosAcumulado
-                                    faltas={acumulado.faltas}
-                                    justificadas={acumulado.faltasJustificadas}
-                                  />
+                                  {parcial ? (
+                                    <span
+                                      className={`text-falta-texto block truncate text-xs ${esmaecida ? "opacity-60" : ""}`}
+                                    >
+                                      saiu em parte das aulas
+                                    </span>
+                                  ) : temAcumulado && acumulado ? (
+                                    <span
+                                      className={`flex flex-wrap items-center gap-1 ${esmaecida ? "opacity-60" : ""}`}
+                                    >
+                                      <span className="text-muted-foreground text-xs">No mês</span>
+                                      <CirculosAcumulado
+                                        faltas={acumulado.faltas}
+                                        justificadas={acumulado.faltasJustificadas}
+                                      />
+                                    </span>
+                                  ) : null}
+                                  {alertasBeneficios.length > 0 && (
+                                    <AvisoBeneficioFrequencia
+                                      nome={nomeExibido}
+                                      alertas={alertasBeneficios}
+                                    />
+                                  )}
                                 </span>
                               ) : null}
                             </span>
@@ -1222,7 +1281,7 @@ export default function VistaFrequencia({
                                   ? { duration: 0 }
                                   : { type: "spring", stiffness: 500, damping: 28 }
                               }
-                              className={
+                              className={`${
                                 desistente
                                   ? "bg-secondary text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
                                   : faltando
@@ -1230,11 +1289,11 @@ export default function VistaFrequencia({
                                       ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
                                       : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
                                     : "border-primary/25 bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
-                              }
+                              } ${esmaecida ? "opacity-60" : ""}`}
                             >
                               {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                             </motion.span>
-                          </button>
+                          </div>
                           {faltando && configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
                             <button
                               type="button"

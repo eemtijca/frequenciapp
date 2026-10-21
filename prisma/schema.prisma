@@ -626,6 +626,21 @@ model Liberador {
   @@map("liberadores")
 }
 
+// Regra de frequência mínima de um benefício. O alerta da Chamada vem destas
+// linhas: percentual mínimo das horas letivas do mês e se a falta justificada
+// conta. O nome é livre e a administração cria, edita e desativa na Gestão.
+model BeneficioFrequencia {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome                       String   @db.VarChar(60)
+  percentualMinimoFrequencia Int      @map("percentual_minimo_frequencia")
+  faltasJustificadasContam   Boolean  @default(false) @map("faltas_justificadas_contam")
+  ativo                      Boolean  @default(true)
+  criadoEm                   DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm               DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  @@map("beneficios_frequencia")
+}
+
 // Trilha de auditoria de ações administrativas. Apenas identificadores
 // e nomes de ação: nenhum dado pessoal de aluno é registrado.
 model Auditoria {

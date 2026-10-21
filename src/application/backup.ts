@@ -251,6 +251,18 @@ const esquemaCopia = z.object({
     )
     .max(1000)
     .optional(),
+  // Regras de frequência dos benefícios; cópias anteriores não trazem o campo.
+  beneficiosFrequencia: z
+    .array(
+      z.object({
+        nome: z.string().trim().min(2).max(60),
+        percentualMinimoFrequencia: z.number().int().min(1).max(100),
+        faltasJustificadasContam: z.boolean(),
+        ativo: z.boolean(),
+      }),
+    )
+    .max(1000)
+    .optional(),
   configuracoes: z
     .object({
       frequenciaPorAula: z.boolean(),
@@ -319,6 +331,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     entradas,
     justificativas,
     liberadores,
+    beneficiosFrequencia,
     configuracoes,
   ] = await Promise.all([
     banco().serie.findMany({
@@ -438,6 +451,14 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     banco().liberador.findMany({
       select: { codigo: true, rotulo: true, ativo: true },
     }),
+    banco().beneficioFrequencia.findMany({
+      select: {
+        nome: true,
+        percentualMinimoFrequencia: true,
+        faltasJustificadasContam: true,
+        ativo: true,
+      },
+    }),
     lerConfiguracoes(),
   ]);
 
@@ -486,6 +507,9 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     })),
     justificativas: ordenarPorRotulo(justificativas),
     liberadores: ordenarPorRotulo(liberadores),
+    beneficiosFrequencia: beneficiosFrequencia.sort((a, b) =>
+      a.nome.localeCompare(b.nome, "pt-BR"),
+    ),
     configuracoes,
   };
 }
@@ -594,6 +618,34 @@ async function mesclarCopia(
         await tx.liberador.create({ data: item });
         resultado.adicionadas += 1;
       } else if (atual.rotulo === item.rotulo && atual.ativo === item.ativo) {
+        resultado.identicas += 1;
+      } else {
+        resultado.conflitos += 1;
+      }
+    }
+    // Regras de frequência dos benefícios, comparadas pelo nome; cópias antigas não trazem o campo.
+    const beneficiosAtuais = new Map(
+      (
+        await tx.beneficioFrequencia.findMany({
+          select: {
+            nome: true,
+            percentualMinimoFrequencia: true,
+            faltasJustificadasContam: true,
+            ativo: true,
+          },
+        })
+      ).map((item) => [item.nome.toLowerCase(), item]),
+    );
+    for (const item of copia.beneficiosFrequencia ?? []) {
+      const atual = beneficiosAtuais.get(item.nome.toLowerCase());
+      if (!atual) {
+        await tx.beneficioFrequencia.create({ data: item });
+        resultado.adicionadas += 1;
+      } else if (
+        atual.percentualMinimoFrequencia === item.percentualMinimoFrequencia &&
+        atual.faltasJustificadasContam === item.faltasJustificadasContam &&
+        atual.ativo === item.ativo
+      ) {
         resultado.identicas += 1;
       } else {
         resultado.conflitos += 1;

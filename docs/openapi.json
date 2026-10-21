@@ -66,6 +66,10 @@
       "description": "Chamada diária, confirmação da Seduc e resumo acumulado."
     },
     {
+      "name": "beneficios-frequencia",
+      "description": "Regras de frequência mínima dos benefícios, que alimentam o alerta de faltas da Chamada."
+    },
+    {
       "name": "frequencias-parciais",
       "description": "Presenças personalizadas gravadas."
     },
@@ -3005,6 +3009,320 @@
           },
           "403": {
             "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/frequencias/alertas-beneficios": {
+      "get": {
+        "operationId": "obterAlertasBeneficios",
+        "summary": "Consultar alunos acima do limite de faltas dos benefícios",
+        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
+        "tags": ["frequencias"],
+        "parameters": [
+          {
+            "name": "mes",
+            "in": "query",
+            "description": "Mês consultado, em AAAA-MM.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+            },
+            "example": "2026-10"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alertas do mês.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertasBeneficiosFrequencia"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "mes": "2026-10",
+                      "alertas": [
+                        {
+                          "beneficioId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "beneficioNome": "Benefício exemplo",
+                          "percentualMinimoFrequencia": 80,
+                          "faltasJustificadasContam": false,
+                          "alunoId": "7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f",
+                          "aulasFaltadas": 23,
+                          "aulasJustificadas": 3,
+                          "horasLetivas": 110,
+                          "limiteFaltas": 22
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/beneficios-frequencia": {
+      "get": {
+        "operationId": "listarBeneficiosFrequencia",
+        "summary": "Listar os benefícios e suas regras de frequência",
+        "description": "Qualquer sessão. A ordem é alfabética pelo nome, com benefícios ativos e inativos.",
+        "tags": ["beneficios-frequencia"],
+        "responses": {
+          "200": {
+            "description": "Benefícios cadastrados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BeneficiosFrequencia"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "beneficios": [
+                        {
+                          "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "nome": "Benefício exemplo",
+                          "percentualMinimoFrequencia": 80,
+                          "faltasJustificadasContam": false,
+                          "ativo": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "criarBeneficioFrequencia",
+        "summary": "Cadastrar um benefício",
+        "description": "Apenas administração, com origem confiável e auditoria. O nome tem de 2 a 60 caracteres e não repete sem diferenciar caixa; o percentual é um inteiro de 1 a 100. Sem faltasJustificadasContam, as justificadas não contam; sem ativo, o benefício nasce ativo.",
+        "tags": ["beneficios-frequencia"],
+        "requestBody": {
+          "required": true,
+          "description": "Nome e regra de frequência.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeneficioFrequenciaCorpo"
+              },
+              "examples": {
+                "Benefício": {
+                  "summary": "Benefício",
+                  "value": {
+                    "nome": "Benefício exemplo",
+                    "percentualMinimoFrequencia": 80,
+                    "faltasJustificadasContam": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Benefício criado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BeneficioFrequenciaResposta"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "beneficio": {
+                        "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "nome": "Benefício exemplo",
+                        "percentualMinimoFrequencia": 80,
+                        "faltasJustificadasContam": false,
+                        "ativo": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/beneficios-frequencia/{id}": {
+      "patch": {
+        "operationId": "atualizarBeneficioFrequencia",
+        "summary": "Editar um benefício",
+        "description": "Apenas administração, com origem confiável e auditoria. Corpo parcial com nome, percentual mínimo, tratamento das faltas justificadas e situação. A mudança vale para os próximos alertas.",
+        "tags": ["beneficios-frequencia"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identificador do benefício.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Campos parciais.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BeneficioFrequenciaEdicao"
+              },
+              "examples": {
+                "Edicao": {
+                  "summary": "Edicao",
+                  "value": {
+                    "percentualMinimoFrequencia": 75
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Benefício atualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BeneficioFrequenciaResposta"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "beneficio": {
+                        "id": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "nome": "Benefício exemplo",
+                        "percentualMinimoFrequencia": 75,
+                        "faltasJustificadasContam": false,
+                        "ativo": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "excluirBeneficioFrequencia",
+        "summary": "Excluir um benefício",
+        "description": "Apenas administração, com origem confiável e auditoria. Nenhum histórico depende do benefício; para só pausar o alerta, desative pelo PATCH.",
+        "tags": ["beneficios-frequencia"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identificador do benefício.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Benefício excluído.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "ok": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -13130,6 +13448,195 @@
         "properties": {
           "confirmacao": {
             "$ref": "#/components/schemas/ConfirmacaoSeduc"
+          }
+        }
+      },
+      "AlertasBeneficiosFrequencia": {
+        "type": "object",
+        "title": "Alertas de frequência dos benefícios",
+        "description": "Alunos ativos com faltas do mês acima do limite da regra de algum benefício ativo; um item por aluno e benefício.",
+        "required": ["mes", "alertas"],
+        "properties": {
+          "mes": {
+            "type": "string",
+            "example": "2026-10"
+          },
+          "alertas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "beneficioId",
+                "beneficioNome",
+                "percentualMinimoFrequencia",
+                "faltasJustificadasContam",
+                "alunoId",
+                "aulasFaltadas",
+                "aulasJustificadas",
+                "horasLetivas",
+                "limiteFaltas"
+              ],
+              "properties": {
+                "beneficioId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+                },
+                "beneficioNome": {
+                  "type": "string",
+                  "example": "Benefício exemplo"
+                },
+                "percentualMinimoFrequencia": {
+                  "type": "integer",
+                  "example": 80
+                },
+                "faltasJustificadasContam": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "alunoId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
+                },
+                "aulasFaltadas": {
+                  "type": "integer",
+                  "description": "Aulas de falta que contam contra o limite, conforme a regra do benefício.",
+                  "example": 23
+                },
+                "aulasJustificadas": {
+                  "type": "integer",
+                  "description": "Aulas de falta com justificativa no mês, contadas ou não pela regra.",
+                  "example": 3
+                },
+                "horasLetivas": {
+                  "type": "integer",
+                  "description": "Aulas do mês: as das chamadas salvas mais as previstas pela grade nos demais dias úteis.",
+                  "example": 110
+                },
+                "limiteFaltas": {
+                  "type": "integer",
+                  "description": "Máximo de aulas de falta que mantém o percentual mínimo de frequência.",
+                  "example": 22
+                }
+              }
+            }
+          }
+        }
+      },
+      "BeneficioFrequencia": {
+        "type": "object",
+        "title": "Benefício e regra de frequência",
+        "description": "Regra de frequência mínima de um benefício, editável pela administração.",
+        "required": [
+          "id",
+          "nome",
+          "percentualMinimoFrequencia",
+          "faltasJustificadasContam",
+          "ativo"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          },
+          "nome": {
+            "type": "string",
+            "example": "Benefício exemplo"
+          },
+          "percentualMinimoFrequencia": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Percentual das aulas do mês em que o aluno precisa estar presente.",
+            "example": 80
+          },
+          "faltasJustificadasContam": {
+            "type": "boolean",
+            "description": "Quando falso, só as faltas sem justificativa entram na conta.",
+            "example": false
+          },
+          "ativo": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "BeneficiosFrequencia": {
+        "type": "object",
+        "title": "Benefícios",
+        "required": ["beneficios"],
+        "properties": {
+          "beneficios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BeneficioFrequencia"
+            }
+          }
+        }
+      },
+      "BeneficioFrequenciaResposta": {
+        "type": "object",
+        "title": "Benefício",
+        "required": ["beneficio"],
+        "properties": {
+          "beneficio": {
+            "$ref": "#/components/schemas/BeneficioFrequencia"
+          }
+        }
+      },
+      "BeneficioFrequenciaCorpo": {
+        "type": "object",
+        "title": "Corpo de criação do benefício",
+        "required": ["nome", "percentualMinimoFrequencia"],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Benefício exemplo"
+          },
+          "percentualMinimoFrequencia": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Percentual das aulas do mês em que o aluno precisa estar presente.",
+            "example": 80
+          },
+          "faltasJustificadasContam": {
+            "type": "boolean",
+            "description": "Quando falso, só as faltas sem justificativa entram na conta.",
+            "example": false
+          },
+          "ativo": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "BeneficioFrequenciaEdicao": {
+        "type": "object",
+        "title": "Corpo de edição do benefício",
+        "description": "Ao menos um campo.",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Benefício exemplo"
+          },
+          "percentualMinimoFrequencia": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Percentual das aulas do mês em que o aluno precisa estar presente.",
+            "example": 80
+          },
+          "faltasJustificadasContam": {
+            "type": "boolean",
+            "description": "Quando falso, só as faltas sem justificativa entram na conta.",
+            "example": false
+          },
+          "ativo": {
+            "type": "boolean",
+            "example": true
           }
         }
       },

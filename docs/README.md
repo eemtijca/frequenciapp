@@ -17,6 +17,7 @@
 | [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
+| [beneficios-frequencia.md](beneficios-frequencia.md) | Regras de frequência mínima dos benefícios e alerta.       |
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
 | [Contribuir](../CONTRIBUTING.md)                     | Fluxo de issues, etiquetas, commits e pull requests.       |
 | [adr/](adr/)                                         | Decisões de arquitetura registradas.                       |
@@ -38,6 +39,7 @@ A integração exclusiva com OAuth e Sheets API está registrada na [ADR-033](ad
 - [ADR-036](adr/036-implantacao-multinuvem.md): implantação em AWS, Azure e GCP com Terraform, com modo local nos emuladores do Floci.
 - [ADR-037](adr/037-frequencia-mensal-no-google.md): preparo de abas por turma e mês, preservação do histórico e confirmação por destino.
 - [ADR-038](adr/038-automacao-do-schema-de-preview.md): schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal.
+- [ADR-049](adr/049-regras-de-frequencia-dos-beneficios.md): regras de frequência de benefícios configuráveis no banco, pela API e pela Gestão.
 - [ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md): fila FIFO durável dos envios automáticos às planilhas, com retentativas e agenda.
 
 - [Referência histórica do painel externo](looker-studio.md): fontes agregadas já preparadas no Zoho Analytics ou Looker Studio. A análise atual fica no FrequenciBI.

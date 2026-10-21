@@ -25,6 +25,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                 |
 | `justificativas`              | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.               |
 | `liberadores`                 | Catálogo de quem libera a saída: código estável, rótulo e situação, editável na Gestão.          |
+| `beneficios_frequencia`       | Regra de frequência mínima de cada benefício: nome, percentual, faltas justificadas e situação.  |
 | `integracoes_planilha`        | Uma linha por finalidade (`FREQUENCIA`, `SAIDAS` e `PARCIAL`) com token, esquema e modo.         |
 | `sincronizacoes_planilha`     | Histórico de envios por finalidade e turma de origem, com contagens e resultado.                 |
 | `fila_planilha`               | Fila FIFO dos envios automáticos às planilhas: ordem, estado, tentativas e reserva (ADR-039).    |
@@ -50,6 +51,7 @@ Restrições de integridade relevantes:
 - `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
 - As seleções de origem têm chave composta e referências para a configuração e para a série ou turma. Excluir uma série ou turma retira somente a respectiva seleção em cascata. Desativar o recurso não remove seleções. A migração `origem_chamada_configuravel` seleciona apenas as séries existentes com ordinal 3 para compatibilidade; em base vazia, o recurso permanece desligado e sem seleção ([ADR-026](adr/026-origem-configuravel-na-chamada.md)).
 - `justificativas` tem unicidade funcional em `lower(codigo)` e é o catálogo usado na validação da chamada e da saída.
+- `beneficios_frequencia` tem unicidade funcional em `lower(nome)`, restrição de percentual entre 1 e 100 e uma linha inicial inserida pela migração, editável pela administração.
 - `liberadores` tem unicidade funcional em `lower(codigo)` e é o catálogo de quem libera a saída, cadastrado pela administração e sem nomes de pessoas na migração.
 - `horarios` tem unicidade de (`turma_id`, `ordem`), exclusão em cascata com a turma e checks de formato de hora, intervalo e dias da semana.
 - `series`, `turmas` e `alunos` se protegem por `ON DELETE RESTRICT`.
