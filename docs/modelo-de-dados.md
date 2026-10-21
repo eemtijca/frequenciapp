@@ -201,6 +201,19 @@ O catálogo nasce com os 12 códigos do aplicativo de referência e é editado e
 
 O catálogo começa vazio e é editado em Gestão, Configurações, Quem libera as saídas. A exclusão é bloqueada quando há saída usando o código; o caminho é desativar. A lista aparece em ordem alfabética pelo rótulo, e a saída guarda o código, não o nome, para o rótulo poder mudar sem perder o histórico.
 
+## Benefício e regra de frequência (beneficio_frequencia)
+
+| Campo                      | Tipo     | Observação                                                      |
+| -------------------------- | -------- | --------------------------------------------------------------- |
+| id                         | uuid     | Gerado pelo banco.                                              |
+| nome                       | texto    | De 2 a 60 caracteres, único sem diferenciar caixa; editável.    |
+| percentualMinimoFrequencia | inteiro  | De 1 a 100, em percentual das aulas do mês.                     |
+| faltasJustificadasContam   | booleano | Falso por padrão: só faltas sem justificativa entram no limite. |
+| ativo                      | booleano | Inativo deixa de gerar alerta na Chamada.                       |
+| criadoEm, atualizadoEm     | data     |                                                                 |
+
+Alimenta o alerta de faltas da Chamada (ver [beneficios-frequencia.md](beneficios-frequencia.md)). A migração insere uma linha inicial, e a administração edita em Gestão, Configurações, Benefícios e frequência mínima. Nenhum histórico depende da linha: os alertas são calculados a cada leitura, então excluir um benefício não altera frequências salvas. A cópia JSON inclui os benefícios, e a restauração compara por nome.
+
 ## Integração com a planilha (integracao_planilha)
 
 Linha única da integração opcional com o Google Planilhas. Guarda a situação, o endereço `/exec`, o token compartilhado, o esquema lido, a assinatura para detectar deriva, a autoria e a janela do modo completo (`modo`, `modoCompletoAte`). Token e esquema ficam fora da cópia JSON e o endereço nunca chega ao navegador.

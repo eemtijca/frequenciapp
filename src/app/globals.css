@@ -43,6 +43,9 @@
   --color-falta-fraca: var(--falta-fraca);
   --color-falta-foreground: var(--falta-foreground);
   --color-falta-texto: var(--falta-texto);
+  --color-alerta-fraca: var(--alerta-fraca);
+  --color-alerta-texto: var(--alerta-texto);
+  --color-alerta: var(--alerta);
   --color-justificada: var(--justificada);
   --color-justificada-fraca: var(--justificada-fraca);
   --color-justificada-foreground: var(--justificada-foreground);
@@ -85,6 +88,10 @@
   --justificada-fraca: oklch(0.955 0.02 250);
   --justificada-foreground: oklch(0.985 0.002 90);
   --justificada-texto: oklch(0.5 0.12 250);
+  /* Alerta em âmbar: aviso que pede atenção sem ser falta nem justificativa. */
+  --alerta: oklch(0.7 0.15 75);
+  --alerta-fraca: oklch(0.965 0.045 90);
+  --alerta-texto: oklch(0.45 0.1 65);
   --border: oklch(0.905 0.006 90);
   --input: oklch(0.65 0.008 90);
   --ring: oklch(0.55 0.1 160);
@@ -127,6 +134,9 @@
   --justificada-fraca: oklch(0.3 0.04 250);
   --justificada-foreground: oklch(0.2 0.04 250);
   --justificada-texto: oklch(0.76 0.11 250);
+  --alerta: oklch(0.75 0.15 80);
+  --alerta-fraca: oklch(0.32 0.06 80);
+  --alerta-texto: oklch(0.85 0.14 85);
   --border: oklch(1 0 0 / 16%);
   --input: oklch(1 0 0 / 20%);
   --ring: oklch(0.6 0.1 160);
