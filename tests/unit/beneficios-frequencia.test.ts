@@ -1,6 +1,6 @@
 // Alerta de frequência dos benefícios: limite pelo percentual configurado, projeção das aulas do mês e regra por benefício.
 import { describe, expect, it } from "vitest";
-import type { Aluno, Horario } from "@/domain/frequencia";
+import { diaDaSemanaIso, diasDoMes, type Aluno, type Horario } from "@/domain/frequencia";
 import {
   acimaDoLimiteDeFaltas,
   alertasDeFrequencia,
@@ -19,6 +19,7 @@ describe("limite de faltas pelo percentual mínimo de frequência", () => {
     [100, 80, 20],
     [101, 80, 20],
     [110, 80, 22],
+    [124, 80, 24],
     [110, 75, 27],
     [110, 90, 11],
     [110, 100, 0],
@@ -30,6 +31,8 @@ describe("limite de faltas pelo percentual mínimo de frequência", () => {
   it("aceita exatamente o percentual mínimo e reprova abaixo dele", () => {
     expect(acimaDoLimiteDeFaltas(20, 100, 80)).toBe(false);
     expect(acimaDoLimiteDeFaltas(21, 100, 80)).toBe(true);
+    expect(acimaDoLimiteDeFaltas(24, 124, 80)).toBe(false);
+    expect(acimaDoLimiteDeFaltas(25, 124, 80)).toBe(true);
     expect(acimaDoLimiteDeFaltas(25, 100, 75)).toBe(false);
     expect(acimaDoLimiteDeFaltas(26, 100, 75)).toBe(true);
     expect(acimaDoLimiteDeFaltas(0, 100, 100)).toBe(false);
@@ -212,6 +215,51 @@ describe("alertas de frequência no mês", () => {
       }),
     );
     expect(alerta?.horasLetivas).toBe(105);
+  });
+
+  it("não reduz o limite por falta do retrato das aulas em uma chamada antiga", () => {
+    expect(
+      alertasDeFrequencia(
+        base({
+          chamadas: [{ dia: "2026-10-01", turmaId: "t1", aulas: 0, alunoIds: ["a1"] }],
+          faltas: faltasDe("a1", 22),
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("usa a grade quando todas as chamadas do mês estão sem retrato de aulas", () => {
+    const chamadas = diasDoMes("2026-10")
+      .filter((dia) => diaDaSemanaIso(dia) <= 5)
+      .map((dia) => ({ dia, turmaId: "t1", aulas: 0, alunoIds: ["a1"] }));
+    expect(alertasDeFrequencia(base({ chamadas, faltas: faltasDe("a1", 23) }))).toEqual([
+      expect.objectContaining({ horasLetivas: 110, limiteFaltas: 22, aulasFaltadas: 23 }),
+    ]);
+  });
+
+  it("recupera as aulas do sábado letivo salvo sem retrato", () => {
+    const [alerta] = alertasDeFrequencia(
+      base({
+        chamadas: [{ dia: "2026-10-03", turmaId: "t1", aulas: 0, alunoIds: ["a1"] }],
+        faltas: faltasDe("a1", 30),
+      }),
+    );
+    expect(alerta).toMatchObject({ horasLetivas: 115, limiteFaltas: 23 });
+  });
+
+  it("recupera a grade da turma da chamada antiga, mesmo depois de transferência", () => {
+    const [alerta] = alertasDeFrequencia(
+      base({
+        alunos: [aluno("a1", { turmaId: "t2" })],
+        turmas: [
+          { id: "t1", horarios: aulasDaSemana("t1", 5) },
+          { id: "t2", horarios: aulasDaSemana("t2", 1) },
+        ],
+        chamadas: [{ dia: "2026-10-01", turmaId: "t1", aulas: 0, alunoIds: ["a1"] }],
+        faltas: faltasDe("a1", 10),
+      }),
+    );
+    expect(alerta).toMatchObject({ horasLetivas: 26, limiteFaltas: 5 });
   });
 
   it("para de projetar aulas depois da desistência", () => {

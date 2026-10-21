@@ -316,6 +316,98 @@ it("benefício inativo não gera alerta e volta a gerar quando é reativado", as
   expect(await alertasDe(beneficio.id)).toHaveLength(1);
 });
 
+it("mantém o limite ao consultar chamadas antigas sem retrato de aulas", async () => {
+  const beneficio = await criarBeneficio({
+    nome: "QA Beneficio Sem Retrato",
+    percentualMinimoFrequencia: 80,
+  });
+  const antes = await alertasDe(beneficio.id);
+  expect(antes[0]).toMatchObject({ horasLetivas: 22, limiteFaltas: 4, aulasFaltadas: 5 });
+  try {
+    await banco.query(
+      "delete from aulas_chamada a using frequencias f where a.frequencia_id=f.id and f.turma_id=$1",
+      [turmaId],
+    );
+    expect(await alertasDe(beneficio.id)).toEqual(antes);
+  } finally {
+    await banco.query(
+      "insert into aulas_chamada (frequencia_id,horario_id) select f.id,h.id from frequencias f join horarios h on h.turma_id=f.turma_id where f.turma_id=$1 on conflict do nothing",
+      [turmaId],
+    );
+  }
+});
+
+it("distingue dias de falta do resumo e aulas perdidas do alerta, preservando o retrato", async () => {
+  const turma = (
+    await banco.query<{ id: string }>(
+      "insert into turmas (nome,serie_id) values ('B',$1) returning id",
+      [serieId],
+    )
+  ).rows[0]?.id;
+  try {
+    const aluno =
+      (
+        await banco.query<{ id: string }>(
+          "insert into alunos (nome,turma_id,turma_original_id,ordem) values ('QA Beneficios Aulas',$1,$1,1) returning id",
+          [turma],
+        )
+      ).rows[0]?.id ?? "";
+    const horarios = (
+      await banco.query<{ id: string }>(
+        "insert into horarios (turma_id,ordem,inicio,fim,dias_semana) select $1,n,'07:00','07:50',array[1,2,3,4,5] from generate_series(1,7) n returning id",
+        [turma],
+      )
+    ).rows;
+    const beneficio = await criarBeneficio({
+      nome: "QA Beneficio Por Aula",
+      percentualMinimoFrequencia: 90,
+    });
+    for (const [indice, dia] of DIAS.entries()) {
+      const salvo = await enviar("POST", "/api/frequencias", cookieCoordenacao, {
+        dia,
+        turmaId: turma,
+        revisao: 0,
+        faltas: [
+          indice < 4
+            ? { alunoId: aluno }
+            : { alunoId: aluno, horarios: [horarios[0]?.id], justificativa: "O" },
+        ],
+      });
+      expect(salvo.status).toBe(200);
+    }
+    const resumo = await enviar(
+      "GET",
+      "/api/frequencias/resumo?de=2026-06-01&ate=2026-06-30",
+      cookieAdmin,
+    );
+    const dados = (await resumo.json()) as {
+      resumo: { porAluno: { alunoId: string; faltas: number; faltasJustificadas: number }[] };
+    };
+    expect(dados.resumo.porAluno.find((item) => item.alunoId === aluno)).toMatchObject({
+      faltas: 4,
+      faltasJustificadas: 2,
+    });
+    expect((await alertasDe(beneficio.id, aluno))[0]).toMatchObject({
+      aulasFaltadas: 28,
+      aulasJustificadas: 2,
+      horasLetivas: 154,
+      limiteFaltas: 15,
+    });
+    // A nova grade muda só a projeção dos 16 dias sem chamada, preservando os seis retratos.
+    await banco.query("update horarios set ativo=false where turma_id=$1 and ordem>5", [turma]);
+    expect((await alertasDe(beneficio.id, aluno))[0]).toMatchObject({
+      aulasFaltadas: 28,
+      aulasJustificadas: 2,
+      horasLetivas: 122,
+      limiteFaltas: 12,
+    });
+  } finally {
+    await banco.query("delete from frequencias where turma_id=$1", [turma]);
+    await banco.query("delete from alunos where turma_id=$1", [turma]);
+    await banco.query("delete from turmas where id=$1", [turma]);
+  }
+});
+
 it.each(["", "mes=", "mes=2026-13", "mes=2026-6", "mes=2026-06-01"])(
   "recusa mês inválido nos alertas: %s",
   async (parametros) => {

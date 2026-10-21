@@ -5,6 +5,7 @@ import {
   alunoDesistenteNoDia,
   diaDaSemanaIso,
   diasDoMes,
+  horariosDaChamada,
   horariosDoDia,
   type Aluno,
   type Horario,
@@ -86,8 +87,8 @@ export interface AlertaFrequenciaBeneficio {
 
 /**
  * Horas letivas do aluno no mês. Dias com chamada salva usam o retrato das aulas
- * (zero quando o aluno não constava nela); os demais dias úteis, sem feriado nem
- * desistência, usam a grade da turma atual.
+ * (zero quando o aluno não constava nela). Sem retrato de aulas, a grade da
+ * turma da chamada serve de estimativa; dias sem chamada usam a turma atual.
  */
 function horasLetivasDoAluno(
   aluno: Aluno,
@@ -124,11 +125,17 @@ export function alertasDeFrequencia(
   const dias = diasDoMes(entrada.mes);
   const aulasPorAlunoDia = new Map<string, number>();
   const turmasComChamada = new Set<string>();
+  const grades = new Map(entrada.turmas.map((turma) => [turma.id, turma.horarios]));
   for (const chamada of entrada.chamadas) {
     turmasComChamada.add(`${chamada.turmaId}|${chamada.dia}`);
+    // Retrato vazio indica chamada antiga. Como no restante da Chamada, a
+    // estimativa usa a grade, inclusive a liberação do sábado já registrado.
+    const aulas =
+      chamada.aulas ||
+      horariosDaChamada(grades.get(chamada.turmaId) ?? [], chamada.dia, true).length;
     for (const alunoId of chamada.alunoIds) {
       const chave = `${alunoId}|${chamada.dia}`;
-      aulasPorAlunoDia.set(chave, (aulasPorAlunoDia.get(chave) ?? 0) + chamada.aulas);
+      aulasPorAlunoDia.set(chave, (aulasPorAlunoDia.get(chave) ?? 0) + aulas);
     }
   }
   const faltasPorAluno = new Map<string, { simples: number; justificadas: number }>();

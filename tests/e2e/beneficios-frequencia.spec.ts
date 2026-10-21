@@ -108,7 +108,10 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
         dia: data,
         turmaId,
         revisao: 0,
-        faltas: [{ alunoId: ids[0] }, ...(indice === 0 ? [{ alunoId: ids[1] }] : [])],
+        faltas: [
+          { alunoId: ids[0], ...(indice === 5 ? { justificativa: "O" } : {}) },
+          ...(indice === 0 ? [{ alunoId: ids[1] }] : []),
+        ],
       },
     });
     expect(resposta.ok()).toBe(true);
@@ -134,8 +137,22 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   const botaoUma = uma.getByRole("button", { name: /passou do limite de faltas do mês/ });
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
-  await botaoUma.click();
+  await botaoMuitas.click();
   const painel = page.locator('[data-slot="popover-content"]');
+  const detalhe = painel.locator(":scope > div").filter({ hasText: NOME_BENEFICIO });
+  await expect(detalhe.getByText(/^5 aulas com falta em/)).toBeVisible();
+  await expect(
+    detalhe.getByText(
+      "1 aula com falta justificada desconsiderada conforme a configuração do benefício.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(painel.getByText(/Os contadores F e FJ da linha contam dias/)).toBeVisible();
+  await expect(
+    painel.getByText(/Este alerta não determina o pagamento do benefício/),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await botaoUma.click();
   await expect(painel.getByText(NOME_BENEFICIO, { exact: true })).toBeVisible();
   await expect(painel.getByText(/Para manter 99% de frequência/)).toBeVisible();
   await page.keyboard.press("Escape");

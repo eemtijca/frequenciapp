@@ -25,13 +25,16 @@ Para um aluno em um mês, com `H` aulas no mês, `P` o percentual mínimo do ben
 
 Exemplo: um mês com 22 dias úteis e 5 aulas por dia tem `H = 110`. Com `P = 80`, `L = 22`: 22 faltas sem justificativa ainda estão no limite e a 23ª dispara o alerta. Com `P = 90`, `L = 11`. Com `P = 100`, `L = 0`: qualquer falta dispara.
 
+Os círculos F e FJ da linha contam dias com falta; o alerta conta aulas. Quatro dias de falta integral com sete aulas cada somam 28 aulas perdidas. Duas ocorrências justificadas em apenas uma aula de cada dia somam duas aulas justificadas. Por isso, os números da linha não precisam coincidir com os do alerta. Com `H = 124` e `P = 80`, o limite é 24 aulas com falta; 28 aulas com falta equivalem a cerca de 77,4% de frequência projetada.
+
 Um aluno pode aparecer uma vez por benefício ativo, e o painel do botão lista cada um com o próprio limite.
 
 ## Aulas do mês
 
 - Dias com chamada salva usam o retrato das aulas daquela chamada, e valem zero quando o aluno não constava nela.
+- Se uma chamada antiga tem lista de alunos, mas não tem retrato de aulas, a estimativa usa a grade da turma daquela chamada, inclusive o sábado letivo já salvo. Essa aproximação não recupera a grade histórica nem grava alterações no histórico.
 - Os demais dias úteis, sem feriado do calendário e antes de uma eventual desistência, usam a grade da turma atual. Sábados só contam quando há chamada salva (sábado letivo), e domingos nunca.
-- Como o denominador projeta o mês todo, o alerta só dispara quando a perda já é certa pelas faltas registradas, e não por uma sequência curta no começo do mês.
+- O denominador estima o mês inteiro, incluindo dias passados sem chamada e dias futuros. O alerta indica excesso perante essa estimativa, que pode mudar com a grade e o calendário; não comprova perda do benefício.
 - Só alunos ativos entram, e só quem tem alguma falta no mês.
 
 ## O Pé-de-Meia como exemplo
@@ -48,4 +51,5 @@ Limite da pesquisa: a regra foi levantada na web em outubro de 2026, e os textos
 - Suspensões de aula sem feriado cadastrado (greve, recesso) entram na projeção como dias letivos até virarem feriado ou chamada salva.
 - Aluno transferido no meio do mês usa a turma atual nos dias sem chamada, o que pode afrouxar o limite.
 - A base de cálculo é sempre as horas letivas (aulas). Outras bases, como dias letivos, exigiriam um novo campo na configuração.
+- O alerta não calcula a média acumulada do período letivo nem determina pagamento ou bloqueio. A exclusão de justificadas segue a configuração da escola e não comprova abono pela rede ou pelo programa.
 - A Chamada relê os alertas ao abrir, ao trocar de mês, depois de salvar e quando a Gestão muda uma regra.

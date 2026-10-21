@@ -3020,7 +3020,7 @@
       "get": {
         "operationId": "obterAlertasBeneficios",
         "summary": "Consultar alunos acima do limite de faltas dos benefícios",
-        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
+        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. Chamadas antigas sem retrato de aulas usam a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas e não determina pagamento. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
         "tags": ["frequencias"],
         "parameters": [
           {
