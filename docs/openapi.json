@@ -3020,7 +3020,7 @@
       "get": {
         "operationId": "obterAlertasBeneficios",
         "summary": "Consultar alunos acima do limite de faltas dos benefícios",
-        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
+        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A carga diária opcional projeta os dias com aulas na grade e sem feriado. Chamadas antigas sem retrato de aulas usam a carga diária configurada ou a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas e não determina pagamento. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -3058,7 +3058,8 @@
                           "aulasFaltadas": 23,
                           "aulasJustificadas": 3,
                           "horasLetivas": 110,
-                          "limiteFaltas": 22
+                          "limiteFaltas": 22,
+                          "aulasPorDia": null
                         }
                       ]
                     }
@@ -3106,7 +3107,8 @@
                           "nome": "Benefício exemplo",
                           "percentualMinimoFrequencia": 80,
                           "faltasJustificadasContam": false,
-                          "ativo": true
+                          "ativo": true,
+                          "aulasPorDia": null
                         }
                       ]
                     }
@@ -3129,7 +3131,7 @@
       "post": {
         "operationId": "criarBeneficioFrequencia",
         "summary": "Cadastrar um benefício",
-        "description": "Apenas administração, com origem confiável e auditoria. O nome tem de 2 a 60 caracteres e não repete sem diferenciar caixa; o percentual é um inteiro de 1 a 100. Sem faltasJustificadasContam, as justificadas não contam; sem ativo, o benefício nasce ativo.",
+        "description": "Apenas administração, com origem confiável e auditoria. O nome tem de 2 a 60 caracteres e não repete sem diferenciar caixa; o percentual é um inteiro de 1 a 100. Sem faltasJustificadasContam, as justificadas não contam; sem ativo, o benefício nasce ativo. Aulas por dia é opcional, inteiro de 1 a 30 ou nulo para usar a grade. Chamadas salvas não são reescritas.",
         "tags": ["beneficios-frequencia"],
         "requestBody": {
           "required": true,
@@ -3145,7 +3147,8 @@
                   "value": {
                     "nome": "Benefício exemplo",
                     "percentualMinimoFrequencia": 80,
-                    "faltasJustificadasContam": false
+                    "faltasJustificadasContam": false,
+                    "aulasPorDia": null
                   }
                 }
               }
@@ -3169,7 +3172,8 @@
                         "nome": "Benefício exemplo",
                         "percentualMinimoFrequencia": 80,
                         "faltasJustificadasContam": false,
-                        "ativo": true
+                        "ativo": true,
+                        "aulasPorDia": null
                       }
                     }
                   }
@@ -3226,7 +3230,8 @@
                 "Edicao": {
                   "summary": "Edicao",
                   "value": {
-                    "percentualMinimoFrequencia": 75
+                    "percentualMinimoFrequencia": 75,
+                    "aulasPorDia": null
                   }
                 }
               }
@@ -3250,7 +3255,8 @@
                         "nome": "Benefício exemplo",
                         "percentualMinimoFrequencia": 75,
                         "faltasJustificadasContam": false,
-                        "ativo": true
+                        "ativo": true,
+                        "aulasPorDia": null
                       }
                     }
                   }
@@ -13474,7 +13480,8 @@
                 "aulasFaltadas",
                 "aulasJustificadas",
                 "horasLetivas",
-                "limiteFaltas"
+                "limiteFaltas",
+                "aulasPorDia"
               ],
               "properties": {
                 "beneficioId": {
@@ -13511,13 +13518,27 @@
                 },
                 "horasLetivas": {
                   "type": "integer",
-                  "description": "Aulas do mês: as das chamadas salvas mais as previstas pela grade nos demais dias úteis.",
+                  "description": "Aulas salvas mais a projeção dos dias com aulas na grade e sem feriado, pela carga diária configurada ou pela própria grade.",
                   "example": 110
                 },
                 "limiteFaltas": {
                   "type": "integer",
                   "description": "Máximo de aulas de falta que mantém o percentual mínimo de frequência.",
                   "example": 22
+                },
+                "aulasPorDia": {
+                  "oneOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 30
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Quantidade diária opcional para projetar dias com aulas na grade, sem feriado. Nulo segue a grade. Chamadas salvas preservam as aulas registradas.",
+                  "example": 9
                 }
               }
             }
@@ -13533,7 +13554,8 @@
           "nome",
           "percentualMinimoFrequencia",
           "faltasJustificadasContam",
-          "ativo"
+          "ativo",
+          "aulasPorDia"
         ],
         "properties": {
           "id": {
@@ -13560,6 +13582,20 @@
           "ativo": {
             "type": "boolean",
             "example": true
+          },
+          "aulasPorDia": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quantidade diária opcional para projetar dias com aulas na grade, sem feriado. Nulo segue a grade. Chamadas salvas preservam as aulas registradas.",
+            "example": 9
           }
         }
       },
@@ -13610,6 +13646,20 @@
           "ativo": {
             "type": "boolean",
             "example": true
+          },
+          "aulasPorDia": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quantidade diária opcional para projetar dias com aulas na grade, sem feriado. Nulo segue a grade. Chamadas salvas preservam as aulas registradas.",
+            "example": 9
           }
         }
       },
@@ -13637,6 +13687,20 @@
           "ativo": {
             "type": "boolean",
             "example": true
+          },
+          "aulasPorDia": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 30
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Quantidade diária opcional para projetar dias com aulas na grade, sem feriado. Nulo segue a grade. Chamadas salvas preservam as aulas registradas.",
+            "example": 9
           }
         }
       },

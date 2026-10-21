@@ -257,6 +257,7 @@ const esquemaCopia = z.object({
       z.object({
         nome: z.string().trim().min(2).max(60),
         percentualMinimoFrequencia: z.number().int().min(1).max(100),
+        aulasPorDia: z.number().int().min(1).max(30).nullable().optional(),
         faltasJustificadasContam: z.boolean(),
         ativo: z.boolean(),
       }),
@@ -455,6 +456,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       select: {
         nome: true,
         percentualMinimoFrequencia: true,
+        aulasPorDia: true,
         faltasJustificadasContam: true,
         ativo: true,
       },
@@ -630,6 +632,7 @@ async function mesclarCopia(
           select: {
             nome: true,
             percentualMinimoFrequencia: true,
+            aulasPorDia: true,
             faltasJustificadasContam: true,
             ativo: true,
           },
@@ -643,6 +646,7 @@ async function mesclarCopia(
         resultado.adicionadas += 1;
       } else if (
         atual.percentualMinimoFrequencia === item.percentualMinimoFrequencia &&
+        (item.aulasPorDia === undefined || atual.aulasPorDia === item.aulasPorDia) &&
         atual.faltasJustificadasContam === item.faltasJustificadasContam &&
         atual.ativo === item.ativo
       ) {

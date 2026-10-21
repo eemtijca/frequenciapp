@@ -15,6 +15,7 @@ interface Beneficio {
   id: string;
   nome: string;
   percentualMinimoFrequencia: number;
+  aulasPorDia: number | null;
   faltasJustificadasContam: boolean;
   ativo: boolean;
 }
@@ -23,6 +24,7 @@ interface Alerta {
   beneficioId: string;
   beneficioNome: string;
   percentualMinimoFrequencia: number;
+  aulasPorDia: number | null;
   faltasJustificadasContam: boolean;
   alunoId: string;
   aulasFaltadas: number;
@@ -138,6 +140,7 @@ it("cria, lista, edita e exclui um benefício, só pela administração", async 
   const criado = await criarBeneficio({
     nome: "QA Beneficio Crud",
     percentualMinimoFrequencia: 85,
+    aulasPorDia: null,
   });
   expect(criado).toMatchObject({
     nome: "QA Beneficio Crud",
@@ -314,6 +317,135 @@ it("benefício inativo não gera alerta e volta a gerar quando é reativado", as
   expect(await alertasDe(beneficio.id)).toEqual([]);
   await enviar("PATCH", `/api/beneficios-frequencia/${beneficio.id}`, cookieAdmin, { ativo: true });
   expect(await alertasDe(beneficio.id)).toHaveLength(1);
+});
+
+it("mantém o limite ao consultar chamadas antigas sem retrato de aulas", async () => {
+  const beneficio = await criarBeneficio({
+    nome: "QA Beneficio Sem Retrato",
+    percentualMinimoFrequencia: 80,
+  });
+  const antes = await alertasDe(beneficio.id);
+  expect(antes[0]).toMatchObject({ horasLetivas: 22, limiteFaltas: 4, aulasFaltadas: 5 });
+  try {
+    await banco.query(
+      "delete from aulas_chamada a using frequencias f where a.frequencia_id=f.id and f.turma_id=$1",
+      [turmaId],
+    );
+    expect(await alertasDe(beneficio.id)).toEqual(antes);
+  } finally {
+    await banco.query(
+      "insert into aulas_chamada (frequencia_id,horario_id) select f.id,h.id from frequencias f join horarios h on h.turma_id=f.turma_id where f.turma_id=$1 on conflict do nothing",
+      [turmaId],
+    );
+  }
+});
+
+it("salva a carga diária pela Gestão, mantém os retratos e permite voltar à grade", async () => {
+  const beneficio = await criarBeneficio({
+    nome: "QA Beneficio Carga Diaria",
+    percentualMinimoFrequencia: 99,
+    aulasPorDia: 9,
+  });
+  expect(beneficio.aulasPorDia).toBe(9);
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+    aulasPorDia: 9,
+    horasLetivas: 150,
+    limiteFaltas: 1,
+    aulasFaltadas: 5,
+  });
+  const editar = (cookie: string, corpo: unknown) =>
+    enviar("PATCH", `/api/beneficios-frequencia/${beneficio.id}`, cookie, corpo);
+  expect((await editar(cookieCoordenacao, { aulasPorDia: 8 })).status).toBe(403);
+  expect((await editar(cookieAdmin, { nome: "QA Beneficio Carga Renomeada" })).status).toBe(200);
+  const lista = await enviar("GET", "/api/beneficios-frequencia", cookieAdmin);
+  const dados = (await lista.json()) as { beneficios: Beneficio[] };
+  expect(dados.beneficios.find((item) => item.id === beneficio.id)?.aulasPorDia).toBe(9);
+  expect((await editar(cookieAdmin, { aulasPorDia: null })).status).toBe(200);
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+    aulasPorDia: null,
+    horasLetivas: 22,
+    limiteFaltas: 0,
+  });
+});
+
+it.each([0, 31, 9.5, "9", false])("recusa carga diária inválida: %s", async (aulasPorDia) => {
+  const criar = await enviar("POST", "/api/beneficios-frequencia", cookieAdmin, {
+    nome: "QA Beneficio Carga Invalida",
+    percentualMinimoFrequencia: 80,
+    aulasPorDia,
+  });
+  expect(criar.status).toBe(400);
+});
+
+it("distingue dias de falta do resumo e aulas perdidas do alerta, preservando o retrato", async () => {
+  const turma = (
+    await banco.query<{ id: string }>(
+      "insert into turmas (nome,serie_id) values ('B',$1) returning id",
+      [serieId],
+    )
+  ).rows[0]?.id;
+  try {
+    const aluno =
+      (
+        await banco.query<{ id: string }>(
+          "insert into alunos (nome,turma_id,turma_original_id,ordem) values ('QA Beneficios Aulas',$1,$1,1) returning id",
+          [turma],
+        )
+      ).rows[0]?.id ?? "";
+    const horarios = (
+      await banco.query<{ id: string }>(
+        "insert into horarios (turma_id,ordem,inicio,fim,dias_semana) select $1,n,'07:00','07:50',array[1,2,3,4,5] from generate_series(1,7) n returning id",
+        [turma],
+      )
+    ).rows;
+    const beneficio = await criarBeneficio({
+      nome: "QA Beneficio Por Aula",
+      percentualMinimoFrequencia: 90,
+    });
+    for (const [indice, dia] of DIAS.entries()) {
+      const salvo = await enviar("POST", "/api/frequencias", cookieCoordenacao, {
+        dia,
+        turmaId: turma,
+        revisao: 0,
+        faltas: [
+          indice < 4
+            ? { alunoId: aluno }
+            : { alunoId: aluno, horarios: [horarios[0]?.id], justificativa: "O" },
+        ],
+      });
+      expect(salvo.status).toBe(200);
+    }
+    const resumo = await enviar(
+      "GET",
+      "/api/frequencias/resumo?de=2026-06-01&ate=2026-06-30",
+      cookieAdmin,
+    );
+    const dados = (await resumo.json()) as {
+      resumo: { porAluno: { alunoId: string; faltas: number; faltasJustificadas: number }[] };
+    };
+    expect(dados.resumo.porAluno.find((item) => item.alunoId === aluno)).toMatchObject({
+      faltas: 4,
+      faltasJustificadas: 2,
+    });
+    expect((await alertasDe(beneficio.id, aluno))[0]).toMatchObject({
+      aulasFaltadas: 28,
+      aulasJustificadas: 2,
+      horasLetivas: 154,
+      limiteFaltas: 15,
+    });
+    // A nova grade muda só a projeção dos 16 dias sem chamada, preservando os seis retratos.
+    await banco.query("update horarios set ativo=false where turma_id=$1 and ordem>5", [turma]);
+    expect((await alertasDe(beneficio.id, aluno))[0]).toMatchObject({
+      aulasFaltadas: 28,
+      aulasJustificadas: 2,
+      horasLetivas: 122,
+      limiteFaltas: 12,
+    });
+  } finally {
+    await banco.query("delete from frequencias where turma_id=$1", [turma]);
+    await banco.query("delete from alunos where turma_id=$1", [turma]);
+    await banco.query("delete from turmas where id=$1", [turma]);
+  }
 });
 
 it.each(["", "mes=", "mes=2026-13", "mes=2026-6", "mes=2026-06-01"])(

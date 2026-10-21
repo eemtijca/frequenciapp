@@ -203,14 +203,15 @@ O catálogo começa vazio e é editado em Gestão, Configurações, Quem libera 
 
 ## Benefício e regra de frequência (beneficio_frequencia)
 
-| Campo                      | Tipo     | Observação                                                      |
-| -------------------------- | -------- | --------------------------------------------------------------- |
-| id                         | uuid     | Gerado pelo banco.                                              |
-| nome                       | texto    | De 2 a 60 caracteres, único sem diferenciar caixa; editável.    |
-| percentualMinimoFrequencia | inteiro  | De 1 a 100, em percentual das aulas do mês.                     |
-| faltasJustificadasContam   | booleano | Falso por padrão: só faltas sem justificativa entram no limite. |
-| ativo                      | booleano | Inativo deixa de gerar alerta na Chamada.                       |
-| criadoEm, atualizadoEm     | data     |                                                                 |
+| Campo                      | Tipo            | Observação                                                      |
+| -------------------------- | --------------- | --------------------------------------------------------------- |
+| id                         | uuid            | Gerado pelo banco.                                              |
+| nome                       | texto           | De 2 a 60 caracteres, único sem diferenciar caixa; editável.    |
+| percentualMinimoFrequencia | inteiro         | De 1 a 100, em percentual das aulas do mês.                     |
+| aulasPorDia                | inteiro ou nulo | De 1 a 30 na projeção dos dias com aulas; nulo usa a grade.     |
+| faltasJustificadasContam   | booleano        | Falso por padrão: só faltas sem justificativa entram no limite. |
+| ativo                      | booleano        | Inativo deixa de gerar alerta na Chamada.                       |
+| criadoEm, atualizadoEm     | data            |                                                                 |
 
 Alimenta o alerta de faltas da Chamada (ver [beneficios-frequencia.md](beneficios-frequencia.md)). A migração insere uma linha inicial, e a administração edita em Gestão, Configurações, Benefícios e frequência mínima. Nenhum histórico depende da linha: os alertas são calculados a cada leitura, então excluir um benefício não altera frequências salvas. A cópia JSON inclui os benefícios, e a restauração compara por nome.
 

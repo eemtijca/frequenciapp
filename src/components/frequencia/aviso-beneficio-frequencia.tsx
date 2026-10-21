@@ -32,29 +32,33 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
         {alertas.map((alerta) => (
           <div key={alerta.beneficioId} className="space-y-1">
             <p className="font-semibold">{alerta.beneficioNome}</p>
+            {alerta.aulasPorDia !== null && (
+              <p className="text-muted-foreground text-xs">
+                Projeção de {alerta.aulasPorDia} aulas por dia, preservando as chamadas salvas.
+              </p>
+            )}
             <p>
-              {quantidade(alerta.aulasFaltadas, "falta", "faltas")} em{" "}
-              {quantidade(alerta.horasLetivas, "aula", "aulas")} do mês. Para manter{" "}
-              {alerta.percentualMinimoFrequencia}% de frequência, o limite é de{" "}
-              {quantidade(alerta.limiteFaltas, "falta", "faltas")}.
+              {quantidade(alerta.aulasFaltadas, "aula com falta", "aulas com falta")} em{" "}
+              {quantidade(alerta.horasLetivas, "aula prevista", "aulas previstas")} no mês. Para
+              manter {alerta.percentualMinimoFrequencia}% de frequência, o limite é de{" "}
+              {quantidade(alerta.limiteFaltas, "aula com falta", "aulas com falta")}.
             </p>
             {alerta.aulasJustificadas > 0 && (
               <p className="text-muted-foreground text-xs">
-                {quantidade(alerta.aulasJustificadas, "falta tem", "faltas têm")} justificativa e{" "}
-                {alerta.faltasJustificadasContam
-                  ? alerta.aulasJustificadas === 1
-                    ? "entra"
-                    : "entram"
-                  : alerta.aulasJustificadas === 1
-                    ? "não entra"
-                    : "não entram"}{" "}
-                na conta deste benefício.
+                {quantidade(
+                  alerta.aulasJustificadas,
+                  "aula com falta justificada",
+                  "aulas com falta justificada",
+                )}{" "}
+                {alerta.faltasJustificadasContam ? "incluída" : "desconsiderada"}
+                {alerta.aulasJustificadas === 1 ? "" : "s"} conforme a configuração do benefício.
               </p>
             )}
           </div>
         ))}
         <p className="text-muted-foreground text-xs">
-          As aulas do mês somam as chamadas salvas e as previstas na grade para os dias que faltam.
+          Estimativa mensal com chamadas salvas e grade dos dias sem chamada. Os contadores F e FJ
+          da linha contam dias. Este alerta não determina o pagamento do benefício.
         </p>
       </PopoverContent>
     </Popover>

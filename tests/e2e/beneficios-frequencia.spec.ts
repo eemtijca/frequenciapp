@@ -99,7 +99,11 @@ async function abrirChamadaDoMesAnterior(page: Page, navegar: boolean) {
   };
 }
 
-test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", async ({ page }) => {
+test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", async ({
+  page,
+  isMobile,
+}) => {
+  if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await comBanco((banco) => banco.query("delete from frequencias where turma_id=$1", [turmaId]));
   // Uma aula por dia útil: seis dias com falta para o primeiro aluno e um dia para o segundo.
   for (const [indice, data] of diasUteis.slice(0, 6).entries()) {
@@ -108,7 +112,10 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
         dia: data,
         turmaId,
         revisao: 0,
-        faltas: [{ alunoId: ids[0] }, ...(indice === 0 ? [{ alunoId: ids[1] }] : [])],
+        faltas: [
+          { alunoId: ids[0], ...(indice === 5 ? { justificativa: "O" } : {}) },
+          ...(indice === 0 ? [{ alunoId: ids[1] }] : []),
+        ],
       },
     });
     expect(resposta.ok()).toBe(true);
@@ -123,6 +130,10 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   const dialogo = page.getByRole("dialog", { name: "Novo benefício" });
   await dialogo.getByLabel("Nome do benefício").fill(NOME_BENEFICIO);
   await dialogo.getByLabel("Frequência mínima, em %").fill("99");
+  await expect(dialogo.getByLabel("Aulas por dia", { exact: true })).toHaveValue("9");
+  await expect(dialogo).toBeInViewport({ ratio: 1 });
+  await dialogo.screenshot({ path: test.info().outputPath("aulas-por-dia.png") });
+  await dialogo.getByLabel("Aulas por dia", { exact: true }).fill("");
   await dialogo.getByRole("button", { name: "Salvar" }).click();
   await expect(secao.getByText(NOME_BENEFICIO)).toBeVisible();
   await expect(secao.getByText(/Mínimo de 99% de frequência/)).toBeVisible();
@@ -134,10 +145,41 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   const botaoUma = uma.getByRole("button", { name: /passou do limite de faltas do mês/ });
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
-  await botaoUma.click();
+  await botaoMuitas.click();
   const painel = page.locator('[data-slot="popover-content"]');
+  const detalhe = painel.locator(":scope > div").filter({ hasText: NOME_BENEFICIO });
+  await expect(detalhe.getByText(/^5 aulas com falta em/)).toBeVisible();
+  await expect(
+    detalhe.getByText(
+      "1 aula com falta justificada desconsiderada conforme a configuração do benefício.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(painel.getByText(/Os contadores F e FJ da linha contam dias/)).toBeVisible();
+  await expect(
+    painel.getByText(/Este alerta não determina o pagamento do benefício/),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await botaoUma.click();
   await expect(painel.getByText(NOME_BENEFICIO, { exact: true })).toBeVisible();
   await expect(painel.getByText(/Para manter 99% de frequência/)).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Nove aulas na projeção aumentam o limite, preservando a aula já salva de cada dia.
+  const carga = await abrirBeneficios(page);
+  await carga.getByRole("button", { name: `Editar ${NOME_BENEFICIO}` }).click();
+  const configurarCarga = page.getByRole("dialog", { name: "Editar benefício" });
+  await configurarCarga.getByLabel("Aulas por dia", { exact: true }).fill("9");
+  await configurarCarga.getByRole("button", { name: "Salvar" }).click();
+  await expect(carga.getByText("Projeção de 9 aulas por dia.", { exact: true })).toBeVisible();
+  await abrirChamadaDoMesAnterior(page, false);
+  await expect(botaoUma).toHaveCount(0);
+  await botaoMuitas.click();
+  await expect(
+    painel.getByText("Projeção de 9 aulas por dia, preservando as chamadas salvas.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
 
   // A administração afrouxa a regra para 50%: nenhum dos dois passa mais do limite do benefício.

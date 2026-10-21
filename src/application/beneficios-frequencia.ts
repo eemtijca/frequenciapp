@@ -9,6 +9,7 @@ import {
   alertasDeFrequencia,
   PERCENTUAL_MINIMO_MAIOR,
   PERCENTUAL_MINIMO_MENOR,
+  AULAS_POR_DIA_MAXIMO,
   type AlertaFrequenciaBeneficio,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
@@ -35,9 +36,17 @@ const percentualMinimo = z
     `O percentual mínimo deve ser de no máximo ${PERCENTUAL_MINIMO_MAIOR}%.`,
   );
 
+const cargaDiaria = z
+  .number("Informe a quantidade de aulas por dia.")
+  .int("A quantidade de aulas por dia deve ser um número inteiro.")
+  .min(1, "Informe ao menos uma aula por dia.")
+  .max(AULAS_POR_DIA_MAXIMO, `Informe até ${AULAS_POR_DIA_MAXIMO} aulas por dia.`)
+  .nullable();
+
 export const esquemaCriarBeneficio = z.object({
   nome: nomeBeneficio,
   percentualMinimoFrequencia: percentualMinimo,
+  aulasPorDia: cargaDiaria.default(null),
   faltasJustificadasContam: z.boolean().default(false),
   ativo: z.boolean().default(true),
 });
@@ -46,6 +55,7 @@ export const esquemaAtualizarBeneficio = z
   .object({
     nome: nomeBeneficio.optional(),
     percentualMinimoFrequencia: percentualMinimo.optional(),
+    aulasPorDia: cargaDiaria.optional(),
     faltasJustificadasContam: z.boolean().optional(),
     ativo: z.boolean().optional(),
   })
@@ -57,6 +67,7 @@ const CAMPOS = {
   id: true,
   nome: true,
   percentualMinimoFrequencia: true,
+  aulasPorDia: true,
   faltasJustificadasContam: true,
   ativo: true,
 } as const;
