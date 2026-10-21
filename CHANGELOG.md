@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Lista de saídas do dia ganha o botão Desbloquear e Bloquear, como na Chamada. A lista abre bloqueada, sem o botão de remover, e só o desbloqueio mostra a lixeira de cada saída. Trocar de dia bloqueia de novo. O registro de novas saídas não muda. O bloqueio é só da interface e não altera a API.
+
 - Planilha de saídas cria abas de consulta com apenas o nome da turma, com atualização automática a partir da origem, cabeçalho verde e alunos em ordem alfabética. Turmas cadastradas e presentes no histórico recebem abas sem copiar ou apagar registros; consultas existentes e abas manuais são preservadas. Consultas com o prefixo da origem são renomeadas no próximo envio.
 
 - Planilha de saídas agrupa os registros por turma e aluno, com desempate por data. Envios manuais e automáticos movem linhas completas criadas pelo app, preservando os demais campos e as posições de linhas manuais. Um envio sem registros novos também organiza a aba existente.

@@ -1,10 +1,18 @@
 "use client";
 
 // Saiu mais cedo: registro da saída antecipada e lista das saídas do dia, com
-// remoção para corrigir um registro. Separado da chamada. O relatório por aluno
-// fica em Relatórios, Saídas e entradas.
+// remoção para corrigir um registro. A lista abre bloqueada, sem o botão de
+// remover, e só o botão Desbloquear a libera. Separado da chamada. O relatório
+// por aluno fica em Relatórios, Saídas e entradas.
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  LockKeyhole,
+  LockKeyholeOpen,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -90,6 +98,8 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
+  // Dia cuja lista foi desbloqueada: trocar de dia volta a bloquear.
+  const [diaLiberado, setDiaLiberado] = useState<string | null>(null);
 
   const { chaveAtiva: removendoId, executar: executarRemocao } = useAcoesPorChave();
 
@@ -120,6 +130,7 @@ export default function VistaSaidas({
   const duranteAula = ehMomentoDeAula(momento);
   // Enquanto a leitura do dia escolhido não chega, a lista fica carregando.
   const carregandoDia = !compartilhado && doDia?.dia !== dia;
+  const listaBloqueada = diaLiberado !== dia;
 
   useEffect(() => {
     if (compartilhado) return;
@@ -507,39 +518,57 @@ export default function VistaSaidas({
         </p>
       ) : (
         saidasDoDia.length > 0 && (
-          <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
-            {saidasDoDia.map((saida) => {
-              const aluno = alunosPorId.get(saida.alunoId);
-              const nome = aluno?.nome ?? "Aluno";
-              return (
-                <li
-                  key={saida.id}
-                  className="superficie-vidro flex items-start justify-between gap-3 p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold break-words">{nome}</p>
-                    <CaixasDeInfo
-                      partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
-                      className="mt-1"
-                    />
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                      {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Remover saída de ${nome}`}
-                    disabled={removendoId === saida.id}
-                    onClick={() => remover(saida)}
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-medium">Saídas de {rotuloDia}</h2>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full px-4"
+                aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
+                disabled={removendoId !== null}
+                onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
+              >
+                {listaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
+                {listaBloqueada ? "Desbloquear" : "Bloquear"}
+              </Button>
+            </div>
+            <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
+              {saidasDoDia.map((saida) => {
+                const aluno = alunosPorId.get(saida.alunoId);
+                const nome = aluno?.nome ?? "Aluno";
+                return (
+                  <li
+                    key={saida.id}
+                    className="superficie-vidro flex items-start justify-between gap-3 p-4"
                   >
-                    <Trash2 size={18} />
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+                    <div className="min-w-0">
+                      <p className="font-semibold break-words">{nome}</p>
+                      <CaixasDeInfo
+                        partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
+                        className="mt-1"
+                      />
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Liberado por {saida.liberadoPorNome ?? "registro anterior"}
+                        {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
+                      </p>
+                    </div>
+                    {!listaBloqueada && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remover saída de ${nome}`}
+                        disabled={removendoId === saida.id}
+                        onClick={() => remover(saida)}
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )
       )}
       <AlertDialog
