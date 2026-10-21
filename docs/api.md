@@ -232,6 +232,21 @@ A cópia inclui todas as aulas da origem, preservando ordem, início, fim, dias,
 
 - 200 `{"ok": true}`; 409 quando a aula já tem faltas registradas (o caminho é desativar); 404 inexistente.
 
+### GET /api/ordem-almoco
+
+Permissão: qualquer sessão. Ordem das turmas no almoço de segunda (1) a sábado (6), usada pela consulta diária da aba Horários.
+
+- 200 `{"dias": [{"diaSemana", "itens": [{"turmaId", "posicao", "inicio"}]}]}`, sempre com os seis dias; dia sem ordem vem com `itens` vazio. `posicao` começa em 1 e vem renumerada; `inicio` é `HH:MM` ou `null`.
+
+### PUT /api/ordem-almoco/{dia}
+
+Permissão: administração, com origem confiável e auditoria (`ordem-almoco.definir`). Substitui a ordem do dia inteiro (`dia` de 1 a 6). Corpo `{"itens": [{"turmaId", "inicio"?}]}`, na ordem desejada; lista vazia limpa o dia. As posições são atribuídas pela ordem da lista.
+
+- 200 `{"ordem": {"diaSemana", "itens": [...]}}`.
+- 400 para dia fora de 1 a 6, corpo sem `itens`, turma repetida, horário fora de `HH:MM` ou horário anterior ao da posição anterior; 403 sem ser administração; 404 quando alguma turma não existe.
+
+Excluir uma turma a retira da ordem de todos os dias. A cópia JSON inclui a ordem; na restauração, um dia vazio recebe a ordem da cópia e um dia já definido não é sobrescrito.
+
 ## Alunos
 
 ### GET /api/alunos

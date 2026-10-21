@@ -26,6 +26,7 @@ const repositorio = vi.hoisted(() => ({
   entradaAtrasada: { findMany: vi.fn(() => []) },
   justificativa: { findMany: vi.fn(() => []) },
   liberador: { findMany: vi.fn(() => []) },
+  ordemAlmoco: { findMany: vi.fn(() => []), createMany: vi.fn() },
   beneficioFrequencia: {
     findMany: vi.fn(() => dados.regras),
     create: vi.fn(async ({ data }: { data: (typeof dados.regras)[number] }) => {

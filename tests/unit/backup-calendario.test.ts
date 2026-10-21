@@ -17,6 +17,7 @@ const transacao = vi.hoisted(() => ({
   justificativa: { findMany: vi.fn(() => []) },
   liberador: { findMany: vi.fn(() => []) },
   beneficioFrequencia: { findMany: vi.fn(() => []) },
+  ordemAlmoco: { findMany: vi.fn(() => []), createMany: vi.fn() },
   serie: { findMany: vi.fn(() => []) },
   turma: { findMany: vi.fn(() => []) },
   horario: { findMany: vi.fn(() => []) },

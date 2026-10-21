@@ -37,6 +37,7 @@ const repositorio = vi.hoisted(() => ({
   justificativa: { findMany: vi.fn(() => []) },
   liberador: { findMany: vi.fn(() => []) },
   beneficioFrequencia: { findMany: vi.fn(() => []) },
+  ordemAlmoco: { findMany: vi.fn(() => []), createMany: vi.fn() },
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => repositorio,

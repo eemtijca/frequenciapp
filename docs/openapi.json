@@ -1967,6 +1967,162 @@
         }
       }
     },
+    "/api/ordem-almoco": {
+      "get": {
+        "operationId": "lerOrdemAlmoco",
+        "summary": "Consultar a ordem do almoço",
+        "description": "Qualquer sessão. Sempre os seis dias, de segunda (1) a sábado (6); dia sem ordem vem com a lista vazia. A posição começa em 1.",
+        "tags": ["horarios"],
+        "responses": {
+          "200": {
+            "description": "Ordem do almoço por dia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdemAlmoco"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "dias": [
+                        {
+                          "diaSemana": 1,
+                          "itens": [
+                            {
+                              "turmaId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                              "posicao": 1,
+                              "inicio": "11:50"
+                            },
+                            {
+                              "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                              "posicao": 2,
+                              "inicio": null
+                            }
+                          ]
+                        },
+                        {
+                          "diaSemana": 2,
+                          "itens": []
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/ordem-almoco/{dia}": {
+      "put": {
+        "operationId": "definirOrdemAlmoco",
+        "summary": "Definir a ordem do almoço de um dia",
+        "description": "Apenas administração, com origem confiável e auditoria. Substitui a ordem do dia inteiro; lista vazia limpa o dia. As posições seguem a ordem da lista, e os horários, quando informados, precisam seguir a mesma ordem.",
+        "tags": ["horarios"],
+        "parameters": [
+          {
+            "name": "dia",
+            "in": "path",
+            "description": "Dia da semana: 1 é segunda e 6 é sábado.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "example": 1
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Turmas na ordem do almoço.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdemAlmocoCorpo"
+              },
+              "examples": {
+                "Ordem": {
+                  "summary": "Ordem",
+                  "value": {
+                    "itens": [
+                      {
+                        "turmaId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                        "inicio": "11:50"
+                      },
+                      {
+                        "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "inicio": null
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ordem do dia salva.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdemAlmocoResposta"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "ordem": {
+                        "diaSemana": 1,
+                        "itens": [
+                          {
+                            "turmaId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                            "posicao": 1,
+                            "inicio": "11:50"
+                          },
+                          {
+                            "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                            "posicao": 2,
+                            "inicio": null
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
     "/api/alunos": {
       "get": {
         "operationId": "listarAlunos",
@@ -18369,6 +18525,146 @@
             "type": ["string", "null"],
             "maxLength": 200,
             "example": null
+          }
+        }
+      },
+      "OrdemAlmoco": {
+        "type": "object",
+        "title": "Ordem do almoço",
+        "description": "Ordem das turmas no almoço de segunda a sábado.",
+        "required": ["dias"],
+        "properties": {
+          "dias": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["diaSemana", "itens"],
+              "properties": {
+                "diaSemana": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 6,
+                  "example": 1
+                },
+                "itens": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["turmaId", "posicao", "inicio"],
+                    "properties": {
+                      "turmaId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                      },
+                      "posicao": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "example": 1
+                      },
+                      "inicio": {
+                        "oneOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Horário da turma no almoço, em HH:MM, ou nulo.",
+                        "example": "11:50"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrdemAlmocoResposta": {
+        "type": "object",
+        "title": "Ordem do almoço de um dia",
+        "required": ["ordem"],
+        "properties": {
+          "ordem": {
+            "type": "object",
+            "required": ["diaSemana", "itens"],
+            "properties": {
+              "diaSemana": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6,
+                "example": 1
+              },
+              "itens": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["turmaId", "posicao", "inicio"],
+                  "properties": {
+                    "turmaId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                    },
+                    "posicao": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "example": 1
+                    },
+                    "inicio": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Horário da turma no almoço, em HH:MM, ou nulo.",
+                      "example": "11:50"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "OrdemAlmocoCorpo": {
+        "type": "object",
+        "title": "Corpo da ordem do almoço",
+        "required": ["itens"],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "object",
+              "required": ["turmaId"],
+              "properties": {
+                "turmaId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                },
+                "inicio": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "example": "11:50"
+                }
+              }
+            }
           }
         }
       }

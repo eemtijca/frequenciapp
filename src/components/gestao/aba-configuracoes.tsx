@@ -51,6 +51,7 @@ import SecaoFilaPlanilha from "@/components/gestao/secao-fila-planilha";
 import SecaoCalendarioLetivo from "@/components/gestao/secao-calendario-letivo";
 import SecaoBeneficiosFrequencia from "@/components/gestao/secao-beneficios-frequencia";
 import VistaHorarios from "@/components/horarios/vista-horarios";
+import SecaoOrdemAlmoco from "@/components/gestao/secao-ordem-almoco";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1140,6 +1141,7 @@ export default function AbaConfiguracoes({
               onPendencia={onPendenciaHorarios}
             />
           )}
+          {horariosAbertos && <SecaoOrdemAlmoco turmas={turmas} />}
         </section>
         <section
           id="config-grupo-planilhas"
