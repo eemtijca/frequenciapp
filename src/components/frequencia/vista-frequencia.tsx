@@ -1222,7 +1222,9 @@ export default function VistaFrequencia({
                                       : ""
                                   }`}
                                   onClick={() => alternarFalta(aluno.id)}
-                                  className="pressionavel focus-visible:after:ring-ring/50 flex min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-[3px] focus-visible:after:ring-inset"
+                                  // Sem escala ao pressionar: scale faria do botão o bloco de
+                                  // contenção do ::after, e o toque na marca P cairia fora dele.
+                                  className="focus-visible:after:ring-ring/50 flex min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-[3px] focus-visible:after:ring-inset"
                                 >
                                   <span
                                     className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
