@@ -148,19 +148,21 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await botaoMuitas.click();
   const painel = page.locator('[data-slot="popover-content"]');
   const detalhe = painel.locator(":scope > div").filter({ hasText: NOME_BENEFICIO });
-  await expect(detalhe.getByText(/Faltou 5 aulas/)).toBeVisible();
-  await expect(detalhe.getByText(/Limite para 99%/)).toBeVisible();
-  await expect(detalhe.getByText(/Frequência projetada:/)).toBeVisible();
+  await expect(detalhe.getByText(/^Faltas: 5\/\d+ aulas · Limite: 0\.$/)).toBeVisible();
+  await expect(detalhe.getByText(/^Frequência estimada: [\d,]+% · Mínimo: 99%\.$/)).toBeVisible();
+  await expect(detalhe.getByText("5 aulas acima do limite.", { exact: true })).toBeVisible();
   await expect(
-    detalhe.getByText(/1 aula com falta justificada desconsiderada nesta conta/),
+    detalhe.getByText("1 aula justificada desconsiderada.", { exact: true }),
   ).toBeVisible();
-  await expect(painel.getByText(/Os contadores F e FJ da linha contam dias/)).toBeVisible();
-  await expect(painel.getByText(/Este alerta conta aulas/)).toBeVisible();
-  await expect(painel.getByText(/Não determina o pagamento do benefício/)).toBeVisible();
+  await expect(
+    painel.getByText("Estimativa mensal. Não determina o pagamento do benefício.", { exact: true }),
+  ).toBeVisible();
+  await expect(painel).toBeInViewport({ ratio: 1 });
+  await painel.screenshot({ path: test.info().outputPath("aviso-frequencia-resumido.png") });
   await page.keyboard.press("Escape");
   await botaoUma.click();
   await expect(painel.getByText(NOME_BENEFICIO, { exact: true })).toBeVisible();
-  await expect(painel.getByText(/Limite para 99%/)).toBeVisible();
+  await expect(painel.getByText(/Mínimo: 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
 
   // Nove aulas na projeção aumentam o limite, preservando a aula já salva de cada dia.
@@ -173,10 +175,8 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await abrirChamadaDoMesAnterior(page, false);
   await expect(botaoUma).toHaveCount(0);
   await botaoMuitas.click();
-  await expect(painel.getByText(/≈ .* dias de 9 aulas/)).toBeVisible();
-  await expect(
-    painel.getByText(/Alguns dias já salvos têm outra quantidade de aulas/),
-  ).toBeVisible();
+  await expect(detalhe.getByText(/^Faltas: 5\/\d+ aulas · Limite: \d+\.$/)).toBeVisible();
+  await expect(painel.getByText(/Mínimo: 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
 
   // A administração afrouxa a regra para 50%: nenhum dos dois passa mais do limite do benefício.
