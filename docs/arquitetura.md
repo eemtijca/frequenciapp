@@ -173,6 +173,7 @@ tests/                      Vitest (unidade e contratos)
 
 ## Decisões registradas
 
+- [ADR-053: backup externo portátil e transporte agnóstico](adr/053-backup-externo-portatil.md)
 - [ADR-001: PostgreSQL via connection string com Prisma](adr/001-postgresql-com-prisma.md)
 - [ADR-002: sessões opacas em cookie HttpOnly](adr/002-sessoes-opacas.md)
 - [ADR-003: faltas normalizadas, presença implícita](adr/003-faltas-normalizadas.md)

@@ -1,5 +1,7 @@
 # Testes
 
+O backup externo tem testes sem rede em `tests/unit/pacote-backup.test.ts` e `tests/unit/backup-externo.test.ts`: recuperação com senha, nomes genéricos, manifesto e hashes, recusa de origem vazia e links, limite de tamanho, confirmação somente após releitura, preservação de versões, corrupção, falha de transporte, permissões e saída sem conteúdo escolar. A porta de transporte usa dublê; o rclone não é necessário para a suíte de unidade. A rotina operacional deve ser ensaiada também com perfis locais sintéticos antes de conectar provedores reais, conforme [backup-externo.md](backup-externo.md).
+
 Suítes, convenções e o que cada uma protege. Os comandos completos estão no [README](../README.md) e em [tests/README.md](../tests/README.md).
 
 ## Suítes

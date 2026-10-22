@@ -143,6 +143,10 @@ Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno, texto
 
 A administração também pode baixar e importar uma cópia JSON em Gestão, Configurações, Cópia de segurança. O download exige a senha atual da administração e oferece ZIP protegido por senha; extrair o JSON antes de importar. Ela reúne séries, turmas, aulas, alunos, chamadas, saídas e configurações, serve para migração entre instalações e conferência, e a importação mescla sem sobrescrever o que já existe. A cópia JSON não substitui o `pg_dump`: para restauração completa e rotinas de operação, use o dump do banco. Cuidados em [downloads.md](downloads.md).
 
+### Arquivos em armazenamento externo
+
+O [backup externo portátil](backup-externo.md) copia arquivos de uma origem configurada para um destino escolhido pela escola, como Dropbox, usando rclone fora da aplicação. Gera ZIP AES-256 com manifesto e hashes, verifica a cópia por download e conserva versões anteriores. Não há SDK de provedor, ativação automática nem expurgo. A configuração, o agendamento, a chave de recuperação e o teste de restauração pertencem ao executor externo.
+
 ## Restauração
 
 Em um banco vazio:
