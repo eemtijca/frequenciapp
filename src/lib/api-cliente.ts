@@ -44,10 +44,10 @@ export function corpoJson(dados: unknown): RequestInit {
   };
 }
 
-export function corpoAlteracao(metodo: "PATCH" | "DELETE", dados?: unknown): RequestInit {
+export function corpoAlteracao(metodo: "PATCH" | "PUT" | "DELETE", dados?: unknown): RequestInit {
   if (metodo === "DELETE") return { method: "DELETE" };
   return {
-    method: "PATCH",
+    method: metodo,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dados),
   };

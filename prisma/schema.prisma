@@ -267,6 +267,7 @@ model Turma {
 
   vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
   configuracoesOrigem ConfiguracaoOrigemTurma[]
+  ordensAlmoco        OrdemAlmoco[]
 
   @@unique([serieId, nome])
   @@map("turmas")
@@ -562,6 +563,22 @@ model Configuracao {
   atualizadoPor     Usuario?                  @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("configuracoes")
+}
+
+// Ordem das turmas no almoço de um dia da semana (1 é segunda, 6 é sábado), com
+// horário opcional de cada turma. A administração define na Gestão; a aba
+// Horários mostra a ordem do dia. Excluir a turma remove a posição.
+model OrdemAlmoco {
+  diaSemana    Int      @map("dia_semana")
+  turmaId      String   @map("turma_id") @db.Uuid
+  posicao      Int
+  inicio       String?  @db.VarChar(5)
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@id([diaSemana, turmaId])
+  @@unique([diaSemana, posicao])
+  @@map("ordens_almoco")
 }
 
 // Feriado escolar em uma data civil explícita, válido para todas as turmas.

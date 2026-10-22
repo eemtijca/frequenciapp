@@ -55,3 +55,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-047](adr/047-regras-do-react-compiler.md): regras do React Compiler no lint, correções reais e exceções pontuais justificadas.
 - [ADR-048](adr/048-abas-de-saidas-por-turma.md): consultas automáticas de saídas por turma, com preservação da origem.
 - [ADR-050](adr/050-limite-de-leitura-da-planilha.md): cota de leitura do Google no envio da frequência e confirmação do que já estava na planilha.
+- [ADR-051](adr/051-ordem-do-almoco.md): ordem das turmas no almoço por dia, com horário opcional e mesclagem na cópia JSON.

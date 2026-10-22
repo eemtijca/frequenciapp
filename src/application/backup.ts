@@ -264,6 +264,21 @@ const esquemaCopia = z.object({
     )
     .max(1000)
     .optional(),
+  // Ordem das turmas no almoço; cópias anteriores não trazem o campo.
+  ordemAlmoco: z
+    .array(
+      z.object({
+        diaSemana: z.number().int().min(1).max(6),
+        turmaId: z.uuid(),
+        posicao: z.number().int().min(1),
+        inicio: z
+          .string()
+          .regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)
+          .nullable(),
+      }),
+    )
+    .max(5000)
+    .optional(),
   configuracoes: z
     .object({
       frequenciaPorAula: z.boolean(),
@@ -333,6 +348,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     justificativas,
     liberadores,
     beneficiosFrequencia,
+    ordemAlmoco,
     configuracoes,
   ] = await Promise.all([
     banco().serie.findMany({
@@ -461,6 +477,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         ativo: true,
       },
     }),
+    banco().ordemAlmoco.findMany({
+      select: { diaSemana: true, turmaId: true, posicao: true, inicio: true },
+      orderBy: [{ diaSemana: "asc" }, { posicao: "asc" }],
+    }),
     lerConfiguracoes(),
   ]);
 
@@ -512,6 +532,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     beneficiosFrequencia: beneficiosFrequencia.sort((a, b) =>
       a.nome.localeCompare(b.nome, "pt-BR"),
     ),
+    ordemAlmoco,
     configuracoes,
   };
 }
@@ -709,6 +730,37 @@ async function mesclarCopia(
         })
       ).map((turma) => turma.id),
     );
+
+    // Ordem do almoço por dia: um dia vazio recebe a ordem da cópia; um dia já definido
+    // só é comparado, sem sobrescrever.
+    const ordemDaCopia = copia.ordemAlmoco ?? [];
+    for (const diaSemana of new Set(ordemDaCopia.map((item) => item.diaSemana))) {
+      const daCopia = ordemDaCopia
+        .filter((item) => item.diaSemana === diaSemana && idsTurmas.has(item.turmaId))
+        .sort((a, b) => a.posicao - b.posicao);
+      const atuais = await tx.ordemAlmoco.findMany({
+        where: { diaSemana },
+        select: { turmaId: true, inicio: true },
+        orderBy: { posicao: "asc" },
+      });
+      const assinatura = (itens: { turmaId: string; inicio: string | null }[]) =>
+        JSON.stringify(itens.map((item) => [item.turmaId, item.inicio]));
+      if (atuais.length === 0 && daCopia.length > 0) {
+        await tx.ordemAlmoco.createMany({
+          data: daCopia.map((item, indice) => ({
+            diaSemana,
+            turmaId: item.turmaId,
+            posicao: indice + 1,
+            inicio: item.inicio,
+          })),
+        });
+        resultado.adicionadas += 1;
+      } else if (assinatura(atuais) === assinatura(daCopia)) {
+        resultado.identicas += 1;
+      } else {
+        resultado.conflitos += 1;
+      }
+    }
 
     // Aulas
     const horariosAtuais = new Map(

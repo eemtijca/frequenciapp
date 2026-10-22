@@ -108,6 +108,18 @@ A origem nasce igual à turma atual e é preservada quando a administração tra
 
 Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, de segunda a sábado), que a administração ajusta quando quiser. A aula com faltas registradas não é excluída, apenas desativada.
 
+## Ordem do almoço (ordem_almoco)
+
+| Campo        | Tipo    | Observação                                               |
+| ------------ | ------- | -------------------------------------------------------- |
+| diaSemana    | inteiro | De 1 (segunda) a 6 (sábado); parte da chave.             |
+| turmaId      | uuid    | Turma; parte da chave. Excluir a turma remove a posição. |
+| posicao      | inteiro | A partir de 1, única no dia.                             |
+| inicio       | texto   | Horário da turma no almoço, em `HH:MM`, ou nulo.         |
+| atualizadoEm | data    |                                                          |
+
+A administração define a ordem de cada dia em Gestão, Configurações, Horários, e a aba Horários mostra a ordem do dia consultado. Gravar um dia substitui a lista inteira, e os horários, quando informados, seguem a ordem das turmas. A cópia JSON inclui a ordem.
+
 ## Frequência (frequencia)
 
 | Campo           | Tipo    | Observação                                        |

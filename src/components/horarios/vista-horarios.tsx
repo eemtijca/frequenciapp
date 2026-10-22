@@ -20,7 +20,9 @@ import {
   type ItemDoDia,
   type Pausa,
 } from "@/domain/horarios-semanais";
+import { ordemDoDia, type OrdemAlmocoDoDia } from "@/domain/ordem-almoco";
 import { corpoAlteracao, pedir } from "@/lib/api-cliente";
+import { ouvirOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -86,6 +88,58 @@ function PausaDoDia({ pausa }: { pausa: Pausa }) {
         {pausa.inicio} às {pausa.fim}
       </span>
     </li>
+  );
+}
+
+interface PropsOrdemAlmoco {
+  dias: OrdemAlmocoDoDia[];
+  dia: number;
+  turmas: Turma[];
+  turmaSelecionada: string | undefined;
+}
+
+/** Ordem das turmas no almoço do dia, com a turma consultada em destaque. */
+function OrdemAlmocoDoDiaCartao({ dias, dia, turmas, turmaSelecionada }: PropsOrdemAlmoco) {
+  const itens = ordemDoDia(dias, dia);
+  if (itens.length === 0) return null;
+  const rotuloDe = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
+  return (
+    <section
+      aria-label={`Ordem do almoço de ${rotuloDia(dia)}`}
+      className="superficie-vidro overflow-hidden"
+    >
+      <h2 className="bg-secondary/50 flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
+        <Utensils size={16} aria-hidden="true" className="shrink-0" />
+        Ordem do almoço · {rotuloDia(dia)}
+      </h2>
+      <ol className="divide-y">
+        {itens.map((item) => {
+          const selecionada = item.turmaId === turmaSelecionada;
+          return (
+            <li
+              key={item.turmaId}
+              aria-current={selecionada ? "true" : undefined}
+              className={`flex min-w-0 items-center gap-3 px-4 py-3 text-sm ${selecionada ? "vidro-selecionado" : ""}`}
+            >
+              <span className="controle-vidro numerais-tabulares flex size-11 shrink-0 items-center justify-center font-semibold">
+                <span aria-hidden="true">{item.posicao}º</span>
+                <span className="sr-only">{item.posicao}º lugar</span>
+              </span>
+              <span className="min-w-0 flex-1 font-medium break-words">
+                {rotuloDe.get(item.turmaId) ?? "Turma"}
+                {selecionada ? <span className="sr-only">, turma consultada</span> : null}
+              </span>
+              {item.inicio ? (
+                <span className="numerais-tabulares text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
+                  <Clock size={14} aria-hidden="true" className="shrink-0" />
+                  {item.inicio}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -179,6 +233,23 @@ export default function VistaHorarios({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const gatilhoEdicao = useRef<HTMLElement | null>(null);
+  // Ordem do almoço: lida ao montar e de novo quando a Gestão a altera; falha só omite o cartão.
+  const [ordemAlmoco, setOrdemAlmoco] = useState<OrdemAlmocoDoDia[]>([]);
+  const [versaoOrdem, setVersaoOrdem] = useState(0);
+  useEffect(() => ouvirOrdemAlmocoMudou(() => setVersaoOrdem((versao) => versao + 1)), []);
+  useEffect(() => {
+    let atual = true;
+    pedir<{ dias: OrdemAlmocoDoDia[] }>("/api/ordem-almoco")
+      .then((dados) => {
+        if (atual) setOrdemAlmoco(dados.dias);
+      })
+      .catch(() => {
+        if (atual) setOrdemAlmoco([]);
+      });
+    return () => {
+      atual = false;
+    };
+  }, [versaoOrdem]);
   const turma = turmas.find((item) => item.id === turmaId) ?? turmas[0];
   const aulas = (turma?.horarios ?? [])
     .filter((aula) => aula.ativo)
@@ -605,6 +676,15 @@ export default function VistaHorarios({
           </AbasDeslizantes>
         </div>
       )}
+
+      {!semanaCompleta ? (
+        <OrdemAlmocoDoDiaCartao
+          dias={ordemAlmoco}
+          dia={dia}
+          turmas={turmas}
+          turmaSelecionada={turma?.id}
+        />
+      ) : null}
 
       {editavel ? (
         <>
