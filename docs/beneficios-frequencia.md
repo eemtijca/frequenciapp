@@ -22,7 +22,7 @@ Em Gestão, Configurações, Benefícios e frequência mínima, a edição de ca
 
 A configuração vale para o mês consultado inteiro, incluindo dias passados sem chamada e dias futuros. Sábados entram apenas com chamada salva. Dias em que o aluno não constava na chamada e dias de desistência não recebem projeção. A quantidade de aulas e as faltas das chamadas salvas permanecem como registradas; uma chamada antiga sem retrato usa a carga diária configurada como estimativa. Não há alteração da grade nem das frequências no banco.
 
-Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 198 aulas e limite de 39 aulas com falta para 80%. Um feriado em dia de aula reduz a projeção para 189. Com seis dias já salvos com sete aulas e 16 dias projetados com nove, o total é 186: os seis retratos continuam respeitados.
+Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 198 aulas e limite de 39 aulas com falta para 80%. Um feriado em dia de aula reduz a projeção para 189. Com seis dias já salvos com sete aulas e 16 dias projetados com nove, o total é 186, e não 22 vezes 9: os seis retratos continuam respeitados. O painel avisa essa diferença.
 
 ## O cálculo
 
@@ -34,7 +34,13 @@ Para um aluno em um mês, com `H` aulas no mês, `P` o percentual mínimo do ben
 
 Exemplo: um mês com 22 dias úteis e 5 aulas por dia tem `H = 110`. Com `P = 80`, `L = 22`: 22 faltas sem justificativa ainda estão no limite e a 23ª dispara o alerta. Com `P = 90`, `L = 11`. Com `P = 100`, `L = 0`: qualquer falta dispara.
 
-Os círculos F e FJ da linha contam dias com falta; o alerta conta aulas. Quatro dias de falta integral com sete aulas cada somam 28 aulas perdidas. Duas ocorrências justificadas em apenas uma aula de cada dia somam duas aulas justificadas. Por isso, os números da linha não precisam coincidir com os do alerta. Com `H = 124` e `P = 80`, o limite é 24 aulas com falta; 28 aulas com falta equivalem a cerca de 77,4% de frequência projetada.
+Os círculos F e FJ da linha contam dias com falta; o alerta conta aulas. Quatro dias de falta integral com sete aulas cada somam 28 aulas perdidas. Duas ocorrências justificadas em apenas uma aula de cada dia somam duas aulas justificadas. Por isso, os números da linha não precisam coincidir com os do alerta. Com `H = 124` e `P = 80`, o limite é 24 aulas com falta; 28 aulas com falta equivalem a 77,4% de frequência projetada, `(H - F) / H`.
+
+O painel lê a conta em voz corrente. Com 28 faltas, 186 aulas previstas em 22 dias letivos e carga de 9:
+
+> Faltou 28 aulas (≈ 3,1 dias de 9 aulas) de 186 aulas previstas em 22 dias letivos. Limite para 80%: 37 aulas (≈ 4,1 dias). Ainda restam 9 aulas até o limite. Frequência projetada: 84,9%.
+
+O botão só aparece quando `F > L`. A frase da margem passa a ser `Passou do limite em R aulas`. Quando os dias contados não têm a mesma carga, o equivalente em dias some e o painel diz que o total pode não ser o número de dias vezes as aulas de um único dia. Quando há carga de referência e algum dia salvo entra com outra quantidade, o painel avisa que as aulas previstas podem não ser os dias letivos vezes essa carga.
 
 Um aluno pode aparecer uma vez por benefício ativo, e o painel do botão lista cada um com o próprio limite.
 
@@ -48,19 +54,25 @@ Um aluno pode aparecer uma vez por benefício ativo, e o painel do botão lista 
 
 ## O Pé-de-Meia como exemplo
 
-O incentivo-frequência do Pé-de-Meia exige frequência mínima de 80% das horas letivas, apurada por mês (Lei 14.818/2024, Decreto 11.901/2024 e Portaria MEC 83/2024, alterada pelas Portarias 210, 364 e 792 de 2024). Esse é o valor da linha inicial, não uma regra do código. Dois pontos da pesquisa que o alerta não resolve sozinho:
+O incentivo-frequência do Pé-de-Meia usa horas letivas, não dias de falta. O requisito é frequência mínima mensal de 80% das horas letivas ou média de 80% das horas letivas no ano, até o momento da coleta. A Lei 14.818/2024 e o Decreto 11.901/2024 instituem o programa. A linha inicial do aplicativo repete os 80% como dado de configuração, não como regra do código.
 
-- **Bloqueio.** Segundo o resumo da Portaria 83/2024 obtido na pesquisa, a parcela só fica retida quando a frequência do mês e a média do período letivo até a apuração estão, as duas, abaixo de 80%. O alerta olha só o mês; a média acumulada fica com o MEC.
-- **Faltas justificadas.** A portaria manda considerar, na informação mensal enviada pelas redes, as regras de justificação ou compensação de ausências da legislação de cada rede. Não foi encontrada orientação específica da SEDUC-CE. A linha inicial não conta justificadas, por decisão da coordenação, e o interruptor de cada benefício permite mudar.
+Fontes consultadas:
 
-Limite da pesquisa: a regra foi levantada na web em outubro de 2026, e os textos oficiais (gov.br, Planalto, MEC Normas) não puderam ser abertos nessa sessão, por bloqueio de rede. A conferência com o texto da portaria ficou a cargo de quem revisou a mudança.
+- [Portaria MEC nº 83, de 7 de fevereiro de 2024](https://mecnormas.mec.gov.br/pesquisa/detalhar/299), norma de operações do Pé-de-Meia, alterada pelas Portarias MEC 210, 364 e 792 de 2024. O texto no MEC Normas não substitui o Diário Oficial.
+- [Portaria MEC nº 916, de 12 de setembro de 2024](https://mecnormas.mec.gov.br/pesquisa/detalhar/1626). O anexo do incentivo-frequência escreve o requisito: frequência mínima mensal de 80% das horas letivas ou média de frequência de 80% das horas letivas no ano, até a coleta.
+- [Manual do Sistema Gestão Presente](https://www.gov.br/mec/pt-br/media/manual-sgp.pdf), seção 7.3. A frequência mensal pede 80% ou mais das horas cursadas no mês. A média no período é a soma dos registros de frequência do ciclo dividida pela soma das horas ofertadas no ciclo, e também precisa ficar em 80% ou mais. O manual aponta o art. 20 da Portaria 83/2024 como diretriz da aferição em 2024.
+
+Dois pontos que o alerta não resolve sozinho:
+
+- **Média anual.** A norma aceita o mês ou a média do ano. Este alerta só compara o mês. A média anual não é verificada. Um mês abaixo de 80% pode seguir elegível se a média acumulada se mantiver, e essa conta fica no Gestão Presente.
+- **Faltas justificadas.** A informação mensal enviada pelas redes observa as regras de justificação ou compensação de ausências de cada rede. A linha inicial desconsidera as faltas justificadas por decisão da coordenação, não como leitura fechada da portaria. O interruptor de cada benefício permite mudar.
 
 ## Limites conhecidos
 
 - Suspensões de aula sem feriado cadastrado (greve, recesso) entram na projeção como dias letivos até virarem feriado ou chamada salva.
 - Aluno transferido no meio do mês usa a turma atual nos dias sem chamada, o que pode afrouxar o limite.
 - A base de cálculo é sempre as horas letivas (aulas). Outras bases, como dias letivos, exigiriam um novo campo na configuração.
-- O alerta não calcula a média acumulada do período letivo nem determina pagamento ou bloqueio. A exclusão de justificadas segue a configuração da escola e não comprova abono pela rede ou pelo programa.
+- O alerta não verifica a média anual do período letivo nem determina pagamento ou bloqueio. A exclusão de justificadas segue a configuração da escola, por decisão da coordenação na linha inicial, e não comprova abono pela rede ou pelo programa.
 - A Chamada relê os alertas ao abrir, ao trocar de mês, depois de salvar e quando a Gestão muda uma regra.
 
 A cópia JSON inclui a quantidade diária por benefício. Cópias antigas sem o campo não apagam a configuração atual, e valores divergentes são conflitos sem sobrescrita.

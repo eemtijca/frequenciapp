@@ -31,6 +31,8 @@ interface Alerta {
   aulasJustificadas: number;
   horasLetivas: number;
   limiteFaltas: number;
+  diasLetivos: number;
+  aulasDeReferencia: number | null;
 }
 
 // Junho de 2026 tem 22 dias úteis; com uma aula por dia, o mês passa de 20 aulas.

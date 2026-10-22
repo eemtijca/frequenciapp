@@ -4,14 +4,14 @@
 import { TriangleAlert } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
+import {
+  frasesDoAlerta,
+  RODAPE_ALERTA_BENEFICIO,
+} from "@/components/frequencia/frases-aviso-beneficio";
 
 interface Props {
   nome: string;
   alertas: AlertaFrequenciaBeneficio[];
-}
-
-function quantidade(valor: number, singular: string, plural: string): string {
-  return `${valor} ${valor === 1 ? singular : plural}`;
 }
 
 export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
@@ -28,38 +28,29 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
           <TriangleAlert size={16} aria-hidden="true" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 space-y-3 p-3 text-sm">
-        {alertas.map((alerta) => (
-          <div key={alerta.beneficioId} className="space-y-1">
-            <p className="font-semibold">{alerta.beneficioNome}</p>
-            {alerta.aulasPorDia !== null && (
-              <p className="text-muted-foreground text-xs">
-                Projeção de {alerta.aulasPorDia} aulas por dia, preservando as chamadas salvas.
-              </p>
-            )}
-            <p>
-              {quantidade(alerta.aulasFaltadas, "aula com falta", "aulas com falta")} em{" "}
-              {quantidade(alerta.horasLetivas, "aula prevista", "aulas previstas")} no mês. Para
-              manter {alerta.percentualMinimoFrequencia}% de frequência, o limite é de{" "}
-              {quantidade(alerta.limiteFaltas, "aula com falta", "aulas com falta")}.
-            </p>
-            {alerta.aulasJustificadas > 0 && (
-              <p className="text-muted-foreground text-xs">
-                {quantidade(
-                  alerta.aulasJustificadas,
-                  "aula com falta justificada",
-                  "aulas com falta justificada",
-                )}{" "}
-                {alerta.faltasJustificadasContam ? "incluída" : "desconsiderada"}
-                {alerta.aulasJustificadas === 1 ? "" : "s"} conforme a configuração do benefício.
-              </p>
-            )}
-          </div>
-        ))}
-        <p className="text-muted-foreground text-xs">
-          Estimativa mensal com chamadas salvas e grade dos dias sem chamada. Os contadores F e FJ
-          da linha contam dias. Este alerta não determina o pagamento do benefício.
-        </p>
+      <PopoverContent
+        align="start"
+        className="w-80 max-w-[calc(100vw-1.5rem)] space-y-3 p-3 text-sm"
+      >
+        {alertas.map((alerta) => {
+          const frases = frasesDoAlerta(alerta);
+          return (
+            <div key={alerta.beneficioId} className="space-y-1">
+              <p className="font-semibold">{alerta.beneficioNome}</p>
+              <p>{frases.faltas}</p>
+              <p>{frases.limite}</p>
+              <p>{frases.margem}</p>
+              <p>{frases.frequencia}</p>
+              {frases.justificadas ? (
+                <p className="text-muted-foreground text-xs">{frases.justificadas}</p>
+              ) : null}
+              {frases.carga ? (
+                <p className="text-muted-foreground text-xs">{frases.carga}</p>
+              ) : null}
+            </div>
+          );
+        })}
+        <p className="text-muted-foreground text-xs">{RODAPE_ALERTA_BENEFICIO}</p>
       </PopoverContent>
     </Popover>
   );

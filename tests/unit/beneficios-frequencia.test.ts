@@ -5,9 +5,11 @@ import {
   acimaDoLimiteDeFaltas,
   alertasDeFrequencia,
   limiteDeFaltas,
+  type AlertaFrequenciaBeneficio,
   type EntradaAlertasFrequencia,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
+import { frasesDoAlerta } from "@/components/frequencia/frases-aviso-beneficio";
 
 describe("limite de faltas pelo percentual mínimo de frequência", () => {
   it.each([
@@ -107,7 +109,13 @@ describe("alertas de frequência no mês", () => {
     const [alerta] = alertasDeFrequencia(
       base({ regras: [regra({ aulasPorDia: 9 })], faltas: faltasDe("a1", 40) }),
     );
-    expect(alerta).toMatchObject({ horasLetivas: 198, limiteFaltas: 39, aulasPorDia: 9 });
+    expect(alerta).toMatchObject({
+      horasLetivas: 198,
+      limiteFaltas: 39,
+      aulasPorDia: 9,
+      diasLetivos: 22,
+      aulasDeReferencia: 9,
+    });
   });
 
   it("a carga diária preserva os retratos e não cria aulas para quem não estava na chamada", () => {
@@ -122,7 +130,12 @@ describe("alertas de frequência no mês", () => {
         faltas: faltasDe("a1", 50),
       }),
     );
-    expect(alerta).toMatchObject({ horasLetivas: 191, limiteFaltas: 38 });
+    expect(alerta).toMatchObject({
+      horasLetivas: 191,
+      limiteFaltas: 38,
+      diasLetivos: 22,
+      aulasDeReferencia: 9,
+    });
   });
 
   it("a carga diária respeita feriados, desistência e dias sem aulas na grade", () => {
@@ -179,6 +192,8 @@ describe("alertas de frequência no mês", () => {
         aulasJustificadas: 0,
         horasLetivas: 110,
         limiteFaltas: 22,
+        diasLetivos: 22,
+        aulasDeReferencia: 5,
       },
     ]);
   });
@@ -354,5 +369,97 @@ describe("alertas de frequência no mês", () => {
         base({ turmas: [{ id: "t1", horarios: [] }], faltas: faltasDe("a1", 5) }),
       ),
     ).toEqual([]);
+  });
+});
+
+function alertaDe(extras: Partial<AlertaFrequenciaBeneficio> = {}): AlertaFrequenciaBeneficio {
+  return {
+    beneficioId: "b1",
+    beneficioNome: "Pé-de-Meia",
+    percentualMinimoFrequencia: 80,
+    faltasJustificadasContam: false,
+    alunoId: "a1",
+    aulasPorDia: 9,
+    aulasFaltadas: 28,
+    aulasJustificadas: 0,
+    horasLetivas: 186,
+    limiteFaltas: 37,
+    diasLetivos: 22,
+    aulasDeReferencia: 9,
+    ...extras,
+  };
+}
+
+describe("frases do alerta", () => {
+  it("lê faltas, limite, margem e frequência projetada em aulas e em dias", () => {
+    const frases = frasesDoAlerta(alertaDe());
+    expect(frases.faltas).toBe(
+      "Faltou 28 aulas (≈ 3,1 dias de 9 aulas) de 186 aulas previstas em 22 dias letivos.",
+    );
+    expect(frases.limite).toBe("Limite para 80%: 37 aulas (≈ 4,1 dias).");
+    expect(frases.margem).toBe("Ainda restam 9 aulas até o limite.");
+    expect(frases.frequencia).toBe("Frequência projetada: 84,9%.");
+    expect(frases.carga).toBe(
+      "Alguns dias já salvos têm outra quantidade de aulas. Por isso, 186 aulas previstas podem não ser 22 vezes 9 aulas.",
+    );
+  });
+
+  it("diz quando o limite já foi passado e quando não resta aula", () => {
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 40 })).margem).toBe(
+      "Passou do limite em 3 aulas.",
+    );
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 37 })).margem).toBe(
+      "Não resta aula até o limite.",
+    );
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 36 })).margem).toBe(
+      "Ainda resta 1 aula até o limite.",
+    );
+  });
+
+  it("omite o equivalente em dias quando os dias não compartilham uma carga", () => {
+    const frases = frasesDoAlerta(
+      alertaDe({ aulasPorDia: null, aulasDeReferencia: null, horasLetivas: 124, limiteFaltas: 24 }),
+    );
+    expect(frases.faltas).toBe("Faltou 28 aulas de 124 aulas previstas em 22 dias letivos.");
+    expect(frases.limite).toBe("Limite para 80%: 24 aulas.");
+    expect(frases.carga).toMatch(/não têm todos a mesma quantidade de aulas/);
+  });
+
+  it("não avisa divergência quando o total é os dias vezes a carga", () => {
+    expect(
+      frasesDoAlerta(alertaDe({ horasLetivas: 198, limiteFaltas: 39, aulasFaltadas: 40 })).carga,
+    ).toBeNull();
+  });
+
+  it("separa a falta justificada desconsiderada da conta", () => {
+    expect(frasesDoAlerta(alertaDe({ aulasJustificadas: 1 })).justificadas).toBe(
+      "1 aula com falta justificada desconsiderada nesta conta, conforme a configuração do benefício.",
+    );
+    expect(
+      frasesDoAlerta(alertaDe({ aulasJustificadas: 2, faltasJustificadasContam: true }))
+        .justificadas,
+    ).toBe(
+      "2 aulas com falta justificada incluídas nesta conta, conforme a configuração do benefício.",
+    );
+  });
+
+  it("explica o mês com retratos diferentes da carga de 9", () => {
+    const alertas = alertasDeFrequencia(
+      base({
+        regras: [regra({ aulasPorDia: 9 })],
+        chamadas: [
+          { dia: "2026-10-01", turmaId: "t1", aulas: 7, alunoIds: ["a1"] },
+          { dia: "2026-10-02", turmaId: "t1", aulas: 5, alunoIds: [] },
+          { dia: "2026-10-03", turmaId: "t1", aulas: 4, alunoIds: ["a1"] },
+        ],
+        faltas: faltasDe("a1", 50),
+      }),
+    );
+    const alerta = alertas[0];
+    expect(alerta).toMatchObject({ horasLetivas: 191, diasLetivos: 22, aulasDeReferencia: 9 });
+    if (!alerta) return;
+    expect(frasesDoAlerta(alerta).carga).toBe(
+      "Alguns dias já salvos têm outra quantidade de aulas. Por isso, 191 aulas previstas podem não ser 22 vezes 9 aulas.",
+    );
   });
 });
