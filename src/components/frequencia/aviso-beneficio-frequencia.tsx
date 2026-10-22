@@ -37,15 +37,11 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
           return (
             <div key={alerta.beneficioId} className="space-y-1">
               <p className="font-semibold">{alerta.beneficioNome}</p>
+              <p className="font-medium tabular-nums">{frases.frequencia}</p>
               <p>{frases.faltas}</p>
-              <p>{frases.limite}</p>
               <p>{frases.margem}</p>
-              <p>{frases.frequencia}</p>
               {frases.justificadas ? (
                 <p className="text-muted-foreground text-xs">{frases.justificadas}</p>
-              ) : null}
-              {frases.carga ? (
-                <p className="text-muted-foreground text-xs">{frases.carga}</p>
               ) : null}
             </div>
           );
