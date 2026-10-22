@@ -278,7 +278,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   await expect(primeiro).toBeChecked();
 });
 
-test("personaliza como presença sem controle da Seduc e preserva a chamada justificada da coordenação", async ({
+test("confirma presença por turno na Seduc e preserva a chamada justificada da coordenação", async ({
   page,
 }) => {
   const chamada = await abrirChamada(page);
@@ -307,12 +307,14 @@ test("personaliza como presença sem controle da Seduc e preserva a chamada just
   await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
-  await expect(confirmacao).toHaveCount(0);
+  await expect(confirmacao).toBeVisible();
+  await expect(confirmacao).not.toBeChecked();
   expect(await chamadaSalva(page)).toEqual(antes);
 
   await abrirParcial(page);
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
-  await expect(confirmacao).toHaveCount(0);
+  await expect(confirmacao).toBeVisible();
+  await expect(confirmacao).not.toBeChecked();
   const resposta = await page.request.get(
     `/api/frequencias-parciais?dia=${diaAtual()}&turmaId=${turmaId}`,
   );
@@ -346,6 +348,9 @@ test("personaliza como presença sem controle da Seduc e preserva a chamada just
       .getByTestId(`parcial-aluno-${segundoAlunoId}`)
       .getByText("Outros: E2E Justificativa inicial", { exact: true }),
   ).toBeVisible();
+  await confirmacao.click();
+  await expect(confirmacao).toBeChecked();
+  expect(await chamadaSalva(page)).toEqual(antes);
   await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);
   await expect(

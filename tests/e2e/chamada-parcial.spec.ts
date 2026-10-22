@@ -187,7 +187,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial", exact: true });
   await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
   await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  await expect(primeiro.getByRole("switch")).toHaveCount(0);
+  await expect(primeiro.getByRole("switch")).toBeVisible();
   await expect(segundo.getByRole("switch")).toHaveCount(0);
   await expect(linhas).toHaveCount(3);
   expect((await registrosDoDia(page)).registros).toHaveLength(1);
@@ -198,7 +198,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await expect(segundo).toBeVisible();
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Pendentes na Seduc", exact: true }).click();
-  await expect(linhas).toHaveCount(0);
+  await expect(linhas).toHaveCount(1);
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Todos os alunos", exact: true }).click();
   await primeiro
@@ -238,13 +238,13 @@ test("preserva a linha histórica após transferência e desativação do aluno"
   await expect(
     linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }),
   ).toBeEnabled();
-  await expect(linha.getByRole("switch")).toHaveCount(0);
+  await expect(linha.getByRole("switch")).toBeVisible();
   await expect(secao.getByTestId(`parcial-aluno-${segundoAlunoId}`)).toBeVisible();
   await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
   await expect(page.getByRole("dialog").locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
 });
 
-test("preserva a confirmação antiga de presença sem exibir o controle e a invalida após corrigir", async ({
+test("confirma presença por turno e por aulas, filtra a pendência e invalida após corrigir", async ({
   page,
 }) => {
   const { secao, dialogo } = await abrirRegistro(page);
@@ -268,14 +268,26 @@ test("preserva a confirmação antiga de presença sem exibir o controle e a inv
   const antes = await (
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
   ).json();
-  await confirmarPresencaAnterior(page);
-  await expect(linha.getByRole("switch")).toHaveCount(0);
-  await expect(linha.getByText(/Confirmado por/)).toHaveCount(0);
+  const controle = linha.getByRole("switch", {
+    name: "Registro na SEDUC: E2E Parcial Um",
+    exact: true,
+  });
+  await expect(controle).toBeVisible();
+  await expect(controle).not.toBeChecked();
+  await secao.locator("#parcial-filtro").click();
+  await page.getByRole("option", { name: "Pendentes na Seduc", exact: true }).click();
+  await expect(linha).toBeVisible();
+  await controle.click();
+  await expect(linha).toBeHidden();
+  await secao.locator("#parcial-filtro").click();
+  await page.getByRole("option", { name: "Registrados na Seduc", exact: true }).click();
+  await expect(controle).toBeChecked();
+  await expect(linha.getByText(/Confirmado por/)).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.registradoSeducEm).not.toBeNull();
 
   await page.reload();
   await abrirParcial(page);
-  await expect(linha.getByRole("switch")).toHaveCount(0);
+  await expect(controle).toBeChecked();
   await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
   const editar = page.getByRole("dialog", { name: "Editar frequência parcial" });
   await editar.getByRole("radio", { name: "Por aulas" }).click();
@@ -285,8 +297,13 @@ test("preserva a confirmação antiga de presença sem exibir o controle e a inv
     editar.getByText("A alteração deixará este registro pendente de conferência na Seduc."),
   ).toBeVisible();
   await editar.getByRole("button", { name: "Salvar frequência parcial" }).click();
-  await expect(linha.getByRole("switch")).toHaveCount(0);
+  await expect(controle).toBeVisible();
+  await expect(controle).not.toBeChecked();
   await expect(linha.getByText("Presente · Aulas 3, 4, 6", { exact: true })).toBeVisible();
+  await controle.click();
+  await expect(controle).toBeChecked();
+  await controle.click();
+  await expect(controle).not.toBeChecked();
   const corrigido = (await registrosDoDia(page)).registros[0];
   expect(corrigido?.aulas).toEqual([3, 4, 6]);
   expect(corrigido?.turno).toBeNull();
@@ -343,7 +360,8 @@ test("registra o dia inteiro sem controle da Seduc e invalida confirmação anti
   await editar.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
   await expect(editar).toBeHidden();
   await expect(linha.getByText("Presente · 2ª à 3ª aula", { exact: true })).toBeVisible();
-  await expect(confirmacao).toHaveCount(0);
+  await expect(confirmacao).toBeVisible();
+  await expect(confirmacao).not.toBeChecked();
   expect((await registrosDoDia(page)).registros[0]).toMatchObject({
     tipo: "AULAS",
     turno: null,
