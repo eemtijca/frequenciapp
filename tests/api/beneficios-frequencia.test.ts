@@ -370,6 +370,35 @@ it("salva a carga diária pela Gestão, mantém os retratos e permite voltar à 
   });
 });
 
+it("usa o mês completo e desconta o feriado importado da API na carga diária", async () => {
+  const beneficio = await criarBeneficio({
+    nome: "QA Beneficio Calendario Mensal",
+    percentualMinimoFrequencia: 99,
+    aulasPorDia: 9,
+  });
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+    horasLetivas: 150,
+    diasLetivos: 22,
+    aulasFaltadas: 5,
+  });
+  // Simula a data já gravada pela sincronização existente, sem consulta externa.
+  // Os seis dias salvos mantêm uma aula cada; os demais usam nove aulas por dia.
+  await banco.query(
+    "insert into feriados (dia,nome,origem,atualizado_em) values ('2026-06-30','QA Beneficios Calendario Mensal','API',now())",
+  );
+  try {
+    expect((await alertasDe(beneficio.id))[0]).toMatchObject({
+      horasLetivas: 141,
+      diasLetivos: 21,
+      aulasFaltadas: 5,
+      limiteFaltas: 1,
+    });
+  } finally {
+    await banco.query("delete from feriados where nome='QA Beneficios Calendario Mensal'");
+  }
+  expect((await alertasDe(beneficio.id))[0]).toMatchObject({ horasLetivas: 150, diasLetivos: 22 });
+});
+
 it.each([0, 31, 9.5, "9", false])("recusa carga diária inválida: %s", async (aulasPorDia) => {
   const criar = await enviar("POST", "/api/beneficios-frequencia", cookieAdmin, {
     nome: "QA Beneficio Carga Invalida",

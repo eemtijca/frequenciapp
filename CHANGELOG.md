@@ -163,6 +163,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Alerta de benefícios atualiza o percentual mensal ao cadastrar, remover ou sincronizar feriados do mês pela Gestão, sem recarregar o aplicativo. O cálculo usa o calendário mensal completo e os feriados já gravados pela integração existente.
+
 - Chamada Parcial mantém Registro na SEDUC para presenças por turno ou aulas específicas e presenças parciais da Chamada, além das justificadas. Os filtros de pendências e confirmações seguem a mesma regra; corrigir o registro continua exigindo nova conferência.
 
 - Chamada volta a marcar a falta pelo toque na marca P, ou em qualquer ponto da linha fora do nome. O efeito de pressionar encolhia a área de toque da linha até o nome no meio do toque, e o celular descartava o clique. A linha mantém a área inteira durante o toque.

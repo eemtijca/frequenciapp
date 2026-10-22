@@ -18,6 +18,7 @@ const NOME_BENEFICIO = "E2E Beneficio Rigoroso";
 
 async function limpar() {
   await comBanco(async (banco) => {
+    await banco.query("delete from feriados where nome like $1", [`${prefixo}%`]);
     await banco.query("delete from beneficios_frequencia where nome like $1", [`${prefixo}%`]);
     await banco.query(
       "delete from frequencias where turma_id in (select t.id from turmas t join series s on s.id=t.serie_id where s.nome=$1)",
@@ -163,6 +164,51 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await botaoUma.click();
   await expect(painel.getByText(NOME_BENEFICIO, { exact: true })).toBeVisible();
   await expect(painel.getByText(/Mínimo: 99%/)).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Um feriado no fim do mês muda o percentual com a Chamada já montada,
+  // sem trocar o mês ou salvar outra frequência. Remover a data restaura a base.
+  await abrirBeneficios(page);
+  const calendarioLetivo = page.locator('[data-secao="config-calendario"]');
+  await calendarioLetivo.getByRole("button", { name: /^Calendário letivo/ }).click();
+  await calendarioLetivo.locator("#calendario-feriado-data").click();
+  const calendarioFeriado = page.getByRole("dialog", { name: "Data do feriado", exact: true });
+  await calendarioFeriado.getByRole("button", { name: "Mês anterior", exact: true }).click();
+  const dataFeriado = diasUteis[diasUteis.length - 1] ?? "";
+  const nomeDoDiaFeriado = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${dataFeriado}T12:00:00Z`));
+  await calendarioFeriado
+    .getByRole("button", { name: new RegExp(`^${nomeDoDiaFeriado}(,|$)`) })
+    .click();
+  const nomeFeriado = `${prefixo} calendário mensal`;
+  await calendarioLetivo.getByLabel("Nome do feriado", { exact: true }).fill(nomeFeriado);
+  await calendarioLetivo.getByRole("button", { name: "Adicionar feriado", exact: true }).click();
+  await expect(calendarioLetivo.getByText(nomeFeriado, { exact: true })).toBeVisible();
+  await abrirChamadaDoMesAnterior(page, false);
+  await botaoMuitas.click();
+  await expect(
+    detalhe.getByText(`Faltas: 5/${diasUteis.length - 1} aulas · Limite: 0.`),
+  ).toBeVisible();
+  const percentualComFeriado = ((1 - 5 / (diasUteis.length - 1)) * 100).toLocaleString("pt-BR", {
+    maximumFractionDigits: 1,
+  });
+  await expect(
+    detalhe.getByText(`Frequência estimada: ${percentualComFeriado}% · Mínimo: 99%.`),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await abrirBeneficios(page);
+  await calendarioLetivo
+    .getByRole("button", { name: `Remover feriado ${nomeFeriado}`, exact: true })
+    .click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Remover", exact: true }).click();
+  await expect(calendarioLetivo.getByText(nomeFeriado, { exact: true })).toHaveCount(0);
+  await abrirChamadaDoMesAnterior(page, false);
+  await botaoMuitas.click();
+  await expect(detalhe.getByText(`Faltas: 5/${diasUteis.length} aulas · Limite: 0.`)).toBeVisible();
   await page.keyboard.press("Escape");
 
   // Nove aulas na projeção aumentam o limite, preservando a aula já salva de cada dia.
