@@ -31,6 +31,7 @@ import {
 import { limiteAgendamentoParcial, type FrequenciaParcial } from "@/domain/frequencia-parcial";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import {
+  exigeConferenciaSeduc,
   rotuloFrequenciaPersonalizada,
   type RegistroPersonalizado,
   type FrequenciaDaChamada,
@@ -119,16 +120,6 @@ function resumoDoRegistro(
   return [registro.marca === "F" ? "Falta" : registro.descricao, motivos]
     .filter(Boolean)
     .join(" · ");
-}
-
-function temFaltaJustificada(
-  registro: RegistroPersonalizado | undefined,
-): registro is RegistroPersonalizado {
-  return (
-    registro?.tipo === "JUSTIFICADA" ||
-    (registro?.tipo === "CHAMADA" &&
-      (registro.marca === "FJ" || registro.justificativas.length > 0))
-  );
 }
 
 function momentoDaConfirmacao(
@@ -267,8 +258,8 @@ export default function VistaFrequenciaParcial({
           (filtro === "sem-registro"
             ? !aluno.registro
             : filtro === "pendentes"
-              ? temFaltaJustificada(aluno.registro) && !aluno.registro.registradoSeduc
-              : temFaltaJustificada(aluno.registro) && aluno.registro.registradoSeduc)),
+              ? exigeConferenciaSeduc(aluno.registro) && !aluno.registro.registradoSeduc
+              : exigeConferenciaSeduc(aluno.registro) && aluno.registro.registradoSeduc)),
     );
   }, [listaAlunos, nomesParaBusca, busca, filtro]);
 
@@ -434,7 +425,7 @@ export default function VistaFrequenciaParcial({
 
   const { chaveAtiva, executar: alterarPorChave } = useAcoesPorChave();
   function confirmarSeduc(registro: RegistroPersonalizado, registrado: boolean) {
-    if (!temFaltaJustificada(registro)) return;
+    if (!exigeConferenciaSeduc(registro)) return;
     void alterarPorChave(registro.id, async () => {
       try {
         if (registro.tipo === "CHAMADA") {
@@ -663,7 +654,7 @@ export default function VistaFrequenciaParcial({
                         </p>
                       </div>
                     </div>
-                    {temFaltaJustificada(registro) && (
+                    {exigeConferenciaSeduc(registro) && (
                       <>
                         <div className="mt-2 flex items-center gap-2 pl-10">
                           <Label

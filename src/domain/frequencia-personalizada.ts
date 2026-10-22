@@ -26,6 +26,19 @@ export interface FrequenciaDaChamada {
 
 export type RegistroPersonalizado = FrequenciaParcial | FrequenciaDaChamada;
 
+/** Registros que precisam de conferência manual na Seduc, inclusive presença em parte do dia. */
+export function exigeConferenciaSeduc(
+  registro: RegistroPersonalizado | undefined,
+): registro is RegistroPersonalizado {
+  return (
+    registro?.tipo === "TURNO" ||
+    registro?.tipo === "AULAS" ||
+    registro?.tipo === "JUSTIFICADA" ||
+    (registro?.tipo === "CHAMADA" &&
+      (registro.marca === "S" || registro.marca === "FJ" || registro.justificativas.length > 0))
+  );
+}
+
 export function rotuloFrequenciaPersonalizada(registro: RegistroPersonalizado): string {
   return registro.tipo === "CHAMADA" ? registro.descricao : rotuloFrequenciaParcial(registro);
 }
