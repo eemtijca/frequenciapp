@@ -59,6 +59,7 @@ export function proximoDaFila<T extends ItemParaOrdem>(
 
 const PRIORIDADE_SITUACAO = [
   "falhou",
+  "limite",
   "sem_confirmacao",
   "pendente_manual",
   "sem_mapa",
@@ -81,16 +82,16 @@ export interface DesfechoDoItem {
 }
 
 /**
- * Só a falha confirmada gera nova tentativa. Envio sem confirmação, plano que
- * pede conferência manual e integração desligada encerram o item: repetir um envio
- * que pode ter escrito na planilha não é seguro.
+ * Falha confirmada e limite de leitura do Google geram nova tentativa. Envio
+ * sem confirmação, plano que pede conferência manual e integração desligada
+ * encerram o item: repetir um envio que pode ter escrito na planilha não é seguro.
  */
 export function desfechoDoItem(
   situacao: string,
   tentativasFeitas: number,
   agora: Date,
 ): DesfechoDoItem {
-  if (situacao !== "falhou") {
+  if (situacao !== "falhou" && situacao !== "limite") {
     return { estado: "CONCLUIDO", resultado: situacao, proximaTentativaEm: null };
   }
   if (tentativasFeitas >= MAXIMO_TENTATIVAS_FILA) {

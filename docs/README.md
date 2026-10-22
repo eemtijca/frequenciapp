@@ -54,3 +54,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-046](adr/046-justificativas-antecipadas.md): justificativas por período na Chamada Parcial, propostas para a Chamada e preservação das revisões.
 - [ADR-047](adr/047-regras-do-react-compiler.md): regras do React Compiler no lint, correções reais e exceções pontuais justificadas.
 - [ADR-048](adr/048-abas-de-saidas-por-turma.md): consultas automáticas de saídas por turma, com preservação da origem.
+- [ADR-050](adr/050-limite-de-leitura-da-planilha.md): cota de leitura do Google no envio da frequência e confirmação do que já estava na planilha.

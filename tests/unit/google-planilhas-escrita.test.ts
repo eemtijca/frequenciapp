@@ -189,6 +189,41 @@ describe("gravação pela Sheets API", () => {
     });
   });
 
+  it("trata valor igual como já presente e não grava a célula", () => {
+    const plano = planejarEscritaGoogle(
+      documento,
+      "Turma",
+      valores,
+      formulas,
+      1,
+      assinatura,
+      [{ tipo: "preencher", linha: 3, coluna: 2, valor: "manual", dia: "2026-10-02" }],
+      false,
+    );
+    expect(plano.contagens.jaPresentes).toBe(1);
+    expect(plano.contagens.puladasOcupadas).toBe(0);
+    expect(plano.contagens.preenchidas).toBe(0);
+    expect(plano.requests).toHaveLength(0);
+    expect(plano.diasBloqueados).toEqual([]);
+  });
+
+  it("bloqueia o dia quando a célula ocupada tem outro valor", () => {
+    const plano = planejarEscritaGoogle(
+      documento,
+      "Turma",
+      valores,
+      formulas,
+      1,
+      assinatura,
+      [{ tipo: "preencher", linha: 3, coluna: 2, valor: "F", dia: "2026-10-02" }],
+      false,
+    );
+    expect(plano.contagens.puladasOcupadas).toBe(1);
+    expect(plano.contagens.jaPresentes).toBe(0);
+    expect(plano.requests).toHaveLength(0);
+    expect(plano.diasBloqueados).toEqual(["2026-10-02"]);
+  });
+
   it("recusa envio quando o cabeçalho mudou desde a prévia", () => {
     expect(() =>
       planejarEscritaGoogle(documento, "Turma", valores, formulas, 1, "antiga", [], false),

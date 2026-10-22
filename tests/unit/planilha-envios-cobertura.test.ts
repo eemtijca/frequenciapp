@@ -2,6 +2,7 @@
 // dias pendentes, e qualquer edição posterior exige uma nova conferência.
 import { describe, expect, it } from "vitest";
 import {
+  diasLimposDoEnvio,
   diasSemEnvioConfirmado,
   type ChamadaParaEnvio,
   type EnvioConfirmadoDaFrequencia,
@@ -78,5 +79,18 @@ describe("dias sem envio confirmado", () => {
         [],
       ),
     ).toEqual(["2026-06-15", "2026-06-16"]);
+  });
+});
+
+describe("dias limpos do envio", () => {
+  it("confirma só o dia já igual e mantém o dia divergente pendente", () => {
+    const limpos = diasLimposDoEnvio(["2026-10-02", "2026-10-01", "2026-10-01"], ["2026-10-02"]);
+    expect(limpos).toEqual(["2026-10-01"]);
+    expect(
+      diasSemEnvioConfirmado(
+        [chamada("2026-10-01"), chamada("2026-10-02")],
+        limpos.map((dia) => envio(dia)),
+      ),
+    ).toEqual(["2026-10-02"]);
   });
 });

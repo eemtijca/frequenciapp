@@ -163,14 +163,18 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       ateColuna: coluna(match[5] ?? "A"),
     };
   }
-  function valores(faixa: ReturnType<typeof intervalo>) {
+  function valores(faixa: ReturnType<typeof intervalo>, render: "valor" | "formula" = "valor") {
     const dimensao = dimensoes(faixa.item);
     return faixa.item.celulas
       .slice(faixa.linha, Math.min(faixa.ateLinha, dimensao.linhas))
       .map((fileira) =>
         Array.from(
           { length: Math.max(0, Math.min(faixa.ateColuna, dimensao.colunas) - faixa.coluna) },
-          (_, c) => fileira[faixa.coluna + c]?.valor ?? "",
+          (_, c) => {
+            const celula = fileira[faixa.coluna + c];
+            if (!celula) return "";
+            return render === "formula" ? celula.formula || celula.valor : celula.valor;
+          },
         ),
       );
   }
@@ -479,6 +483,18 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
                 .filter((meta) => chaves.includes(meta.metadataKey))
                 .map((developerMetadata) => ({ developerMetadata })),
             ),
+          });
+          return;
+        }
+        if (url.pathname.endsWith("/values:batchGet")) {
+          chamadas.push("ler");
+          const render =
+            url.searchParams.get("valueRenderOption") === "FORMULA" ? "formula" : "valor";
+          const ranges = url.searchParams.getAll("ranges");
+          responder({
+            valueRanges: ranges.map((range) => ({
+              values: valores(intervalo(range), render),
+            })),
           });
           return;
         }

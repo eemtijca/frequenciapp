@@ -15,6 +15,7 @@ const dubl = vi.hoisted(() => ({
   ultimoEnvio: vi.fn(),
   envios: vi.fn(),
   criarEnvio: vi.fn(),
+  criarEnvios: vi.fn(),
   concluirEnvio: vi.fn(),
   alunos: vi.fn(),
   turmas: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("@/infra/banco", () => ({
       findFirst: dubl.ultimoEnvio,
       findMany: dubl.envios,
       create: dubl.criarEnvio,
+      createMany: dubl.criarEnvios,
       update: dubl.concluirEnvio,
     },
   }),
@@ -55,6 +57,7 @@ vi.mock("@/infra/trava-planilha-frequencia", () => ({
   controleTravaPlanilhaFrequencia: () => undefined,
 }));
 
+import { reiniciarOrcamentoDeLeituraGoogle } from "@/infra/google-planilhas-limites";
 import { atualizarEsquemaDaAba, enviarAposSalvar, simularEnvio } from "@/application/planilha";
 
 const turmaId = "00000000-0000-4000-8000-000000000101";
@@ -155,6 +158,15 @@ async function responderGoogle(entrada: URL | string, opcoes?: RequestInit): Pro
   const valores = [cabecalho, [nomeNaPlanilha, celula]];
   if (url.pathname.endsWith("/developerMetadata:search"))
     return Response.json({ matchedDeveloperMetadata: [] });
+  if (url.pathname.endsWith("/values:batchGet")) {
+    const ranges = url.searchParams.getAll("ranges");
+    const formulaNaCelula = url.searchParams.get("valueRenderOption") === "FORMULA" && formula;
+    return Response.json({
+      valueRanges: (ranges.length > 0 ? ranges : [nomeAba]).map(() => ({
+        values: [cabecalho, [nomeNaPlanilha, formulaNaCelula ? `="${celula}"` : celula]],
+      })),
+    });
+  }
   if (url.pathname.endsWith(":batchUpdate")) {
     const pedidos = (JSON.parse(String(opcoes?.body)) as { requests: Pedido[] }).requests;
     lotes.push(pedidos);
@@ -236,6 +248,7 @@ async function responderGoogle(entrada: URL | string, opcoes?: RequestInit): Pro
 }
 
 beforeEach(() => {
+  reiniciarOrcamentoDeLeituraGoogle();
   vi.clearAllMocks();
   cabecalho.splice(0, cabecalho.length, "Aluno", "02/10/2026");
   nomeNaPlanilha = aluno.nome;
@@ -304,6 +317,10 @@ beforeEach(() => {
     registros.push(registro);
     antesDaReleitura?.();
     return { id: registro.id };
+  });
+  dubl.criarEnvios.mockImplementation(async ({ data }: { data: Omit<Registro, "id">[] }) => {
+    for (const item of data) registros.push({ ...item, id: `registro-${registros.length + 1}` });
+    return { count: data.length };
   });
   dubl.concluirEnvio.mockImplementation(
     async ({ where, data }: { where: { id: string }; data: Partial<Registro> }) => {
@@ -374,7 +391,13 @@ describe("enviar ao salvar com a conta Google", () => {
     expect(reenvio.get(turmaId)).toBe("enviado");
     expect(lotes).toHaveLength(1);
     expect(registros).toHaveLength(2);
-    expect(registros[1]).toMatchObject({ resultado: "SUCESSO", preenchidas: 0, erro: null });
+    expect(registros[1]).toMatchObject({
+      resultado: "SUCESSO",
+      preenchidas: 0,
+      puladasOcupadas: 0,
+      puladasFormula: 0,
+      erro: null,
+    });
   });
 
   it.each([

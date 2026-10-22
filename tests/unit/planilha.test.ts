@@ -243,6 +243,8 @@ describe("planejarSincronizacao", () => {
     expect(plano.substituir).toHaveLength(0);
     // 11/09 tem coluna e a turma não teve frequência: nada a preencher.
     expect(plano.resumo.preencher).toBe(1);
+    expect(plano.resumo.jaPresentes).toBe(1);
+    expect(plano.diasBloqueados).toEqual([]);
     expect(plano.novasColunas).toHaveLength(0);
   });
 
@@ -263,6 +265,42 @@ describe("planejarSincronizacao", () => {
     );
     expect(plano.substituir).toHaveLength(0);
     expect(plano.resumo.puladasOcupadas).toBe(1);
+    expect(plano.resumo.jaPresentes).toBe(1);
+    expect(plano.diasBloqueados).toEqual(["2026-09-10"]);
+  });
+
+  it("confirma o dia igual e bloqueia só o dia com divergência", () => {
+    const frequenciasDias = [
+      frequencia({ dia: "2026-09-10", faltas: [{ alunoId: "aluno-2", horarios: ["aula-1"] }] }),
+      frequencia({ dia: "2026-09-11", faltas: [{ alunoId: "aluno-2", horarios: ["aula-1"] }] }),
+    ];
+    const turmaDias = montarTurmaPlanilha(
+      "origem-a",
+      "3º ano A",
+      alunos,
+      frequenciasDias,
+      [],
+      dias,
+      () => "3º ano A",
+    );
+    const aba: AbaBruta = {
+      ...ABA,
+      valores: [
+        ABA.valores[0] ?? [],
+        ["Alice", "3º ano A", "P", "P", ""],
+        ["Bruno", "3º ano A", "F", "P", ""],
+      ],
+    };
+    const plano = planejarSincronizacao(
+      detectarEsquema(aba, 2026),
+      turmaDias,
+      conteudoDaAba(aba),
+      opcoes(),
+    );
+    expect(plano.preencher).toHaveLength(0);
+    expect(plano.resumo.jaPresentes).toBe(3);
+    expect(plano.resumo.puladasOcupadas).toBe(1);
+    expect(plano.diasBloqueados).toEqual(["2026-09-11"]);
   });
 
   it("substitui divergência no modo completo, exceto fórmula", () => {

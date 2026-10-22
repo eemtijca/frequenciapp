@@ -5,15 +5,22 @@ import {
   lerDocumentoGoogle,
   tamanhoUtilizado,
 } from "@/infra/google-planilhas-api";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import {
+  comPausasDeLeituraGoogle,
+  esperaDoLimite,
+  reiniciarOrcamentoDeLeituraGoogle,
+} from "@/infra/google-planilhas-limites";
 import { enviarLotesGoogle } from "@/infra/google-planilhas-escrita";
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-02T00:00:00Z"));
+  vi.spyOn(Math, "random").mockReturnValue(0);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
+  reiniciarOrcamentoDeLeituraGoogle();
 });
 afterEach(() => {
+  reiniciarOrcamentoDeLeituraGoogle();
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -79,8 +86,25 @@ describe("pausas de leitura na organização", () => {
     await vi.runAllTimersAsync();
     await lote;
     expect(concluidas).toEqual(nomes);
-    expect(recusas).toBe(4);
-    expect(Date.now() - inicio).toBe(120_000);
+    expect(recusas).toBe(10);
+    expect(Date.now() - inicio).toBe(124_000);
+  });
+
+  it("dobra a espera sem Retry-After e acrescenta jitter", () => {
+    expect(esperaDoLimite(0, "ausente", 0)).toBe(2_000);
+    expect(esperaDoLimite(0, "ausente", 1)).toBe(2_500);
+    expect(esperaDoLimite(1, "ausente", 0)).toBe(4_000);
+    expect(esperaDoLimite(2, "ausente", 0)).toBe(8_000);
+    expect(esperaDoLimite(4, "ausente", 0)).toBe(32_000);
+    expect(esperaDoLimite(5, "ausente", 0)).toBeNull();
+  });
+
+  it("honra Retry-After até um minuto e recusa espera maior", () => {
+    expect(esperaDoLimite(0, 2_000, 1)).toBe(2_000);
+    expect(esperaDoLimite(0, 500, 0)).toBe(1_000);
+    expect(esperaDoLimite(0, 60_000, 0)).toBe(60_000);
+    expect(esperaDoLimite(0, 60_001, 0)).toBeNull();
+    expect(esperaDoLimite(0, Number.NaN, 0)).toBe(60_000);
   });
 
   it.each([
@@ -100,7 +124,7 @@ describe("pausas de leitura na organização", () => {
     expect(chamada).toHaveBeenCalledTimes(2);
   });
 
-  it("encerra uma recusa persistente após duas pausas", async () => {
+  it("encerra uma recusa persistente após cinco pausas", async () => {
     const chamada = vi.fn(async () => limite());
     vi.stubGlobal("fetch", chamada);
     const leitura = comPausasDeLeituraGoogle(() => tamanhoUtilizado("arquivo", "acesso", "QA"));
@@ -110,7 +134,7 @@ describe("pausas de leitura na organização", () => {
     });
     await vi.runAllTimersAsync();
     await resultado;
-    expect(chamada).toHaveBeenCalledTimes(3);
+    expect(chamada).toHaveBeenCalledTimes(6);
   });
 
   it("não antecipa uma espera pedida pelo Google acima do orçamento", async () => {
@@ -154,8 +178,58 @@ describe("pausas de leitura na organização", () => {
     const leitura = comPausasDeLeituraGoogle(() => lerDocumentoGoogle("arquivo", "acesso"));
     await vi.runAllTimersAsync();
     await expect(leitura).resolves.toMatchObject({ spreadsheetId: "arquivo" });
-    expect(Date.now() - inicio).toBe(60_000);
-    expect(chamada).toHaveBeenCalledTimes(4);
+    expect(Date.now() - inicio).toBe(2_000);
+    expect(chamada).toHaveBeenCalledTimes(3);
+  });
+
+  it("executa leituras uma de cada vez", async () => {
+    let emVoo = 0;
+    let pico = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        emVoo += 1;
+        pico = Math.max(pico, emVoo);
+        await new Promise((resolver) => setTimeout(resolver, 30));
+        emVoo -= 1;
+        return Response.json({ values: [["Aluno"]] });
+      }),
+    );
+    const lote = Promise.all([
+      tamanhoUtilizado("arquivo", "acesso", "A"),
+      tamanhoUtilizado("arquivo", "acesso", "B"),
+    ]);
+    await vi.runAllTimersAsync();
+    await lote;
+    expect(pico).toBe(1);
+  });
+
+  it("segura a leitura seguinte ao encher a janela de um minuto", async () => {
+    let chamadas = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        chamadas += 1;
+        return Response.json({ values: [["Aluno"]] });
+      }),
+    );
+    await comPausasDeLeituraGoogle(async () => {
+      for (let indice = 0; indice < 45; indice += 1) {
+        await tamanhoUtilizado("arquivo", "acesso", "QA");
+      }
+    });
+    expect(chamadas).toBe(45);
+    let liberou = false;
+    const extra = comPausasDeLeituraGoogle(() => tamanhoUtilizado("arquivo", "acesso", "QA")).then(
+      () => {
+        liberou = true;
+      },
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(liberou).toBe(false);
+    await vi.advanceTimersByTimeAsync(60_050);
+    await extra;
+    expect(chamadas).toBe(46);
   });
 
   it.each([401, 403, 404, 500])("não repete uma leitura recusada com HTTP %s", async (status) => {

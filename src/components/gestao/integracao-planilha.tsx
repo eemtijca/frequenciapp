@@ -65,9 +65,19 @@ interface IntegracaoAdmin {
     ate: string;
     modalidade: string;
     preenchidas: number;
+    puladasOcupadas: number;
+    puladasFormula: number;
     resultado: string;
     criadoEm: string;
   }[];
+}
+
+function rotuloResultadoEnvio(item: IntegracaoAdmin["sincronizacoes"][number]): string {
+  const puladas = item.puladasOcupadas + item.puladasFormula;
+  if (item.resultado === "SUCESSO" && puladas > 0) return "sucesso, divergências pendentes";
+  if (item.resultado === "SUCESSO" && item.preenchidas === 0)
+    return "sucesso, já estava na planilha";
+  return item.resultado.toLowerCase();
 }
 
 interface MapaAba {
@@ -723,7 +733,7 @@ export default function IntegracaoPlanilha({
                 {integracao.sincronizacoes.slice(0, 5).map((item) => (
                   <li key={item.id}>
                     {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()}{" "}
-                    · {item.preenchidas} células · {item.resultado.toLowerCase()}
+                    · {item.preenchidas} células · {rotuloResultadoEnvio(item)}
                   </li>
                 ))}
               </ul>

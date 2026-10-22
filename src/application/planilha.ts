@@ -10,6 +10,7 @@ import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
 import { mensagemParaRegistro } from "@/infra/planilha-erros";
 import { ErroGoogle } from "@/infra/google-planilhas-escrita";
+import { ErroLeituraGoogle, comCacheDeDocumentoGoogle } from "@/infra/google-planilhas-api";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
@@ -44,9 +45,9 @@ import {
   type PlanoSincronizacao,
 } from "@/domain/planilha";
 import { diaDaSemanaIso, diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
-import { diasSemEnvioConfirmado } from "@/domain/planilha-envios";
+import { diasLimposDoEnvio, diasSemEnvioConfirmado } from "@/domain/planilha-envios";
 import { diasDaPlanilhaMensal, mesValido } from "@/domain/planilha-mensal";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comPausasDeLeituraGoogle, ehLimiteGoogle } from "@/infra/google-planilhas-limites";
 import { comTravaPlanilhaFrequencia } from "@/infra/trava-planilha-frequencia";
 
 const FINALIDADE = "FREQUENCIA" as const;
@@ -656,6 +657,13 @@ async function diasDoEnvio(
   return { dias: dias.slice(-LIMITE_DIAS_ENVIO), incremental: true };
 }
 
+/** Prévia e envio compartilham trava, cache do documento e orçamento de leitura. */
+function comEnvioProtegido<T>(tarefa: () => Promise<T>): Promise<T> {
+  return comTravaPlanilhaFrequencia(() =>
+    comCacheDeDocumentoGoogle(() => comPausasDeLeituraGoogle(tarefa)),
+  );
+}
+
 type LeituraPlanilha = {
   abaId: number;
   valores: string[][];
@@ -672,24 +680,10 @@ type LeituraPlanilha = {
   mensal?: AbaEsquema["mensal"];
 };
 
-/**
- * Lê as colunas necessárias e confere a assinatura e os vínculos dos alunos.
- */
-async function lerParaPlano(
-  linha: LinhaIntegracao,
+function conteudoDaLeitura(
   esquema: AbaEsquema,
-  dias: string[],
-): Promise<{ conteudo: LeituraAba; assinatura: string | null }> {
-  const colunas = colunasNecessarias(esquema, dias);
-  const leitura = await chamarIntegracao<LeituraPlanilha>(linha, {
-    acao: "ler",
-    aba: esquema.nome,
-    linhaInicial: 1,
-    colunaInicial: 1,
-    colunas: Math.max(...colunas, 1),
-    blocos: blocosDeColunas(colunas),
-    cabecalhoLinha: esquema.cabecalho,
-  });
+  leitura: LeituraPlanilha,
+): { conteudo: LeituraAba; assinatura: string | null } {
   if (esquema.abaId !== undefined && leitura.abaId !== esquema.abaId) {
     throw new ErroHttp("A aba foi substituída. Confira a estrutura antes de enviar.", 409);
   }
@@ -723,6 +717,27 @@ async function lerParaPlano(
     },
     assinatura: leitura.assinatura ?? null,
   };
+}
+
+/**
+ * Lê as colunas necessárias e confere a assinatura e os vínculos dos alunos.
+ */
+async function lerParaPlano(
+  linha: LinhaIntegracao,
+  esquema: AbaEsquema,
+  dias: string[],
+): Promise<{ conteudo: LeituraAba; assinatura: string | null }> {
+  const colunas = colunasNecessarias(esquema, dias);
+  const leitura = await chamarIntegracao<LeituraPlanilha>(linha, {
+    acao: "ler",
+    aba: esquema.nome,
+    linhaInicial: 1,
+    colunaInicial: 1,
+    colunas: Math.max(...colunas, 1),
+    blocos: blocosDeColunas(colunas),
+    cabecalhoLinha: esquema.cabecalho,
+  });
+  return conteudoDaLeitura(esquema, leitura);
 }
 
 /** Detecta de novo o esquema de uma aba, pela mesma regra da conferência de estrutura. */
@@ -952,6 +967,24 @@ async function montarSimulacao(
     permitirInserirColunas: entrada.permitirInserirColunas ?? true,
     permitirNovosAlunos: entrada.permitirNovosAlunos ?? true,
   };
+  const pedidosDeLeitura = [
+    ...new Map(
+      pares.flatMap((par) => {
+        if ((diasPorAba.get(par.aba)?.dias.length ?? 0) === 0) return [];
+        const esquema = salvo.abas.find((aba) => aba.nome === par.aba);
+        return esquema
+          ? [[par.aba, { aba: par.aba, cabecalhoLinha: esquema.cabecalho }] as const]
+          : [];
+      }),
+    ).values(),
+  ];
+  const leiturasEmLote =
+    pedidosDeLeitura.length > 0
+      ? await chamarIntegracao<Record<string, LeituraPlanilha>>(linha, {
+          acao: "lerVarias",
+          abas: pedidosDeLeitura,
+        })
+      : {};
   const planos: PlanoDaTurma[] = [];
   for (const par of pares) {
     let esquemaAba = salvo.abas.find((aba) => aba.nome === par.aba);
@@ -982,17 +1015,20 @@ async function montarSimulacao(
       dias,
       rotuloDaTurma,
     );
-    let leitura = await lerParaPlano(linha, esquemaAba, dias);
+    const pronta = leiturasEmLote[par.aba];
     // A aba mudou desde a última conferência (por exemplo, um envio anterior
     // criou o dia e não chegou a responder): o esquema é detectado de novo e
     // salvo, e a prévia já mostra o plano sobre a estrutura atual.
     let estruturaAtualizada = false;
-    if (leitura.assinatura && leitura.assinatura !== esquemaAba.assinatura) {
+    if (pronta?.assinatura && pronta.assinatura !== esquemaAba.assinatura) {
       esquemaAba = await detectarAba(linha, par.aba);
       await salvarEsquemaDaAba(esquemaAba, linha);
-      leitura = await lerParaPlano(linha, esquemaAba, dias);
       estruturaAtualizada = true;
     }
+    const leitura =
+      !estruturaAtualizada && pronta?.assinatura === esquemaAba.assinatura
+        ? conteudoDaLeitura(esquemaAba, pronta)
+        : await lerParaPlano(linha, esquemaAba, dias);
     if (
       par.mes &&
       (esquemaAba.mensal?.destino !== par.destino ||
@@ -1063,7 +1099,13 @@ function hashDoEnvio(
 }
 
 export type SituacaoEnvioAutomatico =
-  "enviado" | "desligado" | "sem_mapa" | "pendente_manual" | "sem_confirmacao" | "falhou";
+  | "enviado"
+  | "desligado"
+  | "sem_mapa"
+  | "pendente_manual"
+  | "sem_confirmacao"
+  | "limite"
+  | "falhou";
 
 /**
  * Envia à planilha a chamada recém-salva de uma turma atual. Só roda com a
@@ -1128,6 +1170,21 @@ async function enviarTurmaAutomatico(
   dia: string,
 ): Promise<SituacaoEnvioAutomatico> {
   try {
+    return await comEnvioProtegido(() =>
+      enviarTurmaAutomaticoProtegido(usuario, linha, turmaOriginalId, dia),
+    );
+  } catch (erro) {
+    return ehLimiteGoogle(erro) ? "limite" : "falhou";
+  }
+}
+
+async function enviarTurmaAutomaticoProtegido(
+  usuario: { id: string },
+  linha: LinhaIntegracao,
+  turmaOriginalId: string,
+  dia: string,
+): Promise<SituacaoEnvioAutomatico> {
+  try {
     const entrada: EntradaEnvio = {
       turmaOriginalId,
       de: dia,
@@ -1178,9 +1235,10 @@ async function enviarTurmaAutomatico(
       );
       return puladas ? "pendente_manual" : "enviado";
     }
+    if (resultado === "falha" && ehLimiteGoogle(new Error(envio?.erro ?? ""))) return "limite";
     return resultado === "parcial" ? "sem_confirmacao" : "falhou";
-  } catch {
-    return "falhou";
+  } catch (erro) {
+    return ehLimiteGoogle(erro) ? "limite" : "falhou";
   }
 }
 
@@ -1196,6 +1254,7 @@ const RESUMO_VAZIO = {
   removerColunas: 0,
   puladasFormula: 0,
   puladasOcupadas: 0,
+  jaPresentes: 0,
   ambiguidades: 0,
 };
 
@@ -1213,7 +1272,7 @@ export async function simularEnvio(usuario: { id: string }, entrada: unknown) {
     throw new ErroHttp("Muitas prévias em sequência. Aguarde alguns minutos.", 429);
   }
   const linha = await lerLinha(FINALIDADE);
-  const simulacao = await montarSimulacao(linha, dados.data);
+  const simulacao = await comEnvioProtegido(() => montarSimulacao(linha, dados.data));
   return {
     modalidade: simulacao.modalidade,
     planoHashGeral: simulacao.planoHashGeral,
@@ -1258,6 +1317,7 @@ interface ResultadoTurma {
   resultado: "sucesso" | "parcial" | "falha" | "sem_envio";
   dias: string[];
   erro?: string;
+  aviso?: string;
   contagens?: Record<string, unknown>;
 }
 
@@ -1269,11 +1329,6 @@ interface ResultadoTurma {
  * resposta: se a função for interrompida, fica a verdade, sem confirmação.
  */
 export async function aplicarEnvio(usuario: { id: string }, entrada: unknown) {
-  return comTravaPlanilhaFrequencia(() => aplicarEnvioProtegido(usuario, entrada));
-}
-
-async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) {
-  const inicio = Date.now();
   const dados = esquemaEnvio.safeParse(entrada);
   if (!dados.success) {
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
@@ -1287,9 +1342,22 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
   if (!(await limiteDeTentativas(`planilha:envio:${usuario.id}`, 60))) {
     throw new ErroHttp("Muitos envios em sequência. Aguarde alguns minutos.", 429);
   }
+  return comEnvioProtegido(() => aplicarEnvioProtegido(usuario, dados.data));
+}
+
+async function aplicarEnvioProtegido(usuario: { id: string }, entrada: EntradaEnvio) {
+  const inicio = Date.now();
   const linha = await lerLinha(FINALIDADE);
-  const simulacao = await montarSimulacao(linha, dados.data);
-  if (dados.data.planoHashGeral !== simulacao.planoHashGeral) {
+  let simulacao: SimulacaoInterna;
+  try {
+    simulacao = await montarSimulacao(linha, entrada);
+  } catch (erro) {
+    if (erro instanceof ErroLeituraGoogle && erro.codigo === "GOOGLE_TEMPORARIO") {
+      throw new ErroHttp(erro.message, 409, erro.codigo);
+    }
+    throw erro;
+  }
+  if (entrada.planoHashGeral !== simulacao.planoHashGeral) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
   }
   const resultados: ResultadoTurma[] = [];
@@ -1317,7 +1385,21 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
     if (operacoes.length === 0) {
       // Registra a conferência; células puladas continuam pendentes.
       await concluirRegistro(registro, plano, "SUCESSO", {});
-      resultados.push({ ...base, resultado: "sucesso", contagens: {} });
+      await registrarDiasReconciliados(
+        usuario.id,
+        item,
+        plano,
+        {},
+        simulacao.modalidade,
+        new Date(inicio),
+      );
+      const aviso = avisoDaConferencia(plano, {});
+      resultados.push({
+        ...base,
+        resultado: "sucesso",
+        contagens: {},
+        ...(aviso ? { aviso } : {}),
+      });
       continue;
     }
     try {
@@ -1332,6 +1414,14 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
         operacoes,
       });
       await concluirRegistro(registro, plano, "SUCESSO", contagens);
+      await registrarDiasReconciliados(
+        usuario.id,
+        item,
+        plano,
+        contagens,
+        simulacao.modalidade,
+        new Date(inicio),
+      );
       // Coluna ou linha nova muda a assinatura: o esquema salvo acompanha,
       // para o próximo envio não pedir nova conferência de estrutura.
       if (Number(contagens.colunasCriadas ?? 0) > 0 || Number(contagens.linhasCriadas ?? 0) > 0) {
@@ -1341,7 +1431,8 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: unknown) 
           // A prévia seguinte detecta a mudança pela assinatura e reconfere.
         }
       }
-      resultados.push({ ...base, resultado: "sucesso", contagens });
+      const aviso = avisoDaConferencia(plano, contagens);
+      resultados.push({ ...base, resultado: "sucesso", contagens, ...(aviso ? { aviso } : {}) });
     } catch (erro) {
       const recusado = erro instanceof ErroGoogle && erro.recusado;
       const mensagem = recusado ? erro.message : ERRO_SEM_CONFIRMACAO;
@@ -1416,6 +1507,7 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
       linha: celula.linha,
       coluna: celula.coluna,
       valor: celula.valor,
+      ...(celula.dia ? { dia: celula.dia } : {}),
     });
   }
   for (const celula of plano.sinalizar ?? []) {
@@ -1461,6 +1553,74 @@ function operacoesDoPlano(plano: PlanoSincronizacao, esquema: AbaEsquema) {
   // A ordenação é a última operação para preservar as coordenadas de escrita.
   operacoes.push({ tipo: "ordenarAlunos", coluna: colunaAluno });
   return operacoes;
+}
+
+function numeroContagem(contagens: Record<string, unknown>, chave: string): number {
+  return typeof contagens[chave] === "number" ? (contagens[chave] as number) : 0;
+}
+
+function avisoDaConferencia(
+  plano: PlanoSincronizacao,
+  contagens: Record<string, unknown>,
+): string | undefined {
+  const puladas =
+    plano.resumo.puladasOcupadas +
+    plano.resumo.puladasFormula +
+    numeroContagem(contagens, "puladasOcupadas") +
+    numeroContagem(contagens, "puladasFormula") +
+    numeroContagem(contagens, "puladasVinculo");
+  const ja = plano.resumo.jaPresentes + numeroContagem(contagens, "jaPresentes");
+  if (puladas > 0 && ja > 0) {
+    return "Parte já estava na planilha. As divergências continuam pendentes.";
+  }
+  if (puladas > 0) return "Há divergências não sobrescritas. Essas chamadas continuam pendentes.";
+  if (numeroContagem(contagens, "preenchidas") === 0 && ja > 0) return "Já estava na planilha.";
+  return undefined;
+}
+
+/** Confirma os dias limpos quando o registro principal ficou com células puladas. */
+async function registrarDiasReconciliados(
+  usuarioId: string,
+  item: PlanoDaTurma,
+  plano: PlanoSincronizacao,
+  contagens: Record<string, unknown>,
+  modalidade: "conservador" | "completo",
+  referencia: Date,
+) {
+  if (numeroContagem(contagens, "puladasVinculo") > 0) return;
+  const puladasOcupadas =
+    plano.resumo.puladasOcupadas + numeroContagem(contagens, "puladasOcupadas");
+  const puladasFormula = plano.resumo.puladasFormula + numeroContagem(contagens, "puladasFormula");
+  if (puladasOcupadas === 0 && puladasFormula === 0) return;
+  const extras = Array.isArray(contagens.diasBloqueados)
+    ? contagens.diasBloqueados.filter((dia): dia is string => typeof dia === "string")
+    : [];
+  const limpos = diasLimposDoEnvio(item.dias, [...plano.diasBloqueados, ...extras]);
+  if (limpos.length === 0) return;
+  try {
+    await banco().sincronizacaoPlanilha.createMany({
+      data: limpos.map((dia) => ({
+        finalidade: FINALIDADE,
+        turmaOriginalId: plano.turmaOriginalId,
+        destino: item.destino,
+        de: new Date(`${dia}T12:00:00Z`),
+        ate: new Date(`${dia}T12:00:00Z`),
+        modalidade: modalidade === "completo" ? ("COMPLETO" as const) : ("CONSERVADOR" as const),
+        planoHash: plano.planoHash,
+        resultado: "SUCESSO" as const,
+        preenchidas: 0,
+        puladasOcupadas: 0,
+        puladasFormula: 0,
+        autorId: usuarioId,
+        criadoEm: referencia,
+      })),
+    });
+  } catch (erro) {
+    console.error(
+      "Confirmação dos dias já presentes não foi gravada.",
+      erro instanceof Error ? erro.name : "",
+    );
+  }
 }
 
 function temDestrutiva(plano: PlanoSincronizacao): boolean {
