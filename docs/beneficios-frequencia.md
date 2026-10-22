@@ -28,6 +28,7 @@ Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 
 
 Para um aluno em um mês, com `H` aulas no mês, `P` o percentual mínimo do benefício e `F` as aulas de falta que a regra manda contar:
 
+- Frequência estimada: `((H - F) / H) * 100`, com o calendário do mês inteiro como referência, inclusive os dias letivos ainda sem chamada.
 - Limite de faltas: `L = floor(H * (100 - P) / 100)`. Exatamente `P`% de frequência ainda é permitido.
 - Há alerta quando `F > L`.
 - `F` soma as aulas de falta sem justificativa e, quando `faltasJustificadasContam` está ligado, também as justificadas. As horas do mês `H` não mudam com isso.
@@ -79,6 +80,6 @@ Dois pontos que o alerta não resolve sozinho:
 - Aluno transferido no meio do mês usa a turma atual nos dias sem chamada, o que pode afrouxar o limite.
 - A base de cálculo é sempre as horas letivas (aulas). Outras bases, como dias letivos, exigiriam um novo campo na configuração.
 - O alerta não verifica a média anual do período letivo nem determina pagamento ou bloqueio. A exclusão de justificadas segue a configuração da escola, por decisão da coordenação na linha inicial, e não comprova abono pela rede ou pelo programa.
-- A Chamada relê os alertas ao abrir, ao trocar de mês, depois de salvar e quando a Gestão muda uma regra.
+- A Chamada relê os alertas ao abrir, ao trocar de mês, depois de salvar, quando a Gestão muda uma regra e quando mudam as datas dos feriados do mês. A base externa alimenta o Calendário letivo pela sincronização na Gestão; o cálculo lê os feriados já gravados, incluindo os cadastrados manualmente, sem consultar a API externa a cada aluno ou alerta.
 
 A cópia JSON inclui a quantidade diária por benefício. Cópias antigas sem o campo não apagam a configuração atual, e valores divergentes são conflitos sem sobrescrita.

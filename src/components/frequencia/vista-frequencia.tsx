@@ -456,7 +456,14 @@ export default function VistaFrequencia({
   // A Gestão avisa quando as regras dos benefícios mudam, pois esta tela continua montada.
   const [versaoBeneficios, setVersaoBeneficios] = useState(0);
   useEffect(() => ouvirBeneficiosMudaram(() => setVersaoBeneficios((versao) => versao + 1)), []);
-  const chaveAlertas = `${chaveResumo}|${versaoBeneficios}`;
+  // Feriados importados e manuais compõem a mesma base mensal. Alterar outra
+  // data fora do mês ou apenas o nome do feriado não exige uma nova consulta.
+  const calendarioDoMes = configuracoes.feriados
+    .filter((feriado) => feriado.dia.startsWith(`${mesDaChamada}-`))
+    .map((feriado) => feriado.dia)
+    .sort()
+    .join(",");
+  const chaveAlertas = `${chaveResumo}|${versaoBeneficios}|${calendarioDoMes}`;
   useEffect(() => {
     let atual = true;
     pedir<{ alertas: AlertaFrequenciaBeneficio[] }>(
