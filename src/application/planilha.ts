@@ -742,35 +742,25 @@ async function lerParaPlano(
 
 /** Detecta de novo o esquema de uma aba, pela mesma regra da conferência de estrutura. */
 export async function detectarAba(linha: LinhaIntegracao, nome: string): Promise<AbaEsquema> {
-  const estrutura = await chamarIntegracao<{
-    abas: {
-      nome: string;
-      abaId: number;
-      oculta: boolean;
-      criada: boolean;
-      linhas: number;
-      colunas: number;
-      congeladasLinhas: number;
-      congeladasColunas: number;
-      mesclagens: string[];
-      mensal?: AbaEsquema["mensal"];
-    }[];
-  }>(linha, { acao: "estrutura", aba: nome });
-  const item = estrutura.abas.find((aba) => aba.nome === nome);
-  if (!item) throw new ErroHttp(`A aba ${nome} não foi encontrada na planilha.`, 409);
-  const leitura = await chamarIntegracao<{ valores: string[][]; formula: boolean[][] }>(linha, {
-    acao: "ler",
-    aba: nome,
-    linhaInicial: 1,
-    colunaInicial: 1,
-    linhas: Math.max(item.linhas, 1),
-    colunas: Math.max(item.colunas, 1),
-  });
+  // Estrutura e conteúdo vêm de uma leitura só, com o mesmo documento e tamanho.
+  const item = await chamarIntegracao<{
+    abaId: number;
+    oculta: boolean;
+    criada: boolean;
+    linhas: number;
+    colunas: number;
+    congeladasLinhas: number;
+    congeladasColunas: number;
+    mesclagens: string[];
+    mensal?: AbaEsquema["mensal"];
+    valores: string[][];
+    formula: boolean[][];
+  }>(linha, { acao: "detectarAba", aba: nome });
   const esquema = detectarEsquema(
     {
       nome,
-      valores: leitura.valores,
-      formulas: leitura.formula.map((fileira) => fileira.map((tem) => (tem ? "=" : ""))),
+      valores: item.valores,
+      formulas: item.formula.map((fileira) => fileira.map((tem) => (tem ? "=" : ""))),
       linhas: item.linhas,
       colunas: item.colunas,
       oculta: item.oculta,
@@ -1152,7 +1142,7 @@ export async function enviarAposSalvar(
         situacoes.set(origem, "sem_mapa");
         continue;
       }
-      situacoes.set(origem, await enviarTurmaAutomatico(usuario, linha, origem, dia));
+      situacoes.set(origem, await enviarTurmaAutomatico(usuario, origem, dia));
     }
   } catch (erro) {
     console.error(
@@ -1165,26 +1155,32 @@ export async function enviarAposSalvar(
 
 async function enviarTurmaAutomatico(
   usuario: { id: string },
-  linha: LinhaIntegracao,
   turmaOriginalId: string,
   dia: string,
 ): Promise<SituacaoEnvioAutomatico> {
   try {
     return await comEnvioProtegido(() =>
-      enviarTurmaAutomaticoProtegido(usuario, linha, turmaOriginalId, dia),
+      enviarTurmaAutomaticoProtegido(usuario, turmaOriginalId, dia),
     );
   } catch (erro) {
     return ehLimiteGoogle(erro) ? "limite" : "falhou";
   }
 }
 
+/**
+ * Monta e aplica o plano sob a mesma trava: o plano conferido é o aplicado,
+ * sem uma segunda simulação só para comparar o hash. A integração é relida
+ * com a trava, para enxergar desligamento ou modo completo aberto na espera.
+ */
 async function enviarTurmaAutomaticoProtegido(
   usuario: { id: string },
-  linha: LinhaIntegracao,
   turmaOriginalId: string,
   dia: string,
 ): Promise<SituacaoEnvioAutomatico> {
   try {
+    const inicio = Date.now();
+    const linha = await lerLinha(FINALIDADE);
+    if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) return "desligado";
     const entrada: EntradaEnvio = {
       turmaOriginalId,
       de: dia,
@@ -1220,12 +1216,9 @@ async function enviarTurmaAutomaticoProtegido(
       resumo.puladasFormula > 0 ||
       item.plano.avisos.length > 0;
     if (naoSeguro) return "pendente_manual";
+    if (!(await limiteDeTentativas(`planilha:envio:${usuario.id}`, 60))) return "falhou";
     // Mesmo sem escrita, a conferência confirma a revisão recém-salva.
-    // O fluxo comum relê e valida o hash antes de registrar o sucesso.
-    const resposta = await aplicarEnvio(usuario, {
-      ...entrada,
-      planoHashGeral: simulacao.planoHashGeral,
-    });
+    const resposta = await aplicarSimulacao(usuario, linha, simulacao, inicio);
     const envio = resposta.resultados[0];
     const resultado = envio?.resultado;
     if (resultado === "sucesso" || resultado === "sem_envio") {
@@ -1360,6 +1353,19 @@ async function aplicarEnvioProtegido(usuario: { id: string }, entrada: EntradaEn
   if (entrada.planoHashGeral !== simulacao.planoHashGeral) {
     throw new ErroHttp("Os dados mudaram desde a prévia. Revise o envio de novo.", 409);
   }
+  return aplicarSimulacao(usuario, linha, simulacao, inicio);
+}
+
+/**
+ * Aplica uma simulação montada sob a trava da frequência. `inicio` é o instante
+ * anterior à leitura: chamadas salvas depois dele continuam pendentes.
+ */
+async function aplicarSimulacao(
+  usuario: { id: string },
+  linha: LinhaIntegracao,
+  simulacao: SimulacaoInterna,
+  inicio: number,
+) {
   const resultados: ResultadoTurma[] = [];
   for (const item of simulacao.planos) {
     const base = {

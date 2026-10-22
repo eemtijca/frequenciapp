@@ -667,7 +667,8 @@ export async function catalogoFrequenciaGoogle(id: string, acesso: string) {
   };
 }
 
-export async function lerGoogle(
+/** Lê uma aba e devolve também o documento e o tamanho usados na leitura. */
+export async function lerAbaGoogle(
   id: string,
   acesso: string,
   nome: string,
@@ -702,7 +703,7 @@ export async function lerGoogle(
       mesclagensDaAssinatura(aba),
     );
   }
-  return {
+  const leitura = {
     aba: nome,
     abaId: aba.properties.sheetId,
     ...(mensal
@@ -733,6 +734,40 @@ export async function lerGoogle(
           : [];
       }),
     ...(assinatura ? { assinatura } : {}),
+  };
+  return { documento: doc, aba, usado, leitura };
+}
+
+export async function lerGoogle(
+  id: string,
+  acesso: string,
+  nome: string,
+  pedidos?: { coluna: number; colunas: number }[],
+  cabecalhoLinha?: number,
+  documentoInicial?: DocumentoGoogle,
+) {
+  return (await lerAbaGoogle(id, acesso, nome, pedidos, cabecalhoLinha, documentoInicial)).leitura;
+}
+
+/**
+ * Estrutura e conteúdo inteiro de uma aba para detectar o esquema de novo, com
+ * um documento e um tamanho só, como a conferência de estrutura seguida da leitura.
+ */
+export async function detectarAbaGoogle(id: string, acesso: string, nome: string) {
+  const { documento, aba, usado, leitura } = await lerAbaGoogle(id, acesso, nome);
+  return {
+    nome,
+    abaId: aba.properties.sheetId,
+    ...(leitura.mensal ? { mensal: leitura.mensal } : {}),
+    oculta: aba.properties.hidden ?? false,
+    criada: metadadosDaAba(documento, aba).some((item) => item.metadataKey === "frequenciapp.aba"),
+    linhas: usado.linhas,
+    colunas: usado.colunas,
+    congeladasLinhas: aba.properties.gridProperties?.frozenRowCount ?? 0,
+    congeladasColunas: aba.properties.gridProperties?.frozenColumnCount ?? 0,
+    mesclagens: mesclagensDaAba(aba),
+    valores: leitura.valores,
+    formula: leitura.formula,
   };
 }
 
@@ -923,6 +958,10 @@ export async function executarAcaoGoogle(
   if (corpo.acao === "estrutura") {
     const aba = typeof corpo.aba === "string" ? corpo.aba : undefined;
     return estruturaGoogle(id, acesso, aba, corpo.apresentacao === true);
+  }
+  if (corpo.acao === "detectarAba") {
+    if (typeof corpo.aba !== "string") throw new ErroHttp("Informe a aba.", 400);
+    return detectarAbaGoogle(id, acesso, corpo.aba);
   }
   if (corpo.acao === "ler") {
     if (typeof corpo.aba !== "string") throw new ErroHttp("Informe a aba.", 400);

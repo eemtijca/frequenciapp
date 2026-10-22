@@ -56,3 +56,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-048](adr/048-abas-de-saidas-por-turma.md): consultas automáticas de saídas por turma, com preservação da origem.
 - [ADR-050](adr/050-limite-de-leitura-da-planilha.md): cota de leitura do Google no envio da frequência e confirmação do que já estava na planilha.
 - [ADR-051](adr/051-ordem-do-almoco.md): ordem das turmas no almoço por dia, com horário opcional e mesclagem na cópia JSON.
+- [ADR-052](adr/052-envio-automatico-com-simulacao-unica.md): envio automático com uma simulação sob a trava, token de acesso guardado e releitura da estrutura numa ação.

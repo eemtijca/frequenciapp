@@ -1,6 +1,7 @@
 // Tradução das leituras da Sheets API para a estrutura usada pela frequência.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  detectarAbaGoogle,
   estruturaGoogle,
   lerGoogle,
   lerBlocosGoogle,
@@ -432,5 +433,80 @@ describe("leitura pela Sheets API", () => {
       congeladasLinhas: 1,
       amostra: [["Aluno"], ["Ana"]],
     });
+  });
+});
+
+describe("detecção da aba numa leitura só", () => {
+  function respostaDe(url: URL) {
+    if (url.pathname.endsWith("/developerMetadata:search")) {
+      return Response.json({ matchedDeveloperMetadata: [] });
+    }
+    if (url.pathname.includes("/values/")) {
+      return Response.json({ values: [["Aluno", "Dia"], ["Ana"]] });
+    }
+    if (url.searchParams.get("includeGridData") === "true") {
+      return Response.json({
+        sheets: [
+          {
+            data: [
+              {
+                rowData: [
+                  { values: [{ formattedValue: "Aluno" }, { formattedValue: "Dia" }] },
+                  { values: [{ formattedValue: "Ana" }] },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    }
+    return Response.json(documento);
+  }
+
+  it("recusa a aba ausente na detecção sem ler o tamanho", async () => {
+    const chamada = vi.fn(async (entrada: URL | string) => respostaDe(new URL(String(entrada))));
+    vi.stubGlobal("fetch", chamada);
+    await expect(detectarAbaGoogle("planilha-de-teste", "acesso", "Outra")).rejects.toThrow(
+      "A aba Outra não foi encontrada na planilha.",
+    );
+    expect(chamada.mock.calls.some(([entrada]) => String(entrada).includes("/values/"))).toBe(
+      false,
+    );
+  });
+
+  it("detecta a aba com um documento e um tamanho só", async () => {
+    const chamada = vi.fn(async (entrada: URL | string) => respostaDe(new URL(String(entrada))));
+    vi.stubGlobal("fetch", chamada);
+    const aba = await detectarAbaGoogle("planilha-de-teste", "acesso", "Turma");
+    expect(aba).toEqual({
+      nome: "Turma",
+      abaId: 7,
+      oculta: false,
+      criada: false,
+      linhas: 2,
+      colunas: 2,
+      congeladasLinhas: 1,
+      congeladasColunas: 0,
+      mesclagens: [],
+      valores: [
+        ["Aluno", "Dia"],
+        ["Ana", ""],
+      ],
+      formula: [
+        [false, false],
+        [false, false],
+      ],
+    });
+    const tipos = chamada.mock.calls.map(([entrada]) => {
+      const url = new URL(String(entrada));
+      return url.pathname.endsWith(":search")
+        ? "busca"
+        : url.pathname.includes("/values/")
+          ? "tamanho"
+          : url.searchParams.get("includeGridData") === "true"
+            ? "grade"
+            : "documento";
+    });
+    expect(tipos.sort()).toEqual(["busca", "documento", "grade", "tamanho"]);
   });
 });

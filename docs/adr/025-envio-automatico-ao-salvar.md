@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceita.
+Aceita. A [ADR-052](052-envio-automatico-com-simulacao-unica.md) troca a comparação de hash do envio automático por uma simulação única sob a trava.
 
 ## Contexto
 

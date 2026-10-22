@@ -425,13 +425,15 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
               ? { error: "invalid_grant" }
               : {
                   access_token: credencial,
+                  expires_in: 3599,
                   ...(autorizacao ? { refresh_token: credencial } : {}),
                 },
             recusarAutorizacao ? 400 : 200,
           );
           return;
         }
-        if (req.headers.authorization !== `Bearer ${credencial}`) {
+        // Autorização revogada também invalida os acessos já emitidos.
+        if (recusarAutorizacao || req.headers.authorization !== `Bearer ${credencial}`) {
           responder({ error: { message: "Credencial sintética inválida." } }, 401);
           return;
         }

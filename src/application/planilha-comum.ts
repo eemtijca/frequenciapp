@@ -8,7 +8,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
-import { renovarAcesso } from "@/infra/google-oauth";
+import { acessoGoogle, esquecerAcessoGoogle } from "@/infra/google-oauth";
 import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
 import { mesValido } from "@/domain/planilha-mensal";
@@ -89,16 +89,46 @@ export function modoCompletoAtivo(linha: LinhaIntegracao): boolean {
   );
 }
 
+/** Ações que só leem: repeti-las com um acesso novo não altera a planilha. */
+const ACOES_DE_LEITURA = new Set([
+  "catalogoFrequencia",
+  "ler",
+  "lerVarias",
+  "estrutura",
+  "detectarAba",
+  "abasMensais",
+  "listarCopias",
+  "listarAbasBackup",
+  "preverAbaAntiga",
+]);
+
 /** Executa a ação na planilha autorizada pela conta Google. */
 export async function chamarIntegracao<T>(
   linha: LinhaIntegracao,
   corpo: Record<string, unknown>,
 ): Promise<T> {
-  if (!linha.ativa || !linha.googleRefreshToken || !linha.googlePlanilhaId) {
+  const token = linha.googleRefreshToken;
+  const planilhaId = linha.googlePlanilhaId;
+  if (!linha.ativa || !token || !planilhaId) {
     throw new ErroHttp("Conecte a conta Google e escolha a planilha na Gestão.", 400);
   }
-  const acesso = await renovarAcesso(linha.googleRefreshToken);
-  return (await executarAcaoGoogle(linha.googlePlanilhaId, acesso, corpo)) as T;
+  const { acesso, guardado } = await acessoGoogle(token);
+  try {
+    return (await executarAcaoGoogle(planilhaId, acesso, corpo)) as T;
+  } catch (erro) {
+    // Qualquer falha descarta o acesso guardado: a ação seguinte renova.
+    esquecerAcessoGoogle(token);
+    const recusado = erro instanceof ErroHttp && erro.codigo === "GOOGLE_RECONECTAR";
+    if (!guardado || !recusado || !ACOES_DE_LEITURA.has(String(corpo.acao))) throw erro;
+    // O Google recusou o acesso guardado numa leitura: renova uma vez e repete.
+    try {
+      const novo = await acessoGoogle(token);
+      return (await executarAcaoGoogle(planilhaId, novo.acesso, corpo)) as T;
+    } catch (repetida) {
+      esquecerAcessoGoogle(token);
+      throw repetida;
+    }
+  }
 }
 
 export const esquemaSenha = z.object({
