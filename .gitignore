@@ -13,6 +13,10 @@ next-env.d.ts
 .env.*
 !.env.example
 
+# Perfis locais de armazenamento podem conter tokens e senhas.
+rclone.conf
+rclone.conf.*
+
 # Banco local e artefatos de execução
 *.db
 *.sqlite

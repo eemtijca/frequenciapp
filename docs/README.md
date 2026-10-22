@@ -19,6 +19,7 @@
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
 | [beneficios-frequencia.md](beneficios-frequencia.md) | Regras de frequência mínima dos benefícios e alerta.       |
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
+| [backup-externo.md](backup-externo.md)               | Backup portátil de arquivos com transporte externo.        |
 | [Contribuir](../CONTRIBUTING.md)                     | Fluxo de issues, etiquetas, commits e pull requests.       |
 | [adr/](adr/)                                         | Decisões de arquitetura registradas.                       |
 | [ADR-026](adr/026-origem-configuravel-na-chamada.md) | Exibição de origem configurável por escola, série e turma. |
