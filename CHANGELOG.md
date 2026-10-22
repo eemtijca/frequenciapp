@@ -14,8 +14,6 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Gestão permite configurar Aulas por dia em cada benefício, com sugestão inicial de nove e campo vazio para seguir a grade. A projeção considera somente os dias com aulas, respeita feriados e desistência e preserva chamadas salvas. API, alerta e cópia JSON incluem a carga diária opcional.
 
-- Saídas gera comunicado formal aos responsáveis com aluno, turma, data e horário já preenchidos. A mensagem pode ser conferida, editada e copiada localmente; motivos e observações ficam fora do texto padrão. Registros antigos sem horário mantêm apenas a data.
-
 - Chamada mostra um botão de alerta na linha do aluno, depois dos círculos de F e FJ do mês, quando as faltas passam do limite da regra de algum benefício ativo. O painel do botão lista cada benefício com as faltas contadas, as aulas do mês, o limite e o tratamento das faltas justificadas. As regras são configuração, sem nome de benefício nem percentual no código: a administração cria, edita, ativa, desativa e exclui benefícios em Gestão, Configurações, Benefícios e frequência mínima, com percentual mínimo de frequência e a escolha de contar ou não as faltas justificadas, e a Chamada relê os alertas na hora. Nova tabela `beneficios_frequencia`, com a regra do incentivo-frequência do Pé-de-Meia (80%, sem contar justificadas) como linha inicial editável, cópia de segurança dos benefícios e rotas `GET` e `POST /api/beneficios-frequencia`, `PATCH` e `DELETE /api/beneficios-frequencia/{id}` e `GET /api/frequencias/alertas-beneficios?mes=AAAA-MM`. A regra e a decisão estão em `docs/beneficios-frequencia.md` e na ADR-049.
 
 - Lista de saídas do dia ganha o botão Desbloquear e Bloquear, como na Chamada. A lista abre bloqueada, sem o botão de remover, e só o desbloqueio mostra a lixeira de cada saída. Trocar de dia bloqueia de novo. O registro de novas saídas não muda. O bloqueio é só da interface e não altera a API.
@@ -153,6 +151,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - O `postinstall` também copia os assets do Swagger UI para `public/vendor/swagger-ui`, e `@scarf/scarf` (telemetria transitiva) fica explicitamente negado nos scripts de instalação.
 
 ### Removido
+
+- Saiu mais cedo deixa de oferecer Gerar comunicado e o texto padronizado aos responsáveis, por orientação da coordenação.
 
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).
 
