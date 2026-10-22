@@ -68,7 +68,7 @@ function ambienteDoTransporte() {
 }
 
 /** A senha do pacote e as credenciais da aplicação não são repassadas ao processo de transporte. */
-function transporte(configRclone) {
+function transporte(configRclone, pasta) {
   return async function executar(argumentos, aoLer) {
     await new Promise((resolve, reject) => {
       const filho = spawn(
@@ -77,6 +77,10 @@ function transporte(configRclone) {
           ...argumentos,
           "--config",
           configRclone,
+          "--cache-dir",
+          path.join(pasta, "cache"),
+          "--temp-dir",
+          pasta,
           "--retries",
           "1",
           "--low-level-retries",
@@ -118,17 +122,15 @@ function transporte(configRclone) {
 }
 
 /** O transporte é substituível; a rotina não conhece APIs, SDKs ou modelos de arquivos de provedores. */
-export async function executarBackup(
-  configuracao,
-  executar = transporte(configuracao.configRclone),
-) {
+export async function executarBackup(configuracao, executar) {
   const info = await lstat(configuracao.configRclone);
   if (!info.isFile() || (info.mode & 0o077) !== 0)
     throw new Error("A configuração do rclone deve ser um arquivo privado, com permissão 600.");
   const pasta = await mkdtemp(path.join(tmpdir(), "frequenciapp-backup-"));
   try {
+    const transferir = executar ?? transporte(configuracao.configRclone, pasta);
     const origem = path.join(pasta, "origem");
-    await executar(["copy", configuracao.origem, origem, "--max-transfer", "64M"]);
+    await transferir(["copy", configuracao.origem, origem, "--max-transfer", "64M"]);
     const pacote = await criarPacote(origem, configuracao.senha);
     await conferirPacote(pacote.bytes, configuracao.senha);
     const resumo = sha256(pacote.bytes);
@@ -137,10 +139,10 @@ export async function executarBackup(
     const local = path.join(pasta, arquivo);
     await writeFile(local, pacote.bytes, { mode: 0o600 });
     const remoto = `${configuracao.destino.replace(/\/+$/, "")}/${arquivo}`;
-    await executar(["copyto", local, remoto, "--immutable"]);
+    await transferir(["copyto", local, remoto, "--immutable"]);
     const hash = createHash("sha256");
     let recebidos = 0;
-    await executar(["cat", remoto], (bytes) => {
+    await transferir(["cat", remoto], (bytes) => {
       recebidos += bytes.byteLength;
       if (recebidos > pacote.bytes.byteLength)
         throw new Error("Tamanho inesperado na conferência.");
@@ -159,7 +161,7 @@ export async function executarBackup(
     };
     const comprovante = path.join(pasta, "confirmacao.json");
     await writeFile(comprovante, JSON.stringify(resultado), { mode: 0o600 });
-    await executar(["copyto", comprovante, `${remoto}.confirmado.json`, "--immutable"]);
+    await transferir(["copyto", comprovante, `${remoto}.confirmado.json`, "--immutable"]);
     return resultado;
   } finally {
     await rm(pasta, { recursive: true, force: true });

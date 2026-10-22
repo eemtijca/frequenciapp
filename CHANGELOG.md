@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- Backup externo opcional usa rclone fora da aplicação, com origem e destino configuráveis e sem SDK de provedor. Produz ZIP AES-256 com manifesto versionado, nomes genéricos e hashes SHA-256, relê a cópia antes de confirmar e conserva versões anteriores. Configuração, agendamento, chave e retenção ficam no executor da escola; nenhuma conexão é ativada automaticamente.
+- Backup externo usa rclone fora da aplicação, com origem e destino configuráveis e sem SDK de provedor. Produz ZIP AES-256 com manifesto versionado, nomes genéricos e hashes SHA-256, relê a cópia antes de confirmar e conserva versões anteriores. Workflow diário às 02h17 de Fortaleza usa repository secrets, configuração temporária privada e limpeza final, com execução manual e concorrência sem cancelamento. Também permite executor próprio. Sem secrets, a agenda falha explicitamente; nenhum envio ocorre no deploy da aplicação. Chaves, monitoramento e retenção seguem sob controle da escola.
 
 - Horários mostra, na consulta diária, a ordem das turmas no almoço do dia da semana, com o horário de cada turma quando definido e a turma consultada em destaque. A administração define a ordem de segunda a sábado em Gestão, Configurações, Horários, seção Ordem do almoço: adiciona, sobe, desce e tira turmas, informa o horário opcional, salva ou descarta o dia e copia a ordem para os outros dias. Nova tabela `ordens_almoco`, rotas `GET /api/ordem-almoco` e `PUT /api/ordem-almoco/{dia}` e a ordem na cópia de segurança.
 

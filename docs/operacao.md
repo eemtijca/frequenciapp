@@ -145,7 +145,7 @@ A administração também pode baixar e importar uma cópia JSON em Gestão, Con
 
 ### Arquivos em armazenamento externo
 
-O [backup externo portátil](backup-externo.md) copia arquivos de uma origem configurada para um destino escolhido pela escola, como Dropbox, usando rclone fora da aplicação. Gera ZIP AES-256 com manifesto e hashes, verifica a cópia por download e conserva versões anteriores. Não há SDK de provedor, ativação automática nem expurgo. A configuração, o agendamento, a chave de recuperação e o teste de restauração pertencem ao executor externo.
+O [backup externo portátil](backup-externo.md) copia arquivos de uma origem configurada para um destino escolhido pela escola, como Dropbox, usando rclone fora da aplicação. Gera ZIP AES-256 com manifesto e hashes, verifica a cópia por download e conserva versões anteriores. O workflow `backup-externo.yml` agenda todos os dias às 02h17 de Fortaleza na branch padrão, com repository secrets, arquivo de configuração temporário e limpeza. Também permite execução manual. Sem secrets, o job falha explicitamente. Não há SDK de provedor, envio no deploy da aplicação ou expurgo. A chave de recuperação, o monitoramento e o teste de restauração seguem sob controle da escola.
 
 ## Restauração
 

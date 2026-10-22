@@ -2,7 +2,7 @@
 
 Rotina opcional para copiar as planilhas para um armazenamento escolhido pela escola, sem SDK ou biblioteca de provedor no FrequenciApp. O transporte usa o executável externo rclone. Origem e destino ficam na configuração do executor: Dropbox, outro serviço compatível ou disco local. Trocar o destino não altera o pacote, o banco nem a aplicação.
 
-A rotina não está ativada pelo deploy. Roda fora da Vercel e do processo que atende o celular, em executor Linux com Node 24, dependências do projeto instaladas e rclone disponível no `PATH`. O operador configura e agenda esse executor. Nenhum arquivo real é enviado na instalação ou nos testes.
+A rotina roda fora da Vercel e do processo que atende o celular, em executor Linux com Node 24, dependências do projeto instaladas e rclone disponível no `PATH`. O workflow do GitHub Actions agenda a execução pela madrugada quando publicado na branch padrão e configurado com os secrets. Um executor próprio também pode usar cron. Nenhum arquivo real é enviado na instalação ou nos testes.
 
 ## Proteções
 
@@ -59,7 +59,51 @@ Sucesso retorna JSON com nome genérico do pacote, data, hash, tamanho e quantid
 
 O comprovante não é criptografado: contém somente nome genérico, data, versão, tamanho, contagem e SHA-256 do ZIP. Não contém nomes de arquivos escolares ou credenciais. A pasta permanece privada.
 
-## Agendamento e retenção
+## GitHub Actions na madrugada
+
+O workflow [backup-externo.yml](../.github/workflows/backup-externo.yml) agenda uma cópia todos os dias às **02h17 em America/Fortaleza**, equivalente a `05h17 UTC` (`17 5 * * *`). Não depende de computador da escola ligado. O GitHub pode atrasar a execução; o horário não é uma garantia de início exato. O agendamento só é registrado na branch padrão do repositório. A execução manual também exige essa branch, e usa o mesmo grupo de concorrência para não interromper nem sobrepor outra cópia.
+
+Em Settings, Secrets and variables, Actions, cadastrar os seguintes **repository secrets**:
+
+Preparar um arquivo de configuração exclusivo da rotina, contendo somente os perfis necessários à origem e ao destino. A configuração global de um computador pode conter credenciais de outras contas e não deve ser copiada inteira para o workflow.
+
+A configuração deve ser suficiente para autenticar os perfis no runner. Caminhos locais para certificados, chaves ou arquivos de conta de serviço não passam a existir no GitHub ao copiar o `rclone.conf`. Usar credenciais embutidas quando o backend oferecer essa opção ou preparar esses arquivos separadamente a partir de secrets, na mesma pasta privada. O workflow não copia arquivos do computador nem acrescenta credenciais ao repositório.
+
+| Secret                 | Conteúdo                                                                                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP_RCLONE_CONFIG` | Conteúdo completo do arquivo `rclone.conf`, com os perfis de origem e destino, como texto multilinha. Aceita configuração normal ou criptografada pelo rclone. Não é um caminho do computador. |
+| `BACKUP_ORIGEM`        | Perfil e pasta, como `origem:planilhas`.                                                                                                                                                       |
+| `BACKUP_DESTINO`       | Perfil e pasta, como `destino:frequenciapp`.                                                                                                                                                   |
+| `BACKUP_CHAVE`         | Chave de recuperação de 32 a 256 caracteres para o ZIP. Guardar também fora do GitHub, em gerenciador da escola.                                                                               |
+| `RCLONE_CONFIG_PASS`   | Somente quando o arquivo de configuração foi criptografado pelo rclone. É diferente da chave do ZIP.                                                                                           |
+
+O GitHub aceita secrets de até 48 KB. Não é necessário converter o arquivo em base64: a configuração do rclone é texto, inclusive quando criptografada. A codificação base64 não acrescenta proteção. O arquivo pode ser cadastrado sem aparecer no comando ou no histórico do terminal:
+
+```bash
+gh secret set BACKUP_RCLONE_CONFIG < /caminho/privado/rclone.conf
+```
+
+Os outros secrets podem ser cadastrados pela interface do GitHub. O arquivo inteiro contém credenciais; valores apenas ofuscados pelo rclone não equivalem a um arquivo criptografado. Para proteção adicional, criptografar a configuração com o próprio rclone antes de cadastrar seu conteúdo e guardar a senha em `RCLONE_CONFIG_PASS`. A permissão de administrar esses secrets deve ficar restrita à equipe responsável.
+
+### O arquivo dentro do runner
+
+`scripts/backup-actions.sh` valida a presença dos secrets antes da instalação, sem criar arquivos nessa etapa. Uma configuração ausente ou inválida faz a execução falhar, para não apresentar como concluído um backup que não ocorreu. Os secrets não são disponibilizados às etapas de checkout, setup ou instalação de dependências.
+
+Na etapa de execução, o script cria uma pasta privada `700` dentro de `RUNNER_TEMP` e grava o conteúdo do secret em `rclone.conf`, com permissão `600`. O texto é escrito literalmente, sem interpolação como código shell. Somente então a variável `BACKUP_RCLONE_CONFIG` recebe o caminho gerado para a rotina existente. A variável com o conteúdo original é retirada do ambiente antes de iniciar o backup. Os arquivos de trabalho, o cache e os temporários do próprio rclone também ficam nessa pasta privada, com caminhos explícitos de transporte.
+
+O arquivo permanece gravável pela conta do runner porque o rclone pode renovar tokens durante a cópia. A limpeza roda ao terminar ou falhar, com tratamento de interrupções, e uma etapa final `always()` tenta remover a pasta novamente. O workflow usa runner hospedado descartável; não utiliza cache ou artifacts para configuração, tokens, chaves, planilhas ou pacotes. O `GITHUB_TOKEN` tem somente `contents: read`, e o checkout não conserva credenciais Git.
+
+Uma interrupção forçada do runner pode impedir a execução dos procedimentos de limpeza; o runner hospedado é descartado pelo GitHub. Não reutilizar esse workflow em runner próprio persistente sem adaptar isolamento e descarte. O log de sucesso contém somente os metadados genéricos do comprovante; falhas não imprimem configuração ou respostas dos provedores.
+
+### Renovação de tokens e operação
+
+O arquivo temporário não é devolvido ao GitHub, ao armazenamento ou a um artifact. Uma renovação normal de access token pode ser refeita na próxima execução a partir de um refresh token ainda válido. Se o provedor rotacionar ou revogar o refresh token, ou a autorização expirar, atualizar `BACKUP_RCLONE_CONFIG` a partir de uma configuração reconectada. O workflow não recebe token com permissão de editar secrets e não os atualiza automaticamente. Escolher uma autorização adequada a rotinas sem interação e monitorar falhas.
+
+Depois de configurar os secrets e integrar o workflow, abrir Actions, Backup externo das planilhas, Run workflow, escolhendo a branch padrão. Conferir a conclusão e o par ZIP e `.confirmado.json` no destino e testar a recuperação. Não é necessário publicar novamente a aplicação na Vercel.
+
+Manter as notificações de falha do GitHub Actions ativas para a equipe responsável e acompanhar também a ausência de execuções ou comprovantes recentes. Repositórios públicos podem ter agendas desativadas pelo GitHub após 60 dias sem atividade; conferir a situação da agenda faz parte da operação. O workflow não envia mensagens externas nem anexa dados escolares.
+
+## Executor próprio e retenção
 
 Agendar uma execução diária após o expediente no executor, por cron ou timer do sistema. Usar uma única rotina e uma trava do agendador para impedir sobreposição. Definir explicitamente o fuso do executor; os nomes dos pacotes usam UTC. Encaminhar falhas pelo monitoramento do próprio agendador, sem anexar dados escolares.
 
@@ -69,7 +113,7 @@ Exemplo de crontab para 22h30 no fuso do executor, com checkout em `/opt/frequen
 30 22 * * * /usr/bin/flock -n /etc/frequenciapp-backup/execucao.lock /usr/bin/node --env-file=/etc/frequenciapp-backup/backup.env /opt/frequenciapp/scripts/backup-externo.mjs
 ```
 
-O programa não cria workflows de envio nem se conecta automaticamente a contas. A configuração real deve ser testada primeiro com arquivos sintéticos, e depois com os arquivos autorizados pela escola.
+Escolher um único agendador para o mesmo destino, evitando executar o cron próprio junto ao workflow diário. A configuração real deve ser testada primeiro com arquivos sintéticos, e depois com os arquivos autorizados pela escola.
 
 Não há expurgo automático. A escola define o prazo de guarda e revisa a capacidade do destino. Uma política futura de retenção deve validar os comprovantes e manter cópias recuperáveis antes de remover versões antigas. A verificação por hash é de integridade; a proteção contra exclusão depende também das permissões e recursos do armazenamento. Manter uma cópia adicional separada quando a política da escola exigir.
 
