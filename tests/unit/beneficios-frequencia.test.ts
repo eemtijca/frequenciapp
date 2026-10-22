@@ -391,59 +391,40 @@ function alertaDe(extras: Partial<AlertaFrequenciaBeneficio> = {}): AlertaFreque
 }
 
 describe("frases do alerta", () => {
-  it("lê faltas, limite, margem e frequência projetada em aulas e em dias", () => {
+  it("resume faltas e limite em aulas, com frequência estimada e mínimo em porcentagem", () => {
     const frases = frasesDoAlerta(alertaDe());
-    expect(frases.faltas).toBe(
-      "Faltou 28 aulas (≈ 3,1 dias de 9 aulas) de 186 aulas previstas em 22 dias letivos.",
-    );
-    expect(frases.limite).toBe("Limite para 80%: 37 aulas (≈ 4,1 dias).");
-    expect(frases.margem).toBe("Ainda restam 9 aulas até o limite.");
-    expect(frases.frequencia).toBe("Frequência projetada: 84,9%.");
-    expect(frases.carga).toBe(
-      "Alguns dias já salvos têm outra quantidade de aulas. Por isso, 186 aulas previstas podem não ser 22 vezes 9 aulas.",
-    );
+    expect(frases.faltas).toBe("Faltas: 28/186 aulas · Limite: 37.");
+    expect(frases.margem).toBe("9 aulas até o limite.");
+    expect(frases.frequencia).toBe("Frequência estimada: 84,9% · Mínimo: 80%.");
+    expect(frases.justificadas).toBeNull();
   });
 
   it("diz quando o limite já foi passado e quando não resta aula", () => {
-    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 40 })).margem).toBe(
-      "Passou do limite em 3 aulas.",
-    );
-    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 37 })).margem).toBe(
-      "Não resta aula até o limite.",
-    );
-    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 36 })).margem).toBe(
-      "Ainda resta 1 aula até o limite.",
-    );
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 40 })).margem).toBe("3 aulas acima do limite.");
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 37 })).margem).toBe("No limite de faltas.");
+    expect(frasesDoAlerta(alertaDe({ aulasFaltadas: 36 })).margem).toBe("1 aula até o limite.");
   });
 
-  it("omite o equivalente em dias quando os dias não compartilham uma carga", () => {
+  it("usa o total de aulas do mês com cargas variadas, sem converter em dias", () => {
     const frases = frasesDoAlerta(
       alertaDe({ aulasPorDia: null, aulasDeReferencia: null, horasLetivas: 124, limiteFaltas: 24 }),
     );
-    expect(frases.faltas).toBe("Faltou 28 aulas de 124 aulas previstas em 22 dias letivos.");
-    expect(frases.limite).toBe("Limite para 80%: 24 aulas.");
-    expect(frases.carga).toMatch(/não têm todos a mesma quantidade de aulas/);
-  });
-
-  it("não avisa divergência quando o total é os dias vezes a carga", () => {
-    expect(
-      frasesDoAlerta(alertaDe({ horasLetivas: 198, limiteFaltas: 39, aulasFaltadas: 40 })).carga,
-    ).toBeNull();
+    expect(frases.faltas).toBe("Faltas: 28/124 aulas · Limite: 24.");
+    expect(frases.frequencia).toBe("Frequência estimada: 77,4% · Mínimo: 80%.");
+    expect(frases.margem).toBe("4 aulas acima do limite.");
   });
 
   it("separa a falta justificada desconsiderada da conta", () => {
     expect(frasesDoAlerta(alertaDe({ aulasJustificadas: 1 })).justificadas).toBe(
-      "1 aula com falta justificada desconsiderada nesta conta, conforme a configuração do benefício.",
+      "1 aula justificada desconsiderada.",
     );
     expect(
       frasesDoAlerta(alertaDe({ aulasJustificadas: 2, faltasJustificadasContam: true }))
         .justificadas,
-    ).toBe(
-      "2 aulas com falta justificada incluídas nesta conta, conforme a configuração do benefício.",
-    );
+    ).toBe("2 aulas justificadas incluídas.");
   });
 
-  it("explica o mês com retratos diferentes da carga de 9", () => {
+  it("resume o mês preservando os retratos diferentes da carga de 9", () => {
     const alertas = alertasDeFrequencia(
       base({
         regras: [regra({ aulasPorDia: 9 })],
@@ -458,8 +439,7 @@ describe("frases do alerta", () => {
     const alerta = alertas[0];
     expect(alerta).toMatchObject({ horasLetivas: 191, diasLetivos: 22, aulasDeReferencia: 9 });
     if (!alerta) return;
-    expect(frasesDoAlerta(alerta).carga).toBe(
-      "Alguns dias já salvos têm outra quantidade de aulas. Por isso, 191 aulas previstas podem não ser 22 vezes 9 aulas.",
-    );
+    expect(frasesDoAlerta(alerta).faltas).toBe("Faltas: 50/191 aulas · Limite: 38.");
+    expect(frasesDoAlerta(alerta).frequencia).toBe("Frequência estimada: 73,8% · Mínimo: 80%.");
   });
 });

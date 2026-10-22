@@ -22,7 +22,7 @@ Em Gestão, Configurações, Benefícios e frequência mínima, a edição de ca
 
 A configuração vale para o mês consultado inteiro, incluindo dias passados sem chamada e dias futuros. Sábados entram apenas com chamada salva. Dias em que o aluno não constava na chamada e dias de desistência não recebem projeção. A quantidade de aulas e as faltas das chamadas salvas permanecem como registradas; uma chamada antiga sem retrato usa a carga diária configurada como estimativa. Não há alteração da grade nem das frequências no banco.
 
-Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 198 aulas e limite de 39 aulas com falta para 80%. Um feriado em dia de aula reduz a projeção para 189. Com seis dias já salvos com sete aulas e 16 dias projetados com nove, o total é 186, e não 22 vezes 9: os seis retratos continuam respeitados. O painel avisa essa diferença.
+Exemplo: 22 dias letivos sem chamadas salvas, com nove aulas por dia, totalizam 198 aulas e limite de 39 aulas com falta para 80%. Um feriado em dia de aula reduz a projeção para 189. Com seis dias já salvos com sete aulas e 16 dias projetados com nove, o total é 186, e não 22 vezes 9: os seis retratos continuam respeitados. O resumo usa esse total preservado, sem converter as aulas em dias.
 
 ## O cálculo
 
@@ -36,11 +36,17 @@ Exemplo: um mês com 22 dias úteis e 5 aulas por dia tem `H = 110`. Com `P = 80
 
 Os círculos F e FJ da linha contam dias com falta; o alerta conta aulas. Quatro dias de falta integral com sete aulas cada somam 28 aulas perdidas. Duas ocorrências justificadas em apenas uma aula de cada dia somam duas aulas justificadas. Por isso, os números da linha não precisam coincidir com os do alerta. Com `H = 124` e `P = 80`, o limite é 24 aulas com falta; 28 aulas com falta equivalem a 77,4% de frequência projetada, `(H - F) / H`.
 
-O painel lê a conta em voz corrente. Com 28 faltas, 186 aulas previstas em 22 dias letivos e carga de 9:
+O painel resume o percentual estimado do mês, o mínimo configurado, as faltas em aulas e o excesso sobre o limite. Exemplo com `H = 124`, `P = 80`, `F = 28` e 11 aulas justificadas desconsideradas:
 
-> Faltou 28 aulas (≈ 3,1 dias de 9 aulas) de 186 aulas previstas em 22 dias letivos. Limite para 80%: 37 aulas (≈ 4,1 dias). Ainda restam 9 aulas até o limite. Frequência projetada: 84,9%.
+> Frequência estimada: 77,4% · Mínimo: 80%.
+>
+> Faltas: 28/124 aulas · Limite: 24.
+>
+> 4 aulas acima do limite.
+>
+> 11 aulas justificadas desconsideradas.
 
-O botão só aparece quando `F > L`. A frase da margem passa a ser `Passou do limite em R aulas`. Quando os dias contados não têm a mesma carga, o equivalente em dias some e o painel diz que o total pode não ser o número de dias vezes as aulas de um único dia. Quando há carga de referência e algum dia salvo entra com outra quantidade, o painel avisa que as aulas previstas podem não ser os dias letivos vezes essa carga.
+O botão só aparece quando `F > L`. A linha de justificadas aparece somente quando há aulas justificadas e informa se entram ou não na conta, conforme a configuração do benefício. O rodapé identifica a estimativa mensal e lembra que o alerta não determina o pagamento. A conversão em dias e as explicações sobre cargas diferentes ficam fora do painel; os retratos de aulas salvas continuam preservados no cálculo descrito abaixo.
 
 Um aluno pode aparecer uma vez por benefício ativo, e o painel do botão lista cada um com o próprio limite.
 
