@@ -190,6 +190,74 @@ describe("OAuth da planilha", () => {
     expect(await renovarAcesso(cifrarToken("renovacao-de-teste"))).toBe("acesso-renovado");
   });
 
+  it("guarda o acesso renovado até a folga antes do vencimento", async () => {
+    const { acessoGoogle, cifrarToken, renovarAcesso } = await import("@/infra/google-oauth");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-06-15T12:00:00Z"));
+      let emitidos = 0;
+      const chamada = vi.fn(async () => {
+        emitidos += 1;
+        return Response.json({ access_token: `acesso-${emitidos}`, expires_in: 3599 });
+      });
+      vi.stubGlobal("fetch", chamada);
+      const token = cifrarToken("renovacao-guardada");
+      expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-1", guardado: false });
+      vi.setSystemTime(new Date("2026-06-15T12:54:58Z"));
+      expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-1", guardado: true });
+      expect(chamada).toHaveBeenCalledOnce();
+      // A renovação explícita continua indo ao Google e não mexe no guardado.
+      expect(await renovarAcesso(token)).toBe("acesso-2");
+      expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-1", guardado: true });
+      vi.setSystemTime(new Date("2026-06-15T12:54:59Z"));
+      expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-3", guardado: false });
+      expect(chamada).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("separa os acessos por token e renova sem validade, curta ou depois de esquecer", async () => {
+    const { acessoGoogle, cifrarToken, esquecerAcessoGoogle } =
+      await import("@/infra/google-oauth");
+    const validades = [3599, 3599, undefined, 300, 3599];
+    const chamada = vi.fn(async () =>
+      Response.json({
+        access_token: `acesso-${chamada.mock.calls.length}`,
+        ...(validades[chamada.mock.calls.length - 1] === undefined
+          ? {}
+          : { expires_in: validades[chamada.mock.calls.length - 1] }),
+      }),
+    );
+    vi.stubGlobal("fetch", chamada);
+    const primeiro = cifrarToken("renovacao-primeira");
+    const segundo = cifrarToken("renovacao-primeira");
+    expect((await acessoGoogle(primeiro)).acesso).toBe("acesso-1");
+    // Reconectar gera outro token cifrado: nada é aproveitado da conexão anterior.
+    expect((await acessoGoogle(segundo)).acesso).toBe("acesso-2");
+    expect((await acessoGoogle(primeiro)).guardado).toBe(true);
+    esquecerAcessoGoogle(primeiro);
+    expect(await acessoGoogle(primeiro)).toEqual({ acesso: "acesso-3", guardado: false });
+    expect(await acessoGoogle(primeiro)).toEqual({ acesso: "acesso-4", guardado: false });
+    expect(await acessoGoogle(primeiro)).toEqual({ acesso: "acesso-5", guardado: false });
+    expect(await acessoGoogle(segundo)).toEqual({ acesso: "acesso-2", guardado: true });
+    expect(chamada).toHaveBeenCalledTimes(5);
+  });
+
+  it("não guarda acesso quando a renovação falha", async () => {
+    const { acessoGoogle, cifrarToken } = await import("@/infra/google-oauth");
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const chamada = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ error: "temporarily_unavailable" }, { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ access_token: "acesso-depois", expires_in: 3599 }));
+    vi.stubGlobal("fetch", chamada);
+    const token = cifrarToken("renovacao-instavel");
+    await expect(acessoGoogle(token)).rejects.toMatchObject({ codigo: "GOOGLE_TEMPORARIO" });
+    expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-depois", guardado: false });
+    expect(await acessoGoogle(token)).toEqual({ acesso: "acesso-depois", guardado: true });
+  });
+
   it.each([
     [400, "invalid_grant", 409, "GOOGLE_RECONECTAR"],
     [401, "invalid_client", 503, "GOOGLE_CONFIGURACAO"],

@@ -37,7 +37,11 @@ vi.mock("@/infra/transacoes", () => ({
 }));
 vi.mock("@/infra/auditoria", () => ({ auditar: dubl.auditar }));
 vi.mock("@/infra/auth/limite", () => ({ limiteDeTentativas: dubl.limitar }));
-vi.mock("@/infra/google-oauth", () => ({ renovarAcesso: dubl.renovar }));
+vi.mock("@/infra/google-oauth", () => ({
+  renovarAcesso: dubl.renovar,
+  acessoGoogle: async (token: string) => ({ acesso: await dubl.renovar(token), guardado: false }),
+  esquecerAcessoGoogle: () => undefined,
+}));
 vi.mock("@/infra/trava-planilha-parcial", () => ({
   comTravaPlanilhaParcial: async (
     tarefa: (controle: { signal: AbortSignal; conferir: () => void }) => Promise<unknown>,

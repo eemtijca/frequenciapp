@@ -44,7 +44,11 @@ vi.mock("@/infra/banco", () => ({
 }));
 vi.mock("@/infra/ambiente", () => ({ ambiente: { fuso: "America/Fortaleza" } }));
 vi.mock("@/infra/auth/limite", () => ({ limiteDeTentativas: async () => true }));
-vi.mock("@/infra/google-oauth", () => ({ renovarAcesso: dubl.acesso }));
+vi.mock("@/infra/google-oauth", () => ({
+  renovarAcesso: dubl.acesso,
+  acessoGoogle: async (token: string) => ({ acesso: await dubl.acesso(token), guardado: false }),
+  esquecerAcessoGoogle: () => undefined,
+}));
 vi.mock("@/application/alunos", () => ({ listarTodosAlunos: dubl.alunos }));
 vi.mock("@/application/turmas", () => ({ listarTodasTurmas: dubl.turmas }));
 vi.mock("@/application/frequencias", () => ({ listarFrequenciasDoPeriodo: dubl.frequencias }));

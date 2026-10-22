@@ -148,7 +148,15 @@ export function decifrarToken(valor: string): string {
 const respostaToken = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().optional(),
+  // Validade em segundos. Fora do formato, o acesso só não é guardado.
+  expires_in: z.number().positive().optional().catch(undefined),
 });
+
+/** Folga antes do vencimento: o acesso guardado nunca vence no meio de uma ação. */
+const MARGEM_ACESSO_MS = 5 * 60 * 1000;
+const MAXIMO_ACESSOS_GUARDADOS = 20;
+/** Acessos renovados, só em memória, pela impressão do token cifrado. */
+const acessosGuardados = new Map<string, { acesso: string; venceEm: number }>();
 
 const falhaToken = z.object({
   error: z.enum([
@@ -236,9 +244,9 @@ export async function trocarCodigo(codigo: string, verifier: string) {
   return dados.refresh_token;
 }
 
-export async function renovarAcesso(tokenCifrado: string): Promise<string> {
+function pedirAcesso(tokenCifrado: string) {
   const { clientId, clientSecret } = configuracao();
-  const dados = await pedirToken(
+  return pedirToken(
     new URLSearchParams({
       refresh_token: decifrarToken(tokenCifrado),
       client_id: clientId,
@@ -246,7 +254,49 @@ export async function renovarAcesso(tokenCifrado: string): Promise<string> {
       grant_type: "refresh_token",
     }),
   );
-  return dados.access_token;
+}
+
+/** Acesso sempre renovado, para quem precisa conferir a autorização ou entregá-lo ao navegador. */
+export async function renovarAcesso(tokenCifrado: string): Promise<string> {
+  return (await pedirAcesso(tokenCifrado)).access_token;
+}
+
+function impressaoDoToken(tokenCifrado: string): string {
+  return createHash("sha256").update(tokenCifrado).digest("hex");
+}
+
+/**
+ * Acesso das ações da planilha. Reaproveita o último acesso renovado com o mesmo
+ * token enquanto falta mais que a folga para vencer, em vez de renovar a cada
+ * ação. `guardado` indica que veio da memória, para quem chama renovar se o
+ * Google o recusar.
+ */
+export async function acessoGoogle(
+  tokenCifrado: string,
+): Promise<{ acesso: string; guardado: boolean }> {
+  const impressao = impressaoDoToken(tokenCifrado);
+  const inicio = Date.now();
+  const atual = acessosGuardados.get(impressao);
+  if (atual && atual.venceEm > inicio) return { acesso: atual.acesso, guardado: true };
+  acessosGuardados.delete(impressao);
+  const dados = await pedirAcesso(tokenCifrado);
+  const validade = (dados.expires_in ?? 0) * 1000 - MARGEM_ACESSO_MS;
+  if (validade > 0) {
+    for (const [outra, item] of acessosGuardados) {
+      if (item.venceEm <= inicio) acessosGuardados.delete(outra);
+    }
+    const maisAntiga = acessosGuardados.keys().next().value;
+    if (acessosGuardados.size >= MAXIMO_ACESSOS_GUARDADOS && maisAntiga !== undefined) {
+      acessosGuardados.delete(maisAntiga);
+    }
+    acessosGuardados.set(impressao, { acesso: dados.access_token, venceEm: inicio + validade });
+  }
+  return { acesso: dados.access_token, guardado: false };
+}
+
+/** Descarta o acesso guardado do token: a próxima ação renova. */
+export function esquecerAcessoGoogle(tokenCifrado: string): void {
+  acessosGuardados.delete(impressaoDoToken(tokenCifrado));
 }
 
 export function dadosDoPicker() {
