@@ -1,5 +1,9 @@
 # Testes
 
+O backup externo tem testes sem rede em `tests/unit/pacote-backup.test.ts` e `tests/unit/backup-externo.test.ts`: recuperação com senha, nomes genéricos, manifesto e hashes, recusa de origem vazia e links, limite de tamanho, confirmação somente após releitura, preservação de versões, corrupção, falha de transporte, permissões e saída sem conteúdo escolar. A porta de transporte usa dublê; o rclone não é necessário para a suíte de unidade. A rotina operacional deve ser ensaiada também com perfis locais sintéticos antes de conectar provedores reais, conforme [backup-externo.md](backup-externo.md).
+
+`tests/unit/backup-actions.test.ts` exercita o script de preparo do runner com configuração sintética multilinha, preservação literal, permissões, retirada do conteúdo do ambiente, falha do processo, limpeza sem secrets e recusa de uma raiz temporária insegura. O dublê do processo dispensa acesso a serviços externos. A definição do workflow também deve passar por análise de sintaxe do GitHub Actions, e a instalação de produção sem scripts deve permitir executar a rotina sem Prisma gerado ou credenciais de banco.
+
 Suítes, convenções e o que cada uma protege. Os comandos completos estão no [README](../README.md) e em [tests/README.md](../tests/README.md).
 
 ## Suítes
