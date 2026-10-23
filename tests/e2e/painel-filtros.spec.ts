@@ -72,15 +72,14 @@ test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo"
   await trocarVisao(page, "Painel", "painel");
   await expect(page.getByRole("group", { name: "Filtro por série" })).toHaveCount(0);
   // Só o chip da Cobertura do dia: o mesmo nome também está em seletores da página.
-  const pendente = (turma: string) =>
-    page.getByRole("article").locator("span.bg-falta-fraca", { hasText: turma });
+  const cobertura = page.getByRole("group", { name: "Cobertura do dia" });
+  const pendente = (turma: string) => cobertura.locator("span.bg-falta-fraca", { hasText: turma });
 
   await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /^E2E Painel (Um|Dois)$/ })).toHaveCount(0);
-  const escola = page.getByRole("article", { name: /: Toda a escola$/ });
-  await escola.locator("summary").click();
+  await cobertura.locator("summary").click();
   await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
   await rolarAteGrafico(page, "E2E Painel Um");
@@ -103,7 +102,7 @@ test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo"
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Desistentes por série" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Toda a escola" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Cobertura do dia" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Cobertura do dia" })).toBeVisible();
 });
 
 test("cobertura distingue chamadas pendentes, parciais, completas e série vazia", async ({
@@ -129,7 +128,7 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
       );
     });
   }
-  const cartao = page.getByRole("article", { name: /: E2E Painel Dois$/ });
+  const cartao = page.getByRole("group", { name: "Cobertura do dia" });
   const progresso = cartao.getByRole("progressbar", { name: "Alunos com chamada salva" });
   try {
     // Turmas com tamanhos diferentes: a A ocupa o dobro da fatia da B.
@@ -206,7 +205,7 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     });
 
     await rolarAteGrafico(page, "E2E Painel Vazio");
-    const vazio = page.getByRole("article", { name: /: E2E Painel Vazio$/ });
+    const vazio = cartao;
     await expect(vazio.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
     await expect(vazio.getByRole("progressbar")).toHaveAttribute(
       "aria-valuetext",
@@ -521,7 +520,7 @@ test.describe("infrequência do dia", () => {
     // O número fica compacto, mas a cobertura continua legível por tecnologia assistiva.
     await expect(
       escola.getByRole("img", { name: "1 de 1 alunos com chamada", exact: true }),
-    ).toHaveText("1");
+    ).toHaveText("1 alunos");
     await testInfo.attach("Legenda compacta clara", {
       body: await escola.screenshot(),
       contentType: "image/png",

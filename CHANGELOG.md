@@ -93,6 +93,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Painel posiciona o cartão Cobertura do dia ao lado do cartão Infrequência no topo da tela, acompanhando a série do cartão ativo ou a escola inteira, e mostra a palavra alunos ao lado da quantidade nas legendas dos gráficos diários.
+
 - Alerta de frequência dos benefícios fica mais compacto, com percentual estimado e mínimo em destaque, faltas em aulas, limite e excesso. Mantém a indicação resumida de justificadas e preserva o cálculo mensal.
 
 - Envio da chamada à planilha depois de salvar fica cerca de duas vezes mais rápido e faz a metade das requisições ao Google. O servidor guarda em memória o token de acesso até perto do vencimento, em vez de renová-lo a cada ação. O envio automático monta o plano uma vez sob a trava da frequência, sem a segunda simulação que só comparava o hash, e a releitura depois de criar a coluna do dia usa uma ação só. O envio com coluna nova passa de 22 etapas sequenciais, com 7 renovações de token e 14 leituras, para 11, com 10 leituras; o teto local de 45 leituras por minuto passa a comportar cerca de quatro envios e meio, contra três. Numa medição com o Google simulado a 150 ms por requisição e sem o teto local, uma turma chega à planilha em 1,7 s, contra 3,4 s, e três turmas salvas em sequência em 5,2 s, contra 10,3 s. A releitura antes do lote, o registro `PARCIAL` antes da escrita e a recusa de plano inseguro continuam iguais. A decisão está na ADR-052.
