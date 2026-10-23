@@ -12,13 +12,17 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
   const descricaoId = useId();
   if (feriado) {
     return (
-      <div className="superficie-vidro flex items-center gap-3 p-4">
-        <div className="text-muted-foreground flex size-16 shrink-0 items-center justify-center rounded-full border">
-          <CalendarOff aria-hidden="true" className="size-6" />
-        </div>
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-medium">Feriado</h2>
-          <span className="text-muted-foreground text-sm break-words">{feriado}</span>
+      <div
+        role="group"
+        aria-label="Cobertura do dia"
+        className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+      >
+        <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
+        <div className="flex items-center gap-2.5">
+          <div className="text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-full border sm:size-14">
+            <CalendarOff aria-hidden="true" className="size-5" />
+          </div>
+          <span className="text-muted-foreground text-xs break-words sm:text-sm">{feriado}</span>
           <span className="sr-only">Não há chamadas pendentes nesta data.</span>
         </div>
       </div>
@@ -44,99 +48,106 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
   const contagem = `${registrados} de ${esperados} alunos com chamada salva`;
 
   return (
-    <div className="superficie-vidro flex items-start gap-3 p-4">
-      <div
-        role="progressbar"
-        aria-label="Alunos com chamada salva"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={progresso}
-        aria-valuetext={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
-        aria-describedby={esperados > 0 ? descricaoId : undefined}
-        className="text-primary relative flex size-16 shrink-0 items-center justify-center"
-      >
-        <svg viewBox="0 0 64 64" aria-hidden="true" className="absolute inset-0 size-full">
-          {esperados === 0 || concluida ? (
-            <circle
-              cx="32"
-              cy="32"
-              r="28"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="4"
-              className={concluida ? "text-primary" : "text-muted-foreground opacity-15"}
-            />
-          ) : (
-            fatias.map((fatia) => (
+    <div
+      role="group"
+      aria-label="Cobertura do dia"
+      className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+    >
+      <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
+      <div className="flex items-center gap-2.5">
+        <div
+          role="progressbar"
+          aria-label="Alunos com chamada salva"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progresso}
+          aria-valuetext={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
+          aria-describedby={esperados > 0 ? descricaoId : undefined}
+          className="text-primary relative flex size-12 shrink-0 items-center justify-center sm:size-14"
+        >
+          <svg viewBox="0 0 64 64" aria-hidden="true" className="absolute inset-0 size-full">
+            {esperados === 0 || concluida ? (
               <circle
-                key={fatia.turma.id}
                 cx="32"
                 cy="32"
                 r="28"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="4"
-                pathLength="100"
-                strokeDasharray={`${fatia.tamanho} ${100 - fatia.tamanho}`}
-                strokeDashoffset={-fatia.inicio}
-                transform="rotate(-90 32 32)"
-                className={fatia.concluida ? "text-primary" : "text-falta-texto"}
-              >
-                <title>{`${fatia.turma.rotulo}: ${fatia.concluida ? "chamada concluída" : "chamada pendente"}`}</title>
-              </circle>
-            ))
-          )}
-        </svg>
-        <span aria-hidden="true" className="numerais-tabulares text-sm font-semibold">
-          {progresso}%
-        </span>
-      </div>
-      <p id={descricaoId} className="sr-only">
-        {turmas
-          .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
-          .join("; ")}
-      </p>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <h2 className="font-medium">Cobertura do dia</h2>
-        <span
-          aria-label={contagem}
-          className="text-muted-foreground flex items-center gap-1.5 text-sm"
-        >
-          <UsersRound aria-hidden="true" className="size-4 shrink-0" />
-          <span className="numerais-tabulares">
-            {registrados}/{esperados} alunos
-          </span>
-        </span>
-        {esperados === 0 ? (
-          <span className="text-muted-foreground text-xs">Sem alunos</span>
-        ) : turmasPendentes.length > 0 ? (
-          <details className="group">
-            <summary className="text-falta-texto focus-visible:ring-ring flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 rounded-full px-2 text-sm focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
-              <Clock3 aria-hidden="true" className="size-4 shrink-0" />
-              <span>
-                {turmasPendentes.length}{" "}
-                {turmasPendentes.length === 1 ? "turma pendente" : "turmas pendentes"}
-              </span>
-              <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
-            </summary>
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {turmasPendentes.map((turma) => (
-                <span
-                  key={turma.id}
-                  className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
+                className={concluida ? "text-primary" : "text-muted-foreground opacity-15"}
+              />
+            ) : (
+              fatias.map((fatia) => (
+                <circle
+                  key={fatia.turma.id}
+                  cx="32"
+                  cy="32"
+                  r="28"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  pathLength="100"
+                  strokeDasharray={`${fatia.tamanho} ${100 - fatia.tamanho}`}
+                  strokeDashoffset={-fatia.inicio}
+                  transform="rotate(-90 32 32)"
+                  className={fatia.concluida ? "text-primary" : "text-falta-texto"}
                 >
-                  {turma.rotulo}
-                </span>
-              ))}
-            </div>
-          </details>
-        ) : (
-          <span className="text-primary flex items-center gap-1.5 text-xs">
-            <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
-            Concluída
+                  <title>{`${fatia.turma.rotulo}: ${fatia.concluida ? "chamada concluída" : "chamada pendente"}`}</title>
+                </circle>
+              ))
+            )}
+          </svg>
+          <span aria-hidden="true" className="numerais-tabulares text-sm font-semibold">
+            {progresso}%
           </span>
-        )}
+        </div>
+        <p id={descricaoId} className="sr-only">
+          {turmas
+            .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
+            .join("; ")}
+        </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span
+            aria-label={contagem}
+            className="text-muted-foreground flex items-center gap-1.5 text-xs sm:text-sm"
+          >
+            <UsersRound aria-hidden="true" className="size-4 shrink-0" />
+            <span className="numerais-tabulares">
+              {registrados}/{esperados} alunos
+            </span>
+          </span>
+          {esperados === 0 ? (
+            <span className="text-muted-foreground text-xs">Sem alunos</span>
+          ) : turmasPendentes.length === 0 ? (
+            <span className="text-primary flex items-center gap-1.5 text-xs">
+              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
+              Concluída
+            </span>
+          ) : null}
+        </div>
       </div>
+      {esperados > 0 && turmasPendentes.length > 0 && (
+        <details className="group">
+          <summary className="text-falta-texto focus-visible:ring-ring -mx-1 flex min-h-11 w-fit cursor-pointer list-none items-center gap-1 rounded-full px-1 text-xs focus-visible:ring-2 focus-visible:outline-none sm:gap-1.5 sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden">
+            <Clock3 aria-hidden="true" className="size-4 shrink-0" />
+            <span>
+              {turmasPendentes.length}{" "}
+              {turmasPendentes.length === 1 ? "turma pendente" : "turmas pendentes"}
+            </span>
+            <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
+          </summary>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {turmasPendentes.map((turma) => (
+              <span
+                key={turma.id}
+                className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
+              >
+                {turma.rotulo}
+              </span>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

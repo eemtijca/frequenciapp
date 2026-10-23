@@ -123,9 +123,9 @@ export default function GraficoRosca({
                     role="img"
                     aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
                     title={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                    className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none"
+                    className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none whitespace-nowrap"
                   >
-                    <span aria-hidden="true">{fatia.alunos}</span>
+                    <span aria-hidden="true">{fatia.alunos} alunos</span>
                   </span>
                 ) : fatia.detalhe ? (
                   <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>

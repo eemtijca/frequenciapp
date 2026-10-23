@@ -33,7 +33,15 @@ function alvoInterativo(alvo: EventTarget | null): boolean {
   );
 }
 
-export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; ativo: boolean }) {
+export default function FaixaGraficos({
+  cartoes,
+  ativo,
+  onCartaoAtivo,
+}: {
+  cartoes: Cartao[];
+  ativo: boolean;
+  onCartaoAtivo?: (id: string) => void;
+}) {
   const faixa = useRef<HTMLDivElement>(null);
   const larguraFaixa = useRef(0);
   const indiceSalvo = useRef(0);
@@ -55,6 +63,10 @@ export default function FaixaGraficos({ cartoes, ativo }: { cartoes: Cartao[]; a
   const faixaId = useId();
   const atual = Math.min(indice, cartoes.length - 1);
   const identidade = cartoes[atual]?.id;
+
+  useEffect(() => {
+    if (identidade) onCartaoAtivo?.(identidade);
+  }, [identidade, onCartaoAtivo]);
 
   const esquerdaDoSalvo = useCallback((elemento: HTMLElement): number | null => {
     const primeiro = elemento.firstElementChild;

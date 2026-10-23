@@ -217,13 +217,16 @@ export default function VistaPainel({
     };
   }, [ativo, atualizarEmSilencio]);
 
+  const [cartaoAtivo, setCartaoAtivo] = useState("escola");
+  const serieAtiva = series.find((item) => item.id === cartaoAtivo) ?? null;
+  const coberturaTurmas = serieAtiva
+    ? cobertura.turmas.filter((item) => item.turma.serieId === serieAtiva.id)
+    : cobertura.turmas;
+
   function graficoDoDia(serieSelecionada: Serie | null) {
     const distribuicaoDaSerie = serieSelecionada
       ? (distribuicao.find((item) => item.serieId === serieSelecionada.id) ?? null)
       : null;
-    const coberturaTurmas = serieSelecionada
-      ? cobertura.turmas.filter((item) => item.turma.serieId === serieSelecionada.id)
-      : cobertura.turmas;
     // A turma original aparece somente nas séries indicadas em Origem na Chamada.
     const porOrigem =
       serieSelecionada &&
@@ -233,9 +236,7 @@ export default function VistaPainel({
       )
         ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
         : null;
-    return feriado ? (
-      <IndicadorCobertura turmas={[]} feriado={feriado.nome} />
-    ) : carregandoPainel ? (
+    return carregandoPainel ? (
       <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
         <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
         Carregando indicadores...
@@ -257,29 +258,33 @@ export default function VistaPainel({
                 : "Faltas do dia por série"
             }
             fatias={
-              distribuicaoDaSerie
-                ? distribuicaoDaSerie.turmas.map((turma) => ({
-                    nome: turma.rotulo,
-                    valor: turma.faltas + turma.justificadas,
-                    alunos: turma.esperados,
-                    detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
-                  }))
-                : distribuicao.map((item) => ({
-                    nome: item.nome,
-                    valor: item.faltas + item.justificadas,
-                    alunos: item.esperados,
-                    detalhe: `${item.registrados} de ${item.esperados} alunos com chamada`,
-                  }))
+              feriado
+                ? []
+                : distribuicaoDaSerie
+                  ? distribuicaoDaSerie.turmas.map((turma) => ({
+                      nome: turma.rotulo,
+                      valor: turma.faltas + turma.justificadas,
+                      alunos: turma.esperados,
+                      detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
+                    }))
+                  : distribuicao.map((item) => ({
+                      nome: item.nome,
+                      valor: item.faltas + item.justificadas,
+                      alunos: item.esperados,
+                      detalhe: `${item.registrados} de ${item.esperados} alunos com chamada`,
+                    }))
             }
             vazio={
-              frequenciasDoDia.length === 0
-                ? "Nenhuma chamada salva neste dia"
-                : "Nenhuma falta registrada neste dia"
+              feriado
+                ? feriado.nome
+                : frequenciasDoDia.length === 0
+                  ? "Nenhuma chamada salva neste dia"
+                  : "Nenhuma falta registrada neste dia"
             }
           />
         </div>
 
-        {serieSelecionada && porOrigem && (
+        {!feriado && serieSelecionada && porOrigem && (
           <div className="superficie-vidro flex flex-col gap-4 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 font-medium">
@@ -307,8 +312,6 @@ export default function VistaPainel({
             />
           </div>
         )}
-
-        <IndicadorCobertura turmas={coberturaTurmas} />
       </>
     );
   }
@@ -363,44 +366,49 @@ export default function VistaPainel({
 
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
-      <div
-        role="group"
-        className="superficie-vidro flex min-h-24 items-center justify-between gap-4 px-5 py-4"
-        aria-label="Resumo do dia"
-        aria-busy={carregandoPainel}
-      >
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-medium">Infrequência do dia</h2>
-          {!feriado && !carregandoPainel && resumo.parciais > 0 && (
-            <span className="text-muted-foreground text-xs">
-              {resumo.parciais} {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
-            </span>
-          )}
-        </div>
-        <span
-          className={
-            !feriado && resumo.registrados > 0
-              ? "numerais-tabulares shrink-0 text-3xl font-semibold sm:text-4xl"
-              : "text-muted-foreground shrink-0 text-sm"
-          }
+      <div className="grid grid-cols-2 items-stretch gap-3">
+        <div
+          role="group"
+          className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+          aria-label="Resumo do dia"
+          aria-busy={carregandoPainel}
         >
-          {feriado ? (
-            <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-              <CalendarOff aria-hidden="true" className="size-4 shrink-0" />
-              Feriado
-            </span>
-          ) : carregandoPainel ? (
-            ""
-          ) : resumo.registrados > 0 ? (
-            percentual.format(resumo.infrequencia)
-          ) : (
-            "Sem dados"
-          )}
-        </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="text-sm font-medium sm:text-base">Infrequência</h2>
+            {!feriado && !carregandoPainel && resumo.parciais > 0 && (
+              <span className="text-muted-foreground text-xs">
+                {resumo.parciais}{" "}
+                {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+              </span>
+            )}
+          </div>
+          <span
+            className={
+              !feriado && resumo.registrados > 0
+                ? "numerais-tabulares shrink-0 text-3xl font-semibold sm:text-4xl"
+                : "text-muted-foreground shrink-0 text-sm"
+            }
+          >
+            {feriado ? (
+              <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+                <CalendarOff aria-hidden="true" className="size-4 shrink-0" />
+                Feriado
+              </span>
+            ) : carregandoPainel ? (
+              ""
+            ) : resumo.registrados > 0 ? (
+              percentual.format(resumo.infrequencia)
+            ) : (
+              "Sem dados"
+            )}
+          </span>
+        </div>
+        <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
       </div>
 
       <FaixaGraficos
         ativo={ativo}
+        onCartaoAtivo={setCartaoAtivo}
         cartoes={[
           { id: "escola", nome: "Toda a escola", conteudo: graficoDoDia(null) },
           ...series.map((serie) => ({
