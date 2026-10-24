@@ -1504,9 +1504,14 @@ describe("configurações e responsáveis", () => {
       const exportada = (await copia.json()) as { configuracoes: Configuracoes };
       expect(exportada.configuracoes).toEqual(configurada.configuracoes);
     } finally {
+      const atual = await autenticado(cookieAdmin, "/api/configuracoes");
+      const atualBody = (await atual.json()) as { configuracoes: Configuracoes };
       const restaurar = await autenticado(cookieAdmin, "/api/configuracoes", {
         method: "PATCH",
-        body: JSON.stringify(inicial.configuracoes),
+        body: JSON.stringify({
+          ...inicial.configuracoes,
+          atualizadoEm: atualBody.configuracoes.atualizadoEm,
+        }),
       });
       expect(restaurar.status).toBe(200);
     }

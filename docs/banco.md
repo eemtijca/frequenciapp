@@ -129,7 +129,7 @@ Produção e Preview podem usar schemas distintos no mesmo database. Cada schema
 
 ## Revisões das configurações
 
-O rascunho único compara a versão de cada seção antes de gravar. `Configuracao`, `ConfiguracaoNotificacoes`, `ParametrosAcesso`, `OrdemAlmoco`, `BeneficioFrequencia` e `Feriado` já tinham `atualizado_em`. A migração `20261024123045_revisoes_catalogos` acrescenta a coluna a `justificativas`, `liberadores` e `chaves_bi`, com preenchimento inicial por `now()` e remoção do valor padrão.
+O rascunho único compara a versão de cada seção antes de gravar. `Configuracao`, `ConfiguracaoNotificacoes`, `ParametrosAcesso`, `OrdemAlmoco`, `BeneficioFrequencia` e `Feriado` já tinham `atualizado_em`. A migração `20261024123045_revisoes_catalogos` acrescenta a coluna a `justificativas`, `liberadores` e `chaves_bi`, com preenchimento inicial por `now()`. A migração `20261024151020_revisoes_catalogos_padrao` mantém o padrão `now()` nas três tabelas, para que inserções diretas e testes de contrato continuem válidos; o Prisma atualiza o valor nas gravações da aplicação.
 
 A revisão de `chaves_bi` considera identificador, rótulo, escopo, validade e revogação, sem os contadores de uso. Consultar o BI atualiza `ultimo_uso_em` e `usos`; esses campos não podem invalidar um rascunho aberto. O lote roda em uma transação serializável e reutiliza o mesmo cliente Prisma via `AsyncLocalStorage`, para que os casos de uso de cada catálogo participem da transação sem abrir outra conexão. Qualquer revisão divergente interrompe o lote inteiro com 409.
 
