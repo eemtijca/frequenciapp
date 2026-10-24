@@ -93,6 +93,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Cobertura do dia no Painel troca o anel por uma barra horizontal verde sobre fundo vermelho suave, com percentual em destaque e espaço entre os elementos. A contagem de alunos deixa de aparecer no cartão, mas segue disponível ao leitor de tela; pendências e estados sem alunos são preservados.
+
 - Painel posiciona o cartão Cobertura do dia ao lado do cartão Infrequência no topo da tela, acompanhando a série do cartão ativo ou a escola inteira, e mostra a palavra alunos ao lado da quantidade nas legendas dos gráficos diários.
 
 - Alerta de frequência dos benefícios fica mais compacto, com percentual estimado e mínimo em destaque, faltas em aulas, limite e excesso. Mantém a indicação resumida de justificadas e preserva o cálculo mensal.
