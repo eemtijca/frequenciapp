@@ -4,8 +4,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { ClipboardList, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useRascunhoConfiguracoes } from "@/components/gestao/rascunho-configuracoes";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
@@ -43,6 +44,9 @@ export default function IntegracaoParcial({
   const [aberto, setAberto] = useState(abertoInicial);
   const [confirmacao, setConfirmacao] = useState(false);
   const { chaveAtiva, executar } = useAcoesPorChave();
+  const { base, rascunho, mutarPlanilha } = useRascunhoConfiguracoes();
+  const ativaServidor = base?.planilhas.parcial.ativa ?? integracao?.ativa ?? false;
+  const ativaRascunho = rascunho?.planilhas.parcial.ativa ?? ativaServidor;
   const ocupado = chaveAtiva !== null;
 
   const carregar = useCallback(async () => {
@@ -64,18 +68,10 @@ export default function IntegracaoParcial({
     void carregar();
   }, [carregar]);
 
-  async function alternarAtiva(ativa: boolean) {
-    await executar("parcial-ativa", async () => {
-      try {
-        const dados = await pedir<{ integracao: IntegracaoParcialAdmin }>(
-          "/api/planilha-parcial",
-          corpoAlteracao("PATCH", { ativa }),
-        );
-        setIntegracao(dados.integracao);
-        toast.success(ativa ? "Planilha parcial ativada." : "Planilha parcial desativada.");
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-      }
+  function alternarAtiva(ativa: boolean) {
+    mutarPlanilha("parcial", { ativa });
+    toast.success("Integração alterada no rascunho.", {
+      description: "Salve as configurações para aplicar.",
     });
   }
 
@@ -124,8 +120,8 @@ export default function IntegracaoParcial({
         onAbertoChange={setAberto}
         resumo={
           <>
-            <Selo variante={integracao?.ativa ? "sucesso" : "neutro"}>
-              {integracao?.ativa ? "Ligada" : "Desligada"}
+            <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
+              {ativaRascunho ? "Ligada" : "Desligada"}
             </Selo>
             <Selo variante={integracao?.preparada ? "sucesso" : "neutro"}>
               {integracao?.preparada ? "Aba preparada" : "Preparação pendente"}
@@ -134,7 +130,7 @@ export default function IntegracaoParcial({
         }
         acoes={
           <Switch
-            checked={integracao?.ativa ?? false}
+            checked={ativaRascunho}
             disabled={ocupado || !integracao?.preparada}
             onCheckedChange={(valor) => void alternarAtiva(valor)}
             aria-label="Integração de chamada parcial ativa"

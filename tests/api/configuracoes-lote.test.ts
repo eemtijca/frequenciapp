@@ -104,6 +104,7 @@ describe("leitura agregada", () => {
     expect(Array.isArray(completo.liberadores)).toBe(true);
     expect(Array.isArray(completo.feriados)).toBe(true);
     expect(Array.isArray(completo.chavesBi)).toBe(true);
+    expect(completo.planilhas.frequencia).toHaveProperty("ativa");
     expect(Object.keys(completo.revisoes).sort()).toEqual(
       [
         "acesso",
@@ -115,6 +116,7 @@ describe("leitura agregada", () => {
         "liberadores",
         "notificacoes",
         "ordemAlmoco",
+        "planilhas",
       ].sort(),
     );
     expect(JSON.stringify(completo.chavesBi)).not.toContain("segredo");

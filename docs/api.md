@@ -554,8 +554,9 @@ As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A 
 
 Apenas administração. Devolve o conjunto usado pelo rascunho único:
 
-- 200 `{ configuracoes, notificacoes, acesso, ordemAlmoco, beneficios, justificativas, liberadores, feriados, chavesBi, revisoes }`.
-- `revisoes` é um mapa por seção (`configuracao`, `notificacoes`, `acesso`, `ordemAlmoco`, `beneficios`, `justificativas`, `liberadores`, `feriados`, `chavesBi`). As chaves do BI saem sem segredo e a revisão ignora os contadores de uso, que mudam a cada consulta.
+- 200 `{ configuracoes, notificacoes, acesso, ordemAlmoco, beneficios, justificativas, liberadores, feriados, chavesBi, planilhas, revisoes }`.
+- `revisoes` é um mapa por seção (`configuracao`, `notificacoes`, `acesso`, `ordemAlmoco`, `beneficios`, `justificativas`, `liberadores`, `feriados`, `chavesBi`, `planilhas`). As chaves do BI saem sem segredo e a revisão ignora os contadores de uso, que mudam a cada consulta.
+- `planilhas` traz `ativa` e `envioAutomatico` de `frequencia`, `saidas` e `parcial`. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos porque dependem de leitura ou ação no Google.
 - 401 sem sessão; 403 sem papel de administração; 503 falha temporária.
 
 ### POST /api/configuracoes/lote
@@ -575,7 +576,12 @@ Administração e origem confiável. Corpo:
       "horarioPendencias": "17:00"
     },
     "chavesBi": [{ "id": "novo-uuid", "rotulo": "Painel", "escopo": {} }],
-    "limparChavesBi": false
+    "limparChavesBi": false,
+    "planilhas": {
+      "frequencia": { "ativa": true, "envioAutomatico": false },
+      "saidas": { "ativa": true, "envioAutomatico": false },
+      "parcial": { "ativa": false, "envioAutomatico": false }
+    }
   },
   "senhaBi": "senha-do-administrador"
 }

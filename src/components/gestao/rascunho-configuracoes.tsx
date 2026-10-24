@@ -14,6 +14,8 @@ import {
 import type {
   ChaveBiDesejada,
   ConfiguracoesCompletas,
+  FinalidadePlanilhaConfigurada,
+  PreferenciaPlanilha,
   ResultadoLote,
   SecaoConfiguracao,
 } from "@/domain/configuracoes";
@@ -55,6 +57,10 @@ interface ContextoRascunho {
   mutarLiberadores: (lista: LiberadorConfigurado[]) => void;
   mutarFeriados: (lista: Feriado[]) => void;
   mutarChaves: (lista: ChaveBiDesejada[]) => void;
+  mutarPlanilha: (
+    finalidade: FinalidadePlanilhaConfigurada,
+    entrada: Partial<PreferenciaPlanilha>,
+  ) => void;
 }
 
 const Contexto = createContext<ContextoRascunho | null>(null);
@@ -69,6 +75,7 @@ const ROTULOS_SECOES: Record<SecaoConfiguracao, string> = {
   liberadores: "Responsáveis",
   feriados: "Calendário letivo",
   chavesBi: "Chaves do BI",
+  planilhas: "Planilhas",
 };
 
 const ORDEM_SECOES: SecaoConfiguracao[] = [
@@ -81,6 +88,7 @@ const ORDEM_SECOES: SecaoConfiguracao[] = [
   "liberadores",
   "feriados",
   "chavesBi",
+  "planilhas",
 ];
 
 function comFeriados(
@@ -197,6 +205,7 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
     if (!igual(base.liberadores, rascunho.liberadores)) alteradas.push("liberadores");
     if (!igual(base.feriados, rascunho.feriados)) alteradas.push("feriados");
     if (!igual(base.chavesBi, rascunho.chavesBi)) alteradas.push("chavesBi");
+    if (!igual(base.planilhas, rascunho.planilhas)) alteradas.push("planilhas");
     return ORDEM_SECOES.filter((chave) => alteradas.includes(chave)).map((chave) => ({
       chave,
       rotulo: ROTULOS_SECOES[chave],
@@ -259,6 +268,7 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
           desejado.limparChavesBi = true;
         }
       }
+      if (!igual(base.planilhas, rascunho.planilhas)) desejado.planilhas = rascunho.planilhas;
       const precisaDeSenha =
         desejado.chavesBi !== undefined || desejado.limparChavesBi !== undefined;
       const senhaEfetiva = precisaDeSenha ? senhaBi : undefined;
@@ -324,6 +334,14 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
       mutarLiberadores: (lista) => mutar((atual) => ({ ...atual, liberadores: lista })),
       mutarFeriados: (lista) => mutar((atual) => comFeriados(atual, lista)),
       mutarChaves: (lista) => mutar((atual) => ({ ...atual, chavesBi: lista })),
+      mutarPlanilha: (finalidade, entrada) =>
+        mutar((atual) => ({
+          ...atual,
+          planilhas: {
+            ...atual.planilhas,
+            [finalidade]: { ...atual.planilhas[finalidade], ...entrada },
+          },
+        })),
     }),
     [
       base,

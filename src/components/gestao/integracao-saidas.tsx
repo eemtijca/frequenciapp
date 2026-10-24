@@ -6,10 +6,11 @@ import { OrganizarPlanilha } from "@/components/gestao/dialogo-organizar-planilh
 import { useCallback, useEffect, useState } from "react";
 import { DoorOpen, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useRascunhoConfiguracoes } from "@/components/gestao/rascunho-configuracoes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +94,11 @@ export default function IntegracaoSaidas({
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   const [confirmarEntradas, setConfirmarEntradas] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+  const { base, rascunho, mutarPlanilha } = useRascunhoConfiguracoes();
+  const ativaServidor = base?.planilhas.saidas.ativa ?? integracao?.ativa ?? false;
+  const ativaRascunho = rascunho?.planilhas.saidas.ativa ?? ativaServidor;
+  const envioRascunho =
+    rascunho?.planilhas.saidas.envioAutomatico ?? integracao?.envioAutomatico ?? false;
 
   const carregar = useCallback(async () => {
     try {
@@ -134,45 +140,19 @@ export default function IntegracaoSaidas({
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
   const conectada = Boolean(integracao?.contaGoogle && integracao.googlePlanilha);
-  const podeEnviar = Boolean(integracao?.ativa && conectada);
+  const podeEnviar = Boolean(ativaServidor && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
   const abaEscolhida = abas.find((aba) => aba.nome === abaSelecionada) ?? null;
 
-  async function alternarAtiva(valor: boolean) {
-    await executarPorChave("alternar-ativa", async () => {
-      setSalvando(true);
-      try {
-        const dados = await pedir<{ integracao: IntegracaoSaidasAdmin }>(
-          "/api/planilha-saidas",
-          corpoAlteracao("PATCH", { ativa: valor }),
-        );
-        setIntegracao(dados.integracao);
-        toast.success(valor ? "Integração ativada." : "Integração desativada.");
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-      } finally {
-        setSalvando(false);
-      }
-    });
+  function alternarAtiva(valor: boolean) {
+    mutarPlanilha("saidas", { ativa: valor });
+    avisarSucesso("Integração alterada no rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function alternarEnvioAutomatico(valor: boolean) {
-    await executarPorChave("alternar-envio-automatico-saidas", async () => {
-      setSalvando(true);
-      try {
-        const dados = await pedir<{ integracao: IntegracaoSaidasAdmin }>(
-          "/api/planilha-saidas",
-          corpoAlteracao("PATCH", { envioAutomatico: valor }),
-        );
-        setIntegracao(dados.integracao);
-        toast.success(valor ? "Envio ao registrar ligado." : "Envio ao registrar desligado.");
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-      } finally {
-        setSalvando(false);
-      }
-    });
+  function alternarEnvioAutomatico(valor: boolean) {
+    mutarPlanilha("saidas", { envioAutomatico: valor });
+    avisarSucesso("Envio automático alterado no rascunho.", "Salve as configurações para aplicar.");
   }
 
   async function lerEstrutura() {
@@ -320,8 +300,8 @@ export default function IntegracaoSaidas({
       onAbertoChange={setAberto}
       resumo={
         <>
-          <Selo variante={integracao?.ativa ? "sucesso" : "neutro"}>
-            {integracao?.ativa ? "Ligada" : "Desligada"}
+          <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
+            {ativaRascunho ? "Ligada" : "Desligada"}
           </Selo>
           <Selo variante={conectada ? "sucesso" : "atencao"}>
             {conectada ? "Google conectado" : "Sem conexão"}
@@ -340,7 +320,7 @@ export default function IntegracaoSaidas({
       }
       acoes={
         <Switch
-          checked={integracao?.ativa ?? false}
+          checked={ativaRascunho}
           disabled={salvando || !conectada}
           onCheckedChange={(valor) => void alternarAtiva(valor)}
           aria-label="Integração de entradas e saídas ativa"
@@ -537,8 +517,8 @@ export default function IntegracaoSaidas({
             </p>
           </div>
           <Switch
-            checked={integracao?.envioAutomatico ?? false}
-            disabled={salvando || !podeEnviar || !estruturaSalva}
+            checked={envioRascunho}
+            disabled={salvando || !ativaRascunho || !conectada || !estruturaSalva}
             onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
             aria-label="Enviar ao registrar saídas e entradas"
           />

@@ -12,10 +12,11 @@ import { DialogoPrepararMes } from "@/components/gestao/dialogo-preparar-mes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileSpreadsheet, LoaderCircle, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useRascunhoConfiguracoes } from "@/components/gestao/rascunho-configuracoes";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
@@ -116,6 +117,11 @@ export default function IntegracaoPlanilha({
   const [mapa, setMapa] = useState<Record<string, MapaAba>>({});
   const [editandoEstrutura, setEditandoEstrutura] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
+  const { base, rascunho, mutarPlanilha } = useRascunhoConfiguracoes();
+  const ativaServidor = base?.planilhas.frequencia.ativa ?? integracao?.ativa ?? false;
+  const ativaRascunho = rascunho?.planilhas.frequencia.ativa ?? ativaServidor;
+  const envioRascunho =
+    rascunho?.planilhas.frequencia.envioAutomatico ?? integracao?.envioAutomatico ?? false;
   const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
   const [envioAberto, setEnvioAberto] = useState(false);
   const [abaApresentacao, setAbaApresentacao] = useState("");
@@ -168,7 +174,7 @@ export default function IntegracaoPlanilha({
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
   const conectada = Boolean(integracao?.googleConectado && integracao.googlePlanilha);
-  const podeEnviar = Boolean(integracao?.ativa && conectada);
+  const podeEnviar = Boolean(ativaServidor && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
   const temMapa = Object.values(mapa).some((item) => item.turmaOriginalId !== "");
@@ -188,42 +194,14 @@ export default function IntegracaoPlanilha({
     });
   }
 
-  async function alternarAtiva(valor: boolean) {
-    await executarPorChave("alternar-ativa", async () => {
-      setSalvando(true);
-      try {
-        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
-          "/api/planilha",
-          corpoAlteracao("PATCH", { ativa: valor }),
-        );
-        setIntegracao(dados.integracao);
-        setConferenciaHash("");
-        toast.success(valor ? "Integração ativada." : "Integração desativada.");
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-      } finally {
-        setSalvando(false);
-      }
-    });
+  function alternarAtiva(valor: boolean) {
+    mutarPlanilha("frequencia", { ativa: valor });
+    avisarSucesso("Integração alterada no rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function alternarEnvioAutomatico(valor: boolean) {
-    await executarPorChave("alternar-envio-automatico", async () => {
-      setSalvando(true);
-      try {
-        const dados = await pedir<{ integracao: IntegracaoAdmin }>(
-          "/api/planilha",
-          corpoAlteracao("PATCH", { envioAutomatico: valor }),
-        );
-        setIntegracao(dados.integracao);
-        setConferenciaHash("");
-        toast.success(valor ? "Envio ao salvar ligado." : "Envio ao salvar desligado.");
-      } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar.");
-      } finally {
-        setSalvando(false);
-      }
-    });
+  function alternarEnvioAutomatico(valor: boolean) {
+    mutarPlanilha("frequencia", { envioAutomatico: valor });
+    avisarSucesso("Envio automático alterado no rascunho.", "Salve as configurações para aplicar.");
   }
 
   async function lerEstrutura() {
@@ -362,8 +340,8 @@ export default function IntegracaoPlanilha({
       onAbertoChange={setAberto}
       resumo={
         <>
-          <Selo variante={integracao?.ativa ? "sucesso" : "neutro"}>
-            {integracao?.ativa ? "Ligada" : "Desligada"}
+          <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
+            {ativaRascunho ? "Ligada" : "Desligada"}
           </Selo>
           <Selo variante={conectada ? "sucesso" : "atencao"}>
             {conectada ? "Google conectado" : "Sem conexão"}
@@ -382,7 +360,7 @@ export default function IntegracaoPlanilha({
       }
       acoes={
         <Switch
-          checked={integracao?.ativa ?? false}
+          checked={ativaRascunho}
           disabled={salvando || !conectada}
           onCheckedChange={(valor) => void alternarAtiva(valor)}
           aria-label="Integração ativa"
@@ -705,10 +683,11 @@ export default function IntegracaoPlanilha({
               </p>
             </div>
             <Switch
-              checked={integracao?.envioAutomatico ?? false}
+              checked={envioRascunho}
               disabled={
                 salvando ||
-                (!integracao?.envioAutomatico && (!podeEnviar || !estruturaSalva || completoAtivo))
+                (!envioRascunho &&
+                  (!ativaRascunho || !conectada || !estruturaSalva || completoAtivo))
               }
               onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
               aria-label="Enviar ao salvar a chamada"

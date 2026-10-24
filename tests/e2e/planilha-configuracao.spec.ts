@@ -10,6 +10,7 @@ import {
 } from "../../src/domain/frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
+import { descartarConfiguracoes, salvarConfiguracoes } from "./helpers/configuracoes";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
@@ -275,4 +276,28 @@ test("salva o mapa somente após conferir a estrutura e invalida a leitura quand
   expect(totalEscritas()).toBe(0);
   expect(google.valor("E2E Ano A", 2, 2)).toBe("FJ");
   expect(google.valor("E2E Ano A", 3, 2)).toBe("P");
+});
+
+test("desativa a planilha no rascunho e só aplica depois de salvar", async ({ page }) => {
+  const cartao = await abrirPlanilha(page);
+  const ativa = cartao.getByRole("switch", { name: "Integração ativa", exact: true });
+  await expect(ativa).toBeChecked();
+
+  await ativa.click();
+  await expect(ativa).not.toBeChecked();
+  await expect(page.getByRole("region", { name: "Salvar configurações" })).toBeVisible();
+
+  await descartarConfiguracoes(page);
+  await expect(ativa).toBeChecked();
+
+  await ativa.click();
+  await salvarConfiguracoes(page);
+  await expect(ativa).not.toBeChecked();
+
+  await page.reload();
+  await aguardarHidratacao(page);
+  const cartaoRecarregado = await abrirPlanilha(page);
+  await expect(
+    cartaoRecarregado.getByRole("switch", { name: "Integração ativa", exact: true }),
+  ).not.toBeChecked();
 });

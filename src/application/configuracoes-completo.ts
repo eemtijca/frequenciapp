@@ -1,5 +1,5 @@
 // Leitura e gravação do conjunto completo de configurações: recursos, catálogos,
-// notificações, acesso, almoço, feriados e chaves do BI em um único lote.
+// notificações, acesso, almoço, feriados, chaves do BI e planilhas em um lote.
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { banco, usarTransacao } from "@/infra/banco";
@@ -9,6 +9,8 @@ import { ErroHttp } from "@/infra/erros";
 import type { OrdemAlmocoDoDia } from "@/domain/ordem-almoco";
 import type {
   ConfiguracoesCompletas,
+  FinalidadePlanilhaConfigurada,
+  PreferenciasPlanilhas,
   ResultadoLote,
   SecaoConfiguracao,
 } from "@/domain/configuracoes";
@@ -39,6 +41,11 @@ import {
 import { lerParametrosAcesso, atualizarParametrosAcesso } from "@/application/parametros-acesso";
 import { lerOrdemAlmoco, definirOrdemAlmoco } from "@/application/ordem-almoco";
 import { listarChavesBi, administrarChaveBi } from "@/application/chaves-bi";
+import {
+  lerLinha,
+  salvarConfiguracao,
+  type FinalidadeIntegracao,
+} from "@/application/planilha-comum";
 
 export type { ConfiguracoesCompletas, ResultadoLote, SecaoConfiguracao };
 
@@ -46,6 +53,13 @@ const itemOrdem = z.object({
   turmaId: z.string().min(1),
   inicio: z.string().nullable().optional(),
 });
+
+const esquemaPreferenciaPlanilha = z
+  .object({
+    ativa: z.boolean().optional(),
+    envioAutomatico: z.boolean().optional(),
+  })
+  .strict();
 
 const esquemaLote = z
   .object({
@@ -90,19 +104,51 @@ const esquemaLote = z
           )
           .optional(),
         limparChavesBi: z.boolean().optional(),
+        planilhas: z
+          .object({
+            frequencia: esquemaPreferenciaPlanilha.optional(),
+            saidas: esquemaPreferenciaPlanilha.optional(),
+            parcial: esquemaPreferenciaPlanilha.optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict(),
     senhaBi: z.string().optional(),
   })
   .strict();
 
+const FINALIDADES: Record<FinalidadePlanilhaConfigurada, FinalidadeIntegracao> = {
+  frequencia: "FREQUENCIA",
+  saidas: "SAIDAS",
+  parcial: "PARCIAL",
+};
+
 function hash(valor: unknown): string {
   return createHash("sha256").update(JSON.stringify(valor)).digest("hex");
 }
 
+async function lerPlanilhas(): Promise<PreferenciasPlanilhas> {
+  const [frequencia, saidas, parcial] = await Promise.all([
+    lerLinha("FREQUENCIA"),
+    lerLinha("SAIDAS"),
+    lerLinha("PARCIAL"),
+  ]);
+  return {
+    frequencia: { ativa: frequencia.ativa, envioAutomatico: frequencia.envioAutomatico },
+    saidas: { ativa: saidas.ativa, envioAutomatico: saidas.envioAutomatico },
+    parcial: { ativa: parcial.ativa, envioAutomatico: parcial.envioAutomatico },
+  };
+}
+
 async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
   // As leituras garantem a criação das linhas únicas antes de calcular a versão.
-  await Promise.all([lerConfiguracoes(), lerConfiguracaoNotificacoes(), lerParametrosAcesso()]);
+  await Promise.all([
+    lerConfiguracoes(),
+    lerConfiguracaoNotificacoes(),
+    lerParametrosAcesso(),
+    lerPlanilhas(),
+  ]);
   const [
     configuracao,
     notificacoes,
@@ -113,6 +159,7 @@ async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
     liberadores,
     feriados,
     chaves,
+    planilhas,
   ] = await Promise.all([
     banco().configuracao.findUnique({
       where: { id: "principal" },
@@ -160,6 +207,10 @@ async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
       },
       orderBy: { id: "asc" },
     }),
+    banco().integracaoPlanilha.findMany({
+      select: { id: true, ativa: true, envioAutomatico: true, atualizadoEm: true },
+      orderBy: { id: "asc" },
+    }),
   ]);
 
   return {
@@ -176,6 +227,7 @@ async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
     liberadores: hash(liberadores),
     feriados: hash(feriados),
     chavesBi: hash(chaves),
+    planilhas: hash(planilhas),
   };
 }
 
@@ -191,6 +243,7 @@ export async function lerConfiguracoesCompletas(): Promise<ConfiguracoesCompleta
     liberadores,
     feriados,
     chavesBi,
+    planilhas,
     revisoes,
   ] = await Promise.all([
     lerConfiguracoes(),
@@ -202,6 +255,7 @@ export async function lerConfiguracoesCompletas(): Promise<ConfiguracoesCompleta
     listarLiberadores(),
     listarFeriados(),
     listarChavesBi(),
+    lerPlanilhas(),
     lerRevisoes(),
   ]);
   return {
@@ -214,6 +268,7 @@ export async function lerConfiguracoesCompletas(): Promise<ConfiguracoesCompleta
     liberadores,
     feriados,
     chavesBi,
+    planilhas,
     revisoes,
   };
 }
@@ -278,6 +333,7 @@ export async function salvarConfiguracoesCompletas(
           liberadores: "Responsáveis",
           feriados: "Calendário letivo",
           chavesBi: "Chaves do BI",
+          planilhas: "Planilhas",
         };
         throw new ErroHttp(
           `As configurações mudaram em outro acesso. Revise: ${divergentes.map((secao) => rotulos[secao]).join(", ")}.`,
@@ -286,25 +342,28 @@ export async function salvarConfiguracoesCompletas(
         );
       }
 
-      const secoes = new Set<string>();
+      const secoes = new Map<string, number>();
+      const marcarSecao = (nome: string, quantidade = 1) => {
+        secoes.set(nome, (secoes.get(nome) ?? 0) + quantidade);
+      };
       const segredosBi: ResultadoLote["segredosBi"] = [];
 
       if (desejado.configuracoes) {
         const campos = semFeriados(desejado.configuracoes);
         if (Object.keys(campos).length > 0) {
           await atualizarConfiguracoes(admin, campos);
-          secoes.add("recursos");
+          marcarSecao("recursos");
         }
       }
 
       if (desejado.notificacoes) {
         await atualizarConfiguracaoNotificacoes(admin, desejado.notificacoes);
-        secoes.add("notificações");
+        marcarSecao("notificações");
       }
 
       if (desejado.acesso) {
         await atualizarParametrosAcesso(admin, desejado.acesso);
-        secoes.add("acesso");
+        marcarSecao("acesso");
       }
 
       if (desejado.ordemAlmoco) {
@@ -316,7 +375,7 @@ export async function salvarConfiguracoesCompletas(
           };
           if (diferencaDeOrdem(atual, dia)) {
             await definirOrdemAlmoco(admin, dia.diaSemana, { itens: dia.itens });
-            secoes.add("ordem do almoço");
+            marcarSecao("ordem do almoço");
           }
         }
       }
@@ -342,7 +401,7 @@ export async function salvarConfiguracoesCompletas(
         for (const atual of atuaisBeneficios) {
           if (!idsDesejados.has(atual.id)) await removerBeneficio(admin, atual.id);
         }
-        secoes.add("benefícios");
+        marcarSecao("benefícios", desejado.beneficios.length);
       }
 
       if (desejado.justificativas) {
@@ -361,7 +420,7 @@ export async function salvarConfiguracoesCompletas(
         for (const atual of atuaisJustificativas) {
           if (!codigosDesejados.has(atual.codigo)) await removerJustificativa(admin, atual.codigo);
         }
-        secoes.add("justificativas");
+        marcarSecao("justificativas", desejado.justificativas.length);
       }
 
       if (desejado.liberadores) {
@@ -380,7 +439,7 @@ export async function salvarConfiguracoesCompletas(
         for (const atual of atuaisLiberadores) {
           if (!codigosDesejados.has(atual.codigo)) await removerLiberador(admin, atual.codigo);
         }
-        secoes.add("responsáveis");
+        marcarSecao("responsáveis", desejado.liberadores.length);
       }
 
       if (desejado.feriados) {
@@ -398,7 +457,7 @@ export async function salvarConfiguracoesCompletas(
         for (const atual of atuaisFeriados) {
           if (!desejadosPorDia.has(atual.dia)) await removerFeriado(admin, atual.dia);
         }
-        secoes.add("calendário");
+        marcarSecao("calendário", desejado.feriados.length);
       }
 
       if (desejado.limparChavesBi) {
@@ -406,7 +465,7 @@ export async function salvarConfiguracoesCompletas(
           acao: "limpar",
           senha: senhaBi ?? "",
         });
-        secoes.add("chaves do BI");
+        marcarSecao("chaves do BI");
       }
 
       if (desejado.chavesBi) {
@@ -470,14 +529,26 @@ export async function salvarConfiguracoesCompletas(
             });
           }
         }
-        secoes.add("chaves do BI");
+        marcarSecao("chaves do BI", desejado.chavesBi.length);
+      }
+
+      if (desejado.planilhas) {
+        for (const chave of ["frequencia", "saidas", "parcial"] as const) {
+          const entrada = desejado.planilhas[chave];
+          if (entrada && Object.keys(entrada).length > 0) {
+            await salvarConfiguracao(admin, FINALIDADES[chave], entrada);
+            marcarSecao("planilhas");
+          }
+        }
       }
 
       await auditar(
         tx,
         admin.id,
         "configuracao.lote",
-        secoes.size > 0 ? [...secoes].join(", ") : "sem alterações",
+        secoes.size > 0
+          ? [...secoes.entries()].map(([nome, quantidade]) => `${nome}: ${quantidade}`).join(", ")
+          : "sem alterações",
       );
 
       return {

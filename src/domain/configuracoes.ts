@@ -1,4 +1,5 @@
-// Contrato compartilhado do rascunho único de configurações.
+// Contrato compartilhado do rascunho único de configurações, incluindo as
+// preferências locais que podem ser gravadas no lote.
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 import type { ParametrosAcesso } from "@/domain/diretores";
 import type { OrdemAlmocoDoDia } from "@/domain/ordem-almoco";
@@ -17,6 +18,15 @@ export interface ChaveBiDesejada extends ChaveBi {
   revogada?: boolean;
 }
 
+export type FinalidadePlanilhaConfigurada = "frequencia" | "saidas" | "parcial";
+
+export interface PreferenciaPlanilha {
+  ativa: boolean;
+  envioAutomatico: boolean;
+}
+
+export type PreferenciasPlanilhas = Record<FinalidadePlanilhaConfigurada, PreferenciaPlanilha>;
+
 export type SecaoConfiguracao =
   | "configuracao"
   | "notificacoes"
@@ -26,7 +36,8 @@ export type SecaoConfiguracao =
   | "justificativas"
   | "liberadores"
   | "feriados"
-  | "chavesBi";
+  | "chavesBi"
+  | "planilhas";
 
 export interface ConfiguracoesCompletas {
   configuracoes: Configuracoes;
@@ -38,6 +49,7 @@ export interface ConfiguracoesCompletas {
   liberadores: LiberadorConfigurado[];
   feriados: Feriado[];
   chavesBi: ChaveBiDesejada[];
+  planilhas: PreferenciasPlanilhas;
   revisoes: Record<SecaoConfiguracao, string>;
 }
 

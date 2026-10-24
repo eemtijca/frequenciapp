@@ -11820,6 +11820,11 @@
                         }
                       ],
                       "chavesBi": [],
+                      "planilhas": {
+                        "frequencia": { "ativa": true, "envioAutomatico": false },
+                        "saidas": { "ativa": true, "envioAutomatico": false },
+                        "parcial": { "ativa": false, "envioAutomatico": false }
+                      },
                       "revisoes": {
                         "configuracao": "hash-da-configuracao",
                         "notificacoes": "hash-das-notificacoes",
@@ -11829,7 +11834,8 @@
                         "justificativas": "hash-das-justificativas",
                         "liberadores": "hash-dos-liberadores",
                         "feriados": "hash-dos-feriados",
-                        "chavesBi": "hash-das-chaves"
+                        "chavesBi": "hash-das-chaves",
+                        "planilhas": "hash-das-planilhas"
                       }
                     }
                   }
@@ -11966,6 +11972,11 @@
                           }
                         ],
                         "chavesBi": [],
+                        "planilhas": {
+                          "frequencia": { "ativa": true, "envioAutomatico": false },
+                          "saidas": { "ativa": true, "envioAutomatico": false },
+                          "parcial": { "ativa": false, "envioAutomatico": false }
+                        },
                         "revisoes": {
                           "configuracao": "hash-da-configuracao",
                           "notificacoes": "hash-das-notificacoes",
@@ -11975,7 +11986,8 @@
                           "justificativas": "hash-das-justificativas",
                           "liberadores": "hash-dos-liberadores",
                           "feriados": "hash-dos-feriados",
-                          "chavesBi": "hash-das-chaves"
+                          "chavesBi": "hash-das-chaves",
+                          "planilhas": "hash-das-planilhas"
                         }
                       },
                       "segredosBi": []
@@ -18958,6 +18970,35 @@
           }
         }
       },
+      "PreferenciaPlanilha": {
+        "type": "object",
+        "title": "Preferência local de planilha",
+        "required": ["ativa", "envioAutomatico"],
+        "properties": {
+          "ativa": {
+            "type": "boolean",
+            "example": true
+          },
+          "envioAutomatico": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "PreferenciaPlanilhaParcial": {
+        "type": "object",
+        "title": "Alteração local de planilha",
+        "properties": {
+          "ativa": {
+            "type": "boolean",
+            "example": true
+          },
+          "envioAutomatico": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
       "ConfiguracoesCompletas": {
         "type": "object",
         "title": "Conjunto completo de configurações",
@@ -18972,6 +19013,7 @@
           "liberadores",
           "feriados",
           "chavesBi",
+          "planilhas",
           "revisoes"
         ],
         "properties": {
@@ -19171,6 +19213,22 @@
               "$ref": "#/components/schemas/ChaveBi"
             }
           },
+          "planilhas": {
+            "type": "object",
+            "description": "Preferências locais das três integrações. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos.",
+            "required": ["frequencia", "saidas", "parcial"],
+            "properties": {
+              "frequencia": {
+                "$ref": "#/components/schemas/PreferenciaPlanilha"
+              },
+              "saidas": {
+                "$ref": "#/components/schemas/PreferenciaPlanilha"
+              },
+              "parcial": {
+                "$ref": "#/components/schemas/PreferenciaPlanilha"
+              }
+            }
+          },
           "revisoes": {
             "type": "object",
             "description": "Versão de cada seção, comparada antes de gravar o lote.",
@@ -19262,6 +19320,21 @@
                 "type": "boolean",
                 "description": "Remove do histórico as chaves revogadas e expiradas.",
                 "example": false
+              },
+              "planilhas": {
+                "type": "object",
+                "description": "Ativação e envio automático de cada integração. Estrutura, mapa, modo completo e visibilidade mensal não entram neste lote.",
+                "properties": {
+                  "frequencia": {
+                    "$ref": "#/components/schemas/PreferenciaPlanilhaParcial"
+                  },
+                  "saidas": {
+                    "$ref": "#/components/schemas/PreferenciaPlanilhaParcial"
+                  },
+                  "parcial": {
+                    "$ref": "#/components/schemas/PreferenciaPlanilhaParcial"
+                  }
+                }
               }
             }
           },
