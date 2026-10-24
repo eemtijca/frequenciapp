@@ -128,7 +128,7 @@ export function SelecionarBuscavel({
             }
           }}
           className={cn(
-            "controle-vidro border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+            "controle border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
             className,
           )}
         >
@@ -196,7 +196,7 @@ export function SelecionarBuscavel({
                 }}
                 className={cn(
                   "pressionavel relative flex min-h-11 w-full cursor-pointer items-center rounded-lg py-1.5 pr-3 pl-8 text-left text-sm outline-none",
-                  opcao.valor === value ? "vidro-selecionado" : "vidro-discreto",
+                  opcao.valor === value ? "selecionado" : "discreto",
                   posicao === indice && "ring-ring/50 ring-2 ring-inset",
                 )}
               >

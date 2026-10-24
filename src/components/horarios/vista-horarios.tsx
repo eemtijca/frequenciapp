@@ -107,7 +107,7 @@ function OrdemAlmocoDoDiaCartao({ dias, dia, turmas, turmaSelecionada }: PropsOr
   return (
     <section
       aria-label={`Ordem do almoço de ${rotuloDia(dia)}`}
-      className="superficie-vidro overflow-hidden"
+      className="superficie overflow-hidden"
     >
       <h2 className="bg-secondary/50 flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
         <Utensils size={16} aria-hidden="true" className="shrink-0" />
@@ -120,9 +120,9 @@ function OrdemAlmocoDoDiaCartao({ dias, dia, turmas, turmaSelecionada }: PropsOr
             <li
               key={item.turmaId}
               aria-current={selecionada ? "true" : undefined}
-              className={`flex min-w-0 items-center gap-3 px-4 py-3 text-sm ${selecionada ? "vidro-selecionado" : ""}`}
+              className={`flex min-w-0 items-center gap-3 px-4 py-3 text-sm ${selecionada ? "selecionado" : ""}`}
             >
-              <span className="controle-vidro numerais-tabulares flex size-11 shrink-0 items-center justify-center font-semibold">
+              <span className="controle numerais-tabulares flex size-11 shrink-0 items-center justify-center font-semibold">
                 <span aria-hidden="true">{item.posicao}º</span>
                 <span className="sr-only">{item.posicao}º lugar</span>
               </span>
@@ -180,7 +180,7 @@ function AulasDoDia({
         return (
           <li key={aula.id} className="flex min-w-0 flex-col gap-3 px-4 py-4">
             <div className="flex items-start gap-3">
-              <span className="controle-vidro numerais-tabulares flex size-11 shrink-0 items-center justify-center text-sm font-semibold">
+              <span className="controle numerais-tabulares flex size-11 shrink-0 items-center justify-center text-sm font-semibold">
                 <span aria-hidden="true">{aula.ordem}ª</span>
                 <span className="sr-only">{aula.ordem}ª aula</span>
               </span>
@@ -493,7 +493,7 @@ export default function VistaHorarios({
       ) : null}
 
       {aulas.length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-3 px-5 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-3 px-5 text-center">
           <CalendarDays size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">
             {turmas.length === 0 ? "Nenhuma turma cadastrada" : "Nenhum horário configurado"}
@@ -501,7 +501,7 @@ export default function VistaHorarios({
         </div>
       ) : semanaCompleta ? (
         <>
-          <div className="superficie-vidro hidden overflow-hidden lg:block">
+          <div className="superficie hidden overflow-hidden lg:block">
             <div className="overflow-x-auto overscroll-contain">
               <table className="w-full table-fixed text-left text-sm">
                 <caption className="sr-only">Grade semanal de {turma?.rotulo}</caption>
@@ -612,7 +612,7 @@ export default function VistaHorarios({
               <section
                 key={item.valor}
                 aria-label={`Aulas de ${rotuloDia(item.valor)}`}
-                className="superficie-vidro overflow-hidden"
+                className="superficie overflow-hidden"
               >
                 <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
                   {rotuloDia(item.valor)}
@@ -651,7 +651,7 @@ export default function VistaHorarios({
             {(turno) => (
               <section
                 aria-label={`Aulas de ${rotuloDia(dia)} · ${turno === "manha" ? "Manhã" : "Tarde"}`}
-                className="superficie-vidro mt-3 overflow-hidden"
+                className="superficie mt-3 overflow-hidden"
               >
                 <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
                   {rotuloDia(dia)}

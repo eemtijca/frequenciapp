@@ -363,7 +363,7 @@ export default function VistaGrade({
               type="button"
               aria-pressed={ativo}
               onClick={() => setTurmaId(turma.id)}
-              className="controle-vidro pressionavel flex h-11 items-center gap-2 px-4 text-sm font-medium transition-colors"
+              className="controle pressionavel flex h-11 items-center gap-2 px-4 text-sm font-medium transition-colors"
             >
               <span>{turma.rotulo}</span>
               <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -471,7 +471,7 @@ export default function VistaGrade({
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
       {turmasOriginais.length === 0 ? (
-        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <Table2 size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Sem alunos ativos</p>
           <p className="text-muted-foreground text-sm">
@@ -484,7 +484,7 @@ export default function VistaGrade({
           initial={semMovimento ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="superficie-vidro overflow-hidden"
+          className="superficie overflow-hidden"
         >
           <BarraBusca
             id="busca-grade"

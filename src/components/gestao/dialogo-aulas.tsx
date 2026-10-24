@@ -224,7 +224,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
             Nenhum horário configurado.
           </div>
         ) : (
-          <ul className="superficie-vidro divide-y overflow-hidden">
+          <ul className="superficie divide-y overflow-hidden">
             {[...aulas]
               .sort((a, b) => a.ordem - b.ordem)
               .map((aula) => (
@@ -355,7 +355,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
           </div>
         ) : (
           <form
-            className="superficie-vidro flex flex-col gap-3 p-3"
+            className="superficie flex flex-col gap-3 p-3"
             aria-busy={ocupado}
             onSubmit={(evento) => {
               evento.preventDefault();
@@ -420,7 +420,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                         aria-pressed={marcado}
                         aria-label={dia.rotulo}
                         onClick={() => alternarDia(dia.valor)}
-                        className="controle-vidro pressionavel h-11 px-3 text-xs font-medium transition-colors"
+                        className="controle pressionavel h-11 px-3 text-xs font-medium transition-colors"
                       >
                         {dia.abreviacao}
                       </button>

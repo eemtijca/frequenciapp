@@ -1,5 +1,5 @@
-// Identidade visual compartilhada: tipografia carregada, enquadramento e
-// alternativas acessíveis ao vidro, com capturas de dados sintéticos.
+// Identidade visual compartilhada: tipografia carregada, enquadramento,
+// superfícies planas e alternativas acessíveis, com capturas sintéticas.
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { contraste, type Rgb } from "../helpers/cor";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
@@ -63,6 +63,22 @@ async function abrirFormulario(page: Page): Promise<Locator> {
   const dialogo = page.getByRole("dialog", { name: "Nova série", exact: true });
   await expect(dialogo).toBeVisible();
   return dialogo;
+}
+
+async function conferirSemDesfoque(page: Page): Promise<void> {
+  const camadas = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("*"))
+      .map((elemento) => {
+        const css = getComputedStyle(elemento);
+        return {
+          elemento: elemento.tagName.toLowerCase(),
+          classe: elemento.getAttribute("class") ?? "",
+          filtro: css.backdropFilter || css.getPropertyValue("-webkit-backdrop-filter"),
+        };
+      })
+      .filter((item) => item.filtro && item.filtro !== "none"),
+  );
+  expect(camadas).toEqual([]);
 }
 
 async function conferirSuperficieSolida(elemento: Locator): Promise<void> {
@@ -198,34 +214,26 @@ test.describe("interface compartilhada", () => {
     });
   }
 
-  test("a transparência reduzida mantém o formulário opaco e legível", async ({
-    page,
-    browserName,
-  }, info) => {
-    test.skip(
-      browserName !== "chromium",
-      "Emulação da transparência reduzida disponível pelo CDP.",
-    );
-    const sessao = await page.context().newCDPSession(page);
-    try {
-      await sessao.send("Emulation.setEmulatedMedia", {
-        features: [
-          { name: "prefers-reduced-transparency", value: "reduce" },
-          { name: "prefers-reduced-motion", value: "reduce" },
-        ],
-      });
-      const dialogo = await abrirFormulario(page);
-      expect(
-        await page.evaluate(() => matchMedia("(prefers-reduced-transparency: reduce)").matches),
-      ).toBe(true);
-      await conferirSuperficieSolida(dialogo);
-      await conferirSuperficieSolida(
-        dialogo.getByRole("button", { name: "Cancelar", exact: true }),
-      );
-      await capturar(page, info, "transparencia-reduzida");
-    } finally {
-      await sessao.detach();
-    }
+  test("nenhuma camada usa desfoque em telas, menus e diálogos", async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await conferirSemDesfoque(page);
+
+    await trocarVisao(page, "Chamada", "chamada");
+    await conferirSemDesfoque(page);
+
+    await page.getByRole("button", { name: "Abrir menu" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeVisible();
+    await conferirSemDesfoque(page);
+    await page.keyboard.press("Escape");
+
+    const dialogo = await abrirFormulario(page);
+    await conferirSemDesfoque(page);
+    await conferirSuperficieSolida(dialogo);
+    await capturar(page, info, "interface-plana");
+    await page.keyboard.press("Escape");
+    await expect(dialogo).toBeHidden();
   });
 
   test("as cores forçadas preservam leitura, foco e operação por teclado", async ({

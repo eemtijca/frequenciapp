@@ -603,7 +603,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           Sair da apresentação
         </Button>
       )}
-      <header className={`superficie-vidro ${estilos.cabecalho} print:hidden`}>
+      <header className={`superficie ${estilos.cabecalho} print:hidden`}>
         <Link
           href="/"
           prefetch={false}
@@ -675,7 +675,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           </p>
         )}
         {!acesso ? (
-          <section className="superficie-vidro mx-auto mt-12 w-full max-w-md space-y-5 p-6">
+          <section className="superficie mx-auto mt-12 w-full max-w-md space-y-5 p-6">
             <div>
               <h2 className="text-xl font-semibold">Abrir análises da escola</h2>
               <p className="text-muted-foreground mt-2 text-sm">
@@ -734,7 +734,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <nav
                   aria-label="Seções do FrequenciBI"
-                  className="controle-vidro hidden max-w-full gap-1 overflow-x-auto p-1 sm:flex"
+                  className="controle hidden max-w-full gap-1 overflow-x-auto p-1 sm:flex"
                 >
                   {ABAS.map((a) => (
                     <Button
@@ -927,7 +927,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                             : `${numero(cobertura.taxa)}%`,
                         ],
                       ].map(([titulo, valor]) => (
-                        <article key={titulo} className="superficie-vidro p-4">
+                        <article key={titulo} className="superficie p-4">
                           <p className="text-muted-foreground text-xs">{titulo}</p>
                           <strong className="mt-2 block text-xl break-words tabular-nums sm:text-2xl">
                             {valor}
@@ -935,7 +935,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                         </article>
                       ))}
                     </section>
-                    <section className="superficie-vidro mb-4 flex flex-wrap items-center gap-3 p-4">
+                    <section className="superficie mb-4 flex flex-wrap items-center gap-3 p-4">
                       <Label htmlFor="comparacao-bi">Comparar infrequência</Label>
                       <div className="min-w-48">
                         <Selecionar
@@ -1025,7 +1025,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                         Escolha uma base permitida pela chave.
                       </p>
                     )}
-                    <section className="superficie-vidro p-4">
+                    <section className="superficie p-4">
                       <h2 className="mb-3 font-semibold">Visões salvas</h2>
                       {!personalizacao.visoes.length && (
                         <p className="text-muted-foreground text-sm">Nenhuma visão salva.</p>
@@ -1034,7 +1034,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                         {personalizacao.visoes.map((v) => (
                           <div
                             key={v.id}
-                            className="controle-vidro flex max-w-full min-w-0 items-center gap-1 p-1"
+                            className="controle flex max-w-full min-w-0 items-center gap-1 p-1"
                           >
                             <Button
                               className="h-auto min-h-11 min-w-0 break-words whitespace-normal"
@@ -1074,7 +1074,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 )}
                 {aba === "paineis" && (
                   <div className="space-y-4">
-                    <section className="superficie-vidro flex flex-wrap gap-2 p-4 print:hidden">
+                    <section className="superficie flex flex-wrap gap-2 p-4 print:hidden">
                       <Input
                         value={nomePainel}
                         maxLength={100}
@@ -1193,13 +1193,13 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                             Adicione gráficos pelo Explorador.
                           </p>
                         )}
-                        <details className="superficie-vidro p-4">
+                        <details className="superficie p-4">
                           <summary className="cursor-pointer text-sm">Anotação do painel</summary>
                           <textarea
                             value={painel.anotacao}
                             maxLength={2000}
                             aria-label="Anotação do painel"
-                            className="controle-vidro mt-3 min-h-20 w-full p-3"
+                            className="controle mt-3 min-h-20 w-full p-3"
                             onChange={(e) => alterarPainel({ ...painel, anotacao: e.target.value })}
                           />
                         </details>
@@ -1223,7 +1223,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   />
                 )}
                 {destaques.length > 0 && aba !== "ajuda" && (
-                  <details className="superficie-vidro mt-4 p-4">
+                  <details className="superficie mt-4 p-4">
                     <summary className="cursor-pointer font-semibold">Destaques do recorte</summary>
                     <ul className="mt-3 space-y-2 text-sm">
                       {destaques.map((d) => (
@@ -1238,7 +1238,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 )}
               </>
             )}
-            <details className="superficie-vidro mt-4 p-4 print:hidden">
+            <details className="superficie mt-4 p-4 print:hidden">
               <summary className="cursor-pointer text-sm font-medium">
                 Configurações deste navegador
               </summary>

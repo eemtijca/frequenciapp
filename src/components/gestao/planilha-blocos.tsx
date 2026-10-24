@@ -174,7 +174,7 @@ export function BlocoModoCompletoPlanilha({
               <div
                 role="radiogroup"
                 aria-label="Duração do modo completo"
-                className="superficie-vidro grid grid-cols-4 gap-1 p-1.5"
+                className="superficie grid grid-cols-4 gap-1 p-1.5"
               >
                 {DURACOES_MODO_COMPLETO.map((minutos) => (
                   <button
@@ -183,7 +183,7 @@ export function BlocoModoCompletoPlanilha({
                     role="radio"
                     aria-checked={duracao === minutos}
                     onClick={() => setDuracao(minutos)}
-                    className="controle-vidro vidro-discreto pressionavel min-h-10 px-1 text-xs font-medium"
+                    className="controle discreto pressionavel min-h-10 px-1 text-xs font-medium"
                   >
                     {minutos} min
                   </button>

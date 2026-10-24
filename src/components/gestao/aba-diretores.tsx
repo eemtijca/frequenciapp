@@ -303,7 +303,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           Carregando diretores...
         </div>
       ) : (diretores ?? []).length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRoundCheck size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum diretor de turma cadastrado</p>
           <p className="text-muted-foreground text-sm">
@@ -323,7 +323,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
             placeholder="Buscar por nome, identificador ou turma"
           />
           {filtrados.length === 0 ? (
-            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhum diretor encontrado</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
@@ -335,7 +335,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                   initial={semMovimento ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
-                  className={`superficie-vidro overflow-hidden ${diretor.ativo ? "" : "opacity-60"}`}
+                  className={`superficie overflow-hidden ${diretor.ativo ? "" : "opacity-60"}`}
                   data-diretor={diretor.identificador}
                 >
                   <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">

@@ -246,7 +246,7 @@ export default function VistaPainel({
       </div>
     ) : (
       <>
-        <div className="superficie-vidro flex flex-col gap-4 p-4">
+        <div className="superficie flex flex-col gap-4 p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="sr-only">
               <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
@@ -288,7 +288,7 @@ export default function VistaPainel({
         </div>
 
         {!feriado && serieSelecionada && porOrigem && (
-          <div className="superficie-vidro flex flex-col gap-4 p-4">
+          <div className="superficie flex flex-col gap-4 p-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="sr-only">
                 <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
@@ -372,7 +372,7 @@ export default function VistaPainel({
       <div className="grid grid-cols-2 items-stretch gap-3">
         <div
           role="group"
-          className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+          className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
           aria-label="Resumo do dia"
           aria-busy={carregandoPainel}
         >
@@ -435,7 +435,7 @@ export default function VistaPainel({
             id: "desistentes",
             nome: "Desistentes",
             conteudo: (
-              <div className="superficie-vidro flex flex-col gap-4 p-4">
+              <div className="superficie flex flex-col gap-4 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="sr-only">Desistentes até este dia</h2>
                   <span className="numerais-tabulares text-muted-foreground shrink-0 text-sm whitespace-nowrap">

@@ -37,7 +37,7 @@ function dataPorExtenso(dia: string): string {
 
 function Destaque({ valor, rotulo, tom }: { valor: string; rotulo: string; tom?: string }) {
   return (
-    <div className="superficie-vidro flex min-h-20 flex-col items-center justify-center gap-1 px-3 py-3">
+    <div className="superficie flex min-h-20 flex-col items-center justify-center gap-1 px-3 py-3">
       <span className={`numerais-tabulares text-2xl font-semibold ${tom ?? ""}`}>{valor}</span>
       <span className="text-muted-foreground text-center text-xs font-medium">{rotulo}</span>
     </div>
@@ -48,7 +48,7 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
   const verJustificadas = estatisticas.categorias.includes("justificativas");
   const verSaidas = estatisticas.categorias.includes("saidas");
   return (
-    <div className="superficie-vidro overflow-x-auto">
+    <div className="superficie overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">Ausência por aluno no período</caption>
         <thead>
@@ -160,7 +160,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
     return (
       <section aria-label="Minhas turmas" className="flex flex-col gap-4 pb-6">
         <h1 className="text-xl font-semibold tracking-tight">Minhas turmas</h1>
-        <p className="superficie-vidro text-muted-foreground px-4 py-8 text-center text-sm">
+        <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
           Nenhuma turma vinculada a esta conta hoje. Procure a gestão da escola.
         </p>
       </section>
@@ -196,8 +196,8 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
               aria-pressed={item.turmaId === turmaId}
               onClick={() => setTurmaId(item.turmaId)}
               className={cn(
-                "controle-vidro pressionavel flex min-h-11 items-center px-4 text-sm font-medium transition-colors",
-                item.turmaId === turmaId && "vidro-selecionado",
+                "controle pressionavel flex min-h-11 items-center px-4 text-sm font-medium transition-colors",
+                item.turmaId === turmaId && "selecionado",
               )}
             >
               {item.turma}
@@ -247,7 +247,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
           Carregando estatísticas
         </div>
       ) : dados && dados.turmaId === turmaId && !periodo ? (
-        <p className="superficie-vidro text-muted-foreground px-4 py-8 text-center text-sm">
+        <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
           O vínculo com esta turma começou em {dataPorExtenso(dados.vinculo.inicio)}; não há dados
           seus neste mês.
         </p>
@@ -271,7 +271,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
           </div>
 
           {semChamada ? (
-            <p className="superficie-vidro text-muted-foreground px-4 py-8 text-center text-sm">
+            <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
               Nenhuma chamada registrada neste período.
               {periodo && dados && periodo.de === dados.vinculo.inicio
                 ? ` Seu acompanhamento desta turma começou em ${dataPorExtenso(dados.vinculo.inicio)}.`
@@ -283,7 +283,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
                 <div
                   role="group"
                   aria-label="Forma de exibição"
-                  className="superficie-vidro flex gap-1 p-1"
+                  className="superficie flex gap-1 p-1"
                 >
                   <button
                     type="button"
@@ -291,9 +291,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
                     onClick={() => setExibicao("grafico")}
                     className={cn(
                       "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "grafico"
-                        ? "vidro-selecionado"
-                        : "vidro-discreto text-muted-foreground",
+                      exibicao === "grafico" ? "selecionado" : "discreto text-muted-foreground",
                     )}
                   >
                     <ChartColumn size={16} aria-hidden="true" />
@@ -305,9 +303,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
                     onClick={() => setExibicao("tabela")}
                     className={cn(
                       "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "tabela"
-                        ? "vidro-selecionado"
-                        : "vidro-discreto text-muted-foreground",
+                      exibicao === "tabela" ? "selecionado" : "discreto text-muted-foreground",
                     )}
                   >
                     <Table2 size={16} aria-hidden="true" />
@@ -318,14 +314,14 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
 
               {exibicao === "grafico" ? (
                 <>
-                  <div className="superficie-vidro flex flex-col gap-3 p-4">
+                  <div className="superficie flex flex-col gap-3 p-4">
                     <h2 className="text-sm font-semibold">Ausência por aluno</h2>
                     <GraficoAlunos
                       alunos={estatisticas.alunos}
                       limiteRisco={estatisticas.limiteRisco}
                     />
                   </div>
-                  <div className="superficie-vidro flex flex-col gap-3 p-4">
+                  <div className="superficie flex flex-col gap-3 p-4">
                     <h2 className="text-sm font-semibold">Ausência da turma por semana</h2>
                     <GraficoSemanas
                       semanas={estatisticas.semanas}

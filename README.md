@@ -65,7 +65,7 @@ A aplicação publicada fica em https://frequenciappjca.vercel.app. Para experim
 - **PWA completo**: instala no dispositivo como aplicativo, abre em Chamada ou Painel pelos atalhos, avisa quando a internet cai e atualiza com um toque quando há versão nova.
 - **Erros em português**: toda falha de banco ou de API vira mensagem curta e acionável, sem termo técnico.
 - **Navegação responsiva**: barra lateral no desktop e menu lateral pelo botão Abrir menu no celular, com as mesmas seções e ações de conta. A troca de visão preserva estado e rolagem; Gestão aparece no menu para a administração.
-- **Tema do sistema, claro ou escuro**, animações discretas que respeitam a preferência de movimento reduzido e interface pensada para uma mão.
+- **Tema do sistema, claro ou escuro**, interface plana sem desfoque, animações discretas que respeitam a preferência de movimento reduzido e layout pensado para uma mão.
 - **Google Planilhas opcional**: frequência, saídas e entradas e Chamada Parcial usam arquivos escolhidos com OAuth e Google Picker, pela Sheets API. A Chamada Parcial exige um terceiro arquivo separado. Há conferência do esquema, prévia obrigatória e releitura antes da escrita. Na frequência e nas saídas, o modo completo, com senha e prazo, permite corrigir divergências e remover apenas o que a integração criou. Não são criadas abas de backup. Consulte [as condições de escrita pela Sheets API](docs/planilha.md).
 
 ## Stack

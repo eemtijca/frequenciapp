@@ -247,7 +247,7 @@ function ConteudoConfiguracoes({
 
   if (!rascunhoCarregado || !baseCarregada) {
     return (
-      <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className="superficie flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
         {carregando ? (
           <>
             <LoaderCircle size={20} className="animate-spin" aria-hidden="true" />
@@ -646,7 +646,7 @@ function ConteudoConfiguracoes({
         </div>
 
         <div
-          className="superficie-vidro flex flex-col gap-3 p-3"
+          className="superficie flex flex-col gap-3 p-3"
           role="group"
           aria-label="Turma de origem na Chamada"
         >
@@ -779,7 +779,7 @@ function ConteudoConfiguracoes({
           </>
         }
       >
-        <div className="superficie-vidro flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
+        <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label htmlFor="justificativa-codigo">Código</Label>
             <Input
@@ -819,7 +819,7 @@ function ConteudoConfiguracoes({
           <AvisoCompacto variante="dados_invalidos" descricao={erroJustificativa} tamanho="linha" />
         )}
 
-        <ul className="superficie-vidro divide-y overflow-hidden">
+        <ul className="superficie divide-y overflow-hidden">
           {atual.justificativas.map((item) => (
             <li
               key={item.codigo}
@@ -947,7 +947,7 @@ function ConteudoConfiguracoes({
           </>
         }
       >
-        <div className="superficie-vidro flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
+        <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5 sm:w-32">
             <Label htmlFor="liberador-codigo">Código</Label>
             <Input
@@ -991,7 +991,7 @@ function ConteudoConfiguracoes({
           <p className="text-muted-foreground text-sm">Nenhum nome cadastrado.</p>
         )}
 
-        <ul className="superficie-vidro divide-y overflow-hidden">
+        <ul className="superficie divide-y overflow-hidden">
           {atual.liberadores.map((item) => (
             <li
               key={item.codigo}
@@ -1221,7 +1221,7 @@ function ConteudoConfiguracoes({
       )}
       <nav
         aria-label="Categorias de configurações"
-        className="superficie-vidro grid grid-cols-2 gap-1.5 p-1.5 lg:grid-cols-1"
+        className="superficie grid grid-cols-2 gap-1.5 p-1.5 lg:grid-cols-1"
       >
         {CATEGORIAS.map(({ valor, rotulo, icone: Icone }) => (
           <Button
@@ -1236,7 +1236,7 @@ function ConteudoConfiguracoes({
               if (valor === "horarios") setHorariosAbertos(true);
             }}
             className={`h-12 min-w-0 justify-start px-3 text-xs sm:text-sm ${
-              categoria === valor ? "vidro-selecionado" : "text-muted-foreground"
+              categoria === valor ? "selecionado" : "text-muted-foreground"
             }`}
           >
             <Icone size={16} aria-hidden="true" />
@@ -1333,7 +1333,7 @@ function ConteudoConfiguracoes({
         <div
           role="region"
           aria-label="Salvar configurações"
-          className="superficie-vidro vidro-flutuante sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
+          className="superficie sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
           style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <p

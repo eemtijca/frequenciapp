@@ -156,7 +156,7 @@ test("Chamada: Turmas recolhe todo o painel e cada série contém suas turmas", 
   await expect(page.getByText("E2E Serie 2B", { exact: true }).first()).toBeVisible();
 });
 
-test("Chamada: painel compacto e degradê cabem em telas pequenas e ampliadas", async ({
+test("Chamada: painel compacto e barra cabem em telas pequenas e ampliadas", async ({
   page,
 }, testInfo) => {
   const secao = await abrirChamada(page);

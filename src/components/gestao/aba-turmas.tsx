@@ -170,7 +170,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
       </div>
 
       {series.length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Crie uma série primeiro</p>
           <p className="text-muted-foreground text-sm">
@@ -178,7 +178,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
           </p>
         </div>
       ) : turmas.length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma turma cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -198,7 +198,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
             placeholder="Buscar turma"
           />
           {gruposFiltrados.length === 0 ? (
-            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhuma turma encontrada</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
@@ -211,7 +211,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                 transition={
                   semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
                 }
-                className="superficie-vidro overflow-hidden"
+                className="superficie overflow-hidden"
               >
                 <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
                   <h2 className="font-medium">{grupo.serie?.nome ?? "Série"}</h2>

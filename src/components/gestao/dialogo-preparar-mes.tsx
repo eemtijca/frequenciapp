@@ -211,7 +211,7 @@ export function DialogoPrepararMes({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {interrupcao && (
-            <div role="alert" className="superficie-vidro flex flex-col gap-3 p-3 text-sm">
+            <div role="alert" className="superficie flex flex-col gap-3 p-3 text-sm">
               <p>{interrupcao.mensagem}</p>
               {interrupcao.reconectar && (
                 <Button

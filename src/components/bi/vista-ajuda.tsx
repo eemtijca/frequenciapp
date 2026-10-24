@@ -60,7 +60,7 @@ export function VistaAjudaBi({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <section className="superficie-vidro p-5">
+      <section className="superficie p-5">
         <h2 className="mb-3 text-lg font-semibold">Usar o FrequenciBI</h2>
         <ol className="list-decimal space-y-3 pl-5 text-sm">
           <li>
@@ -102,7 +102,7 @@ export function VistaAjudaBi({
           </p>
         </details>
       </section>
-      <section className="superficie-vidro p-5">
+      <section className="superficie p-5">
         <h2 className="mb-3 text-lg font-semibold">Dicionário de dados</h2>
         <div className="space-y-2">
           {METRICAS.map(([nome, descricao]) => (
@@ -113,7 +113,7 @@ export function VistaAjudaBi({
           ))}
         </div>
       </section>
-      <section className="superficie-vidro p-5 lg:col-span-2">
+      <section className="superficie p-5 lg:col-span-2">
         <h2 className="mb-3 text-lg font-semibold">Dados de apoio e cadastros</h2>
         <p className="text-muted-foreground mb-3 text-sm">
           Catálogos e cadastros refletem o estado atual; datas do filtro se aplicam aos eventos e

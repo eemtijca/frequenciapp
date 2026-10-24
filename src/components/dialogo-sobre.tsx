@@ -56,7 +56,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
         </DialogHeader>
 
         <div className="flex flex-col gap-4 text-sm">
-          <section aria-labelledby="sobre-privacidade" className="superficie-vidro space-y-2 p-4">
+          <section aria-labelledby="sobre-privacidade" className="superficie space-y-2 p-4">
             <h2 id="sobre-privacidade" className="flex items-center gap-2 font-medium">
               <ShieldCheck aria-hidden="true" className="text-primary size-5 shrink-0" />
               Privacidade

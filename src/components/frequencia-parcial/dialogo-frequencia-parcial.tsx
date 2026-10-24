@@ -195,7 +195,7 @@ export function DialogoFrequenciaParcial({
                   aria-checked={edicao.tipo === tipo}
                   disabled={futuro && tipo !== "JUSTIFICADA"}
                   onClick={() => onEdicao({ ...edicao, tipo })}
-                  className="controle-vidro pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
+                  className="controle pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   {rotulo}
                 </button>
@@ -296,7 +296,7 @@ export function DialogoFrequenciaParcial({
                     aria-checked={edicao.aulas.includes(aula)}
                     aria-label={`${aula}ª aula frequentada`}
                     onClick={() => alternarAula(aula)}
-                    className="controle-vidro pressionavel flex h-11 items-center justify-center text-sm font-medium"
+                    className="controle pressionavel flex h-11 items-center justify-center text-sm font-medium"
                   >
                     {aula}ª aula
                   </button>

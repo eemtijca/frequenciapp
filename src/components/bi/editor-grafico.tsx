@@ -68,7 +68,7 @@ export function EditorGraficoBi({
     </div>
   );
   return (
-    <section className="superficie-vidro p-4 print:hidden" aria-label="Construtor de gráficos">
+    <section className="superficie p-4 print:hidden" aria-label="Construtor de gráficos">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="sm:col-span-2 lg:col-span-3">
           <Label htmlFor={`${id}-titulo`}>Título da análise</Label>
@@ -233,7 +233,7 @@ export function EditorGraficoBi({
         <summary className="cursor-pointer py-2 text-sm">Anotação local</summary>
         <textarea
           aria-label="Anotação do gráfico"
-          className="controle-vidro mt-2 min-h-20 w-full p-3 text-sm"
+          className="controle mt-2 min-h-20 w-full p-3 text-sm"
           maxLength={1000}
           value={config.anotacao}
           onChange={(e) => onAlterar({ ...config, anotacao: e.target.value })}

@@ -38,7 +38,7 @@ export function TabelaApoioBi({
   const colunas = useMemo(() => [...new Set(linhas.flatMap((l) => Object.keys(l)))], [linhas]);
   const atual = paginaTabelaBi(pagina, filtradas.length);
   return (
-    <section className="superficie-vidro mt-4 p-4">
+    <section className="superficie mt-4 p-4">
       <h2 className="mb-3 font-semibold">{ROTULOS_RECURSOS_BI[recurso]}</h2>
       <div className="mb-3 flex flex-wrap gap-2 print:hidden">
         <Input

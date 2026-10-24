@@ -102,7 +102,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
   });
 
   return (
-    <section aria-label="Infrequência personalizada" className="superficie-vidro space-y-5 p-4">
+    <section aria-label="Infrequência personalizada" className="superficie space-y-5 p-4">
       <header>
         <h2 className="font-medium">Infrequência por período</h2>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -219,7 +219,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
             ].map(([rotulo, valor]) => (
               <div
                 key={rotulo}
-                className="superficie-vidro flex flex-col items-center gap-1 p-3 text-center"
+                className="superficie flex flex-col items-center gap-1 p-3 text-center"
               >
                 <strong className="numerais-tabulares text-xl font-semibold">{valor}</strong>
                 <span className="text-muted-foreground text-xs">{rotulo}</span>

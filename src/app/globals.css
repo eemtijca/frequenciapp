@@ -1,7 +1,7 @@
 /* Paleta, tipografia e utilitários globais da interface. */
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./vidro.css";
+@import "./superficies.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -188,7 +188,7 @@
   /* Resposta de toque: encolhe de leve, sem apagar transformações de
      centralização, e respeita quem pediu menos movimento. */
   .pressionavel {
-    transition-property: scale, background-color, color, border-color, opacity, box-shadow;
+    transition-property: scale, background-color, color, border-color, opacity;
     transition-duration: 150ms;
     transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
   }

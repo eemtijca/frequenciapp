@@ -123,7 +123,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
   function classeOpcao(selecionada: boolean) {
     return cn(
       "pressionavel numerais-tabulares focus-visible:ring-ring/50 flex h-11 w-full shrink-0 items-center justify-center text-base transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
-      selecionada ? "vidro-selecionado font-semibold" : "vidro-discreto",
+      selecionada ? "selecionado font-semibold" : "discreto",
     );
   }
 
@@ -178,7 +178,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
               onValor(agora);
               setAberto(false);
             }}
-            className="vidro-discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
+            className="discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
           >
             Agora
           </button>
@@ -188,7 +188,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
         <button
           type="button"
           onClick={() => setAberto(false)}
-          className="vidro-discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
+          className="discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
         >
           Fechar
         </button>
@@ -206,7 +206,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${valor || "sem horário"}`}
       onClick={() => aoAbrir(!aberto)}
-      className="controle-vidro focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Clock size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <span className="numerais-tabulares truncate font-semibold">{valor || "--:--"}</span>
