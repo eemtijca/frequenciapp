@@ -4462,7 +4462,8 @@
                         "origemNaChamada": false,
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -4524,7 +4525,8 @@
                         "origemNaChamada": true,
                         "origemNaChamadaSerieIds": ["5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b"],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -11247,7 +11249,8 @@
                       "origemNaChamada": false,
                       "origemNaChamadaSerieIds": [],
                       "origemNaChamadaTurmaIds": [],
-                      "feriados": []
+                      "feriados": [],
+                      "atualizadoEm": "2026-10-13T17:30:00.000Z"
                     }
                   }
                 }
@@ -11364,7 +11367,8 @@
                         "origemNaChamada": false,
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -14778,7 +14782,13 @@
         "type": "object",
         "title": "Configurações da escola",
         "description": "Recursos configuráveis da operação escolar, com o calendário de feriados.",
-        "required": ["frequenciaPorAula", "saidaAntecipada", "origemNaChamada", "feriados"],
+        "required": [
+          "frequenciaPorAula",
+          "saidaAntecipada",
+          "origemNaChamada",
+          "feriados",
+          "atualizadoEm"
+        ],
         "properties": {
           "frequenciaPorAula": {
             "type": "boolean",
@@ -14813,6 +14823,12 @@
             "items": {
               "$ref": "#/components/schemas/Feriado"
             }
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Versão da última gravação, usada na revisão otimista.",
+            "example": "2026-10-13T17:30:00.000Z"
           }
         }
       },
@@ -14852,6 +14868,12 @@
               "format": "uuid"
             },
             "example": ["3a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"]
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Versão lida em GET. Se divergir da vigente, a API responde 409.",
+            "example": "2026-10-13T17:30:00.000Z"
           }
         }
       },

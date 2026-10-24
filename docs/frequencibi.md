@@ -4,9 +4,11 @@ Análises internas em `/bi`, sem conta de leitor e com chave própria da Gestão
 
 ## Acesso
 
-A administração cria a chave em Gestão, Configurações, Acesso e avisos, FrequenciBI. Cada pessoa recebe uma chave nomeada, com escopo e validade quando necessários. O segredo aparece uma vez. O botão abaixo do login abre a área. O item da barra lateral de administração e coordenação abre outra aba, preservando registros ainda em edição no aplicativo; o diretor continua com a própria tela de estatísticas.
+A administração cria a chave em Gestão, Configurações, Acesso e avisos, FrequenciBI. Cada pessoa recebe uma chave nomeada, com escopo e validade quando necessários. O segredo aparece uma vez. O botão Testar e entrar abre a área com a chave guardada neste navegador. O item da barra lateral de administração e coordenação abre outra aba, preservando registros ainda em edição no aplicativo; o diretor continua com a própria tela de estatísticas.
 
 A sessão do FrequenciApp não concede acesso ao BI. O navegador envia a chave somente no cabeçalho de GET `/api/bi`, com `credentials: omit`. A chave nunca entra em endereço, arquivo de configurações ou exportação escolar. O servidor mantém apenas seu hash.
+
+O cabeçalho usa três colunas no desktop, com a marca centralizada e a volta ao aplicativo à esquerda. No celular, a seção é escolhida em um seletor e as ações secundárias ficam em Mais ações, para o título e os controles não competirem com o conteúdo. As seções e os controles usam a mesma linguagem visual do aplicativo, com alvos de toque de pelo menos 44 pixels.
 
 ## Análises
 
@@ -20,7 +22,7 @@ A sessão do FrequenciApp não concede acesso ao BI. O navegador envia a chave s
 
 Os painéis predefinidos oferecem Personalizar este painel, que cria uma cópia editável em Meus painéis. A ação Personalizar de cada gráfico abre sua configuração no Explorador. Aparência e tamanho reúne cinco paletas, rótulos de valores, legendas nos tipos compatíveis e controles de largura e altura. No celular, os cartões ocupam toda a largura; no desktop, a largura configurada determina sua ocupação na grade.
 
-O período inicial é o mês atual. Hoje, Esta semana, Este mês e Este ano aplicam imediatamente o período no fuso da escola, preservando os demais recortes. Aplicar período efetiva as datas e o ano escolhido; os demais recortes atuam localmente. Comparações usam intervalo anterior com igual quantidade de dias ou o mesmo intervalo no ano anterior, com ajuste do dia bissexto. Taxas variam em pontos percentuais. Atualizar dados renova também o intervalo comparado. Links com filtros explícitos abrem a Visão geral no recorte recebido, preservando os filtros dos painéis salvos. As ações de tabela permitem filtrar série, turma ou aluno e aprofundar da série à turma e ao aluno.
+O período inicial é o mês atual. Hoje, Esta semana, Este mês e Este ano aplicam imediatamente o período no fuso da escola, preservando os demais recortes. O ano e as datas usam popovers próprios, sem campos nativos; Aplicar período efetiva as datas e o ano escolhido, e os demais recortes atuam localmente. Comparações usam intervalo anterior com igual quantidade de dias ou o mesmo intervalo no ano anterior, com ajuste do dia bissexto. Taxas variam em pontos percentuais. Atualizar dados renova também o intervalo comparado. Links com filtros explícitos abrem a Visão geral no recorte recebido, preservando os filtros dos painéis salvos. As ações de tabela permitem filtrar série, turma ou aluno e aprofundar da série à turma e ao aluno.
 
 Recortes por aluno, busca, situação ou marca de frequência calculam os totais da chamada a partir da Lista histórica, agrupada por chamada. A chave precisa permitir essa base. Dados ausentes ou filtros incompatíveis produzem aviso de indisponibilidade, em vez de um zero aparente. Alunos ativos e Turmas são cadastros atuais; Cobertura das turmas é estimada por turma e dia, restrita ao período permitido pela chave, sem filtros individuais.
 

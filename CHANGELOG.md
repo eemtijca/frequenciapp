@@ -93,6 +93,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Interface revisada de ponta a ponta, com foco em consistência e uso no celular: login com favicon e conteúdo centralizado; conta em menu flutuante, com o tema no desktop; Painel com um gráfico por vez, seletor e setas, sem rolagem lateral; Chamada com alerta de benefício em popover e ações empilhadas; Chamada Parcial em tabela compacta; Saídas e Entradas com formulário em grade e envio único; Relatórios abrindo em Resumo e Grade com título; Gestão com descrições nas seções recolhíveis; FrequenciBI com título centralizado, seletor de seção e Mais ações no celular. Configurações de recursos e origem passam a usar rascunho local, confirmação explícita e revisão otimista, com `atualizadoEm` na API e resposta 409 em conflito.
+
 - Painel posiciona o cartão Cobertura do dia ao lado do cartão Infrequência no topo da tela, acompanhando a série do cartão ativo ou a escola inteira, e mostra a palavra alunos ao lado da quantidade nas legendas dos gráficos diários.
 
 - Alerta de frequência dos benefícios fica mais compacto, com percentual estimado e mínimo em destaque, faltas em aulas, limite e excesso. Mantém a indicação resumida de justificadas e preserva o cálculo mensal.
