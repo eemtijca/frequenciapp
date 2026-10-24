@@ -17,11 +17,17 @@ test.describe("responsividade", () => {
       name: "Configurar notificações",
       exact: true,
     });
+    const atualizar = cabecalho.getByRole("button", { name: "Atualizar tela", exact: true });
     const caixaAbrir = await abrir.boundingBox();
+    const caixaAtualizar = await atualizar.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
     expect(caixaAbrir).not.toBeNull();
+    expect(caixaAtualizar).not.toBeNull();
     expect(caixaNotificacoes).not.toBeNull();
     expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
+      caixaAtualizar?.x ?? 0,
+    );
+    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
 
@@ -32,11 +38,13 @@ test.describe("responsividade", () => {
     const tema = cabecalho.getByRole("button", { name: /tema/i });
     const caixaTema = await tema.boundingBox();
     expect(caixaTema).not.toBeNull();
-    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(caixaTema?.x ?? 0);
+    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
+      caixaTema?.x ?? 0,
+    );
     expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
-    await expect(cabecalho.getByRole("button")).toHaveCount(3);
+    await expect(cabecalho.getByRole("button")).toHaveCount(4);
     await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
     await info.attach("conteudo-mobile-390", {
       body: await page.screenshot({ animations: "disabled" }),

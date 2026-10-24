@@ -150,7 +150,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
   await botaoMuitas.click();
-  const painel = page.locator('[data-slot="popover-content"]');
+  const painel = page.locator('[data-slot="popover-content"][data-state="open"]');
   const detalhe = painel
     .locator("div.divide-y > div")
     .filter({ hasText: "Frequência estimada" })
