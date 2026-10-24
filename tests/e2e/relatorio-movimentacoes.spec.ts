@@ -91,7 +91,7 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Saídas e entradas", exact: true }).click();
+  await page.getByRole("tab", { name: "Saídas e Entradas", exact: true }).click();
   return page.getByRole("region", { name: "Relatório de saídas e entradas", exact: true });
 }
 
@@ -142,7 +142,7 @@ test("agrupa duas turmas, filtra os registros e mantém as cinco abas legíveis 
   await expect(grupoA).toContainText("Atraso do transporte escolar");
   await expect(grupoA).toContainText("E2E Secretaria");
 
-  const aba = page.getByRole("tab", { name: "Saídas e entradas", exact: true });
+  const aba = page.getByRole("tab", { name: "Saídas e Entradas", exact: true });
   for (const largura of [360, 320]) {
     await page.setViewportSize({ width: largura, height: 780 });
     await expect(aba).toBeVisible();
@@ -258,7 +258,7 @@ test("oculta dados antigos na falha, permite tentar novamente e distingue o per�
   await expect(totais(painel)).toHaveCount(0);
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
   estado = "dados";
-  await painel.getByRole("button", { name: "Atualizar saídas e entradas", exact: true }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(totais(painel)).toHaveText(["2", "1"]);
   await expect(painel.getByText("E2E Falha temporária do relatório.", { exact: true })).toHaveCount(
     0,
@@ -362,7 +362,7 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
         ),
     );
     expect(consultas).toBe(iniciais);
-    await page.getByRole("tab", { name: "Saídas e entradas", exact: true }).click();
+    await page.getByRole("tab", { name: "Saídas e Entradas", exact: true }).click();
     await expect.poll(() => consultas).toBe(iniciais + 1);
     await expect(painel).toHaveAttribute("aria-busy", "true");
     await expect(totais(painel)).toHaveCount(0);

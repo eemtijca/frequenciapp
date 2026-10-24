@@ -127,7 +127,7 @@ test.describe("interface compartilhada", () => {
         ["Painel", "painel"],
         ["Chamada", "chamada"],
         ["Chamada Parcial", "chamada-parcial"],
-        ["Saídas e entradas", "saidas"],
+        ["Saídas e Entradas", "saidas"],
         ["Relatórios", "relatorios"],
         ["Gestão", "gestao"],
       ] as const) {

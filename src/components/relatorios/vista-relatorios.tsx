@@ -2,6 +2,7 @@
 
 // Relatórios em sub-abas: frequência, acompanhamento individual e movimentações por turma.
 import { ArrowRightLeft, ChartNoAxesCombined, History, Table2, UserRound } from "lucide-react";
+import { useState } from "react";
 import type {
   Aluno,
   Frequencia,
@@ -16,6 +17,7 @@ import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
 import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 export type AbaRelatorio = "resumo" | "historico" | "grade" | "aluno" | "movimentacoes";
 
@@ -47,7 +49,12 @@ const ABAS: AbaItem<AbaRelatorio>[] = [
   { valor: "historico", rotulo: "Histórico", icone: History },
   { valor: "grade", rotulo: "Grade", icone: Table2 },
   { valor: "aluno", rotulo: "Por aluno", icone: UserRound },
-  { valor: "movimentacoes", rotulo: "Saídas e entradas", icone: ArrowRightLeft },
+  {
+    valor: "movimentacoes",
+    rotulo: "Saídas e Entradas",
+    rotuloCurto: "Mov.",
+    icone: ArrowRightLeft,
+  },
 ];
 
 export default function VistaRelatorios({
@@ -74,7 +81,12 @@ export default function VistaRelatorios({
 }: Props) {
   const inicial = ABAS.some((item) => item.valor === abaInicial)
     ? (abaInicial as AbaRelatorio)
-    : "historico";
+    : "resumo";
+  const [atualizacao, setAtualizacao] = useState(0);
+  useAtualizacaoTela("relatorios", async () => {
+    await onRecarregar(mes);
+    setAtualizacao((valor) => valor + 1);
+  });
 
   return (
     <section aria-label="Relatórios" className="flex flex-col gap-4 pb-6">
@@ -102,7 +114,6 @@ export default function VistaRelatorios({
                 carregando={carregando}
                 erro={erro}
                 onMes={onMes}
-                onRecarregar={onRecarregar}
               />
             )}
             {aba === "historico" && (
@@ -115,7 +126,6 @@ export default function VistaRelatorios({
                 fuso={fuso}
                 onMes={onMes}
                 onAbrir={onAbrir}
-                onRecarregar={onRecarregar}
                 bloqueado={bloqueado}
                 rotuloTurma={rotuloTurma}
               />
@@ -130,11 +140,9 @@ export default function VistaRelatorios({
                 hoje={diaCorrente}
                 aberto={ativo && ativa}
                 versao={versao}
+                atualizacao={atualizacao}
                 origens={turmas}
                 onMes={onMes}
-                onRecarregar={async () => {
-                  await onRecarregar(mes);
-                }}
               />
             )}
             {aba === "aluno" && (
@@ -148,7 +156,6 @@ export default function VistaRelatorios({
                 mes={mes}
                 mesCorrente={mesCorrente}
                 onMes={onMes}
-                onRecarregar={onRecarregar}
               />
             )}
             {aba === "movimentacoes" && (
@@ -157,6 +164,7 @@ export default function VistaRelatorios({
                 turmas={turmas}
                 alunos={alunos}
                 ativa={ativo && ativa}
+                atualizacao={atualizacao}
               />
             )}
           </>

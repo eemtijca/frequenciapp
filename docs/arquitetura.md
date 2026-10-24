@@ -49,6 +49,8 @@ sequenceDiagram
 
 Uma frequência existe por (turma, dia), garantida por restrição única no banco. O salvamento inteiro roda dentro de uma transação interativa com isolamento `Serializable`: a validação das faltas contra a lista atual de alunos e das aulas contra a grade da turma, a criação ou atualização da revisão e a troca das faltas acontecem juntas, ou nada acontece. Conflitos de serialização (P2034) são refeitos automaticamente até três vezes com pausa crescente; ao fim, o caminho converte o empate em conflito 409 com a versão vigente, nunca em sobrescrita.
 
+O rascunho de Configurações usa o mesmo isolamento. `configuracoes-completo.ts` compara a revisão de cada seção e executa o lote inteiro dentro de uma transação serializável. `banco.ts` guarda a transação corrente em `AsyncLocalStorage`, então os casos de uso de catálogo reutilizam o mesmo cliente sem abrir outra conexão. Qualquer divergência interrompe o lote antes de gravar e responde 409 com as seções alteradas.
+
 - `revisao 0` cria a primeira versão; se a frequência já existe, a API responde 409 com a versão vigente.
 - `revisao N` atualiza apenas se a versão vigente for exatamente N, com incremento atômico; em caso de divergência, responde 409 com a versão vigente.
 

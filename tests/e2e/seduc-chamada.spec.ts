@@ -88,7 +88,6 @@ async function abrirParcial(page: Page) {
   await page.locator("#parcial-turma").click();
   await page.getByRole("option", { name: `${prefixo} A`, exact: true }).click();
   const secao = page.getByTestId("chamada-parcial");
-  await expect(secao.getByRole("button", { name: "Atualizar lista", exact: true })).toBeEnabled();
   await expect(secao.getByTestId(`parcial-aluno-${alunoId}`)).toBeVisible();
   return secao;
 }
@@ -175,11 +174,11 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await salvarJustificadas(page);
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
-    name: `Registro na SEDUC: ${prefixo} Um`,
+    name: `Registro na Seduc: ${prefixo} Um`,
     exact: true,
   });
   const segundo = secao.getByRole("switch", {
-    name: `Registro na SEDUC: ${prefixo} Dois`,
+    name: `Registro na Seduc: ${prefixo} Dois`,
     exact: true,
   });
   await expect(
@@ -244,7 +243,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   await salvarJustificadas(page);
   const secao = await abrirParcial(page);
   const primeiro = secao.getByRole("switch", {
-    name: `Registro na SEDUC: ${prefixo} Um`,
+    name: `Registro na Seduc: ${prefixo} Um`,
     exact: true,
   });
   await expect(primeiro).toBeEnabled();
@@ -288,7 +287,7 @@ test("confirma presença por turno na Seduc e preserva a chamada justificada da 
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   const confirmacao = linha.getByRole("switch", {
-    name: `Registro na SEDUC: ${prefixo} Um`,
+    name: `Registro na Seduc: ${prefixo} Um`,
     exact: true,
   });
   await expect(linha.getByText("Outros: E2E Justificativa inicial", { exact: true })).toBeVisible();

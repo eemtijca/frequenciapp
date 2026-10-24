@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { PaginaBi, RecursoBi } from "@/domain/bi";
 import { RECURSOS_BI } from "@/domain/bi";
-import { aguardarHidratacao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherDataNoPeriodo } from "./helpers/pagina";
 import { esquemaFiltrosBi } from "@/domain/bi-analise";
 test.use({ serviceWorkers: "block" });
 const CHAVE_FALSA = `fbi_${"z".repeat(43)}`;
@@ -138,24 +138,39 @@ async function abrir(page: Page) {
   await preparar(page);
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
 }
 async function aba(page: Page, nome: string) {
-  await page
-    .getByRole("navigation", { name: "Seções do FrequenciBI" })
-    .getByRole("button", { name: nome, exact: true })
-    .click();
+  const navegacao = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
+  const seletor = page.getByRole("combobox", { name: "Seção do FrequenciBI", exact: true });
+  await expect(navegacao.or(seletor).first()).toBeVisible();
+  if (await navegacao.isVisible().catch(() => false)) {
+    await navegacao.getByRole("button", { name: nome, exact: true }).click();
+    return;
+  }
+  await seletor.click();
+  await page.getByRole("option", { name: nome, exact: true }).click();
 }
 async function escolher(page: Page, nome: string, valor: string) {
   await page.getByRole("combobox", { name: nome, exact: true }).click();
   await page.getByRole("option", { name: valor, exact: true }).click();
 }
+
+/** Executa uma ação do cabeçalho, abrindo Mais ações no celular. */
+async function acaoDoBi(page: Page, nome: string) {
+  const direto = page.getByRole("button", { name: nome, exact: true });
+  if (await direto.isVisible().catch(() => false)) {
+    await direto.click();
+    return;
+  }
+  await page.getByRole("button", { name: "Mais ações da análise", exact: true }).click();
+  await page.getByRole("button", { name: nome, exact: true }).click();
+}
 test("portão recusa chave inválida e consulta sem cookie, com taxas consistentes e sem excesso horizontal", async ({
   page,
 }) => {
   await preparar(page);
-  await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Indicadores gerais" })).toHaveCount(0);
   await page.getByLabel("Chave de acesso", { exact: true }).fill("QA inválida");
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("alert").filter({ hasText: "A chave não autoriza" })).toBeVisible();
@@ -304,7 +319,7 @@ test("reconexão repete falha temporária antes de aceitar o cache e encerra cha
   });
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByRole("alert").filter({ hasText: "Aguarde um minuto" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
   expect(conferencias).toBe(1);
   limitar = false;
   conferencias = 0;
@@ -398,7 +413,7 @@ test("links compartilham só filtros e configuração exportada não inclui segr
       },
     });
   });
-  await page.getByRole("button", { name: "Compartilhar filtros", exact: true }).click();
+  await acaoDoBi(page, "Compartilhar filtros");
   const link = await page.evaluate(() => localStorage.getItem("QA:link"));
   expect(link).toContain("inicio=2026-10-01");
   expect(link).not.toContain(CHAVE_FALSA);
@@ -513,22 +528,28 @@ test("personaliza modelo, preserva filtros do painel e aplica link sem alterar o
   await expect(page.getByRole("textbox", { name: "Nome do painel", exact: true })).toHaveValue(
     "Visão geral",
   );
-  await page.getByLabel("Início da análise", { exact: true }).fill("2026-09-01");
-  await page.getByLabel("Fim da análise", { exact: true }).fill("2026-09-30");
+  await escolherDataNoPeriodo(page, "Início da análise", "2026-09-01");
+  await escolherDataNoPeriodo(page, "Fim da análise", "2026-09-30");
   await page.getByRole("button", { name: "Aplicar período", exact: true }).click();
   await aba(page, "Explorador");
   await page.getByRole("textbox", { name: "Título da análise" }).fill("QA Adicional");
   await escolher(page, "Turma", "QA A");
   await page.getByRole("button", { name: "Adicionar ao painel", exact: true }).click();
   await aba(page, "Meus painéis");
-  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-09-01");
+  await expect(page.getByRole("button", { name: /^Início da análise:/ })).toContainText(
+    "01/09/2026",
+  );
   await expect(page.locator("[data-painel-item]")).toHaveCount(5);
   await page.goto("/bi?inicio=2026-10-01&fim=2026-10-31");
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
-  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-10-01");
+  await expect(page.getByRole("button", { name: /^Início da análise:/ })).toContainText(
+    "01/10/2026",
+  );
   await expect(page.getByRole("combobox", { name: "Turma", exact: true })).toHaveText("Todos");
   await aba(page, "Meus painéis");
-  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-09-01");
+  await expect(page.getByRole("button", { name: /^Início da análise:/ })).toContainText(
+    "01/09/2026",
+  );
 });
 
 test("atualiza visão sem duplicar e recupera aparência e análise após recarga", async ({
@@ -676,7 +697,9 @@ test("mapa de calor mantém células depois do centésimo grupo e tabela ajusta 
   await escolher(page, "Turma", "QA Turma 6");
   await expect(tabela).toContainText("1/1");
   await celula.press("Enter");
-  await expect(page.getByLabel("Início da análise", { exact: true })).toHaveValue("2026-10-20");
+  await expect(page.getByRole("button", { name: /^Início da análise:/ })).toContainText(
+    "20/10/2026",
+  );
   await tabela.scrollIntoViewIfNeeded();
   await expect(tabela).toContainText("1/1");
   await expect(
@@ -701,7 +724,7 @@ test("impressão prepara gráficos fora da tela e editor informa título inváli
       );
     };
   });
-  await page.getByRole("button", { name: "Imprimir", exact: true }).click();
+  await acaoDoBi(page, "Imprimir");
   await expect
     .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("QA:impressao") ?? "null")))
     .toEqual({ cartoes: 4, pendentes: 0 });

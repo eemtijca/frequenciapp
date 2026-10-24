@@ -26,6 +26,7 @@ interface Props {
   modo: "dia" | "mes";
   valor: string;
   max: string;
+  min?: string;
   atual?: string;
   disabled?: boolean;
   rotuloAcessivel: string;
@@ -54,6 +55,7 @@ export function SeletorPeriodo({
   modo,
   valor,
   max,
+  min,
   atual,
   disabled,
   rotuloAcessivel,
@@ -64,9 +66,12 @@ export function SeletorPeriodo({
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
-  const [mesVisivel, setMesVisivel] = useState(() => valor.slice(0, 7));
-  const [anoVisivel, setAnoVisivel] = useState(() => valor.slice(0, 4));
-  const [foco, setFoco] = useState(valor);
+  // Sem valor, o painel abre no dia de referência, mas nenhum dia fica marcado.
+  const corrente = atual ?? max;
+  const inicial = valor || corrente;
+  const [mesVisivel, setMesVisivel] = useState(() => inicial.slice(0, 7));
+  const [anoVisivel, setAnoVisivel] = useState(() => inicial.slice(0, 4));
+  const [foco, setFoco] = useState(inicial);
   const botoes = useRef(new Map<string, HTMLButtonElement>());
   const focoPendente = useRef(false);
 
@@ -74,8 +79,8 @@ export function SeletorPeriodo({
   // inclusive o limite: se hoje é domingo, o último dia escolhível é o sábado.
   const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
   const limite = aprumar(max);
-  const corrente = atual ?? max;
-  const referencia = aprumar(valor > max ? max : valor);
+  const piso = min ? aprumar(min) : null;
+  const referencia = aprumar((valor || corrente) > max ? max : valor || corrente);
   const selo = mostrarSelo && valor === corrente ? (modo === "dia" ? "Hoje" : "Este mês") : "";
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
@@ -107,6 +112,7 @@ export function SeletorPeriodo({
   }
 
   function escolher(proximo: string) {
+    if (piso && proximo < piso) return;
     onValor(proximo);
     setAberto(false);
   }
@@ -133,6 +139,7 @@ export function SeletorPeriodo({
     evento.preventDefault();
     proximo = aprumar(proximo);
     if (proximo > limite) proximo = limite;
+    if (piso && proximo < piso) proximo = piso;
     setFoco(proximo);
     setMesVisivel(proximo.slice(0, 7));
   }
@@ -151,6 +158,7 @@ export function SeletorPeriodo({
     if (proximoIndice < 0 || proximoIndice > 11) return;
     let proximo = `${anoVisivel}-${String(proximoIndice + 1).padStart(2, "0")}`;
     if (proximo > max) proximo = max;
+    if (piso && proximo < piso.slice(0, 7)) proximo = piso.slice(0, 7);
     setFoco(proximo);
     setAnoVisivel(proximo.slice(0, 4));
   }
@@ -161,14 +169,16 @@ export function SeletorPeriodo({
     const ultimo = diasDoMes(proximoMes).length;
     const numero = Math.min(Number(foco.slice(8)), ultimo);
     const proximo = aprumar(`${proximoMes}-${String(numero).padStart(2, "0")}`);
-    setFoco(proximo > limite ? limite : proximo);
+    const comPiso = piso && proximo < piso ? piso : proximo;
+    setFoco(comPiso > limite ? limite : comPiso);
   }
 
   function mudarAno(deslocamento: number) {
     const proximoAno = String(Number(anoVisivel) + deslocamento);
     const proximo = `${proximoAno}-${foco.slice(5)}`;
     setAnoVisivel(proximoAno);
-    setFoco(proximo > max ? max : proximo);
+    const comPiso = piso && proximo < piso ? piso : proximo;
+    setFoco(comPiso > max ? max : comPiso);
   }
 
   function classeCelula(selecionado: boolean, futuro: boolean, corrente: boolean) {
@@ -239,6 +249,7 @@ export function SeletorPeriodo({
                   );
                 const selecionado = dia === valor;
                 const futuro = dia > max;
+                const bloqueado = futuro || Boolean(piso && dia < piso);
                 const noDiaAtual = dia === corrente;
                 const numero = Number(dia.slice(8));
                 return (
@@ -247,13 +258,13 @@ export function SeletorPeriodo({
                     ref={(elemento) => registrar(dia, elemento)}
                     type="button"
                     tabIndex={dia === foco ? 0 : -1}
-                    disabled={futuro}
+                    disabled={bloqueado}
                     aria-pressed={selecionado}
                     aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${noDiaAtual ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
                     onClick={() => escolher(dia)}
                     className={cn(
                       "aspect-square w-full",
-                      classeCelula(selecionado, futuro, noDiaAtual),
+                      classeCelula(selecionado, bloqueado, noDiaAtual),
                     )}
                   >
                     {numero}
@@ -274,6 +285,7 @@ export function SeletorPeriodo({
             const mes = `${anoVisivel}-${String(numero).padStart(2, "0")}`;
             const selecionado = mes === valor;
             const futuro = mes > max;
+            const bloqueado = futuro || Boolean(piso && mes < piso.slice(0, 7));
             const noMesAtual = mes === corrente;
             return (
               <button
@@ -281,10 +293,10 @@ export function SeletorPeriodo({
                 ref={(elemento) => registrar(mes, elemento)}
                 type="button"
                 tabIndex={mes === foco ? 0 : -1}
-                disabled={futuro}
+                disabled={bloqueado}
                 aria-pressed={selecionado}
                 onClick={() => escolher(mes)}
-                className={cn("h-11 w-full", classeCelula(selecionado, futuro, noMesAtual))}
+                className={cn("h-11 w-full", classeCelula(selecionado, bloqueado, noMesAtual))}
               >
                 {nomeDoMes(mes)}
               </button>

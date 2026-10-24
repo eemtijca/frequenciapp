@@ -17,7 +17,7 @@ test.describe("saída durante a aula", () => {
   test("registra com texto opcional e mostra na lista do dia", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
 
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();
@@ -47,7 +47,7 @@ test.describe("saída durante a aula", () => {
   test("registra a justificativa escrita e a coordenadora que liberou", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
 
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();
@@ -69,7 +69,7 @@ test.describe("saída durante a aula", () => {
   test("bloqueia de novo a remoção das saídas ao tocar em Bloquear", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await page.getByRole("button", { name: /^Desbloquear remoção das saídas de/ }).click();
     await expect(lista.getByRole("button", { name: /^Remover saída de/ }).first()).toBeVisible();
@@ -80,7 +80,7 @@ test.describe("saída durante a aula", () => {
   test("remove uma saída pela lista do dia para corrigir o registro", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await expect(lista.getByText("Foi buscar o irmão")).toBeVisible();
     // A lista abre bloqueada: sem lixeira até desbloquear.

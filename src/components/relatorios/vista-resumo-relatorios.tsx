@@ -2,7 +2,7 @@
 
 // Resumo mensal com comparação de séries e turmas, evolução diária e rankings de faltas por aluno.
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, LoaderCircle, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   diasDoMes,
   mesSeguinte,
@@ -25,8 +25,6 @@ import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoEvolucao } from "@/components/graficos/graficos-sob-demanda";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { avisarErro } from "@/lib/avisos";
 
 interface Props {
   mes: string;
@@ -40,7 +38,6 @@ interface Props {
   carregando: boolean;
   erro: string | null;
   onMes: (mes: string) => void;
-  onRecarregar: (mes: string) => Promise<void>;
 }
 
 const percentual = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
@@ -86,7 +83,6 @@ export default function ResumoRelatorios({
   carregando,
   erro,
   onMes,
-  onRecarregar,
 }: Props) {
   const [serieId, setSerieId] = useState("todas");
   const [turmaId, setTurmaId] = useState("todas");
@@ -135,14 +131,7 @@ export default function ResumoRelatorios({
     () => alunosPorFaltas(dados.doFiltro, turmas, frequencias, dados.dias, criterioRanking),
     [dados.doFiltro, dados.dias, turmas, frequencias, criterioRanking],
   );
-  const { executando, executar } = useAcaoUnica(async () => {
-    try {
-      await onRecarregar(mes);
-    } catch (excecao) {
-      avisarErro(excecao, { contexto: "Não foi possível atualizar o resumo." });
-    }
-  });
-  const ocupado = carregando || executando;
+  const ocupado = carregando;
   const comparacoes =
     compararPor === "series"
       ? dados.porSerie.map((serie) => ({ ...serie, id: serie.serieId, rotulo: serie.nome }))
@@ -156,16 +145,6 @@ export default function ResumoRelatorios({
     <section aria-label="Resumo dos relatórios" aria-busy={ocupado} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Resumo do mês</h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-11 shrink-0 sm:order-last"
-          aria-label="Atualizar resumo"
-          disabled={ocupado}
-          onClick={() => void executar()}
-        >
-          {ocupado ? <LoaderCircle size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-        </Button>
         <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:max-w-md sm:flex-1">
           <Button
             variant="outline"
@@ -250,8 +229,7 @@ export default function ResumoRelatorios({
             ))}
           </dl>
           <p className="text-muted-foreground text-xs">
-            Alunos ativos por turma atual. Taxas sobre chamadas salvas; dias sem registro ficam sem
-            taxa.
+            Considera chamadas salvas. Dias sem registro ficam fora da taxa.
           </p>
           {dados.total.registrados === 0 ? (
             <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">

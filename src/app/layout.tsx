@@ -81,7 +81,13 @@ export default async function LayoutRaiz({
         >
           {children}
           <CorDoTema />
-          <Toaster position="top-center" richColors closeButton={false} />
+          <Toaster
+            position="bottom-right"
+            offset={20}
+            mobileOffset={84}
+            richColors
+            closeButton={false}
+          />
         </ThemeProvider>
       </body>
     </html>

@@ -5,15 +5,7 @@
 // acumulada (F + FJ) de todo o histórico.
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  LoaderCircle,
-  RefreshCw,
-  Send,
-  Table2,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, LoaderCircle, Send, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -28,9 +20,8 @@ import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -46,9 +37,9 @@ interface Props {
   hoje: string;
   aberto: boolean;
   versao: number;
+  atualizacao?: number;
   origens: Turma[];
   onMes: (mes: string) => void;
-  onRecarregar: () => Promise<void>;
 }
 
 const MODOS: { valor: ModoPeriodo; rotulo: string }[] = [
@@ -72,9 +63,9 @@ export default function VistaGrade({
   hoje,
   aberto,
   versao,
+  atualizacao = 0,
   origens,
   onMes,
-  onRecarregar,
 }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
@@ -85,7 +76,6 @@ export default function VistaGrade({
   const [diaFim, setDiaFim] = useState(hoje);
   const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
-  const [recarga, setRecarga] = useState(0);
   const [envioAberto, setEnvioAberto] = useState(false);
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();
 
@@ -146,7 +136,7 @@ export default function VistaGrade({
       viva = false;
       controlador.abort();
     };
-  }, [aberto, modo, dias, diaBase, versao, recarga]);
+  }, [aberto, modo, dias, diaBase, versao, atualizacao]);
 
   const frequenciasDoPeriodo = useMemo(() => {
     if (modo === "mes") return frequencias.filter((frequencia) => frequencia.dia.startsWith(mes));
@@ -182,21 +172,6 @@ export default function VistaGrade({
     );
     return (alunoId: string) => mapa.get(alunoId) ?? 0;
   }, [resumo]);
-
-  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
-    setErro("");
-    try {
-      if (modo === "mes") {
-        await onRecarregar();
-      } else {
-        setDoPeriodo(null);
-        setRecarga((valor) => valor + 1);
-      }
-    } catch (excecao) {
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
-    }
-  });
 
   const turmaAtualDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
@@ -333,9 +308,12 @@ export default function VistaGrade({
 
   return (
     <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-center justify-end gap-3">
-        <h1 className="sr-only">Grade</h1>
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Grade</h2>
+          <p className="text-muted-foreground text-sm">Frequência por turma de origem.</p>
+        </div>
+        <div className="flex items-center justify-end gap-1">
           {estadoPlanilha?.podeEnviar && (
             <Button
               variant="outline"
@@ -359,24 +337,21 @@ export default function VistaGrade({
           >
             <Download size={18} />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-10"
-            aria-label="Atualizar consulta"
-            onClick={() => void atualizar()}
-            disabled={atualizando || carregandoPeriodo}
-          >
-            {atualizando || carregandoPeriodo ? (
-              <LoaderCircle size={18} className="animate-spin" />
-            ) : (
-              <RefreshCw size={18} />
-            )}
-          </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="sm:hidden">
+        <Selecionar
+          ariaLabel="Turma de origem da grade"
+          value={turmaEfetiva}
+          onValueChange={setTurmaId}
+          opcoes={turmasOriginais.map((turma) => ({
+            valor: turma.id,
+            rotulo: `${turma.rotulo} (${alunos.filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id).length})`,
+          }))}
+        />
+      </div>
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
         {turmasOriginais.map((turma) => {
           const ativo = turma.id === turmaEfetiva;
           const quantidade = alunos.filter(
@@ -530,44 +505,51 @@ export default function VistaGrade({
           ) : (
             tabela
           )}
-          <div className="text-muted-foreground flex flex-wrap items-center gap-4 border-t px-4 py-2.5 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span
-                className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                aria-hidden="true"
-              />
-              presente
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="bg-falta text-falta-foreground inline-flex size-4 items-center justify-center rounded-[3px] text-[9px] font-bold"
-                aria-hidden="true"
-              >
-                F
+          <div className="text-muted-foreground border-t px-4 py-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="bg-primary/60 inline-flex size-1.5 rounded-full"
+                  aria-hidden="true"
+                />
+                presente
               </span>
-              falta
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
-                aria-hidden="true"
-              >
-                FJ
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="bg-falta text-falta-foreground inline-flex size-4 items-center justify-center rounded-[3px] text-[9px] font-bold"
+                  aria-hidden="true"
+                >
+                  F
+                </span>
+                falta
               </span>
-              falta justificada
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
-                aria-hidden="true"
-              >
-                S
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
+                  aria-hidden="true"
+                >
+                  FJ
+                </span>
+                falta justificada
               </span>
-              presente em parte das aulas
-            </span>
-            <span>Total: faltas (F + FJ) de todo o histórico</span>
-            <span>célula vazia: turma sem frequência no dia</span>
-            <span>Baixar planilha: todos os alunos ativos da turma de origem</span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
+                  aria-hidden="true"
+                >
+                  S
+                </span>
+                presente em parte das aulas
+              </span>
+            </div>
+            <details className="mt-2">
+              <summary className="text-primary cursor-pointer py-1 font-medium">Como ler</summary>
+              <div className="space-y-1 pt-1">
+                <p>Total: faltas (F + FJ) de todo o histórico.</p>
+                <p>Célula vazia: turma sem frequência no dia.</p>
+                <p>Baixar planilha: todos os alunos ativos da turma de origem.</p>
+              </div>
+            </details>
           </div>
         </motion.div>
       )}

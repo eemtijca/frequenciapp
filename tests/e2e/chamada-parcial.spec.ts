@@ -45,7 +45,6 @@ async function abrirParcial(page: Page) {
   await page.locator("#parcial-turma").click();
   await page.getByRole("option", { name: "E2E Parcial A", exact: true }).click();
   const secao = page.getByTestId("chamada-parcial");
-  await expect(secao.getByRole("button", { name: "Atualizar lista", exact: true })).toBeEnabled();
   return secao;
 }
 
@@ -76,6 +75,31 @@ async function registrosDoDia(page: Page) {
       registradoSeduc: boolean;
       registradoSeducEm: string | null;
     }[];
+  };
+}
+
+interface ChamadaDaApi {
+  frequencia: {
+    alunos: string[];
+    aulas: string[];
+    confirmacoesSeduc: { alunoId: string }[];
+  } | null;
+  feriado: unknown;
+}
+
+/** A API não promete a ordem das listas; a comparação não deve depender dela. */
+function normalizarChamada(dados: ChamadaDaApi): ChamadaDaApi {
+  if (!dados.frequencia) return dados;
+  return {
+    ...dados,
+    frequencia: {
+      ...dados.frequencia,
+      alunos: [...dados.frequencia.alunos].sort(),
+      aulas: [...dados.frequencia.aulas].sort(),
+      confirmacoesSeduc: [...dados.frequencia.confirmacoesSeduc].sort((a, b) =>
+        a.alunoId.localeCompare(b.alunoId),
+      ),
+    },
   };
 }
 
@@ -265,11 +289,11 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
     data: { dia, turmaId, faltas: [alunoId], revisao: 0 },
   });
   expect(normal.ok()).toBe(true);
-  const antes = await (
+  const antes = (await (
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
-  ).json();
+  ).json()) as ChamadaDaApi;
   const controle = linha.getByRole("switch", {
-    name: "Registro na SEDUC: E2E Parcial Um",
+    name: "Registro na Seduc: E2E Parcial Um",
     exact: true,
   });
   await expect(controle).toBeVisible();
@@ -308,10 +332,10 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
   expect(corrigido?.aulas).toEqual([3, 4, 6]);
   expect(corrigido?.turno).toBeNull();
   expect(corrigido?.registradoSeducEm).toBeNull();
-  const depois = await (
+  const depois = (await (
     await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`)
-  ).json();
-  expect(depois).toEqual(antes);
+  ).json()) as ChamadaDaApi;
+  expect(normalizarChamada(depois)).toEqual(normalizarChamada(antes));
 });
 
 test("registra o dia inteiro sem controle da Seduc e invalida confirmação antiga ao ajustar aulas", async ({
@@ -340,7 +364,7 @@ test("registra o dia inteiro sem controle da Seduc e invalida confirmação anti
   });
 
   const confirmacao = linha.getByRole("switch", {
-    name: "Registro na SEDUC: E2E Parcial Um",
+    name: "Registro na Seduc: E2E Parcial Um",
     exact: true,
   });
   await confirmarPresencaAnterior(page);
@@ -531,7 +555,7 @@ test("refaz a prévia ao incluir atualizações de registros já enviados", asyn
     await rota.fulfill({ json: { resultado: "sucesso", linhasCriadas: 0, linhasAtualizadas: 1 } });
   });
   const secao = await abrirParcial(page);
-  await secao.getByRole("button", { name: "Enviar para planilha" }).click();
+  await secao.getByRole("button", { name: "Enviar para a planilha" }).click();
   const enviar = page.getByRole("dialog", { name: "Enviar chamada parcial" });
   await enviar.getByRole("button", { name: "Conferir envio" }).click();
   await expect(enviar.getByRole("button", { name: "Confirmar envio" })).toBeDisabled();
@@ -635,7 +659,7 @@ test("agenda uma justificativa futura por início e fim, sem criar presenças e 
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Outros: E2E Motivo do período", { exact: true })).toBeVisible();
   await expect(
-    linha.getByRole("switch", { name: "Registro na SEDUC: E2E Parcial Um", exact: true }),
+    linha.getByRole("switch", { name: "Registro na Seduc: E2E Parcial Um", exact: true }),
   ).toBeVisible();
   const r = await page.request.get(
     `/api/frequencias-parciais?de=${de}&ate=${ate}&turmaId=${turmaId}`,

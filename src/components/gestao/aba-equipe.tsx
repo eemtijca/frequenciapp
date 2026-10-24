@@ -41,6 +41,7 @@ import {
 interface Props {
   usuarioId: string;
   onMudanca: () => Promise<void>;
+  atualizacao?: number;
 }
 
 interface Formulario {
@@ -52,7 +53,7 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO" };
 
-export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
+export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
@@ -78,7 +79,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
 
   useEffect(() => {
     void recarregar();
-  }, [recarregar]);
+  }, [recarregar, atualizacao]);
 
   const administradoresAtivos = useMemo(
     () => (usuarios ?? []).filter((u) => u.papel === "ADMIN" && u.ativo).length,
@@ -248,11 +249,11 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-2 truncate font-medium">
                           {usuario.nome}
-                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                             {rotuloDePapel(usuario.papel)}
                           </span>
                           {propria && (
-                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                               Você
                             </span>
                           )}

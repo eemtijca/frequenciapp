@@ -144,6 +144,7 @@ export async function removerJustificativa(admin: { id: string }, codigo: string
       throw new ErroHttp(
         `Esta justificativa está em uso em ${total} ${total === 1 ? "registro" : "registros"}. Desative em vez de excluir para preservar o histórico.`,
         409,
+        "JUSTIFICATIVA_EM_USO",
       );
     }
     await tx.justificativa.delete({ where: { id: existente.id } });

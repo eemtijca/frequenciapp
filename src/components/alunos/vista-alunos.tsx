@@ -8,10 +8,12 @@ import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
   alunos: Aluno[];
   turmas: Turma[];
+  onAtualizar: () => Promise<void>;
 }
 
 type Agrupamento = "atual" | "origem";
@@ -83,11 +85,12 @@ const GrupoAlunos = memo(function GrupoAlunos({
   );
 });
 
-export default function VistaAlunos({ alunos, turmas }: Props) {
+export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
   const semMovimento = useReducedMotion() ?? false;
   const [busca, setBusca] = useState("");
   const buscaAplicada = useDeferredValue(busca);
+  useAtualizacaoTela("alunos", onAtualizar);
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));

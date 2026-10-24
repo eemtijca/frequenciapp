@@ -17,11 +17,17 @@ test.describe("responsividade", () => {
       name: "Configurar notificações",
       exact: true,
     });
+    const atualizar = cabecalho.getByRole("button", { name: "Atualizar tela", exact: true });
     const caixaAbrir = await abrir.boundingBox();
+    const caixaAtualizar = await atualizar.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
     expect(caixaAbrir).not.toBeNull();
+    expect(caixaAtualizar).not.toBeNull();
     expect(caixaNotificacoes).not.toBeNull();
     expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
+      caixaAtualizar?.x ?? 0,
+    );
+    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
 
@@ -32,11 +38,13 @@ test.describe("responsividade", () => {
     const tema = cabecalho.getByRole("button", { name: /tema/i });
     const caixaTema = await tema.boundingBox();
     expect(caixaTema).not.toBeNull();
-    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(caixaTema?.x ?? 0);
+    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
+      caixaTema?.x ?? 0,
+    );
     expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
-    await expect(cabecalho.getByRole("button")).toHaveCount(3);
+    await expect(cabecalho.getByRole("button")).toHaveCount(4);
     await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
     await info.attach("conteudo-mobile-390", {
       body: await page.screenshot({ animations: "disabled" }),
@@ -73,7 +81,7 @@ test.describe("responsividade", () => {
       .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
     expect(semEstouro).toBe(true);
     const asideCaixa = await page.locator("aside").boundingBox();
-    const sairCaixa = await page.getByRole("button", { name: "Sair da conta" }).boundingBox();
+    const sairCaixa = await page.getByRole("button", { name: /^Conta de / }).boundingBox();
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
     );
@@ -111,13 +119,29 @@ test.describe("responsividade", () => {
       await expect(fechar).toBeInViewport();
       await expect(menu.getByRole("button", { name: /tema/i })).toHaveCount(0);
       expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(240 + 1);
-      for (const nome of ["Gestão", "Trocar senha", "Sair da conta"]) {
+      for (const nome of ["Gestão"]) {
         const acao = menu.getByRole("button", { name: nome, exact: true });
         await acao.scrollIntoViewIfNeeded();
         await expect(acao).toBeInViewport();
         const tamanho = await acao.boundingBox();
         expect(tamanho?.height ?? 0).toBeGreaterThanOrEqual(44);
       }
+      const perfil = menu.getByRole("button", { name: /^Conta de / });
+      await perfil.scrollIntoViewIfNeeded();
+      await expect(perfil).toBeInViewport();
+      expect((await perfil.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await perfil.click();
+      const conta = page.getByRole("menu", { name: "Conta", exact: true });
+      for (const nome of ["Trocar senha", "Sair da conta"]) {
+        const acao = conta.getByRole("menuitem", { name: nome, exact: true });
+        await expect(acao).toBeInViewport();
+        // O popover abre com zoom; aguarda o tamanho final do alvo de toque.
+        await expect
+          .poll(async () => (await acao.boundingBox())?.height ?? 0)
+          .toBeGreaterThanOrEqual(44);
+      }
+      await page.keyboard.press("Escape");
+      await expect(conta).toBeHidden();
       await info.attach(`menu-${largura}-${altura}`, {
         body: await page.screenshot({ animations: "disabled" }),
         contentType: "image/png",
@@ -150,6 +174,17 @@ test.describe("responsividade", () => {
     const campo = await page.locator("#email").boundingBox();
     expect(campo?.width ?? 0).toBeLessThanOrEqual(330);
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
+
+    // A marca e o título acompanham o centro do cartão, não só o espaço restante.
+    const cartao = await page.locator("main .superficie-vidro").first().boundingBox();
+    const titulo = await page
+      .getByRole("heading", { name: "FrequenciApp", exact: true })
+      .boundingBox();
+    expect(cartao).not.toBeNull();
+    expect(titulo).not.toBeNull();
+    const centroCartao = (cartao?.x ?? 0) + (cartao?.width ?? 0) / 2;
+    const centroTitulo = (titulo?.x ?? 0) + (titulo?.width ?? 0) / 2;
+    expect(Math.abs(centroCartao - centroTitulo)).toBeLessThanOrEqual(1);
   });
   // A massa permite conferir a largura das listas de frequência.
   test.describe("com turmas cadastradas", () => {
@@ -165,7 +200,7 @@ test.describe("responsividade", () => {
       for (const [rotulo, visao, largura] of [
         ["Painel", "painel", 1024],
         ["Chamada", "chamada", 1152],
-        ["Chamada Parcial", "chamada-parcial", 896],
+        ["Chamada Parcial", "chamada-parcial", 1152],
         ["Relatórios", "relatorios", 1280],
         ["Gestão", "gestao", 1152],
       ] as const) {

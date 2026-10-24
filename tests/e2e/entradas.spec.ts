@@ -1,6 +1,7 @@
 // Entradas atrasadas na interface, persistência e prévia com Sheets API falsa.
 import { test, expect, type Page } from "@playwright/test";
 import { criarMassaE2E, criarLiberadoresE2E, limparMassaE2E } from "./helpers/banco";
+import { diaCorrente } from "./helpers/dia";
 import {
   abrirAbaMovimentacao,
   abrirNavegacao,
@@ -28,12 +29,53 @@ async function escolherDiaDeTeste(page: Page) {
   await expect(page.locator("#entrada-dia")).toContainText("15/06/2026");
 }
 
+/** Simula a planilha de saídas indisponível para isolar a prévia das entradas. */
+async function mockSaidasBloqueadas(page: Page) {
+  await page.route("**/api/planilha-saidas/estado", (route) =>
+    route.fulfill({
+      json: {
+        estado: {
+          ativa: true,
+          modo: "conservador",
+          modoCompletoAte: null,
+          podeEnviar: true,
+          configurada: true,
+        },
+      },
+    }),
+  );
+  await page.route("**/api/planilha-saidas/simular", (route) =>
+    route.fulfill({
+      json: {
+        modalidade: "conservador",
+        planoHash: "saidas-qa",
+        aba: "Saídas",
+        bloqueado: true,
+        resumo: {
+          criar: 0,
+          preencher: 0,
+          substituir: 0,
+          remover: 0,
+          puladasOcupadas: 0,
+          puladasFormula: 0,
+          ambiguidades: 0,
+        },
+        avisos: [],
+        criar: [],
+        preencher: [],
+        substituir: [],
+        candidatosRemocao: [],
+      },
+    }),
+  );
+}
+
 test("data brasileira e navegação diária seguem a saída mesmo com navegador em inglês", async ({
   page,
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   const dataSaida = (await page.locator("#dia-saidas").textContent())?.match(
     /\d{2}\/\d{2}\/\d{4}/,
   )?.[0];
@@ -53,7 +95,7 @@ test("data brasileira e navegação diária seguem a saída mesmo com navegador 
 test("registra chegada, preserva após recarregar e remove para correção", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await page.locator("#entrada-turma").click();
@@ -78,7 +120,7 @@ test("registra chegada, preserva após recarregar e remove para correção", asy
   );
   await page.reload();
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await expect(
@@ -94,7 +136,7 @@ test("registra justificativa do catálogo com observação e responsável escolh
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   await page.locator("#entrada-aluno").click();
@@ -163,20 +205,23 @@ for (const bloqueado of [false, true]) {
               : { linhasCriadas: 0 },
       });
     });
+    await mockSaidasBloqueadas(page);
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     await abrirAbaMovimentacao(page, "Entradas");
-    await page.getByRole("button", { name: "Prévia das entradas" }).click();
-    const confirmar = page.getByRole("button", { name: "Confirmar conferência", exact: true });
+    await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
+    const dialogo = page.getByRole("dialog", { name: /^Enviar saídas e entradas/ });
+    await expect(dialogo.getByText("Aba Entradas", { exact: true })).toBeVisible();
+    const confirmar = dialogo.getByRole("button", { name: "Enviar", exact: true });
     if (bloqueado) {
       await expect(confirmar).toBeDisabled();
       expect(enviou).toBe(0);
     } else {
       await expect(confirmar).toBeEnabled();
       await confirmar.click();
-      await expect(page.getByText("Conferência registrada.", { exact: true })).toBeVisible();
-      await expect(page.getByRole("alertdialog")).toHaveCount(0);
+      await expect(page.getByText("Entradas: 0 linhas criadas.", { exact: true })).toBeVisible();
+      await expect(dialogo).toBeHidden();
       expect(enviou).toBe(1);
     }
   });
@@ -184,14 +229,14 @@ for (const bloqueado of [false, true]) {
 
 test("revê o envio em confirmação própria", async ({ page }) => {
   let enviou = 0;
+  const mes = diaCorrente().slice(0, 7);
   await page.route("**/api/planilha-entradas/**", async (route) => {
     const acao = new URL(route.request().url()).pathname.split("/").at(-1);
     if (acao === "enviar") {
       enviou++;
       expect(route.request().postDataJSON()).toMatchObject({
         planoHash: "previa-qa",
-        de: "2026-06-15",
-        ate: "2026-06-15",
+        de: `${mes}-01`,
       });
     }
     await route.fulfill({
@@ -226,21 +271,24 @@ test("revê o envio em confirmação própria", async ({ page }) => {
       },
     }),
   );
+  await mockSaidasBloqueadas(page);
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
   // O preparo e a organização da aba Entradas ficam em Gestão, Configurações, Planilhas.
   await expect(page.getByRole("button", { name: "Preparar aba Entradas" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Organizar apresentação/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Prévia das entradas" }).click();
-  await expect(page.getByRole("alertdialog")).toContainText("1 linha nova");
+  await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo.getByText("Aba Entradas", { exact: true })).toBeVisible();
+  await expect(dialogo).toContainText("1 linha nova");
   expect(enviou).toBe(0);
-  await page.getByRole("button", { name: "Enviar entradas", exact: true }).click();
-  await expect(page.getByText("Envio confirmado: 1 linha criada.")).toBeVisible();
+  await dialogo.getByRole("button", { name: "Enviar", exact: true }).click();
+  await expect(page.getByText("Entradas: 1 linha criada.", { exact: true })).toBeVisible();
   expect(enviou).toBe(1);
-  await expect(page.getByText("Envio confirmado: 1 linha criada.")).not.toBeVisible({
+  await expect(page.getByText("Entradas: 1 linha criada.", { exact: true })).not.toBeVisible({
     timeout: 15000,
   });
   await page.screenshot({ path: "test-results/entradas-desktop.png", fullPage: true });
@@ -251,7 +299,7 @@ test("revê o envio em confirmação própria", async ({ page }) => {
   });
   await expect(page.getByRole("button", { name: "Abrir menu", exact: true })).toBeVisible();
   const navegacao = await abrirNavegacao(page);
-  const botao = navegacao.getByRole("button", { name: "Saídas e entradas", exact: true });
+  const botao = navegacao.getByRole("button", { name: "Saídas e Entradas", exact: true });
   await expect(botao).toBeVisible();
   await expect(botao).toHaveAttribute("aria-current", "page");
   await page.keyboard.press("Escape");

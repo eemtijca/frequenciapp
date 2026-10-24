@@ -26,11 +26,11 @@ async function abrirDownload(
     if (await turma.isVisible().catch(() => false)) await turma.click();
     if (perfilImagem) {
       await expect(grade.getByRole("button", { name: "Baixar planilha (CSV)" })).toBeEnabled();
-      await mkdir("docs/imagens", { recursive: true });
+      await mkdir("docs/imagens/locais", { recursive: true });
       // A captura deve mostrar a visão depois da transição, sem interrompê-la.
       await page.waitForTimeout(250);
       await page.screenshot({
-        path: `docs/imagens/download-antes-${perfilImagem}.png`,
+        path: `docs/imagens/locais/download-antes-${perfilImagem}.png`,
       });
     }
     await grade.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
@@ -90,10 +90,10 @@ for (const tipo of ["grade", "relacao", "copia"] as const) {
     if (tipo === "copia")
       await dialogo.getByLabel("Senha atual do administrador").fill(ADMIN_E2E.senha);
     if (tipo === "grade") {
-      await mkdir("docs/imagens", { recursive: true });
+      await mkdir("docs/imagens/locais", { recursive: true });
       await expect(dialogo).toHaveCSS("opacity", "1");
       await page.screenshot({
-        path: `docs/imagens/download-protegido-${testInfo.project.name}.png`,
+        path: `docs/imagens/locais/download-protegido-${testInfo.project.name}.png`,
       });
     }
     const downloads: Download[] = [];

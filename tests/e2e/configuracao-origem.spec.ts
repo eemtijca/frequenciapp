@@ -2,7 +2,12 @@
 // persistência e desativação reversível, somente com dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
+import {
+  definirOrigem,
+  lerOrigem,
+  salvarConfiguracoes,
+  type ConfiguracaoOrigem,
+} from "./helpers/configuracoes";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
 
 let inicial: ConfiguracaoOrigem;
@@ -78,16 +83,16 @@ async function abrirTurmasEspecificas(page: Page): Promise<void> {
   if ((await gatilho.getAttribute("aria-expanded")) === "false") await gatilho.click();
 }
 
-async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
-  const resposta = page.waitForResponse(
-    (item) =>
-      new URL(item.url()).pathname === "/api/configuracoes" && item.request().method() === "PATCH",
-  );
+async function alterarControle(controle: Locator, marcado: boolean): Promise<void> {
   await controle.click();
-  expect((await resposta).status()).toBe(200);
   await expect(controle).toBeEnabled();
   if (marcado) await expect(controle).toBeChecked();
   else await expect(controle).not.toBeChecked();
+}
+
+async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
+  await alterarControle(controle, marcado);
+  await salvarConfiguracoes(page);
 }
 
 async function conferir(

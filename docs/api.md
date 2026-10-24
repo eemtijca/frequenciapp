@@ -1,6 +1,6 @@
 # API
 
-Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009).
+Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem", "codigo"?: "CODIGO"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009). O campo `codigo` é estável e ajuda a interface a escolher o título e a ação, sem depender do texto da mensagem.
 
 Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas por capacidade ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)): rotas de cadastro, de contas, de configurações de recursos, dos catálogos, das integrações e de cópia de segurança exigem `administrar` (papel `ADMIN`); chamada, relatórios, saídas e consultas exigem `operar` (`ADMIN` e `COORDENACAO`); a troca da própria senha exige `alterarPropriaSenha`; as estatísticas do diretor de turma exigem `verEstatisticasDasTurmas` (papel `DIRETOR_TURMA`). Sem sessão, 401; com sessão sem a capacidade, 403.
 
@@ -540,15 +540,56 @@ Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pe
 
 ### GET /api/configuracoes
 
-- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "feriados": Feriado[]}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data.
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "feriados": Feriado[], "atualizadoEm": string}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data. `atualizadoEm` é a versão da última gravação.
 
 ### PATCH /api/configuracoes
 
-Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origemNaChamadaSerieIds?, origemNaChamadaTurmaIds? }`. Apenas administração, com auditoria.
+Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origemNaChamadaSerieIds?, origemNaChamadaTurmaIds?, atualizadoEm? }`. Apenas administração, com auditoria.
 
-As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A seleção é a união das séries completas com as turmas avulsas. Lista vazia não habilita nenhuma turma; alterar somente `origemNaChamada` preserva as seleções. Desligar controla apenas a exibição, sem modificar alunos, chamadas ou planilhas. Seleção inexistente responde 400 e não altera a configuração.
+As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A seleção é a união das séries completas com as turmas avulsas. Lista vazia não habilita nenhuma turma; alterar somente `origemNaChamada` preserva as seleções. Desligar controla apenas a exibição, sem modificar alunos, chamadas ou planilhas. Seleção inexistente responde 400 e não altera a configuração. Ao enviar `atualizadoEm`, a gravação só acontece se a versão ainda for a vigente; caso contrário responde 409 com a mensagem para revisar antes de salvar.
 
-- 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 403 sem papel de administração.
+- 200 `{"configuracoes": Configuracoes}`; 400 corpo inválido; 409 configurações alteradas em outro acesso; 403 sem papel de administração.
+
+### GET /api/configuracoes/completo
+
+Apenas administração. Devolve o conjunto usado pelo rascunho único:
+
+- 200 `{ configuracoes, notificacoes, acesso, ordemAlmoco, beneficios, justificativas, liberadores, feriados, chavesBi, planilhas, revisoes }`.
+- `revisoes` é um mapa por seção (`configuracao`, `notificacoes`, `acesso`, `ordemAlmoco`, `beneficios`, `justificativas`, `liberadores`, `feriados`, `chavesBi`, `planilhas`). As chaves do BI saem sem segredo e a revisão ignora os contadores de uso, que mudam a cada consulta.
+- `planilhas` traz `ativa` e `envioAutomatico` de `frequencia`, `saidas` e `parcial`. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos porque dependem de leitura ou ação no Google.
+- 401 sem sessão; 403 sem papel de administração; 503 falha temporária.
+
+### POST /api/configuracoes/lote
+
+Administração e origem confiável. Corpo:
+
+```json
+{
+  "revisoes": { "justificativas": "hash-lido", "notificacoes": "hash-lido" },
+  "desejado": {
+    "justificativas": [{ "codigo": "D", "rotulo": "Doente", "ativo": true }],
+    "notificacoes": {
+      "resumoDiario": true,
+      "novasChamadas": true,
+      "chamadasPendentes": false,
+      "horarioResumo": "17:00",
+      "horarioPendencias": "17:00"
+    },
+    "chavesBi": [{ "id": "novo-uuid", "rotulo": "Painel", "escopo": {} }],
+    "limparChavesBi": false,
+    "planilhas": {
+      "frequencia": { "ativa": true, "envioAutomatico": false },
+      "saidas": { "ativa": true, "envioAutomatico": false },
+      "parcial": { "ativa": false, "envioAutomatico": false }
+    }
+  },
+  "senhaBi": "senha-do-administrador"
+}
+```
+
+Cada seção enviada traz o estado completo desejado, inclusive catálogos. A gravação acontece em uma única transação serializável: se qualquer revisão divergir, responde 409 com `codigo: "CONFIGURACOES_ALTERADAS"` e a lista das seções, sem gravar nada. Exclusões bloqueadas por histórico respondem 409 com `codigo: "JUSTIFICATIVA_EM_USO"` ou `"LIBERADOR_EM_USO"`. Chaves do BI exigem `senhaBi`; sem ela, 400 com `codigo: "SENHA_BI_OBRIGATORIA"`. Senha incorreta responde 400; excesso de tentativas, 429. O retorno traz o conjunto atualizado e `segredosBi`, com o segredo das chaves criadas ou substituídas apenas nessa resposta. `limparChavesBi` remove as chaves revogadas e expiradas do histórico.
+
+- 200 `{ completo, segredosBi }`; 400 corpo ou senha inválidos; 401 sem sessão; 403 sem papel ou origem; 409 conflito de revisão ou catálogo em uso; 503 falha temporária.
 
 ## Calendário letivo
 

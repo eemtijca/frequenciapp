@@ -67,6 +67,10 @@ interface Props {
   onSaidasMudaram: (mes: string) => Promise<void>;
   /** Usado pela área de movimentações; esta vista não precisa dele. */
   ativo?: boolean;
+  /** Incrementado pelo botão global para reler o dia. */
+  atualizacao?: number;
+  /** Informa o mês do dia visível para o envio da planilha. */
+  onMesVisivel?: (mes: string) => void;
 }
 
 type FormaJustificativa = "texto" | "catalogo";
@@ -81,6 +85,8 @@ export default function VistaSaidas({
   liberadores,
   saidas,
   onSaidasMudaram,
+  atualizacao = 0,
+  onMesVisivel,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turmaFiltro, setTurmaFiltro] = useState("");
@@ -98,6 +104,10 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
+
+  useEffect(() => {
+    onMesVisivel?.(dia.slice(0, 7));
+  }, [dia, onMesVisivel]);
   // Dia cuja lista foi desbloqueada: trocar de dia volta a bloquear.
   const [diaLiberado, setDiaLiberado] = useState<string | null>(null);
 
@@ -151,7 +161,7 @@ export default function VistaSaidas({
     return () => {
       viva = false;
     };
-  }, [compartilhado, dia, recarregarDia]);
+  }, [compartilhado, dia, recarregarDia, atualizacao]);
 
   const saidasDoDia = useMemo(() => {
     if (compartilhado) return saidas.filter((saida) => saida.dia === dia);
@@ -318,7 +328,7 @@ export default function VistaSaidas({
             max={diaCorrente}
             rotuloAcessivel="Data da saída"
             rotulo={rotuloDia}
-            detalhe={rotuloDiaSemana(dia)}
+            detalhe={rotuloDiaSemana(dia).replace("-feira", "")}
             onValor={setDia}
           />
         </div>
@@ -335,180 +345,183 @@ export default function VistaSaidas({
       </div>
 
       <form
-        className="superficie-vidro flex flex-col gap-3 p-4"
+        className="superficie-vidro flex flex-col gap-4 p-4"
         onSubmit={(evento) => {
           evento.preventDefault();
           void registrar();
         }}
         noValidate
       >
-        <h2 className="font-medium">Registro</h2>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="saida-turma">Turma</Label>
-          <Selecionar
-            id="saida-turma"
-            value={turmaFiltro}
-            onValueChange={setTurmaFiltro}
-            placeholder="Todas as turmas"
-            opcoes={opcoesTurma}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="saida-aluno">Aluno</Label>
-          <Selecionar
-            id="saida-aluno"
-            value={alunoId}
-            onValueChange={setAlunoId}
-            buscavel
-            placeholder="Selecione o aluno"
-            opcoes={opcoesAluno}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="saida-momento">Momento da saída</Label>
-          <Selecionar
-            id="saida-momento"
-            value={momento}
-            onValueChange={setMomento}
-            placeholder="Selecione a aula ou pausa"
-            opcoes={MOMENTOS_SAIDA.map((item) => ({
-              valor: item.codigo,
-              rotulo: item.rotulo,
-            }))}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="saida-horario">Horário da saída</Label>
-          <SeletorHorario
-            id="saida-horario"
-            valor={horario}
-            onValor={setHorario}
-            rotuloAcessivel="Horário da saída"
-            agora={horaNoFuso(new Date().toISOString(), fuso)}
-            disabled={enviando}
-          />
-        </div>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">Justificativa</legend>
-          <div
-            role="radiogroup"
-            aria-label="Forma da justificativa"
-            className="flex flex-wrap gap-2"
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={formaJustificativa === "texto"}
-              onClick={() => {
-                setFormaJustificativa("texto");
-                setJustificativa("");
-                setObservacao("");
-              }}
-              className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
-            >
-              Escrever
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={formaJustificativa === "catalogo"}
-              onClick={() => {
-                setFormaJustificativa("catalogo");
-                setTexto("");
-              }}
-              className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
-            >
-              Selecionar tipo
-            </button>
+        <h2 className="font-medium">Registrar saída</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="saida-turma">Turma</Label>
+            <Selecionar
+              id="saida-turma"
+              value={turmaFiltro}
+              onValueChange={setTurmaFiltro}
+              placeholder="Todas as turmas"
+              opcoes={opcoesTurma}
+            />
           </div>
-          {formaJustificativa === "texto" ? (
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="saida-texto">Texto da justificativa</Label>
-                <span className="text-muted-foreground numerais-tabulares text-xs">
-                  {texto.length}/{LIMITE_TEXTO_SAIDA}
-                </span>
-              </div>
-              <Input
-                id="saida-texto"
-                value={texto}
-                maxLength={LIMITE_TEXTO_SAIDA}
-                onChange={(evento) => setTexto(evento.target.value)}
-                placeholder="Descreva o motivo"
-                className="h-11"
-              />
+          <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
+            <Label htmlFor="saida-aluno">Aluno</Label>
+            <Selecionar
+              id="saida-aluno"
+              value={alunoId}
+              onValueChange={setAlunoId}
+              buscavel
+              placeholder="Selecione o aluno"
+              opcoes={opcoesAluno}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="saida-momento">Momento da saída</Label>
+            <Selecionar
+              id="saida-momento"
+              value={momento}
+              onValueChange={setMomento}
+              placeholder="Selecione a aula ou pausa"
+              opcoes={MOMENTOS_SAIDA.map((item) => ({
+                valor: item.codigo,
+                rotulo: item.rotulo,
+              }))}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="saida-horario">Horário da saída</Label>
+            <SeletorHorario
+              id="saida-horario"
+              valor={horario}
+              onValor={setHorario}
+              rotuloAcessivel="Horário da saída"
+              agora={horaNoFuso(new Date().toISOString(), fuso)}
+              disabled={enviando}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
+            <Selecionar
+              id="saida-responsavel"
+              value={responsavelCodigo}
+              onValueChange={setResponsavelCodigo}
+              placeholder="Selecione quem liberou"
+              opcoes={opcoesLiberador}
+            />
+            {opcoesLiberador.length === 0 && (
+              <p className="text-muted-foreground text-xs">
+                Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
+              </p>
+            )}
+          </div>
+          <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
+            <legend className="text-sm font-medium">Justificativa</legend>
+            <div
+              role="radiogroup"
+              aria-label="Forma da justificativa"
+              className="flex flex-wrap gap-2"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={formaJustificativa === "texto"}
+                onClick={() => {
+                  setFormaJustificativa("texto");
+                  setJustificativa("");
+                  setObservacao("");
+                }}
+                className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "vidro-selecionado" : ""}`}
+              >
+                Escrever
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={formaJustificativa === "catalogo"}
+                onClick={() => {
+                  setFormaJustificativa("catalogo");
+                  setTexto("");
+                }}
+                className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "vidro-selecionado" : ""}`}
+              >
+                Selecionar tipo
+              </button>
             </div>
-          ) : (
-            <>
+            {formaJustificativa === "texto" ? (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-justificativa">Tipo</Label>
-                <Selecionar
-                  id="saida-justificativa"
-                  value={justificativa}
-                  onValueChange={setJustificativa}
-                  placeholder="Selecione a justificativa"
-                  opcoes={opcoesJustificativa}
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="saida-texto">Texto da justificativa</Label>
+                  <span className="text-muted-foreground numerais-tabulares text-xs">
+                    {texto.length}/{LIMITE_TEXTO_SAIDA}
+                  </span>
+                </div>
+                <Input
+                  id="saida-texto"
+                  value={texto}
+                  maxLength={LIMITE_TEXTO_SAIDA}
+                  onChange={(evento) => setTexto(evento.target.value)}
+                  placeholder="Descreva o motivo"
+                  className="h-11"
                 />
               </div>
-              {duranteAula ? (
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="saida-texto">Texto da justificativa</Label>
-                    <span className="text-muted-foreground numerais-tabulares text-xs">
-                      {texto.length}/{LIMITE_TEXTO_SAIDA}
-                    </span>
+                  <Label htmlFor="saida-justificativa">Tipo</Label>
+                  <Selecionar
+                    id="saida-justificativa"
+                    value={justificativa}
+                    onValueChange={setJustificativa}
+                    placeholder="Selecione a justificativa"
+                    opcoes={opcoesJustificativa}
+                  />
+                </div>
+                {duranteAula ? (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="saida-texto">Texto da justificativa</Label>
+                      <span className="text-muted-foreground numerais-tabulares text-xs">
+                        {texto.length}/{LIMITE_TEXTO_SAIDA}
+                      </span>
+                    </div>
+                    <Input
+                      id="saida-texto"
+                      value={texto}
+                      maxLength={LIMITE_TEXTO_SAIDA}
+                      onChange={(evento) => setTexto(evento.target.value)}
+                      placeholder="Opcional"
+                      className="h-11"
+                    />
                   </div>
-                  <Input
-                    id="saida-texto"
-                    value={texto}
-                    maxLength={LIMITE_TEXTO_SAIDA}
-                    onChange={(evento) => setTexto(evento.target.value)}
-                    placeholder="Opcional: descreva a saída durante a aula"
-                    className="h-11"
-                  />
-                  <p className="text-muted-foreground text-xs">Opcional. Aparece nos relatórios.</p>
-                </div>
-              ) : justificativa === JUSTIFICATIVA_OUTROS ? (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="saida-observacao">Observação</Label>
-                  <Input
-                    id="saida-observacao"
-                    value={observacao}
-                    maxLength={200}
-                    onChange={(evento) => setObservacao(evento.target.value)}
-                    placeholder="Descreva brevemente o motivo"
-                    className="h-11"
-                  />
-                </div>
-              ) : null}
-            </>
-          )}
-        </fieldset>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
-          <Selecionar
-            id="saida-responsavel"
-            value={responsavelCodigo}
-            onValueChange={setResponsavelCodigo}
-            placeholder="Selecione quem liberou"
-            opcoes={opcoesLiberador}
-          />
-          {opcoesLiberador.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              Nenhum nome cadastrado. A administração cadastra em Gestão, Configurações.
-            </p>
-          )}
+                ) : justificativa === JUSTIFICATIVA_OUTROS ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="saida-observacao">Observação</Label>
+                    <Input
+                      id="saida-observacao"
+                      value={observacao}
+                      maxLength={200}
+                      onChange={(evento) => setObservacao(evento.target.value)}
+                      placeholder="Descreva brevemente o motivo"
+                      className="h-11"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </fieldset>
         </div>
         {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-        <Button
-          type="submit"
-          size="lg"
-          className="h-11 w-full px-6 sm:w-auto"
-          disabled={enviando || opcoesLiberador.length === 0}
-        >
-          {enviando && <LoaderCircle size={16} className="animate-spin" />}
-          Registrar saída
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            size="lg"
+            className="h-11 w-full px-6 sm:w-auto"
+            disabled={enviando || opcoesLiberador.length === 0}
+          >
+            {enviando && <LoaderCircle size={16} className="animate-spin" />}
+            Registrar saída
+          </Button>
+        </div>
       </form>
 
       {carregandoDia ? (

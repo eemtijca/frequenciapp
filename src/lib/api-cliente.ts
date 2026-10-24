@@ -4,13 +4,21 @@
 export class ErroApi extends Error {
   status: number;
   conflito: boolean;
+  codigo?: string;
   corpo?: unknown;
 
-  constructor(mensagem: string, status: number, conflito = false, corpo?: unknown) {
+  constructor(
+    mensagem: string,
+    status: number,
+    conflito = false,
+    corpo?: unknown,
+    codigo?: string,
+  ) {
     super(mensagem);
     this.name = "ErroApi";
     this.status = status;
     this.conflito = conflito;
+    this.codigo = codigo;
     this.corpo = corpo;
   }
 }
@@ -31,7 +39,8 @@ export async function pedir<T>(caminho: string, opcoes?: RequestInit): Promise<T
     const mensagem =
       typeof dados.error === "string" ? dados.error : "Não foi possível concluir a operação.";
     const conflito = dados.conflito === true;
-    throw new ErroApi(mensagem, resposta.status, conflito, dados);
+    const codigo = typeof dados.codigo === "string" ? dados.codigo : undefined;
+    throw new ErroApi(mensagem, resposta.status, conflito, dados, codigo);
   }
   return dados as T;
 }

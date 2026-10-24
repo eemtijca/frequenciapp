@@ -3,14 +3,7 @@
 // Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  History,
-  LoaderCircle,
-  RefreshCw,
-} from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, History } from "lucide-react";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
   horaNoFuso,
@@ -21,10 +14,6 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
-import { avisarErro } from "@/lib/avisos";
-import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
@@ -37,7 +26,6 @@ interface Props {
   fuso: string;
   onMes: (mes: string) => void;
   onAbrir: (dia: string, turmaId: string) => void;
-  onRecarregar: (mes: string) => Promise<void>;
   bloqueado: boolean;
   rotuloTurma: (id: string) => string;
 }
@@ -60,26 +48,12 @@ export default function VistaHistorico({
   fuso,
   onMes,
   onAbrir,
-  onRecarregar,
   bloqueado,
   rotuloTurma,
 }: Props) {
   const semMovimento = useReducedMotion() ?? false;
-  const [erro, setErro] = useState("");
-  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
-
-  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
-    setErro("");
-    try {
-      await onRecarregar(mes);
-    } catch (excecao) {
-      setErro("Não foi possível buscar as frequências.");
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, { contexto: "Não foi possível buscar as frequências." });
-    }
-  });
 
   const ordenadas = [...frequencias].sort(
     (a, b) =>
@@ -108,20 +82,6 @@ export default function VistaHistorico({
               : `${frequencias.length} ${frequencias.length === 1 ? "frequência salva" : "frequências salvas"}`}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Atualizar histórico"
-          onClick={atualizar}
-          disabled={atualizando}
-        >
-          {atualizando ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
-          )}
-        </Button>
       </div>
 
       <div className="flex items-center gap-2">
@@ -196,8 +156,6 @@ export default function VistaHistorico({
         </p>
       )}
 
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-
       {frequencias.length === 0 ? (
         <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <History size={28} className="text-muted-foreground" aria-hidden="true" />
@@ -271,7 +229,7 @@ export default function VistaHistorico({
                         <span className="numerais-tabulares text-lg font-semibold">
                           {rotulo.numero}
                         </span>
-                        <span className="text-muted-foreground text-[10px] uppercase">
+                        <span className="text-muted-foreground text-xs uppercase">
                           {rotulo.semana}
                         </span>
                       </span>

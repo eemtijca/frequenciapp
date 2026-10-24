@@ -12,3 +12,13 @@ export function estadoDeErro(excecao: unknown): VarianteEstado {
   if (excecao.status >= 500) return "indisponivel";
   return "dados_invalidos";
 }
+
+/** Título específico para conflitos conhecidos, sem reutilizar o texto da Chamada. */
+export function tituloDeConflito(excecao: unknown): string | undefined {
+  if (!(excecao instanceof ErroApi) || excecao.status !== 409) return undefined;
+  if (excecao.codigo === "JUSTIFICATIVA_EM_USO") return "Justificativa em uso";
+  if (excecao.codigo === "LIBERADOR_EM_USO") return "Responsável em uso";
+  if (excecao.codigo === "CONFIGURACOES_ALTERADAS")
+    return "Configurações alteradas em outro acesso";
+  return undefined;
+}

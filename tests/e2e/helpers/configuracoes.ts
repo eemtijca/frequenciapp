@@ -1,5 +1,7 @@
 // Preserva e restaura a configuração de origem nos testes sintéticos,
-// sem deixar uma suíte alterar a seleção usada pela seguinte.
+// sem deixar uma suíte alterar a seleção usada pela seguinte. Também reúne
+// os passos do rascunho único e do lote de configurações.
+import { expect, type Page } from "@playwright/test";
 import type { Configuracoes } from "@/domain/frequencia";
 import { comBanco } from "./banco";
 
@@ -55,4 +57,35 @@ export async function definirOrigem(configuracao: ConfiguracaoOrigem): Promise<v
       throw erro;
     }
   });
+}
+
+/** Envia o rascunho único e devolve a resposta do lote, sem exigir sucesso. */
+export async function enviarRascunhoConfiguracoes(page: Page, senhaBi?: string) {
+  const resposta = page.waitForResponse(
+    (item) =>
+      new URL(item.url()).pathname === "/api/configuracoes/lote" &&
+      item.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+  if (senhaBi) {
+    await dialogo.getByLabel("Senha do administrador", { exact: true }).fill(senhaBi);
+  }
+  await dialogo.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  return resposta;
+}
+
+/** Envia o rascunho e exige que o lote seja gravado. */
+export async function salvarConfiguracoes(page: Page, senhaBi?: string): Promise<void> {
+  const resposta = await enviarRascunhoConfiguracoes(page, senhaBi);
+  expect(resposta.status()).toBe(200);
+  await expect(page.getByRole("alertdialog", { name: "Salvar configurações?" })).toBeHidden();
+}
+
+/** Descarta o rascunho inteiro pelo rodapé. */
+export async function descartarConfiguracoes(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Descartar", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", { name: "Descartar alterações?" });
+  await dialogo.getByRole("button", { name: "Descartar", exact: true }).click();
+  await expect(dialogo).toBeHidden();
 }

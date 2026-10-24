@@ -41,7 +41,7 @@ export function BarraBusca({
         placeholder={placeholder}
         autoComplete="off"
         spellCheck={false}
-        className="campo-integrado h-9 px-0 focus-visible:ring-0"
+        className="campo-integrado h-9 px-0 focus-visible:ring-0 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
       />
       {valor && (
         <button

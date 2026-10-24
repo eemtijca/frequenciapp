@@ -10,6 +10,18 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Configurações usam um rascunho único que reúne recursos, origem, notificações globais, acesso dos diretores, ordem do almoço, benefícios, justificativas, liberadores, feriados e chaves do BI. Catálogos deixam de gravar a cada edição: o diálogo de revisão mostra as seções e o salvamento envia um único lote atômico, com revisão otimista por seção e conflito 409 sem gravar nada. Chaves do BI pedem a senha no lote e o segredo aparece uma única vez. Novas rotas `GET /api/configuracoes/completo` e `POST /api/configuracoes/lote`; a migração `20261024123045_revisoes_catalogos` acrescenta `atualizado_em` a justificativas, liberadores e chaves do BI.
+
+- Todas as telas ganham o botão Atualizar tela no cabeçalho, que recarrega só a visão ativa e preserva filtros. Com rascunho pendente, orienta a salvar ou descartar antes de atualizar. O FrequenciBI usa o mesmo botão no desktop e Minhas turmas repete no cabeçalho do diretor.
+
+- A barra de salvamento da Chamada passa a ter largura pelo conteúdo, alinhada à direita no desktop e centralizada no celular, com texto truncado e respeito à área segura inferior.
+
+- A criação de chave do FrequenciBI usa os seletores próprios de data e hora, lado a lado, no lugar do campo nativo. O escopo abre por um botão recolhível com resumo das séries, turmas e bases escolhidas.
+
+- Ativação e envio automático das três planilhas entram no rascunho único e são gravados no lote. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos porque dependem de leitura ou ação no Google.
+
+- A atualização global preserva os dados sem conexão e oferece Tentar novamente em falhas que chegam ao botão. Os botões locais de atualizar resumo, histórico, relatório, consulta, lista e saídas deixam de ser sempre visíveis. As barras compactas alinham à direita já a partir do layout com barra lateral, em 1024 px.
+
 - Backup externo usa rclone fora da aplicação, com origem e destino configuráveis e sem SDK de provedor. Produz ZIP AES-256 com manifesto versionado, nomes genéricos e hashes SHA-256, relê a cópia antes de confirmar e conserva versões anteriores. Workflow diário às 02h17 de Fortaleza usa repository secrets, configuração temporária privada e limpeza final, com execução manual e concorrência sem cancelamento. Também permite executor próprio. Sem secrets, a agenda falha explicitamente; nenhum envio ocorre no deploy da aplicação. Chaves, monitoramento e retenção seguem sob controle da escola.
 
 - Horários mostra, na consulta diária, a ordem das turmas no almoço do dia da semana, com o horário de cada turma quando definido e a turma consultada em destaque. A administração define a ordem de segunda a sábado em Gestão, Configurações, Horários, seção Ordem do almoço: adiciona, sobe, desce e tira turmas, informa o horário opcional, salva ou descarta o dia e copia a ordem para os outros dias. Nova tabela `ordens_almoco`, rotas `GET /api/ordem-almoco` e `PUT /api/ordem-almoco/{dia}` e a ordem na cópia de segurança.
@@ -93,6 +105,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Interface revisada de ponta a ponta, com foco em consistência e uso no celular: login com favicon e conteúdo centralizado; conta em menu flutuante, com o tema no desktop; Painel com um gráfico por vez, seletor e setas, sem rolagem lateral; Chamada com alerta de benefício em popover e ações empilhadas; Chamada Parcial em tabela compacta; Saídas e Entradas com formulário em grade e envio único; Relatórios abrindo em Resumo e Grade com título; Gestão com descrições nas seções recolhíveis; FrequenciBI com título centralizado, seletor de seção e Mais ações no celular. Configurações de recursos e origem passam a usar rascunho local, confirmação explícita e revisão otimista, com `atualizadoEm` na API e resposta 409 em conflito.
+
 - Painel posiciona o cartão Cobertura do dia ao lado do cartão Infrequência no topo da tela, acompanhando a série do cartão ativo ou a escola inteira, e mostra a palavra alunos ao lado da quantidade nas legendas dos gráficos diários.
 
 - Alerta de frequência dos benefícios fica mais compacto, com percentual estimado e mínimo em destaque, faltas em aulas, limite e excesso. Mantém a indicação resumida de justificadas e preserva o cálculo mensal.
@@ -166,6 +180,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Erros 4xx de catálogo deixam de mostrar "A chamada foi salva em outro aparelho" e a dica genérica de internet. Justificativa e responsável em uso ganham título próprio e a contagem de registros; a dica de rede fica restrita a falha de conexão ou de servidor.
+
+- A busca exibe apenas o botão próprio de limpar; o X nativo do navegador deixa de aparecer ao lado.
+
+- No celular, a marca e o título da entrada ficam centralizados no cartão, alinhados ao formulário, e o seletor de tema permanece no canto.
 
 - Alerta de benefícios atualiza o percentual mensal ao cadastrar, remover ou sincronizar feriados do mês pela Gestão, sem recarregar o aplicativo. O cálculo usa o calendário mensal completo e os feriados já gravados pela integração existente.
 

@@ -126,7 +126,7 @@ test("processa só as turmas mapeadas, mostra falhas e não repete a gravação"
     dialogo.getByRole("button", { name: "Aplicar apresentação", exact: true }),
   ).toHaveCount(0);
   await dialogo.screenshot({
-    path: `docs/imagens/planilha-todas-pendencias-${contexto.project.name}.png`,
+    path: `docs/imagens/locais/planilha-todas-pendencias-${contexto.project.name}.png`,
   });
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   todasRecusadas = true;
