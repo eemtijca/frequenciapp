@@ -296,6 +296,8 @@ export interface Configuracoes {
   origemNaChamadaSerieIds: string[];
   origemNaChamadaTurmaIds: string[];
   feriados: Feriado[];
+  /** Versão da última gravação, usada no salvamento otimista. */
+  atualizadoEm?: string;
 }
 
 /** Padrões de fábrica dos recursos. */

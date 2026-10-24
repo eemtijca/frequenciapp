@@ -67,7 +67,7 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
   await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
   const secao = cartao.locator('[data-secao="planilha-entradas-preparo"]');
   await secao.screenshot({
-    path: `docs/imagens/planilha-apresentacao-acesso-${contexto.project.name}.png`,
+    path: `docs/imagens/locais/planilha-apresentacao-acesso-${contexto.project.name}.png`,
   });
   const botao = secao.getByRole("button", {
     name: "Organizar apresentação de Entradas",
@@ -94,7 +94,7 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
     elemento.scrollLeft = 0;
   });
   await dialogo.screenshot({
-    path: `docs/imagens/planilha-apresentacao-previa-${contexto.project.name}.png`,
+    path: `docs/imagens/locais/planilha-apresentacao-previa-${contexto.project.name}.png`,
   });
   await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   expect(confirmacoes).toHaveLength(0);

@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { criarGoogleFalso, type GoogleFalso } from "../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "./helpers/pagina";
 
 // A resposta simulada por page.route exige que o service worker não intercepte a requisição.
 // O funcionamento com service worker é verificado na suíte própria de PWA.
@@ -225,10 +225,7 @@ test.describe("Google Planilhas", () => {
     // Prévia na Grade, sem enviar.
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Grade" }).click();
-    const turmaE2E = page
-      .locator('section[aria-label="Grade de frequência"]')
-      .getByRole("button", { name: /E2E Ano A/ });
-    await turmaE2E.click();
+    await escolherTurmaNaGrade(page, /E2E Ano A/);
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
     const dialogo = page.getByRole("dialog");
     await dialogo.getByLabel(/O período inteiro/).check();

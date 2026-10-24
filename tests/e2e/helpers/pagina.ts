@@ -100,22 +100,67 @@ export async function abrirAbaMovimentacao(
   await page.getByRole("tab", { name: rotulo, exact: true }).click();
 }
 
-/** Rola a faixa nativa até o cartão de gráfico indicado. */
+/** Escolhe o cartão de gráfico indicado no seletor da faixa. */
 export async function rolarAteGrafico(page: Page, nome: string) {
   const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
-  await faixa.evaluate((elemento, rotulo) => {
-    const primeiro = elemento.firstElementChild;
-    const cartao = Array.from(elemento.children).find((item) =>
-      item.getAttribute("aria-label")?.endsWith(`: ${rotulo}`),
-    );
-    if (!(primeiro instanceof HTMLElement) || !(cartao instanceof HTMLElement))
-      throw new Error("Cartão não encontrado.");
-    // A faixa só troca o cartão vigente em um gesto ou neste pedido explícito.
-    elemento.setAttribute("data-rolagem-intencional", "true");
-    elemento.scrollTo({ left: cartao.offsetLeft - primeiro.offsetLeft, behavior: "instant" });
-  }, nome);
-  await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeInViewport();
+  const seletor = page.getByRole("combobox", { name: "Gráfico em exibição", exact: true });
+  await seletor.click();
+  await page.getByRole("option", { name: nome, exact: true }).click();
+  await expect(page.getByRole("article", { name: new RegExp(`: ${nome}$`) })).toBeVisible();
   return faixa;
+}
+
+/** Escolhe uma data no popover de período, navegando pelos meses até o alvo. */
+export async function escolherDataNoPeriodo(
+  page: Page,
+  rotuloAcessivel: string,
+  diaIso: string,
+): Promise<void> {
+  const gatilho = page.getByRole("button", {
+    name: new RegExp(`^${rotuloAcessivel}:`),
+  });
+  const diaFormatado = diaIso.split("-").reverse().join("/");
+  if ((await gatilho.getAttribute("aria-label"))?.includes(diaFormatado)) return;
+  await gatilho.click();
+  const painel = page.getByRole("dialog", { name: rotuloAcessivel, exact: true });
+  const data = new Date(`${diaIso}T12:00:00Z`);
+  const mes = new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(data);
+  const mesCompleto = `${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
+  const nomesDosMeses = Array.from({ length: 12 }, (_, indice) =>
+    new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" }).format(
+      new Date(Date.UTC(2000, indice, 1)),
+    ),
+  );
+  for (let tentativa = 0; tentativa < 36; tentativa += 1) {
+    if (await painel.getByRole("group", { name: `Dias de ${mesCompleto}`, exact: true }).count())
+      break;
+    const grade = painel.getByRole("group", { name: /^Dias de / });
+    const rotuloAtual = (await grade.getAttribute("aria-label")) ?? "";
+    const partes = /^Dias de (\S+) de (\d{4})$/.exec(rotuloAtual);
+    const numeroDoMes = nomesDosMeses.indexOf((partes?.[1] ?? "").toLowerCase()) + 1;
+    if (!partes?.[2] || numeroDoMes < 1)
+      throw new Error("Mês visível do calendário não encontrado.");
+    const mesVisivel = `${partes[2]}-${String(numeroDoMes).padStart(2, "0")}`;
+    await painel
+      .getByRole("button", {
+        name: mesVisivel > diaIso.slice(0, 7) ? "Mês anterior" : "Mês seguinte",
+        exact: true,
+      })
+      .click();
+    await expect(grade).not.toHaveAttribute("aria-label", rotuloAtual);
+  }
+  const nomeDoDia = new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(data);
+  await painel.getByRole("button", { name: new RegExp(`^${nomeDoDia}(,|$)`) }).click();
+  await expect(painel).toHaveCount(0);
 }
 
 /** Escolhe a turma dentro da série, abrindo o painel Turmas quando necessário. */
@@ -134,4 +179,57 @@ export async function escolherTurmaNaChamada(secao: Locator, nome: RegExp): Prom
     }
   }
   await turma.click();
+}
+
+/** Abre o menu flutuante da conta a partir do botão de perfil visível. */
+export async function abrirMenuConta(page: Page, _escopo?: Locator): Promise<Locator> {
+  const perfil = page.getByRole("button", { name: /^Conta de / }).last();
+  await perfil.click();
+  const menu = page.getByRole("menu", { name: "Conta", exact: true });
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** Abre o diálogo de notificações pelo cabeçalho móvel ou pelo menu da conta. */
+export async function abrirNotificacoes(page: Page): Promise<void> {
+  const noCabecalho = page
+    .getByRole("banner")
+    .getByRole("button", { name: "Configurar notificações", exact: true });
+  if (await noCabecalho.isVisible().catch(() => false)) {
+    await noCabecalho.click();
+    return;
+  }
+  const navegacao = await abrirNavegacao(page);
+  const conta = await abrirMenuConta(page, navegacao);
+  await conta.getByRole("menuitem", { name: "Notificações", exact: true }).click();
+}
+
+/** Abre o seletor de tema no cabeçalho móvel ou no menu da conta. */
+export async function abrirSeletorTema(page: Page): Promise<Locator> {
+  const noCabecalho = page.getByRole("banner").getByRole("button", { name: /tema/i });
+  if (await noCabecalho.isVisible().catch(() => false)) {
+    await noCabecalho.click();
+  } else {
+    const navegacao = await abrirNavegacao(page);
+    const conta = await abrirMenuConta(page, navegacao);
+    await conta.getByRole("button", { name: /tema/i }).click();
+  }
+  const temas = page.getByRole("radiogroup", { name: "Tema do aplicativo" });
+  await expect(temas).toBeVisible();
+  return temas;
+}
+
+/** Escolhe a turma de origem na Grade, no seletor móvel ou nos botões do desktop. */
+export async function escolherTurmaNaGrade(page: Page, nome: RegExp): Promise<void> {
+  const grade = page.getByRole("region", { name: "Grade de frequência", exact: true });
+  const seletor = grade.getByRole("combobox", {
+    name: "Turma de origem da grade",
+    exact: true,
+  });
+  if (await seletor.isVisible().catch(() => false)) {
+    await seletor.click();
+    await page.getByRole("option", { name: nome }).first().click();
+    return;
+  }
+  await grade.getByRole("button", { name: nome }).first().click();
 }

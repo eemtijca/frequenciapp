@@ -17,8 +17,6 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   FileText,
-  LoaderCircle,
-  RefreshCw,
   UserRound,
 } from "lucide-react";
 import type {
@@ -44,8 +42,7 @@ import { indexarPorDia, resumoPorAluno, type ResumoAlunoPeriodo } from "@/domain
 import { Button } from "@/components/ui/button";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { BarraBusca } from "@/components/ui/barra-busca";
-import { avisarErro, avisarInfo } from "@/lib/avisos";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { avisarInfo } from "@/lib/avisos";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
@@ -58,7 +55,6 @@ interface Props {
   mes: string;
   mesCorrente: string;
   onMes: (mes: string) => void;
-  onRecarregar: (mes: string) => Promise<void>;
 }
 
 interface DetalheProps {
@@ -290,7 +286,6 @@ export default function PorAluno({
   mes,
   mesCorrente,
   onMes,
-  onRecarregar,
 }: Props) {
   const [busca, setBusca] = useState("");
   const [seriesFechadas, setSeriesFechadas] = useState<ReadonlySet<string>>(new Set());
@@ -396,33 +391,9 @@ export default function PorAluno({
     definir(proximo);
   }
 
-  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
-    try {
-      await onRecarregar(mes);
-    } catch (excecao) {
-      avisarErro(excecao, { contexto: "Não foi possível atualizar o relatório." });
-    }
-  });
-
   return (
     <section aria-label="Relatório por aluno" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-end justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-10"
-          aria-label="Atualizar relatório"
-          onClick={() => void atualizar()}
-          disabled={atualizando}
-        >
-          {atualizando ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
-          )}
-        </Button>
-      </div>
+      <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
 
       <div className="flex items-center gap-2">
         <Button

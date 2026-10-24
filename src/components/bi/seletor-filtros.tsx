@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
+import { SeletorAno } from "@/components/ui/seletor-ano";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { textoBi, type DadosBi, type FiltrosBi } from "@/domain/bi-analise";
 import { periodoRapidoBi, PERIODOS_RAPIDOS_BI, type PeriodoRapidoBi } from "@/domain/bi-periodos";
 const PERIODOS: Record<PeriodoRapidoBi, string> = {
@@ -22,6 +24,11 @@ const CAMPOS_ADICIONAIS = [
   "situacao",
   "busca",
 ] as const;
+
+function dataBr(valor: string): string {
+  const [ano, mes, dia] = valor.split("-");
+  return dia && mes && ano ? `${dia}/${mes}/${ano}` : valor;
+}
 export function SeletorFiltrosBi({
   filtros,
   onAlterar,
@@ -131,20 +138,16 @@ export function SeletorFiltrosBi({
             <Label htmlFor={`${id}-ano`} className="mb-1 block text-xs">
               Ano
             </Label>
-            <Input
+            <SeletorAno
               id={`${id}-ano`}
-              aria-label="Ano da análise"
-              type="number"
-              min="1900"
-              max="2200"
-              value={ano}
-              onChange={(e) => {
-                const ano = e.target.value;
-                setAno(ano);
-                if (/^\d{4}$/.test(ano)) {
-                  setInicio(`${ano}-01-01`);
-                  setFim(`${ano}-12-31`);
-                }
+              rotuloAcessivel="Ano da análise"
+              valor={ano}
+              min={1900}
+              max={2200}
+              onValor={(valor) => {
+                setAno(valor);
+                setInicio(`${valor}-01-01`);
+                setFim(`${valor}-12-31`);
               }}
             />
           </div>
@@ -152,30 +155,29 @@ export function SeletorFiltrosBi({
             <Label htmlFor={`${id}-inicio`} className="mb-1 block text-xs">
               De
             </Label>
-            <Input
+            <SeletorPeriodo
               id={`${id}-inicio`}
-              aria-label="Início da análise"
-              type="date"
-              className="max-w-full"
-              value={inicio}
-              max={fim || undefined}
-              onChange={(e) => setInicio(e.target.value)}
-              required
+              modo="dia"
+              valor={inicio}
+              max={fim || `${ano}-12-31`}
+              rotulo={dataBr(inicio)}
+              rotuloAcessivel="Início da análise"
+              onValor={setInicio}
             />
           </div>
           <div className="col-span-2 min-w-0 sm:col-span-1">
             <Label htmlFor={`${id}-fim`} className="mb-1 block text-xs">
               Até
             </Label>
-            <Input
+            <SeletorPeriodo
               id={`${id}-fim`}
-              aria-label="Fim da análise"
-              type="date"
-              className="max-w-full"
-              value={fim}
-              min={inicio || undefined}
-              onChange={(e) => setFim(e.target.value)}
-              required
+              modo="dia"
+              valor={fim}
+              min={inicio}
+              max={`${ano}-12-31`}
+              rotulo={dataBr(fim)}
+              rotuloAcessivel="Fim da análise"
+              onValor={setFim}
             />
           </div>
           {selecionar(

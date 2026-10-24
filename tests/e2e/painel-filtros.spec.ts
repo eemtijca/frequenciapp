@@ -300,7 +300,7 @@ test("no computador, setas e seletor alternam os gráficos e respeitam os limite
   await expect(anterior).toBeDisabled();
 });
 
-test("no celular, a faixa rola sem alargar a página e ajusta a altura", async ({
+test("no celular, o cartão ocupa a largura sem alargar a página e ajusta a altura", async ({
   page,
   browserName,
 }) => {
@@ -308,8 +308,7 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
-  // O seletor e o grupo de navegação ficam só no computador; no celular há duas setas acima dos cartões.
-  await expect(page.getByRole("group", { name: "Navegação dos gráficos" })).toHaveCount(0);
+  // O seletor troca o cartão em exibição; a página não depende de rolagem lateral.
   await rolarAteGrafico(page, "Personalizado");
   await rolarAteGrafico(page, "Desistentes");
   await expect
@@ -326,7 +325,7 @@ test("no celular, a faixa rola sem alargar a página e ajusta a altura", async (
   await expect
     .poll(() =>
       page.getByRole("group", { name: "Cartões de gráficos" }).evaluate((elemento) => {
-        const cartao = elemento.querySelector('[aria-hidden="false"]');
+        const cartao = elemento.querySelector("[data-cartao]:not([hidden])");
         return cartao ? elemento.clientHeight - cartao.getBoundingClientRect().height : Infinity;
       }),
     )
@@ -390,69 +389,6 @@ test("no celular, as setas acima dos cartões percorrem os gráficos e respeitam
   }
   await expect(anterior).toBeDisabled();
   await expect(page.getByRole("article", { name: /^1 de \d+: Toda a escola$/ })).toBeInViewport();
-});
-
-test("o gesto de deslizar no Android troca o gráfico", async ({ page, browserName, isMobile }) => {
-  test.skip(browserName !== "chromium" || !isMobile, "Gesto nativo por CDP disponível no Android.");
-  await page.goto("/");
-  await aguardarHidratacao(page);
-  await trocarVisao(page, "Painel", "painel");
-  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
-  await faixa.scrollIntoViewIfNeeded();
-  const caixa = await faixa.boundingBox();
-  if (!caixa) throw new Error("Faixa não encontrada.");
-  const sessao = await page.context().newCDPSession(page);
-  const y = caixa.y + 80;
-  const x = caixa.x + caixa.width - 30;
-  await sessao.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-  for (let passo = 1; passo <= 10; passo += 1) {
-    await sessao.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: x - ((caixa.width - 60) * passo) / 10, y }],
-    });
-    await page.waitForTimeout(20);
-  }
-  await sessao.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await sessao.detach();
-  await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toHaveCount(0);
-  await expect(page.getByRole("article")).toBeInViewport();
-});
-
-test("o deslize que começa sobre um campo do gráfico personalizado também troca o gráfico", async ({
-  page,
-  browserName,
-  isMobile,
-}) => {
-  test.skip(browserName !== "chromium" || !isMobile, "Gesto nativo por CDP disponível no Android.");
-  await page.goto("/");
-  await aguardarHidratacao(page);
-  await trocarVisao(page, "Painel", "painel");
-  await rolarAteGrafico(page, "Personalizado");
-  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
-  // O seletor de data está sempre ativo; o de série fica desativado sem séries cadastradas.
-  const campo = page
-    .getByRole("region", { name: "Infrequência personalizada", exact: true })
-    .getByRole("button")
-    .first();
-  await campo.scrollIntoViewIfNeeded();
-  const [caixaFaixa, caixaCampo] = await Promise.all([faixa.boundingBox(), campo.boundingBox()]);
-  if (!caixaFaixa || !caixaCampo) throw new Error("Faixa ou campo não encontrado.");
-  const sessao = await page.context().newCDPSession(page);
-  const y = caixaCampo.y + caixaCampo.height / 2;
-  const x = caixaCampo.x + 40;
-  await sessao.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
-  for (let passo = 1; passo <= 12; passo += 1) {
-    await sessao.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: x + ((caixaFaixa.width - 80) * passo) / 12, y }],
-    });
-    await page.waitForTimeout(16);
-  }
-  await sessao.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-  await sessao.detach();
-  // Voltar um cartão: o Personalizado sai da exibição em vez de a faixa recuar sozinha.
-  await expect(page.getByRole("article", { name: /: Personalizado$/ })).toHaveCount(0);
-  await expect(page.getByRole("article")).toBeInViewport();
 });
 
 test.describe("infrequência do dia", () => {
@@ -617,7 +553,7 @@ test.describe("gráfico personalizado por período", () => {
       await rota.fulfill({ json: { frequencias: chamadas } });
     });
     const nomes = await page
-      .locator('article[aria-roledescription="cartão"]')
+      .locator('[role="article"][aria-roledescription="cartão"]')
       .evaluateAll((elementos) => elementos.map((item) => item.getAttribute("aria-label")));
     expect(nomes.at(-2)).toMatch(/: Personalizado$/);
     expect(nomes.at(-1)).toMatch(/: Desistentes$/);

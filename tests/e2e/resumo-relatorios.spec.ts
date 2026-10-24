@@ -206,7 +206,7 @@ test("oculta indicadores antigos na falha e recupera o mês pela atualização",
       await rota.fulfill({ json: { frequencias: [{ ...chamada, dia: `${mes}-01` }] } });
     }
   });
-  await painel.getByRole("button", { name: "Atualizar resumo" }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
   falhar = true;
   await painel.getByRole("button", { name: "Mês anterior do resumo" }).click();
@@ -214,7 +214,7 @@ test("oculta indicadores antigos na falha e recupera o mês pela atualização",
   await expect(painel.locator("dd")).toHaveCount(0);
   await expect(painel.getByText(/Nenhuma chamada registrada/)).toHaveCount(0);
   falhar = false;
-  await painel.getByRole("button", { name: "Atualizar resumo" }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(painel.getByRole("alert")).toHaveCount(0);
   await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
 });

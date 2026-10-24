@@ -2,6 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { salvarConfiguracoes } from "./helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 const serie = "E2E Almoco";
@@ -79,8 +80,7 @@ test("a ordem definida na Gestão aparece na aba Horários do dia", async ({ pag
   await escolher(page, regiao.getByRole("combobox", { name: "Turma" }), `${serie} A`);
   await regiao.getByRole("button", { name: "Adicionar à ordem" }).click();
   await regiao.getByRole("button", { name: `Subir ${serie} A` }).click();
-  await regiao.getByRole("button", { name: `Salvar ordem de ${ROTULO_DIA}` }).click();
-  await expect(page.getByText(`Ordem do almoço de ${ROTULO_DIA} salva.`)).toBeVisible();
+  await salvarConfiguracoes(page);
 
   const editada = regiao.getByRole("list", { name: `Ordem do almoço de ${ROTULO_DIA}` });
   await expect(editada.getByRole("listitem").nth(0)).toContainText(`${serie} A`);

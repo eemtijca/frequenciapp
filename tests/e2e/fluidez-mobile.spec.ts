@@ -128,6 +128,7 @@ test("buscar sem acento e limpar conserva a ordem do cadastro e permite editar",
   await busca.pressSequentially("alvaro");
   await expect(busca).toBeFocused();
   await expect(nomes).toHaveText([alvaro]);
+  await expect(painel.getByRole("button", { name: "Limpar busca", exact: true })).toHaveCount(1);
   await painel.getByRole("button", { name: "Limpar busca", exact: true }).click();
   await expect(nomes).toHaveText([bruna, caio, alvaro]);
   await grupo.getByRole("button", { name: `Editar ${alvaro}`, exact: true }).click();
@@ -323,7 +324,12 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per√
     name: "Grade de frequ√™ncia",
     exact: true,
   });
-  await grade.getByRole("button", { name: new RegExp(`^${turmaA} `) }).click();
+  const seletorTurma = grade.getByRole("combobox", {
+    name: "Turma de origem da grade",
+    exact: true,
+  });
+  await seletorTurma.click();
+  await page.getByRole("option", { name: new RegExp(`^${turmaA} \\(`) }).click();
   await grade.getByRole("searchbox", { name: "Buscar aluno", exact: true }).fill("alvaro");
   await grade.getByRole("combobox", { name: "Per√≠odo da consulta", exact: true }).click();
   const primeira = page.waitForResponse((resposta) =>
@@ -331,9 +337,6 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per√
   );
   await page.getByRole("option", { name: "Um dia", exact: true }).click();
   await (await primeira).finished();
-  await expect(
-    grade.getByRole("button", { name: "Atualizar consulta", exact: true }),
-  ).toBeEnabled();
   const antes = consultas.length;
 
   await page.getByRole("tab", { name: "Hist√≥rico", exact: true }).click();
@@ -361,10 +364,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per√
   await expect(
     grade.getByRole("combobox", { name: "Per√≠odo da consulta", exact: true }),
   ).toContainText("Um dia");
-  await expect(grade.getByRole("button", { name: new RegExp(`^${turmaA} `) })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(seletorTurma).toContainText(turmaA);
   await expect(grade.getByRole("row").filter({ hasText: alvaro })).toHaveCount(1);
   const aposAba = consultas.length;
   await trocarVisao(page, "Hor√°rios", "horarios");

@@ -1,8 +1,9 @@
 "use client";
 
-// Diálogo institucional: proteção de dados, projeto, desenvolvimento e licença.
+// Diálogo institucional curto: privacidade, projeto e licença.
 import { useRef } from "react";
 import { ShieldCheck } from "lucide-react";
+import { Logotipo } from "@/components/ui/logotipo";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
   return (
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent
-        className="max-w-md"
+        className="max-w-lg"
         onOpenAutoFocus={() => {
           focoAnterior.current =
             document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -45,38 +46,22 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
         }}
       >
         <DialogHeader>
-          <DialogTitle>Sobre o FrequenciApp</DialogTitle>
-          <DialogDescription>
-            Aplicativo de frequência escolar da EEMTI José Cláudio de Araújo: chamada diária,
-            saídas, justificativas, relatórios e indicadores.
-          </DialogDescription>
+          <div className="flex items-center gap-3">
+            <Logotipo tamanho={40} />
+            <div>
+              <DialogTitle>Sobre o FrequenciApp</DialogTitle>
+              <DialogDescription>EEMTI José Cláudio de Araújo</DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
+
         <div className="flex flex-col gap-4 text-sm">
-          <section
-            aria-labelledby="sobre-protecao-dados"
-            className="superficie-vidro space-y-3 p-4"
-          >
-            <h2 id="sobre-protecao-dados" className="flex items-center gap-2 font-medium">
+          <section aria-labelledby="sobre-privacidade" className="superficie-vidro space-y-2 p-4">
+            <h2 id="sobre-privacidade" className="flex items-center gap-2 font-medium">
               <ShieldCheck aria-hidden="true" className="text-primary size-5 shrink-0" />
-              Proteção de dados e LGPD
+              Privacidade
             </h2>
-            <p className="leading-relaxed">
-              O FrequenciApp adota medidas rigorosas de proteção de dados para apoiar o cumprimento
-              da Lei Geral de Proteção de Dados (LGPD).
-            </p>
-            <p className="leading-relaxed">
-              Uso institucional aprovado pela escola, com documento de consentimento assinado e
-              verificado por assinatura gov.br.
-            </p>
-            <ul className="text-muted-foreground list-disc space-y-1 pl-4">
-              <li>Acesso restrito por conta e permissão.</li>
-              <li>Controle de alterações e registro de operações administrativas.</li>
-              <li>Compartilhamento nas integrações sob controle da gestão.</li>
-            </ul>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Dúvidas e solicitações de acesso ou correção de dados pessoais devem ser encaminhadas
-              à gestão da escola.
-            </p>
+            <p>Dados de alunos restritos à equipe da escola. Tratamento conforme a LGPD.</p>
             <a
               href={`${REPOSITORIO}/blob/main/docs/lgpd.md`}
               target="_blank"
@@ -86,37 +71,49 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
               Como os dados são tratados
             </a>
           </section>
-          <div className="flex flex-col gap-1.5">
-            <p className="font-medium">Desenvolvimento</p>
-            <ul className="flex flex-col gap-1">
-              {DESENVOLVEDORES.map(({ nome, url }) => (
-                <li key={url}>
+
+          <section aria-labelledby="sobre-projeto" className="space-y-2">
+            <h2 id="sobre-projeto" className="font-medium">
+              Projeto
+            </h2>
+            <p className="text-muted-foreground">Código aberto mantido pela equipe da escola.</p>
+            <p>
+              <a
+                href={REPOSITORIO}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                Repositório no GitHub
+              </a>
+            </p>
+            <p className="text-muted-foreground">
+              Desenvolvido por{" "}
+              {DESENVOLVEDORES.map(({ nome, url }, indice) => (
+                <span key={url}>
+                  {indice > 0 ? " e " : ""}
                   <a
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="underline-offset-4 hover:underline"
+                    className="text-foreground underline-offset-4 hover:underline"
                   >
                     {nome}
                   </a>
-                </li>
+                </span>
               ))}
-            </ul>
-          </div>
-          <p>
-            <a
-              href={REPOSITORIO}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline-offset-4 hover:underline"
-            >
-              Repositório do projeto no GitHub
-            </a>
-          </p>
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            Código aberto sob a licença MIT, mantido pela equipe do FrequenciApp na EEMTI José
-            Cláudio de Araújo.
-          </p>
+              .
+            </p>
+          </section>
+
+          <section aria-labelledby="sobre-licenca" className="space-y-2">
+            <h2 id="sobre-licenca" className="font-medium">
+              Licença
+            </h2>
+            <p className="text-muted-foreground">
+              MIT. O texto completo está no arquivo LICENSE do repositório.
+            </p>
+          </section>
         </div>
       </DialogContent>
     </Dialog>

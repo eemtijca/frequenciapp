@@ -2,7 +2,7 @@
 // completo, com as respostas da API simuladas.
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "./helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -81,10 +81,7 @@ async function abrirEnvio(page: Page, modo: "conservador" | "completo") {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Relatórios", "relatorios");
   await page.getByRole("tab", { name: "Grade" }).click();
-  await page
-    .locator('section[aria-label="Grade de frequência"]')
-    .getByRole("button", { name: /E2E Ano A/ })
-    .click();
+  await escolherTurmaNaGrade(page, /E2E Ano A/);
   await page.getByRole("button", { name: "Enviar para a planilha" }).click();
   return page.getByRole("dialog");
 }

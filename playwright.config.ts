@@ -3,6 +3,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
+// No Docker Desktop do Windows, o aplicativo publicado fica em
+// host.docker.internal. O Chromium resolve localhost para esse host, o que
+// preserva a origem segura exigida por crypto.subtle no FrequenciBI.
+const resolverLocalhost = process.env.PLAYWRIGHT_RESOLVER_LOCALHOST === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -23,6 +27,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     storageState: "tests/e2e/.auth/admin.json",
+    launchOptions: resolverLocalhost
+      ? { args: ["--host-resolver-rules=MAP localhost host.docker.internal"] }
+      : undefined,
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

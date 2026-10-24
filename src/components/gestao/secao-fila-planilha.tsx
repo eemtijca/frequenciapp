@@ -138,6 +138,7 @@ export default function SecaoFilaPlanilha() {
     <SecaoRecolhivel
       dataSecao="planilha-fila"
       titulo="Fila de envios automáticos"
+      descricao="Envios pendentes e em processamento."
       icone={ListOrdered}
       aberto={aberto}
       onAbertoChange={setAberto}

@@ -104,7 +104,8 @@ async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: turma, exact: true }).click();
-  await vista.getByRole("button", { name: "Semana completa", exact: true }).click();
+  await vista.getByRole("combobox", { name: "Dia da semana", exact: true }).click();
+  await page.getByRole("option", { name: "Semana completa", exact: true }).click();
   return vista;
 }
 
@@ -116,7 +117,8 @@ async function abrirConsulta(page: Page, turma = origem): Promise<Locator> {
   const vista = page.getByRole("region", { name: "Horários semanais", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: turma, exact: true }).click();
-  await vista.getByRole("button", { name: "Semana completa", exact: true }).click();
+  await vista.getByRole("combobox", { name: "Dia da semana", exact: true }).click();
+  await page.getByRole("option", { name: "Semana completa", exact: true }).click();
   return vista;
 }
 
@@ -161,6 +163,9 @@ async function mudarHorario(page: Page, formulario: Locator, nome: string, valor
     .getByRole("option", { name: minuto ?? "", exact: true })
     .click();
   await expect(painel).toHaveCount(0);
+  await expect(formulario.getByRole("button", { name: new RegExp(`^${rotulo}:`) })).toContainText(
+    valor,
+  );
 }
 
 test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestão", async ({

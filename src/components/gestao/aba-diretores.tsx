@@ -56,6 +56,7 @@ import {
 interface Props {
   turmas: Turma[];
   diaCorrente: string;
+  atualizacao?: number;
 }
 
 interface Formulario {
@@ -79,7 +80,7 @@ function dataCurta(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("pt-BR") : "";
 }
 
-export default function AbaDiretores({ turmas, diaCorrente }: Props) {
+export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: Props) {
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
   const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
@@ -113,7 +114,7 @@ export default function AbaDiretores({ turmas, diaCorrente }: Props) {
 
   useEffect(() => {
     void recarregar();
-  }, [recarregar]);
+  }, [recarregar, atualizacao]);
 
   const turmasOrdenadas = useMemo(
     () => turmas.slice().sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR")),

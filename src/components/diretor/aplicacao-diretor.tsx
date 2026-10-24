@@ -13,6 +13,7 @@ import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios"
 import type { ContextoDiretor } from "@/domain/estatisticas-diretor";
 import { Button } from "@/components/ui/button";
 import { SeletorTema } from "@/components/ui/seletor-tema";
+import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
@@ -29,6 +30,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [sobreAberto, setSobreAberto] = useState(false);
+  const [atualizacao, setAtualizacao] = useState(0);
 
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
@@ -52,6 +54,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <BotaoAtualizar onAtualizar={() => setAtualizacao((valor) => valor + 1)} />
             <SeletorTema />
             {!contexto.trocaObrigatoria ? (
               <Button
@@ -106,7 +109,7 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
             Crie sua palavra-chave para ver as estatísticas.
           </div>
         ) : (
-          <VistaMinhasTurmas contexto={contexto} />
+          <VistaMinhasTurmas contexto={contexto} atualizacao={atualizacao} />
         )}
       </main>
 

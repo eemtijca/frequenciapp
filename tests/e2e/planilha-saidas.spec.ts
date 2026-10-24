@@ -95,7 +95,7 @@ test.describe("Google Planilhas de saídas", () => {
     ]);
 
     // Envio pela vista Saídas.
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
     await page.getByRole("button", { name: /Mês do envio das saídas e entradas/ }).click();
     await page

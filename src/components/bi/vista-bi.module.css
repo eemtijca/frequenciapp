@@ -5,12 +5,15 @@
     env(safe-area-inset-left);
 }
 .cabecalho {
-  display: flex;
-  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  min-height: 3.5rem;
+  padding: 0.5rem max(1rem, calc((100% - 1500px) / 2));
   border-radius: 0;
 }
 .conteudo {

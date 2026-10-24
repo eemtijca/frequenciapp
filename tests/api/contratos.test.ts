@@ -1482,8 +1482,9 @@ describe("configurações e responsáveis", () => {
         expect(alternar.status).toBe(200);
         const recarregar = await autenticado(cookieCoord, "/api/configuracoes");
         const dados = (await recarregar.json()) as { configuracoes: Configuracoes };
-        expect(dados.configuracoes).toEqual({
-          ...configurada.configuracoes,
+        const { atualizadoEm: _atualizadoEm, ...base } = configurada.configuracoes;
+        expect(dados.configuracoes).toMatchObject({
+          ...base,
           origemNaChamada: ligada,
         });
       }
@@ -1501,11 +1502,18 @@ describe("configurações e responsáveis", () => {
         body: JSON.stringify({ senha: SENHA_ADMIN }),
       });
       const exportada = (await copia.json()) as { configuracoes: Configuracoes };
-      expect(exportada.configuracoes).toEqual(configurada.configuracoes);
+      const { atualizadoEm: _exportadaEm, ...exportadaSemVersao } = exportada.configuracoes;
+      const { atualizadoEm: _configuradaEm, ...configuradaSemVersao } = configurada.configuracoes;
+      expect(exportadaSemVersao).toEqual(configuradaSemVersao);
     } finally {
+      const atual = await autenticado(cookieAdmin, "/api/configuracoes");
+      const atualBody = (await atual.json()) as { configuracoes: Configuracoes };
       const restaurar = await autenticado(cookieAdmin, "/api/configuracoes", {
         method: "PATCH",
-        body: JSON.stringify(inicial.configuracoes),
+        body: JSON.stringify({
+          ...inicial.configuracoes,
+          atualizadoEm: atualBody.configuracoes.atualizadoEm,
+        }),
       });
       expect(restaurar.status).toBe(200);
     }

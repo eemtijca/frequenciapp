@@ -3,6 +3,7 @@
 // Gestão: área do administrador. Séries, turmas, alunos, equipe, diretores
 // de turma e configurações em abas curtas.
 import { GraduationCap, ListChecks, School, Settings2, UserRoundCheck, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import type {
   Aluno,
   Configuracoes,
@@ -18,6 +19,8 @@ import AbaAlunos from "@/components/gestao/aba-alunos";
 import AbaEquipe from "@/components/gestao/aba-equipe";
 import AbaDiretores from "@/components/gestao/aba-diretores";
 import AbaConfiguracoes from "@/components/gestao/aba-configuracoes";
+import { avisarInfo } from "@/lib/avisos";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 export type Aba = "series" | "turmas" | "alunos" | "equipe" | "diretores" | "configuracoes";
 
@@ -40,6 +43,7 @@ interface Props {
   onLiberadoresMudaram: () => Promise<void>;
   onHorariosMudaram: () => Promise<void> | void;
   onPendenciaHorarios?: (pendente: boolean) => void;
+  onPendenciaConfiguracoes?: (pendente: boolean) => void;
   onAbrirSaidas?: () => void;
   onAbrirParcial?: () => void;
 }
@@ -72,9 +76,36 @@ export default function VistaGestao({
   onLiberadoresMudaram,
   onHorariosMudaram,
   onPendenciaHorarios,
+  onPendenciaConfiguracoes,
   onAbrirSaidas,
   onAbrirParcial,
 }: Props) {
+  const [atualizacao, setAtualizacao] = useState(0);
+  const [horariosPendentes, setHorariosPendentes] = useState(false);
+  const [configPendente, setConfigPendente] = useState(false);
+
+  useEffect(() => {
+    onPendenciaHorarios?.(horariosPendentes);
+  }, [horariosPendentes, onPendenciaHorarios]);
+
+  useEffect(() => {
+    onPendenciaConfiguracoes?.(configPendente);
+  }, [configPendente, onPendenciaConfiguracoes]);
+
+  useAtualizacaoTela("gestao", async () => {
+    if (horariosPendentes || configPendente) {
+      avisarInfo("Salve ou descarte as alterações antes de atualizar.");
+      return;
+    }
+    await Promise.all([
+      onTurmasMudaram(),
+      onAlunosMudaram(),
+      onJustificativasMudaram(),
+      onLiberadoresMudaram(),
+    ]);
+    setAtualizacao((valor) => valor + 1);
+  });
+
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
       <h1 className="sr-only">Gestão</h1>
@@ -100,8 +131,16 @@ export default function VistaGestao({
             {aba === "alunos" && (
               <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
             )}
-            {aba === "equipe" && <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} />}
-            {aba === "diretores" && <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} />}
+            {aba === "equipe" && (
+              <AbaEquipe
+                usuarioId={usuarioId}
+                onMudanca={onTurmasMudaram}
+                atualizacao={atualizacao}
+              />
+            )}
+            {aba === "diretores" && (
+              <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} atualizacao={atualizacao} />
+            )}
             {aba === "configuracoes" && (
               <AbaConfiguracoes
                 planilhaInicial={planilhaInicial}
@@ -111,11 +150,13 @@ export default function VistaGestao({
                 liberadores={liberadores}
                 turmas={turmas}
                 diaCorrente={diaCorrente}
+                atualizacao={atualizacao}
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}
                 onLiberadoresMudaram={onLiberadoresMudaram}
                 onHorariosMudaram={onHorariosMudaram}
-                onPendenciaHorarios={onPendenciaHorarios}
+                onPendenciaHorarios={setHorariosPendentes}
+                onPendenciaConfiguracoes={setConfigPendente}
                 onAbrirSaidas={onAbrirSaidas}
                 onAbrirParcial={onAbrirParcial}
               />

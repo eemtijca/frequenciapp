@@ -13,7 +13,7 @@ test.afterAll(limparMassaE2E);
 test("abas refletem a URL e sobrevivem ao recarregamento", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   await expect(page.getByRole("tab", { name: "Saídas", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",

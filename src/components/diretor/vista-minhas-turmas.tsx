@@ -21,6 +21,7 @@ import { GraficoAlunos, GraficoSemanas } from "@/components/graficos/graficos-so
 
 interface Props {
   contexto: ContextoDiretor;
+  atualizacao?: number;
 }
 
 type Exibicao = "grafico" | "tabela";
@@ -112,7 +113,7 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
   );
 }
 
-export default function VistaMinhasTurmas({ contexto }: Props) {
+export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) {
   const mesCorrente = contexto.diaCorrente.slice(0, 7);
   const [turmaId, setTurmaId] = useState(contexto.turmas[0]?.turmaId ?? "");
   const [mes, setMes] = useState(mesCorrente);
@@ -153,7 +154,7 @@ export default function VistaMinhasTurmas({ contexto }: Props) {
     return () => {
       viva = false;
     };
-  }, [turmaId, mes]);
+  }, [turmaId, mes, atualizacao]);
 
   if (contexto.turmas.length === 0) {
     return (
