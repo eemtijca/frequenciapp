@@ -174,6 +174,17 @@ test.describe("responsividade", () => {
     const campo = await page.locator("#email").boundingBox();
     expect(campo?.width ?? 0).toBeLessThanOrEqual(330);
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
+
+    // A marca e o título acompanham o centro do cartão, não só o espaço restante.
+    const cartao = await page.locator("main .superficie-vidro").first().boundingBox();
+    const titulo = await page
+      .getByRole("heading", { name: "FrequenciApp", exact: true })
+      .boundingBox();
+    expect(cartao).not.toBeNull();
+    expect(titulo).not.toBeNull();
+    const centroCartao = (cartao?.x ?? 0) + (cartao?.width ?? 0) / 2;
+    const centroTitulo = (titulo?.x ?? 0) + (titulo?.width ?? 0) / 2;
+    expect(Math.abs(centroCartao - centroTitulo)).toBeLessThanOrEqual(1);
   });
   // A massa permite conferir a largura das listas de frequência.
   test.describe("com turmas cadastradas", () => {

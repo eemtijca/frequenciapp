@@ -136,8 +136,8 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
         <div className="superficie-vidro flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col items-center gap-3 text-center lg:items-start lg:text-left">
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="flex w-full min-w-0 flex-col items-center gap-3 text-center lg:w-auto lg:items-start lg:text-left">
               <Logotipo tamanho={48} className="lg:hidden" priority />
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
@@ -146,7 +146,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                 </p>
               </div>
             </div>
-            <SeletorTema className="shrink-0" />
+            <SeletorTema className="absolute top-0 right-0 shrink-0 lg:static" />
           </div>
 
           {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}

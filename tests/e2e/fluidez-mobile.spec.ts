@@ -128,6 +128,7 @@ test("buscar sem acento e limpar conserva a ordem do cadastro e permite editar",
   await busca.pressSequentially("alvaro");
   await expect(busca).toBeFocused();
   await expect(nomes).toHaveText([alvaro]);
+  await expect(painel.getByRole("button", { name: "Limpar busca", exact: true })).toHaveCount(1);
   await painel.getByRole("button", { name: "Limpar busca", exact: true }).click();
   await expect(nomes).toHaveText([bruna, caio, alvaro]);
   await grupo.getByRole("button", { name: `Editar ${alvaro}`, exact: true }).click();

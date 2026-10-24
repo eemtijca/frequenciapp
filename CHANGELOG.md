@@ -179,6 +179,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Erros 4xx de catálogo deixam de mostrar "A chamada foi salva em outro aparelho" e a dica genérica de internet. Justificativa e responsável em uso ganham título próprio e a contagem de registros; a dica de rede fica restrita a falha de conexão ou de servidor.
 
+- A busca exibe apenas o botão próprio de limpar; o X nativo do navegador deixa de aparecer ao lado.
+
+- No celular, a marca e o título da entrada ficam centralizados no cartão, alinhados ao formulário, e o seletor de tema permanece no canto.
+
 - Alerta de benefícios atualiza o percentual mensal ao cadastrar, remover ou sincronizar feriados do mês pela Gestão, sem recarregar o aplicativo. O cálculo usa o calendário mensal completo e os feriados já gravados pela integração existente.
 
 - Chamada Parcial mantém Registro na SEDUC para presenças por turno ou aulas específicas e presenças parciais da Chamada, além das justificadas. Os filtros de pendências e confirmações seguem a mesma regra; corrigir o registro continua exigindo nova conferência.
