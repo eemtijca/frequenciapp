@@ -337,9 +337,6 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per√
   );
   await page.getByRole("option", { name: "Um dia", exact: true }).click();
   await (await primeira).finished();
-  await expect(
-    grade.getByRole("button", { name: "Atualizar consulta", exact: true }),
-  ).toBeEnabled();
   const antes = consultas.length;
 
   await page.getByRole("tab", { name: "Hist√≥rico", exact: true }).click();

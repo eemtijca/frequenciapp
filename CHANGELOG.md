@@ -18,6 +18,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A criação de chave do FrequenciBI usa os seletores próprios de data e hora, lado a lado, no lugar do campo nativo. O escopo abre por um botão recolhível com resumo das séries, turmas e bases escolhidas.
 
+- Ativação e envio automático das três planilhas entram no rascunho único e são gravados no lote. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos porque dependem de leitura ou ação no Google.
+
+- A atualização global preserva os dados sem conexão e oferece Tentar novamente em falhas que chegam ao botão. Os botões locais de atualizar resumo, histórico, relatório, consulta, lista e saídas deixam de ser sempre visíveis. As barras compactas alinham à direita já a partir do layout com barra lateral, em 1024 px.
+
 - Backup externo usa rclone fora da aplicação, com origem e destino configuráveis e sem SDK de provedor. Produz ZIP AES-256 com manifesto versionado, nomes genéricos e hashes SHA-256, relê a cópia antes de confirmar e conserva versões anteriores. Workflow diário às 02h17 de Fortaleza usa repository secrets, configuração temporária privada e limpeza final, com execução manual e concorrência sem cancelamento. Também permite executor próprio. Sem secrets, a agenda falha explicitamente; nenhum envio ocorre no deploy da aplicação. Chaves, monitoramento e retenção seguem sob controle da escola.
 
 - Horários mostra, na consulta diária, a ordem das turmas no almoço do dia da semana, com o horário de cada turma quando definido e a turma consultada em destaque. A administração define a ordem de segunda a sábado em Gestão, Configurações, Horários, seção Ordem do almoço: adiciona, sobe, desce e tira turmas, informa o horário opcional, salva ou descarta o dia e copia a ordem para os outros dias. Nova tabela `ordens_almoco`, rotas `GET /api/ordem-almoco` e `PUT /api/ordem-almoco/{dia}` e a ordem na cópia de segurança.

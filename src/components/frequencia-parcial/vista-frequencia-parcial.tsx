@@ -9,7 +9,6 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
-  RefreshCw,
   Trash2,
   CalendarOff,
 } from "lucide-react";
@@ -754,18 +753,6 @@ export default function VistaFrequenciaParcial({
             </div>
           )}
         </div>
-      )}
-      {!carregando && !erro && turmaId && (
-        <Button
-          type="button"
-          variant="ghost"
-          disabled={ocupado || editorAberto}
-          onClick={() => setRecarregar((valor) => valor + 1)}
-          className="h-11 self-start"
-        >
-          <RefreshCw size={16} />
-          Atualizar lista
-        </Button>
       )}
       <DialogoFrequenciaParcial
         aberto={ativa && editorAberto}

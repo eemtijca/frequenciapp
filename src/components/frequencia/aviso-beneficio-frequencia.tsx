@@ -57,9 +57,7 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
               <div key={alerta.beneficioId} className="space-y-3 px-4 py-3">
                 <div className="flex items-end justify-between gap-3">
                   <div>
-                    <p className="text-muted-foreground text-[11px] font-medium">
-                      Frequência estimada
-                    </p>
+                    <p className="text-muted-foreground text-xs font-medium">Frequência estimada</p>
                     <p className="numerais-tabulares text-2xl font-semibold">
                       {percentual.format(numeros.frequencia)}%
                     </p>
@@ -98,7 +96,7 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
             );
           })}
         </div>
-        <p className="text-muted-foreground border-t px-4 py-2.5 text-[11px]">
+        <p className="text-muted-foreground border-t px-4 py-2.5 text-xs">
           {RODAPE_ALERTA_BENEFICIO}
         </p>
       </PopoverContent>

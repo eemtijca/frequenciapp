@@ -10,6 +10,7 @@ test.afterAll(limparMassaE2E);
 
 for (const [nome, largura, altura] of [
   ["desktop", 1440, 900],
+  ["desktop estreito", 1024, 900],
   ["celular", 390, 844],
 ] as const) {
   test(`barra de salvamento compacta no ${nome}`, async ({ page }) => {
@@ -36,8 +37,8 @@ for (const [nome, largura, altura] of [
     const depois = await barra.boundingBox();
     expect(depois).not.toBeNull();
     expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.85);
-    if (largura >= 1280) {
-      // No desktop, a barra fica à direita, sem ocupar a largura da lista.
+    if (largura >= 1024) {
+      // No desktop, a barra fica à direita do conteúdo, sem ocupar a largura da lista.
       expect((depois?.x ?? 0) + (depois?.width ?? 0)).toBeGreaterThan(
         (secao?.x ?? 0) + (secao?.width ?? 0) / 2,
       );
@@ -98,4 +99,25 @@ test("o botão global atualiza a tela ativa e não descarta um rascunho", async 
   const dialogo = page.getByRole("alertdialog", { name: "Descartar alterações?" });
   await dialogo.getByRole("button", { name: "Descartar", exact: true }).click();
   await expect(barra).toHaveCount(0);
+});
+
+test("sem conexão preserva os dados e não dispara a atualização", async ({ page, context }) => {
+  await page.goto("/?visao=painel");
+  await aguardarHidratacao(page);
+  const pedidos: string[] = [];
+  page.on("request", (pedido) => {
+    if (pedido.url().includes("/api/frequencias")) pedidos.push(pedido.url());
+  });
+  await page.waitForTimeout(800);
+  const antes = pedidos.length;
+  await context.setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, get: () => false });
+  });
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
+  await expect(
+    page.getByText("Sem conexão. Os dados atuais continuam na tela.", { exact: true }),
+  ).toBeVisible();
+  expect(pedidos).toHaveLength(antes);
+  await context.setOffline(false);
 });

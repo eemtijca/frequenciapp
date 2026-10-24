@@ -113,7 +113,7 @@ test("restaura os pontos verdes sem salvar novamente nem apagar faltas", async (
       ),
     );
   });
-  await grade.getByRole("button", { name: "Atualizar consulta", exact: true }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   for (const nome of [nomes.presente, nomes.movido]) {
     await expect(
       grade.getByRole("img", { name: `${nome} presente em 2026-09-15`, exact: true }),

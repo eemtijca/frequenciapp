@@ -5,15 +5,7 @@
 // acumulada (F + FJ) de todo o histórico.
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  LoaderCircle,
-  RefreshCw,
-  Send,
-  Table2,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, LoaderCircle, Send, Table2 } from "lucide-react";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -28,9 +20,8 @@ import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { Button } from "@/components/ui/button";
 import { BarraBusca } from "@/components/ui/barra-busca";
@@ -49,7 +40,6 @@ interface Props {
   atualizacao?: number;
   origens: Turma[];
   onMes: (mes: string) => void;
-  onRecarregar: () => Promise<void>;
 }
 
 const MODOS: { valor: ModoPeriodo; rotulo: string }[] = [
@@ -76,7 +66,6 @@ export default function VistaGrade({
   atualizacao = 0,
   origens,
   onMes,
-  onRecarregar,
 }: Props) {
   const semMovimento = useReducedMotion() ?? false;
   const [erro, setErro] = useState("");
@@ -87,7 +76,6 @@ export default function VistaGrade({
   const [diaFim, setDiaFim] = useState(hoje);
   const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
-  const [recarga, setRecarga] = useState(0);
   const [envioAberto, setEnvioAberto] = useState(false);
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();
 
@@ -148,7 +136,7 @@ export default function VistaGrade({
       viva = false;
       controlador.abort();
     };
-  }, [aberto, modo, dias, diaBase, versao, recarga, atualizacao]);
+  }, [aberto, modo, dias, diaBase, versao, atualizacao]);
 
   const frequenciasDoPeriodo = useMemo(() => {
     if (modo === "mes") return frequencias.filter((frequencia) => frequencia.dia.startsWith(mes));
@@ -184,21 +172,6 @@ export default function VistaGrade({
     );
     return (alunoId: string) => mapa.get(alunoId) ?? 0;
   }, [resumo]);
-
-  const { executando: atualizando, executar: atualizar } = useAcaoUnica(async () => {
-    setErro("");
-    try {
-      if (modo === "mes") {
-        await onRecarregar();
-      } else {
-        setDoPeriodo(null);
-        setRecarga((valor) => valor + 1);
-      }
-    } catch (excecao) {
-      setErroVariante(estadoDeErro(excecao));
-      avisarErro(excecao, { contexto: "Não foi possível atualizar a grade." });
-    }
-  });
 
   const turmaAtualDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));
@@ -363,20 +336,6 @@ export default function VistaGrade({
             disabled={grade.linhas.length === 0 || carregandoPeriodo}
           >
             <Download size={18} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-10"
-            aria-label="Atualizar consulta"
-            onClick={() => void atualizar()}
-            disabled={atualizando || carregandoPeriodo}
-          >
-            {atualizando || carregandoPeriodo ? (
-              <LoaderCircle size={18} className="animate-spin" />
-            ) : (
-              <RefreshCw size={18} />
-            )}
           </Button>
         </div>
       </div>

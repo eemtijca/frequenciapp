@@ -103,7 +103,7 @@ test("mantém faltas e retrato quando a grade ganha aulas", async ({ page }) => 
   await page.getByRole("option", { name: "E2E Ano", exact: true }).click();
   await painel.getByRole("combobox", { name: "Turma do resumo" }).click();
   await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
-  await painel.getByRole("button", { name: "Atualizar resumo" }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(painel).toHaveAttribute("aria-busy", "false");
   await expect(painel.locator("dd")).toHaveText(["1", "0", "1", "50%"]);
   await painel.getByText("Ver dados diários", { exact: true }).click();

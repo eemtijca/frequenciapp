@@ -588,6 +588,19 @@ function ConteudoConfiguracoes({
           .join(", ") || "Chaves ajustadas."
       );
     }
+    if (chave === "planilhas") {
+      const nomes: Record<string, string> = {
+        frequencia: "Frequência",
+        saidas: "Saídas e Entradas",
+        parcial: "Chamada Parcial",
+      };
+      const mudadas = Object.keys(atual.planilhas).filter(
+        (finalidade) =>
+          JSON.stringify(atual.planilhas[finalidade as keyof typeof atual.planilhas]) !==
+          JSON.stringify(anterior.planilhas[finalidade as keyof typeof anterior.planilhas]),
+      );
+      return mudadas.map((finalidade) => nomes[finalidade] ?? finalidade).join(", ");
+    }
     return "";
   }
 
@@ -1319,7 +1332,7 @@ function ConteudoConfiguracoes({
         <div
           role="region"
           aria-label="Salvar configurações"
-          className="superficie-vidro vidro-flutuante sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 xl:mr-0 xl:ml-auto"
+          className="superficie-vidro vidro-flutuante sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
           style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <p

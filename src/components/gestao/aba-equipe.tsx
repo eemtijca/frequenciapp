@@ -249,11 +249,11 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-2 truncate font-medium">
                           {usuario.nome}
-                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                             {rotuloDePapel(usuario.papel)}
                           </span>
                           {propria && (
-                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap">
+                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
                               Você
                             </span>
                           )}

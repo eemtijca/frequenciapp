@@ -114,7 +114,6 @@ export default function VistaRelatorios({
                 carregando={carregando}
                 erro={erro}
                 onMes={onMes}
-                onRecarregar={onRecarregar}
               />
             )}
             {aba === "historico" && (
@@ -127,7 +126,6 @@ export default function VistaRelatorios({
                 fuso={fuso}
                 onMes={onMes}
                 onAbrir={onAbrir}
-                onRecarregar={onRecarregar}
                 bloqueado={bloqueado}
                 rotuloTurma={rotuloTurma}
               />
@@ -145,9 +143,6 @@ export default function VistaRelatorios({
                 atualizacao={atualizacao}
                 origens={turmas}
                 onMes={onMes}
-                onRecarregar={async () => {
-                  await onRecarregar(mes);
-                }}
               />
             )}
             {aba === "aluno" && (
@@ -161,7 +156,6 @@ export default function VistaRelatorios({
                 mes={mes}
                 mesCorrente={mesCorrente}
                 onMes={onMes}
-                onRecarregar={onRecarregar}
               />
             )}
             {aba === "movimentacoes" && (

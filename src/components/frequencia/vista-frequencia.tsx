@@ -1418,7 +1418,7 @@ export default function VistaFrequencia({
           </div>
           <div
             aria-label="Barra de salvamento"
-            className="superficie-vidro vidro-flutuante sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 xl:mr-0 xl:ml-auto"
+            className="superficie-vidro vidro-flutuante sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
             style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <p

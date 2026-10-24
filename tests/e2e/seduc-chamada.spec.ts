@@ -88,7 +88,6 @@ async function abrirParcial(page: Page) {
   await page.locator("#parcial-turma").click();
   await page.getByRole("option", { name: `${prefixo} A`, exact: true }).click();
   const secao = page.getByTestId("chamada-parcial");
-  await expect(secao.getByRole("button", { name: "Atualizar lista", exact: true })).toBeEnabled();
   await expect(secao.getByTestId(`parcial-aluno-${alunoId}`)).toBeVisible();
   return secao;
 }

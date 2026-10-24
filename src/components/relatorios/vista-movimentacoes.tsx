@@ -2,14 +2,7 @@
 
 // Relatório conjunto de saídas e entradas, com consulta independente do mês e grupos por turma ou por aluno.
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  RefreshCw,
-} from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import {
   diaDaSemanaIso,
   diaSeguinte,
@@ -236,22 +229,7 @@ export default function VistaMovimentacoes({
       className="flex min-w-0 flex-col gap-4"
     >
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Saídas e entradas</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Atualizar saídas e entradas"
-          disabled={carregando || Boolean(erroPeriodo)}
-          onClick={() => setRecarga((valor) => valor + 1)}
-        >
-          {carregando ? (
-            <LoaderCircle size={18} className="animate-spin" />
-          ) : (
-            <RefreshCw size={18} />
-          )}
-        </Button>
+        <h2 className="text-lg font-semibold">Saídas e Entradas</h2>
       </div>
       <div role="group" aria-label="Período do relatório" className="flex flex-wrap gap-2">
         {MODOS.map((item) => (

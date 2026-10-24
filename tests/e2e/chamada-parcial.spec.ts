@@ -45,7 +45,6 @@ async function abrirParcial(page: Page) {
   await page.locator("#parcial-turma").click();
   await page.getByRole("option", { name: "E2E Parcial A", exact: true }).click();
   const secao = page.getByTestId("chamada-parcial");
-  await expect(secao.getByRole("button", { name: "Atualizar lista", exact: true })).toBeEnabled();
   return secao;
 }
 

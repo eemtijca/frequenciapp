@@ -12,7 +12,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { avisarErro } from "@/lib/avisos";
+import { avisarErro, avisarInfo } from "@/lib/avisos";
 
 type Atualizador = () => Promise<void> | void;
 
@@ -33,6 +33,18 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
   const atualizadores = useRef(new Map<string, Atualizador>());
   const [ids, setIds] = useState<Set<string>>(() => new Set());
   const [ocupado, setOcupado] = useState(false);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+
+  useEffect(() => {
+    const marcarOffline = () => setOnline(false);
+    const marcarOnline = () => setOnline(true);
+    window.addEventListener("offline", marcarOffline);
+    window.addEventListener("online", marcarOnline);
+    return () => {
+      window.removeEventListener("offline", marcarOffline);
+      window.removeEventListener("online", marcarOnline);
+    };
+  }, []);
 
   const registrar = useCallback((id: string, atualizar: Atualizador | null) => {
     if (atualizar) atualizadores.current.set(id, atualizar);
@@ -41,19 +53,32 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
   }, []);
 
   const disponivel = ids.has(ativo);
+  const atualizarRef = useRef<() => Promise<void>>(async () => {});
 
   const atualizar = useCallback(async () => {
     const executar = atualizadores.current.get(ativo);
     if (!executar || ocupado) return;
+    const semConexao = !online || (typeof navigator !== "undefined" && navigator.onLine === false);
+    if (semConexao) {
+      avisarInfo("Sem conexão. Os dados atuais continuam na tela.");
+      return;
+    }
     setOcupado(true);
     try {
       await executar();
     } catch (excecao) {
-      avisarErro(excecao, { contexto: "Não foi possível atualizar a tela." });
+      avisarErro(excecao, {
+        contexto: "Não foi possível atualizar a tela.",
+        tentarDeNovo: () => void atualizarRef.current(),
+      });
     } finally {
       setOcupado(false);
     }
-  }, [ativo, ocupado]);
+  }, [ativo, ocupado, online]);
+
+  useEffect(() => {
+    atualizarRef.current = atualizar;
+  }, [atualizar]);
 
   const valor = useMemo(
     () => ({ registrar, atualizar, ocupado, disponivel }),

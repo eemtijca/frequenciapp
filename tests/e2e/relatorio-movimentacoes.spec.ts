@@ -258,7 +258,7 @@ test("oculta dados antigos na falha, permite tentar novamente e distingue o per�
   await expect(totais(painel)).toHaveCount(0);
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
   estado = "dados";
-  await painel.getByRole("button", { name: "Atualizar saídas e entradas", exact: true }).click();
+  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(totais(painel)).toHaveText(["2", "1"]);
   await expect(painel.getByText("E2E Falha temporária do relatório.", { exact: true })).toHaveCount(
     0,
