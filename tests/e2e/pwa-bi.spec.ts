@@ -52,7 +52,7 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
         alunoId,
       ]);
       await db.query(
-        "insert into chaves_bi (id,rotulo,segredo_hash,escopo) values ($1,$2,$3,$4::jsonb)",
+        "insert into chaves_bi (id,rotulo,segredo_hash,escopo,atualizado_em) values ($1,$2,$3,$4::jsonb,now())",
         [
           id,
           rotulo,

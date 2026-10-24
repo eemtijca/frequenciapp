@@ -3,6 +3,7 @@
 import { expect, test } from "@playwright/test";
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 import { abrirNotificacoes, aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { salvarConfiguracoes } from "./helpers/configuracoes";
 
 test.describe("configuração de notificações", () => {
   let anterior: ConfiguracaoNotificacoes;
@@ -48,8 +49,8 @@ test.describe("configuração de notificações", () => {
       .getByRole("listbox", { name: "Minutos" })
       .getByRole("option", { name: "30", exact: true })
       .click();
-    await secao.getByRole("button", { name: "Salvar notificações", exact: true }).click();
-    await expect(page.getByText("Configuração de notificações salva.")).toBeVisible();
+    await salvarConfiguracoes(page);
+    await expect(page.getByText("Configurações salvas.")).toBeVisible();
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");

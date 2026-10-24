@@ -1,7 +1,7 @@
 // Transações ACID com repetição automática: conflitos de serialização (P2034)
 // são refeitos com pequena pausa antes de devolver o erro.
 import { Prisma } from "../../generated/prisma/client";
-import { banco } from "@/infra/banco";
+import { banco, transacaoCorrente } from "@/infra/banco";
 import { ehConflitoDeSerializacao } from "@/infra/erros";
 
 export type Transacao<T> = (tx: Prisma.TransactionClient) => Promise<T>;
@@ -22,6 +22,8 @@ export async function comTransacao<T>(
   operacao: Transacao<T>,
   opcoes: { timeout?: number } = {},
 ): Promise<T> {
+  const corrente = transacaoCorrente();
+  if (corrente) return operacao(corrente);
   let ultimoErro: unknown = null;
   for (let tentativa = 1; tentativa <= MAXIMO_TENTATIVAS; tentativa += 1) {
     try {

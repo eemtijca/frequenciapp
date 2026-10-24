@@ -1,13 +1,12 @@
 "use client";
 
-// Calendário anual de feriados, com sincronização, remoção confirmada e releitura.
+// Calendário anual de feriados no rascunho das configurações, com
+// sincronização externa imediata e remoção confirmada.
 import { useState } from "react";
-import { CalendarDays, LoaderCircle, RefreshCw, Trash2 } from "lucide-react";
+import { CalendarDays, Trash2 } from "lucide-react";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido, rotuloData } from "@/domain/frequencia";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { avisarSucesso } from "@/lib/avisos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,23 +25,29 @@ import ControleSincronizarFeriados from "@/components/gestao/controle-sincroniza
 import { Selo } from "@/components/ui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorAno } from "@/components/ui/seletor-ano";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { AvisoCompacto } from "@/components/ui/tela-estado";
 
 interface Props {
   feriados: Feriado[];
   diaCorrente: string;
-  onAtualizar: () => Promise<void>;
+  onAdicionar: (feriado: Feriado) => void;
+  onRemover: (dia: string) => void;
+  onSincronizar: () => Promise<void>;
 }
 
-export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualizar }: Props) {
+export default function SecaoCalendarioLetivo({
+  feriados,
+  diaCorrente,
+  onAdicionar,
+  onRemover,
+  onSincronizar,
+}: Props) {
   const [aberto, setAberto] = useState(false);
   const [ano, setAno] = useState(diaCorrente.slice(0, 4));
   const [dia, setDia] = useState(diaCorrente);
   const [nome, setNome] = useState("");
   const [paraRemover, setParaRemover] = useState<Feriado | null>(null);
   const [erro, setErro] = useState("");
-  const [varianteErro, setVarianteErro] = useState<VarianteEstado>("dados_invalidos");
-  const [precisaAtualizar, setPrecisaAtualizar] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const anoValido = /^\d{4}$/.test(ano) && ehAnoLetivoValido(Number(ano));
   const feriadosDoAno = anoValido
@@ -60,75 +65,38 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
 
   function escolherDia(proximo: string) {
     if (!ehDiaValido(proximo) || !ehAnoLetivoValido(Number(proximo.slice(0, 4)))) {
-      setVarianteErro("dados_invalidos");
       setErro("Informe uma data entre 1900 e 2199.");
       return;
     }
+    setErro("");
     setDia(proximo);
     setAno(proximo.slice(0, 4));
   }
 
-  const { executando, executar } = useAcaoUnica(async () => {
+  function adicionar() {
     setErro("");
-    if (precisaAtualizar) {
-      try {
-        await onAtualizar();
-        setPrecisaAtualizar(false);
-      } catch (excecao) {
-        setVarianteErro("indisponivel");
-        setErro("Não foi possível atualizar o calendário. Tente novamente.");
-        avisarErro(excecao, { contexto: "Não foi possível atualizar o calendário." });
-      }
-      return;
-    }
-
-    const removendo = paraRemover !== null;
-    if (!removendo && (!anoValido || !ehDiaValido(dia) || !nome.trim())) {
-      setVarianteErro("dados_invalidos");
+    if (!anoValido || !ehDiaValido(dia) || !nome.trim()) {
       setErro("Confira o ano, a data e o nome do feriado.");
       return;
     }
-    try {
-      if (paraRemover) {
-        await pedir<{ ok: boolean }>(
-          `/api/calendario-letivo/${paraRemover.dia}`,
-          corpoAlteracao("DELETE"),
-        );
-        setParaRemover(null);
-      } else {
-        await pedir<{ feriado: Feriado }>(
-          "/api/calendario-letivo",
-          corpoJson({ dia, nome: nome.trim() }),
-        );
-        setNome("");
-      }
-    } catch (excecao) {
-      const contexto = removendo
-        ? "Não foi possível remover o feriado."
-        : "Não foi possível salvar o feriado.";
-      setVarianteErro(
-        excecao instanceof ErroApi && excecao.status < 500 ? "dados_invalidos" : "indisponivel",
-      );
-      setErro(excecao instanceof ErroApi ? excecao.message : contexto);
-      avisarErro(excecao, { contexto });
+    if (feriados.some((feriado) => feriado.dia === dia)) {
+      setErro("Já existe um feriado nesta data. Remova o atual para trocar o nome.");
       return;
     }
+    onAdicionar({ dia, nome: nome.trim() });
+    setNome("");
+    avisarSucesso("Feriado adicionado ao rascunho.", "Salve as configurações para aplicar.");
+  }
 
-    try {
-      await onAtualizar();
-      avisarSucesso(removendo ? "Feriado removido." : "Feriado salvo.");
-    } catch {
-      // A alteração foi confirmada. Repetir esta ação deve consultar, sem gravar de novo.
-      const mensagem = removendo
-        ? "Feriado removido. Atualize o calendário para conferir."
-        : "Feriado salvo. Atualize o calendário para conferir.";
-      setPrecisaAtualizar(true);
-      setVarianteErro("indisponivel");
-      setErro(mensagem);
-      avisarInfo(mensagem);
-    }
-  });
-  const bloqueado = executando || precisaAtualizar || sincronizando;
+  function remover() {
+    if (!paraRemover) return;
+    onRemover(paraRemover.dia);
+    setParaRemover(null);
+    setErro("");
+    avisarSucesso("Feriado removido do rascunho.", "Salve as configurações para aplicar.");
+  }
+
+  const bloqueado = sincronizando;
   const revisaoFeriados = feriadosDoAno.map((feriado) => feriado.dia).join("|");
 
   return (
@@ -137,9 +105,7 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
       descricao="Feriados e recessos que suspendem a chamada."
       icone={CalendarDays}
       aberto={aberto}
-      onAbertoChange={(valor) => {
-        if (!bloqueado) setAberto(valor);
-      }}
+      onAbertoChange={setAberto}
       dataSecao="config-calendario"
       resumo={
         <Selo>
@@ -168,14 +134,13 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
         revisao={revisaoFeriados}
         desabilitado={bloqueado}
         onExecutandoChange={setSincronizando}
-        onAtualizar={onAtualizar}
+        onAtualizar={onSincronizar}
       />
       <form
         className="flex flex-col gap-3"
-        aria-busy={executando}
         onSubmit={(evento) => {
           evento.preventDefault();
-          if (!bloqueado) void executar();
+          if (!bloqueado) adicionar();
         }}
       >
         <div className="flex flex-col gap-1.5">
@@ -208,40 +173,10 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
           disabled={bloqueado || !anoValido || !nome.trim()}
           className="self-start"
         >
-          {executando && !paraRemover ? (
-            <LoaderCircle
-              size={16}
-              aria-hidden="true"
-              className="animate-spin motion-reduce:animate-none"
-            />
-          ) : null}
           Adicionar feriado
         </Button>
       </form>
-      {erro && (
-        <AvisoCompacto
-          variante={varianteErro}
-          titulo={precisaAtualizar ? "Atualização pendente" : "Confira o calendário"}
-          descricao={erro}
-          tamanho="linha"
-        />
-      )}
-      {precisaAtualizar && (
-        <Button
-          type="button"
-          variant="outline"
-          className="self-start"
-          disabled={executando}
-          onClick={() => void executar()}
-        >
-          <RefreshCw
-            size={16}
-            aria-hidden="true"
-            className={executando ? "animate-spin motion-reduce:animate-none" : ""}
-          />
-          Recarregar calendário
-        </Button>
-      )}
+      {erro && <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
       {anoValido &&
         (feriadosDoAno.length ? (
           <ul
@@ -281,7 +216,7 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
       <AlertDialog
         open={paraRemover !== null}
         onOpenChange={(valor) => {
-          if (!valor && !executando) setParaRemover(null);
+          if (!valor) setParaRemover(null);
         }}
       >
         <AlertDialogContent>
@@ -292,31 +227,9 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
               voltará a seguir a grade semanal. As frequências salvas serão preservadas.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {erro && (
-            <AvisoCompacto
-              variante={varianteErro}
-              titulo="Confira o calendário"
-              descricao={erro}
-              tamanho="linha"
-            />
-          )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={executando}
-              onClick={(evento) => {
-                evento.preventDefault();
-                void executar();
-              }}
-            >
-              {executando && (
-                <LoaderCircle
-                  size={16}
-                  aria-hidden="true"
-                  className="animate-spin motion-reduce:animate-none"
-                />
-              )}
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={remover}>
               Remover
             </AlertDialogAction>
           </AlertDialogFooter>

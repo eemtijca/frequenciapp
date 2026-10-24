@@ -1,18 +1,14 @@
 "use client";
 
-// Tipos de aviso oferecidos pela escola e horários de envio, editáveis
-// pela Gestão com escolhas pessoais preservadas em cada conta.
-import { useEffect, useState } from "react";
-import { Bell, LoaderCircle } from "lucide-react";
-import { pedir, corpoAlteracao } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+// Tipos de aviso oferecidos pela escola e horários de envio no rascunho,
+// com as escolhas pessoais preservadas em cada conta.
+import { Bell } from "lucide-react";
+import { useState } from "react";
 import {
   NOTIFICACOES_PADRAO,
   type ConfiguracaoNotificacoes,
   type TipoDeAviso,
 } from "@/domain/notificacoes";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
@@ -36,43 +32,14 @@ const CAMPOS: { tipo: TipoDeAviso; rotulo: string; descricao?: string }[] = [
   },
 ];
 
-export default function SecaoNotificacoes() {
+export default function SecaoNotificacoes({
+  configuracao,
+  onMudar,
+}: {
+  configuracao: ConfiguracaoNotificacoes;
+  onMudar: (configuracao: ConfiguracaoNotificacoes) => void;
+}) {
   const [aberto, setAberto] = useState(false);
-  const [rascunho, setRascunho] = useState<ConfiguracaoNotificacoes | null>(null);
-  const [erro, setErro] = useState("");
-  const { executando: carregando, executar: carregar } = useAcaoUnica(async () => {
-    setErro("");
-    try {
-      const dados = await pedir<{ configuracao: ConfiguracaoNotificacoes }>(
-        "/api/notificacoes/configuracao",
-      );
-      setRascunho(dados.configuracao);
-    } catch (excecao) {
-      setErro(
-        excecao instanceof Error ? excecao.message : "Não foi possível consultar as notificações.",
-      );
-    }
-  });
-  useEffect(() => {
-    if (aberto && !rascunho) void carregar();
-  }, [aberto, rascunho, carregar]);
-  const { executando: salvando, executar: salvar } = useAcaoUnica(async () => {
-    if (!rascunho) return;
-    setErro("");
-    try {
-      const dados = await pedir<{ configuracao: ConfiguracaoNotificacoes }>(
-        "/api/notificacoes/configuracao",
-        corpoAlteracao("PATCH", rascunho),
-      );
-      setRascunho(dados.configuracao);
-      avisarSucesso("Configuração de notificações salva.");
-    } catch (excecao) {
-      setErro(
-        excecao instanceof Error ? excecao.message : "Não foi possível salvar as notificações.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível salvar as notificações." });
-    }
-  });
   return (
     <SecaoRecolhivel
       titulo="Notificações"
@@ -82,79 +49,49 @@ export default function SecaoNotificacoes() {
       onAbertoChange={setAberto}
       dataSecao="notificacoes"
     >
-      {!rascunho ? (
-        <div className="flex flex-col gap-3">
-          {carregando ? (
-            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" />
-              Consultando notificações...
-            </p>
-          ) : (
-            <Button variant="outline" onClick={() => void carregar()}>
-              Tentar novamente
-            </Button>
-          )}
-        </div>
-      ) : (
-        <form
-          className="flex flex-col gap-5"
-          onSubmit={(evento) => {
-            evento.preventDefault();
-            void salvar();
-          }}
-        >
-          {CAMPOS.map(({ tipo, rotulo, descricao }) => (
-            <div key={tipo} className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <Label htmlFor={`aviso-${tipo}`}>{rotulo}</Label>
-                {descricao && <p className="text-muted-foreground text-sm">{descricao}</p>}
-              </div>
-              <Switch
-                id={`aviso-${tipo}`}
-                checked={rascunho[tipo]}
-                disabled={salvando}
-                onCheckedChange={(valor) => setRascunho({ ...rascunho, [tipo]: valor })}
-              />
+      <div className="flex flex-col gap-5">
+        {CAMPOS.map(({ tipo, rotulo, descricao }) => (
+          <div key={tipo} className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <Label htmlFor={`aviso-${tipo}`}>{rotulo}</Label>
+              {descricao && <p className="text-muted-foreground text-sm">{descricao}</p>}
             </div>
-          ))}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="horario-resumo-notificacoes">Horário do resumo diário</Label>
-              <SeletorHorario
-                id="horario-resumo-notificacoes"
-                valor={rascunho.horarioResumo ?? NOTIFICACOES_PADRAO.horarioResumo}
-                rotuloAcessivel="Horário do resumo diário"
-                disabled={salvando || !rascunho.resumoDiario}
-                onValor={(valor) => setRascunho({ ...rascunho, horarioResumo: valor })}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="horario-pendencias-notificacoes">
-                Horário do aviso de pendências
-              </Label>
-              <SeletorHorario
-                id="horario-pendencias-notificacoes"
-                valor={rascunho.horarioPendencias}
-                rotuloAcessivel="Horário do aviso de pendências"
-                disabled={salvando || !rascunho.chamadasPendentes}
-                onValor={(valor) => setRascunho({ ...rascunho, horarioPendencias: valor })}
-              />
-            </div>
+            <Switch
+              id={`aviso-${tipo}`}
+              checked={configuracao[tipo]}
+              onCheckedChange={(valor) => onMudar({ ...configuracao, [tipo]: valor })}
+            />
           </div>
-          <p className="text-muted-foreground text-sm">
-            Horários da escola. Ativação na conta, por dispositivo.
-          </p>
-          <Button type="submit" disabled={salvando} className="self-start">
-            {salvando ? <LoaderCircle size={16} className="animate-spin" /> : null}Salvar
-            notificações
-          </Button>
-        </form>
-      )}
-      {erro ? (
-        <p role="alert" className="text-falta-texto mt-3 text-sm">
-          {erro}
+        ))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="horario-resumo-notificacoes">Horário do resumo diário</Label>
+            <SeletorHorario
+              id="horario-resumo-notificacoes"
+              valor={configuracao.horarioResumo ?? NOTIFICACOES_PADRAO.horarioResumo}
+              rotuloAcessivel="Horário do resumo diário"
+              disabled={!configuracao.resumoDiario}
+              onValor={(valor) => onMudar({ ...configuracao, horarioResumo: valor })}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="horario-pendencias-notificacoes">Horário do aviso de pendências</Label>
+            <SeletorHorario
+              id="horario-pendencias-notificacoes"
+              valor={configuracao.horarioPendencias}
+              rotuloAcessivel="Horário do aviso de pendências"
+              disabled={!configuracao.chamadasPendentes}
+              onValor={(valor) => onMudar({ ...configuracao, horarioPendencias: valor })}
+            />
+          </div>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          Horários da escola. Ativação na conta, por dispositivo.
         </p>
-      ) : null}
+        <p className="text-muted-foreground text-xs">
+          As alterações entram no rascunho e valem ao salvar as configurações.
+        </p>
+      </div>
     </SecaoRecolhivel>
   );
 }

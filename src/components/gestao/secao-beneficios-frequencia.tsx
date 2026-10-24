@@ -1,18 +1,16 @@
 "use client";
 
-// Benefícios e frequência mínima: a administração cria, edita, desativa e remove as regras que alimentam o alerta da Chamada.
-import { useEffect, useState } from "react";
-import { LoaderCircle, Pencil, Percent, Plus, Power, Trash2 } from "lucide-react";
+// Benefícios e frequência mínima no rascunho: a administração cria, edita,
+// desativa e remove as regras que alimentam o alerta da Chamada.
+import { useState } from "react";
+import { Pencil, Percent, Plus, Power, Trash2 } from "lucide-react";
 import {
   PERCENTUAL_MINIMO_MAIOR,
   PERCENTUAL_MINIMO_MENOR,
   AULAS_POR_DIA_MAXIMO,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { avisarBeneficiosMudaram } from "@/lib/eventos-beneficios";
-import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
+import { avisarSucesso } from "@/lib/avisos";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,32 +62,19 @@ function percentualValido(texto: string): number | null {
   return valor >= PERCENTUAL_MINIMO_MENOR && valor <= PERCENTUAL_MINIMO_MAIOR ? valor : null;
 }
 
-export default function SecaoBeneficiosFrequencia() {
+export default function SecaoBeneficiosFrequencia({
+  beneficios,
+  onMudar,
+}: {
+  beneficios: RegraFrequenciaBeneficio[];
+  onMudar: (lista: RegraFrequenciaBeneficio[]) => void;
+}) {
   const [aberto, setAberto] = useState(false);
-  const [beneficios, setBeneficios] = useState<RegraFrequenciaBeneficio[] | null>(null);
-  const [erroLeitura, setErroLeitura] = useState("");
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [erroFormulario, setErroFormulario] = useState("");
   const [paraExcluir, setParaExcluir] = useState<RegraFrequenciaBeneficio | null>(null);
-  const { chaveAtiva, executar: executarLinha } = useAcoesPorChave();
 
-  const { executar: carregar, executando: carregando } = useAcaoUnica(async () => {
-    setErroLeitura("");
-    try {
-      setBeneficios(
-        (await pedir<{ beneficios: RegraFrequenciaBeneficio[] }>("/api/beneficios-frequencia"))
-          .beneficios,
-      );
-    } catch (excecao) {
-      setErroLeitura("Não foi possível carregar os benefícios. Tente novamente.");
-      avisarErro(excecao, { contexto: "Não foi possível carregar os benefícios." });
-    }
-  });
-  useEffect(() => {
-    if (aberto && beneficios === null) void carregar();
-  }, [aberto, beneficios, carregar]);
-
-  const { executar: salvar, executando: salvando } = useAcaoUnica(async () => {
+  function salvar() {
     if (!formulario) return;
     const percentual = percentualValido(formulario.percentual);
     const textoAulas = formulario.aulasPorDia.trim();
@@ -112,61 +97,40 @@ export default function SecaoBeneficiosFrequencia() {
       return;
     }
     setErroFormulario("");
-    const corpo = {
+    const dados = {
       nome: formulario.nome.trim(),
       percentualMinimoFrequencia: percentual,
       aulasPorDia,
       faltasJustificadasContam: formulario.justificadasContam,
       ativo: formulario.ativo,
     };
-    try {
-      if (formulario.id) {
-        await pedir(`/api/beneficios-frequencia/${formulario.id}`, corpoAlteracao("PATCH", corpo));
-      } else {
-        await pedir("/api/beneficios-frequencia", corpoJson(corpo));
-      }
-      avisarSucesso(formulario.id ? "Benefício atualizado." : "Benefício criado.");
-      avisarBeneficiosMudaram();
-      setFormulario(null);
-      await carregar();
-    } catch (excecao) {
-      setErroFormulario(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar o benefício.",
-      );
-      avisarErro(excecao, { contexto: "Não foi possível salvar o benefício." });
+    if (formulario.id) {
+      onMudar(beneficios.map((item) => (item.id === formulario.id ? { ...item, ...dados } : item)));
+      avisarSucesso("Benefício atualizado no rascunho.", "Salve as configurações para aplicar.");
+    } else {
+      onMudar([...beneficios, { id: `novo-${crypto.randomUUID()}`, ...dados }]);
+      avisarSucesso("Benefício adicionado ao rascunho.", "Salve as configurações para aplicar.");
     }
-  });
+    setFormulario(null);
+  }
 
   function alternarSituacao(beneficio: RegraFrequenciaBeneficio) {
-    void executarLinha(`situacao-${beneficio.id}`, async () => {
-      try {
-        await pedir(
-          `/api/beneficios-frequencia/${beneficio.id}`,
-          corpoAlteracao("PATCH", { ativo: !beneficio.ativo }),
-        );
-        avisarSucesso(beneficio.ativo ? "Benefício desativado." : "Benefício ativado.");
-        avisarBeneficiosMudaram();
-        await carregar();
-      } catch (excecao) {
-        avisarErro(excecao, { contexto: "Não foi possível alterar a situação do benefício." });
-      }
-    });
+    onMudar(
+      beneficios.map((item) =>
+        item.id === beneficio.id ? { ...item, ativo: !beneficio.ativo } : item,
+      ),
+    );
+    avisarSucesso(
+      beneficio.ativo ? "Benefício desativado no rascunho." : "Benefício ativado no rascunho.",
+      "Salve as configurações para aplicar.",
+    );
   }
 
   function confirmarExclusao() {
-    const alvo = paraExcluir;
-    if (!alvo) return;
+    if (!paraExcluir) return;
+    onMudar(beneficios.filter((item) => item.id !== paraExcluir.id));
     setParaExcluir(null);
-    void executarLinha(`excluir-${alvo.id}`, async () => {
-      try {
-        await pedir(`/api/beneficios-frequencia/${alvo.id}`, corpoAlteracao("DELETE"));
-        avisarSucesso("Benefício excluído.");
-        avisarBeneficiosMudaram();
-        await carregar();
-      } catch (excecao) {
-        avisarErro(excecao, { contexto: "Não foi possível excluir o benefício." });
-      }
-    });
+    avisarSucesso("Benefício removido do rascunho.", "Salve as configurações para aplicar.");
   }
 
   function abrirFormulario(beneficio: RegraFrequenciaBeneficio | null) {
@@ -185,7 +149,7 @@ export default function SecaoBeneficiosFrequencia() {
     );
   }
 
-  const ativos = beneficios?.filter((beneficio) => beneficio.ativo).length ?? 0;
+  const ativos = beneficios.filter((beneficio) => beneficio.ativo).length;
 
   return (
     <SecaoRecolhivel
@@ -196,11 +160,9 @@ export default function SecaoBeneficiosFrequencia() {
       onAbertoChange={setAberto}
       dataSecao="config-beneficios"
       resumo={
-        beneficios ? (
-          <Selo>
-            {ativos} {ativos === 1 ? "ativo" : "ativos"}
-          </Selo>
-        ) : undefined
+        <Selo>
+          {ativos} {ativos === 1 ? "ativo" : "ativos"}
+        </Selo>
       }
     >
       <p className="text-muted-foreground text-sm">
@@ -209,26 +171,12 @@ export default function SecaoBeneficiosFrequencia() {
         benefício.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => abrirFormulario(null)} disabled={salvando}>
+        <Button type="button" onClick={() => abrirFormulario(null)}>
           <Plus size={16} aria-hidden="true" />
           Novo benefício
         </Button>
       </div>
-      {erroLeitura && (
-        <AvisoCompacto variante="indisponivel" descricao={erroLeitura} tamanho="linha" />
-      )}
-      {beneficios === null ? (
-        carregando && (
-          <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-            <LoaderCircle
-              size={16}
-              className="animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            Carregando benefícios...
-          </p>
-        )
-      ) : beneficios.length === 0 ? (
+      {beneficios.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           Nenhum benefício cadastrado. Sem benefício ativo, a Chamada não mostra alerta de faltas.
         </p>
@@ -241,6 +189,7 @@ export default function SecaoBeneficiosFrequencia() {
                 <Selo variante={beneficio.ativo ? "sucesso" : "neutro"}>
                   {beneficio.ativo ? "Ativo" : "Inativo"}
                 </Selo>
+                {beneficio.id.startsWith("novo-") && <Selo>Novo</Selo>}
               </div>
               <p className="text-muted-foreground text-xs">
                 Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência. Faltas justificadas{" "}
@@ -257,7 +206,6 @@ export default function SecaoBeneficiosFrequencia() {
                   variant="outline"
                   size="sm"
                   aria-label={`Editar ${beneficio.nome}`}
-                  disabled={chaveAtiva !== null}
                   onClick={() => abrirFormulario(beneficio)}
                 >
                   <Pencil size={14} aria-hidden="true" />
@@ -268,7 +216,6 @@ export default function SecaoBeneficiosFrequencia() {
                   variant="outline"
                   size="sm"
                   aria-label={`${beneficio.ativo ? "Desativar" : "Ativar"} ${beneficio.nome}`}
-                  disabled={chaveAtiva !== null}
                   onClick={() => alternarSituacao(beneficio)}
                 >
                   <Power size={14} aria-hidden="true" />
@@ -279,7 +226,6 @@ export default function SecaoBeneficiosFrequencia() {
                   variant="ghost"
                   size="sm"
                   aria-label={`Excluir ${beneficio.nome}`}
-                  disabled={chaveAtiva !== null}
                   onClick={() => setParaExcluir(beneficio)}
                 >
                   <Trash2 size={14} aria-hidden="true" />
@@ -294,7 +240,7 @@ export default function SecaoBeneficiosFrequencia() {
       <Dialog
         open={formulario !== null}
         onOpenChange={(valor) => {
-          if (!valor && !salvando) setFormulario(null);
+          if (!valor) setFormulario(null);
         }}
       >
         <DialogContent>
@@ -307,11 +253,10 @@ export default function SecaoBeneficiosFrequencia() {
           {formulario && (
             <form
               className="flex flex-col gap-4"
-              aria-busy={salvando}
               noValidate
               onSubmit={(evento) => {
                 evento.preventDefault();
-                void salvar();
+                salvar();
               }}
             >
               <div className="flex flex-col gap-1.5">
@@ -320,7 +265,6 @@ export default function SecaoBeneficiosFrequencia() {
                   id="beneficio-nome"
                   value={formulario.nome}
                   maxLength={60}
-                  disabled={salvando}
                   onChange={(evento) => setFormulario({ ...formulario, nome: evento.target.value })}
                 />
               </div>
@@ -334,7 +278,6 @@ export default function SecaoBeneficiosFrequencia() {
                   max={PERCENTUAL_MINIMO_MAIOR}
                   step={1}
                   value={formulario.percentual}
-                  disabled={salvando}
                   onChange={(evento) =>
                     setFormulario({ ...formulario, percentual: evento.target.value })
                   }
@@ -356,7 +299,6 @@ export default function SecaoBeneficiosFrequencia() {
                     step={1}
                     value={formulario.aulasPorDia}
                     placeholder="Usar grade da turma"
-                    disabled={salvando}
                     aria-describedby="beneficio-aulas-dia-ajuda"
                     onChange={(evento) =>
                       setFormulario({ ...formulario, aulasPorDia: evento.target.value })
@@ -378,7 +320,6 @@ export default function SecaoBeneficiosFrequencia() {
                 <Switch
                   id="beneficio-justificadas"
                   checked={formulario.justificadasContam}
-                  disabled={salvando}
                   onCheckedChange={(valor) =>
                     setFormulario({ ...formulario, justificadasContam: valor })
                   }
@@ -394,7 +335,6 @@ export default function SecaoBeneficiosFrequencia() {
                 <Switch
                   id="beneficio-ativo"
                   checked={formulario.ativo}
-                  disabled={salvando}
                   onCheckedChange={(valor) => setFormulario({ ...formulario, ativo: valor })}
                 />
               </div>
@@ -406,24 +346,10 @@ export default function SecaoBeneficiosFrequencia() {
                 />
               )}
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={salvando}
-                  onClick={() => setFormulario(null)}
-                >
+                <Button type="button" variant="outline" onClick={() => setFormulario(null)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={salvando}>
-                  {salvando && (
-                    <LoaderCircle
-                      size={16}
-                      aria-hidden="true"
-                      className="animate-spin motion-reduce:animate-none"
-                    />
-                  )}
-                  Salvar
-                </Button>
+                <Button type="submit">Aplicar ao rascunho</Button>
               </DialogFooter>
             </form>
           )}

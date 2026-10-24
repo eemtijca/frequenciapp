@@ -2,7 +2,12 @@
 // persistência e desativação reversível, somente com dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "./helpers/configuracoes";
+import {
+  definirOrigem,
+  lerOrigem,
+  salvarConfiguracoes,
+  type ConfiguracaoOrigem,
+} from "./helpers/configuracoes";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
 
 let inicial: ConfiguracaoOrigem;
@@ -83,18 +88,6 @@ async function alterarControle(controle: Locator, marcado: boolean): Promise<voi
   await expect(controle).toBeEnabled();
   if (marcado) await expect(controle).toBeChecked();
   else await expect(controle).not.toBeChecked();
-}
-
-async function salvarConfiguracoes(page: Page): Promise<void> {
-  const resposta = page.waitForResponse(
-    (item) =>
-      new URL(item.url()).pathname === "/api/configuracoes" && item.request().method() === "PATCH",
-  );
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog", { name: "Salvar configurações?" });
-  await dialogo.getByRole("button", { name: "Salvar configurações", exact: true }).click();
-  expect((await resposta).status()).toBe(200);
-  await expect(dialogo).toBeHidden();
 }
 
 async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {

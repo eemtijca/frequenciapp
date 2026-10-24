@@ -28,8 +28,8 @@ for (const largura of [390, 800]) {
     const confirmar = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
     const resposta = page.waitForResponse(
       (item) =>
-        new URL(item.url()).pathname === "/api/configuracoes" &&
-        item.request().method() === "PATCH",
+        new URL(item.url()).pathname === "/api/configuracoes/lote" &&
+        item.request().method() === "POST",
     );
     await confirmar.getByRole("button", { name: "Salvar configurações", exact: true }).click();
     expect((await resposta).status()).toBe(200);

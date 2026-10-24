@@ -1,7 +1,7 @@
 "use client";
 
-// Configurações da escola agrupadas por assunto, preservando os formulários
-// ao trocar de categoria. Restrita à administração, com auditoria no servidor.
+// Configurações da escola em um único rascunho: recursos, catálogos, avisos,
+// acesso, almoço, calendário e chaves do BI são revisados e gravados em lote.
 import { useEffect, useRef, useState } from "react";
 import {
   Archive,
@@ -25,18 +25,26 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { estadoDeErro } from "@/lib/estado-http";
-import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { avisarBeneficiosMudaram } from "@/lib/eventos-beneficios";
+import { avisarOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import type {
-  Configuracoes,
-  JustificativaConfigurada,
-  LiberadorConfigurado,
-  Serie,
-  Turma,
+import {
+  ordenarPorRotulo,
+  type Configuracoes,
+  type JustificativaConfigurada,
+  type LiberadorConfigurado,
+  type Serie,
+  type Turma,
 } from "@/domain/frequencia";
-import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import type {
+  ChaveBiDesejada,
+  ConfiguracoesCompletas,
+  ResultadoLote,
+} from "@/domain/configuracoes";
+import { DIAS_ORDEM_ALMOCO } from "@/domain/ordem-almoco";
+import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -55,6 +63,10 @@ import SecaoBeneficiosFrequencia from "@/components/gestao/secao-beneficios-freq
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import SecaoOrdemAlmoco from "@/components/gestao/secao-ordem-almoco";
 import {
+  ProvedorRascunhoConfiguracoes,
+  useRascunhoConfiguracoes,
+} from "@/components/gestao/rascunho-configuracoes";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -65,6 +77,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Props {
   planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
@@ -74,6 +94,8 @@ interface Props {
   series: Serie[];
   turmas: Turma[];
   diaCorrente: string;
+  /** Incrementado pelo botão global de atualização. */
+  atualizacao?: number;
   onMudanca: (configuracoes: Configuracoes) => void;
   onJustificativasMudaram: () => Promise<void>;
   onLiberadoresMudaram: () => Promise<void>;
@@ -100,6 +122,8 @@ const CATEGORIAS = [
 ] as const;
 type Categoria = (typeof CATEGORIAS)[number]["valor"];
 
+const CODIGO_JUSTIFICATIVA = /^[A-Za-z][A-Za-z0-9]*$/;
+
 function listasIguais(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   const ordenadaA = [...a].sort();
@@ -107,14 +131,34 @@ function listasIguais(a: string[], b: string[]): boolean {
   return ordenadaA.every((valor, indice) => valor === ordenadaB[indice]);
 }
 
-export default function AbaConfiguracoes({
+function varianteDoErro(status: number | undefined): VarianteEstado {
+  if (status === 0) return "offline";
+  if (status === 403) return "sem_permissao";
+  if (status === 404) return "nao_encontrado";
+  if (status === 409) return "conflito";
+  if (status === 413 || status === 429) return "limite";
+  if (status !== undefined && status >= 500) return "indisponivel";
+  return "dados_invalidos";
+}
+
+function contagem(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+export default function AbaConfiguracoes(props: Props) {
+  return (
+    <ProvedorRascunhoConfiguracoes>
+      <ConteudoConfiguracoes {...props} />
+    </ProvedorRascunhoConfiguracoes>
+  );
+}
+
+function ConteudoConfiguracoes({
   planilhaInicial,
-  configuracoes,
-  justificativas,
-  liberadores,
   series,
   turmas,
   diaCorrente,
+  atualizacao = 0,
   onMudanca,
   onJustificativasMudaram,
   onLiberadoresMudaram,
@@ -124,6 +168,32 @@ export default function AbaConfiguracoes({
   onAbrirParcial,
   onPendenciaConfiguracoes,
 }: Props) {
+  const {
+    base: baseCarregada,
+    rascunho: rascunhoCarregado,
+    carregando,
+    salvando,
+    erro,
+    erroStatus,
+    erroCodigo,
+    alterado,
+    secoesAlteradas,
+    precisaSenhaBi,
+    recarregar,
+    descartar,
+    salvar,
+    aplicarFeriadosExternos,
+    mutarConfiguracoes,
+    mutarNotificacoes,
+    mutarAcesso,
+    mutarOrdem,
+    mutarBeneficios,
+    mutarJustificativas,
+    mutarLiberadores,
+    mutarFeriados,
+    mutarChaves,
+  } = useRascunhoConfiguracoes();
+
   const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
   // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
   const [horariosAbertos, setHorariosAbertos] = useState(false);
@@ -132,24 +202,40 @@ export default function AbaConfiguracoes({
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
   const [abertoCopia, setAbertoCopia] = useState(false);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
-  const [rascunho, setRascunho] = useState<Configuracoes>(configuracoes);
-  const [base, setBase] = useState<Configuracoes>(configuracoes);
-  const [salvandoConfig, setSalvandoConfig] = useState(false);
   const [confirmarSalvar, setConfirmarSalvar] = useState(false);
   const [confirmarDescartar, setConfirmarDescartar] = useState(false);
-  const [erro, setErro] = useState("");
-  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
+  const [senhaBi, setSenhaBi] = useState("");
+  const [segredosBi, setSegredosBi] = useState<ResultadoLote["segredosBi"]>([]);
   const [downloadAberto, setDownloadAberto] = useState(false);
   const [importando, setImportando] = useState(false);
   const [erroCopia, setErroCopia] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
-  const alterado =
-    rascunho.frequenciaPorAula !== base.frequenciaPorAula ||
-    rascunho.saidaAntecipada !== base.saidaAntecipada ||
-    rascunho.origemNaChamada !== base.origemNaChamada ||
-    !listasIguais(rascunho.origemNaChamadaSerieIds, base.origemNaChamadaSerieIds) ||
-    !listasIguais(rascunho.origemNaChamadaTurmaIds, base.origemNaChamadaTurmaIds);
+
+  const [novaCodigo, setNovaCodigo] = useState("");
+  const [novaRotulo, setNovaRotulo] = useState("");
+  const [editando, setEditando] = useState<string | null>(null);
+  const [rotuloEdicao, setRotuloEdicao] = useState("");
+  const [erroJustificativa, setErroJustificativa] = useState("");
+  const [excluirAlvo, setExcluirAlvo] = useState<JustificativaConfigurada | null>(null);
+
+  const [novaCodigoLiberador, setNovaCodigoLiberador] = useState("");
+  const [novaRotuloLiberador, setNovaRotuloLiberador] = useState("");
+  const [editandoLiberador, setEditandoLiberador] = useState<string | null>(null);
+  const [rotuloEdicaoLiberador, setRotuloEdicaoLiberador] = useState("");
+  const [erroLiberador, setErroLiberador] = useState("");
+  const [excluirAlvoLiberador, setExcluirAlvoLiberador] = useState<LiberadorConfigurado | null>(
+    null,
+  );
+
+  // O botão global só recarrega quando já houve uma atualização; a carga inicial
+  // é feita pelo próprio provedor.
+  const atualizacaoInicial = useRef(atualizacao);
+  useEffect(() => {
+    if (atualizacao === atualizacaoInicial.current) return;
+    atualizacaoInicial.current = atualizacao;
+    void recarregar();
+  }, [atualizacao, recarregar]);
 
   useEffect(() => {
     onPendenciaConfiguracoes?.(alterado);
@@ -159,32 +245,31 @@ export default function AbaConfiguracoes({
     return () => onPendenciaConfiguracoes?.(false);
   }, [onPendenciaConfiguracoes]);
 
-  const [novaCodigo, setNovaCodigo] = useState("");
-  const [novaRotulo, setNovaRotulo] = useState("");
-  const [editando, setEditando] = useState<string | null>(null);
-  const [rotuloEdicao, setRotuloEdicao] = useState("");
-  const [erroJustificativa, setErroJustificativa] = useState("");
-  const [erroJustificativaVariante, setErroJustificativaVariante] =
-    useState<VarianteEstado>("dados_invalidos");
-  const [enviandoJustificativa, setEnviandoJustificativa] = useState(false);
-  const [excluirAlvo, setExcluirAlvo] = useState<JustificativaConfigurada | null>(null);
-  const { executar: executarPorChave } = useAcoesPorChave();
+  if (!rascunhoCarregado || !baseCarregada) {
+    return (
+      <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
+        {carregando ? (
+          <>
+            <LoaderCircle size={20} className="animate-spin" aria-hidden="true" />
+            <p className="text-muted-foreground text-sm">Carregando configurações...</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm">{erro || "Não foi possível carregar as configurações."}</p>
+            <Button type="button" variant="outline" onClick={() => void recarregar()}>
+              Tentar novamente
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
-  const [novaCodigoLiberador, setNovaCodigoLiberador] = useState("");
-  const [novaRotuloLiberador, setNovaRotuloLiberador] = useState("");
-  const [editandoLiberador, setEditandoLiberador] = useState<string | null>(null);
-  const [rotuloEdicaoLiberador, setRotuloEdicaoLiberador] = useState("");
-  const [erroLiberador, setErroLiberador] = useState("");
-  const [erroLiberadorVariante, setErroLiberadorVariante] =
-    useState<VarianteEstado>("dados_invalidos");
-  const [enviandoLiberador, setEnviandoLiberador] = useState(false);
-  const [excluirAlvoLiberador, setExcluirAlvoLiberador] = useState<LiberadorConfigurado | null>(
-    null,
-  );
+  const atual = rascunhoCarregado;
+  const anterior = baseCarregada;
 
   function alternar(chave: "frequenciaPorAula" | "saidaAntecipada", valor: boolean) {
-    setRascunho((atual) => ({ ...atual, [chave]: valor }));
-    setErro("");
+    mutarConfiguracoes({ [chave]: valor });
   }
 
   function salvarOrigem(
@@ -192,281 +277,156 @@ export default function AbaConfiguracoes({
       Pick<Configuracoes, "origemNaChamada" | "origemNaChamadaSerieIds" | "origemNaChamadaTurmaIds">
     >,
   ) {
-    setRascunho((atual) => ({ ...atual, ...entrada }));
-    setErro("");
-  }
-
-  async function salvarConfiguracoes() {
-    if (!alterado || salvandoConfig) return;
-    await executarPorChave("configuracoes-salvar", async () => {
-      setSalvandoConfig(true);
-      setErro("");
-      try {
-        const dados = await pedir<{ configuracoes: Configuracoes }>(
-          "/api/configuracoes",
-          corpoAlteracao("PATCH", {
-            frequenciaPorAula: rascunho.frequenciaPorAula,
-            saidaAntecipada: rascunho.saidaAntecipada,
-            origemNaChamada: rascunho.origemNaChamada,
-            origemNaChamadaSerieIds: rascunho.origemNaChamadaSerieIds,
-            origemNaChamadaTurmaIds: rascunho.origemNaChamadaTurmaIds,
-            ...(base.atualizadoEm ? { atualizadoEm: base.atualizadoEm } : {}),
-          }),
-        );
-        setBase(dados.configuracoes);
-        setRascunho(dados.configuracoes);
-        onMudanca(dados.configuracoes);
-        setConfirmarSalvar(false);
-        toast.success("Configurações salvas.");
-      } catch (excecao) {
-        setErro(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível salvar as configurações.",
-        );
-        setErroVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível salvar as configurações." });
-      } finally {
-        setSalvandoConfig(false);
-      }
-    });
-  }
-
-  function descartarConfiguracoes() {
-    setRascunho(base);
-    setErro("");
-    setConfirmarDescartar(false);
-  }
-
-  async function recarregarConfiguracoes() {
-    try {
-      const dados = await pedir<{ configuracoes: Configuracoes }>("/api/configuracoes");
-      setBase(dados.configuracoes);
-      setRascunho(dados.configuracoes);
-      onMudanca(dados.configuracoes);
-      setErro("");
-      toast.success("Configurações atualizadas.");
-    } catch (excecao) {
-      avisarErro(excecao, { contexto: "Não foi possível atualizar as configurações." });
-    }
+    mutarConfiguracoes(entrada);
   }
 
   function selecaoAlterada(ids: string[], id: string, marcado: boolean): string[] {
     return marcado ? [...ids, id] : ids.filter((atual) => atual !== id);
   }
 
-  async function criarJustificativa() {
-    await executarPorChave("justificativa-nova", async () => {
-      if (enviandoJustificativa) return;
-      setEnviandoJustificativa(true);
-      setErroJustificativa("");
-      try {
-        await pedir<{ justificativa: JustificativaConfigurada }>(
-          "/api/justificativas",
-          corpoJson({ codigo: novaCodigo, rotulo: novaRotulo }),
-        );
-        setNovaCodigo("");
-        setNovaRotulo("");
-        await onJustificativasMudaram();
-        avisarSucesso(
-          "Justificativa adicionada.",
-          "Ela já aparece no seletor da Chamada e das Saídas.",
-        );
-      } catch (excecao) {
-        setErroJustificativa(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível adicionar a justificativa.",
-        );
-        setErroJustificativaVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível adicionar a justificativa." });
-      } finally {
-        setEnviandoJustificativa(false);
-      }
-    });
+  function criarJustificativa() {
+    const codigo = novaCodigo.trim();
+    const rotulo = novaRotulo.trim();
+    if (!CODIGO_JUSTIFICATIVA.test(codigo) || codigo.length > 10) {
+      setErroJustificativa("Use até 10 letras e números, começando por uma letra.");
+      return;
+    }
+    if (rotulo.length < 2 || rotulo.length > 60) {
+      setErroJustificativa("O rótulo deve ter de 2 a 60 caracteres.");
+      return;
+    }
+    if (atual.justificativas.some((item) => item.codigo === codigo)) {
+      setErroJustificativa("Já existe uma justificativa com este código.");
+      return;
+    }
+    setErroJustificativa("");
+    mutarJustificativas(
+      ordenarPorRotulo([...atual.justificativas, { codigo, rotulo, ativo: true }]),
+    );
+    setNovaCodigo("");
+    setNovaRotulo("");
+    avisarSucesso("Justificativa adicionada ao rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function salvarRotulo(codigo: string) {
-    await executarPorChave(`justificativa-rotulo-${codigo}`, async () => {
-      if (enviandoJustificativa) return;
-      setEnviandoJustificativa(true);
-      setErroJustificativa("");
-      try {
-        await pedir<{ justificativa: JustificativaConfigurada }>(
-          `/api/justificativas/${encodeURIComponent(codigo)}`,
-          corpoAlteracao("PATCH", { rotulo: rotuloEdicao }),
-        );
-        setEditando(null);
-        setRotuloEdicao("");
-        await onJustificativasMudaram();
-        avisarSucesso("Justificativa atualizada.", "O seletor da Chamada já mostra o rótulo novo.");
-      } catch (excecao) {
-        setErroJustificativa(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível atualizar a justificativa.",
-        );
-        setErroJustificativaVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível atualizar a justificativa." });
-      } finally {
-        setEnviandoJustificativa(false);
-      }
-    });
+  function salvarRotulo(codigo: string) {
+    const rotulo = rotuloEdicao.trim();
+    if (rotulo.length < 2 || rotulo.length > 60) {
+      setErroJustificativa("O rótulo deve ter de 2 a 60 caracteres.");
+      return;
+    }
+    setErroJustificativa("");
+    mutarJustificativas(
+      ordenarPorRotulo(
+        atual.justificativas.map((item) => (item.codigo === codigo ? { ...item, rotulo } : item)),
+      ),
+    );
+    setEditando(null);
+    setRotuloEdicao("");
+    avisarSucesso("Justificativa atualizada no rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function alternarAtivo(item: JustificativaConfigurada) {
-    await executarPorChave(`justificativa-${item.codigo}`, async () => {
-      setErroJustificativa("");
-      try {
-        await pedir<{ justificativa: JustificativaConfigurada }>(
-          `/api/justificativas/${encodeURIComponent(item.codigo)}`,
-          corpoAlteracao("PATCH", { ativo: !item.ativo }),
-        );
-        await onJustificativasMudaram();
-        avisarSucesso(
-          item.ativo ? "Justificativa desativada." : "Justificativa reativada.",
-          item.ativo
-            ? "O histórico que usa o código continua intacto."
-            : "Ela volta a aparecer no seletor da Chamada.",
-        );
-      } catch (excecao) {
-        setErroJustificativa(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.",
-        );
-        setErroJustificativaVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
-      }
-    });
+  function alternarAtivo(item: JustificativaConfigurada) {
+    mutarJustificativas(
+      atual.justificativas.map((atual) =>
+        atual.codigo === item.codigo ? { ...atual, ativo: !atual.ativo } : atual,
+      ),
+    );
+    avisarSucesso(
+      item.ativo ? "Justificativa desativada no rascunho." : "Justificativa reativada no rascunho.",
+      item.ativo
+        ? "O histórico que usa o código continua intacto."
+        : "Ela volta ao seletor depois de salvar.",
+    );
   }
 
-  async function removerJustificativa(item: JustificativaConfigurada) {
-    await executarPorChave(`justificativa-excluir-${item.codigo}`, async () => {
-      setErroJustificativa("");
-      try {
-        await pedir<{ ok: boolean }>(`/api/justificativas/${encodeURIComponent(item.codigo)}`, {
-          method: "DELETE",
-        });
-        await onJustificativasMudaram();
-        toast.success("Justificativa excluída.");
-      } catch (excecao) {
-        setErroJustificativa(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível excluir a justificativa.",
-        );
-        setErroJustificativaVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível excluir a justificativa." });
-      } finally {
-        setExcluirAlvo(null);
-      }
-    });
+  function removerJustificativa(item: JustificativaConfigurada) {
+    mutarJustificativas(atual.justificativas.filter((atual) => atual.codigo !== item.codigo));
+    setExcluirAlvo(null);
+    avisarSucesso("Justificativa removida do rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function criarLiberador() {
-    await executarPorChave("liberador-novo", async () => {
-      if (enviandoLiberador) return;
-      setEnviandoLiberador(true);
-      setErroLiberador("");
-      try {
-        await pedir<{ liberador: LiberadorConfigurado }>(
-          "/api/liberadores",
-          corpoJson({ codigo: novaCodigoLiberador, rotulo: novaRotuloLiberador }),
-        );
-        setNovaCodigoLiberador("");
-        setNovaRotuloLiberador("");
-        await onLiberadoresMudaram();
-        avisarSucesso(
-          "Responsável adicionado.",
-          "Ele já aparece no seletor de quem liberou, nas Saídas.",
-        );
-      } catch (excecao) {
-        setErroLiberador(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível adicionar o responsável.",
-        );
-        setErroLiberadorVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível adicionar o responsável." });
-      } finally {
-        setEnviandoLiberador(false);
-      }
-    });
+  function criarLiberador() {
+    const codigo = novaCodigoLiberador.trim();
+    const rotulo = novaRotuloLiberador.trim();
+    if (!CODIGO_JUSTIFICATIVA.test(codigo) || codigo.length > 20) {
+      setErroLiberador("Use até 20 letras e números, começando por uma letra.");
+      return;
+    }
+    if (rotulo.length < 2 || rotulo.length > 60) {
+      setErroLiberador("O rótulo deve ter de 2 a 60 caracteres.");
+      return;
+    }
+    if (atual.liberadores.some((item) => item.codigo === codigo)) {
+      setErroLiberador("Já existe um responsável com este código.");
+      return;
+    }
+    setErroLiberador("");
+    mutarLiberadores(ordenarPorRotulo([...atual.liberadores, { codigo, rotulo, ativo: true }]));
+    setNovaCodigoLiberador("");
+    setNovaRotuloLiberador("");
+    avisarSucesso("Responsável adicionado ao rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function salvarRotuloLiberador(codigo: string) {
-    await executarPorChave(`liberador-rotulo-${codigo}`, async () => {
-      if (enviandoLiberador) return;
-      setEnviandoLiberador(true);
-      setErroLiberador("");
-      try {
-        await pedir<{ liberador: LiberadorConfigurado }>(
-          `/api/liberadores/${encodeURIComponent(codigo)}`,
-          corpoAlteracao("PATCH", { rotulo: rotuloEdicaoLiberador }),
-        );
-        setEditandoLiberador(null);
-        setRotuloEdicaoLiberador("");
-        await onLiberadoresMudaram();
-        avisarSucesso("Responsável atualizado.", "O seletor das Saídas já mostra o rótulo novo.");
-      } catch (excecao) {
-        setErroLiberador(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível atualizar o responsável.",
-        );
-        setErroLiberadorVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível atualizar o responsável." });
-      } finally {
-        setEnviandoLiberador(false);
-      }
-    });
+  function salvarRotuloLiberador(codigo: string) {
+    const rotulo = rotuloEdicaoLiberador.trim();
+    if (rotulo.length < 2 || rotulo.length > 60) {
+      setErroLiberador("O rótulo deve ter de 2 a 60 caracteres.");
+      return;
+    }
+    setErroLiberador("");
+    mutarLiberadores(
+      ordenarPorRotulo(
+        atual.liberadores.map((item) => (item.codigo === codigo ? { ...item, rotulo } : item)),
+      ),
+    );
+    setEditandoLiberador(null);
+    setRotuloEdicaoLiberador("");
+    avisarSucesso("Responsável atualizado no rascunho.", "Salve as configurações para aplicar.");
   }
 
-  async function alternarAtivoLiberador(item: LiberadorConfigurado) {
-    await executarPorChave(`liberador-${item.codigo}`, async () => {
-      setErroLiberador("");
-      try {
-        await pedir<{ liberador: LiberadorConfigurado }>(
-          `/api/liberadores/${encodeURIComponent(item.codigo)}`,
-          corpoAlteracao("PATCH", { ativo: !item.ativo }),
-        );
-        await onLiberadoresMudaram();
-        avisarSucesso(
-          item.ativo ? "Responsável desativado." : "Responsável reativado.",
-          item.ativo
-            ? "As saídas antigas continuam mostrando o nome dele."
-            : "Ele volta a aparecer no seletor das Saídas.",
-        );
-      } catch (excecao) {
-        setErroLiberador(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível alterar a situação do responsável.",
-        );
-        setErroLiberadorVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível alterar a situação do responsável." });
-      }
-    });
+  function alternarAtivoLiberador(item: LiberadorConfigurado) {
+    mutarLiberadores(
+      atual.liberadores.map((atual) =>
+        atual.codigo === item.codigo ? { ...atual, ativo: !atual.ativo } : atual,
+      ),
+    );
+    avisarSucesso(
+      item.ativo ? "Responsável desativado no rascunho." : "Responsável reativado no rascunho.",
+      item.ativo
+        ? "As saídas antigas continuam mostrando o nome dele."
+        : "Ele volta ao seletor depois de salvar.",
+    );
   }
 
-  async function removerLiberador(item: LiberadorConfigurado) {
-    await executarPorChave(`liberador-excluir-${item.codigo}`, async () => {
-      setErroLiberador("");
+  function removerLiberador(item: LiberadorConfigurado) {
+    mutarLiberadores(atual.liberadores.filter((atual) => atual.codigo !== item.codigo));
+    setExcluirAlvoLiberador(null);
+    avisarSucesso("Responsável removido do rascunho.", "Salve as configurações para aplicar.");
+  }
+
+  async function concluirSalvamento() {
+    if (precisaSenhaBi && senhaBi.trim() === "") {
+      toast.error("Informe a senha do administrador para alterar as chaves do BI.");
+      return;
+    }
+    try {
+      const resultadoLote = await salvar(precisaSenhaBi ? senhaBi : undefined);
+      setConfirmarSalvar(false);
+      setSenhaBi("");
+      avisarSucesso("Configurações salvas.", "As alterações valem para toda a escola.");
+      onMudanca(resultadoLote.completo.configuracoes);
+      avisarBeneficiosMudaram();
+      avisarOrdemAlmocoMudou();
+      if (resultadoLote.segredosBi.length > 0) setSegredosBi(resultadoLote.segredosBi);
       try {
-        await pedir<{ ok: boolean }>(`/api/liberadores/${encodeURIComponent(item.codigo)}`, {
-          method: "DELETE",
-        });
-        await onLiberadoresMudaram();
-        toast.success("Responsável excluído.");
-      } catch (excecao) {
-        setErroLiberador(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o responsável.",
-        );
-        setErroLiberadorVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível excluir o responsável." });
-      } finally {
-        setExcluirAlvoLiberador(null);
+        await Promise.all([onJustificativasMudaram(), onLiberadoresMudaram()]);
+        await onHorariosMudaram();
+      } catch {
+        // A gravação já foi concluída; a próxima atualização relê os catálogos.
       }
-    });
+    } catch {
+      // O provedor mantém a mensagem e o rascunho para revisão.
+    }
   }
 
   async function prepararCopia(senha: string) {
@@ -481,41 +441,154 @@ export default function AbaConfiguracoes({
 
   async function importar(arquivo: File) {
     const aviso = "backup-importar";
-    await executarPorChave(aviso, async () => {
-      setImportando(true);
-      setErroCopia("");
-      setResultado(null);
-      toast.loading("Importando a cópia de segurança...", { id: aviso });
-      try {
-        if (arquivo.size > LIMITE_ARQUIVO) {
-          throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
-        }
-        let corpo: unknown;
-        try {
-          corpo = JSON.parse(await arquivo.text());
-        } catch {
-          throw new Error("Não foi possível ler a cópia. Selecione o arquivo JSON correto.");
-        }
-        const dados = await pedir<ResultadoImportacao>("/api/backup", corpoJson(corpo));
-        setResultado(dados);
-        avisarSucesso(
-          "Importação concluída.",
-          "Confira o resumo na tela antes de continuar.",
-          aviso,
-        );
-      } catch (excecao) {
-        const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
-        setErroCopia(mensagem);
-        toast.error(mensagem, {
-          id: aviso,
-          description: "Confira o arquivo e tente de novo.",
-          duration: 8000,
-        });
-      } finally {
-        setImportando(false);
-        if (arquivoRef.current) arquivoRef.current.value = "";
+    setImportando(true);
+    setErroCopia("");
+    setResultado(null);
+    toast.loading("Importando a cópia de segurança...", { id: aviso });
+    try {
+      if (arquivo.size > LIMITE_ARQUIVO) {
+        throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
       }
-    });
+      let corpo: unknown;
+      try {
+        corpo = JSON.parse(await arquivo.text());
+      } catch {
+        throw new Error("Não foi possível ler a cópia. Selecione o arquivo JSON correto.");
+      }
+      const dados = await pedir<ResultadoImportacao>("/api/backup", corpoJson(corpo));
+      setResultado(dados);
+      avisarSucesso("Importação concluída.", "Confira o resumo na tela antes de continuar.", aviso);
+    } catch (excecao) {
+      const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
+      setErroCopia(mensagem);
+      toast.error(mensagem, {
+        id: aviso,
+        description: "Confira o arquivo e tente de novo.",
+        duration: 8000,
+      });
+    } finally {
+      setImportando(false);
+      if (arquivoRef.current) arquivoRef.current.value = "";
+    }
+  }
+
+  function resumoDaSecao(chave: string): string {
+    const configuracoesBase = anterior.configuracoes;
+    const configuracoesAtuais = atual.configuracoes;
+    if (chave === "configuracao") {
+      const mudancas: string[] = [];
+      if (configuracoesBase.frequenciaPorAula !== configuracoesAtuais.frequenciaPorAula) {
+        mudancas.push(
+          configuracoesAtuais.frequenciaPorAula ? "chamada por aula" : "chamada diária",
+        );
+      }
+      if (configuracoesBase.saidaAntecipada !== configuracoesAtuais.saidaAntecipada) {
+        mudancas.push(configuracoesAtuais.saidaAntecipada ? "saídas ligadas" : "saídas desligadas");
+      }
+      if (configuracoesBase.origemNaChamada !== configuracoesAtuais.origemNaChamada) {
+        mudancas.push(configuracoesAtuais.origemNaChamada ? "origem ligada" : "origem desligada");
+      }
+      if (
+        !listasIguais(
+          configuracoesBase.origemNaChamadaSerieIds,
+          configuracoesAtuais.origemNaChamadaSerieIds,
+        )
+      ) {
+        mudancas.push(
+          contagem(configuracoesAtuais.origemNaChamadaSerieIds.length, "série", "séries"),
+        );
+      }
+      if (
+        !listasIguais(
+          configuracoesBase.origemNaChamadaTurmaIds,
+          configuracoesAtuais.origemNaChamadaTurmaIds,
+        )
+      ) {
+        mudancas.push(
+          contagem(configuracoesAtuais.origemNaChamadaTurmaIds.length, "turma", "turmas"),
+        );
+      }
+      return mudancas.join(", ");
+    }
+    if (chave === "notificacoes") return "Regras e horários dos avisos.";
+    if (chave === "acesso") return "Limites e visibilidade dos diretores.";
+    if (chave === "ordemAlmoco") {
+      const diasMudados = atual.ordemAlmoco.filter((dia) => {
+        const anteriorDoDia = anterior.ordemAlmoco.find((item) => item.diaSemana === dia.diaSemana);
+        return JSON.stringify(anteriorDoDia?.itens ?? []) !== JSON.stringify(dia.itens);
+      }).length;
+      return contagem(diasMudados, "dia alterado", "dias alterados");
+    }
+    if (chave === "beneficios") {
+      const novos = atual.beneficios.filter((item) => item.id.startsWith("novo-")).length;
+      const removidos = anterior.beneficios.filter(
+        (item) => !atual.beneficios.some((atual) => atual.id === item.id),
+      ).length;
+      return (
+        [
+          novos ? contagem(novos, "novo", "novos") : "",
+          removidos ? `${removidos} removido${removidos === 1 ? "" : "s"}` : "",
+        ]
+          .filter(Boolean)
+          .join(", ") || "Regras ajustadas."
+      );
+    }
+    if (chave === "justificativas" || chave === "liberadores") {
+      const listaBase = chave === "justificativas" ? anterior.justificativas : anterior.liberadores;
+      const listaAtual = chave === "justificativas" ? atual.justificativas : atual.liberadores;
+      const novos = listaAtual.filter(
+        (item) => !listaBase.some((anterior) => anterior.codigo === item.codigo),
+      ).length;
+      const removidos = listaBase.filter(
+        (item) => !listaAtual.some((atual) => atual.codigo === item.codigo),
+      ).length;
+      return (
+        [
+          novos ? contagem(novos, "novo", "novos") : "",
+          removidos ? `${removidos} removido${removidos === 1 ? "" : "s"}` : "",
+        ]
+          .filter(Boolean)
+          .join(", ") || "Itens ajustados."
+      );
+    }
+    if (chave === "feriados") {
+      const novos = atual.feriados.filter(
+        (item) => !anterior.feriados.some((anterior) => anterior.dia === item.dia),
+      ).length;
+      const removidos = anterior.feriados.filter(
+        (item) => !atual.feriados.some((atual) => atual.dia === item.dia),
+      ).length;
+      return (
+        [
+          novos ? contagem(novos, "novo", "novos") : "",
+          removidos ? `${removidos} removido${removidos === 1 ? "" : "s"}` : "",
+        ]
+          .filter(Boolean)
+          .join(", ") || "Calendário ajustado."
+      );
+    }
+    if (chave === "chavesBi") {
+      const novas = atual.chavesBi.filter((item) => item.id.startsWith("novo-")).length;
+      const rotacionadas = atual.chavesBi.filter((item) => item.rotacionar).length;
+      const revogadas = atual.chavesBi.filter(
+        (item) =>
+          item.revogada && !anterior.chavesBi.find((antiga) => antiga.id === item.id)?.revogadaEm,
+      ).length;
+      const removidas = anterior.chavesBi.filter(
+        (item) => !atual.chavesBi.some((atual) => atual.id === item.id),
+      ).length;
+      return (
+        [
+          novas ? contagem(novas, "nova", "novas") : "",
+          rotacionadas ? `${rotacionadas} substituída${rotacionadas === 1 ? "" : "s"}` : "",
+          revogadas ? `${revogadas} revogada${revogadas === 1 ? "" : "s"}` : "",
+          removidas ? `${removidas} removida${removidas === 1 ? "" : "s"} do histórico` : "",
+        ]
+          .filter(Boolean)
+          .join(", ") || "Chaves ajustadas."
+      );
+    }
+    return "";
   }
 
   const escola = (
@@ -537,23 +610,23 @@ export default function AbaConfiguracoes({
           </div>
           <Switch
             id="config-frequencia-aula"
-            checked={rascunho.frequenciaPorAula}
-            disabled={salvandoConfig}
+            checked={atual.configuracoes.frequenciaPorAula}
+            disabled={salvando}
             onCheckedChange={(valor) => alternar("frequenciaPorAula", valor)}
           />
         </div>
 
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <Label htmlFor="config-saida-antecipada">Saídas e entradas</Label>
+            <Label htmlFor="config-saida-antecipada">Saídas e Entradas</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
               Desligar oculta a área e preserva os registros.
             </p>
           </div>
           <Switch
             id="config-saida-antecipada"
-            checked={rascunho.saidaAntecipada}
-            disabled={salvandoConfig}
+            checked={atual.configuracoes.saidaAntecipada}
+            disabled={salvando}
             onCheckedChange={(valor) => alternar("saidaAntecipada", valor)}
           />
         </div>
@@ -572,14 +645,14 @@ export default function AbaConfiguracoes({
             </div>
             <Switch
               id="config-origem-chamada"
-              checked={rascunho.origemNaChamada}
-              disabled={salvandoConfig}
+              checked={atual.configuracoes.origemNaChamada}
+              disabled={salvando}
               onCheckedChange={(valor) => salvarOrigem({ origemNaChamada: valor })}
             />
           </div>
-          {rascunho.origemNaChamada && (
+          {atual.configuracoes.origemNaChamada && (
             <>
-              <fieldset disabled={salvandoConfig} className="flex flex-col gap-2">
+              <fieldset disabled={salvando} className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-medium">Séries completas</legend>
                 <p className="text-muted-foreground text-xs">Inclui as turmas atuais e futuras.</p>
                 {series.map((serie) => (
@@ -591,11 +664,11 @@ export default function AbaConfiguracoes({
                       type="checkbox"
                       className="accent-primary size-4 shrink-0"
                       aria-label={`Mostrar origem na série ${serie.nome}`}
-                      checked={rascunho.origemNaChamadaSerieIds.includes(serie.id)}
+                      checked={atual.configuracoes.origemNaChamadaSerieIds.includes(serie.id)}
                       onChange={(evento) =>
                         void salvarOrigem({
                           origemNaChamadaSerieIds: selecaoAlterada(
-                            rascunho.origemNaChamadaSerieIds,
+                            atual.configuracoes.origemNaChamadaSerieIds,
                             serie.id,
                             evento.target.checked,
                           ),
@@ -615,17 +688,19 @@ export default function AbaConfiguracoes({
                 onAbertoChange={setAbertoTurmasOrigem}
                 resumo={
                   <Selo
-                    variante={rascunho.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"}
+                    variante={
+                      atual.configuracoes.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"
+                    }
                   >
-                    {rascunho.origemNaChamadaTurmaIds.length === 0
+                    {atual.configuracoes.origemNaChamadaTurmaIds.length === 0
                       ? "Nenhuma"
-                      : `${rascunho.origemNaChamadaTurmaIds.length} selecionada${
-                          rascunho.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
+                      : `${atual.configuracoes.origemNaChamadaTurmaIds.length} selecionada${
+                          atual.configuracoes.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
                         }`}
                   </Selo>
                 }
               >
-                <fieldset disabled={salvandoConfig} className="flex flex-col gap-2">
+                <fieldset disabled={salvando} className="flex flex-col gap-2">
                   <legend className="sr-only">Turmas específicas</legend>
                   {turmas.map((item) => (
                     <label
@@ -636,11 +711,11 @@ export default function AbaConfiguracoes({
                         type="checkbox"
                         className="accent-primary size-4 shrink-0"
                         aria-label={`Mostrar origem na turma ${item.rotulo}`}
-                        checked={rascunho.origemNaChamadaTurmaIds.includes(item.id)}
+                        checked={atual.configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
                         onChange={(evento) =>
                           void salvarOrigem({
                             origemNaChamadaTurmaIds: selecaoAlterada(
-                              rascunho.origemNaChamadaTurmaIds,
+                              atual.configuracoes.origemNaChamadaTurmaIds,
                               item.id,
                               evento.target.checked,
                             ),
@@ -652,8 +727,8 @@ export default function AbaConfiguracoes({
                   ))}
                 </fieldset>
               </SecaoRecolhivel>
-              {rascunho.origemNaChamadaSerieIds.length === 0 &&
-                rascunho.origemNaChamadaTurmaIds.length === 0 && (
+              {atual.configuracoes.origemNaChamadaSerieIds.length === 0 &&
+                atual.configuracoes.origemNaChamadaTurmaIds.length === 0 && (
                   <p className="text-muted-foreground text-xs">
                     Nenhuma série ou turma selecionada.
                   </p>
@@ -661,37 +736,20 @@ export default function AbaConfiguracoes({
             </>
           )}
         </div>
-
-        {erro && (
-          <AvisoCompacto
-            variante={erroVariante}
-            titulo={
-              erroVariante === "conflito" ? "Configurações alteradas em outro acesso" : undefined
-            }
-            descricao={erro}
-            tamanho="linha"
-            acao={
-              erroVariante === "conflito"
-                ? {
-                    rotulo: "Recarregar configurações",
-                    onClick: () => void recarregarConfiguracoes(),
-                  }
-                : undefined
-            }
-          />
-        )}
       </SecaoRecolhivel>
 
       <SecaoCalendarioLetivo
-        feriados={configuracoes.feriados}
+        feriados={atual.feriados}
         diaCorrente={diaCorrente}
-        onAtualizar={async () => {
-          const dados = await pedir<{ configuracoes: Configuracoes }>("/api/configuracoes");
-          onMudanca(dados.configuracoes);
+        onAdicionar={(feriado) => mutarFeriados([...atual.feriados, feriado])}
+        onRemover={(dia) => mutarFeriados(atual.feriados.filter((feriado) => feriado.dia !== dia))}
+        onSincronizar={async () => {
+          const dados = await pedir<ConfiguracoesCompletas>("/api/configuracoes/completo");
+          aplicarFeriadosExternos(dados);
         }}
       />
 
-      <SecaoBeneficiosFrequencia />
+      <SecaoBeneficiosFrequencia beneficios={atual.beneficios} onMudar={mutarBeneficios} />
 
       <SecaoRecolhivel
         dataSecao="config-justificativas"
@@ -702,8 +760,8 @@ export default function AbaConfiguracoes({
         onAbertoChange={setAbertoJustificativas}
         resumo={
           <>
-            <Selo>{justificativas.length} no catálogo</Selo>
-            <Selo>{justificativas.filter((item) => item.ativo).length} ativas</Selo>
+            <Selo>{atual.justificativas.length} no catálogo</Selo>
+            <Selo>{atual.justificativas.filter((item) => item.ativo).length} ativas</Selo>
           </>
         }
       >
@@ -715,7 +773,6 @@ export default function AbaConfiguracoes({
               value={novaCodigo}
               maxLength={10}
               autoComplete="off"
-              disabled={enviandoJustificativa}
               onChange={(evento) => setNovaCodigo(evento.target.value)}
               placeholder="Ex.: At"
               className="h-11"
@@ -728,7 +785,6 @@ export default function AbaConfiguracoes({
               value={novaRotulo}
               maxLength={60}
               autoComplete="off"
-              disabled={enviandoJustificativa}
               onChange={(evento) => setNovaRotulo(evento.target.value)}
               placeholder="Ex.: Atestado"
               className="h-11"
@@ -737,28 +793,20 @@ export default function AbaConfiguracoes({
           <Button
             type="button"
             className="h-11 sm:w-auto"
-            onClick={() => void criarJustificativa()}
-            disabled={enviandoJustificativa || novaCodigo.trim() === "" || novaRotulo.trim() === ""}
+            onClick={criarJustificativa}
+            disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
           >
-            {enviandoJustificativa ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <Plus size={16} />
-            )}
+            <Plus size={16} />
             Adicionar
           </Button>
         </div>
 
         {erroJustificativa && (
-          <AvisoCompacto
-            variante={erroJustificativaVariante}
-            descricao={erroJustificativa}
-            tamanho="linha"
-          />
+          <AvisoCompacto variante="dados_invalidos" descricao={erroJustificativa} tamanho="linha" />
         )}
 
         <ul className="superficie-vidro divide-y overflow-hidden">
-          {justificativas.map((item) => (
+          {atual.justificativas.map((item) => (
             <li
               key={item.codigo}
               className={`flex min-h-14 items-center gap-3 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
@@ -784,8 +832,8 @@ export default function AbaConfiguracoes({
                     size="icon"
                     className="size-10 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
-                    onClick={() => void salvarRotulo(item.codigo)}
-                    disabled={enviandoJustificativa || rotuloEdicao.trim().length < 2}
+                    onClick={() => salvarRotulo(item.codigo)}
+                    disabled={rotuloEdicao.trim().length < 2}
                   >
                     <Check size={16} />
                   </Button>
@@ -812,7 +860,7 @@ export default function AbaConfiguracoes({
                   <Switch
                     checked={item.ativo}
                     aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                    onCheckedChange={() => void alternarAtivo(item)}
+                    onCheckedChange={() => alternarAtivo(item)}
                   />
                   <Button
                     type="button"
@@ -853,15 +901,16 @@ export default function AbaConfiguracoes({
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir a justificativa {excluirAlvo?.codigo}?</AlertDialogTitle>
               <AlertDialogDescription>
-                A exclusão só é possível quando não há faltas nem saídas usando o código. Com
-                histórico, o caminho é desativar.
+                A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando
+                o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é
+                desativar.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
-                onClick={() => excluirAlvo && void removerJustificativa(excluirAlvo)}
+                onClick={() => excluirAlvo && removerJustificativa(excluirAlvo)}
               >
                 Excluir
               </AlertDialogAction>
@@ -879,8 +928,8 @@ export default function AbaConfiguracoes({
         onAbertoChange={setAbertoLiberadores}
         resumo={
           <>
-            <Selo>{liberadores.length} no catálogo</Selo>
-            <Selo>{liberadores.filter((item) => item.ativo).length} ativos</Selo>
+            <Selo>{atual.liberadores.length} no catálogo</Selo>
+            <Selo>{atual.liberadores.filter((item) => item.ativo).length} ativos</Selo>
           </>
         }
       >
@@ -892,7 +941,6 @@ export default function AbaConfiguracoes({
               value={novaCodigoLiberador}
               maxLength={20}
               autoComplete="off"
-              disabled={enviandoLiberador}
               onChange={(evento) => setNovaCodigoLiberador(evento.target.value)}
               placeholder="Ex.: maria"
               className="h-11"
@@ -905,7 +953,6 @@ export default function AbaConfiguracoes({
               value={novaRotuloLiberador}
               maxLength={60}
               autoComplete="off"
-              disabled={enviandoLiberador}
               onChange={(evento) => setNovaRotuloLiberador(evento.target.value)}
               placeholder="Ex.: Coordenadora Maria"
               className="h-11"
@@ -914,36 +961,24 @@ export default function AbaConfiguracoes({
           <Button
             type="button"
             className="h-11 sm:w-auto"
-            onClick={() => void criarLiberador()}
-            disabled={
-              enviandoLiberador ||
-              novaCodigoLiberador.trim() === "" ||
-              novaRotuloLiberador.trim() === ""
-            }
+            onClick={criarLiberador}
+            disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
           >
-            {enviandoLiberador ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <Plus size={16} />
-            )}
+            <Plus size={16} />
             Adicionar
           </Button>
         </div>
 
         {erroLiberador && (
-          <AvisoCompacto
-            variante={erroLiberadorVariante}
-            descricao={erroLiberador}
-            tamanho="linha"
-          />
+          <AvisoCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
         )}
 
-        {liberadores.length === 0 && (
+        {atual.liberadores.length === 0 && (
           <p className="text-muted-foreground text-sm">Nenhum nome cadastrado.</p>
         )}
 
         <ul className="superficie-vidro divide-y overflow-hidden">
-          {liberadores.map((item) => (
+          {atual.liberadores.map((item) => (
             <li
               key={item.codigo}
               className={`flex min-h-14 items-center gap-3 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
@@ -969,8 +1004,8 @@ export default function AbaConfiguracoes({
                     size="icon"
                     className="size-10 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
-                    onClick={() => void salvarRotuloLiberador(item.codigo)}
-                    disabled={enviandoLiberador || rotuloEdicaoLiberador.trim().length < 2}
+                    onClick={() => salvarRotuloLiberador(item.codigo)}
+                    disabled={rotuloEdicaoLiberador.trim().length < 2}
                   >
                     <Check size={16} />
                   </Button>
@@ -997,7 +1032,7 @@ export default function AbaConfiguracoes({
                   <Switch
                     checked={item.ativo}
                     aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                    onCheckedChange={() => void alternarAtivoLiberador(item)}
+                    onCheckedChange={() => alternarAtivoLiberador(item)}
                   />
                   <Button
                     type="button"
@@ -1038,15 +1073,15 @@ export default function AbaConfiguracoes({
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir {excluirAlvoLiberador?.rotulo}?</AlertDialogTitle>
               <AlertDialogDescription>
-                A exclusão só é possível quando não há saídas com este código. Com histórico, o
-                caminho é desativar.
+                A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código,
+                o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
-                onClick={() => excluirAlvoLiberador && void removerLiberador(excluirAlvoLiberador)}
+                onClick={() => excluirAlvoLiberador && removerLiberador(excluirAlvoLiberador)}
               >
                 Excluir
               </AlertDialogAction>
@@ -1056,6 +1091,7 @@ export default function AbaConfiguracoes({
       </SecaoRecolhivel>
     </>
   );
+
   const dados = (
     <>
       <SecaoRecolhivel
@@ -1136,8 +1172,39 @@ export default function AbaConfiguracoes({
     </>
   );
 
+  const tituloErro =
+    erroCodigo === "CONFIGURACOES_ALTERADAS"
+      ? "Configurações alteradas em outro acesso"
+      : erroCodigo === "JUSTIFICATIVA_EM_USO"
+        ? "Justificativa em uso"
+        : erroCodigo === "LIBERADOR_EM_USO"
+          ? "Responsável em uso"
+          : erroCodigo === "SENHA_BI_OBRIGATORIA"
+            ? "Senha do administrador"
+            : erroStatus === 409
+              ? "Não foi possível concluir"
+              : undefined;
+
   return (
     <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6">
+      {erro && !confirmarSalvar && (
+        <div className="col-span-full">
+          <AvisoCompacto
+            variante={varianteDoErro(erroStatus)}
+            titulo={tituloErro}
+            descricao={erro}
+            tamanho="linha"
+            acao={
+              erroStatus === 409
+                ? {
+                    rotulo: "Recarregar tudo e descartar",
+                    onClick: () => void recarregar(),
+                  }
+                : undefined
+            }
+          />
+        </div>
+      )}
       <nav
         aria-label="Categorias de configurações"
         className="superficie-vidro grid grid-cols-2 gap-1.5 p-1.5 lg:grid-cols-1"
@@ -1189,7 +1256,16 @@ export default function AbaConfiguracoes({
               onPendencia={onPendenciaHorarios}
             />
           )}
-          {horariosAbertos && <SecaoOrdemAlmoco turmas={turmas} />}
+          {horariosAbertos && (
+            <SecaoOrdemAlmoco
+              turmas={turmas}
+              dias={atual.ordemAlmoco}
+              onMudar={mutarOrdem}
+              onCopiarParaTodos={(dia, itens) => {
+                for (const valor of DIAS_ORDEM_ALMOCO) mutarOrdem(valor, itens);
+              }}
+            />
+          )}
         </section>
         <section
           id="config-grupo-planilhas"
@@ -1220,9 +1296,14 @@ export default function AbaConfiguracoes({
           inert={categoria !== "acesso"}
           className="flex min-w-0 flex-col gap-4"
         >
-          <SecaoChavesBi series={series} turmas={turmas} />
-          <SecaoAcessoDiretores />
-          <SecaoNotificacoes />
+          <SecaoChavesBi
+            series={series}
+            turmas={turmas}
+            chaves={atual.chavesBi}
+            onMudar={(lista: ChaveBiDesejada[]) => mutarChaves(lista)}
+          />
+          <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />
+          <SecaoNotificacoes configuracao={atual.notificacoes} onMudar={mutarNotificacoes} />
         </section>
         <section
           id="config-grupo-dados"
@@ -1238,86 +1319,118 @@ export default function AbaConfiguracoes({
         <div
           role="region"
           aria-label="Salvar configurações"
-          className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 col-span-full flex flex-wrap items-center gap-2 rounded-2xl p-2"
+          className="superficie-vidro vidro-flutuante sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 xl:mr-0 xl:ml-auto"
+          style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
           <p
-            className="text-muted-foreground min-w-0 flex-1 px-2 text-xs font-medium"
+            className="text-muted-foreground max-w-32 min-w-0 truncate px-2 text-xs font-medium sm:max-w-48"
             aria-live="polite"
+            title={`Alterações não salvas em ${secoesAlteradas.length} ${
+              secoesAlteradas.length === 1 ? "seção" : "seções"
+            }`}
           >
-            Alterações não salvas
+            <span className="sm:hidden">Não salvo</span>
+            <span className="hidden sm:inline">
+              Alterações não salvas em {secoesAlteradas.length}{" "}
+              {secoesAlteradas.length === 1 ? "seção" : "seções"}
+            </span>
           </p>
           <Button
             type="button"
             variant="ghost"
+            className="shrink-0"
+            aria-label="Descartar"
             onClick={() => setConfirmarDescartar(true)}
-            disabled={salvandoConfig}
+            disabled={salvando}
           >
             <RotateCcw size={16} aria-hidden="true" />
-            Descartar
+            <span className="hidden sm:inline">Descartar</span>
           </Button>
           <Button
             type="button"
-            className="px-4"
-            onClick={() => setConfirmarSalvar(true)}
-            disabled={salvandoConfig}
+            className="shrink-0 px-4"
+            aria-label="Salvar configurações"
+            onClick={() => {
+              setSenhaBi("");
+              setConfirmarSalvar(true);
+            }}
+            disabled={salvando}
           >
-            {salvandoConfig ? (
+            {salvando ? (
               <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
             ) : (
               <Save size={16} aria-hidden="true" />
             )}
-            Salvar configurações
+            <span className="hidden sm:inline">Salvar configurações</span>
+            <span className="sm:hidden">Salvar</span>
           </Button>
         </div>
       )}
-      <AlertDialog open={confirmarSalvar} onOpenChange={setConfirmarSalvar}>
+      <AlertDialog
+        open={confirmarSalvar}
+        onOpenChange={(aberto) => {
+          if (!aberto && !salvando) setConfirmarSalvar(false);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Salvar configurações?</AlertDialogTitle>
-            <AlertDialogDescription>As alterações valem para toda a escola.</AlertDialogDescription>
+            <AlertDialogDescription>
+              As alterações valem para toda a escola e são gravadas de uma vez. Se outra pessoa
+              tiver mudado alguma seção, nada é gravado.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-            {rascunho.frequenciaPorAula !== base.frequenciaPorAula && (
-              <>
-                <dt className="text-muted-foreground">Chamada por aula</dt>
-                <dd>{rascunho.frequenciaPorAula ? "Ligada" : "Desligada"}</dd>
-              </>
-            )}
-            {rascunho.saidaAntecipada !== base.saidaAntecipada && (
-              <>
-                <dt className="text-muted-foreground">Saídas e Entradas</dt>
-                <dd>{rascunho.saidaAntecipada ? "Ligadas" : "Desligadas"}</dd>
-              </>
-            )}
-            {rascunho.origemNaChamada !== base.origemNaChamada && (
-              <>
-                <dt className="text-muted-foreground">Turma de origem</dt>
-                <dd>{rascunho.origemNaChamada ? "Ligada" : "Desligada"}</dd>
-              </>
-            )}
-            {!listasIguais(rascunho.origemNaChamadaSerieIds, base.origemNaChamadaSerieIds) && (
-              <>
-                <dt className="text-muted-foreground">Séries de origem</dt>
-                <dd>{rascunho.origemNaChamadaSerieIds.length} selecionadas</dd>
-              </>
-            )}
-            {!listasIguais(rascunho.origemNaChamadaTurmaIds, base.origemNaChamadaTurmaIds) && (
-              <>
-                <dt className="text-muted-foreground">Turmas de origem</dt>
-                <dd>{rascunho.origemNaChamadaTurmaIds.length} selecionadas</dd>
-              </>
-            )}
-          </dl>
+          <ul className="flex flex-col gap-2 text-sm">
+            {secoesAlteradas.map((secao) => (
+              <li key={secao.chave} className="flex flex-col gap-0.5">
+                <span className="font-medium">{secao.rotulo}</span>
+                <span className="text-muted-foreground text-xs">{resumoDaSecao(secao.chave)}</span>
+              </li>
+            ))}
+          </ul>
+          {precisaSenhaBi && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="config-senha-bi">Senha do administrador</Label>
+              <CampoSenha
+                id="config-senha-bi"
+                autoComplete="current-password"
+                value={senhaBi}
+                onChange={(evento) => setSenhaBi(evento.target.value)}
+              />
+              <p className="text-muted-foreground text-xs">
+                A senha confirma a criação, a substituição ou a revogação das chaves do BI.
+              </p>
+            </div>
+          )}
+          {erro && (
+            <AvisoCompacto
+              variante={varianteDoErro(erroStatus)}
+              titulo={tituloErro}
+              descricao={erro}
+              tamanho="linha"
+              acao={
+                erroStatus === 409
+                  ? {
+                      rotulo: "Recarregar tudo e descartar",
+                      onClick: () => {
+                        setConfirmarSalvar(false);
+                        void recarregar();
+                      },
+                    }
+                  : undefined
+              }
+            />
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={salvandoConfig}>Continuar editando</AlertDialogCancel>
+            <AlertDialogCancel disabled={salvando}>Continuar revisando</AlertDialogCancel>
             <AlertDialogAction
-              disabled={salvandoConfig}
+              disabled={salvando || (precisaSenhaBi && senhaBi.trim() === "")}
               onClick={(evento) => {
                 evento.preventDefault();
-                void salvarConfiguracoes();
+                void concluirSalvamento();
               }}
             >
-              {salvandoConfig ? <LoaderCircle size={16} className="animate-spin" /> : null}
+              {salvando ? <LoaderCircle size={16} className="animate-spin" /> : null}
               Salvar configurações
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1328,17 +1441,72 @@ export default function AbaConfiguracoes({
           <AlertDialogHeader>
             <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
             <AlertDialogDescription>
-              As configurações voltam ao estado salvo.
+              Todas as seções voltam ao estado salvo, inclusive catálogos, calendário e chaves.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={descartarConfiguracoes}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                descartar();
+                setConfirmarDescartar(false);
+              }}
+            >
               Descartar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <Dialog
+        open={segredosBi.length > 0}
+        onOpenChange={(aberto) => {
+          if (!aberto) setSegredosBi([]);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Guarde as chaves do BI</DialogTitle>
+            <DialogDescription>
+              Elas aparecem apenas agora e dão acesso a dados pessoais. Não as inclua em links.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            {segredosBi.map((item) => (
+              <div key={item.id} className="flex flex-col gap-1.5">
+                <Label>{item.rotulo}</Label>
+                <Input
+                  aria-label={`Chave gerada para ${item.rotulo}`}
+                  readOnly
+                  value={item.segredo}
+                  autoComplete="off"
+                  className="font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="self-start"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(item.segredo);
+                      avisarSucesso("Chave copiada.");
+                    } catch (excecao) {
+                      avisarErro(excecao, {
+                        contexto: "Não foi possível copiar. Selecione a chave e copie manualmente.",
+                      });
+                    }
+                  }}
+                >
+                  Copiar chave
+                </Button>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setSegredosBi([])}>Já guardei</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <DialogoDownload
         confirmarAdmin
         aberto={downloadAberto}

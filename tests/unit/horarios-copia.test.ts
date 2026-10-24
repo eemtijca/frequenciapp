@@ -86,6 +86,7 @@ const executarTransacao = vi.hoisted(() =>
 
 vi.mock("@/infra/banco", () => ({
   banco: () => ({ $transaction: executarTransacao }),
+  transacaoCorrente: () => undefined,
 }));
 
 import { copiarHorarios } from "@/application/horarios";

@@ -1,20 +1,19 @@
 "use client";
 
-// Chaves do FrequenciBI: escopo visual, confirmação com senha e segredo exibido uma vez.
-import { useEffect, useRef, useState } from "react";
-import { KeyRound, Copy, Plus, Pencil, RotateCw, Ban, Trash2, RefreshCw } from "lucide-react";
+// Chaves do FrequenciBI no rascunho: escopo visual e ações que só valem
+// depois da confirmação do lote. O segredo aparece uma única vez no salvamento.
+import { useRef, useState } from "react";
+import { KeyRound, Plus, Pencil, RotateCw, Ban, Trash2 } from "lucide-react";
 import type { Serie, Turma } from "@/domain/frequencia";
-import { RECURSOS_BI, ROTULOS_RECURSOS_BI, type ChaveBi, type EscopoBi } from "@/domain/bi";
-import { pedir, corpoJson } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+import type { ChaveBiDesejada } from "@/domain/configuracoes";
+import { RECURSOS_BI, ROTULOS_RECURSOS_BI, type EscopoBi } from "@/domain/bi";
+import { avisarSucesso } from "@/lib/avisos";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { CampoSenha } from "@/components/ui/campo-senha";
 import { Selo } from "@/components/ui/selo";
 import {
   Dialog,
@@ -34,72 +33,113 @@ const TITULOS: Record<Acao, string> = {
   "revogar-todas": "Revogar todas as chaves",
   limpar: "Limpar histórico de chaves",
 };
+
 function dataLocal(valor: string | null) {
   if (!valor) return "";
   const d = new Date(valor);
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
-export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; turmas: Turma[] }) {
+
+function estaRevogada(chave: ChaveBiDesejada): boolean {
+  return chave.revogada === true || chave.estado === "revogada";
+}
+
+export default function SecaoChavesBi({
+  series,
+  turmas,
+  chaves,
+  onMudar,
+}: {
+  series: Serie[];
+  turmas: Turma[];
+  chaves: ChaveBiDesejada[];
+  onMudar: (chaves: ChaveBiDesejada[]) => void;
+}) {
   const [aberto, setAberto] = useState(false);
-  const [chaves, setChaves] = useState<ChaveBi[] | null>(null);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState("recentes");
   const [acao, setAcao] = useState<Acao | null>(null);
-  const [chave, setChave] = useState<ChaveBi | null>(null);
+  const [chave, setChave] = useState<ChaveBiDesejada | null>(null);
   const [rotulo, setRotulo] = useState("");
   const [validade, setValidade] = useState("");
   const [escopo, setEscopo] = useState<EscopoBi>({});
-  const [senha, setSenha] = useState("");
-  const [segredo, setSegredo] = useState("");
   const hoje = new Date().toISOString().slice(0, 10);
   const foco = useRef<HTMLElement | null>(null);
-  const { executar: carregar, executando: carregando } = useAcaoUnica(async () => {
-    setErro("");
-    try {
-      setChaves((await pedir<{ chaves: ChaveBi[] }>("/api/bi/chaves")).chaves);
-    } catch (e) {
-      setErro("Não foi possível atualizar as chaves. Tente novamente.");
-      avisarErro(e, { contexto: "Não foi possível concluir a ação nas chaves." });
-    }
-  });
-  useEffect(() => {
-    if (aberto && chaves === null) void carregar();
-  }, [aberto, chaves, carregar]);
-  function preparar(a: Acao, c: ChaveBi | null = null) {
+
+  function preparar(a: Acao, c: ChaveBiDesejada | null = null) {
     foco.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setErro("");
     setAcao(a);
     setChave(c);
     setRotulo(c?.rotulo ?? "");
     setValidade(dataLocal(c?.expiraEm ?? null));
     setEscopo(c?.escopo ?? {});
-    setSenha("");
   }
-  const { executar: confirmar, executando: salvando } = useAcaoUnica(async () => {
+
+  function confirmar() {
     if (!acao) return;
-    try {
-      const corpo = {
-        acao,
-        senha,
-        ...(chave ? { id: chave.id } : {}),
-        ...(acao === "criar" || acao === "editar"
-          ? { rotulo, expiraEm: validade ? new Date(validade).toISOString() : null, escopo }
-          : {}),
-      };
-      const resultado = await pedir<{ segredo?: string }>("/api/bi/chaves", corpoJson(corpo));
-      setSenha("");
-      setAcao(null);
-      setChave(null);
-      if (resultado.segredo) setSegredo(resultado.segredo);
-      avisarSucesso("Ação concluída.");
-      // Falha de atualização não repete a mutação nem perde o segredo recém-gerado.
-      await carregar();
-    } catch (e) {
-      avisarErro(e, { contexto: "Não foi possível concluir a ação nas chaves." });
+    if ((acao === "criar" || acao === "editar") && rotulo.trim().length < 2) {
+      setErro("Informe o rótulo da chave, com ao menos 2 caracteres.");
+      return;
     }
-  });
+    const expiraEm = validade ? new Date(validade).toISOString() : null;
+    if ((acao === "criar" || acao === "editar") && expiraEm && new Date(expiraEm) <= new Date()) {
+      setErro("A validade precisa ser uma data futura.");
+      return;
+    }
+    setErro("");
+    const agora = new Date().toISOString();
+    let lista = chaves;
+    if (acao === "criar") {
+      lista = [
+        ...chaves,
+        {
+          id: `novo-${crypto.randomUUID()}`,
+          rotulo: rotulo.trim(),
+          criadaEm: agora,
+          expiraEm,
+          revogadaEm: null,
+          primeiroUsoEm: null,
+          ultimoUsoEm: null,
+          usos: 0,
+          escopo,
+          estado: "ativa",
+          inativa: false,
+        },
+      ];
+    } else if (acao === "editar" && chave) {
+      lista = chaves.map((item) =>
+        item.id === chave.id ? { ...item, rotulo: rotulo.trim(), escopo, expiraEm } : item,
+      );
+    } else if (acao === "rotacionar" && chave) {
+      lista = chaves.map((item) => (item.id === chave.id ? { ...item, rotacionar: true } : item));
+    } else if (acao === "revogar" && chave) {
+      lista = chaves.map((item) =>
+        item.id === chave.id
+          ? { ...item, revogada: true, revogadaEm: agora, estado: "revogada" as const }
+          : item,
+      );
+    } else if (acao === "revogar-todas") {
+      lista = chaves.map((item) =>
+        item.estado === "ativa" && !estaRevogada(item)
+          ? { ...item, revogada: true, revogadaEm: agora, estado: "revogada" as const }
+          : item,
+      );
+    } else if (acao === "limpar") {
+      lista = chaves.filter((item) => item.estado === "ativa" && !estaRevogada(item));
+    }
+    onMudar(lista);
+    setAcao(null);
+    setChave(null);
+    setRotulo("");
+    setValidade("");
+    setEscopo({});
+    avisarSucesso("Alteração aplicada ao rascunho.", "Salve as configurações para concluir.");
+  }
+
   const cadastro = acao === "criar" || acao === "editar";
-  const visiveis = (chaves ?? [])
+  const visiveis = chaves
     .filter((c) => c.rotulo.toLocaleLowerCase("pt-BR").includes(busca.toLocaleLowerCase("pt-BR")))
     .sort((a, b) =>
       ordem === "nome"
@@ -108,11 +148,29 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
           ? b.usos - a.usos
           : b.criadaEm.localeCompare(a.criadaEm),
     );
+  const ativas = chaves.filter((c) => c.estado === "ativa" && !estaRevogada(c)).length;
+  const naoAtivas = chaves.some((c) => c.estado !== "ativa" || estaRevogada(c));
+
   function alternar(campo: "series" | "turmas" | "recursos", valor: string, marcada: boolean) {
     const atuais = escopo[campo] ?? [];
     const lista = marcada ? [...atuais, valor] : atuais.filter((v) => v !== valor);
     setEscopo((e) => ({ ...e, [campo]: lista.length ? lista : undefined }));
   }
+
+  function desfazerRevogacao(alvo: ChaveBiDesejada) {
+    onMudar(
+      chaves.map((item) =>
+        item.id === alvo.id
+          ? { ...item, revogada: false, revogadaEm: null, estado: "ativa" as const }
+          : item,
+      ),
+    );
+  }
+
+  function desfazerRotacao(alvo: ChaveBiDesejada) {
+    onMudar(chaves.map((item) => (item.id === alvo.id ? { ...item, rotacionar: false } : item)));
+  }
+
   return (
     <SecaoRecolhivel
       titulo="FrequenciBI"
@@ -121,43 +179,30 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
       aberto={aberto}
       onAbertoChange={setAberto}
       dataSecao="config-chaves-bi"
-      resumo={
-        chaves ? <Selo>{chaves.filter((c) => c.estado === "ativa").length} ativas</Selo> : undefined
-      }
+      resumo={<Selo>{ativas} ativas</Selo>}
     >
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => preparar("criar")} disabled={salvando}>
+          <Button onClick={() => preparar("criar")}>
             <Plus size={16} />
             Criar chave
           </Button>
           <Button
             variant="outline"
-            onClick={() => void carregar()}
-            disabled={carregando || salvando}
-            aria-label="Atualizar chaves"
-          >
-            <RefreshCw size={16} />
-          </Button>
-          <Button
-            variant="outline"
             onClick={() => preparar("revogar-todas")}
-            disabled={salvando || !chaves?.some((c) => c.estado === "ativa")}
+            disabled={!chaves.some((c) => c.estado === "ativa" && !estaRevogada(c))}
           >
             <Ban size={16} />
             Revogar todas
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => preparar("limpar")}
-            disabled={salvando || !chaves?.some((c) => c.estado !== "ativa")}
-          >
+          <Button variant="outline" onClick={() => preparar("limpar")} disabled={!naoAtivas}>
             <Trash2 size={16} />
             Limpar histórico
           </Button>
         </div>
         <p className="text-muted-foreground text-sm">
-          Uma chave permite consultar dados pessoais. Entregue apenas à equipe autorizada.
+          Uma chave permite consultar dados pessoais. Entregue apenas à equipe autorizada. As ações
+          só valem depois de salvar as configurações.
         </p>
         <div className="flex flex-wrap gap-2">
           <Input
@@ -184,73 +229,99 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
             {erro}
           </p>
         )}
-        {carregando && <p role="status">Carregando chaves...</p>}
-        {!carregando && !erro && visiveis.length === 0 && (
+        {visiveis.length === 0 && (
           <p className="text-muted-foreground text-sm">Nenhuma chave encontrada.</p>
         )}
-        {visiveis.map((c) => (
-          <article key={c.id} className="controle-vidro flex flex-col gap-3 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="min-w-0 font-semibold break-words">{c.rotulo}</h3>
-              <Selo>{c.estado}</Selo>
-            </div>
-            <dl className="text-muted-foreground grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <dt>Criação</dt>
-                <dd>{new Date(c.criadaEm).toLocaleDateString("pt-BR")}</dd>
+        {visiveis.map((c) => {
+          const nova = c.id.startsWith("novo-");
+          const revogada = estaRevogada(c);
+          const acionavel = c.estado === "ativa" && !revogada;
+          return (
+            <article key={c.id} className="controle-vidro flex flex-col gap-3 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="min-w-0 font-semibold break-words">{c.rotulo}</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  <Selo>{c.estado}</Selo>
+                  {nova && <Selo>Nova</Selo>}
+                  {c.rotacionar && <Selo variante="atencao">Substituir ao salvar</Selo>}
+                </div>
               </div>
-              <div>
-                <dt>Validade</dt>
-                <dd>{c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}</dd>
-              </div>
-              <div>
-                <dt>Primeiro uso</dt>
-                <dd>
-                  {c.primeiroUsoEm ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR") : "Sem uso"}
-                </dd>
-              </div>
-              <div>
-                <dt>Último uso</dt>
-                <dd>
-                  {c.ultimoUsoEm ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR") : "Sem uso"}
-                </dd>
-              </div>
-            </dl>
-            <div className="flex flex-wrap gap-2">
-              <Selo>{c.usos} consultas</Selo>
-              <Selo>
-                {c.escopo.recursos ? `${c.escopo.recursos.length} bases` : "Todas as bases"}
-              </Selo>
-              <Selo>
-                {c.escopo.turmas ? `${c.escopo.turmas.length} turmas` : "Todas as turmas"}
-              </Selo>
-              {c.inativa && c.estado === "ativa" && <Selo>Revisar: sem uso há 90 dias</Selo>}
-            </div>
-            {c.estado === "ativa" && (
+              <dl className="text-muted-foreground grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <dt>Criação</dt>
+                  <dd>{new Date(c.criadaEm).toLocaleDateString("pt-BR")}</dd>
+                </div>
+                <div>
+                  <dt>Validade</dt>
+                  <dd>{c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}</dd>
+                </div>
+                <div>
+                  <dt>Primeiro uso</dt>
+                  <dd>
+                    {c.primeiroUsoEm
+                      ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR")
+                      : "Sem uso"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Último uso</dt>
+                  <dd>
+                    {c.ultimoUsoEm ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR") : "Sem uso"}
+                  </dd>
+                </div>
+              </dl>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={() => preparar("editar", c)}>
-                  <Pencil size={15} />
-                  Editar
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => preparar("rotacionar", c)}>
-                  <RotateCw size={15} />
-                  Substituir
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => preparar("revogar", c)}>
-                  <Ban size={15} />
-                  Revogar
-                </Button>
+                <Selo>{c.usos} consultas</Selo>
+                <Selo>
+                  {c.escopo.recursos ? `${c.escopo.recursos.length} bases` : "Todas as bases"}
+                </Selo>
+                <Selo>
+                  {c.escopo.turmas ? `${c.escopo.turmas.length} turmas` : "Todas as turmas"}
+                </Selo>
+                {c.inativa && c.estado === "ativa" && <Selo>Revisar: sem uso há 90 dias</Selo>}
               </div>
-            )}
-          </article>
-        ))}
+              {acionavel && (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={() => preparar("editar", c)}>
+                    <Pencil size={15} />
+                    Editar
+                  </Button>
+                  {!nova &&
+                    (c.rotacionar ? (
+                      <Button variant="outline" size="sm" onClick={() => desfazerRotacao(c)}>
+                        <RotateCw size={15} />
+                        Desfazer substituição
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => preparar("rotacionar", c)}>
+                        <RotateCw size={15} />
+                        Substituir
+                      </Button>
+                    ))}
+                  <Button variant="outline" size="sm" onClick={() => preparar("revogar", c)}>
+                    <Ban size={15} />
+                    Revogar
+                  </Button>
+                </div>
+              )}
+              {c.revogada && (
+                <div>
+                  <Button variant="outline" size="sm" onClick={() => desfazerRevogacao(c)}>
+                    <Ban size={15} />
+                    Desfazer revogação
+                  </Button>
+                </div>
+              )}
+            </article>
+          );
+        })}
       </div>
       <Dialog
         open={acao !== null}
         onOpenChange={(v) => {
-          if (!v && !salvando) {
+          if (!v) {
             setAcao(null);
-            setSenha("");
+            setChave(null);
           }
         }}
       >
@@ -264,22 +335,22 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
             <DialogTitle>{acao ? TITULOS[acao] : "Chave"}</DialogTitle>
             <DialogDescription>
               {cadastro
-                ? "Sem seleção, o escopo inclui todas as séries, turmas e bases."
+                ? "Sem seleção, o escopo inclui todas as séries, turmas e bases. A chave só é criada ou alterada ao salvar as configurações."
                 : acao === "rotacionar"
-                  ? "A chave anterior deixa de funcionar. Entregue a substituta à pessoa autorizada."
+                  ? "A chave anterior deixa de funcionar ao salvar. O novo segredo aparece uma única vez."
                   : acao === "limpar"
-                    ? "Remove chaves revogadas e expiradas. A auditoria permanece."
-                    : "O acesso será encerrado. Dados já baixados não podem ser apagados remotamente."}
+                    ? "Remove do rascunho as chaves revogadas e expiradas. A auditoria permanece."
+                    : "O acesso será encerrado ao salvar. Dados já baixados não podem ser apagados remotamente."}
             </DialogDescription>
           </DialogHeader>
           <form
             className="flex flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
-              void confirmar();
+              confirmar();
             }}
           >
-            <fieldset disabled={salvando} className="flex min-w-0 flex-col gap-3">
+            <fieldset className="flex min-w-0 flex-col gap-3">
               {cadastro && (
                 <>
                   <div className="grid gap-2">
@@ -421,16 +492,11 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
                 </>
               )}
               {chave && <p className="text-sm font-medium">{chave.rotulo}</p>}
-              <div className="grid gap-2">
-                <Label htmlFor="bi-senha">Senha do administrador</Label>
-                <CampoSenha
-                  id="bi-senha"
-                  autoComplete="current-password"
-                  value={senha}
-                  onChange={(e) => setSenha(e.target.value)}
-                  required
-                />
-              </div>
+              {erro && (
+                <p role="alert" className="text-falta-texto text-sm">
+                  {erro}
+                </p>
+              )}
             </fieldset>
             <DialogFooter>
               <Button
@@ -438,63 +504,14 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
                 variant="outline"
                 onClick={() => {
                   setAcao(null);
-                  setSenha("");
+                  setChave(null);
                 }}
-                disabled={salvando}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={salvando || !senha}>
-                {salvando ? "Confirmando..." : "Confirmar"}
-              </Button>
+              <Button type="submit">Aplicar ao rascunho</Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(segredo)}
-        onOpenChange={(v) => {
-          if (!v) setSegredo("");
-        }}
-      >
-        <DialogContent
-          onCloseAutoFocus={(e) => {
-            e.preventDefault();
-            foco.current?.focus();
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>Guarde a chave</DialogTitle>
-            <DialogDescription>
-              Ela aparece apenas agora e dá acesso a dados pessoais. Não a inclua em links.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            aria-label="Chave gerada"
-            readOnly
-            value={segredo}
-            autoComplete="off"
-            className="font-mono text-xs"
-          />
-          <Button
-            variant="outline"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(segredo);
-                avisarSucesso("Chave copiada.");
-              } catch (e) {
-                avisarErro(e, {
-                  contexto: "Não foi possível copiar. Selecione a chave e copie manualmente.",
-                });
-              }
-            }}
-          >
-            <Copy size={16} />
-            Copiar chave
-          </Button>
-          <DialogFooter>
-            <Button onClick={() => setSegredo("")}>Já guardei</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </SecaoRecolhivel>
