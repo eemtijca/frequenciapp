@@ -118,6 +118,7 @@ export default function IntegracaoParcial({
       <SecaoRecolhivel
         dataSecao="planilha-parcial"
         titulo="Planilha de chamada parcial"
+        descricao="Envio das confirmações da Seduc."
         icone={ClipboardList}
         aberto={aberto}
         onAbertoChange={setAberto}

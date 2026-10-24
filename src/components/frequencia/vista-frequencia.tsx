@@ -67,6 +67,7 @@ import { SeletorTurmaChamada } from "@/components/frequencia/seletor-turma-chama
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/frequencia/aviso-beneficio-frequencia";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -186,6 +187,15 @@ export default function VistaFrequencia({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
   const semMovimento = useReducedMotion() ?? false;
+
+  const atualizarTela = useCallback(() => {
+    if (sujo) {
+      toast.info("Salve ou descarte as alterações antes de atualizar.");
+      return;
+    }
+    setRecarregar((valor) => valor + 1);
+  }, [sujo]);
+  useAtualizacaoTela("chamada", atualizarTela);
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
   // A prop é comparada durante o render, como o React recomenda para estado
@@ -747,7 +757,7 @@ export default function VistaFrequencia({
   }
 
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
-  const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
+  const diaDaSemana = dia ? rotuloDiaSemana(dia).replace("-feira", "") : "";
   const tituloResumo = dia === diaCorrente ? "Resumo de hoje" : "Resumo do dia";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
 
@@ -898,59 +908,53 @@ export default function VistaFrequencia({
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div
-              className={
-                ehSabado && !feriado ? "grid w-full grid-cols-2 items-stretch gap-2" : "contents"
-              }
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              aria-expanded={resumoAberto}
+              aria-controls={idResumo}
+              onClick={() => setResumoAberto((atual) => !atual)}
+              className="vidro-selecionado h-11 w-full justify-center rounded-full px-4"
             >
+              <span>{tituloResumo}</span>
+              <ChevronDown
+                aria-hidden="true"
+                className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
+              />
+            </Button>
+            {ehSabado && !feriado && (
               <Button
                 type="button"
                 variant="outline"
-                aria-expanded={resumoAberto}
-                aria-controls={idResumo}
-                onClick={() => setResumoAberto((atual) => !atual)}
-                className={`vidro-selecionado rounded-full px-4 ${ehSabado && !feriado ? "h-auto min-h-11 py-2 text-sm whitespace-normal" : ""}`}
+                aria-pressed={sabadoLiberado}
+                disabled={ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas}
+                title={
+                  !temAulasAtivas
+                    ? "Cadastre aulas ativas na Gestão."
+                    : !leituraConfirmada
+                      ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
+                      : "Libera a chamada somente para esta turma e este sábado."
+                }
+                className={`h-11 w-full justify-center rounded-full px-4 ${sabadoLiberado ? "vidro-selecionado" : ""}`}
+                onClick={() => {
+                  if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas) return;
+                  setSabadoDesbloqueado(chave);
+                }}
               >
-                <span>{tituloResumo}</span>
-                <ChevronDown
-                  aria-hidden="true"
-                  className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
-                />
+                {sabadoLiberado ? (
+                  <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <LockKeyholeOpen className="size-4 shrink-0" aria-hidden="true" />
+                )}
+                <span>{sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}</span>
               </Button>
-              {ehSabado && !feriado && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-pressed={sabadoLiberado}
-                  disabled={ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas}
-                  title={
-                    !temAulasAtivas
-                      ? "Cadastre aulas ativas na Gestão."
-                      : !leituraConfirmada
-                        ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
-                        : "Libera a chamada somente para esta turma e este sábado."
-                  }
-                  className={`h-auto min-h-11 rounded-full px-3 py-2 text-sm whitespace-normal ${sabadoLiberado ? "vidro-selecionado" : ""}`}
-                  onClick={() => {
-                    if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas) return;
-                    setSabadoDesbloqueado(chave);
-                  }}
-                >
-                  {sabadoLiberado ? (
-                    <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-                  ) : (
-                    <LockKeyholeOpen className="size-4 shrink-0" aria-hidden="true" />
-                  )}
-                  <span>{sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}</span>
-                </Button>
-              )}
-            </div>
+            )}
             {revisaoSalva > 0 && (
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-full px-4"
+                className="h-11 w-full justify-center rounded-full px-4"
                 aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}`}
                 disabled={ocupado || (edicaoLiberada && sujo)}
                 onClick={() => {
@@ -969,6 +973,7 @@ export default function VistaFrequencia({
             (conflito ? (
               <AvisoCompacto
                 variante="conflito"
+                titulo="A chamada foi salva em outro aparelho"
                 descricao={erro || undefined}
                 tamanho="linha"
                 acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
@@ -990,7 +995,7 @@ export default function VistaFrequencia({
             ))}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 xl:order-1">
+        <div className="flex min-w-0 flex-col gap-4 pb-24 xl:order-1">
           <section
             id={idResumo}
             aria-label={tituloResumo}
@@ -1413,11 +1418,12 @@ export default function VistaFrequencia({
           </div>
           <div
             aria-label="Barra de salvamento"
-            className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 flex items-center gap-2 rounded-2xl p-2"
+            className="superficie-vidro vidro-flutuante sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 xl:mr-0 xl:ml-auto"
+            style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <p
               aria-live="polite"
-              className="text-muted-foreground min-w-0 flex-1 truncate px-2 text-xs font-medium"
+              className="text-muted-foreground max-w-48 min-w-0 truncate px-2 text-xs font-medium"
               title={feriado?.nome}
             >
               {feriado ? "Feriado" : tituloEstado}
@@ -1431,6 +1437,7 @@ export default function VistaFrequencia({
                     aria-label="Descartar"
                     title="Descartar alterações"
                     disabled={salvando}
+                    className="size-11 shrink-0"
                   >
                     <RotateCcw size={16} aria-hidden="true" />
                   </Button>
@@ -1450,7 +1457,7 @@ export default function VistaFrequencia({
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            <Button className="px-4" onClick={salvar} disabled={!podeSalvar}>
+            <Button className="h-11 shrink-0 px-4" onClick={salvar} disabled={!podeSalvar}>
               {salvando ? (
                 <LoaderCircle size={16} className="animate-spin" />
               ) : atualizadoEm && !sujo ? (

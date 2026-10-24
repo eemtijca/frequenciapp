@@ -11,6 +11,7 @@
 | [api.md](api.md)                                     | Contratos das rotas HTTP e Swagger UI em /api/docs.        |
 | [llms.txt](../public/llms.txt)                       | Índice da documentação para agentes de IA.                 |
 | [interface.md](interface.md)                         | Interface, movimento, PWA e acessibilidade.                |
+| [textos.md](textos.md)                               | Regras de texto, glossário e exemplos antes e depois.      |
 | [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
 | [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |

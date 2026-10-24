@@ -110,7 +110,7 @@ test.describe("Capturas do README", () => {
       animations: "disabled",
     });
 
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     await page.waitForTimeout(900);
     await page.screenshot({
       path: path.join(pastaImagens, "saidas-entradas-desktop.png"),

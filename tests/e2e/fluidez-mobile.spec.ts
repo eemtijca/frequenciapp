@@ -323,7 +323,12 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
     name: "Grade de frequência",
     exact: true,
   });
-  await grade.getByRole("button", { name: new RegExp(`^${turmaA} `) }).click();
+  const seletorTurma = grade.getByRole("combobox", {
+    name: "Turma de origem da grade",
+    exact: true,
+  });
+  await seletorTurma.click();
+  await page.getByRole("option", { name: new RegExp(`^${turmaA} \\(`) }).click();
   await grade.getByRole("searchbox", { name: "Buscar aluno", exact: true }).fill("alvaro");
   await grade.getByRole("combobox", { name: "Período da consulta", exact: true }).click();
   const primeira = page.waitForResponse((resposta) =>
@@ -361,10 +366,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   await expect(
     grade.getByRole("combobox", { name: "Período da consulta", exact: true }),
   ).toContainText("Um dia");
-  await expect(grade.getByRole("button", { name: new RegExp(`^${turmaA} `) })).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  await expect(seletorTurma).toContainText(turmaA);
   await expect(grade.getByRole("row").filter({ hasText: alvaro })).toHaveCount(1);
   const aposAba = consultas.length;
   await trocarVisao(page, "Horários", "horarios");

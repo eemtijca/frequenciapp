@@ -3,6 +3,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import {
+  descartarConfiguracoes,
+  enviarRascunhoConfiguracoes,
+  salvarConfiguracoes,
+} from "./helpers/configuracoes";
 
 async function abrirCatalogo(page: Page) {
   const secao = page.locator('[data-secao="config-liberadores"]');
@@ -24,6 +29,7 @@ test.describe("quem libera as saídas", () => {
   });
 
   test("administração mantém o catálogo e o formulário usa o nome novo", async ({ page }) => {
+    test.setTimeout(90_000);
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
@@ -34,8 +40,9 @@ test.describe("quem libera as saídas", () => {
     await page.locator("#liberador-rotulo").fill("E2E Porteiro");
     await secao.getByRole("button", { name: "Adicionar" }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
+    await salvarConfiguracoes(page);
 
-    await trocarVisao(page, "Saídas e entradas", "saidas");
+    await trocarVisao(page, "Saídas e Entradas", "saidas");
     await page.locator("#saida-turma").click();
     await page.getByRole("option", { name: "E2E Ano A" }).click();
     await page.locator("#saida-aluno").click();
@@ -55,6 +62,14 @@ test.describe("quem libera as saídas", () => {
     const catalogo = await abrirCatalogo(page);
     await catalogo.getByRole("button", { name: "Excluir E2E1" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
-    await expect(catalogo.getByText(/em uso em 1 saída/)).toBeVisible();
+    const resposta = await enviarRascunhoConfiguracoes(page);
+    expect(resposta.status()).toBe(409);
+    const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+    await expect(revisao.getByText("Responsável em uso")).toBeVisible();
+    await expect(revisao.getByText(/em uso em 1 saída/)).toBeVisible();
+    await expect(revisao.getByText(/A chamada foi salva em outro aparelho/)).toHaveCount(0);
+    await expect(revisao.getByText(/Confira a internet/)).toHaveCount(0);
+    await revisao.getByRole("button", { name: "Continuar revisando" }).click();
+    await descartarConfiguracoes(page);
   });
 });

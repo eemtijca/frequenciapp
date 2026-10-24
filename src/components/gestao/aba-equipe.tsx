@@ -41,6 +41,7 @@ import {
 interface Props {
   usuarioId: string;
   onMudanca: () => Promise<void>;
+  atualizacao?: number;
 }
 
 interface Formulario {
@@ -52,7 +53,7 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO" };
 
-export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
+export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
@@ -78,7 +79,7 @@ export default function AbaEquipe({ usuarioId, onMudanca }: Props) {
 
   useEffect(() => {
     void recarregar();
-  }, [recarregar]);
+  }, [recarregar, atualizacao]);
 
   const administradoresAtivos = useMemo(
     () => (usuarios ?? []).filter((u) => u.papel === "ADMIN" && u.ativo).length,

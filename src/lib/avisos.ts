@@ -20,12 +20,18 @@ export function avisarErro(
 ): void {
   // A sessão expirada tem fluxo próprio: o shell volta para a entrada com aviso.
   if (excecao instanceof ErroApi && excecao.status === 401) return;
+  const descricaoDaFalha =
+    excecao instanceof ErroApi
+      ? excecao.status === 0 || excecao.status >= 500
+        ? "Tente de novo em instantes."
+        : undefined
+      : "Confira a internet e tente de novo em instantes.";
   toast.error(mensagemAmigavel(excecao, opcoes.contexto), {
-    description: opcoes.descricao ?? "Confira a internet e tente de novo em instantes.",
+    description: opcoes.descricao ?? descricaoDaFalha,
     duration: 8000,
     id: opcoes.id,
     action: opcoes.tentarDeNovo
-      ? { label: "Tentar de novo", onClick: opcoes.tentarDeNovo }
+      ? { label: "Tentar novamente", onClick: opcoes.tentarDeNovo }
       : undefined,
   });
 }

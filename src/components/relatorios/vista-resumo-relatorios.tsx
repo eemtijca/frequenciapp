@@ -250,8 +250,7 @@ export default function ResumoRelatorios({
             ))}
           </dl>
           <p className="text-muted-foreground text-xs">
-            Alunos ativos por turma atual. Taxas sobre chamadas salvas; dias sem registro ficam sem
-            taxa.
+            Considera chamadas salvas. Dias sem registro ficam fora da taxa.
           </p>
           {dados.total.registrados === 0 ? (
             <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">

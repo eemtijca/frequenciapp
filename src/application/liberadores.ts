@@ -137,6 +137,7 @@ export async function removerLiberador(admin: { id: string }, codigo: string): P
     throw new ErroHttp(
       `Este responsável está em uso em ${total} ${total === 1 ? "saída" : "saídas"}. Desative em vez de excluir para preservar o histórico.`,
       409,
+      "LIBERADOR_EM_USO",
     );
   }
   await comTransacao(async (tx) => {

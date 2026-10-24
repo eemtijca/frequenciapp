@@ -2,7 +2,8 @@
 // com restauração das regras e imagens locais fora do versionamento.
 import { expect, test } from "@playwright/test";
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { abrirNotificacoes, aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { salvarConfiguracoes } from "./helpers/configuracoes";
 
 test.describe("configuração de notificações", () => {
   let anterior: ConfiguracaoNotificacoes;
@@ -48,8 +49,8 @@ test.describe("configuração de notificações", () => {
       .getByRole("listbox", { name: "Minutos" })
       .getByRole("option", { name: "30", exact: true })
       .click();
-    await secao.getByRole("button", { name: "Salvar notificações", exact: true }).click();
-    await expect(page.getByText("Configuração de notificações salva.")).toBeVisible();
+    await salvarConfiguracoes(page);
+    await expect(page.getByText("Configurações salvas.")).toBeVisible();
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
@@ -69,7 +70,7 @@ test.describe("configuração de notificações", () => {
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
     await secao.screenshot({
-      path: `docs/imagens/notificacoes-gestao-${test.info().project.name}.png`,
+      path: `docs/imagens/locais/notificacoes-gestao-${test.info().project.name}.png`,
     });
   });
 });
@@ -96,7 +97,7 @@ test.describe("notificações da coordenação", () => {
     try {
       await page.goto("/");
       await aguardarHidratacao(page);
-      await page.getByRole("button", { name: "Configurar notificações" }).click();
+      await abrirNotificacoes(page);
       const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
       await expect(
         dialogo.getByRole("switch", { name: "Chamadas pendentes", exact: true }),
@@ -105,7 +106,7 @@ test.describe("notificações da coordenação", () => {
       await expect(dialogo.getByRole("switch", { name: "Novas chamadas" })).toHaveCount(0);
       await expect(dialogo.getByText("Este aviso está desligado pela Gestão.")).toBeVisible();
       await dialogo.screenshot({
-        path: `docs/imagens/notificacoes-coordenacao-${test.info().project.name}.png`,
+        path: `docs/imagens/locais/notificacoes-coordenacao-${test.info().project.name}.png`,
       });
     } finally {
       expect(

@@ -23,17 +23,18 @@ for (const largura of [390, 800]) {
     await page.getByRole("tab", { name: "Configurações", exact: true }).click();
 
     const origem = page.getByRole("group", { name: "Turma de origem na Chamada", exact: true });
+    await origem.getByRole("switch").click();
+    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+    const confirmar = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
     const resposta = page.waitForResponse(
       (item) =>
-        new URL(item.url()).pathname === "/api/configuracoes" &&
-        item.request().method() === "PATCH",
+        new URL(item.url()).pathname === "/api/configuracoes/lote" &&
+        item.request().method() === "POST",
     );
-    await origem.getByRole("switch").click();
+    await confirmar.getByRole("button", { name: "Salvar configurações", exact: true }).click();
     expect((await resposta).status()).toBe(200);
 
-    const aviso = page
-      .locator("[data-sonner-toast]")
-      .filter({ hasText: "Indicação de origem atualizada." });
+    const aviso = page.locator("[data-sonner-toast]").filter({ hasText: "Configurações salvas." });
     await expect(aviso).toBeVisible();
     const cabecalho = page.getByRole("banner");
     const caixaCabecalho = await cabecalho.boundingBox();

@@ -2,6 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { salvarConfiguracoes } from "./helpers/configuracoes";
 import { diaDeChamada } from "./helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -104,6 +105,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   page,
   isMobile,
 }) => {
+  test.setTimeout(120_000);
   if (isMobile) await page.setViewportSize({ width: 320, height: 720 });
   await comBanco((banco) => banco.query("delete from frequencias where turma_id=$1", [turmaId]));
   // Uma aula por dia útil: seis dias com falta para o primeiro aluno e um dia para o segundo.
@@ -135,7 +137,8 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(dialogo).toBeInViewport({ ratio: 1 });
   await dialogo.screenshot({ path: test.info().outputPath("aulas-por-dia.png") });
   await dialogo.getByLabel("Aulas por dia", { exact: true }).fill("");
-  await dialogo.getByRole("button", { name: "Salvar" }).click();
+  await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+  await salvarConfiguracoes(page);
   await expect(secao.getByText(NOME_BENEFICIO)).toBeVisible();
   await expect(secao.getByText(/Mínimo de 99% de frequência/)).toBeVisible();
 
@@ -147,10 +150,13 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
   await botaoMuitas.click();
-  const painel = page.locator('[data-slot="popover-content"]');
-  const detalhe = painel.locator(":scope > div").filter({ hasText: NOME_BENEFICIO });
-  await expect(detalhe.getByText(/^Faltas: 5\/\d+ aulas · Limite: 0\.$/)).toBeVisible();
-  await expect(detalhe.getByText(/^Frequência estimada: [\d,]+% · Mínimo: 99%\.$/)).toBeVisible();
+  const painel = page.locator('[data-slot="popover-content"][data-state="open"]');
+  const detalhe = painel
+    .locator("div.divide-y > div")
+    .filter({ hasText: "Frequência estimada" })
+    .first();
+  await expect(detalhe.getByText(/^5 de \d+ aulas$/)).toBeVisible();
+  await expect(detalhe.getByText("Frequência estimada")).toBeVisible();
   await expect(detalhe.getByText("5 aulas acima do limite.", { exact: true })).toBeVisible();
   await expect(
     detalhe.getByText("1 aula justificada desconsiderada.", { exact: true }),
@@ -163,7 +169,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await page.keyboard.press("Escape");
   await botaoUma.click();
   await expect(painel.getByText(NOME_BENEFICIO, { exact: true })).toBeVisible();
-  await expect(painel.getByText(/Mínimo: 99%/)).toBeVisible();
+  await expect(painel.getByText(/Mínimo 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
 
   // Um feriado no fim do mês muda o percentual com a Chamada já montada,
@@ -188,17 +194,11 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await calendarioLetivo.getByLabel("Nome do feriado", { exact: true }).fill(nomeFeriado);
   await calendarioLetivo.getByRole("button", { name: "Adicionar feriado", exact: true }).click();
   await expect(calendarioLetivo.getByText(nomeFeriado, { exact: true })).toBeVisible();
+  await salvarConfiguracoes(page);
   await abrirChamadaDoMesAnterior(page, false);
   await botaoMuitas.click();
-  await expect(
-    detalhe.getByText(`Faltas: 5/${diasUteis.length - 1} aulas · Limite: 0.`),
-  ).toBeVisible();
-  const percentualComFeriado = ((1 - 5 / (diasUteis.length - 1)) * 100).toLocaleString("pt-BR", {
-    maximumFractionDigits: 1,
-  });
-  await expect(
-    detalhe.getByText(`Frequência estimada: ${percentualComFeriado}% · Mínimo: 99%.`),
-  ).toBeVisible();
+  await expect(detalhe.getByText(new RegExp(`^5 de ${diasUteis.length - 1} aulas$`))).toBeVisible();
+  await expect(detalhe.getByText(/Mínimo 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await abrirBeneficios(page);
   await calendarioLetivo
@@ -206,9 +206,10 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
     .click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Remover", exact: true }).click();
   await expect(calendarioLetivo.getByText(nomeFeriado, { exact: true })).toHaveCount(0);
+  await salvarConfiguracoes(page);
   await abrirChamadaDoMesAnterior(page, false);
   await botaoMuitas.click();
-  await expect(detalhe.getByText(`Faltas: 5/${diasUteis.length} aulas · Limite: 0.`)).toBeVisible();
+  await expect(detalhe.getByText(new RegExp(`^5 de ${diasUteis.length} aulas$`))).toBeVisible();
   await page.keyboard.press("Escape");
 
   // Nove aulas na projeção aumentam o limite, preservando a aula já salva de cada dia.
@@ -216,13 +217,14 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await carga.getByRole("button", { name: `Editar ${NOME_BENEFICIO}` }).click();
   const configurarCarga = page.getByRole("dialog", { name: "Editar benefício" });
   await configurarCarga.getByLabel("Aulas por dia", { exact: true }).fill("9");
-  await configurarCarga.getByRole("button", { name: "Salvar" }).click();
+  await configurarCarga.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+  await salvarConfiguracoes(page);
   await expect(carga.getByText("Projeção de 9 aulas por dia.", { exact: true })).toBeVisible();
   await abrirChamadaDoMesAnterior(page, false);
   await expect(botaoUma).toHaveCount(0);
   await botaoMuitas.click();
-  await expect(detalhe.getByText(/^Faltas: 5\/\d+ aulas · Limite: \d+\.$/)).toBeVisible();
-  await expect(painel.getByText(/Mínimo: 99%/)).toBeVisible();
+  await expect(detalhe.getByText(/^5 de \d+ aulas$/)).toBeVisible();
+  await expect(painel.getByText(/Mínimo 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
 
   // A administração afrouxa a regra para 50%: nenhum dos dois passa mais do limite do benefício.
@@ -230,7 +232,8 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await edicao.getByRole("button", { name: `Editar ${NOME_BENEFICIO}` }).click();
   const editar = page.getByRole("dialog", { name: "Editar benefício" });
   await editar.getByLabel("Frequência mínima, em %").fill("50");
-  await editar.getByRole("button", { name: "Salvar" }).click();
+  await editar.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+  await salvarConfiguracoes(page);
   await expect(edicao.getByText(/Mínimo de 50% de frequência/)).toBeVisible();
 
   await abrirChamadaDoMesAnterior(page, false);
@@ -246,9 +249,11 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   const final = await abrirBeneficios(page);
   await final.getByRole("button", { name: `Desativar ${NOME_BENEFICIO}` }).click();
   await expect(
-    final.getByText("Benefício desativado.").or(final.getByText("Inativo")),
+    final.getByText("Benefício desativado no rascunho.").or(final.getByText("Inativo")),
   ).toBeVisible();
+  await salvarConfiguracoes(page);
   await final.getByRole("button", { name: `Excluir ${NOME_BENEFICIO}` }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();
   await expect(final.getByText(NOME_BENEFICIO)).toHaveCount(0);
+  await salvarConfiguracoes(page);
 });

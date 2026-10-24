@@ -90,8 +90,8 @@ const PRESETS: Record<VarianteEstado, Preset> = {
   },
   conflito: {
     icone: RefreshCw,
-    titulo: "A chamada foi salva em outro aparelho",
-    descricao: "Revise as marcações e salve de novo.",
+    titulo: "Não foi possível concluir",
+    descricao: "Revise os dados e tente novamente.",
     tom: "aviso",
   },
   offline: {

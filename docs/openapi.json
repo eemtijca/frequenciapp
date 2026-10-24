@@ -4462,7 +4462,8 @@
                         "origemNaChamada": false,
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -4524,7 +4525,8 @@
                         "origemNaChamada": true,
                         "origemNaChamadaSerieIds": ["5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b"],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -6495,11 +6497,11 @@
           "403": {
             "$ref": "#/components/responses/Erro403"
           },
-          "503": {
-            "$ref": "#/components/responses/Erro503"
-          },
           "409": {
             "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
           }
         }
       }
@@ -6654,11 +6656,11 @@
           "404": {
             "$ref": "#/components/responses/Erro404"
           },
-          "503": {
-            "$ref": "#/components/responses/Erro503"
-          },
           "409": {
             "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
           }
         }
       }
@@ -7117,6 +7119,9 @@
           "403": {
             "$ref": "#/components/responses/Erro403"
           },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
           "429": {
             "description": "Prévias em excesso.",
             "content": {
@@ -7156,9 +7161,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
-          },
-          "409": {
-            "$ref": "#/components/responses/Erro409"
           }
         }
       }
@@ -11198,14 +11200,14 @@
         "description": "A exportação sem confirmação foi encerrada. Com sessão administrativa responde 405 e orienta usar backup/exportar; não devolve dados escolares.",
         "tags": ["backup"],
         "responses": {
-          "405": {
-            "$ref": "#/components/responses/Erro405"
-          },
           "401": {
             "$ref": "#/components/responses/Erro401"
           },
           "403": {
             "$ref": "#/components/responses/Erro403"
+          },
+          "405": {
+            "$ref": "#/components/responses/Erro405"
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -11247,7 +11249,8 @@
                       "origemNaChamada": false,
                       "origemNaChamadaSerieIds": [],
                       "origemNaChamadaTurmaIds": [],
-                      "feriados": []
+                      "feriados": [],
+                      "atualizadoEm": "2026-10-13T17:30:00.000Z"
                     }
                   }
                 }
@@ -11364,7 +11367,8 @@
                         "origemNaChamada": false,
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
-                        "feriados": []
+                        "feriados": [],
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
                       }
                     }
                   }
@@ -11697,6 +11701,19 @@
               }
             }
           },
+          "413": {
+            "description": "Corpo acima de 1.000.000 bytes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "example": {
+                  "error": "O conteúdo enviado é grande demais para processar."
+                }
+              }
+            }
+          },
           "429": {
             "description": "Limite de conferências atingido.",
             "content": {
@@ -11714,19 +11731,274 @@
                 }
               }
             }
-          },
-          "413": {
-            "description": "Corpo acima de 1.000.000 bytes.",
+          }
+        }
+      }
+    },
+    "/api/configuracoes/completo": {
+      "get": {
+        "operationId": "obterConfiguracoesCompletas",
+        "summary": "Consultar o conjunto completo de configurações",
+        "description": "Apenas administração. Devolve recursos, catálogos, notificações, acesso, almoço, calendário e chaves do BI sem segredo, com o mapa de revisões por seção.",
+        "tags": ["configuracoes"],
+        "responses": {
+          "200": {
+            "description": "Conjunto completo de configurações e revisões.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Erro"
+                  "$ref": "#/components/schemas/ConfiguracoesCompletas"
                 },
-                "example": {
-                  "error": "O conteúdo enviado é grande demais para processar."
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "configuracoes": {
+                        "frequenciaPorAula": false,
+                        "saidaAntecipada": true,
+                        "origemNaChamada": false,
+                        "origemNaChamadaSerieIds": [],
+                        "origemNaChamadaTurmaIds": [],
+                        "feriados": [
+                          {
+                            "dia": "2026-09-07",
+                            "nome": "Independência do Brasil"
+                          }
+                        ],
+                        "atualizadoEm": "2026-10-24T12:00:00.000Z"
+                      },
+                      "notificacoes": {
+                        "resumoDiario": true,
+                        "novasChamadas": true,
+                        "chamadasPendentes": false,
+                        "horarioResumo": "17:00",
+                        "horarioPendencias": "17:00"
+                      },
+                      "acesso": {
+                        "validadePalavraDias": 90,
+                        "sessaoDiretorHoras": 12,
+                        "tentativasPorOrigem": 10,
+                        "tentativasPorLogin": 30,
+                        "janelaMinutos": 15,
+                        "categoriasDiretor": ["faltas"],
+                        "limiteRiscoPercentual": 25
+                      },
+                      "ordemAlmoco": [
+                        {
+                          "diaSemana": 1,
+                          "itens": []
+                        }
+                      ],
+                      "beneficios": [
+                        {
+                          "id": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f7a",
+                          "nome": "Bolsa Escola",
+                          "percentualMinimoFrequencia": 99,
+                          "aulasPorDia": 9,
+                          "faltasJustificadasContam": false,
+                          "ativo": true
+                        }
+                      ],
+                      "justificativas": [
+                        {
+                          "codigo": "D",
+                          "rotulo": "Doente",
+                          "ativo": true
+                        }
+                      ],
+                      "liberadores": [
+                        {
+                          "codigo": "S1",
+                          "rotulo": "Coordenação",
+                          "ativo": true
+                        }
+                      ],
+                      "feriados": [
+                        {
+                          "dia": "2026-09-07",
+                          "nome": "Independência do Brasil"
+                        }
+                      ],
+                      "chavesBi": [],
+                      "revisoes": {
+                        "configuracao": "hash-da-configuracao",
+                        "notificacoes": "hash-das-notificacoes",
+                        "acesso": "hash-do-acesso",
+                        "ordemAlmoco": "hash-da-ordem",
+                        "beneficios": "hash-dos-beneficios",
+                        "justificativas": "hash-das-justificativas",
+                        "liberadores": "hash-dos-liberadores",
+                        "feriados": "hash-dos-feriados",
+                        "chavesBi": "hash-das-chaves"
+                      }
+                    }
+                  }
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/configuracoes/lote": {
+      "post": {
+        "operationId": "salvarConfiguracoesEmLote",
+        "summary": "Gravar o rascunho de configurações em lote",
+        "description": "Apenas administração. Confere as revisões por seção, grava tudo em uma transação serializável e devolve o conjunto atualizado. Chaves do BI exigem a senha do administrador; o segredo aparece uma única vez.",
+        "tags": ["configuracoes"],
+        "requestBody": {
+          "required": true,
+          "description": "Revisões lidas e o estado desejado das seções alteradas.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfiguracoesLoteCorpo"
+              },
+              "examples": {
+                "Exemplo": {
+                  "summary": "Exemplo",
+                  "value": {
+                    "revisoes": {
+                      "configuracoes": "hash-da-configuracao",
+                      "justificativas": "hash-das-justificativas"
+                    },
+                    "desejado": {
+                      "justificativas": [
+                        {
+                          "codigo": "D",
+                          "rotulo": "Doente",
+                          "ativo": true
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lote gravado e conjunto atualizado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracoesLoteResposta"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "completo": {
+                        "configuracoes": {
+                          "frequenciaPorAula": false,
+                          "saidaAntecipada": true,
+                          "origemNaChamada": false,
+                          "origemNaChamadaSerieIds": [],
+                          "origemNaChamadaTurmaIds": [],
+                          "feriados": [
+                            {
+                              "dia": "2026-09-07",
+                              "nome": "Independência do Brasil"
+                            }
+                          ],
+                          "atualizadoEm": "2026-10-24T12:00:00.000Z"
+                        },
+                        "notificacoes": {
+                          "resumoDiario": true,
+                          "novasChamadas": true,
+                          "chamadasPendentes": false,
+                          "horarioResumo": "17:00",
+                          "horarioPendencias": "17:00"
+                        },
+                        "acesso": {
+                          "validadePalavraDias": 90,
+                          "sessaoDiretorHoras": 12,
+                          "tentativasPorOrigem": 10,
+                          "tentativasPorLogin": 30,
+                          "janelaMinutos": 15,
+                          "categoriasDiretor": ["faltas"],
+                          "limiteRiscoPercentual": 25
+                        },
+                        "ordemAlmoco": [
+                          {
+                            "diaSemana": 1,
+                            "itens": []
+                          }
+                        ],
+                        "beneficios": [
+                          {
+                            "id": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f7a",
+                            "nome": "Bolsa Escola",
+                            "percentualMinimoFrequencia": 99,
+                            "aulasPorDia": 9,
+                            "faltasJustificadasContam": false,
+                            "ativo": true
+                          }
+                        ],
+                        "justificativas": [
+                          {
+                            "codigo": "D",
+                            "rotulo": "Doente",
+                            "ativo": true
+                          }
+                        ],
+                        "liberadores": [
+                          {
+                            "codigo": "S1",
+                            "rotulo": "Coordenação",
+                            "ativo": true
+                          }
+                        ],
+                        "feriados": [
+                          {
+                            "dia": "2026-09-07",
+                            "nome": "Independência do Brasil"
+                          }
+                        ],
+                        "chavesBi": [],
+                        "revisoes": {
+                          "configuracao": "hash-da-configuracao",
+                          "notificacoes": "hash-das-notificacoes",
+                          "acesso": "hash-do-acesso",
+                          "ordemAlmoco": "hash-da-ordem",
+                          "beneficios": "hash-dos-beneficios",
+                          "justificativas": "hash-das-justificativas",
+                          "liberadores": "hash-dos-liberadores",
+                          "feriados": "hash-dos-feriados",
+                          "chavesBi": "hash-das-chaves"
+                        }
+                      },
+                      "segredosBi": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
           }
         }
       }
@@ -14778,7 +15050,13 @@
         "type": "object",
         "title": "Configurações da escola",
         "description": "Recursos configuráveis da operação escolar, com o calendário de feriados.",
-        "required": ["frequenciaPorAula", "saidaAntecipada", "origemNaChamada", "feriados"],
+        "required": [
+          "frequenciaPorAula",
+          "saidaAntecipada",
+          "origemNaChamada",
+          "feriados",
+          "atualizadoEm"
+        ],
         "properties": {
           "frequenciaPorAula": {
             "type": "boolean",
@@ -14813,6 +15091,12 @@
             "items": {
               "$ref": "#/components/schemas/Feriado"
             }
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Versão da última gravação, usada na revisão otimista.",
+            "example": "2026-10-13T17:30:00.000Z"
           }
         }
       },
@@ -14852,6 +15136,12 @@
               "format": "uuid"
             },
             "example": ["3a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"]
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Versão lida em GET. Se divergir da vigente, a API responde 409.",
+            "example": "2026-10-13T17:30:00.000Z"
           }
         }
       },
@@ -18662,6 +18952,351 @@
                     }
                   ],
                   "example": "11:50"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ConfiguracoesCompletas": {
+        "type": "object",
+        "title": "Conjunto completo de configurações",
+        "description": "Seções da tela de Configurações com o mapa de revisões usado no salvamento otimista.",
+        "required": [
+          "configuracoes",
+          "notificacoes",
+          "acesso",
+          "ordemAlmoco",
+          "beneficios",
+          "justificativas",
+          "liberadores",
+          "feriados",
+          "chavesBi",
+          "revisoes"
+        ],
+        "properties": {
+          "configuracoes": {
+            "$ref": "#/components/schemas/Configuracoes"
+          },
+          "notificacoes": {
+            "type": "object",
+            "description": "Regras globais de aviso da escola.",
+            "properties": {
+              "resumoDiario": {
+                "type": "boolean",
+                "example": true
+              },
+              "novasChamadas": {
+                "type": "boolean",
+                "example": true
+              },
+              "chamadasPendentes": {
+                "type": "boolean",
+                "example": false
+              },
+              "horarioResumo": {
+                "type": "string",
+                "example": "17:00"
+              },
+              "horarioPendencias": {
+                "type": "string",
+                "example": "17:00"
+              }
+            }
+          },
+          "acesso": {
+            "type": "object",
+            "description": "Parâmetros de acesso dos diretores de turma.",
+            "properties": {
+              "validadePalavraDias": {
+                "type": "integer",
+                "example": 90
+              },
+              "sessaoDiretorHoras": {
+                "type": "integer",
+                "example": 12
+              },
+              "tentativasPorOrigem": {
+                "type": "integer",
+                "example": 10
+              },
+              "tentativasPorLogin": {
+                "type": "integer",
+                "example": 30
+              },
+              "janelaMinutos": {
+                "type": "integer",
+                "example": 15
+              },
+              "categoriasDiretor": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": ["faltas"]
+              },
+              "limiteRiscoPercentual": {
+                "type": "integer",
+                "example": 25
+              }
+            }
+          },
+          "ordemAlmoco": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "diaSemana": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "itens": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "turmaId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "posicao": {
+                        "type": "integer",
+                        "example": 1
+                      },
+                      "inicio": {
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "example": "11:50"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "beneficios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "nome": {
+                  "type": "string",
+                  "example": "Bolsa Escola"
+                },
+                "percentualMinimoFrequencia": {
+                  "type": "integer",
+                  "example": 99
+                },
+                "aulasPorDia": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "example": 9
+                },
+                "faltasJustificadasContam": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "ativo": {
+                  "type": "boolean",
+                  "example": true
+                }
+              }
+            }
+          },
+          "justificativas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo": {
+                  "type": "string",
+                  "example": "D"
+                },
+                "rotulo": {
+                  "type": "string",
+                  "example": "Doente"
+                },
+                "ativo": {
+                  "type": "boolean",
+                  "example": true
+                }
+              }
+            }
+          },
+          "liberadores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "codigo": {
+                  "type": "string",
+                  "example": "S1"
+                },
+                "rotulo": {
+                  "type": "string",
+                  "example": "Coordenação"
+                },
+                "ativo": {
+                  "type": "boolean",
+                  "example": true
+                }
+              }
+            }
+          },
+          "feriados": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Feriado"
+            }
+          },
+          "chavesBi": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChaveBi"
+            }
+          },
+          "revisoes": {
+            "type": "object",
+            "description": "Versão de cada seção, comparada antes de gravar o lote.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "configuracao": "hash-da-configuracao",
+              "justificativas": "hash-das-justificativas"
+            }
+          }
+        }
+      },
+      "ConfiguracoesLoteCorpo": {
+        "type": "object",
+        "title": "Lote de configurações",
+        "description": "Revisões lidas na abertura e o estado desejado apenas das seções alteradas.",
+        "required": ["revisoes", "desejado"],
+        "properties": {
+          "revisoes": {
+            "type": "object",
+            "description": "Mapa de revisões por seção.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "desejado": {
+            "type": "object",
+            "description": "Seções alteradas, com catálogos completos quando presentes.",
+            "properties": {
+              "configuracoes": {
+                "$ref": "#/components/schemas/ConfiguracoesCorpo"
+              },
+              "notificacoes": {
+                "type": "object"
+              },
+              "acesso": {
+                "type": "object"
+              },
+              "ordemAlmoco": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "diaSemana": {
+                      "type": "integer",
+                      "example": 1
+                    },
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              },
+              "beneficios": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "justificativas": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "liberadores": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "feriados": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Feriado"
+                }
+              },
+              "chavesBi": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "limparChavesBi": {
+                "type": "boolean",
+                "description": "Remove do histórico as chaves revogadas e expiradas.",
+                "example": false
+              }
+            }
+          },
+          "senhaBi": {
+            "type": "string",
+            "description": "Senha do administrador, exigida quando alguma chave do BI muda.",
+            "example": "senha-do-administrador"
+          }
+        }
+      },
+      "ConfiguracoesLoteResposta": {
+        "type": "object",
+        "title": "Resultado do lote de configurações",
+        "required": ["completo", "segredosBi"],
+        "properties": {
+          "completo": {
+            "$ref": "#/components/schemas/ConfiguracoesCompletas"
+          },
+          "segredosBi": {
+            "type": "array",
+            "description": "Segredos das chaves criadas ou substituídas, exibidos uma única vez.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "rotulo": {
+                  "type": "string",
+                  "example": "Painel da direção"
+                },
+                "segredo": {
+                  "type": "string",
+                  "example": "fbi_..."
                 }
               }
             }

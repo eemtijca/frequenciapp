@@ -10,6 +10,7 @@ import {
   restaurarParametrosAcessoE2E,
 } from "./helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { salvarConfiguracoes } from "./helpers/configuracoes";
 
 test.describe("diretores de turma na Gestão", () => {
   test.beforeAll(async () => {
@@ -139,8 +140,8 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(validade).toHaveValue("90");
     await validade.fill("30");
     await expect(secao.getByLabel("Faltas", { exact: true })).toBeDisabled();
-    await secao.getByRole("button", { name: "Salvar parâmetros" }).click();
-    await expect(page.getByText("Parâmetros de acesso salvos.")).toBeVisible();
+    await salvarConfiguracoes(page);
+    await expect(page.getByText("Configurações salvas.")).toBeVisible();
     await expect(secao.getByText("Palavra por 30 dias")).toBeVisible();
   });
 

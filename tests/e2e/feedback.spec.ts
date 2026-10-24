@@ -55,7 +55,11 @@ test.describe("toasts e toque duplo", () => {
     await painel.getByRole("tab", { name: "Grade" }).click();
     const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) await pilula.click();
-    await painel.locator("table").first().waitFor();
+    await painel
+      .getByRole("tabpanel", { name: "Grade", exact: true })
+      .locator("table")
+      .first()
+      .waitFor();
     await page.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
     const downloadDialogo = page.getByRole("dialog", { name: "Preparar download" });
     await downloadDialogo.getByLabel("Arquivo original sem senha").check();

@@ -5,6 +5,7 @@ import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "./helpers/banco";
 import { diaDeChamada } from "./helpers/dia";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "./helpers/pagina";
+import { enviarRascunhoConfiguracoes, salvarConfiguracoes } from "./helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 
@@ -113,19 +114,32 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   return secao;
 }
 
+/** Escolhe o ano no popover, percorrendo os blocos até encontrá-lo. */
+async function escolherAno(page: Page, secao: Locator, ano: string) {
+  const gatilho = secao.getByLabel("Ano do calendário", { exact: true });
+  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
+  const painel = page.getByRole("dialog", { name: "Ano do calendário", exact: true });
+  await expect(painel).toBeVisible();
+  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
+    const alvo = painel.getByRole("button", { name: ano, exact: true });
+    if ((await alvo.count()) > 0) {
+      await alvo.click();
+      await expect(painel).toBeHidden();
+      return;
+    }
+    const anterior = painel.getByRole("button", { name: "Bloco de anos anterior", exact: true });
+    if (await anterior.isDisabled()) break;
+    await anterior.click();
+  }
+  throw new Error(`Ano ${ano} não encontrado no calendário.`);
+}
+
 async function adicionarPelaInterface(page: Page, secao: Locator, dia: string, nome: string) {
-  await secao.getByLabel("Ano do calendário", { exact: true }).fill(dia.slice(0, 4));
+  await escolherAno(page, secao, dia.slice(0, 4));
   await escolherDia(page, secao, "calendario-feriado-data", "Data do feriado", dia);
   await secao.getByLabel("Nome do feriado", { exact: true }).fill(nome);
-  const [resposta] = await Promise.all([
-    page.waitForResponse(
-      (item) =>
-        new URL(item.url()).pathname === "/api/calendario-letivo" &&
-        item.request().method() === "POST",
-    ),
-    secao.getByRole("button", { name: "Adicionar feriado", exact: true }).click(),
-  ]);
-  return resposta;
+  await secao.getByRole("button", { name: "Adicionar feriado", exact: true }).click();
+  return enviarRascunhoConfiguracoes(page);
 }
 
 async function chamada(page: Page, recarregar = false): Promise<Locator> {
@@ -210,22 +224,21 @@ test.afterAll(limparMassa);
 test("cadastra feriado no ano escolhido, recarrega e remove somente após confirmar", async ({
   page,
 }, info) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   let secao = await abrirCalendario(page);
   const ano = secao.getByLabel("Ano do calendário", { exact: true });
-  await expect(ano).toHaveAttribute("min", "1900");
-  await expect(ano).toHaveAttribute("max", "2199");
-  expect((await adicionarPelaInterface(page, secao, DIA_ANUAL, NOME_ANUAL)).status()).toBe(201);
+  await expect(ano).toHaveAttribute("aria-haspopup", "dialog");
+  expect((await adicionarPelaInterface(page, secao, DIA_ANUAL, NOME_ANUAL)).status()).toBe(200);
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
-  await secao.getByRole("button", { name: "Ano seguinte", exact: true }).click();
-  await expect(ano).toHaveValue("1995");
+  await escolherAno(page, secao, "1995");
+  await expect(ano).toContainText("1995");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toHaveCount(0);
-  await secao.getByRole("button", { name: "Ano anterior", exact: true }).click();
-  await expect(ano).toHaveValue("1994");
+  await escolherAno(page, secao, "1994");
+  await expect(ano).toContainText("1994");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
 
   secao = await abrirCalendario(page);
-  await secao.getByLabel("Ano do calendário", { exact: true }).fill("1994");
+  await escolherAno(page, secao, "1994");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
   for (const largura of [320, 360, 1280]) {
     await page.setViewportSize({ width: largura, height: 900 });
@@ -251,6 +264,7 @@ test("cadastra feriado no ano escolhido, recarrega e remove somente após confir
   await remover.click();
   await dialogo.getByRole("button", { name: /^(Remover feriado|Remover)$/ }).click();
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toHaveCount(0);
+  await salvarConfiguracoes(page);
   const resposta = await page.request.get("/api/calendario-letivo?ano=1994");
   const dados = (await resposta.json()) as { feriados: { dia: string; nome: string }[] };
   expect(dados.feriados.some((item) => item.dia === DIA_ANUAL)).toBe(false);
@@ -350,10 +364,12 @@ test("recusa transformar chamada salva em feriado e preserva a frequência após
   expect(await resposta.json()).toMatchObject({
     error: expect.stringContaining("frequência salva"),
   });
+  const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+  await expect(revisao.getByText(/frequência salva/)).toBeVisible();
+  await revisao.getByRole("button", { name: "Recarregar tudo e descartar" }).click();
+  await expect(revisao).toBeHidden();
   await expect(secaoCalendario.getByText(proposta, { exact: true })).toHaveCount(0);
-  await expect(
-    secaoCalendario.getByRole("button", { name: "Adicionar feriado", exact: true }),
-  ).toBeEnabled();
+  await expect(secaoCalendario.getByLabel("Nome do feriado", { exact: true })).toBeEnabled();
   expect(await lerChamada(page, diaProtegido)).toEqual(antes);
   const inexistente = await page.request.delete(`/api/calendario-letivo/${diaProtegido}`);
   expect(inexistente.status()).toBe(404);
@@ -363,42 +379,28 @@ test("recusa transformar chamada salva em feriado e preserva a frequência após
   expect(dados.feriados.some((item) => item.dia === diaProtegido)).toBe(false);
 });
 
-test("recarrega após falha de leitura sem cadastrar o mesmo feriado novamente", async ({
-  page,
-}) => {
+test("falha do lote mantém o feriado no rascunho e permite tentar de novo", async ({ page }) => {
   const secao = await abrirCalendario(page);
-  let falhar = true;
-  let cadastros = 0;
-  page.on("request", (pedido) => {
-    if (pedido.method() === "POST" && new URL(pedido.url()).pathname === "/api/calendario-letivo")
-      cadastros += 1;
-  });
-  await page.route("**/api/configuracoes", async (rota) => {
-    if (falhar && rota.request().method() === "GET") {
-      await rota.fulfill({
-        status: 503,
-        json: { error: "Não foi possível atualizar o calendário." },
-      });
-    } else {
-      await rota.continue();
-    }
-  });
-  expect((await adicionarPelaInterface(page, secao, DIA_ANUAL, NOME_ANUAL)).status()).toBe(201);
-  const recarregar = secao.getByRole("button", { name: "Recarregar calendário", exact: true });
-  await expect(recarregar).toBeEnabled();
-  await expect(
-    secao.getByRole("button", { name: "Adicionar feriado", exact: true }),
-  ).toBeDisabled();
-  expect(cadastros).toBe(1);
+  await escolherAno(page, secao, DIA_ANUAL.slice(0, 4));
+  await escolherDia(page, secao, "calendario-feriado-data", "Data do feriado", DIA_ANUAL);
+  await secao.getByLabel("Nome do feriado", { exact: true }).fill(NOME_ANUAL);
+  await secao.getByRole("button", { name: "Adicionar feriado", exact: true }).click();
+  await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
+
+  await page.route("**/api/configuracoes/lote", (rota) => rota.abort("failed"));
+  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+  await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await expect(revisao).toBeVisible();
+  await expect(revisao.getByText(/Não foi possível salvar as configurações/)).toBeVisible();
+  await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
+
+  await page.unroute("**/api/configuracoes/lote");
+  await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await expect(revisao).toBeHidden();
   const resposta = await page.request.get("/api/calendario-letivo?ano=1994");
   const dados = (await resposta.json()) as { feriados: { dia: string; nome: string }[] };
   expect(dados.feriados).toContainEqual({ dia: DIA_ANUAL, nome: NOME_ANUAL });
-  falhar = false;
-  await recarregar.click();
-  await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
-  await expect(recarregar).toHaveCount(0);
-  await expect(secao.getByLabel("Nome do feriado", { exact: true })).toBeEnabled();
-  expect(cadastros).toBe(1);
 });
 
 test("preserva o rascunho quando outro administrador cadastra feriado e permite salvar após sua remoção", async ({

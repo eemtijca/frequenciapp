@@ -1,13 +1,14 @@
 "use client";
 
-// Tela de entrada: cartão único no celular e painel institucional no desktop.
+// Tela de entrada: marca e recursos no desktop, formulário único no celular.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, LoaderCircle, LockKeyhole, WifiOff } from "lucide-react";
+import { CalendarCheck, DoorOpen, LoaderCircle, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logotipo } from "@/components/ui/logotipo";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import DialogoSobre from "@/components/dialogo-sobre";
@@ -19,8 +20,8 @@ const CHAVE_AVISO = "frequenciapp:aviso-entrada";
 
 const DESTAQUES = [
   { Icone: CalendarCheck, texto: "Chamada do dia com saída por aula" },
-  { Icone: LockKeyhole, texto: "Acesso pessoal, sem cadastro público" },
-  { Icone: WifiOff, texto: "Rascunho local enquanto a rede oscila" },
+  { Icone: DoorOpen, texto: "Saídas e entradas registradas na hora" },
+  { Icone: WifiOff, texto: "Rascunho local quando a rede falha" },
 ];
 
 interface Props {
@@ -105,51 +106,47 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <div className="absolute top-3 right-3 z-10">
-        <SeletorTema />
-      </div>
-
-      <aside className="superficie-vidro hidden flex-col justify-between rounded-none border-0 border-r p-10 lg:flex xl:p-14">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="vidro-selecionado flex size-10 items-center justify-center rounded-2xl">
-              <CalendarCheck size={20} aria-hidden="true" />
-            </span>
-            <span className="text-lg font-semibold tracking-tight">FrequenciApp</span>
+      <aside className="superficie-vidro hidden flex-col items-center justify-center rounded-none border-0 border-r p-10 lg:flex xl:p-14">
+        <div className="flex w-full max-w-md flex-col gap-10">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <Logotipo tamanho={56} priority />
+            <span className="text-xl font-semibold tracking-tight">FrequenciApp</span>
+            <h2 className="max-w-sm text-3xl leading-tight font-semibold tracking-tight">
+              A frequência da escola em um só lugar.
+            </h2>
+            <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
+              Chamada, saídas e relatórios da equipe da escola.
+            </p>
           </div>
-          <h2 className="mt-14 max-w-md text-3xl leading-tight font-semibold tracking-tight">
-            A frequência da escola em um só lugar.
-          </h2>
-          <p className="text-muted-foreground mt-4 max-w-md text-sm leading-relaxed">
-            Uma chamada por turma e dia, compartilhada pela coordenação, com as saídas no meio da
-            aula registradas aula a aula.
-          </p>
+          <ul className="flex flex-col gap-3">
+            {DESTAQUES.map(({ Icone, texto }) => (
+              <li
+                key={texto}
+                className="vidro-reflexo text-muted-foreground flex items-center gap-3 rounded-2xl border border-[var(--vidro-borda)] px-4 py-3 text-sm"
+              >
+                <span className="vidro-selecionado text-primary flex size-9 shrink-0 items-center justify-center rounded-xl">
+                  <Icone size={17} aria-hidden="true" />
+                </span>
+                {texto}
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="flex flex-col gap-3">
-          {DESTAQUES.map(({ Icone, texto }) => (
-            <li key={texto} className="text-muted-foreground flex items-center gap-2.5 text-sm">
-              <Icone size={16} aria-hidden="true" />
-              {texto}
-            </li>
-          ))}
-        </ul>
       </aside>
 
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
-        <div className="superficie-vidro flex w-full max-w-sm flex-col gap-7 p-6 sm:max-w-md sm:p-8">
-          <div className="flex flex-col items-center gap-3 text-center lg:items-start lg:text-left">
-            <div
-              className="vidro-selecionado flex size-12 items-center justify-center rounded-2xl lg:hidden"
-              aria-hidden="true"
-            >
-              <LockKeyhole size={22} strokeWidth={1.8} />
+        <div className="superficie-vidro flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col items-center gap-3 text-center lg:items-start lg:text-left">
+              <Logotipo tamanho={48} className="lg:hidden" priority />
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Registro de frequência dos alunos da escola.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Registro de frequência dos alunos da escola.
-              </p>
-            </div>
+            <SeletorTema className="shrink-0" />
           </div>
 
           {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}
@@ -225,19 +222,18 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
             </Button>
           </form>
 
-          <Button asChild variant="outline">
-            <a href="/bi">Abrir FrequenciBI</a>
-          </Button>
-
-          <p className="text-muted-foreground text-center text-xs leading-relaxed lg:text-left">
-            Acesso pessoal. As contas são criadas pela administração da escola e a recuperação de
-            senha é feita com ela, sem cadastro público.
-          </p>
-
           <nav
-            aria-label="Projeto"
-            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs lg:justify-start"
+            aria-label="Projeto e ferramentas"
+            className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs"
           >
+            <a
+              href="/bi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            >
+              FrequenciBI
+            </a>
             <a
               href="https://github.com/eemtijca/frequenciapp"
               target="_blank"
@@ -252,7 +248,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
             >
-              Documentação da API
+              API
             </a>
             <button
               type="button"

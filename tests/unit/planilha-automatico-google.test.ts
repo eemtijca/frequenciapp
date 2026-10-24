@@ -41,6 +41,7 @@ vi.mock("@/infra/banco", () => ({
       update: dubl.concluirEnvio,
     },
   }),
+  transacaoCorrente: () => undefined,
 }));
 vi.mock("@/infra/ambiente", () => ({ ambiente: { fuso: "America/Fortaleza" } }));
 vi.mock("@/infra/auth/limite", () => ({ limiteDeTentativas: async () => true }));
