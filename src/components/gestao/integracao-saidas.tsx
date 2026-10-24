@@ -135,12 +135,18 @@ export default function IntegracaoSaidas({
     void carregar();
   }, [carregar]);
 
+  useEffect(() => {
+    const recarregar = () => void carregar();
+    window.addEventListener("configuracoes-salvas", recarregar);
+    return () => window.removeEventListener("configuracoes-salvas", recarregar);
+  }, [carregar]);
+
   const completoAtivo =
     integracao?.modo === "completo" &&
     integracao.modoCompletoAte !== null &&
     new Date(integracao.modoCompletoAte).getTime() > Date.now();
   const conectada = Boolean(integracao?.contaGoogle && integracao.googlePlanilha);
-  const podeEnviar = Boolean(ativaServidor && conectada);
+  const podeEnviar = Boolean(integracao?.ativa && conectada);
   const estruturaSalva = Boolean(integracao?.esquema);
   const estruturaEmEdicao = !estruturaSalva || editandoEstrutura;
   const abaEscolhida = abas.find((aba) => aba.nome === abaSelecionada) ?? null;

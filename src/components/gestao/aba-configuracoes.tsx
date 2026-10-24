@@ -418,6 +418,7 @@ function ConteudoConfiguracoes({
       avisarBeneficiosMudaram();
       avisarOrdemAlmocoMudou();
       if (resultadoLote.segredosBi.length > 0) setSegredosBi(resultadoLote.segredosBi);
+      window.dispatchEvent(new Event("configuracoes-salvas"));
       try {
         await Promise.all([onJustificativasMudaram(), onLiberadoresMudaram()]);
         await onHorariosMudaram();

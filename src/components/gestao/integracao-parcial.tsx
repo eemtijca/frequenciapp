@@ -68,6 +68,12 @@ export default function IntegracaoParcial({
     void carregar();
   }, [carregar]);
 
+  useEffect(() => {
+    const recarregar = () => void carregar();
+    window.addEventListener("configuracoes-salvas", recarregar);
+    return () => window.removeEventListener("configuracoes-salvas", recarregar);
+  }, [carregar]);
+
   function alternarAtiva(ativa: boolean) {
     mutarPlanilha("parcial", { ativa });
     toast.success("Integração alterada no rascunho.", {
