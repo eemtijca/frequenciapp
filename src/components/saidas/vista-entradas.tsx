@@ -47,6 +47,7 @@ interface Props {
   alunos: Aluno[];
   liberadores: LiberadorConfigurado[];
   catalogoJustificativas: JustificativaConfigurada[];
+  atualizacao?: number;
 }
 const OPCOES_MOMENTO = MOMENTOS_SAIDA.map((item) => ({ valor: item.codigo, rotulo: item.rotulo }));
 
@@ -57,6 +58,7 @@ export default function VistaEntradas({
   alunos,
   liberadores,
   catalogoJustificativas,
+  atualizacao = 0,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turma, setTurma] = useState("");
@@ -80,7 +82,7 @@ export default function VistaEntradas({
         : "Não foi possível concluir a operação. Tente novamente.",
     [],
   );
-  const recorte = `${dia}|${turma}|${versao}`;
+  const recorte = `${dia}|${turma}|${versao}|${atualizacao}`;
   const carregando = recorteCarregado !== recorte;
   useEffect(() => {
     let viva = true;

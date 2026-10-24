@@ -67,6 +67,10 @@ interface Props {
   onSaidasMudaram: (mes: string) => Promise<void>;
   /** Usado pela área de movimentações; esta vista não precisa dele. */
   ativo?: boolean;
+  /** Incrementado pelo botão global para reler o dia. */
+  atualizacao?: number;
+  /** Informa o mês do dia visível para o envio da planilha. */
+  onMesVisivel?: (mes: string) => void;
 }
 
 type FormaJustificativa = "texto" | "catalogo";
@@ -81,6 +85,8 @@ export default function VistaSaidas({
   liberadores,
   saidas,
   onSaidasMudaram,
+  atualizacao = 0,
+  onMesVisivel,
 }: Props) {
   const [dia, setDia] = useState(diaCorrente);
   const [turmaFiltro, setTurmaFiltro] = useState("");
@@ -98,6 +104,10 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
+
+  useEffect(() => {
+    onMesVisivel?.(dia.slice(0, 7));
+  }, [dia, onMesVisivel]);
   // Dia cuja lista foi desbloqueada: trocar de dia volta a bloquear.
   const [diaLiberado, setDiaLiberado] = useState<string | null>(null);
 
@@ -151,7 +161,7 @@ export default function VistaSaidas({
     return () => {
       viva = false;
     };
-  }, [compartilhado, dia, recarregarDia]);
+  }, [compartilhado, dia, recarregarDia, atualizacao]);
 
   const saidasDoDia = useMemo(() => {
     if (compartilhado) return saidas.filter((saida) => saida.dia === dia);

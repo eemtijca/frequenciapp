@@ -106,10 +106,6 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <div className="absolute top-3 right-3 z-10">
-        <SeletorTema />
-      </div>
-
       <aside className="superficie-vidro hidden flex-col items-center justify-center rounded-none border-0 border-r p-10 lg:flex xl:p-14">
         <div className="flex w-full max-w-md flex-col gap-10">
           <div className="flex flex-col items-center gap-4 text-center">
@@ -140,14 +136,17 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
         <div className="superficie-vidro flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
-          <div className="flex flex-col items-center gap-3 text-center lg:items-start lg:text-left">
-            <Logotipo tamanho={48} className="lg:hidden" priority />
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
-              <p className="text-muted-foreground mt-1 text-sm">
-                Registro de frequência dos alunos da escola.
-              </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col items-center gap-3 text-center lg:items-start lg:text-left">
+              <Logotipo tamanho={48} className="lg:hidden" priority />
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Registro de frequência dos alunos da escola.
+                </p>
+              </div>
             </div>
+            <SeletorTema className="shrink-0" />
           </div>
 
           {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}

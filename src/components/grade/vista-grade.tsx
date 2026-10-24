@@ -46,6 +46,7 @@ interface Props {
   hoje: string;
   aberto: boolean;
   versao: number;
+  atualizacao?: number;
   origens: Turma[];
   onMes: (mes: string) => void;
   onRecarregar: () => Promise<void>;
@@ -72,6 +73,7 @@ export default function VistaGrade({
   hoje,
   aberto,
   versao,
+  atualizacao = 0,
   origens,
   onMes,
   onRecarregar,
@@ -146,7 +148,7 @@ export default function VistaGrade({
       viva = false;
       controlador.abort();
     };
-  }, [aberto, modo, dias, diaBase, versao, recarga]);
+  }, [aberto, modo, dias, diaBase, versao, recarga, atualizacao]);
 
   const frequenciasDoPeriodo = useMemo(() => {
     if (modo === "mes") return frequencias.filter((frequencia) => frequencia.dia.startsWith(mes));

@@ -48,6 +48,7 @@ import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Switch } from "@/components/ui/switch";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -189,6 +190,15 @@ export default function VistaFrequenciaParcial({
   const [estadoPlanilha, setEstadoPlanilha] = useState<EstadoPlanilha | null>(null);
   const [envioAberto, setEnvioAberto] = useState(false);
   const sujo = editorAberto && assinaturaDaEdicao(edicao) !== assinaturaInicial;
+
+  const atualizarTela = useCallback(() => {
+    if (sujo) {
+      avisarInfo("Salve ou descarte as alterações antes de atualizar.");
+      return;
+    }
+    setRecarregar((valor) => valor + 1);
+  }, [sujo]);
+  useAtualizacaoTela("chamada-parcial", atualizarTela);
 
   const turmasOrdenadas = useMemo(() => {
     const ordem = new Map(series.map((serie) => [serie.id, serie.ordem]));

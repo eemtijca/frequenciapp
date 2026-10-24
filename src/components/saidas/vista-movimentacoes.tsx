@@ -11,11 +11,13 @@ import { Button } from "@/components/ui/button";
 import DialogoEnvioSaidas, {
   useEstadoPlanilhaSaidas,
 } from "@/components/saidas/dialogo-envio-saidas";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 export type AbaMovimentacao = "saidas" | "entradas";
 
 type Props = ComponentProps<typeof VistaSaidas> & {
   abaInicial?: AbaMovimentacao;
+  onAbrirGestao?: () => void;
 };
 
 const ABAS: AbaItem<AbaMovimentacao>[] = [
@@ -40,7 +42,11 @@ function refletirNaUrl(aba: AbaMovimentacao | null) {
   }
 }
 
-export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: Props) {
+export default function VistaMovimentacoes({
+  abaInicial = "saidas",
+  onAbrirGestao,
+  ...props
+}: Props) {
   const [aba, setAba] = useState<AbaMovimentacao>(abaInicial);
   const { ativo } = props;
 
@@ -55,7 +61,18 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
   // Um só botão ao lado das abas envia as saídas e as entradas do mês para a planilha.
   const [envioAberto, setEnvioAberto] = useState(false);
   const [mesEnvio, setMesEnvio] = useState(props.diaCorrente.slice(0, 7));
+  const aoMesVisivel = useCallback(
+    (novo: string) => {
+      if (!envioAberto) setMesEnvio(novo);
+    },
+    [envioAberto],
+  );
+  const [atualizacao, setAtualizacao] = useState(0);
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilhaSaidas();
+  useAtualizacaoTela("saidas", async () => {
+    setAtualizacao((valor) => valor + 1);
+    await Promise.all([recarregarPlanilha(), props.onSaidasMudaram(props.mes)]);
+  });
   // A área é aquecida em segundo plano e pode montar antes de a planilha ser
   // configurada; ao ficar visível, o estado da integração é relido.
   useEffect(() => {
@@ -92,7 +109,12 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
       >
         {(atual, ativa) =>
           atual === "saidas" ? (
-            <VistaSaidas {...props} ativo={props.ativo && ativa} />
+            <VistaSaidas
+              {...props}
+              ativo={props.ativo && ativa}
+              atualizacao={atualizacao}
+              onMesVisivel={aoMesVisivel}
+            />
           ) : (
             <VistaEntradas
               diaCorrente={props.diaCorrente}
@@ -101,6 +123,7 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
               alunos={props.alunos}
               liberadores={props.liberadores}
               catalogoJustificativas={props.catalogoJustificativas}
+              atualizacao={atualizacao}
             />
           )
         }
@@ -115,7 +138,18 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
       />
       {estadoPlanilha && !estadoPlanilha.podeEnviar && (
         <p className="text-muted-foreground text-xs">
-          Planilha não conectada. Configure em Gestão, Configurações.
+          Planilha não conectada.{" "}
+          {onAbrirGestao ? (
+            <button
+              type="button"
+              onClick={onAbrirGestao}
+              className="text-primary font-medium underline-offset-4 hover:underline"
+            >
+              Configurar na Gestão
+            </button>
+          ) : (
+            "Configure na Gestão."
+          )}
         </p>
       )}
     </div>

@@ -76,9 +76,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
             <h2 id="sobre-projeto" className="font-medium">
               Projeto
             </h2>
-            <p className="text-muted-foreground">
-              Código aberto sob a licença MIT, mantido pela equipe da escola.
-            </p>
+            <p className="text-muted-foreground">Código aberto mantido pela equipe da escola.</p>
             <p>
               <a
                 href={REPOSITORIO}
@@ -105,6 +103,15 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
                 </span>
               ))}
               .
+            </p>
+          </section>
+
+          <section aria-labelledby="sobre-licenca" className="space-y-2">
+            <h2 id="sobre-licenca" className="font-medium">
+              Licença
+            </h2>
+            <p className="text-muted-foreground">
+              MIT. O texto completo está no arquivo LICENSE do repositório.
             </p>
           </section>
         </div>

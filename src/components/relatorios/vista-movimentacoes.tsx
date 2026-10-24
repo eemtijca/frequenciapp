@@ -125,11 +125,13 @@ export default function VistaMovimentacoes({
   turmas,
   alunos,
   ativa,
+  atualizacao = 0,
 }: {
   hoje: string;
   turmas: Turma[];
   alunos: Aluno[];
   ativa: boolean;
+  atualizacao?: number;
 }) {
   const [modo, setModo] = useState<Modo>("dia");
   const [dia, setDia] = useState(hoje);
@@ -165,7 +167,7 @@ export default function VistaMovimentacoes({
   const parametros = new URLSearchParams({ de, ate });
   if (turmaId !== "todas") parametros.set("turmaId", turmaId);
   const consulta = parametros.toString();
-  const chave = `${consulta}|${recarga}`;
+  const chave = `${consulta}|${recarga}|${atualizacao}`;
   const atual = carga?.chave === chave ? carga : null;
   const carregando = ativa && !erroPeriodo && !atual;
   const dados = !erroPeriodo ? atual?.dados : null;

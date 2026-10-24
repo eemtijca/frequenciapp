@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 const TURNOS: AbaItem<"manha" | "tarde">[] = [
   { valor: "manha", rotulo: "Manhã", icone: Sun },
@@ -236,6 +237,10 @@ export default function VistaHorarios({
   // Ordem do almoço: lida ao montar e de novo quando a Gestão a altera; falha só omite o cartão.
   const [ordemAlmoco, setOrdemAlmoco] = useState<OrdemAlmocoDoDia[]>([]);
   const [versaoOrdem, setVersaoOrdem] = useState(0);
+  useAtualizacaoTela("horarios", async () => {
+    await onMudanca();
+    setVersaoOrdem((versao) => versao + 1);
+  });
   useEffect(() => ouvirOrdemAlmocoMudou(() => setVersaoOrdem((versao) => versao + 1)), []);
   useEffect(() => {
     let atual = true;

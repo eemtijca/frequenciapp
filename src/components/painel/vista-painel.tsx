@@ -37,6 +37,7 @@ import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
   ativo: boolean;
@@ -204,6 +205,8 @@ export default function VistaPainel({
     }
   }, [compartilhado, mes, onRecarregar]);
 
+  useAtualizacaoTela("painel", atualizarEmSilencio);
+
   useEffect(() => {
     if (!ativo) return;
     const quandoVisivel = () => {
@@ -245,7 +248,7 @@ export default function VistaPainel({
       <>
         <div className="superficie-vidro flex flex-col gap-4 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 font-medium">
+            <h2 className="sr-only">
               <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
               {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
             </h2>
@@ -287,7 +290,7 @@ export default function VistaPainel({
         {!feriado && serieSelecionada && porOrigem && (
           <div className="superficie-vidro flex flex-col gap-4 p-4">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 font-medium">
+              <h2 className="sr-only">
                 <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
                 {serieSelecionada.nome} por turma original
               </h2>
@@ -434,7 +437,7 @@ export default function VistaPainel({
             conteudo: (
               <div className="superficie-vidro flex flex-col gap-4 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-medium">Desistentes até este dia</h2>
+                  <h2 className="sr-only">Desistentes até este dia</h2>
                   <span className="numerais-tabulares text-muted-foreground shrink-0 text-sm whitespace-nowrap">
                     {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
                   </span>

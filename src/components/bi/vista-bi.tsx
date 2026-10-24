@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChartNoAxesCombined,
   ArrowLeft,
-  RefreshCw,
   Download,
   Upload,
   Link2,
@@ -24,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/ui/campo-senha";
+import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { Selecionar } from "@/components/ui/selecionar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -756,15 +756,15 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   ))}
                 </nav>
                 <div className="flex flex-wrap gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={carregando || fonte.ocupado}
-                    onClick={atualizar}
-                  >
-                    <RefreshCw size={15} />
-                    Atualizar dados
-                  </Button>
+                  <BotaoAtualizar
+                    onAtualizar={atualizar}
+                    ocupado={carregando || fonte.ocupado}
+                    disponivel
+                    rotulo="Atualizar dados"
+                    variante="outline"
+                    tamanho="sm"
+                    comRotulo
+                  />
                   <div className="hidden flex-wrap gap-1 sm:flex">
                     <Button variant="ghost" size="sm" onClick={() => void compartilhar()}>
                       <Link2 size={15} />

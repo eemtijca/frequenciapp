@@ -37,6 +37,8 @@ import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { cn } from "@/lib/utils";
 import { MenuConta, type AcaoConta } from "@/components/conta/menu-conta";
+import { ProvedorAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
+import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
 import { Logotipo } from "@/components/ui/logotipo";
 import {
   AlertDialog,
@@ -719,6 +721,7 @@ export default function Aplicacao({
             saidas={saidas}
             onSaidasMudaram={recarregarSaidas}
             ativo={ativo}
+            onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
           />
         )}
         {alvoVisao === "relatorios" && (
@@ -745,7 +748,15 @@ export default function Aplicacao({
             onRecarregar={recarregarFrequencias}
           />
         )}
-        {alvoVisao === "alunos" && <VistaAlunos alunos={alunos} turmas={turmas} />}
+        {alvoVisao === "alunos" && (
+          <VistaAlunos
+            alunos={alunos}
+            turmas={turmas}
+            onAtualizar={async () => {
+              await Promise.all([recarregarAlunos(), recarregarEscopo()]);
+            }}
+          />
+        )}
         {alvoVisao === "gestao" && ehAdmin && (
           <VistaGestao
             planilhaInicial={planilhaInicial}
@@ -815,6 +826,7 @@ export default function Aplicacao({
             <Logotipo tamanho={26} />
             <p className="truncate text-base font-semibold tracking-tight">FrequenciApp</p>
           </div>
+          {!movel && <BotaoAtualizar />}
           {movel && (
             <DialogClose asChild>
               <Button
@@ -871,180 +883,183 @@ export default function Aplicacao({
   }
 
   return (
-    <>
-      <div
-        ref={raizRef}
-        className="flex h-dvh w-full flex-col lg:flex-row"
-        style={{
-          paddingLeft: "env(safe-area-inset-left)",
-          paddingRight: "env(safe-area-inset-right)",
-          paddingBottom: "env(safe-area-inset-bottom)",
-        }}
-      >
-        <a
-          href="#conteudo"
-          className="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
+    <ProvedorAtualizacao ativo={visao}>
+      <>
+        <div
+          ref={raizRef}
+          className="flex h-dvh w-full flex-col lg:flex-row"
+          style={{
+            paddingLeft: "env(safe-area-inset-left)",
+            paddingRight: "env(safe-area-inset-right)",
+            paddingBottom: "env(safe-area-inset-bottom)",
+          }}
         >
-          Pular para o conteúdo
-        </a>
-
-        <aside className="superficie-vidro hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
-          {renderizarMenu()}
-        </aside>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <header
-            className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
-            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          <a
+            href="#conteudo"
+            className="bg-primary text-primary-foreground sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:px-3 focus:py-2 focus:text-sm focus:font-medium"
           >
-            <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
-              <MenuMovel
-                raizRef={raizRef}
-                gatilhoRef={gatilhoMenuRef}
-                conteudoRef={conteudoRef}
-                pendente={pendencias.length > 0 || configuracaoPendente}
-                renderizarConteudo={renderizarMenu}
-              />
-              <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
-                FrequenciApp
-              </span>
-              <SeletorTema className="shrink-0 rounded-full" />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-11 shrink-0 rounded-full"
-                aria-label="Configurar notificações"
-                title="Configurar notificações"
-                onClick={(evento) => {
-                  origemDialogoRef.current = evento.currentTarget;
-                  setNotificacoesAbertas(true);
+            Pular para o conteúdo
+          </a>
+
+          <aside className="superficie-vidro hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
+            {renderizarMenu()}
+          </aside>
+
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <header
+              className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
+              style={{ paddingTop: "env(safe-area-inset-top)" }}
+            >
+              <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">
+                <MenuMovel
+                  raizRef={raizRef}
+                  gatilhoRef={gatilhoMenuRef}
+                  conteudoRef={conteudoRef}
+                  pendente={pendencias.length > 0 || configuracaoPendente}
+                  renderizarConteudo={renderizarMenu}
+                />
+                <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+                  FrequenciApp
+                </span>
+                <BotaoAtualizar />
+                <SeletorTema className="shrink-0 rounded-full" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-11 shrink-0 rounded-full"
+                  aria-label="Configurar notificações"
+                  title="Configurar notificações"
+                  onClick={(evento) => {
+                    origemDialogoRef.current = evento.currentTarget;
+                    setNotificacoesAbertas(true);
+                  }}
+                >
+                  <Bell size={18} aria-hidden="true" />
+                </Button>
+              </div>
+            </header>
+
+            {offline && (
+              <div
+                role="status"
+                className="bg-falta-fraca text-falta-texto flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-xs"
+              >
+                <WifiOff size={14} aria-hidden="true" />
+                Sem conexão. As marcações continuam na tela e precisam de internet para salvar.
+              </div>
+            )}
+
+            <main
+              ref={conteudoRef}
+              tabIndex={-1}
+              id="conteudo"
+              data-visao={visao}
+              className="relative min-h-0 flex-1 overflow-hidden"
+            >
+              <div ref={pagerRef} data-pager="principal" className="h-full overflow-hidden">
+                {itens.map((item, indice) => {
+                  const ativo = item.visao === visao;
+                  const distante = Math.abs(indice - indiceAtivo) > 1;
+                  if (!ativo && !visitadas.has(item.visao)) return null;
+                  return (
+                    <section
+                      key={item.visao}
+                      role="group"
+                      aria-label={item.rotulo}
+                      aria-hidden={!ativo}
+                      inert={!ativo}
+                      data-distante={distante ? "true" : undefined}
+                      hidden={!ativo}
+                      onScroll={(evento) => guardarRolagem(item.visao, evento)}
+                      className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
+                    >
+                      {renderizarVisao(item.visao, ativo)}
+                    </section>
+                  );
+                })}
+              </div>
+            </main>
+          </div>
+        </div>
+
+        <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
+          <AlertDialogContent
+            onCloseAutoFocus={(evento) => {
+              evento.preventDefault();
+              devolverFocoDoDialogo();
+            }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Há alterações não salvas</AlertDialogTitle>
+              <AlertDialogDescription>
+                As alterações não salvas serão perdidas.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmarSaida} disabled={saindo}>
+                Sair mesmo assim
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={visaoComPendencia !== null}
+          onOpenChange={(aberto) => {
+            if (!aberto) setVisaoComPendencia(null);
+          }}
+        >
+          <AlertDialogContent
+            onCloseAutoFocus={(evento) => {
+              evento.preventDefault();
+              devolverFocoDoDialogo();
+            }}
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {visao === "gestao"
+                  ? configuracaoPendente
+                    ? "Há configurações não salvas"
+                    : "Há alterações não salvas nos Horários"
+                  : "Há alterações não salvas na Chamada Parcial"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                As alterações continuam pendentes. Ao voltar, será possível salvá-las.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  const proxima = visaoComPendencia;
+                  setVisaoComPendencia(null);
+                  if (proxima) ativarVisao(proxima);
                 }}
               >
-                <Bell size={18} aria-hidden="true" />
-              </Button>
-            </div>
-          </header>
+                Mudar de tela
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-          {offline && (
-            <div
-              role="status"
-              className="bg-falta-fraca text-falta-texto flex shrink-0 items-center justify-center gap-2 px-4 py-2 text-xs"
-            >
-              <WifiOff size={14} aria-hidden="true" />
-              Sem conexão. As marcações continuam na tela e precisam de internet para salvar.
-            </div>
-          )}
-
-          <main
-            ref={conteudoRef}
-            tabIndex={-1}
-            id="conteudo"
-            data-visao={visao}
-            className="relative min-h-0 flex-1 overflow-hidden"
-          >
-            <div ref={pagerRef} data-pager="principal" className="h-full overflow-hidden">
-              {itens.map((item, indice) => {
-                const ativo = item.visao === visao;
-                const distante = Math.abs(indice - indiceAtivo) > 1;
-                if (!ativo && !visitadas.has(item.visao)) return null;
-                return (
-                  <section
-                    key={item.visao}
-                    role="group"
-                    aria-label={item.rotulo}
-                    aria-hidden={!ativo}
-                    inert={!ativo}
-                    data-distante={distante ? "true" : undefined}
-                    hidden={!ativo}
-                    onScroll={(evento) => guardarRolagem(item.visao, evento)}
-                    className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
-                  >
-                    {renderizarVisao(item.visao, ativo)}
-                  </section>
-                );
-              })}
-            </div>
-          </main>
-        </div>
-      </div>
-
-      <AlertDialog open={saidaComPendencia} onOpenChange={setSaidaComPendencia}>
-        <AlertDialogContent
-          onCloseAutoFocus={(evento) => {
-            evento.preventDefault();
-            devolverFocoDoDialogo();
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>Há alterações não salvas</AlertDialogTitle>
-            <AlertDialogDescription>
-              As alterações não salvas serão perdidas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarSaida} disabled={saindo}>
-              Sair mesmo assim
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={visaoComPendencia !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setVisaoComPendencia(null);
-        }}
-      >
-        <AlertDialogContent
-          onCloseAutoFocus={(evento) => {
-            evento.preventDefault();
-            devolverFocoDoDialogo();
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {visao === "gestao"
-                ? configuracaoPendente
-                  ? "Há configurações não salvas"
-                  : "Há alterações não salvas nos Horários"
-                : "Há alterações não salvas na Chamada Parcial"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              As alterações continuam pendentes. Ao voltar, será possível salvá-las.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar aqui</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const proxima = visaoComPendencia;
-                setVisaoComPendencia(null);
-                if (proxima) ativarVisao(proxima);
-              }}
-            >
-              Mudar de tela
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <DialogoSenha
-        aberto={senhaAberta}
-        onAbrir={setSenhaAberta}
-        onDevolverFoco={devolverFocoDoDialogo}
-      />
-      <DialogoNotificacoes
-        aberto={notificacoesAbertas}
-        onAbrir={setNotificacoesAbertas}
-        onDevolverFoco={devolverFocoDoDialogo}
-      />
-      <DialogoSobre
-        aberto={sobreAberto}
-        onAbrir={setSobreAberto}
-        onDevolverFoco={devolverFocoDoDialogo}
-      />
-      <RegistroPwa />
-    </>
+        <DialogoSenha
+          aberto={senhaAberta}
+          onAbrir={setSenhaAberta}
+          onDevolverFoco={devolverFocoDoDialogo}
+        />
+        <DialogoNotificacoes
+          aberto={notificacoesAbertas}
+          onAbrir={setNotificacoesAbertas}
+          onDevolverFoco={devolverFocoDoDialogo}
+        />
+        <DialogoSobre
+          aberto={sobreAberto}
+          onAbrir={setSobreAberto}
+          onDevolverFoco={devolverFocoDoDialogo}
+        />
+        <RegistroPwa />
+      </>
+    </ProvedorAtualizacao>
   );
 }

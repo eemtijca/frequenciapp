@@ -67,6 +67,7 @@ import { SeletorTurmaChamada } from "@/components/frequencia/seletor-turma-chama
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/frequencia/aviso-beneficio-frequencia";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -186,6 +187,15 @@ export default function VistaFrequencia({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
   const semMovimento = useReducedMotion() ?? false;
+
+  const atualizarTela = useCallback(() => {
+    if (sujo) {
+      toast.info("Salve ou descarte as alterações antes de atualizar.");
+      return;
+    }
+    setRecarregar((valor) => valor + 1);
+  }, [sujo]);
+  useAtualizacaoTela("chamada", atualizarTela);
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
   // A prop é comparada durante o render, como o React recomenda para estado
@@ -963,6 +973,7 @@ export default function VistaFrequencia({
             (conflito ? (
               <AvisoCompacto
                 variante="conflito"
+                titulo="A chamada foi salva em outro aparelho"
                 descricao={erro || undefined}
                 tamanho="linha"
                 acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
@@ -1407,11 +1418,12 @@ export default function VistaFrequencia({
           </div>
           <div
             aria-label="Barra de salvamento"
-            className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 flex items-center gap-2 rounded-2xl p-2"
+            className="superficie-vidro vidro-flutuante sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 xl:mr-0 xl:ml-auto"
+            style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <p
               aria-live="polite"
-              className="text-muted-foreground min-w-0 flex-1 truncate px-2 text-xs font-medium"
+              className="text-muted-foreground max-w-48 min-w-0 truncate px-2 text-xs font-medium"
               title={feriado?.nome}
             >
               {feriado ? "Feriado" : tituloEstado}
@@ -1425,6 +1437,7 @@ export default function VistaFrequencia({
                     aria-label="Descartar"
                     title="Descartar alterações"
                     disabled={salvando}
+                    className="size-11 shrink-0"
                   >
                     <RotateCcw size={16} aria-hidden="true" />
                   </Button>
@@ -1444,7 +1457,7 @@ export default function VistaFrequencia({
                 </AlertDialogContent>
               </AlertDialog>
             )}
-            <Button className="px-4" onClick={salvar} disabled={!podeSalvar}>
+            <Button className="h-11 shrink-0 px-4" onClick={salvar} disabled={!podeSalvar}>
               {salvando ? (
                 <LoaderCircle size={16} className="animate-spin" />
               ) : atualizadoEm && !sujo ? (
