@@ -78,6 +78,52 @@ describe("desenhos vetoriais do ícone", () => {
     },
   );
 
+  it("mantém o favicon com o mesmo enquadramento do mestre", async () => {
+    const sharp = (await import("sharp")).default;
+    async function caixaBranca(arquivo: string) {
+      const { data, info } = await sharp(ler(arquivo), { density: 288 })
+        .resize(512, 512)
+        .ensureAlpha()
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      let minX = info.width;
+      let minY = info.height;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < info.height; y++) {
+        for (let x = 0; x < info.width; x++) {
+          const i = (y * info.width + x) * info.channels;
+          const branco = data[i] === 0xff && data[i + 1] === 0xff && data[i + 2] === 0xff;
+          const opaco = (data[i + 3] ?? 0) > 128;
+          if (!branco || !opaco) continue;
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+      expect(maxX).toBeGreaterThanOrEqual(0);
+      expect(maxY).toBeGreaterThanOrEqual(0);
+      return {
+        centroX: (minX + maxX) / 2,
+        centroY: (minY + maxY) / 2,
+        esquerda: minX,
+        direita: info.width - 1 - maxX,
+        topo: minY,
+        base: info.height - 1 - maxY,
+      };
+    }
+
+    const mestre = await caixaBranca("design/icone/mestre.svg");
+    const favicon = await caixaBranca("src/app/icon.svg");
+    expect(Math.abs(favicon.centroX - mestre.centroX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(favicon.centroY - mestre.centroY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(favicon.esquerda - mestre.esquerda)).toBeLessThanOrEqual(2);
+    expect(Math.abs(favicon.direita - mestre.direita)).toBeLessThanOrEqual(2);
+    expect(Math.abs(favicon.topo - mestre.topo)).toBeLessThanOrEqual(2);
+    expect(Math.abs(favicon.base - mestre.base)).toBeLessThanOrEqual(2);
+  });
+
   it("mantém nos PNGs gerados só as duas cores do desenho, fora a suavização das bordas", async () => {
     const sharp = (await import("sharp")).default;
     const { data, info } = await sharp(ler("public/icon-mascara-512.png"))

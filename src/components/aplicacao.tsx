@@ -821,7 +821,7 @@ export default function Aplicacao({
           paddingLeft: movel ? "env(safe-area-inset-left)" : undefined,
         }}
       >
-        <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-2 py-4 pr-4 pl-5">
           <div className="flex min-w-0 items-center gap-2.5">
             <Logotipo tamanho={26} />
             <p className="truncate text-base font-semibold tracking-tight">FrequenciApp</p>

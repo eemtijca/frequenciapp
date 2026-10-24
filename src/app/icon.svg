@@ -1,5 +1,5 @@
-<!-- Favicon do FrequenciApp: o mesmo traço do mestre, ampliado e com linhas um pouco mais grossas, para 16 e 32 px. -->
-<!-- Duas cores sólidas; cantos arredondados próprios (rx 14 em 64). -->
+<!-- Favicon do FrequenciApp: o mesmo enquadramento do mestre, reduzido para 64 unidades. -->
+<!-- Duas cores sólidas; cantos arredondados próprios (rx 14 em 64). Sem contorno extra para o desenho coincidir com os PNGs. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <defs>
     <clipPath id="quadro">
@@ -8,9 +8,9 @@
   </defs>
   <g clip-path="url(#quadro)">
     <rect id="fundo" width="64" height="64" fill="#17784d"/>
-    <g id="composicao" transform="translate(-4 -0.32) scale(0.05175)">
+    <g id="composicao" transform="translate(0.76 3.95) scale(0.0449125)">
       <rect id="folha-branca" x="100" y="100" width="1054" height="1054" fill="#ffffff"/>
-      <g id="desenho" transform="translate(0 1254) scale(0.1 -0.1)" fill="#17784d" stroke="#ffffff" stroke-width="150" stroke-linejoin="round">
+      <g id="desenho" transform="translate(0 1254) scale(0.1 -0.1)" fill="#17784d">
         <path d="M0 6270 l0 -6270 6270 0 6270 0 0 6270 0 6270 -6270 0 -6270 0 0
 -6270z m8190 4319 c165 -30 343 -117 457 -222 l41 -38 59 24 c105 45 203 60
 332 54 137 -7 208 -24 313 -77 242 -121 425 -368 453 -610 l7 -59 68 6 c89 7

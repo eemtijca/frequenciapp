@@ -85,6 +85,15 @@ test.describe("responsividade", () => {
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
     );
+
+    // O símbolo acompanha a coluna dos ícones da navegação, sem deslocamento.
+    const marca = await page.locator('aside img[src$="icon.svg"]').first().boundingBox();
+    const primeiroIcone = await page.locator("aside nav button svg").first().boundingBox();
+    expect(marca).not.toBeNull();
+    expect(primeiroIcone).not.toBeNull();
+    const centroMarca = (marca?.x ?? 0) + (marca?.width ?? 0) / 2;
+    const centroIcone = (primeiroIcone?.x ?? 0) + (primeiroIcone?.width ?? 0) / 2;
+    expect(Math.abs(centroMarca - centroIcone)).toBeLessThanOrEqual(2);
     await info.attach("barra-lateral-desktop", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",
@@ -180,11 +189,15 @@ test.describe("responsividade", () => {
     const titulo = await page
       .getByRole("heading", { name: "FrequenciApp", exact: true })
       .boundingBox();
+    const marca = await page.locator('main img[src$="icon.svg"]').first().boundingBox();
     expect(cartao).not.toBeNull();
     expect(titulo).not.toBeNull();
+    expect(marca).not.toBeNull();
     const centroCartao = (cartao?.x ?? 0) + (cartao?.width ?? 0) / 2;
     const centroTitulo = (titulo?.x ?? 0) + (titulo?.width ?? 0) / 2;
+    const centroMarca = (marca?.x ?? 0) + (marca?.width ?? 0) / 2;
     expect(Math.abs(centroCartao - centroTitulo)).toBeLessThanOrEqual(1);
+    expect(Math.abs(centroCartao - centroMarca)).toBeLessThanOrEqual(1);
   });
   // A massa permite conferir a largura das listas de frequência.
   test.describe("com turmas cadastradas", () => {
