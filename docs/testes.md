@@ -60,6 +60,9 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - ordem do almoço: seis dias na leitura, definição e substituição do dia pela administração, turma excluída saindo da ordem, escrita barrada para a coordenação, dia inválido, turma repetida, horário inválido ou fora da ordem, turma inexistente, lista vazia limpando o dia e sessão exigida;
 - benefícios e alertas de frequência: leitura por qualquer sessão, escrita barrada para a coordenação, criação, edição e exclusão pela administração, percentual inválido, nome repetido, mudança de percentual alterando limite e alerta na mesma proporção, segundo benefício com regra própria, benefício inativo sem alerta e sessão exigida;
 - quem libera: leitura ordenada por qualquer sessão, escrita barrada para a coordenação, criação, edição de rótulo e situação pela administração, duplicata sem diferenciar caixa, dados inválidos, exclusão bloqueada quando há saída usando o código e catálogo presente na cópia de segurança, com os liberadores criados pela própria suíte;
+
+`tests/api/configuracoes-lote.test.ts` cobre a leitura agregada, o lote atômico, a revisão otimista, a recusa por catálogo em uso, a senha e o segredo único das chaves do BI e a autorização. As suítes `configuracao-origem.spec.ts`, `liberadores.spec.ts`, `notificacoes.spec.ts`, `ordem-almoco.spec.ts`, `chaves-bi.spec.ts`, `calendario-letivo.spec.ts`, `beneficios-frequencia.spec.ts` e `interface-compacta.spec.ts` cobrem o rascunho único, o diálogo de revisão, a atualização global e a barra compacta da Chamada.
+
 - cópia de segurança: exportação barrada para a coordenação, formato e versão conferidos, importação da própria cópia sem conflitos e arquivo em outro formato recusado;
 - conta: troca de senha com atual errada, sucesso, senha antiga invalidada e outros dispositivos desconectados;
 - trilha de auditoria confirmando os registros das ações administrativas e a ausência de nomes de alunos;

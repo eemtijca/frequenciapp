@@ -127,6 +127,12 @@ O nome escolhido, pela variável ou pela URL, é recusado quando está vazio ou 
 
 Produção e Preview podem usar schemas distintos no mesmo database. Cada schema mantém tabelas, contas e histórico `_prisma_migrations` próprios. As credenciais PostgreSQL são independentes do nome do schema e precisam das permissões adequadas. O preparo do Preview está em [deploy.md](deploy.md#preview-em-schema-do-mesmo-banco).
 
+## Revisões das configurações
+
+O rascunho único compara a versão de cada seção antes de gravar. `Configuracao`, `ConfiguracaoNotificacoes`, `ParametrosAcesso`, `OrdemAlmoco`, `BeneficioFrequencia` e `Feriado` já tinham `atualizado_em`. A migração `20261024123045_revisoes_catalogos` acrescenta a coluna a `justificativas`, `liberadores` e `chaves_bi`, com preenchimento inicial por `now()` e remoção do valor padrão.
+
+A revisão de `chaves_bi` considera identificador, rótulo, escopo, validade e revogação, sem os contadores de uso. Consultar o BI atualiza `ultimo_uso_em` e `usos`; esses campos não podem invalidar um rascunho aberto. O lote roda em uma transação serializável e reutiliza o mesmo cliente Prisma via `AsyncLocalStorage`, para que os casos de uso de cada catálogo participem da transação sem abrir outra conexão. Qualquer revisão divergente interrompe o lote inteiro com 409.
+
 ## Migrações
 
 Dia a dia em desenvolvimento:
