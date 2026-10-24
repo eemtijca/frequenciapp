@@ -1,5 +1,5 @@
-// Cobertura das chamadas por turma em fatias verdes e vermelhas, ponderadas pelos alunos.
-import { CalendarOff, CheckCircle2, ChevronDown, Clock3, UsersRound } from "lucide-react";
+// Cobertura das chamadas com barra ponderada pelos alunos e pendências por turma.
+import { CalendarOff, CheckCircle2, ChevronDown, Clock3 } from "lucide-react";
 import { useId } from "react";
 import type { CoberturaTurmaDia } from "@/domain/relatorios";
 
@@ -34,15 +34,6 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
     0,
   );
   const turmasPendentes = turmas.filter((item) => !item.concluida).map((item) => item.turma);
-  const concluida = esperados > 0 && turmasPendentes.length === 0;
-  let inicio = 0;
-  const fatias = turmas.map((item) => {
-    const tamanho = (item.esperados * 100) / esperados;
-    const intervalo = turmas.length > 1 ? Math.min(0.8, tamanho / 8) : 0;
-    const fatia = { ...item, inicio: inicio + intervalo / 2, tamanho: tamanho - intervalo };
-    inicio += tamanho;
-    return fatia;
-  });
   const progresso =
     esperados > 0 ? Math.min(100, Math.max(0, Math.floor((registrados * 100) / esperados))) : 0;
   const contagem = `${registrados} de ${esperados} alunos com chamada salva`;
@@ -54,7 +45,13 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
       className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
     >
       <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
-      <div className="flex items-center gap-2.5">
+      <div className="flex flex-col gap-2">
+        <span
+          aria-hidden="true"
+          className="numerais-tabulares text-primary text-3xl font-semibold sm:text-4xl"
+        >
+          {progresso}%
+        </span>
         <div
           role="progressbar"
           aria-label="Alunos com chamada salva"
@@ -63,68 +60,28 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
           aria-valuenow={progresso}
           aria-valuetext={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
           aria-describedby={esperados > 0 ? descricaoId : undefined}
-          className="text-primary relative flex size-12 shrink-0 items-center justify-center sm:size-14"
+          className={`ring-border h-3 w-full overflow-hidden rounded-full ring-1 ring-inset ${esperados > 0 ? "bg-falta-fraca" : "bg-muted"}`}
         >
-          <svg viewBox="0 0 64 64" aria-hidden="true" className="absolute inset-0 size-full">
-            {esperados === 0 || concluida ? (
-              <circle
-                cx="32"
-                cy="32"
-                r="28"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="4"
-                className={concluida ? "text-primary" : "text-muted-foreground opacity-15"}
-              />
-            ) : (
-              fatias.map((fatia) => (
-                <circle
-                  key={fatia.turma.id}
-                  cx="32"
-                  cy="32"
-                  r="28"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  pathLength="100"
-                  strokeDasharray={`${fatia.tamanho} ${100 - fatia.tamanho}`}
-                  strokeDashoffset={-fatia.inicio}
-                  transform="rotate(-90 32 32)"
-                  className={fatia.concluida ? "text-primary" : "text-falta-texto"}
-                >
-                  <title>{`${fatia.turma.rotulo}: ${fatia.concluida ? "chamada concluída" : "chamada pendente"}`}</title>
-                </circle>
-              ))
-            )}
-          </svg>
-          <span aria-hidden="true" className="numerais-tabulares text-sm font-semibold">
-            {progresso}%
-          </span>
+          <div
+            data-testid="cobertura-preenchida"
+            aria-hidden="true"
+            className="bg-primary h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255_/_0.25)] transition-[width] duration-300 motion-reduce:transition-none"
+            style={{ width: `${progresso}%` }}
+          />
         </div>
         <p id={descricaoId} className="sr-only">
           {turmas
             .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
             .join("; ")}
         </p>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span
-            aria-label={contagem}
-            className="text-muted-foreground flex items-center gap-1.5 text-xs sm:text-sm"
-          >
-            <UsersRound aria-hidden="true" className="size-4 shrink-0" />
-            <span className="numerais-tabulares">
-              {registrados}/{esperados} alunos
-            </span>
+        {esperados === 0 ? (
+          <span className="text-muted-foreground text-xs">Sem alunos</span>
+        ) : turmasPendentes.length === 0 ? (
+          <span className="text-primary flex items-center gap-1.5 text-xs">
+            <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
+            Concluída
           </span>
-          {esperados === 0 ? (
-            <span className="text-muted-foreground text-xs">Sem alunos</span>
-          ) : turmasPendentes.length === 0 ? (
-            <span className="text-primary flex items-center gap-1.5 text-xs">
-              <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
-              Concluída
-            </span>
-          ) : null}
-        </div>
+        ) : null}
       </div>
       {esperados > 0 && turmasPendentes.length > 0 && (
         <details className="group">
