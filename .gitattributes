@@ -1,0 +1,4 @@
+# Normaliza os arquivos executados dentro de contêineres Linux.
+*.sh text eol=lf
+*.mjs text eol=lf
+Dockerfile text eol=lf
