@@ -3,7 +3,7 @@
 // Aplicação de BI isolada: chave própria, leituras sob demanda e personalização apenas no navegador.
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3,
+  ChartNoAxesCombined,
   ArrowLeft,
   RefreshCw,
   Download,
@@ -17,6 +17,7 @@ import {
   LoaderCircle,
   WifiOff,
   Pencil,
+  MoreHorizontal,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { Selecionar } from "@/components/ui/selecionar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -98,6 +100,11 @@ interface RetratoVista {
   datas: string[];
   falhas: string[];
 }
+function dataBr(valor: string): string {
+  const [ano, mes, dia] = valor.split("-");
+  return dia && mes && ano ? `${dia}/${mes}/${ano}` : valor;
+}
+
 export default function VistaBi({ fuso }: { fuso: string }) {
   const fonte = useDadosBi();
   const { acesso, carregar, entrar, esquecer, armazenamentoFalhou } = fonte;
@@ -601,35 +608,70 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           href="/"
           prefetch={false}
           aria-label="Voltar ao FrequenciApp"
-          className="flex min-h-11 min-w-11 items-center gap-2 text-sm"
+          className="flex min-h-11 min-w-11 items-center gap-2 justify-self-start text-sm"
         >
           <ArrowLeft size={18} />
           <span className="hidden sm:inline">FrequenciApp</span>
         </Link>
-        <h1 className="flex items-center gap-2 text-xl font-semibold">
-          <BarChart3 size={22} aria-hidden="true" />
+        <h1 className="flex items-center gap-2 justify-self-center text-lg font-semibold sm:text-xl">
+          <ChartNoAxesCombined size={22} aria-hidden="true" />
           FrequenciBI
         </h1>
-        <div className="flex items-center gap-1">
-          <SeletorTema />
-          {acesso && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setChave("");
-                void esquecer();
-              }}
-            >
-              Esquecer chave
-            </Button>
-          )}
+        <div className="flex items-center justify-self-end">
+          <div className="hidden items-center gap-1 sm:flex">
+            <SeletorTema />
+            {acesso && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setChave("");
+                  void esquecer();
+                }}
+              >
+                Esquecer chave
+              </Button>
+            )}
+          </div>
+          <div className="sm:hidden">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-11 rounded-full"
+                  aria-label="Mais ações do FrequenciBI"
+                >
+                  <MoreHorizontal size={20} aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-60 p-1.5">
+                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                  <span className="text-sm font-medium">Tema</span>
+                  <SeletorTema />
+                </div>
+                {acesso && (
+                  <Button
+                    variant="ghost"
+                    className="h-11 w-full justify-start"
+                    onClick={() => {
+                      setChave("");
+                      void esquecer();
+                    }}
+                  >
+                    Esquecer chave
+                  </Button>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </header>
       <main className={estilos.conteudo}>
         {acesso && (
           <p className="text-muted-foreground mb-3 text-xs">
-            {ABAS.find((a) => a.id === aba)?.nome} | {filtros.inicio} a {filtros.fim}
+            {ABAS.find((a) => a.id === aba)?.nome} | {dataBr(filtros.inicio)} a{" "}
+            {dataBr(filtros.fim)}
           </p>
         )}
         {!acesso ? (
@@ -637,7 +679,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
             <div>
               <h2 className="text-xl font-semibold">Abrir análises da escola</h2>
               <p className="text-muted-foreground mt-2 text-sm">
-                Peça uma chave à Gestão. Não é necessário entrar na conta do FrequenciApp.
+                Use a chave criada na Gestão. Não é necessário entrar na conta do FrequenciApp.
               </p>
             </div>
             <form
@@ -670,7 +712,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
             </form>
             <p className="text-muted-foreground text-xs">
               A chave fica neste navegador e permite consultar dados pessoais. Use um dispositivo
-              autorizado e esqueça a chave ao deixar de utilizá-lo.
+              autorizado e remova a chave ao sair.
             </p>
             {fonte.erro && (
               <p role="alert" className="text-falta-texto text-sm">
@@ -680,57 +722,112 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           </section>
         ) : (
           <>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
-              <nav
-                aria-label="Seções do FrequenciBI"
-                className="controle-vidro flex max-w-full gap-1 overflow-x-auto p-1"
-              >
-                {ABAS.map((a) => (
+            <div className="mb-4 flex flex-col gap-2 print:hidden">
+              <div className="sm:hidden">
+                <Selecionar
+                  ariaLabel="Seção do FrequenciBI"
+                  value={aba}
+                  onValueChange={(valor) => trocarAba(valor as AbaBi)}
+                  opcoes={ABAS.map((item) => ({ valor: item.id, rotulo: item.nome }))}
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <nav
+                  aria-label="Seções do FrequenciBI"
+                  className="controle-vidro hidden max-w-full gap-1 overflow-x-auto p-1 sm:flex"
+                >
+                  {ABAS.map((a) => (
+                    <Button
+                      key={a.id}
+                      variant={aba === a.id ? "secondary" : "ghost"}
+                      size="sm"
+                      aria-current={aba === a.id ? "page" : undefined}
+                      onClick={() => trocarAba(a.id)}
+                      ref={(el) => {
+                        if (el && aba === a.id) {
+                          const nav = el.parentElement;
+                          if (nav) nav.scrollLeft = el.offsetLeft - nav.offsetLeft - 8;
+                        }
+                      }}
+                      className="shrink-0"
+                    >
+                      {a.nome}
+                    </Button>
+                  ))}
+                </nav>
+                <div className="flex flex-wrap gap-1">
                   <Button
-                    key={a.id}
-                    variant={aba === a.id ? "secondary" : "ghost"}
+                    variant="outline"
                     size="sm"
-                    aria-current={aba === a.id ? "page" : undefined}
-                    onClick={() => trocarAba(a.id)}
-                    ref={(el) => {
-                      if (el && aba === a.id) {
-                        const nav = el.parentElement;
-                        if (nav) nav.scrollLeft = el.offsetLeft - nav.offsetLeft - 8;
-                      }
-                    }}
-                    className="shrink-0"
+                    disabled={carregando || fonte.ocupado}
+                    onClick={atualizar}
                   >
-                    {a.nome}
+                    <RefreshCw size={15} />
+                    Atualizar dados
                   </Button>
-                ))}
-              </nav>
-              <div className="flex flex-wrap gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={carregando || fonte.ocupado}
-                  onClick={atualizar}
-                >
-                  <RefreshCw size={15} />
-                  Atualizar dados
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => void compartilhar()}>
-                  <Link2 size={15} />
-                  Compartilhar filtros
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setApresentacao(!apresentacao)}>
-                  <Maximize size={15} />
-                  {apresentacao ? "Sair da apresentação" : "Apresentar"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={carregando || imprimindo}
-                  onClick={() => void imprimir()}
-                >
-                  <Printer size={15} />
-                  {imprimindo ? "Preparando impressão..." : "Imprimir"}
-                </Button>
+                  <div className="hidden flex-wrap gap-1 sm:flex">
+                    <Button variant="ghost" size="sm" onClick={() => void compartilhar()}>
+                      <Link2 size={15} />
+                      Compartilhar filtros
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setApresentacao(!apresentacao)}
+                    >
+                      <Maximize size={15} />
+                      {apresentacao ? "Sair da apresentação" : "Apresentar"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={carregando || imprimindo}
+                      onClick={() => void imprimir()}
+                    >
+                      <Printer size={15} />
+                      {imprimindo ? "Preparando impressão..." : "Imprimir"}
+                    </Button>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 rounded-full sm:hidden"
+                        aria-label="Mais ações da análise"
+                      >
+                        <MoreHorizontal size={18} aria-hidden="true" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-56 p-1.5">
+                      <Button
+                        variant="ghost"
+                        className="h-11 w-full justify-start"
+                        onClick={() => void compartilhar()}
+                      >
+                        <Link2 size={16} />
+                        Compartilhar filtros
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="h-11 w-full justify-start"
+                        onClick={() => setApresentacao(!apresentacao)}
+                      >
+                        <Maximize size={16} />
+                        {apresentacao ? "Sair da apresentação" : "Apresentar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="h-11 w-full justify-start"
+                        disabled={carregando || imprimindo}
+                        onClick={() => void imprimir()}
+                      >
+                        <Printer size={16} />
+                        {imprimindo ? "Preparando impressão..." : "Imprimir"}
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
             <SeletorFiltrosBi

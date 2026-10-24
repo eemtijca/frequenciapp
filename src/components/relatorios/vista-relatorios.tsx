@@ -47,7 +47,12 @@ const ABAS: AbaItem<AbaRelatorio>[] = [
   { valor: "historico", rotulo: "Histórico", icone: History },
   { valor: "grade", rotulo: "Grade", icone: Table2 },
   { valor: "aluno", rotulo: "Por aluno", icone: UserRound },
-  { valor: "movimentacoes", rotulo: "Saídas e entradas", icone: ArrowRightLeft },
+  {
+    valor: "movimentacoes",
+    rotulo: "Saídas e Entradas",
+    rotuloCurto: "Mov.",
+    icone: ArrowRightLeft,
+  },
 ];
 
 export default function VistaRelatorios({
@@ -74,7 +79,7 @@ export default function VistaRelatorios({
 }: Props) {
   const inicial = ABAS.some((item) => item.valor === abaInicial)
     ? (abaInicial as AbaRelatorio)
-    : "historico";
+    : "resumo";
 
   return (
     <section aria-label="Relatórios" className="flex flex-col gap-4 pb-6">

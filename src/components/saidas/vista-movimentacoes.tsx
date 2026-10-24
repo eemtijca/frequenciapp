@@ -75,17 +75,18 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
           <Button
             type="button"
             variant="outline"
-            className="h-auto min-h-12 shrink-0 px-3"
+            className="h-11 shrink-0 px-3"
             aria-label="Enviar saídas e entradas para a planilha"
             disabled={!estadoPlanilha?.podeEnviar}
             title={
               estadoPlanilha?.podeEnviar
                 ? "Enviar as saídas e as entradas do mês para o Google Planilhas"
-                : "Conecte a planilha de entradas e saídas na Gestão"
+                : "Planilha não conectada. Configure em Gestão."
             }
             onClick={() => setEnvioAberto(true)}
           >
-            <FileSpreadsheet size={18} aria-hidden="true" />
+            <FileSpreadsheet size={16} aria-hidden="true" />
+            <span className="hidden sm:inline">Planilha</span>
           </Button>
         }
       >
@@ -112,6 +113,11 @@ export default function VistaMovimentacoes({ abaInicial = "saidas", ...props }: 
         modoCompleto={estadoPlanilha?.modo === "completo"}
         aoConcluir={() => void recarregarPlanilha()}
       />
+      {estadoPlanilha && !estadoPlanilha.podeEnviar && (
+        <p className="text-muted-foreground text-xs">
+          Planilha não conectada. Configure em Gestão, Configurações.
+        </p>
+      )}
     </div>
   );
 }

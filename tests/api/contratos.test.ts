@@ -1482,8 +1482,9 @@ describe("configurações e responsáveis", () => {
         expect(alternar.status).toBe(200);
         const recarregar = await autenticado(cookieCoord, "/api/configuracoes");
         const dados = (await recarregar.json()) as { configuracoes: Configuracoes };
-        expect(dados.configuracoes).toEqual({
-          ...configurada.configuracoes,
+        const { atualizadoEm: _atualizadoEm, ...base } = configurada.configuracoes;
+        expect(dados.configuracoes).toMatchObject({
+          ...base,
           origemNaChamada: ligada,
         });
       }

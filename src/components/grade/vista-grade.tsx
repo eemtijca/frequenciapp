@@ -333,9 +333,12 @@ export default function VistaGrade({
 
   return (
     <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-center justify-end gap-3">
-        <h1 className="sr-only">Grade</h1>
-        <div className="flex items-center gap-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Grade</h2>
+          <p className="text-muted-foreground text-sm">Frequência por turma de origem.</p>
+        </div>
+        <div className="flex items-center justify-end gap-1">
           {estadoPlanilha?.podeEnviar && (
             <Button
               variant="outline"
@@ -376,7 +379,18 @@ export default function VistaGrade({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="sm:hidden">
+        <Selecionar
+          ariaLabel="Turma de origem da grade"
+          value={turmaEfetiva}
+          onValueChange={setTurmaId}
+          opcoes={turmasOriginais.map((turma) => ({
+            valor: turma.id,
+            rotulo: `${turma.rotulo} (${alunos.filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id).length})`,
+          }))}
+        />
+      </div>
+      <div className="hidden flex-wrap items-center gap-2 sm:flex">
         {turmasOriginais.map((turma) => {
           const ativo = turma.id === turmaEfetiva;
           const quantidade = alunos.filter(
@@ -530,44 +544,51 @@ export default function VistaGrade({
           ) : (
             tabela
           )}
-          <div className="text-muted-foreground flex flex-wrap items-center gap-4 border-t px-4 py-2.5 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span
-                className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                aria-hidden="true"
-              />
-              presente
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="bg-falta text-falta-foreground inline-flex size-4 items-center justify-center rounded-[3px] text-[9px] font-bold"
-                aria-hidden="true"
-              >
-                F
+          <div className="text-muted-foreground border-t px-4 py-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="bg-primary/60 inline-flex size-1.5 rounded-full"
+                  aria-hidden="true"
+                />
+                presente
               </span>
-              falta
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
-                aria-hidden="true"
-              >
-                FJ
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="bg-falta text-falta-foreground inline-flex size-4 items-center justify-center rounded-[3px] text-[9px] font-bold"
+                  aria-hidden="true"
+                >
+                  F
+                </span>
+                falta
               </span>
-              falta justificada
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span
-                className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
-                aria-hidden="true"
-              >
-                S
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
+                  aria-hidden="true"
+                >
+                  FJ
+                </span>
+                falta justificada
               </span>
-              presente em parte das aulas
-            </span>
-            <span>Total: faltas (F + FJ) de todo o histórico</span>
-            <span>célula vazia: turma sem frequência no dia</span>
-            <span>Baixar planilha: todos os alunos ativos da turma de origem</span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
+                  aria-hidden="true"
+                >
+                  S
+                </span>
+                presente em parte das aulas
+              </span>
+            </div>
+            <details className="mt-2">
+              <summary className="text-primary cursor-pointer py-1 font-medium">Como ler</summary>
+              <div className="space-y-1 pt-1">
+                <p>Total: faltas (F + FJ) de todo o histórico.</p>
+                <p>Célula vazia: turma sem frequência no dia.</p>
+                <p>Baixar planilha: todos os alunos ativos da turma de origem.</p>
+              </div>
+            </details>
           </div>
         </motion.div>
       )}

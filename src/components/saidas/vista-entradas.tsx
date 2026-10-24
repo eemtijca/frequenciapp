@@ -48,15 +48,6 @@ interface Props {
   liberadores: LiberadorConfigurado[];
   catalogoJustificativas: JustificativaConfigurada[];
 }
-interface Previa {
-  planoHash: string;
-  novas: number;
-  existentes: number;
-  bloqueado: boolean;
-  avisos: string[];
-  criar: { nome: string; linha: number }[];
-}
-
 const OPCOES_MOMENTO = MOMENTOS_SAIDA.map((item) => ({ valor: item.codigo, rotulo: item.rotulo }));
 
 export default function VistaEntradas({
@@ -82,10 +73,6 @@ export default function VistaEntradas({
   const [recorteCarregado, setRecorteCarregado] = useState("");
   const [versao, setVersao] = useState(0);
   const [remover, setRemover] = useState<EntradaAtrasada | null>(null);
-  const [estado, setEstado] = useState<{ podeEnviar: boolean; planilhaNome: string | null } | null>(
-    null,
-  );
-  const [previa, setPrevia] = useState<Previa | null>(null);
   const mensagemErro = useCallback(
     (erro: unknown) =>
       erro instanceof ErroApi
@@ -116,19 +103,6 @@ export default function VistaEntradas({
       viva = false;
     };
   }, [dia, turma, versao, recorte, mensagemErro]);
-  useEffect(() => {
-    let viva = true;
-    pedir<{ podeEnviar: boolean; planilhaNome: string | null }>("/api/planilha-entradas/estado")
-      .then((dados) => {
-        if (viva) setEstado(dados);
-      })
-      .catch(() => {
-        if (viva) setEstado(null);
-      });
-    return () => {
-      viva = false;
-    };
-  }, []);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const executando = chaveAtiva !== null;
   const executar = (acao: () => Promise<void>) =>
@@ -138,11 +112,9 @@ export default function VistaEntradas({
         await acao();
       } catch (erro) {
         setRemover(null);
-        setPrevia(null);
         setErro(mensagemErro(erro));
       }
     });
-  const dadosEnvio = { de: dia, ate: dia, ...(turma ? { turmaId: turma } : {}) };
   const opcoesResponsavel = useMemo(
     () =>
       liberadores
@@ -190,7 +162,6 @@ export default function VistaEntradas({
   );
   function escolherDia(valor: string) {
     setDia(valor);
-    setPrevia(null);
     setErro("");
   }
   return (
@@ -215,7 +186,7 @@ export default function VistaEntradas({
             max={diaCorrente}
             rotuloAcessivel="Data da entrada"
             rotulo={dia.split("-").reverse().join("/")}
-            detalhe={rotuloDiaSemana(dia)}
+            detalhe={rotuloDiaSemana(dia).replace("-feira", "")}
             disabled={executando}
             onValor={escolherDia}
           />
@@ -232,7 +203,7 @@ export default function VistaEntradas({
         </Button>
       </div>
       <form
-        className="superficie-vidro flex flex-col gap-3 p-4"
+        className="superficie-vidro flex flex-col gap-4 p-4"
         onSubmit={(e) => {
           e.preventDefault();
           void executar(async () => {
@@ -256,170 +227,170 @@ export default function VistaEntradas({
             setJustificativa("");
             setObservacao("");
             setFormaJustificativa("catalogo");
-            setPrevia(null);
             setVersao((valor) => valor + 1);
             avisarSucesso("Entrada registrada.");
           });
         }}
       >
-        <h2 className="font-medium">Registro</h2>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="entrada-turma">Turma</Label>
-          <Selecionar
-            id="entrada-turma"
-            value={turma || "todas"}
-            disabled={executando}
-            onValueChange={(valor) => {
-              setTurma(valor === "todas" ? "" : valor);
-              setPrevia(null);
-              setErro("");
-              setAlunoId("");
-            }}
-            opcoes={opcoesTurma}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="entrada-aluno">Aluno</Label>
-          <Selecionar
-            id="entrada-aluno"
-            value={alunoId}
-            onValueChange={setAlunoId}
-            disabled={executando}
-            buscavel
-            opcoes={opcoesAluno}
-            placeholder="Selecione o aluno"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="entrada-momento">Momento da entrada</Label>
-          <Selecionar
-            id="entrada-momento"
-            value={momento}
-            disabled={executando}
-            onValueChange={setMomento}
-            placeholder="Selecione a aula ou pausa"
-            opcoes={OPCOES_MOMENTO}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor="entrada-horario">Horário da chegada</Label>
-          <SeletorHorario
-            id="entrada-horario"
-            valor={horario}
-            onValor={setHorario}
-            rotuloAcessivel="Horário da chegada"
-            agora={horaNoFuso(new Date().toISOString(), fuso)}
-            disabled={executando}
-          />
-        </div>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="text-sm font-medium">Justificativa</legend>
-          <div
-            role="radiogroup"
-            aria-label="Forma da justificativa"
-            className="flex flex-wrap gap-2"
-          >
-            {(
-              [
-                { valor: "texto", rotulo: "Escrever" },
-                { valor: "catalogo", rotulo: "Selecionar tipo" },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.valor}
-                type="button"
-                role="radio"
-                aria-checked={formaJustificativa === item.valor}
-                disabled={executando}
-                onClick={() => {
-                  setFormaJustificativa(item.valor);
-                  setMotivo("");
-                  setJustificativa("");
-                  setObservacao("");
-                }}
-                className="controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
-              >
-                {item.rotulo}
-              </button>
-            ))}
+        <h2 className="font-medium">Registrar entrada</h2>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="entrada-turma">Turma</Label>
+            <Selecionar
+              id="entrada-turma"
+              value={turma || "todas"}
+              disabled={executando}
+              onValueChange={(valor) => {
+                setTurma(valor === "todas" ? "" : valor);
+                setErro("");
+                setAlunoId("");
+              }}
+              opcoes={opcoesTurma}
+            />
           </div>
-          {formaJustificativa === "texto" ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="entrada-motivo">Texto da justificativa</Label>
-              <Input
-                id="entrada-motivo"
-                required
-                minLength={2}
-                maxLength={100}
-                value={motivo}
-                disabled={executando}
-                onChange={(e) => setMotivo(e.target.value)}
-                placeholder="Descreva o motivo"
-                className="h-11"
-              />
-              <p className="text-muted-foreground text-xs">Até 100 caracteres.</p>
+          <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
+            <Label htmlFor="entrada-aluno">Aluno</Label>
+            <Selecionar
+              id="entrada-aluno"
+              value={alunoId}
+              onValueChange={setAlunoId}
+              disabled={executando}
+              buscavel
+              opcoes={opcoesAluno}
+              placeholder="Selecione o aluno"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="entrada-momento">Momento da entrada</Label>
+            <Selecionar
+              id="entrada-momento"
+              value={momento}
+              disabled={executando}
+              onValueChange={setMomento}
+              placeholder="Selecione a aula ou pausa"
+              opcoes={OPCOES_MOMENTO}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="entrada-horario">Horário da chegada</Label>
+            <SeletorHorario
+              id="entrada-horario"
+              valor={horario}
+              onValor={setHorario}
+              rotuloAcessivel="Horário da chegada"
+              agora={horaNoFuso(new Date().toISOString(), fuso)}
+              disabled={executando}
+            />
+          </div>
+          <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
+            <legend className="text-sm font-medium">Justificativa</legend>
+            <div
+              role="radiogroup"
+              aria-label="Forma da justificativa"
+              className="flex flex-wrap gap-2"
+            >
+              {(
+                [
+                  { valor: "texto", rotulo: "Escrever" },
+                  { valor: "catalogo", rotulo: "Selecionar tipo" },
+                ] as const
+              ).map((item) => (
+                <button
+                  key={item.valor}
+                  type="button"
+                  role="radio"
+                  aria-checked={formaJustificativa === item.valor}
+                  disabled={executando}
+                  onClick={() => {
+                    setFormaJustificativa(item.valor);
+                    setMotivo("");
+                    setJustificativa("");
+                    setObservacao("");
+                  }}
+                  className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "vidro-selecionado" : ""}`}
+                >
+                  {item.rotulo}
+                </button>
+              ))}
             </div>
-          ) : (
-            <>
+            {formaJustificativa === "texto" ? (
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-justificativa">Tipo</Label>
-                <Selecionar
-                  id="entrada-justificativa"
-                  value={justificativa}
-                  disabled={executando}
-                  onValueChange={setJustificativa}
-                  placeholder="Selecione a justificativa"
-                  opcoes={opcoesJustificativa}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-observacao">Observação</Label>
+                <Label htmlFor="entrada-motivo">Texto da justificativa</Label>
                 <Input
-                  id="entrada-observacao"
-                  value={observacao}
-                  disabled={executando}
+                  id="entrada-motivo"
+                  required
+                  minLength={2}
                   maxLength={100}
-                  onChange={(e) => setObservacao(e.target.value)}
-                  placeholder="Opcional: descreva brevemente o motivo"
+                  value={motivo}
+                  disabled={executando}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Descreva o motivo"
                   className="h-11"
                 />
               </div>
-            </>
-          )}
-        </fieldset>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="entrada-responsavel">Responsável pelo registro</Label>
-          <Selecionar
-            id="entrada-responsavel"
-            value={responsavelCodigo}
-            disabled={executando}
-            onValueChange={setResponsavelCodigo}
-            placeholder="Selecione quem registrou"
-            opcoes={opcoesResponsavel}
-          />
-          {opcoesResponsavel.length === 0 && (
-            <p className="text-muted-foreground text-xs">
-              Nenhum nome cadastrado. A administração cadastra em Gestão, Configurações, Quem
-              libera.
-            </p>
-          )}
+            ) : (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="entrada-justificativa">Tipo</Label>
+                  <Selecionar
+                    id="entrada-justificativa"
+                    value={justificativa}
+                    disabled={executando}
+                    onValueChange={setJustificativa}
+                    placeholder="Selecione a justificativa"
+                    opcoes={opcoesJustificativa}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="entrada-observacao">Observação</Label>
+                  <Input
+                    id="entrada-observacao"
+                    value={observacao}
+                    disabled={executando}
+                    maxLength={100}
+                    onChange={(e) => setObservacao(e.target.value)}
+                    placeholder="Opcional: descreva brevemente o motivo"
+                    className="h-11"
+                  />
+                </div>
+              </>
+            )}
+          </fieldset>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="entrada-responsavel">Responsável pelo registro</Label>
+            <Selecionar
+              id="entrada-responsavel"
+              value={responsavelCodigo}
+              disabled={executando}
+              onValueChange={setResponsavelCodigo}
+              placeholder="Selecione quem registrou"
+              opcoes={opcoesResponsavel}
+            />
+            {opcoesResponsavel.length === 0 && (
+              <p className="text-muted-foreground text-xs">
+                Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
+              </p>
+            )}
+          </div>
         </div>
-        <Button
-          className="h-11 w-full px-6 sm:w-auto"
-          size="lg"
-          type="submit"
-          disabled={
-            executando ||
-            !alunoId ||
-            !momento ||
-            !responsavelCodigo ||
-            carregando ||
-            opcoesResponsavel.length === 0 ||
-            (formaJustificativa === "catalogo" && !justificativa)
-          }
-        >
-          Registrar entrada
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            className="h-11 w-full px-6 sm:w-auto"
+            size="lg"
+            type="submit"
+            disabled={
+              executando ||
+              !alunoId ||
+              !momento ||
+              !responsavelCodigo ||
+              carregando ||
+              opcoesResponsavel.length === 0 ||
+              (formaJustificativa === "catalogo" && !justificativa)
+            }
+          >
+            Registrar entrada
+          </Button>
+        </div>
       </form>
       {erro && (
         <p role="alert" className="text-falta-texto rounded-lg border p-3 text-sm">
@@ -470,37 +441,6 @@ export default function VistaEntradas({
           ))
         )}
       </section>
-      <section className="superficie-vidro space-y-3 p-4" aria-label="Prévia das entradas">
-        <h2 className="sr-only">Prévia das entradas</h2>
-        {estado?.podeEnviar ? (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                disabled={executando || carregando || entradas.length === 0}
-                onClick={() =>
-                  void executar(async () => {
-                    setPrevia(null);
-                    setPrevia(
-                      await pedir<Previa>("/api/planilha-entradas/simular", {
-                        method: "POST",
-                        ...corpoJson(dadosEnvio),
-                      }),
-                    );
-                  })
-                }
-              >
-                Prévia das entradas
-              </Button>
-            </div>
-          </>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            Ative a conexão Google da planilha de entradas e saídas na Gestão para enviar as
-            entradas.
-          </p>
-        )}
-      </section>
       <AlertDialog
         open={Boolean(remover)}
         onOpenChange={(aberto) => {
@@ -531,65 +471,6 @@ export default function VistaEntradas({
               }}
             >
               Remover entrada
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog
-        open={Boolean(previa)}
-        onOpenChange={(aberto) => {
-          if (!aberto && !executando) setPrevia(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {previa?.novas === 0
-                ? "Confirmar conferência das entradas?"
-                : "Enviar entradas para a planilha?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {previa?.novas} {previa?.novas === 1 ? "linha nova" : "linhas novas"} na aba Entradas;{" "}
-              {previa?.existentes}{" "}
-              {previa?.existentes === 1 ? "registro já enviado" : "registros já enviados"}. Data:{" "}
-              {rotuloData(dia)}. Linhas existentes e fórmulas serão preservadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="max-h-60 space-y-2 overflow-y-auto text-sm">
-            {previa?.avisos.map((aviso) => (
-              <p key={aviso}>{aviso}</p>
-            ))}
-            {previa?.criar.map((item) => (
-              <p key={item.linha}>
-                {item.nome}: linha {item.linha}
-              </p>
-            ))}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={executando || !previa || previa.bloqueado}
-              onClick={(e) => {
-                e.preventDefault();
-                if (previa)
-                  void executar(async () => {
-                    const resultado = await pedir<{ linhasCriadas: number }>(
-                      "/api/planilha-entradas/enviar",
-                      {
-                        method: "POST",
-                        ...corpoJson({ ...dadosEnvio, planoHash: previa.planoHash }),
-                      },
-                    );
-                    setPrevia(null);
-                    avisarSucesso(
-                      resultado.linhasCriadas === 0
-                        ? "Conferência registrada."
-                        : `Envio confirmado: ${resultado.linhasCriadas} ${resultado.linhasCriadas === 1 ? "linha criada" : "linhas criadas"}.`,
-                    );
-                  });
-              }}
-            >
-              {previa?.novas === 0 ? "Confirmar conferência" : "Enviar entradas"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

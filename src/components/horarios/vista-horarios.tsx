@@ -459,18 +459,8 @@ export default function VistaHorarios({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:flex">
-        <Button
-          variant="outline"
-          className="min-h-11 min-w-0"
-          aria-pressed={semanaCompleta}
-          onClick={() => setDiaSelecionado("0")}
-          disabled={turmas.length === 0 || navegacaoBloqueada}
-        >
-          <CalendarDays size={16} aria-hidden="true" />
-          Semana completa
-        </Button>
-        {editavel ? (
+      {editavel ? (
+        <div className="flex">
           <Button
             type="button"
             variant="outline"
@@ -482,8 +472,8 @@ export default function VistaHorarios({
             <Pencil size={16} aria-hidden="true" />
             Editar horários
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {editavel && rascunho && !contextoDisponivel ? (
         <div className="flex min-w-0 flex-col gap-3">

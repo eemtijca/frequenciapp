@@ -2,7 +2,7 @@
 
 // Configurações da escola agrupadas por assunto, preservando os formulários
 // ao trocar de categoria. Restrita à administração, com auditoria no servidor.
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   Check,
@@ -12,6 +12,8 @@ import {
   LoaderCircle,
   Pencil,
   Plus,
+  RotateCcw,
+  Save,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -79,6 +81,7 @@ interface Props {
   onPendenciaHorarios?: (pendente: boolean) => void;
   onAbrirSaidas?: () => void;
   onAbrirParcial?: () => void;
+  onPendenciaConfiguracoes?: (pendente: boolean) => void;
 }
 
 interface ResultadoImportacao {
@@ -97,6 +100,13 @@ const CATEGORIAS = [
 ] as const;
 type Categoria = (typeof CATEGORIAS)[number]["valor"];
 
+function listasIguais(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const ordenadaA = [...a].sort();
+  const ordenadaB = [...b].sort();
+  return ordenadaA.every((valor, indice) => valor === ordenadaB[indice]);
+}
+
 export default function AbaConfiguracoes({
   planilhaInicial,
   configuracoes,
@@ -112,6 +122,7 @@ export default function AbaConfiguracoes({
   onPendenciaHorarios,
   onAbrirSaidas,
   onAbrirParcial,
+  onPendenciaConfiguracoes,
 }: Props) {
   const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
   // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
@@ -121,9 +132,11 @@ export default function AbaConfiguracoes({
   const [abertoLiberadores, setAbertoLiberadores] = useState(false);
   const [abertoCopia, setAbertoCopia] = useState(false);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
-  const [salvando, setSalvando] = useState<
-    "frequenciaPorAula" | "saidaAntecipada" | "origemNaChamada" | null
-  >(null);
+  const [rascunho, setRascunho] = useState<Configuracoes>(configuracoes);
+  const [base, setBase] = useState<Configuracoes>(configuracoes);
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
+  const [confirmarSalvar, setConfirmarSalvar] = useState(false);
+  const [confirmarDescartar, setConfirmarDescartar] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [downloadAberto, setDownloadAberto] = useState(false);
@@ -131,6 +144,20 @@ export default function AbaConfiguracoes({
   const [erroCopia, setErroCopia] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
+  const alterado =
+    rascunho.frequenciaPorAula !== base.frequenciaPorAula ||
+    rascunho.saidaAntecipada !== base.saidaAntecipada ||
+    rascunho.origemNaChamada !== base.origemNaChamada ||
+    !listasIguais(rascunho.origemNaChamadaSerieIds, base.origemNaChamadaSerieIds) ||
+    !listasIguais(rascunho.origemNaChamadaTurmaIds, base.origemNaChamadaTurmaIds);
+
+  useEffect(() => {
+    onPendenciaConfiguracoes?.(alterado);
+  }, [alterado, onPendenciaConfiguracoes]);
+
+  useEffect(() => {
+    return () => onPendenciaConfiguracoes?.(false);
+  }, [onPendenciaConfiguracoes]);
 
   const [novaCodigo, setNovaCodigo] = useState("");
   const [novaRotulo, setNovaRotulo] = useState("");
@@ -155,62 +182,73 @@ export default function AbaConfiguracoes({
     null,
   );
 
-  async function alternar(chave: "frequenciaPorAula" | "saidaAntecipada", valor: boolean) {
-    await executarPorChave(`recurso-${chave}`, async () => {
-      setSalvando(chave);
-      setErro("");
-      try {
-        const dados = await pedir<{ configuracoes: Configuracoes }>(
-          "/api/configuracoes",
-          corpoAlteracao("PATCH", { [chave]: valor }),
-        );
-        onMudanca(dados.configuracoes);
-        toast.success(
-          chave === "frequenciaPorAula"
-            ? valor
-              ? "Chamada por aula ativada."
-              : "Chamada por aula desativada."
-            : valor
-              ? "Saídas e entradas ativadas."
-              : "Saídas e entradas desativadas.",
-        );
-      } catch (excecao) {
-        setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
-        );
-        setErroVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
-      } finally {
-        setSalvando(null);
-      }
-    });
+  function alternar(chave: "frequenciaPorAula" | "saidaAntecipada", valor: boolean) {
+    setRascunho((atual) => ({ ...atual, [chave]: valor }));
+    setErro("");
   }
 
-  async function salvarOrigem(
+  function salvarOrigem(
     entrada: Partial<
       Pick<Configuracoes, "origemNaChamada" | "origemNaChamadaSerieIds" | "origemNaChamadaTurmaIds">
     >,
   ) {
-    await executarPorChave("recurso-origem", async () => {
-      setSalvando("origemNaChamada");
+    setRascunho((atual) => ({ ...atual, ...entrada }));
+    setErro("");
+  }
+
+  async function salvarConfiguracoes() {
+    if (!alterado || salvandoConfig) return;
+    await executarPorChave("configuracoes-salvar", async () => {
+      setSalvandoConfig(true);
       setErro("");
       try {
         const dados = await pedir<{ configuracoes: Configuracoes }>(
           "/api/configuracoes",
-          corpoAlteracao("PATCH", entrada),
+          corpoAlteracao("PATCH", {
+            frequenciaPorAula: rascunho.frequenciaPorAula,
+            saidaAntecipada: rascunho.saidaAntecipada,
+            origemNaChamada: rascunho.origemNaChamada,
+            origemNaChamadaSerieIds: rascunho.origemNaChamadaSerieIds,
+            origemNaChamadaTurmaIds: rascunho.origemNaChamadaTurmaIds,
+            ...(base.atualizadoEm ? { atualizadoEm: base.atualizadoEm } : {}),
+          }),
         );
+        setBase(dados.configuracoes);
+        setRascunho(dados.configuracoes);
         onMudanca(dados.configuracoes);
-        toast.success("Indicação de origem atualizada.");
+        setConfirmarSalvar(false);
+        toast.success("Configurações salvas.");
       } catch (excecao) {
         setErro(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível salvar a configuração.",
+          excecao instanceof ErroApi
+            ? excecao.message
+            : "Não foi possível salvar as configurações.",
         );
         setErroVariante(estadoDeErro(excecao));
-        avisarErro(excecao, { contexto: "Não foi possível salvar a configuração." });
+        avisarErro(excecao, { contexto: "Não foi possível salvar as configurações." });
       } finally {
-        setSalvando(null);
+        setSalvandoConfig(false);
       }
     });
+  }
+
+  function descartarConfiguracoes() {
+    setRascunho(base);
+    setErro("");
+    setConfirmarDescartar(false);
+  }
+
+  async function recarregarConfiguracoes() {
+    try {
+      const dados = await pedir<{ configuracoes: Configuracoes }>("/api/configuracoes");
+      setBase(dados.configuracoes);
+      setRascunho(dados.configuracoes);
+      onMudanca(dados.configuracoes);
+      setErro("");
+      toast.success("Configurações atualizadas.");
+    } catch (excecao) {
+      avisarErro(excecao, { contexto: "Não foi possível atualizar as configurações." });
+    }
   }
 
   function selecaoAlterada(ids: string[], id: string, marcado: boolean): string[] {
@@ -485,6 +523,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-recursos"
         titulo="Recursos da escola"
+        descricao="Liga e desliga recursos da chamada e das saídas."
         icone={Settings2}
         aberto={abertoRecursos}
         onAbertoChange={setAbertoRecursos}
@@ -498,9 +537,9 @@ export default function AbaConfiguracoes({
           </div>
           <Switch
             id="config-frequencia-aula"
-            checked={configuracoes.frequenciaPorAula}
-            disabled={salvando !== null}
-            onCheckedChange={(valor) => void alternar("frequenciaPorAula", valor)}
+            checked={rascunho.frequenciaPorAula}
+            disabled={salvandoConfig}
+            onCheckedChange={(valor) => alternar("frequenciaPorAula", valor)}
           />
         </div>
 
@@ -513,9 +552,9 @@ export default function AbaConfiguracoes({
           </div>
           <Switch
             id="config-saida-antecipada"
-            checked={configuracoes.saidaAntecipada}
-            disabled={salvando !== null}
-            onCheckedChange={(valor) => void alternar("saidaAntecipada", valor)}
+            checked={rascunho.saidaAntecipada}
+            disabled={salvandoConfig}
+            onCheckedChange={(valor) => alternar("saidaAntecipada", valor)}
           />
         </div>
 
@@ -533,14 +572,14 @@ export default function AbaConfiguracoes({
             </div>
             <Switch
               id="config-origem-chamada"
-              checked={configuracoes.origemNaChamada}
-              disabled={salvando !== null}
-              onCheckedChange={(valor) => void salvarOrigem({ origemNaChamada: valor })}
+              checked={rascunho.origemNaChamada}
+              disabled={salvandoConfig}
+              onCheckedChange={(valor) => salvarOrigem({ origemNaChamada: valor })}
             />
           </div>
-          {configuracoes.origemNaChamada && (
+          {rascunho.origemNaChamada && (
             <>
-              <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
+              <fieldset disabled={salvandoConfig} className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm font-medium">Séries completas</legend>
                 <p className="text-muted-foreground text-xs">Inclui as turmas atuais e futuras.</p>
                 {series.map((serie) => (
@@ -552,11 +591,11 @@ export default function AbaConfiguracoes({
                       type="checkbox"
                       className="accent-primary size-4 shrink-0"
                       aria-label={`Mostrar origem na série ${serie.nome}`}
-                      checked={configuracoes.origemNaChamadaSerieIds.includes(serie.id)}
+                      checked={rascunho.origemNaChamadaSerieIds.includes(serie.id)}
                       onChange={(evento) =>
                         void salvarOrigem({
                           origemNaChamadaSerieIds: selecaoAlterada(
-                            configuracoes.origemNaChamadaSerieIds,
+                            rascunho.origemNaChamadaSerieIds,
                             serie.id,
                             evento.target.checked,
                           ),
@@ -576,19 +615,17 @@ export default function AbaConfiguracoes({
                 onAbertoChange={setAbertoTurmasOrigem}
                 resumo={
                   <Selo
-                    variante={
-                      configuracoes.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"
-                    }
+                    variante={rascunho.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"}
                   >
-                    {configuracoes.origemNaChamadaTurmaIds.length === 0
+                    {rascunho.origemNaChamadaTurmaIds.length === 0
                       ? "Nenhuma"
-                      : `${configuracoes.origemNaChamadaTurmaIds.length} selecionada${
-                          configuracoes.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
+                      : `${rascunho.origemNaChamadaTurmaIds.length} selecionada${
+                          rascunho.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
                         }`}
                   </Selo>
                 }
               >
-                <fieldset disabled={salvando !== null} className="flex flex-col gap-2">
+                <fieldset disabled={salvandoConfig} className="flex flex-col gap-2">
                   <legend className="sr-only">Turmas específicas</legend>
                   {turmas.map((item) => (
                     <label
@@ -599,11 +636,11 @@ export default function AbaConfiguracoes({
                         type="checkbox"
                         className="accent-primary size-4 shrink-0"
                         aria-label={`Mostrar origem na turma ${item.rotulo}`}
-                        checked={configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
+                        checked={rascunho.origemNaChamadaTurmaIds.includes(item.id)}
                         onChange={(evento) =>
                           void salvarOrigem({
                             origemNaChamadaTurmaIds: selecaoAlterada(
-                              configuracoes.origemNaChamadaTurmaIds,
+                              rascunho.origemNaChamadaTurmaIds,
                               item.id,
                               evento.target.checked,
                             ),
@@ -615,23 +652,34 @@ export default function AbaConfiguracoes({
                   ))}
                 </fieldset>
               </SecaoRecolhivel>
-              {configuracoes.origemNaChamadaSerieIds.length === 0 &&
-                configuracoes.origemNaChamadaTurmaIds.length === 0 && (
+              {rascunho.origemNaChamadaSerieIds.length === 0 &&
+                rascunho.origemNaChamadaTurmaIds.length === 0 && (
                   <p className="text-muted-foreground text-xs">
                     Nenhuma série ou turma selecionada.
                   </p>
                 )}
             </>
           )}
-          {salvando === "origemNaChamada" && (
-            <p role="status" className="text-muted-foreground flex items-center gap-2 text-xs">
-              <LoaderCircle size={14} className="animate-spin" />
-              Salvando indicação de origem...
-            </p>
-          )}
         </div>
 
-        {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+        {erro && (
+          <AvisoCompacto
+            variante={erroVariante}
+            titulo={
+              erroVariante === "conflito" ? "Configurações alteradas em outro acesso" : undefined
+            }
+            descricao={erro}
+            tamanho="linha"
+            acao={
+              erroVariante === "conflito"
+                ? {
+                    rotulo: "Recarregar configurações",
+                    onClick: () => void recarregarConfiguracoes(),
+                  }
+                : undefined
+            }
+          />
+        )}
       </SecaoRecolhivel>
 
       <SecaoCalendarioLetivo
@@ -648,7 +696,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-justificativas"
         titulo="Justificativas"
-        descricao="Códigos fixos após o cadastro."
+        descricao="Motivos disponíveis nas faltas justificadas."
         icone={ScrollText}
         aberto={abertoJustificativas}
         onAbertoChange={setAbertoJustificativas}
@@ -825,7 +873,7 @@ export default function AbaConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-liberadores"
         titulo="Quem libera as saídas"
-        descricao="Códigos fixos após o cadastro."
+        descricao="Nomes disponíveis ao registrar uma saída."
         icone={UserCheck}
         aberto={abertoLiberadores}
         onAbertoChange={setAbertoLiberadores}
@@ -1115,7 +1163,7 @@ export default function AbaConfiguracoes({
           </Button>
         ))}
       </nav>
-      <div className="min-w-0">
+      <div className="min-w-0 pb-24">
         <section
           id="config-grupo-escola"
           aria-labelledby="categoria-config-escola"
@@ -1186,6 +1234,111 @@ export default function AbaConfiguracoes({
           {dados}
         </section>
       </div>
+      {alterado && (
+        <div
+          role="region"
+          aria-label="Salvar configurações"
+          className="superficie-vidro vidro-flutuante sticky bottom-3 z-20 col-span-full flex flex-wrap items-center gap-2 rounded-2xl p-2"
+        >
+          <p
+            className="text-muted-foreground min-w-0 flex-1 px-2 text-xs font-medium"
+            aria-live="polite"
+          >
+            Alterações não salvas
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setConfirmarDescartar(true)}
+            disabled={salvandoConfig}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+            Descartar
+          </Button>
+          <Button
+            type="button"
+            className="px-4"
+            onClick={() => setConfirmarSalvar(true)}
+            disabled={salvandoConfig}
+          >
+            {salvandoConfig ? (
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Save size={16} aria-hidden="true" />
+            )}
+            Salvar configurações
+          </Button>
+        </div>
+      )}
+      <AlertDialog open={confirmarSalvar} onOpenChange={setConfirmarSalvar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Salvar configurações?</AlertDialogTitle>
+            <AlertDialogDescription>As alterações valem para toda a escola.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+            {rascunho.frequenciaPorAula !== base.frequenciaPorAula && (
+              <>
+                <dt className="text-muted-foreground">Chamada por aula</dt>
+                <dd>{rascunho.frequenciaPorAula ? "Ligada" : "Desligada"}</dd>
+              </>
+            )}
+            {rascunho.saidaAntecipada !== base.saidaAntecipada && (
+              <>
+                <dt className="text-muted-foreground">Saídas e Entradas</dt>
+                <dd>{rascunho.saidaAntecipada ? "Ligadas" : "Desligadas"}</dd>
+              </>
+            )}
+            {rascunho.origemNaChamada !== base.origemNaChamada && (
+              <>
+                <dt className="text-muted-foreground">Turma de origem</dt>
+                <dd>{rascunho.origemNaChamada ? "Ligada" : "Desligada"}</dd>
+              </>
+            )}
+            {!listasIguais(rascunho.origemNaChamadaSerieIds, base.origemNaChamadaSerieIds) && (
+              <>
+                <dt className="text-muted-foreground">Séries de origem</dt>
+                <dd>{rascunho.origemNaChamadaSerieIds.length} selecionadas</dd>
+              </>
+            )}
+            {!listasIguais(rascunho.origemNaChamadaTurmaIds, base.origemNaChamadaTurmaIds) && (
+              <>
+                <dt className="text-muted-foreground">Turmas de origem</dt>
+                <dd>{rascunho.origemNaChamadaTurmaIds.length} selecionadas</dd>
+              </>
+            )}
+          </dl>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={salvandoConfig}>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={salvandoConfig}
+              onClick={(evento) => {
+                evento.preventDefault();
+                void salvarConfiguracoes();
+              }}
+            >
+              {salvandoConfig ? <LoaderCircle size={16} className="animate-spin" /> : null}
+              Salvar configurações
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={confirmarDescartar} onOpenChange={setConfirmarDescartar}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As configurações voltam ao estado salvo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={descartarConfiguracoes}>
+              Descartar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <DialogoDownload
         confirmarAdmin
         aberto={downloadAberto}

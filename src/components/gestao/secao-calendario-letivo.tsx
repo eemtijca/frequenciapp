@@ -2,14 +2,7 @@
 
 // Calendário anual de feriados, com sincronização, remoção confirmada e releitura.
 import { useState } from "react";
-import {
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  RefreshCw,
-  Trash2,
-} from "lucide-react";
+import { CalendarDays, LoaderCircle, RefreshCw, Trash2 } from "lucide-react";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido, rotuloData } from "@/domain/frequencia";
 import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
@@ -32,6 +25,7 @@ import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import ControleSincronizarFeriados from "@/components/gestao/controle-sincronizar-feriados";
 import { Selo } from "@/components/ui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { SeletorAno } from "@/components/ui/seletor-ano";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 
 interface Props {
@@ -140,6 +134,7 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
   return (
     <SecaoRecolhivel
       titulo="Calendário letivo"
+      descricao="Feriados e recessos que suspendem a chamada."
       icone={CalendarDays}
       aberto={aberto}
       onAbertoChange={(valor) => {
@@ -156,41 +151,16 @@ export default function SecaoCalendarioLetivo({ feriados, diaCorrente, onAtualiz
     >
       <p className="text-muted-foreground text-sm">Feriados valem para todas as turmas.</p>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="calendario-letivo-ano">Ano do calendário</Label>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Ano anterior"
-            disabled={bloqueado || !anoValido || Number(ano) <= 1900}
-            onClick={() => mudarAno(String(Number(ano) - 1))}
-          >
-            <ChevronLeft size={18} aria-hidden="true" />
-          </Button>
-          <Input
-            id="calendario-letivo-ano"
-            type="number"
-            inputMode="numeric"
-            min={1900}
-            max={2199}
-            step={1}
-            value={ano}
-            disabled={bloqueado}
-            onChange={(evento) => mudarAno(evento.target.value)}
-            className="numerais-tabulares text-center"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Ano seguinte"
-            disabled={bloqueado || !anoValido || Number(ano) >= 2199}
-            onClick={() => mudarAno(String(Number(ano) + 1))}
-          >
-            <ChevronRight size={18} aria-hidden="true" />
-          </Button>
-        </div>
+        <span className="text-sm font-medium">Ano do calendário</span>
+        <SeletorAno
+          id="calendario-letivo-ano"
+          valor={ano}
+          min={1900}
+          max={2199}
+          disabled={bloqueado}
+          rotuloAcessivel="Ano do calendário"
+          onValor={mudarAno}
+        />
       </div>
       <ControleSincronizarFeriados
         ano={ano}

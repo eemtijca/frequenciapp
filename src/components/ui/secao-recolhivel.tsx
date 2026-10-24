@@ -3,6 +3,7 @@
 // Seção recolhível com resumo no cabeçalho, sobre o Radix Collapsible. O
 // gatilho cobre só o título; as ações ficam fora para não abrir sem querer.
 import type { ReactNode } from "react";
+import { useId } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { ChevronDown, type LucideIcon } from "lucide-react";
 
@@ -37,6 +38,7 @@ export function SecaoRecolhivel({
   children,
 }: Props) {
   const perigo = variante === "perigo";
+  const descricaoId = useId();
   return (
     <Collapsible.Root
       open={aberto}
@@ -47,7 +49,10 @@ export function SecaoRecolhivel({
       }`}
     >
       <div className="flex items-start gap-2 p-3 sm:p-4">
-        <Collapsible.Trigger className="pressionavel focus-visible:ring-ring/50 flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-2xl text-left outline-none focus-visible:ring-[3px]">
+        <Collapsible.Trigger
+          aria-describedby={descricao ? descricaoId : undefined}
+          className="pressionavel focus-visible:ring-ring/50 flex min-h-11 min-w-0 flex-1 items-start gap-3 rounded-2xl text-left outline-none focus-visible:ring-[3px]"
+        >
           <span
             className={`mt-0.5 flex size-9 shrink-0 items-center justify-center ${
               perigo
@@ -73,7 +78,9 @@ export function SecaoRecolhivel({
               />
             </span>
             {descricao && (
-              <span className="text-muted-foreground mt-0.5 block text-sm">{descricao}</span>
+              <span id={descricaoId} className="text-muted-foreground mt-0.5 block text-sm">
+                {descricao}
+              </span>
             )}
             {resumo && <span className="mt-2 flex flex-wrap items-center gap-1.5">{resumo}</span>}
           </span>

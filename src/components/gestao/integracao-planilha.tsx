@@ -356,6 +356,7 @@ export default function IntegracaoPlanilha({
     <SecaoRecolhivel
       dataSecao="planilha-frequencia"
       titulo="Planilha de frequência"
+      descricao="Envio das chamadas para o Google Planilhas."
       icone={FileSpreadsheet}
       aberto={aberto}
       onAbertoChange={setAberto}

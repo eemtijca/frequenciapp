@@ -12,6 +12,8 @@ import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Selecionar } from "@/components/ui/selecionar";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Selo } from "@/components/ui/selo";
 import {
@@ -50,6 +52,7 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
   const [escopo, setEscopo] = useState<EscopoBi>({});
   const [senha, setSenha] = useState("");
   const [segredo, setSegredo] = useState("");
+  const hoje = new Date().toISOString().slice(0, 10);
   const foco = useRef<HTMLElement | null>(null);
   const { executar: carregar, executando: carregando } = useAcaoUnica(async () => {
     setErro("");
@@ -164,16 +167,17 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
             onChange={(e) => setBusca(e.target.value)}
             className="min-w-0 flex-1"
           />
-          <select
-            aria-label="Ordenar chaves"
+          <Selecionar
+            ariaLabel="Ordenar chaves"
             value={ordem}
-            onChange={(e) => setOrdem(e.target.value)}
-            className="controle-vidro min-h-11 rounded-xl px-3 text-sm"
-          >
-            <option value="recentes">Mais recentes</option>
-            <option value="nome">Nome</option>
-            <option value="uso">Mais usadas</option>
-          </select>
+            onValueChange={setOrdem}
+            opcoes={[
+              { valor: "recentes", rotulo: "Mais recentes" },
+              { valor: "nome", rotulo: "Nome" },
+              { valor: "uso", rotulo: "Mais usadas" },
+            ]}
+            className="w-44"
+          />
         </div>
         {erro && (
           <p role="alert" className="text-falta-texto text-sm">
@@ -340,24 +344,77 @@ export default function SecaoChavesBi({ series, turmas }: { series: Serie[]; tur
                         ))}
                       </fieldset>
                       <div className="grid gap-2">
-                        <Label htmlFor="bi-escopo-inicio">Desde</Label>
-                        <Input
-                          id="bi-escopo-inicio"
-                          type="date"
-                          value={escopo.inicio ?? ""}
-                          onChange={(e) =>
-                            setEscopo((s) => ({ ...s, inicio: e.target.value || undefined }))
-                          }
-                        />
-                        <Label htmlFor="bi-escopo-fim">Até</Label>
-                        <Input
-                          id="bi-escopo-fim"
-                          type="date"
-                          value={escopo.fim ?? ""}
-                          onChange={(e) =>
-                            setEscopo((s) => ({ ...s, fim: e.target.value || undefined }))
-                          }
-                        />
+                        <Label>Desde</Label>
+                        {escopo.inicio ? (
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <SeletorPeriodo
+                                id="bi-escopo-inicio"
+                                modo="dia"
+                                valor={escopo.inicio}
+                                max={escopo.fim || "2199-12-31"}
+                                rotulo={escopo.inicio.split("-").reverse().join("/")}
+                                rotuloAcessivel="Início do escopo da chave"
+                                onValor={(valor) =>
+                                  setEscopo((s) => ({ ...s, inicio: valor || undefined }))
+                                }
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEscopo((s) => ({ ...s, inicio: undefined }))}
+                            >
+                              Limpar
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => setEscopo((s) => ({ ...s, inicio: hoje }))}
+                          >
+                            Definir data inicial
+                          </Button>
+                        )}
+                        <Label>Até</Label>
+                        {escopo.fim ? (
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <SeletorPeriodo
+                                id="bi-escopo-fim"
+                                modo="dia"
+                                valor={escopo.fim}
+                                min={escopo.inicio}
+                                max="2199-12-31"
+                                rotulo={escopo.fim.split("-").reverse().join("/")}
+                                rotuloAcessivel="Fim do escopo da chave"
+                                onValor={(valor) =>
+                                  setEscopo((s) => ({ ...s, fim: valor || undefined }))
+                                }
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEscopo((s) => ({ ...s, fim: undefined }))}
+                            >
+                              Limpar
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => setEscopo((s) => ({ ...s, fim: hoje }))}
+                          >
+                            Definir data final
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </details>

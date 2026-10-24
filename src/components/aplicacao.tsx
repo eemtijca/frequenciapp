@@ -3,7 +3,6 @@
 // Navegação lateral compartilhada entre desktop e menu móvel, com estado preservado.
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import {
   Bell,
   CalendarDays,
@@ -11,14 +10,10 @@ import {
   ClipboardCheck,
   ClipboardList,
   DoorOpen,
-  Info,
-  KeyRound,
-  LogOut,
   Menu,
   ChartNoAxesCombined,
   Settings2,
   Table2,
-  UserRound,
   Users,
   WifiOff,
   X,
@@ -38,9 +33,11 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import { diasDoMes } from "@/domain/frequencia";
-import { rotuloDePapel, temCapacidade, type Identidade } from "@/domain/usuarios";
+import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { cn } from "@/lib/utils";
+import { MenuConta, type AcaoConta } from "@/components/conta/menu-conta";
+import { Logotipo } from "@/components/ui/logotipo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -139,7 +136,7 @@ const ITENS_INICIAIS: ItemNav[] = [
   { visao: "horarios", rotulo: "Horários", icone: CalendarDays },
 ];
 
-const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas e entradas", icone: DoorOpen };
+const ITEM_SAIDAS: ItemNav = { visao: "saidas", rotulo: "Saídas e Entradas", icone: DoorOpen };
 const ITEM_RELATORIOS: ItemNav = { visao: "relatorios", rotulo: "Relatórios", icone: Table2 };
 const ITEM_CHAMADA_PARCIAL: ItemNav = {
   visao: "chamada-parcial",
@@ -156,7 +153,7 @@ const LARGURAS: Record<Visao, string> = {
   painel: "max-w-5xl",
   chamada: "max-w-2xl xl:max-w-6xl",
   horarios: "max-w-6xl",
-  "chamada-parcial": "max-w-4xl",
+  "chamada-parcial": "max-w-6xl",
   saidas: "max-w-5xl",
   relatorios: "max-w-7xl",
   alunos: "max-w-5xl",
@@ -167,17 +164,11 @@ interface ItemNavegacaoProps {
   item: ItemNav;
   ativo: boolean;
   pendente: boolean;
-  /**
-   * Indicador animado entre itens; sem ele, a marca é estática. A gaveta do
-   * celular fecha ao trocar de tela, então lá a animação só custaria medições.
-   */
-  indicador?: string;
   onTrocar: (visao: Visao) => void;
 }
 
-function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNavegacaoProps) {
+function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) {
   const Icone = item.icone;
-  const semMovimento = (useReducedMotion() ?? false) || indicador === undefined;
   return (
     <button
       type="button"
@@ -188,20 +179,6 @@ function ItemNavegacao({ item, ativo, pendente, indicador, onTrocar }: ItemNaveg
         ativo ? "vidro-selecionado" : "vidro-discreto text-muted-foreground",
       )}
     >
-      {ativo &&
-        (semMovimento ? (
-          <span
-            aria-hidden="true"
-            className="bg-primary/15 absolute inset-y-1 left-0 w-1 rounded-full"
-          />
-        ) : (
-          <motion.span
-            layoutId={indicador}
-            aria-hidden="true"
-            className="bg-primary/15 absolute inset-y-1 left-0 w-1 rounded-full"
-            transition={{ type: "spring", stiffness: 500, damping: 40 }}
-          />
-        ))}
       <Icone size={20} strokeWidth={ativo ? 2 : 1.7} aria-hidden="true" className="shrink-0" />
       <span className="text-left leading-tight">{item.rotulo}</span>
       {pendente && (
@@ -365,6 +342,7 @@ export default function Aplicacao({
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
   const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
+  const [configuracaoPendente, setConfiguracaoPendente] = useState(false);
   const [saidaComPendencia, setSaidaComPendencia] = useState(false);
   const [visaoComPendencia, setVisaoComPendencia] = useState<Visao | null>(null);
   const [senhaAberta, setSenhaAberta] = useState(false);
@@ -497,8 +475,9 @@ export default function Aplicacao({
   const visaoComRascunho = useCallback(
     (alvo: Visao) =>
       (alvo === "chamada-parcial" && pendencias.includes("chamada-parcial")) ||
-      (alvo === "gestao" && pendencias.includes("horarios")),
-    [pendencias],
+      (alvo === "gestao" && pendencias.includes("horarios")) ||
+      (alvo === "gestao" && configuracaoPendente),
+    [pendencias, configuracaoPendente],
   );
   const trocarVisao = useCallback(
     (proxima: Visao) => {
@@ -617,7 +596,7 @@ export default function Aplicacao({
 
   useEffect(() => {
     function avisarSaida(evento: BeforeUnloadEvent) {
-      if (pendencias.length > 0) {
+      if (pendencias.length > 0 || configuracaoPendente) {
         evento.preventDefault();
         evento.returnValue = "";
       }
@@ -646,7 +625,7 @@ export default function Aplicacao({
       window.removeEventListener("online", aoFicarOnline);
       window.removeEventListener("sessao-expirada", aoExpirarSessao);
     };
-  }, [pendencias, router]);
+  }, [pendencias, configuracaoPendente, router]);
 
   const { executando: saindo, executar: executarSaida } = useAcaoUnica(async () => {
     try {
@@ -660,7 +639,7 @@ export default function Aplicacao({
   });
 
   function sair() {
-    if (pendencias.length > 0) {
+    if (pendencias.length > 0 || configuracaoPendente) {
       setSaidaComPendencia(true);
       return;
     }
@@ -794,12 +773,30 @@ export default function Aplicacao({
             onLiberadoresMudaram={recarregarLiberadores}
             onHorariosMudaram={recarregarEscopo}
             onPendenciaHorarios={registrarPendenciaHorarios}
+            onPendenciaConfiguracoes={setConfiguracaoPendente}
             onAbrirSaidas={() => trocarVisao("saidas")}
             onAbrirParcial={() => trocarVisao("chamada-parcial")}
           />
         )}
       </div>
     );
+  }
+
+  function abrirAcaoConta(
+    acao: AcaoConta,
+    gatilho: HTMLButtonElement | null,
+    fecharMenu?: FecharMenu,
+  ) {
+    origemDialogoRef.current = fecharMenu ? gatilhoMenuRef.current : gatilho;
+    if (acao === "sair") {
+      fecharMenu?.(pendencias.length > 0 || configuracaoPendente ? "dialogo" : "gatilho");
+      void sair();
+      return;
+    }
+    fecharMenu?.("dialogo");
+    if (acao === "notificacoes") setNotificacoesAbertas(true);
+    else if (acao === "senha") setSenhaAberta(true);
+    else setSobreAberto(true);
   }
 
   function renderizarMenu(fecharMenu?: FecharMenu) {
@@ -814,7 +811,10 @@ export default function Aplicacao({
         }}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-4">
-          <p className="text-lg font-semibold tracking-tight">FrequenciApp</p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <Logotipo tamanho={26} />
+            <p className="truncate text-base font-semibold tracking-tight">FrequenciApp</p>
+          </div>
           {movel && (
             <DialogClose asChild>
               <Button
@@ -840,9 +840,9 @@ export default function Aplicacao({
                 ativo={visao === item.visao}
                 pendente={
                   pendencias.includes(item.visao) ||
-                  (item.visao === "gestao" && pendencias.includes("horarios"))
+                  (item.visao === "gestao" &&
+                    (pendencias.includes("horarios") || configuracaoPendente))
                 }
-                indicador={movel ? undefined : "indicador-lateral"}
                 onTrocar={
                   fecharMenu ? (proxima) => navegarPeloMenu(proxima, fecharMenu) : trocarVisao
                 }
@@ -857,74 +857,13 @@ export default function Aplicacao({
               </Button>
             )}
           </nav>
-          <div className="border-border mt-auto shrink-0 border-t p-3">
-            <div className="flex items-center gap-2 px-1">
-              <span className="vidro-selecionado flex size-9 shrink-0 items-center justify-center rounded-full">
-                <UserRound size={16} aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{usuario.nome}</span>
-                <span className="text-muted-foreground block truncate text-xs">
-                  {rotuloDePapel(usuario.papel)}
-                </span>
-              </span>
-              {!movel && <SeletorTema />}
-            </div>
-            <div className="mt-1 flex flex-col gap-0.5">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-full justify-start gap-2"
-                onClick={(evento) => {
-                  origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  fecharMenu?.("dialogo");
-                  setNotificacoesAbertas(true);
-                }}
-              >
-                <Bell size={16} aria-hidden="true" />
-                Configurar notificações
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-full justify-start gap-2"
-                onClick={(evento) => {
-                  origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  fecharMenu?.("dialogo");
-                  setSenhaAberta(true);
-                }}
-              >
-                <KeyRound size={16} aria-hidden="true" />
-                Trocar senha
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-full justify-start gap-2"
-                onClick={(evento) => {
-                  origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  fecharMenu?.("dialogo");
-                  setSobreAberto(true);
-                }}
-              >
-                <Info size={16} aria-hidden="true" />
-                Sobre
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-11 w-full justify-start gap-2"
-                onClick={(evento) => {
-                  origemDialogoRef.current = movel ? gatilhoMenuRef.current : evento.currentTarget;
-                  fecharMenu?.(pendencias.length > 0 ? "dialogo" : "gatilho");
-                  void sair();
-                }}
-                disabled={saindo}
-              >
-                <LogOut size={16} aria-hidden="true" />
-                Sair da conta
-              </Button>
-            </div>
+          <div className="border-border mt-auto shrink-0 border-t p-2">
+            <MenuConta
+              usuario={usuario}
+              movel={movel}
+              saindo={saindo}
+              onAcao={(acao, gatilho) => abrirAcaoConta(acao, gatilho, fecharMenu)}
+            />
           </div>
         </div>
       </div>
@@ -963,7 +902,7 @@ export default function Aplicacao({
                 raizRef={raizRef}
                 gatilhoRef={gatilhoMenuRef}
                 conteudoRef={conteudoRef}
-                pendente={pendencias.length > 0}
+                pendente={pendencias.length > 0 || configuracaoPendente}
                 renderizarConteudo={renderizarMenu}
               />
               <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
@@ -1039,7 +978,7 @@ export default function Aplicacao({
           <AlertDialogHeader>
             <AlertDialogTitle>Há alterações não salvas</AlertDialogTitle>
             <AlertDialogDescription>
-              Se sair agora, as marcações não salvas serão perdidas.
+              As alterações não salvas serão perdidas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1066,11 +1005,13 @@ export default function Aplicacao({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {visao === "gestao"
-                ? "Há alterações não salvas nos Horários"
+                ? configuracaoPendente
+                  ? "Há configurações não salvas"
+                  : "Há alterações não salvas nos Horários"
                 : "Há alterações não salvas na Chamada Parcial"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Os registros continuam pendentes. Ao voltar, será possível salvá-los.
+              As alterações continuam pendentes. Ao voltar, será possível salvá-las.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

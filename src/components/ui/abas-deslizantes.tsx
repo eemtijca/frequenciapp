@@ -116,7 +116,7 @@ export default function AbasDeslizantes<T extends string>({
                 tabIndex={ativo ? 0 : -1}
                 disabled={bloqueada}
                 onClick={() => trocarAba(item.valor)}
-                className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 flex-col items-center justify-center gap-0.5 px-0 text-[11px] font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs"
+                className="vidro-discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs"
               >
                 {ativo &&
                   (semMovimento ? (
@@ -134,7 +134,7 @@ export default function AbasDeslizantes<T extends string>({
                   aria-hidden="true"
                 />
                 <span
-                  className={`relative z-10 text-center ${ativo ? "text-foreground" : "text-muted-foreground"}`}
+                  className={`relative z-10 min-w-0 text-center ${ativo ? "text-foreground" : "text-muted-foreground"}`}
                 >
                   {item.rotuloCurto ? (
                     <>

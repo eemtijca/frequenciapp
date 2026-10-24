@@ -26,6 +26,7 @@ export const esquemaAtualizarConfiguracoes = z
       .max(500, "Selecione até 500 turmas.")
       .transform((ids) => [...new Set(ids)])
       .optional(),
+    atualizadoEm: z.iso.datetime("Versão inválida.").optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
     message: "Nada a atualizar.",
@@ -37,6 +38,7 @@ interface LinhaConfiguracao {
   origemNaChamada: boolean;
   origemSeries: { serieId: string }[];
   origemTurmas: { turmaId: string }[];
+  atualizadoEm: Date;
 }
 
 const SELECAO = {
@@ -45,6 +47,7 @@ const SELECAO = {
   origemNaChamada: true,
   origemSeries: { select: { serieId: true }, orderBy: { serieId: "asc" } },
   origemTurmas: { select: { turmaId: true }, orderBy: { turmaId: "asc" } },
+  atualizadoEm: true,
 } as const;
 
 function paraConfiguracoes(linha: LinhaConfiguracao, feriados: Feriado[]): Configuracoes {
@@ -55,6 +58,7 @@ function paraConfiguracoes(linha: LinhaConfiguracao, feriados: Feriado[]): Confi
     origemNaChamadaSerieIds: linha.origemSeries.map((item) => item.serieId),
     origemNaChamadaTurmaIds: linha.origemTurmas.map((item) => item.turmaId),
     feriados,
+    atualizadoEm: linha.atualizadoEm.toISOString(),
   };
 }
 
@@ -92,6 +96,19 @@ export async function atualizarConfiguracoes(
       (await tx.turma.count({ where: { id: { in: turmaIds } } })) !== turmaIds.length
     ) {
       throw new ErroHttp("Uma turma selecionada não existe mais. Atualize o cadastro.", 400);
+    }
+    if (dados.data.atualizadoEm) {
+      const atual = await tx.configuracao.findUnique({
+        where: { id: ID },
+        select: { atualizadoEm: true },
+      });
+      if (atual && atual.atualizadoEm.toISOString() !== dados.data.atualizadoEm) {
+        throw new ErroHttp(
+          "As configurações foram alteradas em outro acesso. Revise antes de salvar.",
+          409,
+          "CONFIGURACOES_ALTERADAS",
+        );
+      }
     }
     const atualizada = await tx.configuracao.upsert({
       where: { id: ID },

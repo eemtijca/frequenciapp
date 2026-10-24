@@ -9,6 +9,14 @@ export interface FrasesDoAlerta {
   margem: string;
   frequencia: string;
   justificadas: string | null;
+  numeros: {
+    aulasFaltadas: number;
+    horasLetivas: number;
+    limiteFaltas: number;
+    frequencia: number;
+    percentualMinimo: number;
+    resto: number;
+  };
 }
 
 function comUmaCasa(valor: number): string {
@@ -51,5 +59,13 @@ export function frasesDoAlerta(alerta: AlertaFrequenciaBeneficio): FrasesDoAlert
     margem,
     frequencia: `Frequência estimada: ${comUmaCasa(frequencia)}% · Mínimo: ${alerta.percentualMinimoFrequencia}%.`,
     justificadas,
+    numeros: {
+      aulasFaltadas: alerta.aulasFaltadas,
+      horasLetivas: alerta.horasLetivas,
+      limiteFaltas: alerta.limiteFaltas,
+      frequencia,
+      percentualMinimo: alerta.percentualMinimoFrequencia,
+      resto,
+    },
   };
 }

@@ -314,6 +314,7 @@ export default function IntegracaoSaidas({
     <SecaoRecolhivel
       dataSecao="planilha-saidas"
       titulo="Planilha de entradas e saídas"
+      descricao="Envio das movimentações para o Google Planilhas."
       icone={DoorOpen}
       aberto={aberto}
       onAbertoChange={setAberto}

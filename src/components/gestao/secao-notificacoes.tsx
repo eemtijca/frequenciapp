@@ -76,6 +76,7 @@ export default function SecaoNotificacoes() {
   return (
     <SecaoRecolhivel
       titulo="Notificações"
+      descricao="Avisos automáticos enviados à equipe."
       icone={Bell}
       aberto={aberto}
       onAbertoChange={setAberto}
