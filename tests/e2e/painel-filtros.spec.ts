@@ -131,7 +131,7 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
   const cartao = page.getByRole("group", { name: "Cobertura do dia" });
   const progresso = cartao.getByRole("progressbar", { name: "Alunos com chamada salva" });
   try {
-    // Turmas com tamanhos diferentes: a A ocupa o dobro da fatia da B.
+    // Turmas com tamanhos diferentes: a barra avança conforme os alunos da A.
     await comBanco(async (cliente) => {
       await cliente.query(
         "insert into alunos (nome,turma_id,turma_original_id,ordem,ativo) select 'E2E Painel Cobertura Extra',t.id,t.id,2,true from turmas t join series s on s.id=t.serie_id where s.nome='E2E Painel Dois' and t.nome='A'",
@@ -141,8 +141,11 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "0");
     await expect(progresso).toHaveAttribute("aria-valuetext", "0 de 3 alunos com chamada salva");
-    await expect(progresso.locator("circle.text-falta-texto")).toHaveCount(2);
-    await expect(progresso.locator("circle.text-primary")).toHaveCount(0);
+    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
+      "style",
+      /^width:\s*0%;?$/,
+    );
+    await expect(cartao.getByText("0/3 alunos")).toHaveCount(0);
     await expect(progresso).toHaveAccessibleDescription(
       "E2E Painel Dois A: pendente; E2E Painel Dois B: pendente",
     );
@@ -166,23 +169,20 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "66");
     await expect(progresso).toHaveAttribute("aria-valuetext", "2 de 3 alunos com chamada salva");
-    await expect(progresso.locator("circle.text-primary")).toHaveCount(1);
-    await expect(progresso.locator("circle.text-falta-texto")).toHaveCount(1);
+    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
+      "style",
+      /^width:\s*66%;?$/,
+    );
+    await expect(cartao.getByText("2/3 alunos")).toHaveCount(0);
+    const percentual = await cartao.getByText("66%", { exact: true }).boundingBox();
+    const barra = await progresso.boundingBox();
+    expect(
+      percentual && barra && barra.y - percentual.y - percentual.height,
+    ).toBeGreaterThanOrEqual(6);
     await expect(progresso).toHaveAccessibleDescription(
       "E2E Painel Dois A: concluída; E2E Painel Dois B: pendente",
     );
-    const arcoVerde = Number(
-      (await progresso.locator("circle.text-primary").getAttribute("stroke-dasharray"))?.split(
-        " ",
-      )[0],
-    );
-    const arcoVermelho = Number(
-      (await progresso.locator("circle.text-falta-texto").getAttribute("stroke-dasharray"))?.split(
-        " ",
-      )[0],
-    );
-    expect(arcoVerde / arcoVermelho).toBeGreaterThan(1.9);
-    expect(arcoVerde / arcoVermelho).toBeLessThan(2.1);
+    await expect(progresso.locator("svg")).toHaveCount(0);
     await testInfo.attach("Cobertura por turma parcialmente concluída", {
       body: await cartao.screenshot(),
       contentType: "image/png",
@@ -194,9 +194,10 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await salvarChamada("B");
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "100");
-    await expect(progresso.locator("circle")).toHaveCount(1);
-    await expect(progresso.locator("circle.text-primary")).toHaveCount(1);
-    await expect(progresso.locator("circle.text-primary")).not.toHaveAttribute("stroke-dasharray");
+    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
+      "style",
+      /^width:\s*100%;?$/,
+    );
     await expect(cartao.getByText("Concluída", { exact: true })).toBeVisible();
     await expect(cartao.locator("summary")).toHaveCount(0);
     await testInfo.attach("Cobertura concluída", {
@@ -213,8 +214,9 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     );
     await expect(vazio.getByText("Sem alunos", { exact: true })).toBeVisible();
     await expect(vazio.getByText("Concluída", { exact: true })).toHaveCount(0);
-    await expect(vazio.getByRole("progressbar").locator("circle.text-primary")).toHaveCount(0);
-    await expect(vazio.getByRole("progressbar").locator("circle.text-falta-texto")).toHaveCount(0);
+    await expect(
+      vazio.getByRole("progressbar").getByTestId("cobertura-preenchida"),
+    ).toHaveAttribute("style", /^width:\s*0%;?$/);
   } finally {
     await comBanco(async (cliente) => {
       await cliente.query(
