@@ -127,7 +127,7 @@ Após a primeira visita, o gráfico permanece montado e o módulo fica reutiliz�
 
 ## Administração do FrequenciBI
 
-Gestão, Configurações, Acesso inclui seção FrequenciBI carregada sob demanda. Criar e editar mostram rótulo, validade opcional e escopo por série, turma, período e base. Criar, editar, substituir, revogar e limpar o histórico entram no rascunho único; a senha do administrador é pedida uma vez no diálogo Salvar configurações. O segredo aparece em diálogo apenas após o lote, na criação ou substituição, com cópia manual e automática; fechar apaga o segredo da interface. A lista admite busca e ordenação e mostra estado, datas de uso, quantidade de consultas e aviso de inatividade. A restauração escolar lembra que chaves não são restauradas.
+Gestão, Configurações, Acesso inclui seção FrequenciBI carregada sob demanda. Criar e editar mostram rótulo, validade opcional e escopo por série, turma, período e base. A validade usa os seletores próprios de data e hora, lado a lado, e o escopo abre por um botão recolhível com o resumo da seleção. Criar, editar, substituir, revogar e limpar o histórico entram no rascunho único; a senha do administrador é pedida uma vez no diálogo Salvar configurações. O segredo aparece em diálogo apenas após o lote, na criação ou substituição, com cópia manual e automática; fechar apaga o segredo da interface. A lista admite busca e ordenação e mostra estado, datas de uso, quantidade de consultas e aviso de inatividade. A restauração escolar lembra que chaves não são restauradas.
 
 ## FrequenciBI
 

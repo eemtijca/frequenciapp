@@ -66,9 +66,12 @@ export function SeletorPeriodo({
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
-  const [mesVisivel, setMesVisivel] = useState(() => valor.slice(0, 7));
-  const [anoVisivel, setAnoVisivel] = useState(() => valor.slice(0, 4));
-  const [foco, setFoco] = useState(valor);
+  // Sem valor, o painel abre no dia de referência, mas nenhum dia fica marcado.
+  const corrente = atual ?? max;
+  const inicial = valor || corrente;
+  const [mesVisivel, setMesVisivel] = useState(() => inicial.slice(0, 7));
+  const [anoVisivel, setAnoVisivel] = useState(() => inicial.slice(0, 4));
+  const [foco, setFoco] = useState(inicial);
   const botoes = useRef(new Map<string, HTMLButtonElement>());
   const focoPendente = useRef(false);
 
@@ -77,8 +80,7 @@ export function SeletorPeriodo({
   const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
   const limite = aprumar(max);
   const piso = min ? aprumar(min) : null;
-  const corrente = atual ?? max;
-  const referencia = aprumar(valor > max ? max : valor);
+  const referencia = aprumar((valor || corrente) > max ? max : valor || corrente);
   const selo = mostrarSelo && valor === corrente ? (modo === "dia" ? "Hoje" : "Este mês") : "";
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.

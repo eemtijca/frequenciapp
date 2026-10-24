@@ -3,7 +3,17 @@
 // Chaves do FrequenciBI no rascunho: escopo visual e ações que só valem
 // depois da confirmação do lote. O segredo aparece uma única vez no salvamento.
 import { useRef, useState } from "react";
-import { KeyRound, Plus, Pencil, RotateCw, Ban, Trash2 } from "lucide-react";
+import * as Collapsible from "@radix-ui/react-collapsible";
+import {
+  Ban,
+  ChevronDown,
+  KeyRound,
+  ListFilter,
+  Pencil,
+  Plus,
+  RotateCw,
+  Trash2,
+} from "lucide-react";
 import type { Serie, Turma } from "@/domain/frequencia";
 import type { ChaveBiDesejada } from "@/domain/configuracoes";
 import { RECURSOS_BI, ROTULOS_RECURSOS_BI, type EscopoBi } from "@/domain/bi";
@@ -13,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
+import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { Selo } from "@/components/ui/selo";
 import {
@@ -34,10 +45,32 @@ const TITULOS: Record<Acao, string> = {
   limpar: "Limpar histórico de chaves",
 };
 
-function dataLocal(valor: string | null) {
+function diaLocal(valor: string | null) {
   if (!valor) return "";
   const d = new Date(valor);
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function horaLocal(valor: string | null) {
+  if (!valor) return "23:59";
+  const d = new Date(valor);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(11, 16);
+}
+
+function rotuloDia(valor: string) {
+  return valor ? valor.split("-").reverse().join("/") : "Sem prazo";
+}
+
+function contar(quantidade: number, singular: string, plural: string) {
+  return `${quantidade} ${quantidade === 1 ? singular : plural}`;
+}
+
+function resumoDoEscopo(escopo: EscopoBi) {
+  return [
+    escopo.series?.length ? contar(escopo.series.length, "série", "séries") : "Todas as séries",
+    escopo.turmas?.length ? contar(escopo.turmas.length, "turma", "turmas") : "Todas as turmas",
+    escopo.recursos?.length ? contar(escopo.recursos.length, "base", "bases") : "Todas as bases",
+  ].join(" · ");
 }
 
 function estaRevogada(chave: ChaveBiDesejada): boolean {
@@ -62,9 +95,11 @@ export default function SecaoChavesBi({
   const [acao, setAcao] = useState<Acao | null>(null);
   const [chave, setChave] = useState<ChaveBiDesejada | null>(null);
   const [rotulo, setRotulo] = useState("");
-  const [validade, setValidade] = useState("");
+  const [validadeDia, setValidadeDia] = useState("");
+  const [validadeHora, setValidadeHora] = useState("23:59");
   const [escopo, setEscopo] = useState<EscopoBi>({});
-  const hoje = new Date().toISOString().slice(0, 10);
+  const [escopoAberto, setEscopoAberto] = useState(false);
+  const hoje = diaLocal(new Date().toISOString());
   const foco = useRef<HTMLElement | null>(null);
 
   function preparar(a: Acao, c: ChaveBiDesejada | null = null) {
@@ -73,8 +108,14 @@ export default function SecaoChavesBi({
     setAcao(a);
     setChave(c);
     setRotulo(c?.rotulo ?? "");
-    setValidade(dataLocal(c?.expiraEm ?? null));
+    setValidadeDia(diaLocal(c?.expiraEm ?? null));
+    setValidadeHora(horaLocal(c?.expiraEm ?? null));
     setEscopo(c?.escopo ?? {});
+    setEscopoAberto(
+      Boolean(
+        c?.escopo?.series?.length || c?.escopo?.turmas?.length || c?.escopo?.recursos?.length,
+      ),
+    );
   }
 
   function confirmar() {
@@ -83,11 +124,12 @@ export default function SecaoChavesBi({
       setErro("Informe o rótulo da chave, com ao menos 2 caracteres.");
       return;
     }
-    const expiraEm = validade ? new Date(validade).toISOString() : null;
-    if ((acao === "criar" || acao === "editar") && expiraEm && new Date(expiraEm) <= new Date()) {
+    const escolhida = validadeDia ? new Date(`${validadeDia}T${validadeHora || "23:59"}:00`) : null;
+    if ((acao === "criar" || acao === "editar") && escolhida && escolhida <= new Date()) {
       setErro("A validade precisa ser uma data futura.");
       return;
     }
+    const expiraEm = escolhida?.toISOString() ?? null;
     setErro("");
     const agora = new Date().toISOString();
     let lista = chaves;
@@ -133,8 +175,10 @@ export default function SecaoChavesBi({
     setAcao(null);
     setChave(null);
     setRotulo("");
-    setValidade("");
+    setValidadeDia("");
+    setValidadeHora("23:59");
     setEscopo({});
+    setEscopoAberto(false);
     avisarSucesso("Alteração aplicada ao rascunho.", "Salve as configurações para concluir.");
   }
 
@@ -150,6 +194,7 @@ export default function SecaoChavesBi({
     );
   const ativas = chaves.filter((c) => c.estado === "ativa" && !estaRevogada(c)).length;
   const naoAtivas = chaves.some((c) => c.estado !== "ativa" || estaRevogada(c));
+  const resumoEscopo = resumoDoEscopo(escopo);
 
   function alternar(campo: "series" | "turmas" | "recursos", valor: string, marcada: boolean) {
     const atuais = escopo[campo] ?? [];
@@ -364,131 +409,194 @@ export default function SecaoChavesBi({
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="bi-validade">Validade opcional</Label>
-                    <Input
-                      id="bi-validade"
-                      type="datetime-local"
-                      value={validade}
-                      onChange={(e) => setValidade(e.target.value)}
-                    />
-                  </div>
-                  <details className="controle-vidro p-3">
-                    <summary className="cursor-pointer font-medium">Escopo</summary>
-                    <div className="mt-3 grid gap-3">
-                      <fieldset className="grid gap-2">
-                        <legend className="mb-2 text-sm font-medium">Séries</legend>
-                        {series.map((s) => (
-                          <label key={s.id} className="flex min-h-11 items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={escopo.series?.includes(s.id) ?? false}
-                              onChange={(e) => alternar("series", s.id, e.target.checked)}
-                            />
-                            {s.nome}
-                          </label>
-                        ))}
-                      </fieldset>
-                      <fieldset className="grid gap-2">
-                        <legend className="mb-2 text-sm font-medium">Turmas</legend>
-                        {turmas.map((t) => (
-                          <label key={t.id} className="flex min-h-11 items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={escopo.turmas?.includes(t.id) ?? false}
-                              onChange={(e) => alternar("turmas", t.id, e.target.checked)}
-                            />
-                            {t.rotulo}
-                          </label>
-                        ))}
-                      </fieldset>
-                      <fieldset className="grid gap-2">
-                        <legend className="mb-2 text-sm font-medium">Bases</legend>
-                        {RECURSOS_BI.map((r) => (
-                          <label key={r} className="flex min-h-11 items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={escopo.recursos?.includes(r) ?? false}
-                              onChange={(e) => alternar("recursos", r, e.target.checked)}
-                            />
-                            {ROTULOS_RECURSOS_BI[r]}
-                          </label>
-                        ))}
-                      </fieldset>
-                      <div className="grid gap-2">
-                        <Label>Desde</Label>
-                        {escopo.inicio ? (
-                          <div className="flex items-center gap-2">
-                            <div className="min-w-0 flex-1">
-                              <SeletorPeriodo
-                                id="bi-escopo-inicio"
-                                modo="dia"
-                                valor={escopo.inicio}
-                                max={escopo.fim || "2199-12-31"}
-                                rotulo={escopo.inicio.split("-").reverse().join("/")}
-                                rotuloAcessivel="Início do escopo da chave"
-                                onValor={(valor) =>
-                                  setEscopo((s) => ({ ...s, inicio: valor || undefined }))
-                                }
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEscopo((s) => ({ ...s, inicio: undefined }))}
-                            >
-                              Limpar
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => setEscopo((s) => ({ ...s, inicio: hoje }))}
-                          >
-                            Definir data inicial
-                          </Button>
-                        )}
-                        <Label>Até</Label>
-                        {escopo.fim ? (
-                          <div className="flex items-center gap-2">
-                            <div className="min-w-0 flex-1">
-                              <SeletorPeriodo
-                                id="bi-escopo-fim"
-                                modo="dia"
-                                valor={escopo.fim}
-                                min={escopo.inicio}
-                                max="2199-12-31"
-                                rotulo={escopo.fim.split("-").reverse().join("/")}
-                                rotuloAcessivel="Fim do escopo da chave"
-                                onValor={(valor) =>
-                                  setEscopo((s) => ({ ...s, fim: valor || undefined }))
-                                }
-                              />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEscopo((s) => ({ ...s, fim: undefined }))}
-                            >
-                              Limpar
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="justify-start"
-                            onClick={() => setEscopo((s) => ({ ...s, fim: hoje }))}
-                          >
-                            Definir data final
-                          </Button>
-                        )}
-                      </div>
+                    <div className="flex min-h-8 items-center justify-between gap-2">
+                      <span className="text-sm font-medium">Validade opcional</span>
+                      {validadeDia && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="-mr-2"
+                          onClick={() => {
+                            setValidadeDia("");
+                            setValidadeHora("23:59");
+                          }}
+                        >
+                          Sem prazo
+                        </Button>
+                      )}
                     </div>
-                  </details>
+                    <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                      <SeletorPeriodo
+                        id="bi-validade"
+                        modo="dia"
+                        valor={validadeDia}
+                        atual={hoje}
+                        min={hoje}
+                        max="2199-12-31"
+                        rotulo={rotuloDia(validadeDia)}
+                        rotuloAcessivel="Data de validade da chave"
+                        onValor={setValidadeDia}
+                      />
+                      <SeletorHorario
+                        id="bi-validade-hora"
+                        valor={validadeHora}
+                        disabled={!validadeDia}
+                        rotuloAcessivel="Hora de validade da chave"
+                        onValor={setValidadeHora}
+                      />
+                    </div>
+                    <p className="text-muted-foreground text-xs">
+                      Sem data, a chave não expira. O horário usa o fuso deste dispositivo.
+                    </p>
+                  </div>
+                  <Collapsible.Root
+                    open={escopoAberto}
+                    onOpenChange={setEscopoAberto}
+                    className="controle-vidro overflow-hidden"
+                  >
+                    <Collapsible.Trigger
+                      type="button"
+                      className="pressionavel focus-visible:ring-ring/50 flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none focus-visible:ring-[3px]"
+                    >
+                      <span className="bg-secondary/60 text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
+                        <ListFilter size={16} aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">Escopo</span>
+                        <span className="text-muted-foreground line-clamp-1 text-xs">
+                          {resumoEscopo}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        aria-hidden="true"
+                        className={`text-muted-foreground shrink-0 transition-transform motion-reduce:transition-none ${
+                          escopoAberto ? "rotate-180" : ""
+                        }`}
+                      />
+                    </Collapsible.Trigger>
+                    <Collapsible.Content
+                      role="region"
+                      aria-label="Escopo da chave"
+                      className="border-t p-3"
+                    >
+                      <div className="grid gap-3">
+                        <fieldset className="grid gap-2">
+                          <legend className="mb-2 text-sm font-medium">Séries</legend>
+                          {series.map((s) => (
+                            <label key={s.id} className="flex min-h-11 items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={escopo.series?.includes(s.id) ?? false}
+                                onChange={(e) => alternar("series", s.id, e.target.checked)}
+                              />
+                              {s.nome}
+                            </label>
+                          ))}
+                        </fieldset>
+                        <fieldset className="grid gap-2">
+                          <legend className="mb-2 text-sm font-medium">Turmas</legend>
+                          {turmas.map((t) => (
+                            <label key={t.id} className="flex min-h-11 items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={escopo.turmas?.includes(t.id) ?? false}
+                                onChange={(e) => alternar("turmas", t.id, e.target.checked)}
+                              />
+                              {t.rotulo}
+                            </label>
+                          ))}
+                        </fieldset>
+                        <fieldset className="grid gap-2">
+                          <legend className="mb-2 text-sm font-medium">Bases</legend>
+                          {RECURSOS_BI.map((r) => (
+                            <label key={r} className="flex min-h-11 items-center gap-2 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={escopo.recursos?.includes(r) ?? false}
+                                onChange={(e) => alternar("recursos", r, e.target.checked)}
+                              />
+                              {ROTULOS_RECURSOS_BI[r]}
+                            </label>
+                          ))}
+                        </fieldset>
+                        <div className="grid gap-2">
+                          <Label>Desde</Label>
+                          {escopo.inicio ? (
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <SeletorPeriodo
+                                  id="bi-escopo-inicio"
+                                  modo="dia"
+                                  valor={escopo.inicio}
+                                  max={escopo.fim || "2199-12-31"}
+                                  rotulo={escopo.inicio.split("-").reverse().join("/")}
+                                  rotuloAcessivel="Início do escopo da chave"
+                                  onValor={(valor) =>
+                                    setEscopo((s) => ({ ...s, inicio: valor || undefined }))
+                                  }
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEscopo((s) => ({ ...s, inicio: undefined }))}
+                              >
+                                Limpar
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="justify-start"
+                              onClick={() => setEscopo((s) => ({ ...s, inicio: hoje }))}
+                            >
+                              Definir data inicial
+                            </Button>
+                          )}
+                          <Label>Até</Label>
+                          {escopo.fim ? (
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <SeletorPeriodo
+                                  id="bi-escopo-fim"
+                                  modo="dia"
+                                  valor={escopo.fim}
+                                  min={escopo.inicio}
+                                  max="2199-12-31"
+                                  rotulo={escopo.fim.split("-").reverse().join("/")}
+                                  rotuloAcessivel="Fim do escopo da chave"
+                                  onValor={(valor) =>
+                                    setEscopo((s) => ({ ...s, fim: valor || undefined }))
+                                  }
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEscopo((s) => ({ ...s, fim: undefined }))}
+                              >
+                                Limpar
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="justify-start"
+                              onClick={() => setEscopo((s) => ({ ...s, fim: hoje }))}
+                            >
+                              Definir data final
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </Collapsible.Content>
+                  </Collapsible.Root>
                 </>
               )}
               {chave && <p className="text-sm font-medium">{chave.rotulo}</p>}

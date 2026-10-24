@@ -74,6 +74,63 @@ test("cria no rascunho, exige a senha no lote e mostra o segredo uma única vez"
   });
 });
 
+test("validade usa data e hora próprias lado a lado e o escopo abre pelo botão da seção", async ({
+  page,
+}) => {
+  const secao = await abrir(page);
+  await secao.getByRole("button", { name: "Criar chave", exact: true }).click();
+  const dialogo = page.getByRole("dialog", { name: "Criar chave", exact: true });
+  await dialogo.getByLabel("Rótulo", { exact: true }).fill(`${prefixo} Validade`);
+
+  const data = dialogo.locator("#bi-validade");
+  const hora = dialogo.locator("#bi-validade-hora");
+  await expect(data).toHaveAccessibleName(/Sem prazo$/);
+  await expect(hora).toHaveAccessibleName(/23:59$/);
+  const caixaData = await data.boundingBox();
+  const caixaHora = await hora.boundingBox();
+  expect(caixaData).not.toBeNull();
+  expect(caixaHora).not.toBeNull();
+  expect(Math.abs((caixaData?.y ?? 0) - (caixaHora?.y ?? 0))).toBeLessThanOrEqual(1);
+  expect((caixaData?.x ?? 0) + (caixaData?.width ?? 0)).toBeLessThanOrEqual(caixaHora?.x ?? 0);
+  await expect(hora).toBeDisabled();
+
+  await data.click();
+  const calendario = page.getByRole("dialog", {
+    name: "Data de validade da chave",
+    exact: true,
+  });
+  await calendario.getByRole("button", { name: "Mês seguinte", exact: true }).click();
+  await calendario
+    .getByRole("button", { name: /^1 de / })
+    .first()
+    .click();
+  await expect(hora).toBeEnabled();
+
+  await hora.click();
+  const relogio = page.getByRole("dialog", { name: "Hora de validade da chave", exact: true });
+  await relogio
+    .getByRole("listbox", { name: "Horas" })
+    .getByRole("option", { name: "18", exact: true })
+    .click();
+  await relogio
+    .getByRole("listbox", { name: "Minutos" })
+    .getByRole("option", { name: "30", exact: true })
+    .click();
+  await expect(hora).toHaveAccessibleName(/18:30$/);
+
+  const escopo = dialogo.getByRole("button", { name: /^Escopo/ });
+  await expect(escopo).toHaveAttribute("aria-expanded", "false");
+  await expect(escopo).toContainText("Todas as séries");
+  await escopo.click();
+  await expect(escopo).toHaveAttribute("aria-expanded", "true");
+  await expect(dialogo.getByRole("region", { name: "Escopo da chave" })).toBeVisible();
+
+  await dialogo.getByRole("button", { name: "Aplicar ao rascunho", exact: true }).click();
+  await expect(
+    secao.getByRole("heading", { name: `${prefixo} Validade`, exact: true }),
+  ).toBeVisible();
+});
+
 test("falha do lote mantém o rascunho e a revogação pode ser desfeita antes de salvar", async ({
   page,
 }) => {
