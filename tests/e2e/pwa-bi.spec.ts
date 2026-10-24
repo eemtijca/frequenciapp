@@ -1,9 +1,22 @@
 // Cache do BI contra o worker real: casca pública offline, dados em IndexedDB e revogação na reconexão.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao } from "./helpers/pagina";
 import { comBanco } from "./helpers/banco";
 const rotulo = "E2E BI Offline";
+
+async function aba(page: Page, nome: string) {
+  const navegacao = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
+  const seletor = page.getByRole("combobox", { name: "Seção do FrequenciBI", exact: true });
+  await expect(navegacao.or(seletor).first()).toBeVisible();
+  if (await navegacao.isVisible().catch(() => false)) {
+    await navegacao.getByRole("button", { name: nome, exact: true }).click();
+    return;
+  }
+  await seletor.click();
+  await page.getByRole("option", { name: nome, exact: true }).click();
+}
+
 test("reabre o retrato offline e apaga os dados quando a chave é revogada", async ({
   page,
   context,
@@ -85,16 +98,16 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
       .toBe(true);
     await context.setOffline(true);
     await page.reload();
-    await expect(page.getByRole("navigation", { name: "Seções do FrequenciBI" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Consulta offline" })).toBeVisible();
     await expect(indicadores.locator("article").filter({ hasText: "Alunos ativos" })).toHaveText(
       "Alunos ativos1",
     );
-    await page.getByRole("button", { name: "Ajuda", exact: true }).click();
+    await aba(page, "Ajuda");
     await page.getByRole("button", { name: "Alunos: 1", exact: true }).click();
     await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1);
     await expect(page.getByRole("table").locator("tbody tr")).toContainText(aluno);
-    await page.getByRole("button", { name: "Visão geral", exact: true }).click();
+    await aba(page, "Visão geral");
     const grafico = page.locator("article[data-grafico-id]").first();
     await grafico.scrollIntoViewIfNeeded();
     await grafico.getByRole("button", { name: "Tabela", exact: true }).click();

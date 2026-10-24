@@ -3,6 +3,7 @@ import { expect, test, type Locator } from "@playwright/test";
 import { ADMIN_E2E, criarMassaE2E, limparMassaE2E } from "./helpers/banco";
 import { entrarAdmin } from "./helpers/auth";
 import {
+  abrirMenuConta,
   abrirNavegacao,
   aguardarHidratacao,
   liberarSabadoSeNecessario,
@@ -125,7 +126,8 @@ test.describe("menu lateral", () => {
     const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     await expect(menu.getByText(ADMIN_E2E.nome, { exact: true })).toBeVisible();
     await expect(menu.getByText("Administração", { exact: true })).toBeVisible();
-    await menu.getByRole("button", { name: "Trocar senha", exact: true }).click();
+    let conta = await abrirMenuConta(page, menu);
+    await conta.getByRole("menuitem", { name: "Trocar senha", exact: true }).click();
     const senha = page.getByRole("dialog", { name: "Trocar minha senha", exact: true });
     await expect(menu).toBeHidden();
     await expect(senha).toBeVisible();
@@ -135,7 +137,8 @@ test.describe("menu lateral", () => {
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
 
     await abrirNavegacao(page);
-    await menu.getByRole("button", { name: "Configurar notificações", exact: true }).click();
+    conta = await abrirMenuConta(page, menu);
+    await conta.getByRole("menuitem", { name: "Notificações", exact: true }).click();
     const notificacoes = page.getByRole("dialog", { name: "Notificações", exact: true });
     await expect(menu).toBeHidden();
     await expect(notificacoes).toBeVisible();
@@ -179,7 +182,8 @@ test.describe("menu lateral", () => {
       });
       const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
       await abrirNavegacao(page);
-      await menu.getByRole("button", { name: "Sair da conta", exact: true }).click();
+      let conta = await abrirMenuConta(page, menu);
+      await conta.getByRole("menuitem", { name: "Sair da conta", exact: true }).click();
       const confirmar = page.getByRole("alertdialog", { name: "Há alterações não salvas" });
       await expect(menu).toBeHidden();
       await expect(confirmar).toBeVisible();
@@ -192,7 +196,8 @@ test.describe("menu lateral", () => {
       await expect(aluno).toHaveAttribute("aria-pressed", "true");
 
       await abrirNavegacao(page);
-      await menu.getByRole("button", { name: "Sair da conta", exact: true }).click();
+      conta = await abrirMenuConta(page, menu);
+      await conta.getByRole("menuitem", { name: "Sair da conta", exact: true }).click();
       await confirmar.getByRole("button", { name: "Sair mesmo assim", exact: true }).click();
       await expect(page.getByRole("button", { name: "Entrar", exact: true })).toBeVisible();
       expect(pedidosDeSaida).toBe(1);
@@ -212,7 +217,8 @@ test.describe("menu da coordenação", () => {
     await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toBeVisible();
     const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     await expect(menu.getByText("Demo", { exact: true })).toBeVisible();
-    await expect(menu.getByRole("button", { name: "Trocar senha", exact: true })).toBeVisible();
-    await expect(menu.getByRole("button", { name: "Sair da conta", exact: true })).toBeVisible();
+    const conta = await abrirMenuConta(page, menu);
+    await expect(conta.getByRole("menuitem", { name: "Trocar senha", exact: true })).toBeVisible();
+    await expect(conta.getByRole("menuitem", { name: "Sair da conta", exact: true })).toBeVisible();
   });
 });

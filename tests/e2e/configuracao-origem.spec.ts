@@ -78,16 +78,28 @@ async function abrirTurmasEspecificas(page: Page): Promise<void> {
   if ((await gatilho.getAttribute("aria-expanded")) === "false") await gatilho.click();
 }
 
-async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
+async function alterarControle(controle: Locator, marcado: boolean): Promise<void> {
+  await controle.click();
+  await expect(controle).toBeEnabled();
+  if (marcado) await expect(controle).toBeChecked();
+  else await expect(controle).not.toBeChecked();
+}
+
+async function salvarConfiguracoes(page: Page): Promise<void> {
   const resposta = page.waitForResponse(
     (item) =>
       new URL(item.url()).pathname === "/api/configuracoes" && item.request().method() === "PATCH",
   );
-  await controle.click();
+  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+  await dialogo.getByRole("button", { name: "Salvar configurações", exact: true }).click();
   expect((await resposta).status()).toBe(200);
-  await expect(controle).toBeEnabled();
-  if (marcado) await expect(controle).toBeChecked();
-  else await expect(controle).not.toBeChecked();
+  await expect(dialogo).toBeHidden();
+}
+
+async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
+  await alterarControle(controle, marcado);
+  await salvarConfiguracoes(page);
 }
 
 async function conferir(

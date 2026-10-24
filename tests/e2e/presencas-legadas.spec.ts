@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "./helpers/pagina";
+import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "./helpers/pagina";
 
 const nomes = {
   serie: "E2E Histórico de presenças",
@@ -95,7 +95,7 @@ test("restaura os pontos verdes sem salvar novamente nem apagar faltas", async (
   await trocarVisao(page, "Relatórios", "relatorios");
   await page.getByRole("tab", { name: "Grade", exact: true }).click();
   const grade = page.getByRole("region", { name: "Grade de frequência" });
-  await grade.getByRole("button", { name: new RegExp(`${nomes.serie} A`) }).click();
+  await escolherTurmaNaGrade(page, new RegExp(`${nomes.serie} A`));
   await grade.locator("#mes-grade").click();
   await page
     .getByRole("dialog", { name: "Mês da consulta" })

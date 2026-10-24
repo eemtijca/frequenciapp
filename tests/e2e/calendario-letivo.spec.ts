@@ -113,8 +113,28 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   return secao;
 }
 
+/** Escolhe o ano no popover, percorrendo os blocos até encontrá-lo. */
+async function escolherAno(page: Page, secao: Locator, ano: string) {
+  const gatilho = secao.getByLabel("Ano do calendário", { exact: true });
+  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
+  const painel = page.getByRole("dialog", { name: "Ano do calendário", exact: true });
+  await expect(painel).toBeVisible();
+  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
+    const alvo = painel.getByRole("button", { name: ano, exact: true });
+    if ((await alvo.count()) > 0) {
+      await alvo.click();
+      await expect(painel).toBeHidden();
+      return;
+    }
+    const anterior = painel.getByRole("button", { name: "Bloco de anos anterior", exact: true });
+    if (await anterior.isDisabled()) break;
+    await anterior.click();
+  }
+  throw new Error(`Ano ${ano} não encontrado no calendário.`);
+}
+
 async function adicionarPelaInterface(page: Page, secao: Locator, dia: string, nome: string) {
-  await secao.getByLabel("Ano do calendário", { exact: true }).fill(dia.slice(0, 4));
+  await escolherAno(page, secao, dia.slice(0, 4));
   await escolherDia(page, secao, "calendario-feriado-data", "Data do feriado", dia);
   await secao.getByLabel("Nome do feriado", { exact: true }).fill(nome);
   const [resposta] = await Promise.all([
@@ -213,19 +233,18 @@ test("cadastra feriado no ano escolhido, recarrega e remove somente após confir
   test.setTimeout(90_000);
   let secao = await abrirCalendario(page);
   const ano = secao.getByLabel("Ano do calendário", { exact: true });
-  await expect(ano).toHaveAttribute("min", "1900");
-  await expect(ano).toHaveAttribute("max", "2199");
+  await expect(ano).toHaveAttribute("aria-haspopup", "dialog");
   expect((await adicionarPelaInterface(page, secao, DIA_ANUAL, NOME_ANUAL)).status()).toBe(201);
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
-  await secao.getByRole("button", { name: "Ano seguinte", exact: true }).click();
-  await expect(ano).toHaveValue("1995");
+  await escolherAno(page, secao, "1995");
+  await expect(ano).toContainText("1995");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toHaveCount(0);
-  await secao.getByRole("button", { name: "Ano anterior", exact: true }).click();
-  await expect(ano).toHaveValue("1994");
+  await escolherAno(page, secao, "1994");
+  await expect(ano).toContainText("1994");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
 
   secao = await abrirCalendario(page);
-  await secao.getByLabel("Ano do calendário", { exact: true }).fill("1994");
+  await escolherAno(page, secao, "1994");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
   for (const largura of [320, 360, 1280]) {
     await page.setViewportSize({ width: largura, height: 900 });

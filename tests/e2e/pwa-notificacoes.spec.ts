@@ -3,7 +3,7 @@
 import { createECDH, randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "./helpers/banco";
-import { aguardarHidratacao } from "./helpers/pagina";
+import { abrirNotificacoes, aguardarHidratacao } from "./helpers/pagina";
 
 const LOGIN = "e2e-push-diretor";
 
@@ -121,7 +121,7 @@ test.describe("notificações da PWA", () => {
     await simularDispositivo(page);
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
     await expect(
       dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }),
@@ -133,7 +133,7 @@ test.describe("notificações da PWA", () => {
     expect(await contagens(page)).toEqual({ pedidos: 0, inscricoes: 0, cancelamentos: 0 });
     await page.reload();
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await expect(
       dialogo.getByRole("switch", { name: "Novas chamadas", exact: true }),
     ).toHaveAttribute("aria-checked", "true");
@@ -152,7 +152,7 @@ test.describe("notificações da PWA", () => {
     ).toBe(true);
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
     await expect(
       dialogo.getByRole("switch", { name: "Chamadas pendentes", exact: true }),
@@ -172,7 +172,7 @@ test.describe("notificações da PWA", () => {
     await page.route("**/api/notificacoes/teste", (rota) => rota.fulfill({ json: { ok: true } }));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     const dialogo = page.getByRole("dialog", { name: "Notificações", exact: true });
     await expect(
       dialogo.getByRole("button", { name: "Ativar notificações", exact: true }),
@@ -206,7 +206,7 @@ test.describe("notificações da PWA", () => {
     await simularDispositivo(page, "default", "default");
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("A permissão não foi concedida");
     expect(await contagens(page)).toEqual({ pedidos: 1, inscricoes: 0, cancelamentos: 0 });
@@ -215,7 +215,7 @@ test.describe("notificações da PWA", () => {
     await simularDispositivo(page, "denied");
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await expect(page.getByText(/As notificações estão bloqueadas/)).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Ativar notificações", exact: true }),
@@ -231,7 +231,7 @@ test.describe("notificações da PWA", () => {
     );
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Envio temporariamente indisponível");
     expect(await contagens(page)).toEqual({ pedidos: 1, inscricoes: 1, cancelamentos: 1 });
@@ -249,7 +249,7 @@ test.describe("notificações da PWA", () => {
     );
     await page.goto("/");
     await aguardarHidratacao(page);
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
     await page.getByRole("button", { name: "Enviar notificação de teste" }).click();
     await expect(page.getByRole("alert")).toContainText("As notificações expiraram");
@@ -271,7 +271,7 @@ test.describe("notificações da PWA", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Minhas turmas" })).toBeVisible();
-    await page.getByRole("button", { name: "Configurar notificações" }).click();
+    await abrirNotificacoes(page);
     await expect(
       page.getByText("As notificações ainda não foram configuradas pela administração."),
     ).toBeVisible();

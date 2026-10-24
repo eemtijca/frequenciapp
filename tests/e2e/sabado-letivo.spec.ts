@@ -225,11 +225,11 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
     if (caixaResumo && caixaLiberar) {
       expect(caixaResumo.height).toBeGreaterThanOrEqual(44);
       expect(caixaLiberar.height).toBeGreaterThanOrEqual(44);
-      expect(caixaLiberar.x).toBeGreaterThan(caixaResumo.x + caixaResumo.width);
+      // Os dois controles ocupam a largura e ficam empilhados, sem sobreposição.
+      expect(Math.abs(caixaResumo.x - caixaLiberar.x)).toBeLessThan(4);
+      expect(Math.abs(caixaResumo.width - caixaLiberar.width)).toBeLessThan(4);
+      expect(caixaLiberar.y).toBeGreaterThanOrEqual(caixaResumo.y + caixaResumo.height - 1);
       expect(caixaLiberar.x + caixaLiberar.width).toBeLessThanOrEqual(largura);
-      expect(
-        Math.abs(caixaResumo.y + caixaResumo.height / 2 - caixaLiberar.y - caixaLiberar.height / 2),
-      ).toBeLessThan(4);
     }
     for (const tema of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: tema });

@@ -73,7 +73,7 @@ test.describe("responsividade", () => {
       .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
     expect(semEstouro).toBe(true);
     const asideCaixa = await page.locator("aside").boundingBox();
-    const sairCaixa = await page.getByRole("button", { name: "Sair da conta" }).boundingBox();
+    const sairCaixa = await page.getByRole("button", { name: /^Conta de / }).boundingBox();
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
     );
@@ -111,13 +111,29 @@ test.describe("responsividade", () => {
       await expect(fechar).toBeInViewport();
       await expect(menu.getByRole("button", { name: /tema/i })).toHaveCount(0);
       expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(240 + 1);
-      for (const nome of ["Gestão", "Trocar senha", "Sair da conta"]) {
+      for (const nome of ["Gestão"]) {
         const acao = menu.getByRole("button", { name: nome, exact: true });
         await acao.scrollIntoViewIfNeeded();
         await expect(acao).toBeInViewport();
         const tamanho = await acao.boundingBox();
         expect(tamanho?.height ?? 0).toBeGreaterThanOrEqual(44);
       }
+      const perfil = menu.getByRole("button", { name: /^Conta de / });
+      await perfil.scrollIntoViewIfNeeded();
+      await expect(perfil).toBeInViewport();
+      expect((await perfil.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+      await perfil.click();
+      const conta = page.getByRole("menu", { name: "Conta", exact: true });
+      for (const nome of ["Trocar senha", "Sair da conta"]) {
+        const acao = conta.getByRole("menuitem", { name: nome, exact: true });
+        await expect(acao).toBeInViewport();
+        // O popover abre com zoom; aguarda o tamanho final do alvo de toque.
+        await expect
+          .poll(async () => (await acao.boundingBox())?.height ?? 0)
+          .toBeGreaterThanOrEqual(44);
+      }
+      await page.keyboard.press("Escape");
+      await expect(conta).toBeHidden();
       await info.attach(`menu-${largura}-${altura}`, {
         body: await page.screenshot({ animations: "disabled" }),
         contentType: "image/png",
@@ -165,7 +181,7 @@ test.describe("responsividade", () => {
       for (const [rotulo, visao, largura] of [
         ["Painel", "painel", 1024],
         ["Chamada", "chamada", 1152],
-        ["Chamada Parcial", "chamada-parcial", 896],
+        ["Chamada Parcial", "chamada-parcial", 1152],
         ["Relatórios", "relatorios", 1280],
         ["Gestão", "gestao", 1152],
       ] as const) {

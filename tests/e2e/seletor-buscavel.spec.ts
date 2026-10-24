@@ -53,7 +53,7 @@ test("a lista longa rola dentro do painel e seleciona por toque ou teclado", asy
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Saídas e entradas", "saidas");
+  await trocarVisao(page, "Saídas e Entradas", "saidas");
   const aluno = page.locator("#saida-aluno");
   await aluno.click();
   const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
@@ -78,7 +78,7 @@ test("a lista longa rola dentro do painel e seleciona por toque ou teclado", asy
   await busca.pressSequentially("E2E Lista 01");
   await expect(lista.getByRole("option")).toHaveCount(1);
   // Clicar fora cancela a escolha sem alterar o aluno selecionado.
-  await page.getByRole("heading", { name: "Registro", exact: true }).click();
+  await page.getByRole("heading", { name: "Registrar saída", exact: true }).click();
   await expect(busca).toHaveCount(0);
   await expect(aluno).toContainText("E2E Aluno Dois");
 });

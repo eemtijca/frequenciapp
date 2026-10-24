@@ -2,15 +2,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADMIN_E2E } from "./helpers/banco";
 import { entrar } from "./helpers/auth";
-import { abrirNavegacao, aguardarHidratacao } from "./helpers/pagina";
+import { abrirMenuConta, abrirNavegacao, aguardarHidratacao } from "./helpers/pagina";
 
 // Sem estado de sessão: este arquivo testa a tela de entrada.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 /** Sai da conta pela barra lateral do desktop ou pelo menu do celular. */
 async function sairDaConta(page: Page): Promise<void> {
-  await abrirNavegacao(page);
-  await page.getByRole("button", { name: "Sair da conta", exact: true }).click();
+  const navegacao = await abrirNavegacao(page);
+  const conta = await abrirMenuConta(page, navegacao);
+  await conta.getByRole("menuitem", { name: "Sair da conta", exact: true }).click();
   await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible({ timeout: 25_000 });
 }
 
@@ -89,8 +90,9 @@ test.describe("autenticação", () => {
 
     // Na troca de senha, os três campos também alternam.
     await entrar(page, ADMIN_E2E.email, ADMIN_E2E.senha);
-    await abrirNavegacao(page);
-    await page.getByRole("button", { name: "Trocar senha", exact: true }).click();
+    const navegacao = await abrirNavegacao(page);
+    const conta = await abrirMenuConta(page, navegacao);
+    await conta.getByRole("menuitem", { name: "Trocar senha", exact: true }).click();
     for (const id of ["senha-atual", "senha-nova", "senha-confirmacao"]) {
       const campo = page.locator(`#${id}`);
       await expect(campo).toHaveAttribute("type", "password");
