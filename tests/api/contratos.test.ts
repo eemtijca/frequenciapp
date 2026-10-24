@@ -1502,7 +1502,9 @@ describe("configurações e responsáveis", () => {
         body: JSON.stringify({ senha: SENHA_ADMIN }),
       });
       const exportada = (await copia.json()) as { configuracoes: Configuracoes };
-      expect(exportada.configuracoes).toEqual(configurada.configuracoes);
+      const { atualizadoEm: _exportadaEm, ...exportadaSemVersao } = exportada.configuracoes;
+      const { atualizadoEm: _configuradaEm, ...configuradaSemVersao } = configurada.configuracoes;
+      expect(exportadaSemVersao).toEqual(configuradaSemVersao);
     } finally {
       const atual = await autenticado(cookieAdmin, "/api/configuracoes");
       const atualBody = (await atual.json()) as { configuracoes: Configuracoes };
