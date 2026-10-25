@@ -134,7 +134,7 @@ pnpm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo
 
 Quando o dia corrente é feriado ou fim de semana, o spec volta ao último dia letivo com chamada para a captura sair com dados.
 
-Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas e confira o diff das imagens no pull request.
+Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas e confira o diff das imagens no pull request. A galeria fica em `docs/imagens/README.md` e o teste `tests/unit/readme-imagens.test.ts` limita a largura e o peso das imagens exibidas no README.
 
 ## Convenções
 

@@ -7,6 +7,13 @@ import { massaDeDemonstracaoPresente } from "./helpers/banco";
 
 const pastaImagens = path.resolve(process.cwd(), "docs/imagens");
 
+/** Remove o anel de foco da última ação para a captura mostrar só o estado da tela. */
+async function limparFoco(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+}
+
 /** Abre o Painel em um dia letivo com chamada, voltando quando cai em feriado. */
 async function abrirPainelComDados(page: Page) {
   const secao = page.locator('section[aria-label="Painel de frequência"]');
@@ -20,13 +27,18 @@ async function abrirPainelComDados(page: Page) {
   throw new Error("Sem dia letivo com chamada. Aplique a semente: pnpm run seed");
 }
 
-/** Abre a Chamada em um dia letivo com aulas, voltando quando cai em feriado. */
+/** Abre a Chamada em um dia letivo com chamada salva, voltando quando cai em feriado. */
 async function abrirChamadaComDados(page: Page) {
   const secao = page.locator('section[aria-label="Fazer chamada"]');
   for (let tentativa = 0; tentativa < 8; tentativa += 1) {
     const feriado = await secao.getByText(/^Feriado ·/).count();
     const lista = await secao.getByRole("list", { name: "Alunos da chamada", exact: true }).count();
-    if (lista > 0 && feriado === 0) {
+    // Sábado bloqueado e dia sem chamada salva não representam a rotina da tela.
+    const sabadoBloqueado = await secao
+      .getByRole("button", { name: "Desbloquear sábado letivo", exact: true })
+      .count();
+    const semChamada = await secao.getByText("Nova chamada", { exact: true }).count();
+    if (lista > 0 && feriado === 0 && sabadoBloqueado === 0 && semChamada === 0) {
       // Chamada salva abre bloqueada: a captura mostra a correção liberada.
       const desbloquear = secao.getByRole("button", { name: /^Desbloquear chamada de / });
       if ((await desbloquear.count()) > 0) {
@@ -38,7 +50,7 @@ async function abrirChamadaComDados(page: Page) {
     await secao.getByLabel("Dia anterior").click();
     await page.waitForTimeout(400);
   }
-  throw new Error("Sem dia letivo com chamada. Aplique a semente: pnpm run seed");
+  throw new Error("Sem dia letivo com chamada salva. Aplique a semente: pnpm run seed");
 }
 
 test.describe("Capturas do README", () => {
@@ -60,11 +72,13 @@ test.describe("Capturas do README", () => {
     await page.waitForTimeout(800);
     await abrirPainelComDados(page);
     await page.emulateMedia({ colorScheme: "light" });
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "painel-desktop-claro.png"),
       animations: "disabled",
     });
     await page.emulateMedia({ colorScheme: "dark" });
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "painel-desktop-escuro.png"),
       animations: "disabled",
@@ -84,11 +98,13 @@ test.describe("Capturas do README", () => {
     await abrirChamadaComDados(page);
     await page.waitForTimeout(800);
     await page.emulateMedia({ colorScheme: "light" });
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "chamada-mobile-claro.png"),
       animations: "disabled",
     });
     await page.emulateMedia({ colorScheme: "dark" });
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "chamada-mobile-escuro.png"),
       animations: "disabled",
@@ -105,6 +121,7 @@ test.describe("Capturas do README", () => {
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Resumo" }).click();
     await page.waitForTimeout(900);
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "relatorios-resumo-desktop.png"),
       animations: "disabled",
@@ -112,6 +129,7 @@ test.describe("Capturas do README", () => {
 
     await trocarVisao(page, "Saídas e Entradas", "saidas");
     await page.waitForTimeout(900);
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "saidas-entradas-desktop.png"),
       animations: "disabled",
@@ -120,6 +138,7 @@ test.describe("Capturas do README", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Turmas" }).click();
     await page.waitForTimeout(900);
+    await limparFoco(page);
     await page.screenshot({
       path: path.join(pastaImagens, "gestao-turmas-desktop.png"),
       animations: "disabled",
