@@ -137,7 +137,7 @@ test.describe("abas da Gestão", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Equipe" }).click();
-    const propria = page.locator(".superficie-vidro").filter({ hasText: "Você" });
+    const propria = page.locator(".superficie").filter({ hasText: "Você" });
     await propria.getByRole("button", { name: /^Editar conta de / }).click();
 
     const dialogo = page.getByRole("dialog");

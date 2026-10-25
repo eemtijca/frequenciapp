@@ -25,7 +25,7 @@ export function BarraBusca({
   return (
     <div
       className={cn(
-        "controle-vidro focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
+        "controle focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
         className,
       )}
     >
@@ -48,7 +48,7 @@ export function BarraBusca({
           type="button"
           aria-label="Limpar busca"
           onClick={() => onValor("")}
-          className="vidro-discreto text-muted-foreground focus-visible:ring-ring/50 pressionavel flex size-11 shrink-0 items-center justify-center focus-visible:ring-[3px] focus-visible:outline-none"
+          className="discreto text-muted-foreground focus-visible:ring-ring/50 pressionavel flex size-11 shrink-0 items-center justify-center focus-visible:ring-[3px] focus-visible:outline-none"
         >
           <X size={16} />
         </button>

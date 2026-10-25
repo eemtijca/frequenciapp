@@ -107,7 +107,7 @@ export function SeletorFiltrosBi({
     </div>
   );
   return (
-    <section className="superficie-vidro p-4 print:hidden" aria-label="Filtros da análise">
+    <section className="superficie p-4 print:hidden" aria-label="Filtros da análise">
       <div role="group" aria-label="Aplicar período rápido" className="mb-4 flex flex-wrap gap-2">
         {PERIODOS_RAPIDOS_BI.map((periodo) => (
           <Button

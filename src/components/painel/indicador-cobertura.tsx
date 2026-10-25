@@ -15,7 +15,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
       <div
         role="group"
         aria-label="Cobertura do dia"
-        className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+        className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
       >
         <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
         <div className="flex items-center gap-2.5">
@@ -42,7 +42,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
     <div
       role="group"
       aria-label="Cobertura do dia"
-      className="superficie-vidro flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+      className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
     >
       <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
       <div className="flex flex-col gap-2">
@@ -65,7 +65,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
           <div
             data-testid="cobertura-preenchida"
             aria-hidden="true"
-            className="bg-primary h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255_/_0.25)] transition-[width] duration-300 motion-reduce:transition-none"
+            className="bg-primary h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
             style={{ width: `${progresso}%` }}
           />
         </div>

@@ -205,7 +205,7 @@ export default function VistaEntradas({
         </Button>
       </div>
       <form
-        className="superficie-vidro flex flex-col gap-4 p-4"
+        className="superficie flex flex-col gap-4 p-4"
         onSubmit={(e) => {
           e.preventDefault();
           void executar(async () => {
@@ -309,7 +309,7 @@ export default function VistaEntradas({
                     setJustificativa("");
                     setObservacao("");
                   }}
-                  className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "vidro-selecionado" : ""}`}
+                  className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : ""}`}
                 >
                   {item.rotulo}
                 </button>
@@ -412,7 +412,7 @@ export default function VistaEntradas({
           entradas.map((entrada) => (
             <article
               key={entrada.id}
-              className="superficie-vidro flex items-start justify-between gap-3 p-4"
+              className="superficie flex items-start justify-between gap-3 p-4"
             >
               <div className="min-w-0">
                 <h3 className="font-semibold break-words">{entrada.nome}</h3>

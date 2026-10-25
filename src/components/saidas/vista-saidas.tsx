@@ -345,7 +345,7 @@ export default function VistaSaidas({
       </div>
 
       <form
-        className="superficie-vidro flex flex-col gap-4 p-4"
+        className="superficie flex flex-col gap-4 p-4"
         onSubmit={(evento) => {
           evento.preventDefault();
           void registrar();
@@ -430,7 +430,7 @@ export default function VistaSaidas({
                   setJustificativa("");
                   setObservacao("");
                 }}
-                className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "vidro-selecionado" : ""}`}
+                className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : ""}`}
               >
                 Escrever
               </button>
@@ -442,7 +442,7 @@ export default function VistaSaidas({
                   setFormaJustificativa("catalogo");
                   setTexto("");
                 }}
-                className={`controle-vidro pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "vidro-selecionado" : ""}`}
+                className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : ""}`}
               >
                 Selecionar tipo
               </button>
@@ -551,7 +551,7 @@ export default function VistaSaidas({
                 const aluno = alunosPorId.get(saida.alunoId);
                 const nome = aluno?.nome ?? "Aluno";
                 return (
-                  <li key={saida.id} className="superficie-vidro p-4">
+                  <li key={saida.id} className="superficie p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-semibold break-words">{nome}</p>

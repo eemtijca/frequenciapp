@@ -38,7 +38,6 @@
   .conteudo article {
     break-inside: avoid;
     box-shadow: none;
-    backdrop-filter: none;
   }
   .raiz {
     padding: 0;

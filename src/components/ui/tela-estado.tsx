@@ -177,7 +177,7 @@ export function TelaEstado({
         <Icone size={26} strokeWidth={1.9} />
       </span>
       {codigo ? (
-        <span className="controle-vidro text-muted-foreground numerais-tabulares mt-3 px-2.5 py-1 text-[11px] font-semibold">
+        <span className="controle text-muted-foreground numerais-tabulares mt-3 px-2.5 py-1 text-[11px] font-semibold">
           Erro {codigo}
         </span>
       ) : null}
@@ -207,7 +207,7 @@ export function TelaEstado({
   );
 
   const classes =
-    "superficie-vidro mx-auto flex w-full max-w-xl flex-col items-center px-6 py-10 text-center sm:px-8";
+    "superficie mx-auto flex w-full max-w-xl flex-col items-center px-6 py-10 text-center sm:px-8";
 
   if (incorporado) {
     return (
@@ -279,7 +279,7 @@ export function AvisoCompacto({
   }
 
   return (
-    <div role={papel} className={cn("superficie-vidro p-5 text-center", className)}>
+    <div role={papel} className={cn("superficie p-5 text-center", className)}>
       <span
         className={cn(
           "mx-auto flex size-10 items-center justify-center rounded-2xl",

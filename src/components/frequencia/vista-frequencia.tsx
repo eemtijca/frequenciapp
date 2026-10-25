@@ -785,7 +785,7 @@ export default function VistaFrequencia({
           <h1 className="text-xl font-semibold tracking-tight">Chamada</h1>
           <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
         </div>
-        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <School size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma turma cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -875,7 +875,7 @@ export default function VistaFrequencia({
           {feriado && (
             <div
               role="status"
-              className="superficie-vidro text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+              className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
             >
               <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
               <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
@@ -915,7 +915,7 @@ export default function VistaFrequencia({
               aria-expanded={resumoAberto}
               aria-controls={idResumo}
               onClick={() => setResumoAberto((atual) => !atual)}
-              className="vidro-selecionado h-11 w-full justify-center rounded-full px-4"
+              className="selecionado h-11 w-full justify-center rounded-full px-4"
             >
               <span>{tituloResumo}</span>
               <ChevronDown
@@ -936,7 +936,7 @@ export default function VistaFrequencia({
                       ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
                       : "Libera a chamada somente para esta turma e este sábado."
                 }
-                className={`h-11 w-full justify-center rounded-full px-4 ${sabadoLiberado ? "vidro-selecionado" : ""}`}
+                className={`h-11 w-full justify-center rounded-full px-4 ${sabadoLiberado ? "selecionado" : ""}`}
                 onClick={() => {
                   if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas) return;
                   setSabadoDesbloqueado(chave);
@@ -1000,7 +1000,7 @@ export default function VistaFrequencia({
             id={idResumo}
             aria-label={tituloResumo}
             hidden={!resumoAberto}
-            className="superficie-vidro overflow-hidden"
+            className="superficie overflow-hidden"
           >
             {resumoAberto && (
               <>
@@ -1018,7 +1018,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
                       }
-                      className="controle-vidro aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                      className="controle aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                         {carregando ? "" : contagemFaltas}
@@ -1031,7 +1031,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "justificadas" ? "todos" : "justificadas"))
                       }
-                      className="controle-vidro aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                      className="controle aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
                         {carregando ? "" : contagemJustificadas}
@@ -1046,7 +1046,7 @@ export default function VistaFrequencia({
                       onClick={() =>
                         setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))
                       }
-                      className="controle-vidro pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                      className="controle pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                     >
                       <span className="numerais-tabulares text-primary text-2xl font-semibold">
                         {carregando ? "" : contagemPresencas}
@@ -1123,7 +1123,7 @@ export default function VistaFrequencia({
             )}
           </section>
 
-          <div className="superficie-vidro overflow-hidden">
+          <div className="superficie overflow-hidden">
             {filtro !== "todos" && (
               <div className="flex justify-end px-4 py-2 text-xs">
                 <button
@@ -1317,7 +1317,7 @@ export default function VistaFrequencia({
                               onClick={() =>
                                 setAulasAbertas((atual) => (atual === aluno.id ? null : aluno.id))
                               }
-                              className="controle-vidro text-muted-foreground pressionavel my-2 mr-2 h-9 shrink-0 px-2.5 text-xs font-medium disabled:opacity-50"
+                              className="controle text-muted-foreground pressionavel my-2 mr-2 h-9 shrink-0 px-2.5 text-xs font-medium disabled:opacity-50"
                             >
                               Aulas
                             </button>
@@ -1418,7 +1418,7 @@ export default function VistaFrequencia({
           </div>
           <div
             aria-label="Barra de salvamento"
-            className="superficie-vidro vidro-flutuante sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
+            className="superficie sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
             style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           >
             <p

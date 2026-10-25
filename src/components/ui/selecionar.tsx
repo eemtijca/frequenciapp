@@ -54,7 +54,7 @@ export function Selecionar({
         id={id}
         aria-label={ariaLabel}
         className={cn(
-          "controle-vidro border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
+          "controle border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
           className,
         )}
       >
@@ -67,7 +67,7 @@ export function Selecionar({
         <SelectPrimitive.Content
           position="popper"
           sideOffset={4}
-          className="superficie-vidro vidro-flutuante text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden"
+          className="superficie flutuante text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-7 items-center justify-center">
             <ChevronUp size={14} aria-hidden="true" />
@@ -84,7 +84,7 @@ export function Selecionar({
                   value={opcao.valor}
                   className={cn(
                     "pressionavel focus-visible:ring-ring/50 relative flex min-h-11 w-full cursor-pointer items-center py-1.5 pr-8 pl-8 text-sm outline-none select-none focus-visible:ring-2 focus-visible:ring-inset data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-                    opcao.valor === value ? "vidro-selecionado" : "vidro-discreto",
+                    opcao.valor === value ? "selecionado" : "discreto",
                   )}
                 >
                   <span className="absolute left-2 flex size-4 items-center justify-center">

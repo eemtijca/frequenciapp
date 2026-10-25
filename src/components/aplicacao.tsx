@@ -178,7 +178,7 @@ function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) 
       onClick={() => onTrocar(item.visao)}
       className={cn(
         "pressionavel focus-visible:ring-ring relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-2xl px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-        ativo ? "vidro-selecionado" : "vidro-discreto text-muted-foreground",
+        ativo ? "selecionado" : "discreto text-muted-foreground",
       )}
     >
       <Icone size={20} strokeWidth={ativo ? 2 : 1.7} aria-hidden="true" className="shrink-0" />
@@ -901,13 +901,13 @@ export default function Aplicacao({
             Pular para o conteúdo
           </a>
 
-          <aside className="superficie-vidro hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
+          <aside className="superficie hidden min-h-0 w-60 shrink-0 flex-col rounded-none border-0 border-r lg:flex">
             {renderizarMenu()}
           </aside>
 
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <header
-              className="superficie-vidro vidro-flutuante shrink-0 rounded-none border-0 border-b lg:hidden"
+              className="superficie shrink-0 rounded-none border-0 border-b lg:hidden"
               style={{ paddingTop: "env(safe-area-inset-top)" }}
             >
               <div className="flex items-center gap-2 px-3 py-2 sm:gap-3 sm:px-6">

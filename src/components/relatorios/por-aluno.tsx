@@ -486,13 +486,13 @@ export default function PorAluno({
       </div>
 
       {linhas.length === 0 ? (
-        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum aluno encontrado</p>
           <p className="text-muted-foreground text-sm">Ajuste a busca.</p>
         </div>
       ) : (
-        <div className="superficie-vidro divide-y overflow-hidden">
+        <div className="superficie divide-y overflow-hidden">
           {grupos.map(({ serie, turmas: gruposTurma, alunos: totalSerie }) => {
             const serieAberta = buscando || !seriesFechadas.has(serie.id);
             return (

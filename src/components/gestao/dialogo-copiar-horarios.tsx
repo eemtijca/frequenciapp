@@ -97,7 +97,7 @@ export function DialogoCopiarHorarios({ destino, turmas, disabled, onOcupado, on
     );
 
   return (
-    <section aria-label="Copiar grade" className="superficie-vidro flex min-w-0 flex-col gap-3 p-3">
+    <section aria-label="Copiar grade" className="superficie flex min-w-0 flex-col gap-3 p-3">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="horarios-turma-origem">Turma de origem</Label>
         <Selecionar

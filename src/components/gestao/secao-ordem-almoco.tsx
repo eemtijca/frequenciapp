@@ -152,7 +152,7 @@ export default function SecaoOrdemAlmoco({
             return (
               <li key={item.turmaId} className="flex flex-col gap-2 px-3 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="controle-vidro numerais-tabulares flex size-9 shrink-0 items-center justify-center text-sm font-semibold">
+                  <span className="controle numerais-tabulares flex size-9 shrink-0 items-center justify-center text-sm font-semibold">
                     <span aria-hidden="true">{indice + 1}º</span>
                     <span className="sr-only">{indice + 1}º lugar</span>
                   </span>

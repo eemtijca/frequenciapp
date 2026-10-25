@@ -282,7 +282,7 @@ export default function SecaoChavesBi({
           const revogada = estaRevogada(c);
           const acionavel = c.estado === "ativa" && !revogada;
           return (
-            <article key={c.id} className="controle-vidro flex flex-col gap-3 p-3">
+            <article key={c.id} className="controle flex flex-col gap-3 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="min-w-0 font-semibold break-words">{c.rotulo}</h3>
                 <div className="flex flex-wrap gap-1.5">
@@ -453,7 +453,7 @@ export default function SecaoChavesBi({
                   <Collapsible.Root
                     open={escopoAberto}
                     onOpenChange={setEscopoAberto}
-                    className="controle-vidro overflow-hidden"
+                    className="controle overflow-hidden"
                   >
                     <Collapsible.Trigger
                       type="button"

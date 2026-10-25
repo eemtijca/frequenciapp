@@ -126,7 +126,7 @@ export function DialogoConfigurarPlanilha({
         {diagnostico && (
           <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
             <section
-              className="superficie-vidro flex flex-col gap-2 p-3"
+              className="superficie flex flex-col gap-2 p-3"
               aria-label="Conexão da planilha"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -147,10 +147,7 @@ export function DialogoConfigurarPlanilha({
                 Revisar conexão
               </Button>
             </section>
-            <section
-              className="superficie-vidro flex flex-col gap-3 p-3"
-              aria-label="Turmas do mês"
-            >
+            <section className="superficie flex flex-col gap-3 p-3" aria-label="Turmas do mês">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">2. Turmas e mês</h3>
                 <Selo variante={diagnostico.estruturaPronta ? "sucesso" : "atencao"}>
@@ -204,7 +201,7 @@ export function DialogoConfigurarPlanilha({
               </Button>
             </section>
             <section
-              className="superficie-vidro flex flex-col gap-3 p-3"
+              className="superficie flex flex-col gap-3 p-3"
               aria-label="Situação dos envios"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">

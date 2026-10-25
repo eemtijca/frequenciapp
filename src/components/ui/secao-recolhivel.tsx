@@ -44,7 +44,7 @@ export function SecaoRecolhivel({
       open={aberto}
       onOpenChange={onAbertoChange}
       data-secao={dataSecao}
-      className={`flex flex-col ${nivel === "raiz" ? "superficie-vidro" : "rounded-2xl border bg-transparent"} ${
+      className={`flex flex-col ${nivel === "raiz" ? "superficie" : "rounded-2xl border bg-transparent"} ${
         perigo ? "border-falta/40" : ""
       }`}
     >
@@ -57,7 +57,7 @@ export function SecaoRecolhivel({
             className={`mt-0.5 flex size-9 shrink-0 items-center justify-center ${
               perigo
                 ? "bg-falta-fraca text-falta-texto rounded-full"
-                : "controle-vidro text-secondary-foreground"
+                : "controle text-secondary-foreground"
             }`}
           >
             <Icone size={16} aria-hidden="true" />

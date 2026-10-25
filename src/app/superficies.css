@@ -1,0 +1,175 @@
+/* Superfícies planas, controles e estados compartilhados. */
+:root {
+  --superficie-raio: var(--radius);
+  --superficie-sombra: 0 12px 32px rgb(24 34 29 / 14%);
+  --superficie-elevada: 0 16px 40px rgb(24 34 29 / 18%);
+}
+
+.dark {
+  --superficie-sombra: 0 12px 32px rgb(0 0 0 / 26%);
+  --superficie-elevada: 0 16px 40px rgb(0 0 0 / 34%);
+}
+
+@layer components {
+  .superficie,
+  .controle,
+  .primario,
+  .destrutivo {
+    border: 1px solid var(--border);
+    border-radius: var(--superficie-raio);
+    background-color: var(--card);
+  }
+
+  .controle,
+  .discreto,
+  .primario,
+  .destrutivo {
+    transition-property: background-color, border-color, color;
+    transition-duration: 160ms;
+    transition-timing-function: ease;
+  }
+
+  .discreto {
+    border: 1px solid transparent;
+    border-radius: var(--superficie-raio);
+    background: transparent;
+  }
+
+  .primario {
+    border-color: var(--primary);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .destrutivo {
+    border-color: var(--falta);
+    background-color: var(--falta);
+    color: var(--falta-foreground);
+  }
+
+  .selecionado,
+  .controle:where(
+      [aria-pressed="true"],
+      [aria-selected="true"],
+      [aria-checked="true"],
+      [data-state="active"]
+    ):not(.primario, .destrutivo) {
+    border: 1px solid color-mix(in oklab, var(--primary) 55%, var(--border));
+    border-radius: var(--superficie-raio);
+    background-color: color-mix(in oklab, var(--primary) 12%, var(--card));
+    color: var(--primary);
+  }
+
+  .flutuante {
+    box-shadow: var(--superficie-elevada);
+  }
+
+  .interruptor {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background-color: var(--input);
+  }
+
+  .campo-integrado {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .grafico-fatia {
+    fill: var(--cor-fatia);
+  }
+
+  @media (hover: hover) {
+    .controle:where(:not(:disabled, [aria-disabled="true"]):hover),
+    .discreto:where(:not(:disabled, [aria-disabled="true"]):hover) {
+      border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+      background-color: color-mix(in oklab, var(--primary) 7%, var(--card));
+    }
+
+    .selecionado:where(:not(:disabled, [aria-disabled="true"]):hover),
+    .controle:where(
+        [aria-pressed="true"],
+        [aria-selected="true"],
+        [aria-checked="true"],
+        [data-state="active"]
+      ):not(.primario, .destrutivo):where(:not(:disabled):hover) {
+      background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
+    }
+
+    .primario:where(:not(:disabled):hover) {
+      background-color: color-mix(in oklab, var(--primary) 90%, var(--foreground));
+    }
+
+    .destrutivo:where(:not(:disabled):hover) {
+      background-color: color-mix(in oklab, var(--falta) 90%, var(--foreground));
+    }
+  }
+
+  @media (forced-colors: active) {
+    .superficie,
+    .controle,
+    .discreto,
+    .selecionado,
+    .flutuante,
+    .interruptor,
+    .primario,
+    .destrutivo {
+      border-color: ButtonText;
+      background: Canvas;
+      color: CanvasText;
+      box-shadow: none;
+    }
+
+    .primario,
+    .destrutivo {
+      background: Highlight;
+      color: HighlightText;
+    }
+
+    .selecionado,
+    .controle:where(
+      [aria-pressed="true"],
+      [aria-selected="true"],
+      [aria-checked="true"],
+      [data-state="active"]
+    ) {
+      outline: 2px solid Highlight;
+      outline-offset: -3px;
+    }
+
+    .interruptor > span {
+      border: 1px solid ButtonText;
+      background: ButtonText;
+      box-shadow: none;
+    }
+
+    .interruptor[data-state="checked"] {
+      background: Highlight;
+    }
+
+    .interruptor[data-state="checked"] > span {
+      border-color: HighlightText;
+      background: HighlightText;
+    }
+  }
+}
+
+/* Foco visível também nas cores forçadas, acima das utilidades de outline. */
+@media (forced-colors: active) {
+  :where(
+    button,
+    a,
+    input,
+    select,
+    textarea,
+    [role="button"],
+    [role="tab"],
+    [role="radio"],
+    [role="option"]
+  ):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

@@ -135,7 +135,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       )}
 
       {series.length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <GraduationCap size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma série cadastrada</p>
           <p className="text-muted-foreground text-sm">
@@ -147,12 +147,12 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           </Button>
         </div>
       ) : filtradas.length === 0 ? (
-        <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+        <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
           <p className="font-medium">Nenhuma série encontrada</p>
           <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
         </div>
       ) : (
-        <ul className="superficie-vidro divide-y overflow-hidden">
+        <ul className="superficie divide-y overflow-hidden">
           {filtradas.map((serie) => (
             <motion.li
               key={serie.id}

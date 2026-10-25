@@ -106,7 +106,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <aside className="superficie-vidro hidden flex-col items-center justify-center rounded-none border-0 border-r p-10 lg:flex xl:p-14">
+      <aside className="superficie hidden flex-col items-center justify-center rounded-none border-0 border-r p-10 lg:flex xl:p-14">
         <div className="flex w-full max-w-md flex-col gap-10">
           <div className="flex flex-col items-center gap-4 text-center">
             <Logotipo tamanho={56} priority />
@@ -122,9 +122,9 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
             {DESTAQUES.map(({ Icone, texto }) => (
               <li
                 key={texto}
-                className="vidro-reflexo text-muted-foreground flex items-center gap-3 rounded-2xl border border-[var(--vidro-borda)] px-4 py-3 text-sm"
+                className="superficie text-muted-foreground flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm"
               >
-                <span className="vidro-selecionado text-primary flex size-9 shrink-0 items-center justify-center rounded-xl">
+                <span className="selecionado text-primary flex size-9 shrink-0 items-center justify-center rounded-xl">
                   <Icone size={17} aria-hidden="true" />
                 </span>
                 {texto}
@@ -135,7 +135,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
       </aside>
 
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
-        <div className="superficie-vidro flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
+        <div className="superficie flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
           <div className="relative flex items-start justify-between gap-3">
             <div className="flex w-full min-w-0 flex-col items-center gap-3 text-center lg:w-auto lg:items-start lg:text-left">
               <Logotipo tamanho={48} className="lg:hidden" priority />

@@ -54,7 +54,7 @@ export function SeletorTema({ className }: { className?: string }) {
                 onClick={() => setTheme(valor)}
                 className={cn(
                   "pressionavel focus-visible:ring-ring/50 flex min-h-11 items-center gap-2 px-2.5 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
-                  ativo ? "vidro-selecionado" : "vidro-discreto",
+                  ativo ? "selecionado" : "discreto",
                 )}
               >
                 <Icone size={16} aria-hidden="true" />

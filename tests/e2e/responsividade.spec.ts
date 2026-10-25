@@ -185,7 +185,7 @@ test.describe("responsividade", () => {
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
 
     // A marca e o título acompanham o centro do cartão, não só o espaço restante.
-    const cartao = await page.locator("main .superficie-vidro").first().boundingBox();
+    const cartao = await page.locator("main .superficie").first().boundingBox();
     const titulo = await page
       .getByRole("heading", { name: "FrequenciApp", exact: true })
       .boundingBox();

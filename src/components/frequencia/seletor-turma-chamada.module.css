@@ -1,4 +1,4 @@
-/* Painel compacto com turmas contidas em cada série e progresso em degradê. */
+/* Painel compacto com turmas contidas em cada série e progresso em barra sólida. */
 .faixa {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -18,17 +18,15 @@
   flex-direction: column;
   gap: 5px;
   border-radius: var(--radius);
-  border-color: var(--vidro-borda);
+  border-color: var(--border);
   padding: 10px;
   white-space: normal;
   color: var(--foreground);
   background-color: var(--card);
-  box-shadow: var(--vidro-elevacao);
   text-align: center;
   transition:
     background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    border-color 180ms ease;
 }
 
 .gatilho:where([data-situacao="concluida"]),
@@ -107,11 +105,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    color-mix(in oklab, var(--primary) 70%, var(--foreground)),
-    var(--primary)
-  );
+  background: var(--primary);
   transition: width 180ms ease;
 }
 
@@ -236,10 +230,9 @@
 }
 .blocoSerie {
   min-width: 0;
-  border: 1px solid var(--vidro-borda);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
-  box-shadow: var(--vidro-elevacao);
 }
 .blocoSerie[data-selecionada="true"] {
   border-color: var(--justificada);
@@ -274,7 +267,7 @@
   aspect-ratio: 1;
   align-self: start;
   justify-self: center;
-  border-color: var(--vidro-borda);
+  border-color: var(--border);
   border-radius: 50%;
   padding: 10px;
 }

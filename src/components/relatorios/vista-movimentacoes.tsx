@@ -259,7 +259,7 @@ export default function VistaMovimentacoes({
           </Button>
         ))}
       </div>
-      <div className="superficie-vidro grid gap-4 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="superficie grid gap-4 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {modo === "periodo" ? (
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <div className="min-w-0 space-y-2">
@@ -400,13 +400,13 @@ export default function VistaMovimentacoes({
         dados && (
           <>
             <dl aria-label="Totais de movimentações" className="grid grid-cols-2 gap-3">
-              <div className="superficie-vidro p-4">
+              <div className="superficie p-4">
                 <dt className="text-muted-foreground text-sm">Saídas</dt>
                 <dd className="numerais-tabulares mt-1 text-2xl font-semibold">
                   {dados.totais.saidas}
                 </dd>
               </div>
-              <div className="superficie-vidro p-4">
+              <div className="superficie p-4">
                 <dt className="text-muted-foreground text-sm">Entradas</dt>
                 <dd className="numerais-tabulares mt-1 text-2xl font-semibold">
                   {dados.totais.entradas}
@@ -414,12 +414,12 @@ export default function VistaMovimentacoes({
               </div>
             </dl>
             {dados.turmas.length === 0 ? (
-              <p className="superficie-vidro text-muted-foreground p-6 text-center text-sm">
+              <p className="superficie text-muted-foreground p-6 text-center text-sm">
                 Nenhuma saída ou entrada neste período.
               </p>
             ) : agrupamento === "aluno" ? (
               porAluno.length === 0 ? (
-                <p className="superficie-vidro text-muted-foreground p-6 text-center text-sm">
+                <p className="superficie text-muted-foreground p-6 text-center text-sm">
                   {alunoId === TODOS_OS_ALUNOS
                     ? "Nenhum aluno encontrado com estes filtros."
                     : "Este aluno não tem saídas nem entradas neste período."}
@@ -429,7 +429,7 @@ export default function VistaMovimentacoes({
                   <section
                     key={aluno.alunoId}
                     aria-label={`Aluno ${aluno.alunoNome}`}
-                    className="superficie-vidro min-w-0 overflow-hidden"
+                    className="superficie min-w-0 overflow-hidden"
                   >
                     <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                       <div className="min-w-0">
@@ -457,7 +457,7 @@ export default function VistaMovimentacoes({
                 <section
                   key={`${grupo.turmaId}:${grupo.turmaRotulo}`}
                   aria-label={`Turma ${grupo.turmaRotulo}`}
-                  className="superficie-vidro min-w-0 overflow-hidden"
+                  className="superficie min-w-0 overflow-hidden"
                 >
                   <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                     <h3 className="font-semibold wrap-anywhere">{grupo.turmaRotulo}</h3>

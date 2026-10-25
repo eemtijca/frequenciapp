@@ -288,7 +288,7 @@ export default function IntegracaoSaidas({
       <section
         data-secao="planilha-saidas"
         aria-label="Planilha de entradas e saídas"
-        className="superficie-vidro flex flex-col gap-4 p-4"
+        className="superficie flex flex-col gap-4 p-4"
       >
         <h2 className="font-medium">Planilha de entradas e saídas</h2>
         <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
@@ -457,7 +457,7 @@ export default function IntegracaoSaidas({
       </EtapaPlanilha>
 
       {(abaSelecionada || integracao?.esquema?.aba) && (
-        <div className="superficie-vidro flex flex-col gap-2 p-3">
+        <div className="superficie flex flex-col gap-2 p-3">
           <div>
             <OrganizarPlanilha
               rota="/api/planilha-saidas/organizar"
@@ -469,10 +469,7 @@ export default function IntegracaoSaidas({
       )}
 
       {conectada && (
-        <div
-          data-secao="planilha-entradas-preparo"
-          className="superficie-vidro flex flex-col gap-2 p-3"
-        >
+        <div data-secao="planilha-entradas-preparo" className="superficie flex flex-col gap-2 p-3">
           <p className="text-muted-foreground text-xs">
             A aba Entradas tem as mesmas colunas da aba de saídas.
           </p>
@@ -514,7 +511,7 @@ export default function IntegracaoSaidas({
             </Button>
           )}
         </div>
-        <div className="superficie-vidro flex items-start justify-between gap-3 p-3">
+        <div className="superficie flex items-start justify-between gap-3 p-3">
           <div className="min-w-0">
             <p className="text-sm font-medium">Enviar ao registrar</p>
             <p className="text-muted-foreground text-xs">

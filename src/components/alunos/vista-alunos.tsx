@@ -43,7 +43,7 @@ const GrupoAlunos = memo(function GrupoAlunos({
       initial={semMovimento ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="superficie-vidro overflow-hidden"
+      className="superficie overflow-hidden"
     >
       <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
         <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
@@ -168,7 +168,7 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
       <div
         role="group"
         aria-label="Agrupamento da lista"
-        className="superficie-vidro grid grid-cols-2 gap-1 p-1.5"
+        className="superficie grid grid-cols-2 gap-1 p-1.5"
       >
         {AGRUPAMENTOS.map((opcao) => {
           const ativo = agrupamento === opcao.valor;
@@ -178,7 +178,7 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
               type="button"
               aria-pressed={ativo}
               onClick={() => setAgrupamento(opcao.valor)}
-              className="controle-vidro vidro-discreto pressionavel relative flex min-h-10 items-center justify-center px-2 text-xs font-medium transition-colors"
+              className="controle discreto pressionavel relative flex min-h-10 items-center justify-center px-2 text-xs font-medium transition-colors"
             >
               {opcao.rotulo}
             </button>
@@ -197,7 +197,7 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
       )}
 
       {alunos.length === 0 ? (
-        <div className="superficie-vidro flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhum aluno nas suas turmas</p>
           <p className="text-muted-foreground text-sm">
@@ -205,7 +205,7 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
           </p>
         </div>
       ) : gruposFiltrados.length === 0 ? (
-        <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+        <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
           <p className="font-medium">Nenhum aluno encontrado</p>
           <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
         </div>

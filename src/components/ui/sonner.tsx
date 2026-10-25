@@ -30,7 +30,7 @@ const Toaster = ({ className, toastOptions, ...props }: ToasterProps) => {
         ...toastOptions,
         classNames: {
           ...toastOptions?.classNames,
-          toast: cn("vidro-reflexo", toastOptions?.classNames?.toast),
+          toast: cn("superficie flutuante", toastOptions?.classNames?.toast),
         },
       }}
       {...props}

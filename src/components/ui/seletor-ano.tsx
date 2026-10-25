@@ -101,9 +101,9 @@ export function SeletorAno({
     return cn(
       "pressionavel numerais-tabulares focus-visible:ring-ring/50 flex h-11 items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
       fora && "text-muted-foreground/40 cursor-not-allowed",
-      ano === selecionado && "vidro-selecionado font-semibold",
-      ano !== selecionado && ano === anoAtual && "controle-vidro text-primary font-semibold",
-      ano !== selecionado && ano !== anoAtual && !fora && "vidro-discreto",
+      ano === selecionado && "selecionado font-semibold",
+      ano !== selecionado && ano === anoAtual && "controle text-primary font-semibold",
+      ano !== selecionado && ano !== anoAtual && !fora && "discreto",
     );
   }
 
@@ -118,7 +118,7 @@ export function SeletorAno({
           aria-expanded={aberto}
           aria-label={rotuloAcessivel}
           onClick={() => aoAbrir(!aberto)}
-          className="controle-vidro focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
           <CalendarDays
             size={16}
@@ -146,7 +146,7 @@ export function SeletorAno({
                 setBloco((atual) => Math.max(inicioDoBloco(min), atual - ANOS_POR_BLOCO));
                 setFoco((atual) => Math.max(min, atual - ANOS_POR_BLOCO));
               }}
-              className="controle-vidro focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft size={18} />
             </button>
@@ -161,7 +161,7 @@ export function SeletorAno({
                 setBloco((atual) => Math.min(inicioDoBloco(max), atual + ANOS_POR_BLOCO));
                 setFoco((atual) => Math.min(max, atual + ANOS_POR_BLOCO));
               }}
-              className="controle-vidro focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronRight size={18} />
             </button>
@@ -195,14 +195,14 @@ export function SeletorAno({
               type="button"
               disabled={anoAtual === selecionado || anoAtual < min || anoAtual > max}
               onClick={() => escolher(anoAtual)}
-              className="vidro-discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
+              className="discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
             >
               Ano atual
             </button>
             <button
               type="button"
               onClick={() => setAberto(false)}
-              className="vidro-discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
+              className="discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
             >
               Fechar
             </button>

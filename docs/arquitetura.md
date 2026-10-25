@@ -199,3 +199,4 @@ tests/                      Vitest (unidade e contratos)
 - [ADR-049: regras de frequência dos benefícios configuráveis](adr/049-regras-de-frequencia-dos-beneficios.md)
 
 - [ADR-034: Chamada Parcial e confirmação manual da Seduc](adr/034-chamada-parcial-e-confirmacao-seduc.md)
+- [ADR-054: interface plana sem desfoque](adr/054-interface-plana.md)

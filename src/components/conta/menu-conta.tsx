@@ -62,7 +62,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           aria-label={`Conta de ${usuario.nome}`}
           className="pressionavel focus-visible:ring-ring/50 hover:bg-secondary flex min-h-12 w-full items-center gap-2.5 rounded-2xl px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
-          <span className="vidro-selecionado flex size-10 shrink-0 items-center justify-center rounded-full">
+          <span className="selecionado flex size-10 shrink-0 items-center justify-center rounded-full">
             <span className="text-sm font-semibold" aria-hidden="true">
               {usuario.nome.slice(0, 1).toUpperCase()}
             </span>

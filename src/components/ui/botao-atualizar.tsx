@@ -14,7 +14,7 @@ export interface BotaoAtualizarProps {
   disponivel?: boolean;
   className?: string;
   rotulo?: string;
-  /** Variante e tamanho do botão; o padrão é o ícone de vidro dos cabeçalhos. */
+  /** Variante e tamanho do botão; o padrão é o ícone dos cabeçalhos. */
   variante?: ComponentProps<typeof Button>["variant"];
   tamanho?: ComponentProps<typeof Button>["size"];
   /** Mostra o rótulo ao lado do ícone a partir do breakpoint sm. */

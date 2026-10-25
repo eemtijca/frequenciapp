@@ -508,7 +508,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       </div>
 
       {modoSelecao && (
-        <div className="superficie-vidro flex flex-col gap-3 p-3">
+        <div className="superficie flex flex-col gap-3 p-3">
           <p className="text-muted-foreground text-xs leading-relaxed">
             Mudar a turma de origem não move o aluno. A Grade e a planilha passam a agrupar o
             histórico pela origem escolhida.
@@ -541,7 +541,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         </div>
       )}
 
-      <div className="superficie-vidro overflow-hidden">
+      <div className="superficie overflow-hidden">
         <BarraBusca
           id="busca-gestao-aluno"
           valor={busca}

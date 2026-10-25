@@ -563,7 +563,7 @@ export default function VistaFrequenciaParcial({
       {feriado && (
         <div
           role="status"
-          className="superficie-vidro text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+          className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
         >
           <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
           <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
@@ -608,7 +608,7 @@ export default function VistaFrequenciaParcial({
           Carregando chamada parcial...
         </p>
       ) : (
-        <div className="superficie-vidro overflow-hidden">
+        <div className="superficie overflow-hidden">
           <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
             <span className="numerais-tabulares">
               {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}

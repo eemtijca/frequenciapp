@@ -207,7 +207,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
           Carregando contas...
         </div>
       ) : (usuarios ?? []).length === 0 ? (
-        <div className="superficie-vidro flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
+        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
           <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
           <p className="font-medium">Nenhuma conta além da sua</p>
           <p className="text-muted-foreground text-sm">
@@ -227,7 +227,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
             placeholder="Buscar por nome ou e-mail"
           />
           {usuariosFiltrados.length === 0 ? (
-            <div className="superficie-vidro flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
+            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
               <p className="font-medium">Nenhuma conta encontrada</p>
               <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
             </div>
@@ -243,7 +243,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                     initial={semMovimento ? false : { opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
-                    className={`superficie-vidro overflow-hidden ${usuario.ativo ? "" : "opacity-60"}`}
+                    className={`superficie overflow-hidden ${usuario.ativo ? "" : "opacity-60"}`}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
                       <div className="min-w-0 flex-1">

@@ -174,6 +174,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Removido
 
+- Acabamento de vidro em toda a interface: desfoque, reflexos, brilho interno, transparência de superfície e gradientes decorativos. Superfícies, controles, botões, estados selecionados, roscas e camadas flutuantes passam a usar preenchimento sólido, borda de 1 pixel e raio único, com sombra apenas em diálogos, popovers, menus e toasts. A decisão está na ADR-054.
+
 - Saiu mais cedo deixa de oferecer Gerar comunicado e o texto padronizado aos responsáveis, por orientação da coordenação.
 
 - Integração por Apps Script, publicação manual, controles de token e endereço, rotas antigas e quatro campos do banco. As conexões existentes por Entrar com Google são preservadas; configurações do provedor antigo exigem seleção de arquivo pelo Google (ADR-033).

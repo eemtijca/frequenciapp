@@ -25,7 +25,7 @@ export function GraficoRosca(props: ComponentProps<typeof Rosca>) {
   const fatias = props.fatias.filter((fatia) => fatia.valor > 0);
   if (fatias.length === 0)
     return (
-      <div className="superficie-vidro text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
+      <div className="superficie text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
         {props.vazio ?? "Nenhuma falta registrada"}
       </div>
     );

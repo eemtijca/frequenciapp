@@ -57,7 +57,7 @@ export function CirculoValor({ texto, rotulo, tom = "neutro" }: CirculoValorProp
       className={cn(
         "numerais-tabulares inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full border px-1.5 text-[11px] leading-none font-semibold",
         tom === "falta"
-          ? "vidro-reflexo border-falta bg-falta text-falta-foreground"
+          ? "border-falta bg-falta text-falta-foreground"
           : "bg-secondary text-foreground border-border",
       )}
     >

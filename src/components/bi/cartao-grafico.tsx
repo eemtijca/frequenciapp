@@ -156,7 +156,7 @@ export function CartaoGrafico({
   return (
     <article
       ref={ref}
-      className="superficie-vidro flex h-full min-w-0 flex-col gap-3 p-4"
+      className="superficie flex h-full min-w-0 flex-col gap-3 p-4"
       data-grafico-id={config.id}
       data-bi-carregando={!indisponivel && calculando ? "true" : undefined}
     >

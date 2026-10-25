@@ -44,7 +44,7 @@ export default function GraficoRosca({
 
   if (total === 0) {
     return (
-      <div className="superficie-vidro text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
+      <div className="superficie text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
         {vazio}
       </div>
     );
@@ -62,14 +62,14 @@ export default function GraficoRosca({
               innerRadius="62%"
               outerRadius="96%"
               paddingAngle={2}
-              stroke="var(--vidro-reflexo)"
+              stroke="var(--card)"
               strokeWidth={1}
               isAnimationActive={false}
             >
               {visiveis.map((fatia, indice) => (
                 <Cell
                   key={fatia.nome}
-                  className="grafico-vidro-fatia"
+                  className="grafico-fatia"
                   fill={CORES[indice % CORES.length]}
                   style={{ "--cor-fatia": CORES[indice % CORES.length] } as CSSProperties}
                 />
@@ -78,7 +78,7 @@ export default function GraficoRosca({
             <Tooltip
               content={({ active, payload }) =>
                 active && payload?.length ? (
-                  <div className="superficie-vidro text-foreground max-w-44 px-3 py-2 text-xs break-words whitespace-normal">
+                  <div className="superficie text-foreground max-w-44 px-3 py-2 text-xs break-words whitespace-normal">
                     {payload.map((item) => (
                       <p key={String(item.name)} className="numerais-tabulares">
                         {String(item.name)}: {Number(item.value) || 0}{" "}
@@ -97,7 +97,7 @@ export default function GraficoRosca({
         </ResponsiveContainer>
         <span
           aria-hidden="true"
-          className="superficie-vidro pointer-events-none absolute inset-[24%] flex flex-col items-center justify-center rounded-full"
+          className="superficie pointer-events-none absolute inset-[24%] flex flex-col items-center justify-center rounded-full"
         >
           <strong className="numerais-tabulares text-2xl font-semibold">{total}</strong>
           <span className="text-muted-foreground text-[11px]">{rotuloTotal}</span>
@@ -107,13 +107,13 @@ export default function GraficoRosca({
         {visiveis.map((fatia, indice) => (
           <li
             key={fatia.nome}
-            className="vidro-reflexo flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--vidro-borda)] p-2.5 text-sm"
+            className="superficie flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--border)] p-2.5 text-sm"
           >
             {/* Sem espaço para o nome, os círculos descem para a linha de baixo. */}
             <span className="flex min-w-24 flex-1 items-center gap-2">
               <span
                 aria-hidden="true"
-                className="vidro-reflexo size-2.5 shrink-0 rounded-full"
+                className="size-2.5 shrink-0 rounded-full"
                 style={{ background: CORES[indice % CORES.length] }}
               />
               <span className="min-w-0 flex-1 break-words">
