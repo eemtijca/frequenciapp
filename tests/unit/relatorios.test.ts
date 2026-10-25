@@ -12,6 +12,7 @@ import {
   infrequencia,
   indexarPorDia,
   marcasDoDia,
+  nivelInfrequencia,
   resumoDoDia,
   resumoPorAluno,
 } from "@/domain/relatorios";
@@ -668,5 +669,25 @@ describe("alunosPorFaltas", () => {
       }));
       expect(alunosPorFaltas(alunos, [turma()], soJustificadas, dias, "faltas")).toEqual([]);
     });
+  });
+});
+
+describe("níveis de infrequência do Painel", () => {
+  it.each([
+    [0, "baixa"],
+    [0.099, "baixa"],
+    [0.1, "baixa"],
+    [0.101, "atencao"],
+    [0.2, "atencao"],
+    [0.201, "critica"],
+    [1, "critica"],
+  ] as const)("classifica %s como %s", (taxa, esperado) => {
+    expect(nivelInfrequencia(taxa)).toBe(esperado);
+  });
+
+  it("protege contra valores fora da faixa", () => {
+    expect(nivelInfrequencia(-1)).toBe("baixa");
+    expect(nivelInfrequencia(2)).toBe("critica");
+    expect(nivelInfrequencia(Number.NaN)).toBe("baixa");
   });
 });

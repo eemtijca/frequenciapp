@@ -3,7 +3,16 @@
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e destaque para a infrequência do dia.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarOff, ChartPie, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
+import {
+  CalendarOff,
+  ChartPie,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  LoaderCircle,
+  TriangleAlert,
+} from "lucide-react";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type {
   Aluno,
@@ -26,6 +35,7 @@ import {
   distribuicaoDoDia,
   distribuicaoPorOrigem,
   marcasDoDia,
+  nivelInfrequencia,
   resumoDoDia,
 } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
@@ -56,6 +66,27 @@ const percentual = new Intl.NumberFormat("pt-BR", {
   style: "percent",
   maximumFractionDigits: 1,
 });
+
+const NIVEIS = {
+  baixa: {
+    rotulo: "Dentro do esperado",
+    barra: "bg-primary",
+    texto: "text-primary",
+    Icone: CheckCircle2,
+  },
+  atencao: {
+    rotulo: "Atenção",
+    barra: "bg-alerta",
+    texto: "text-alerta-texto",
+    Icone: TriangleAlert,
+  },
+  critica: {
+    rotulo: "Acima do limite",
+    barra: "bg-falta",
+    texto: "text-falta-texto",
+    Icone: CircleAlert,
+  },
+} as const;
 
 export default function VistaPainel({
   ativo,
@@ -385,26 +416,60 @@ export default function VistaPainel({
               </span>
             )}
           </div>
-          <span
-            className={
-              !feriado && resumo.registrados > 0
-                ? "numerais-tabulares shrink-0 text-3xl font-semibold sm:text-4xl"
-                : "text-muted-foreground shrink-0 text-sm"
-            }
-          >
+          <div className="flex flex-col gap-2">
             {feriado ? (
               <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
                 <CalendarOff aria-hidden="true" className="size-4 shrink-0" />
-                Feriado
+                {feriado.nome}
               </span>
-            ) : carregandoPainel ? (
-              ""
-            ) : resumo.registrados > 0 ? (
-              percentual.format(resumo.infrequencia)
             ) : (
-              "Sem dados"
+              (() => {
+                const nivel =
+                  resumo.registrados > 0 ? nivelInfrequencia(resumo.infrequencia) : null;
+                const config = nivel ? NIVEIS[nivel] : null;
+                const Icone = config?.Icone;
+                const largura = Math.min(100, Math.max(0, resumo.infrequencia * 100));
+                const texto = config
+                  ? `${percentual.format(resumo.infrequencia)} de infrequência, ${config.rotulo.toLowerCase()}`
+                  : "Sem dados";
+                return (
+                  <>
+                    <span
+                      className={
+                        config
+                          ? "numerais-tabulares text-3xl font-semibold sm:text-4xl"
+                          : "text-muted-foreground text-sm"
+                      }
+                    >
+                      {config ? percentual.format(resumo.infrequencia) : "Sem dados"}
+                    </span>
+                    <div
+                      role="progressbar"
+                      aria-label="Infrequência do dia"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.round(largura)}
+                      aria-valuetext={texto}
+                      className="ring-border bg-secondary h-3 w-full overflow-hidden rounded-full ring-1 ring-inset"
+                    >
+                      <div
+                        data-testid="infrequencia-preenchida"
+                        aria-hidden="true"
+                        className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${config?.barra ?? "bg-muted"}`}
+                        style={{ width: `${largura}%` }}
+                      />
+                    </div>
+                    {config && Icone ? (
+                      <span className={`flex items-center gap-1.5 text-xs ${config.texto}`}>
+                        <Icone aria-hidden="true" className="size-4 shrink-0" />
+                        {config.rotulo}
+                      </span>
+                    ) : null}
+                  </>
+                );
+              })()
             )}
-          </span>
+          </div>
         </div>
         <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
       </div>

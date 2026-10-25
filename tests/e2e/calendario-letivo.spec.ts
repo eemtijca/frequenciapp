@@ -338,7 +338,7 @@ test("feriado deixa a cobertura neutra e bloqueia Chamada e Parcial, inclusive n
   const painel = page.getByRole("region", { name: "Painel de frequência", exact: true });
   await escolherDia(page, painel, "dia-painel", "Dia do painel", diaUtil);
   const resumo = painel.getByRole("group", { name: "Resumo do dia", exact: true });
-  await expect(resumo.getByText("Feriado", { exact: true })).toBeVisible();
+  await expect(resumo.getByText(`${PREFIXO} em dia útil`, { exact: true })).toBeVisible();
   await expect(resumo.getByText(/\d+(?:,\d+)?%/)).toHaveCount(0);
   const escola = painel.getByRole("article", { name: /: Toda a escola$/ });
   await expect(escola.getByText(`${PREFIXO} em dia útil`, { exact: true })).toBeVisible();

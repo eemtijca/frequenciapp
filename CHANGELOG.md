@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- O cartão de Infrequência do Painel passa a usar uma barra de medição, com percentual acima, uma única cor por nível e rótulo textual. Até 10% fica verde e Dentro do esperado; acima de 10% até 20% fica âmbar e Atenção; acima de 20% fica vermelho e Acima do limite. A barra tem nome acessível e `aria-valuetext`, e o estado sem chamada salva mostra Sem dados. Os limites ficam em constantes de domínio com teste de fronteira.
+
 - Configurações usam um rascunho único que reúne recursos, origem, notificações globais, acesso dos diretores, ordem do almoço, benefícios, justificativas, liberadores, feriados e chaves do BI. Catálogos deixam de gravar a cada edição: o diálogo de revisão mostra as seções e o salvamento envia um único lote atômico, com revisão otimista por seção e conflito 409 sem gravar nada. Chaves do BI pedem a senha no lote e o segredo aparece uma única vez. Novas rotas `GET /api/configuracoes/completo` e `POST /api/configuracoes/lote`; a migração `20261024123045_revisoes_catalogos` acrescenta `atualizado_em` a justificativas, liberadores e chaves do BI.
 
 - Todas as telas ganham o botão Atualizar tela no cabeçalho, que recarrega só a visão ativa e preserva filtros. Com rascunho pendente, orienta a salvar ou descartar antes de atualizar. O FrequenciBI usa o mesmo botão no desktop e Minhas turmas repete no cabeçalho do diretor.

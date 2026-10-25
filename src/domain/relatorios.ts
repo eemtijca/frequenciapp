@@ -67,6 +67,20 @@ export function infrequencia(contagem: ContagemDia): number {
   return contagem.registrados > 0 ? ausencias(contagem) / contagem.registrados : 0;
 }
 
+/** Faixas do cartão de Infrequência do Painel. */
+export const LIMIAR_INFREQUENCIA_ATENCAO = 0.1;
+export const LIMIAR_INFREQUENCIA_CRITICA = 0.2;
+
+export type NivelInfrequencia = "baixa" | "atencao" | "critica";
+
+/** Classifica a taxa de infrequência em baixa, atenção ou crítica. */
+export function nivelInfrequencia(taxa: number): NivelInfrequencia {
+  const normalizada = Number.isFinite(taxa) ? Math.min(1, Math.max(0, taxa)) : 0;
+  if (normalizada <= LIMIAR_INFREQUENCIA_ATENCAO) return "baixa";
+  if (normalizada <= LIMIAR_INFREQUENCIA_CRITICA) return "atencao";
+  return "critica";
+}
+
 /** Resumo do dia com ausências, saídas e taxa. */
 export interface ResumoDia extends ContagemDia {
   ausencias: number;
