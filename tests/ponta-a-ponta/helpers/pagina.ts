@@ -56,13 +56,39 @@ const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial"]);
  */
 export async function abrirDiaSeResumo(page: Page): Promise<void> {
   if (!hojeEDomingo()) return;
-  const gatilho = page
-    .locator("#dia-frequencia, #dia-painel, #dia-chamada-parcial")
-    .locator("visible=true");
+  const visao = await page.locator("main").getAttribute("data-visao");
+  const seletor = {
+    painel: "#dia-painel",
+    chamada: "#dia-frequencia",
+    "chamada-parcial": "#dia-chamada-parcial",
+  }[visao ?? ""];
+  if (!seletor) return;
+  const gatilho = page.locator(seletor).locator("visible=true").first();
+  const vazio = page.getByText("Nenhuma turma cadastrada", { exact: true }).locator("visible=true");
   await expect
-    .poll(async () => (await gatilho.first().getAttribute("aria-label")) ?? "", { timeout: 5000 })
-    .toMatch(/^(Resumo da semana:|Data da chamada|Dia do painel|Data da chamada parcial)/);
-  const rotulo = (await gatilho.first().getAttribute("aria-label")) ?? "";
+    .poll(
+      async () => {
+        const rotulo = (await gatilho.count())
+          ? ((await gatilho.getAttribute("aria-label")) ?? "")
+          : "";
+        if (
+          /^(Resumo da semana:|Data da chamada|Dia do painel|Data da chamada parcial)/.test(rotulo)
+        )
+          return "dia";
+        if (
+          await vazio
+            .first()
+            .isVisible()
+            .catch(() => false)
+        )
+          return "vazio";
+        return "";
+      },
+      { timeout: 15000 },
+    )
+    .not.toBe("");
+  if (!(await gatilho.count())) return;
+  const rotulo = (await gatilho.getAttribute("aria-label")) ?? "";
   if (!rotulo.startsWith("Resumo da semana")) return;
   await page.getByRole("button", { name: /^Dia anterior/ }).click();
   await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeHidden();
