@@ -1,7 +1,12 @@
 // Barra de salvamento da Chamada compacta e atualização global da tela ativa.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 
@@ -17,6 +22,7 @@ for (const [nome, largura, altura] of [
     await page.setViewportSize({ width: largura, height: altura });
     await page.goto("/?visao=chamada");
     await aguardarHidratacao(page);
+    await abrirDiaSeResumo(page);
     const chamada = page.getByRole("region", { name: "Fazer chamada", exact: true });
     await expect(chamada.getByText("E2E Aluno Um")).toBeVisible();
     await liberarSabadoSeNecessario(chamada);

@@ -196,22 +196,37 @@ const esquemaCopia = z.object({
   frequenciasParciais: z.array(esquemaParcial).max(50000).optional(),
   saidas: z
     .array(
-      z.object({
-        id: uuid,
-        alunoId: uuid,
-        dia,
-        momento: z
-          .string()
-          .trim()
-          .max(20)
-          .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-        horario: z.string().refine(ehHorarioEntrada, "Horário da saída inválido.").nullish(),
-        justificativa: z.string().trim().min(1).max(10).nullish(),
-        observacao: z.string().trim().max(200).nullish(),
-        texto: z.string().trim().max(100).nullish(),
-        liberadoPorId: uuid.nullish(),
-        liberadoPorCodigo: z.string().trim().max(20).nullish(),
-      }),
+      z
+        .object({
+          id: uuid,
+          alunoId: uuid,
+          dia,
+          momento: z
+            .string()
+            .trim()
+            .max(20)
+            .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+          horario: z.string().refine(ehHorarioEntrada, "Horário da saída inválido.").nullish(),
+          justificativa: z.string().trim().min(1).max(10).nullish(),
+          observacao: z.string().trim().max(200).nullish(),
+          texto: z.string().trim().max(100).nullish(),
+          liberadoPorId: uuid.nullish(),
+          liberadoPorCodigo: z.string().trim().max(20).nullish(),
+          assinaturaSeduc: z
+            .string()
+            .regex(/^[a-f0-9]{64}$/)
+            .nullish(),
+          registradoSeducEm: instante.nullish(),
+          registradoSeducPorNome: z.string().trim().min(1).max(200).nullish(),
+          revisaoSeduc: z.number().int().min(0).max(999999).optional(),
+        })
+        .refine(
+          (saida) =>
+            saida.assinaturaSeduc != null
+              ? saida.registradoSeducEm != null && saida.registradoSeducPorNome != null
+              : saida.registradoSeducEm == null && saida.registradoSeducPorNome == null,
+          "Confira a confirmação da saída na Seduc.",
+        ),
     )
     .max(50000),
   entradas: z
@@ -444,6 +459,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         texto: true,
         liberadoPorId: true,
         liberadoPorCodigo: true,
+        assinaturaSeduc: true,
+        registradoSeducEm: true,
+        registradoSeducPorNome: true,
+        revisaoSeduc: true,
       },
     }),
     banco().entradaAtrasada.findMany({
@@ -522,6 +541,7 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
     saidas: saidas.map((saida) => ({
       ...saida,
       dia: saida.dia.toISOString().slice(0, 10),
+      registradoSeducEm: saida.registradoSeducEm?.toISOString() ?? null,
     })),
     entradas: entradas.map((entrada) => ({
       ...entrada,
@@ -1135,6 +1155,10 @@ async function mesclarCopia(
           observacao: true,
           texto: true,
           liberadoPorCodigo: true,
+          assinaturaSeduc: true,
+          registradoSeducEm: true,
+          registradoSeducPorNome: true,
+          revisaoSeduc: true,
         },
       });
       if (atual) {
@@ -1144,13 +1168,29 @@ async function mesclarCopia(
           atual.justificativa === codigo &&
           (atual.observacao ?? null) === (saida.observacao ?? null) &&
           (atual.texto ?? null) === texto &&
-          (atual.liberadoPorCodigo ?? null) === codigoLiberacao;
+          (atual.liberadoPorCodigo ?? null) === codigoLiberacao &&
+          (saida.revisaoSeduc === undefined ||
+            (atual.id === saida.id &&
+              atual.revisaoSeduc === saida.revisaoSeduc &&
+              atual.assinaturaSeduc === (saida.assinaturaSeduc ?? null) &&
+              (atual.registradoSeducEm?.toISOString() ?? null) ===
+                (saida.registradoSeducEm ?? null) &&
+              atual.registradoSeducPorNome === (saida.registradoSeducPorNome ?? null)));
         if (igual) resultado.identicas += 1;
         else resultado.conflitos += 1;
         continue;
       }
+      if (await tx.saidaAntecipada.findUnique({ where: { id: saida.id }, select: { id: true } })) {
+        resultado.conflitos += 1;
+        continue;
+      }
       await tx.saidaAntecipada.create({
         data: {
+          id: saida.id,
+          assinaturaSeduc: saida.assinaturaSeduc ?? null,
+          registradoSeducEm: saida.registradoSeducEm ? new Date(saida.registradoSeducEm) : null,
+          registradoSeducPorNome: saida.registradoSeducPorNome ?? null,
+          revisaoSeduc: saida.revisaoSeduc ?? 0,
           alunoId: saida.alunoId,
           dia: diaRepositorio,
           momento: saida.momento,

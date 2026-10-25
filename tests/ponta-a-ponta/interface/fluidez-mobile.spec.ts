@@ -311,10 +311,14 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, perÃ
   page,
 }) => {
   const consultas: string[] = [];
+  const consultaDeUmDia = (urlTexto: string): boolean => {
+    const url = new URL(urlTexto);
+    const de = url.searchParams.get("de");
+    const ate = url.searchParams.get("ate");
+    return url.pathname === "/api/frequencias" && de !== null && de === ate;
+  };
   page.on("request", (pedido) => {
-    const url = new URL(pedido.url());
-    if (url.pathname === "/api/frequencias" && url.searchParams.has("de"))
-      consultas.push(pedido.url());
+    if (consultaDeUmDia(pedido.url())) consultas.push(pedido.url());
   });
   await page.goto("/");
   await aguardarHidratacao(page);
@@ -332,9 +336,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, perÃ
   await page.getByRole("option", { name: new RegExp(`^${turmaA} \\(`) }).click();
   await grade.getByRole("searchbox", { name: "Buscar aluno", exact: true }).fill("alvaro");
   await grade.getByRole("combobox", { name: "PerÃ­odo da consulta", exact: true }).click();
-  const primeira = page.waitForResponse((resposta) =>
-    new URL(resposta.url()).searchParams.has("de"),
-  );
+  const primeira = page.waitForResponse((resposta) => consultaDeUmDia(resposta.url()));
   await page.getByRole("option", { name: "Um dia", exact: true }).click();
   await (await primeira).finished();
   const antes = consultas.length;
@@ -353,9 +355,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, perÃ
   await aguardarQuadros(page);
   expect(consultas).toHaveLength(antes);
 
-  const retomada = page.waitForResponse((resposta) =>
-    new URL(resposta.url()).searchParams.has("de"),
-  );
+  const retomada = page.waitForResponse((resposta) => consultaDeUmDia(resposta.url()));
   await page.getByRole("tab", { name: "Grade", exact: true }).click();
   await (await retomada).finished();
   await expect(grade.getByRole("searchbox", { name: "Buscar aluno", exact: true })).toHaveValue(

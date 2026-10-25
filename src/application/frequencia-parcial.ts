@@ -1,6 +1,7 @@
 // Presenças personalizadas e justificativas por período, com revisão otimista
 // e confirmação manual do lançamento na SEDUC invalidada após correções.
 import { aplicarJustificativaEmChamadasSalvas } from "@/application/justificativas-antecipadas";
+import { conferirBaseSaida, esquemaBaseSaida, invalidarConfirmacaoSaida } from "./saidas-parciais";
 import { z } from "zod";
 import type { Prisma, FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
@@ -43,6 +44,7 @@ export const esquemaRegistroParcial = z
       .default([]),
     observacao: z.string().trim().max(LIMITE_OBSERVACAO_PARCIAL).nullable().optional(),
     revisao: z.number().int().min(0).optional(),
+    baseSaida: esquemaBaseSaida.optional(),
     baseChamada: z
       .object({ turmaId: z.uuid("Turma inválida."), revisao: z.number().int().min(1) })
       .strict()
@@ -50,6 +52,8 @@ export const esquemaRegistroParcial = z
   })
   .strict()
   .superRefine((dados, ctx) => {
+    if (dados.baseSaida && (dados.baseChamada || (dados.ate && dados.ate !== dados.dia)))
+      ctx.addIssue({ code: "custom", message: "Personalize a saída em um único dia." });
     if (
       dados.tipo === "JUSTIFICADA" &&
       (!dados.justificativa ||
@@ -244,6 +248,7 @@ export async function salvarPeriodoParcial(
             atualizadoPorId: identidade.id,
           })),
         });
+        await invalidarConfirmacaoSaida(tx, aluno.id, datas);
         await aplicarJustificativaEmChamadasSalvas(
           tx,
           aluno.id,
@@ -298,6 +303,16 @@ export async function salvarFrequenciaParcial(
       const existente = await tx.frequenciaParcial.findUnique({
         where: { alunoId_dia: { alunoId: dados.data.alunoId, dia } },
       });
+      const saidaBase = dados.data.baseSaida
+        ? await conferirBaseSaida(tx, dados.data.baseSaida)
+        : null;
+      if (
+        saidaBase &&
+        (saidaBase.alunoId !== dados.data.alunoId ||
+          saidaBase.dia !== dados.data.dia ||
+          (dados.data.turmaId && saidaBase.turmaId !== dados.data.turmaId))
+      )
+        throw new ErroHttp("A saída usada como base mudou. Recarregue a lista.", 409);
       if (existente) {
         if (dados.data.revisao !== existente.revisao)
           throw new ErroHttp("Este registro mudou. Recarregue a lista antes de corrigir.", 409);
@@ -323,6 +338,7 @@ export async function salvarFrequenciaParcial(
             registradoSeducPorNome: null,
           },
         });
+        await invalidarConfirmacaoSaida(tx, existente.alunoId, [dia]);
         if (valores.justificativa)
           await aplicarJustificativaEmChamadasSalvas(
             tx,
@@ -376,16 +392,24 @@ export async function salvarFrequenciaParcial(
       if (!aluno) throw new ErroHttp("Aluno não encontrado.", 404);
       if (
         !base &&
+        !saidaBase &&
         (!aluno.ativo ||
           (aluno.desistenteEm && aluno.desistenteEm.toISOString().slice(0, 10) <= dados.data.dia))
       )
         throw new ErroHttp("Este aluno está desativado ou desistente nesta data.", 409);
-      if (!base && dados.data.turmaId && dados.data.turmaId !== aluno.turmaId)
+      if (!base && !saidaBase && dados.data.turmaId && dados.data.turmaId !== aluno.turmaId)
         throw new ErroHttp(
           "Este aluno mudou de turma. Recarregue a lista antes de registrar.",
           409,
         );
-      const turma = base?.turma ?? aluno.turma;
+      const turma =
+        base?.turma ??
+        (saidaBase
+          ? await tx.turma.findUniqueOrThrow({
+              where: { id: saidaBase.turmaId },
+              include: { serie: true },
+            })
+          : aluno.turma);
       const criada = await tx.frequenciaParcial.create({
         data: {
           ...valores,
@@ -398,6 +422,7 @@ export async function salvarFrequenciaParcial(
           atualizadoPorId: identidade.id,
         },
       });
+      await invalidarConfirmacaoSaida(tx, aluno.id, [dia]);
       if (valores.justificativa)
         await aplicarJustificativaEmChamadasSalvas(
           tx,
@@ -478,6 +503,7 @@ export async function removerFrequenciaParcial(
     if (existente.revisao !== dados.data.revisao)
       throw new ErroHttp("Este registro mudou. Recarregue a lista antes de remover.", 409);
     await tx.frequenciaParcial.delete({ where: { id, revisao: existente.revisao } });
+    await invalidarConfirmacaoSaida(tx, existente.alunoId, [existente.dia]);
     // Voltar à presença da chamada exige nova conferência do lançamento na Seduc.
     await tx.alunoDaChamada.updateMany({
       where: {

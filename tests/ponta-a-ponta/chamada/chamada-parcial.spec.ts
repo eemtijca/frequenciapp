@@ -685,10 +685,20 @@ test("agenda uma justificativa futura por início e fim, sem criar presenças e 
     .getByRole("dialog", { name: "Data da chamada parcial", exact: true })
     .getByRole("button", { name: "Hoje", exact: true })
     .click();
-  await expect(secao.locator("#dia-chamada-parcial")).toHaveAttribute(
-    "aria-label",
-    new RegExp(diaDeChamada().split("-").reverse().join("/")),
-  );
+  if (ehDomingo(diaCorrente())) {
+    await expect(
+      secao.getByRole("region", { name: "Resumo da semana", exact: true }),
+    ).toBeVisible();
+    await expect(secao.locator("#dia-chamada-parcial")).toHaveAttribute(
+      "aria-label",
+      /^Resumo da semana:/,
+    );
+  } else {
+    await expect(secao.locator("#dia-chamada-parcial")).toHaveAttribute(
+      "aria-label",
+      new RegExp(diaDeChamada().split("-").reverse().join("/")),
+    );
+  }
 });
 
 test("preenche a primeira Chamada com o motivo agendado e mantém datas futuras bloqueadas na Chamada", async ({

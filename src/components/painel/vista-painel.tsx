@@ -21,13 +21,7 @@ import type {
   Serie,
   Turma,
 } from "@/domain/frequencia";
-import {
-  alunoDesistenteNoDia,
-  diaDeChamadaVizinho,
-  exibirOrigemNaChamada,
-  rotuloDiaSemana,
-  ultimoDiaDeChamada,
-} from "@/domain/frequencia";
+import { alunoDesistenteNoDia, exibirOrigemNaChamada, rotuloDiaSemana } from "@/domain/frequencia";
 import {
   coberturaDoDia,
   desistenciasNoDia,
@@ -40,8 +34,10 @@ import {
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
@@ -100,9 +96,9 @@ export default function VistaPainel({
   configuracoes,
   onRecarregar,
 }: Props) {
-  // Domingo não tem chamada: aos domingos o painel abre no sábado anterior.
-  const diaPadrao = ultimoDiaDeChamada(diaCorrente);
-  const [dia, setDia] = useState(diaPadrao);
+  // No domingo, o painel abre no resumo da semana encerrada.
+  const nav = useNavegacaoDoDia({ diaCorrente, max: diaCorrente });
+  const dia = nav.dia;
   const [doDia, setDoDia] = useState<{
     dia: string;
     frequencias: Frequencia[];
@@ -126,7 +122,7 @@ export default function VistaPainel({
       : feriadoCadastrado;
 
   useEffect(() => {
-    if (!ativo) return;
+    if (!ativo || nav.resumo) return;
     const controlador = new AbortController();
     let viva = true;
     async function buscar() {
@@ -168,7 +164,7 @@ export default function VistaPainel({
       viva = false;
       controlador.abort();
     };
-  }, [ativo, compartilhado, dia, recarregar, nomeFeriadoNoCadastro]);
+  }, [ativo, compartilhado, dia, recarregar, nomeFeriadoNoCadastro, nav.resumo]);
 
   const frequenciasDoDia = useMemo(
     () =>
@@ -360,7 +356,7 @@ export default function VistaPainel({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia anterior"
-          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, -1))}
+          onClick={() => nav.anterior()}
         >
           <ChevronLeft size={18} />
         </Button>
@@ -368,13 +364,18 @@ export default function VistaPainel({
           <SeletorPeriodo
             id="dia-painel"
             modo="dia"
-            valor={dia}
+            valor={nav.resumo ? "" : dia}
             max={diaCorrente}
             semDomingo
-            rotuloAcessivel="Dia do painel"
-            rotulo={rotuloDia}
-            detalhe={diaDaSemana}
-            onValor={setDia}
+            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Dia do painel"}
+            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
+            detalhe={nav.resumo ? "semana" : diaDaSemana}
+            aoHoje={() => {
+              setCarregando(false);
+              nav.voltarParaHoje();
+            }}
+            hojeAtivo={nav.resumo || dia === diaCorrente}
+            onValor={(proximo) => nav.escolherDia(proximo)}
           />
         </div>
         <Button
@@ -382,144 +383,161 @@ export default function VistaPainel({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia seguinte"
-          disabled={dia >= diaPadrao}
-          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
+          disabled={nav.seguinteDesabilitado}
+          onClick={() => nav.seguinte()}
         >
           <ChevronRight size={18} />
         </Button>
       </div>
-      {dia !== diaPadrao && (
+      {nav.mostrarVoltar && (
         <button
           type="button"
-          onClick={() => setDia(diaPadrao)}
+          onClick={() => {
+            setCarregando(false);
+            nav.voltarParaHoje();
+          }}
           className="text-primary pressionavel self-start text-sm font-medium hover:underline"
         >
           Voltar para hoje
         </button>
       )}
 
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+      {nav.resumo && nav.semana ? (
+        <VistaResumoSemana
+          turmas={turmas}
+          alunos={alunos}
+          dias={nav.semana}
+          feriados={configuracoes.feriados}
+          mostrarSaidas={configuracoes.saidaAntecipada}
+          versao={recarregar}
+          onAbrirDia={(proximo) => nav.escolherDia(proximo)}
+        />
+      ) : (
+        <>
+          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
-      <div className="grid grid-cols-2 items-stretch gap-3">
-        <div
-          role="group"
-          className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
-          aria-label="Resumo do dia"
-          aria-busy={carregandoPainel}
-        >
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="text-sm font-medium sm:text-base">Infrequência</h2>
-            {!feriado && !carregandoPainel && resumo.parciais > 0 && (
-              <span className="text-muted-foreground text-xs">
-                {resumo.parciais}{" "}
-                {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-col gap-2">
-            {feriado ? (
-              <IndicadorFeriado nome={feriado.nome} />
-            ) : (
-              (() => {
-                const nivel =
-                  resumo.registrados > 0 ? nivelInfrequencia(resumo.infrequencia) : null;
-                const config = nivel ? NIVEIS[nivel] : null;
-                const Icone = config?.Icone;
-                const largura = Math.min(100, Math.max(0, resumo.infrequencia * 100));
-                const texto = config
-                  ? `${percentual.format(resumo.infrequencia)} de infrequência, ${config.rotulo.toLowerCase()}`
-                  : "Sem dados";
-                return (
-                  <>
-                    <span
-                      className={
-                        config
-                          ? "numerais-tabulares text-3xl font-semibold sm:text-4xl"
-                          : "text-muted-foreground text-sm"
-                      }
-                    >
-                      {config ? percentual.format(resumo.infrequencia) : "Sem dados"}
-                    </span>
-                    <div
-                      role="progressbar"
-                      aria-label="Infrequência do dia"
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={Math.round(largura)}
-                      aria-valuetext={texto}
-                      className="ring-border bg-secondary h-3 w-full overflow-hidden rounded-full ring-1 ring-inset"
-                    >
-                      <div
-                        data-testid="infrequencia-preenchida"
-                        aria-hidden="true"
-                        className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${config?.barra ?? "bg-muted"}`}
-                        style={{ width: `${largura}%` }}
-                      />
-                    </div>
-                    {config && Icone ? (
-                      <span className={`flex items-center gap-1.5 text-xs ${config.texto}`}>
-                        <Icone aria-hidden="true" className="size-4 shrink-0" />
-                        {config.rotulo}
-                      </span>
-                    ) : null}
-                  </>
-                );
-              })()
-            )}
-          </div>
-        </div>
-        <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
-      </div>
-
-      <FaixaGraficos
-        ativo={ativo}
-        onCartaoAtivo={setCartaoAtivo}
-        cartoes={[
-          { id: "escola", nome: "Toda a escola", conteudo: graficoDoDia(null) },
-          ...series.map((serie) => ({
-            id: serie.id,
-            nome: serie.nome,
-            conteudo: graficoDoDia(serie),
-          })),
-          {
-            id: "personalizado",
-            nome: "Personalizado",
-            conteudo: (
-              <VistaPeriodo
-                diaCorrente={diaCorrente}
-                series={series}
-                turmas={turmas}
-                alunos={alunos}
-              />
-            ),
-          },
-          {
-            id: "desistentes",
-            nome: "Desistentes",
-            conteudo: (
-              <div className="superficie flex flex-col gap-4 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="sr-only">Desistentes até este dia</h2>
-                  <span className="numerais-tabulares text-muted-foreground shrink-0 text-sm whitespace-nowrap">
-                    {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
+          <div className="grid grid-cols-2 items-stretch gap-3">
+            <div
+              role="group"
+              className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
+              aria-label="Resumo do dia"
+              aria-busy={carregandoPainel}
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <h2 className="text-sm font-medium sm:text-base">Infrequência</h2>
+                {!feriado && !carregandoPainel && resumo.parciais > 0 && (
+                  <span className="text-muted-foreground text-xs">
+                    {resumo.parciais}{" "}
+                    {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
                   </span>
-                </div>
-                <GraficoRosca
-                  titulo="Desistentes por série"
-                  fatias={desistencias.series.map((serie) => ({
-                    nome: serie.nome,
-                    valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
-                  }))}
-                  rotuloTotal="desistentes"
-                  unidadeSingular="desistente"
-                  unidadePlural="desistentes"
-                  vazio="Nenhum aluno desistente até este dia"
-                />
+                )}
               </div>
-            ),
-          },
-        ]}
-      />
+              <div className="flex flex-col gap-2">
+                {feriado ? (
+                  <IndicadorFeriado nome={feriado.nome} />
+                ) : (
+                  (() => {
+                    const nivel =
+                      resumo.registrados > 0 ? nivelInfrequencia(resumo.infrequencia) : null;
+                    const config = nivel ? NIVEIS[nivel] : null;
+                    const Icone = config?.Icone;
+                    const largura = Math.min(100, Math.max(0, resumo.infrequencia * 100));
+                    const texto = config
+                      ? `${percentual.format(resumo.infrequencia)} de infrequência, ${config.rotulo.toLowerCase()}`
+                      : "Sem dados";
+                    return (
+                      <>
+                        <span
+                          className={
+                            config
+                              ? "numerais-tabulares text-3xl font-semibold sm:text-4xl"
+                              : "text-muted-foreground text-sm"
+                          }
+                        >
+                          {config ? percentual.format(resumo.infrequencia) : "Sem dados"}
+                        </span>
+                        <div
+                          role="progressbar"
+                          aria-label="Infrequência do dia"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round(largura)}
+                          aria-valuetext={texto}
+                          className="ring-border bg-secondary h-3 w-full overflow-hidden rounded-full ring-1 ring-inset"
+                        >
+                          <div
+                            data-testid="infrequencia-preenchida"
+                            aria-hidden="true"
+                            className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${config?.barra ?? "bg-muted"}`}
+                            style={{ width: `${largura}%` }}
+                          />
+                        </div>
+                        {config && Icone ? (
+                          <span className={`flex items-center gap-1.5 text-xs ${config.texto}`}>
+                            <Icone aria-hidden="true" className="size-4 shrink-0" />
+                            {config.rotulo}
+                          </span>
+                        ) : null}
+                      </>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+            <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
+          </div>
+
+          <FaixaGraficos
+            ativo={ativo}
+            onCartaoAtivo={setCartaoAtivo}
+            cartoes={[
+              { id: "escola", nome: "Toda a escola", conteudo: graficoDoDia(null) },
+              ...series.map((serie) => ({
+                id: serie.id,
+                nome: serie.nome,
+                conteudo: graficoDoDia(serie),
+              })),
+              {
+                id: "personalizado",
+                nome: "Personalizado",
+                conteudo: (
+                  <VistaPeriodo
+                    diaCorrente={diaCorrente}
+                    series={series}
+                    turmas={turmas}
+                    alunos={alunos}
+                  />
+                ),
+              },
+              {
+                id: "desistentes",
+                nome: "Desistentes",
+                conteudo: (
+                  <div className="superficie flex flex-col gap-4 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="sr-only">Desistentes até este dia</h2>
+                      <span className="numerais-tabulares text-muted-foreground shrink-0 text-sm whitespace-nowrap">
+                        {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
+                      </span>
+                    </div>
+                    <GraficoRosca
+                      titulo="Desistentes por série"
+                      fatias={desistencias.series.map((serie) => ({
+                        nome: serie.nome,
+                        valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
+                      }))}
+                      rotuloTotal="desistentes"
+                      unidadeSingular="desistente"
+                      unidadePlural="desistentes"
+                      vazio="Nenhum aluno desistente até este dia"
+                    />
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </>
+      )}
     </section>
   );
 }

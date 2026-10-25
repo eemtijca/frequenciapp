@@ -28,6 +28,8 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 - Pendências da organização das abas antigas são estruturadas, com aluno e links às células. As `resolucoes` identificam homônimos, incluem aluno histórico ausente ou escolhem a marca antiga ou mensal. Essas decisões exigem conferência humana, nova prévia e senha administrativa antes da confirmação. Nenhuma escolha autoriza alterar fórmulas ou notas de destino; uma prévia com pendências nunca permite retirar a origem.
 - As rotas da agenda de notificações usam `Authorization: Bearer <CRON_SECRET>`, sem sessão de usuário.
 
+- A Chamada Parcial inclui saídas antecipadas como itens `SAIDA` de `/api/frequencias-personalizadas`. Apenas aulas concluídas antes do horário contam; ajustes manuais prevalecem. A confirmação manual usa `POST /api/saidas/{id}/seduc` com assinatura e revisão vigentes. Ausência de grade ou horário exige conferência.
+
 ## Optional
 
 - [Arquitetura](https://github.com/eemtijca/frequenciapp/blob/main/docs/arquitetura.md) e [planilha](https://github.com/eemtijca/frequenciapp/blob/main/docs/planilha.md).

@@ -4,7 +4,12 @@ import { expect, test } from "@playwright/test";
 import { rotuloData } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaCorrente, diaDeChamada, tituloResumoDoDia } from "../helpers/dia";
-import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.describe("chamada com saída por aula", () => {
   test.beforeAll(async ({ request }) => {
@@ -78,6 +83,7 @@ test.describe("chamada com saída por aula", () => {
     await expect(painel.getByRole("button", { name: "Resumo do dia" })).toBeVisible();
     await expect(painel.getByRole("button", { name: "Voltar para hoje" })).toBeVisible();
     await painel.getByRole("button", { name: "Voltar para hoje" }).click();
+    await abrirDiaSeResumo(page);
     await expect(gatilhoDia).toHaveAttribute(
       "aria-label",
       new RegExp(`Data da chamada: ${rotuloData(diaDeChamada())}`),

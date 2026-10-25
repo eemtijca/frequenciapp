@@ -1,7 +1,11 @@
 // Planejamento da chamada parcial com conflitos e células preservadas.
 import { describe, expect, it } from "vitest";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
-import type { FrequenciaDaChamada, RegistroPersonalizado } from "@/domain/frequencia-personalizada";
+import type {
+  FrequenciaDaChamada,
+  FrequenciaDaSaida,
+  RegistroPersonalizado,
+} from "@/domain/frequencia-personalizada";
 import { assinarAba, type LeituraAba } from "@/domain/planilha";
 import { ABA_PARCIAL, CABECALHO_PARCIAL, planejarParciais } from "@/domain/planilha-parcial";
 
@@ -622,3 +626,25 @@ function normalizarSemAcento(valor: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase();
 }
+
+it("exporta saídas na mesma linha por aluno e dia, com assinatura e aulas concluídas", () => {
+  const saida: FrequenciaDaSaida = {
+    ...frequencia,
+    tipo: "SAIDA",
+    horario: "08:10",
+    aulas: [1],
+    aulasConferiveis: true,
+    assinatura: "a".repeat(64),
+    revisaoSeduc: 0,
+    observacao: "Saída às 08:10",
+  };
+  const valores = valoresExportados(saida);
+  expect(valores[3]).toBe("Presente · 1ª aula");
+  expect(valores[4]).toBe("Não");
+  expect(valores[6]).toBe("Saída às 08:10");
+  expect(valores[7]).toBe(codigo(saida));
+  expect(valores[8]).toBe(`saida:${saida.assinatura}:seduc:0`);
+  expect(valoresExportados({ ...saida, aulas: [], aulasConferiveis: false })[3]).toBe(
+    "Saída · conferir aulas",
+  );
+});

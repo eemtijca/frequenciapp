@@ -699,6 +699,7 @@ export default function Aplicacao({
             ativa={ativo}
             fuso={fuso}
             feriados={configuracoes.feriados}
+            mostrarSaidas={configuracoes.saidaAntecipada}
             justificativas={justificativas}
             onFrequenciasMudaram={() => recarregarFrequencias(mes)}
             onPendencia={registrarPendenciaParcial}

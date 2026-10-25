@@ -22,10 +22,13 @@ interface Props {
   feriado?: string;
   /** Bloqueia a troca (alterações por salvar, carregamento ou salvamento). */
   travado: boolean;
+  /** Domingo com o resumo da semana: não há chamada do dia para conferir. */
+  semCobertura?: boolean;
   onEscolher: (turmaId: string) => void;
 }
 
-type Situacao = "carregando" | "indisponivel" | "sem-alunos" | "pendente" | "concluida" | "feriado";
+type Situacao =
+  "carregando" | "indisponivel" | "sem-alunos" | "pendente" | "concluida" | "feriado" | "semana";
 
 const ROTULOS: Record<Situacao, string> = {
   carregando: "Conferindo chamadas",
@@ -34,6 +37,7 @@ const ROTULOS: Record<Situacao, string> = {
   pendente: "Chamada pendente",
   concluida: "Chamada salva",
   feriado: "Feriado, sem chamada prevista",
+  semana: "Resumo da semana",
 };
 
 function nomeDaSerie(nome: string): string {
@@ -64,6 +68,7 @@ export function SeletorTurmaChamada({
   temAlteracoes,
   feriado,
   travado,
+  semCobertura = false,
   onEscolher,
 }: Props) {
   const id = useId();
@@ -109,6 +114,7 @@ export function SeletorTurmaChamada({
   }, [participantes]);
 
   function situacaoDe(total: number, concluida: boolean): Situacao {
+    if (semCobertura) return "semana";
     if (feriado) return "feriado";
     if (total === 0) return "sem-alunos";
     if (!coberturaDisponivel) return carregando ? "carregando" : "indisponivel";
@@ -129,8 +135,11 @@ export function SeletorTurmaChamada({
       total,
       turmasDaSerie.every((item) => item.concluida),
     );
-    const percentual = !feriado && coberturaDisponivel && total > 0 ? progresso : null;
-    const descricao = `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
+    const percentual =
+      !semCobertura && !feriado && coberturaDisponivel && total > 0 ? progresso : null;
+    const descricao = semCobertura
+      ? `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS.semana}.`
+      : `${total} ${total === 1 ? "aluno" : "alunos"}. ${ROTULOS[situacao]}${feriado ? `. ${feriado}.` : coberturaDisponivel && total > 0 ? `. ${progresso}% concluído. ${turmasDaSerie.map((item) => `${item.turma.rotulo}: ${item.concluida ? "chamada salva" : "chamada pendente"}`).join("; ")}` : "."}`;
     return {
       grupo,
       nome: nomeDaSerie(grupo.nome),
@@ -144,7 +153,7 @@ export function SeletorTurmaChamada({
   const totalGeral = resumos.reduce((soma, resumo) => soma + resumo.total, 0);
   const registradosGeral = resumos.reduce((soma, resumo) => soma + resumo.registrados, 0);
   const progressoGeral =
-    !feriado && coberturaDisponivel && totalGeral > 0
+    !semCobertura && !feriado && coberturaDisponivel && totalGeral > 0
       ? Math.floor((registradosGeral * 100) / totalGeral)
       : null;
   const situacaoGeral = situacaoDe(totalGeral, registradosGeral === totalGeral);

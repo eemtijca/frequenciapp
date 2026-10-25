@@ -244,3 +244,40 @@ describe("cópia JSON da chamada parcial", () => {
     ).toHaveLength(0);
   });
 });
+
+it("preserva identidade e conferência das saídas e aceita cópia antiga sem apagá-las", async () => {
+  const id = randomUUID();
+  const dados = novaCopia();
+  dados.frequenciasParciais = [];
+  dados.saidas = [
+    {
+      id,
+      alunoId,
+      dia: "2026-06-18",
+      momento: "aula_2",
+      horario: "08:10",
+      texto: "QA Saída da cópia",
+      assinaturaSeduc: "a".repeat(64),
+      registradoSeducEm: "2026-06-18T15:00:00.000Z",
+      registradoSeducPorNome: "QA Coordenação",
+      revisaoSeduc: 1,
+    },
+  ];
+  expect((await restaurar(dados)).adicionadas).toBe(1);
+  expect((await restaurar(dados)).conflitos).toBe(0);
+  const antiga = structuredClone(dados);
+  const saida = antiga.saidas[0];
+  if (!saida) throw new Error("Saída sintética ausente.");
+  delete saida.assinaturaSeduc;
+  delete saida.registradoSeducEm;
+  delete saida.registradoSeducPorNome;
+  delete saida.revisaoSeduc;
+  expect((await restaurar(antiga)).conflitos).toBe(0);
+  const exportada = await chamar("/api/backup/exportar", { senha: "DirecaoFrequencia2026" });
+  expect(exportada.status).toBe(200);
+  const copia = (await exportada.json()) as CopiaFrequenciapp;
+  expect(copia.saidas.find((s) => s.id === id)).toMatchObject(dados.saidas[0] ?? {});
+  const divergente = structuredClone(dados);
+  if (divergente.saidas[0]) divergente.saidas[0].revisaoSeduc = 2;
+  expect((await restaurar(divergente)).conflitos).toBe(1);
+});
