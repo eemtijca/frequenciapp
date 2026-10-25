@@ -1,7 +1,8 @@
 // Cobertura das chamadas com barra ponderada pelos alunos e pendências por turma.
-import { CalendarOff, CheckCircle2, ChevronDown, Clock3 } from "lucide-react";
+import { CheckCircle2, ChevronDown, Clock3 } from "lucide-react";
 import { useId } from "react";
 import type { CoberturaTurmaDia } from "@/domain/relatorios";
+import { IndicadorFeriado } from "@/components/painel/indicador-feriado";
 
 interface Props {
   turmas: CoberturaTurmaDia[];
@@ -18,13 +19,8 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
         className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
       >
         <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
-        <div className="flex items-center gap-2.5">
-          <div className="text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-full border sm:size-14">
-            <CalendarOff aria-hidden="true" className="size-5" />
-          </div>
-          <span className="text-muted-foreground text-xs break-words sm:text-sm">{feriado}</span>
-          <span className="sr-only">Não há chamadas pendentes nesta data.</span>
-        </div>
+        <IndicadorFeriado nome={feriado} />
+        <span className="sr-only">Não há chamadas pendentes nesta data.</span>
       </div>
     );
   }

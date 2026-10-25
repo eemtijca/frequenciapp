@@ -4,7 +4,6 @@
 // e destaque para a infrequência do dia.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CalendarOff,
   ChartPie,
   CheckCircle2,
   ChevronLeft,
@@ -47,6 +46,7 @@ import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
+import { IndicadorFeriado } from "@/components/painel/indicador-feriado";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
@@ -418,10 +418,7 @@ export default function VistaPainel({
           </div>
           <div className="flex flex-col gap-2">
             {feriado ? (
-              <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-                <CalendarOff aria-hidden="true" className="size-4 shrink-0" />
-                {feriado.nome}
-              </span>
+              <IndicadorFeriado nome={feriado.nome} />
             ) : (
               (() => {
                 const nivel =
