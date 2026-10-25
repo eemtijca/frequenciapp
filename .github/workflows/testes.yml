@@ -90,7 +90,7 @@ jobs:
             -e ADMIN_EMAIL=bootstrap@escola.exemplo \
             -e ADMIN_SENHA=BootstrapFrequencia2026 \
             -e ADMIN_NOME=Bootstrap \
-            app node scripts/criar-admin.mjs --somente-criar
+            app node scripts/administracao/criar-admin.mjs --somente-criar
 
       - name: Criar administrador de teste
         env:

@@ -6,7 +6,7 @@ import { ambiente } from "@/infra/ambiente";
 import { ErroHttp } from "@/infra/erros";
 import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comPausasDeLeituraGoogle } from "@/infra/google/planilhas-limites";
 import { comTravaPlanilhaMovimentacoes } from "@/infra/trava-planilha-movimentacoes";
 import { detectarEsquema, assinarAba, colunasDoIntervalo } from "@/domain/planilha";
 import { detectarEsquemaSaida } from "@/domain/planilha-saidas";

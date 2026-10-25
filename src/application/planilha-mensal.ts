@@ -7,7 +7,7 @@ import { ErroHttp } from "@/infra/erros";
 import { auditar } from "@/infra/auditoria";
 import { comTransacao } from "@/infra/transacoes";
 import { limiteDeTentativas } from "@/infra/auth/limite";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comPausasDeLeituraGoogle } from "@/infra/google/planilhas-limites";
 import { comTravaPlanilhaFrequencia } from "@/infra/trava-planilha-frequencia";
 import { mesValido, type AbaMensalPlanilha } from "@/domain/planilha-mensal";
 import { hashTexto } from "@/domain/planilha";

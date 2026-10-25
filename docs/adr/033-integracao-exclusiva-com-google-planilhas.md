@@ -21,4 +21,6 @@ A administração usa Entrar com Google. Manter publicação manual de Apps Scri
 
 A administração mantém uma única forma de conexão. Instalações que usavam apenas o provedor antigo precisam selecionar a planilha por Entrar com Google antes de ativar o envio. Remover o código do aplicativo não apaga implantações externas do projeto Google nem abas da escola.
 
+Os últimos arquivos locais de `gas/` foram removidos do repositório. As ADRs 016, 019, 023, 024, 025 e 032 permanecem como registro histórico da integração antiga.
+
 A Sheets API não oferece escrita condicionada ao valor anterior de uma célula. As prévias, releituras e a orientação de conferência após resposta perdida continuam necessárias; nenhuma escrita é repetida automaticamente.

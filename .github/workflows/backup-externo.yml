@@ -33,7 +33,7 @@ jobs:
           BACKUP_DESTINO: ${{ secrets.BACKUP_DESTINO }}
           BACKUP_CHAVE: ${{ secrets.BACKUP_CHAVE }}
           RCLONE_CONFIG_PASS: ${{ secrets.RCLONE_CONFIG_PASS }}
-        run: bash scripts/backup-actions.sh --validar
+        run: bash scripts/backup/backup-actions.sh --validar
 
       - name: Setup pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -58,8 +58,8 @@ jobs:
           BACKUP_DESTINO: ${{ secrets.BACKUP_DESTINO }}
           BACKUP_CHAVE: ${{ secrets.BACKUP_CHAVE }}
           RCLONE_CONFIG_PASS: ${{ secrets.RCLONE_CONFIG_PASS }}
-        run: bash scripts/backup-actions.sh
+        run: bash scripts/backup/backup-actions.sh
 
       - name: Remover configuração e temporários
         if: always() && steps.checkout.outcome == 'success'
-        run: bash scripts/backup-actions.sh --limpar
+        run: bash scripts/backup/backup-actions.sh --limpar

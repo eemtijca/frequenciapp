@@ -8,8 +8,8 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
-import { acessoGoogle, esquecerAcessoGoogle } from "@/infra/google-oauth";
-import { executarAcaoGoogle } from "@/infra/google-planilhas-api";
+import { acessoGoogle, esquecerAcessoGoogle } from "@/infra/google/oauth";
+import { executarAcaoGoogle } from "@/infra/google/planilhas-api";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
 import { mesValido } from "@/domain/planilha-mensal";
 

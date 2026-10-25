@@ -5,7 +5,7 @@ extends:
 
 rules:
   # As sondas de saúde e de sessão respondem apenas 200; a guarda
-  # tests/unit/openapi.test.ts exige 4xx nas demais operações.
+  # tests/unidade/interface/openapi.test.ts exige 4xx nas demais operações.
   operation-4xx-response: warn
 
   # GET /api/backup responde apenas 405 (o download é POST) e o retorno do

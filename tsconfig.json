@@ -41,6 +41,6 @@
     "docker",
     "docs",
     "skills",
-    "tests/e2e"
+    "tests/ponta-a-ponta"
   ]
 }

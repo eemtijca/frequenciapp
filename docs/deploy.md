@@ -140,7 +140,7 @@ O primeiro parâmetro da URL usa `?`; os seguintes usam `&`. Sem o `?`, o sufixo
 
 Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABASE_SCHEMA=preview` como variável de configuração: ela vence o parâmetro da URL e vale para o runtime, os scripts e o migrador. Use uma única forma de seleção por ambiente para evitar divergência.
 
-O provisionamento das roles, do schema e dos default privileges está em [`scripts/provisionar-preview.sql`](../scripts/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
+O provisionamento das roles, do schema e dos default privileges está em [`scripts/banco/provisionar-preview.sql`](../scripts/banco/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
 
 1. Crie o schema de Preview com uma conta administrativa do banco e conceda os privilégios necessários às roles de migração e runtime. Limite essas permissões ao ambiente correspondente.
 2. Em um terminal com as variáveis do Preview, aplique `pnpm exec prisma migrate deploy` e confira `pnpm exec prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.

@@ -8,7 +8,7 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { conferirSenhaDoAdmin } from "./confirmacao-admin";
 import { FRASE_MODO_COMPLETO } from "@/domain/planilha";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+import { comPausasDeLeituraGoogle } from "@/infra/google/planilhas-limites";
 
 export async function limparCopiasDaPlanilha(
   admin: { id: string },

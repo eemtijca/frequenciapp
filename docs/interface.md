@@ -58,7 +58,7 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 
 - Papel neutro quente de fundo, tinta grafite e um único acento verde institucional para presença e ações primárias.
 - O vermelho é estritamente semântico: aparece somente onde comunica falta ou erro.
-- A falta justificada (FJ) usa um azul próprio, os tokens `--justificada`, e não o verde institucional. Vermelho e verde na mesma luminosidade se confundem para quem tem daltonismo vermelho-verde; o par falta e falta justificada é conferido em `tests/unit/paleta.test.ts` nos dois temas, com separação sob daltonismo simulado e contraste AA do texto.
+- A falta justificada (FJ) usa um azul próprio, os tokens `--justificada`, e não o verde institucional. Vermelho e verde na mesma luminosidade se confundem para quem tem daltonismo vermelho-verde; o par falta e falta justificada é conferido em `tests/unidade/interface/paleta.test.ts` nos dois temas, com separação sob daltonismo simulado e contraste AA do texto.
 - Tema claro e escuro com preferência do sistema e troca manual persistida; as duas variações mantêm contraste AA.
 - Raio de canto único (14 px) em cartões, botões e campos; uma única família de forma em toda a interface.
 - Tipografia Plus Jakarta Sans para interface e JetBrains Mono com numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
@@ -113,7 +113,7 @@ Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo
 - Em Gestão > Configurações, títulos e estados identificam as seções. Descrições curtas explicam apenas escolhas que precisam de contexto; instruções repetidas saem da tela. A conexão das planilhas usa Entrar com Google e o seletor de arquivos. Avisos sobre exclusão, restauração e acesso a dados sensíveis permanecem junto das ações e confirmações.
 - Textos de apoio seguem o mesmo critério nas demais telas: Saídas e Entradas usam Escrever e Selecionar tipo para a justificativa, sem repetir a instrução no campo e na ajuda; os limites continuam no contador ou na orientação do campo. Por aluno mantém os títulos dos indicadores sem um subtítulo repetido. Alunos e Notificações preservam explicações curtas sobre administração, conta e dispositivo. Séries mostra a ordem uma vez, com descrição acessível.
 - Números de contagem com singular e plural corretos ("1 falta", "2 faltas").
-- Sem travessão em qualquer texto da interface: ponto, vírgula ou parênteses cumprem o papel. O guarda editorial em `tests/unit/texto-editorial.test.ts` mantém a regra verificada por teste.
+- Sem travessão em qualquer texto da interface: ponto, vírgula ou parênteses cumprem o papel. O guarda editorial em `tests/unidade/interface/texto-editorial.test.ts` mantém a regra verificada por teste.
 
 ## Seletores com busca
 

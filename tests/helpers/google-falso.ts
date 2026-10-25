@@ -2,7 +2,7 @@
 // O aplicativo usa seus clientes reais contra uma planilha em memória.
 import { createServer } from "node:http";
 import type pg from "pg";
-import { cifrarToken } from "../../src/infra/google-oauth";
+import { cifrarToken } from "../../src/infra/google/oauth";
 
 type Objeto = Record<string, unknown>;
 interface Celula {

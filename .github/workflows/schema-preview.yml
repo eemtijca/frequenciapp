@@ -70,7 +70,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
-        run: node scripts/preview-schema.mjs preparar --pr ${{ github.event.pull_request.number }}
+        run: node scripts/banco/preview-schema.mjs preparar --pr ${{ github.event.pull_request.number }}
 
   limpar:
     name: Limpar schema do preview
@@ -100,7 +100,7 @@ jobs:
       - name: Remover o schema do pull request
         env:
           DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
-        run: node scripts/preview-schema.mjs limpar --pr ${{ github.event.pull_request.number }}
+        run: node scripts/banco/preview-schema.mjs limpar --pr ${{ github.event.pull_request.number }}
 
   fallback:
     name: Atualizar schema de fallback
@@ -160,4 +160,4 @@ jobs:
         env:
           DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/preview-schema.mjs faxina
+        run: node scripts/banco/preview-schema.mjs faxina

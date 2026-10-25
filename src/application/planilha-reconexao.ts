@@ -2,8 +2,8 @@
 // O estado assinado identifica a conexão para recusar retornos de uma configuração antiga.
 import { createHash } from "node:crypto";
 import { ErroHttp } from "@/infra/erros";
-import { renovarAcesso } from "@/infra/google-oauth";
-import { lerPlanilhaEscolhida } from "@/infra/google-planilhas";
+import { renovarAcesso } from "@/infra/google/oauth";
+import { lerPlanilhaEscolhida } from "@/infra/google/planilhas";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import {

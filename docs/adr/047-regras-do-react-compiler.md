@@ -21,9 +21,9 @@ Corrigir de verdade o que a regra acerta:
 
 Manter exceções pontuais, com justificativa na própria linha, nos casos em que a regra não distingue o padrão pretendido:
 
-- `src/components/auth/tela-login.tsx`: semente única do e-mail lembrado e do aviso de sessão expirada lida do armazenamento do navegador. Semear durante a renderização do servidor divergiria a hidratação;
+- `src/components/entrada/tela-login.tsx`: semente única do e-mail lembrado e do aviso de sessão expirada lida do armazenamento do navegador. Semear durante a renderização do servidor divergiria a hidratação;
 - `src/components/bi/vista-bi.tsx`: semente única das preferências guardadas, pelo mesmo motivo;
-- `src/components/frequencia/vista-frequencia.tsx`: efeito de carregamento da Chamada, que reinicia o estado antes da busca para nenhuma marca do dia anterior aparecer enquanto a chamada nova não chega;
+- `src/components/chamada/vista-frequencia.tsx`: efeito de carregamento da Chamada, que reinicia o estado antes da busca para nenhuma marca do dia anterior aparecer enquanto a chamada nova não chega;
 - `src/components/gestao/integracao-planilha.tsx`, `src/components/gestao/integracao-parcial.tsx`, `src/components/gestao/integracao-saidas.tsx` e `src/lib/use-dados-bi.ts`: carregamento de montagem por auxiliar assíncrono, cujo veredito muda conforme a estrutura acidental do auxiliar.
 
 Nenhuma regra é desativada no `eslint.config.mjs`. As exceções são locais e cada uma aponta para este ADR.

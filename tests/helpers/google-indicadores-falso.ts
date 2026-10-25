@@ -1,7 +1,7 @@
 // Google sintético com arquivos separados, metadados e respostas perdidas da criação e escrita.
 import { createServer } from "node:http";
 import type pg from "pg";
-import { cifrarToken } from "../../src/infra/google-oauth";
+import { cifrarToken } from "../../src/infra/google/oauth";
 
 type Objeto = Record<string, unknown>;
 const objeto = (v: unknown): Objeto => (v && typeof v === "object" ? (v as Objeto) : {});

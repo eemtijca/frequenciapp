@@ -13,12 +13,12 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import AbaSeries from "@/components/gestao/aba-series";
-import AbaTurmas from "@/components/gestao/aba-turmas";
-import AbaAlunos from "@/components/gestao/aba-alunos";
-import AbaEquipe from "@/components/gestao/aba-equipe";
-import AbaDiretores from "@/components/gestao/aba-diretores";
-import AbaConfiguracoes from "@/components/gestao/aba-configuracoes";
+import AbaSeries from "@/components/gestao/abas/aba-series";
+import AbaTurmas from "@/components/gestao/abas/aba-turmas";
+import AbaAlunos from "@/components/gestao/abas/aba-alunos";
+import AbaEquipe from "@/components/gestao/abas/aba-equipe";
+import AbaDiretores from "@/components/gestao/abas/aba-diretores";
+import AbaConfiguracoes from "@/components/gestao/abas/aba-configuracoes";
 import { avisarInfo } from "@/lib/avisos";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 

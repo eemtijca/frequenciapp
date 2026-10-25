@@ -2,8 +2,8 @@
 "area: chamada":
   - changed-files:
       - any-glob-to-any-file:
-          - "src/components/frequencia/**"
-          - "src/components/frequencia-parcial/**"
+          - "src/components/chamada/**"
+          - "src/components/chamada-parcial/**"
           - "src/components/grade/**"
           - "src/app/api/frequencias/**"
           - "src/app/api/frequencias-parciais/**"
@@ -13,15 +13,20 @@
       - any-glob-to-any-file:
           - "src/components/ui/**"
           - "src/components/painel/**"
-          - "src/app/vidro.css"
+          - "src/components/entrada/**"
+          - "src/components/movimentacoes/**"
+          - "src/components/relatorios/**"
+          - "src/components/alunos/**"
+          - "src/components/diretor/**"
+          - "src/components/bi/**"
+          - "src/app/superficies.css"
           - "src/app/globals.css"
 
 "area: planilhas":
   - changed-files:
       - any-glob-to-any-file:
           - "src/**/planilha*"
-          - "src/**/google-*"
-          - "gas/**"
+          - "src/infra/google/**"
 
 "area: gestao":
   - changed-files:

@@ -37,7 +37,7 @@ done
 # existente, então reiniciar o contêiner não regrava a senha.
 if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_SENHA:-}" ]; then
   echo "[entrada] Verificando o administrador inicial..."
-  node ./scripts/criar-admin.mjs --somente-criar \
+  node ./scripts/administracao/criar-admin.mjs --somente-criar \
     || echo "[entrada] Aviso: falha ao configurar o admin."
 fi
 

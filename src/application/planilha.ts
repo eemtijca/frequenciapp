@@ -8,9 +8,9 @@ import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ambiente } from "@/infra/ambiente";
-import { mensagemParaRegistro } from "@/infra/planilha-erros";
-import { ErroGoogle } from "@/infra/google-planilhas-escrita";
-import { ErroLeituraGoogle, comCacheDeDocumentoGoogle } from "@/infra/google-planilhas-api";
+import { mensagemParaRegistro } from "@/infra/google/planilha-erros";
+import { ErroGoogle } from "@/infra/google/planilhas-escrita";
+import { ErroLeituraGoogle, comCacheDeDocumentoGoogle } from "@/infra/google/planilhas-api";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarFrequenciasDoPeriodo } from "@/application/frequencias";
@@ -47,7 +47,7 @@ import {
 import { diaDaSemanaIso, diasEntre, ehDiaValido, normalizar } from "@/domain/frequencia";
 import { diasLimposDoEnvio, diasSemEnvioConfirmado } from "@/domain/planilha-envios";
 import { diasDaPlanilhaMensal, mesValido } from "@/domain/planilha-mensal";
-import { comPausasDeLeituraGoogle, ehLimiteGoogle } from "@/infra/google-planilhas-limites";
+import { comPausasDeLeituraGoogle, ehLimiteGoogle } from "@/infra/google/planilhas-limites";
 import { comTravaPlanilhaFrequencia } from "@/infra/trava-planilha-frequencia";
 
 const FINALIDADE = "FREQUENCIA" as const;

@@ -13,7 +13,7 @@ import {
 } from "@/domain/planilha-diagnostico";
 import { mesValido } from "@/domain/planilha-mensal";
 import { ErroHttp } from "@/infra/erros";
-import { renovarAcesso } from "@/infra/google-oauth";
+import { renovarAcesso } from "@/infra/google/oauth";
 import {
   lerBlocosGoogle,
   lerDocumentoGoogle,
@@ -21,8 +21,8 @@ import {
   mesclagensDaAba,
   mesclagensDaAssinatura,
   type DocumentoGoogle,
-} from "@/infra/google-planilhas-api";
-import { comPausasDeLeituraGoogle } from "@/infra/google-planilhas-limites";
+} from "@/infra/google/planilhas-api";
+import { comPausasDeLeituraGoogle } from "@/infra/google/planilhas-limites";
 
 const esquemaMes = z.string().refine(mesValido, "Informe um mês válido.");
 const LIMITE_COLUNAS = 400;

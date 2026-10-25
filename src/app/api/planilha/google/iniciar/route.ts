@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { ambiente } from "@/infra/ambiente";
-import { iniciarAutorizacao } from "@/infra/google-oauth";
+import { iniciarAutorizacao } from "@/infra/google/oauth";
 import { iniciarReconexaoGoogle } from "@/application/planilha-reconexao";
 import { mesValido } from "@/domain/planilha-mensal";
 import { corpoJson, erroApi, executarRota, exigirAdmin, json, origemPermitida } from "@/infra/http";
