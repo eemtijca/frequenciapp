@@ -394,7 +394,7 @@ test("no celular, as setas acima dos cartões percorrem os gráficos e respeitam
 test.describe("infrequência do dia", () => {
   test.use({ serviceWorkers: "block" });
 
-  test("distingue ausência de chamadas de zero faltas e calcula a taxa sobre chamadas salvas", async ({
+  test("distingue ausência de chamadas, calcula a taxa e alinha os cartões no feriado", async ({
     page,
   }, testInfo) => {
     const { alunos } = (await (await page.request.get("/api/alunos")).json()) as {
@@ -403,11 +403,12 @@ test.describe("infrequência do dia", () => {
     const nomes = ["E2E Painel Remanejado 1", "E2E Painel Aluno 2", "E2E Painel Remanejado 2"];
     const chamados = alunos.filter((aluno) => nomes.includes(aluno.nome));
     expect(chamados).toHaveLength(3);
-    let estado: "vazio" | "falta" | "presenca" = "vazio";
+    const nomeFeriado = "E2E Painel Dia sem aula";
+    let estado: "vazio" | "falta" | "presenca" | "feriado" = "vazio";
     await page.route("**/api/frequencias?dia=**", async (rota) => {
       const dia = new URL(rota.request().url()).searchParams.get("dia") ?? "";
       const frequencias: Frequencia[] =
-        estado === "vazio"
+        estado === "vazio" || estado === "feriado"
           ? []
           : chamados.map((aluno, indice) => ({
               dia,
@@ -421,7 +422,12 @@ test.describe("infrequência do dia", () => {
                   ? [{ alunoId: aluno.id, horarios: ["aula-sintetica"] }]
                   : [],
             }));
-      await rota.fulfill({ json: { frequencias } });
+      await rota.fulfill({
+        json:
+          estado === "feriado"
+            ? { frequencias, feriado: { dia, nome: nomeFeriado } }
+            : { frequencias },
+      });
     });
     await page.setViewportSize({ width: 320, height: 780 });
     await page.goto("/");
@@ -488,6 +494,37 @@ test.describe("infrequência do dia", () => {
     await expect(barra).toHaveAttribute("aria-valuetext", /0% de infrequência, dentro do esperado/);
     await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-primary/);
     await expect(resumo.getByText("Dentro do esperado", { exact: true })).toBeVisible();
+
+    estado = "feriado";
+    await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(resumo.getByText(nomeFeriado, { exact: true })).toBeVisible();
+    const cobertura = page.getByRole("group", { name: "Cobertura do dia" });
+    await expect(cobertura.getByText(nomeFeriado, { exact: true })).toBeVisible();
+    const iconeInfrequencia = resumo.locator("svg").first().locator("xpath=..");
+    const iconeCobertura = cobertura.locator("svg").first().locator("xpath=..");
+    const [estiloInfrequencia, estiloCobertura] = await Promise.all(
+      [iconeInfrequencia, iconeCobertura].map((elemento) =>
+        elemento.evaluate((no) => {
+          const estilo = getComputedStyle(no);
+          return {
+            borderRadius: estilo.borderRadius,
+            borderWidth: estilo.borderWidth,
+            width: estilo.width,
+            height: estilo.height,
+          };
+        }),
+      ),
+    );
+    expect(estiloInfrequencia).toEqual(estiloCobertura);
+    const [tamanhoFonteInfrequencia, tamanhoFonteCobertura] = await Promise.all([
+      resumo
+        .getByText(nomeFeriado, { exact: true })
+        .evaluate((elemento) => getComputedStyle(elemento).fontSize),
+      cobertura
+        .getByText(nomeFeriado, { exact: true })
+        .evaluate((elemento) => getComputedStyle(elemento).fontSize),
+    ]);
+    expect(tamanhoFonteInfrequencia).toBe(tamanhoFonteCobertura);
   });
 });
 
