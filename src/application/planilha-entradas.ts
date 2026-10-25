@@ -19,7 +19,7 @@ import { ErroHttp } from "@/infra/erros";
 import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
 import { limiteDeTentativas } from "@/infra/auth/limite";
-import { ErroGoogle } from "@/infra/google-planilhas-escrita";
+import { ErroGoogle } from "@/infra/google/planilhas-escrita";
 import {
   comTravaPlanilhaMovimentacoes,
   controleTravaPlanilhaMovimentacoes,

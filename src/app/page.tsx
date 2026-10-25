@@ -13,7 +13,7 @@ import { ambiente } from "@/infra/ambiente";
 import { urlDoIndiceDeAgentes } from "@/infra/documentacao";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
 import { temCapacidade } from "@/domain/usuarios";
-import TelaLogin from "@/components/auth/tela-login";
+import TelaLogin from "@/components/entrada/tela-login";
 import Aplicacao from "@/components/aplicacao";
 import AplicacaoDiretor from "@/components/diretor/aplicacao-diretor";
 import { contextoDoDiretor } from "@/application/diretor-visao";

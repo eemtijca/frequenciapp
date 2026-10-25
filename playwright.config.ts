@@ -9,7 +9,7 @@ const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 const resolverLocalhost = process.env.PLAYWRIGHT_RESOLVER_LOCALHOST === "1";
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./tests/ponta-a-ponta",
   // O PWA roda em configuração própria contra o build de produção.
   testIgnore: /pwa.*\.spec\.ts/,
   fullyParallel: false,
@@ -17,7 +17,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 1,
   workers: 1,
   reporter: [["html", { open: "never" }], ["list"]],
-  globalSetup: "./tests/e2e/global-setup.ts",
+  globalSetup: "./tests/ponta-a-ponta/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 15_000 },
   use: {
@@ -26,7 +26,7 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    storageState: "tests/e2e/.auth/admin.json",
+    storageState: "tests/ponta-a-ponta/.auth/admin.json",
     launchOptions: resolverLocalhost
       ? { args: ["--host-resolver-rules=MAP localhost host.docker.internal"] }
       : undefined,

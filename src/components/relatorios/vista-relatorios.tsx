@@ -12,7 +12,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import VistaHistorico from "@/components/historico/vista-historico";
+import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
 import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";

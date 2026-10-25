@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { idDaIntegracao } from "@/application/planilha-comum";
-import { dadosDoPicker, renovarAcesso } from "@/infra/google-oauth";
+import { dadosDoPicker, renovarAcesso } from "@/infra/google/oauth";
 import { ErroHttp } from "@/infra/erros";
 import { executarRota, exigirAdmin, json } from "@/infra/http";
 

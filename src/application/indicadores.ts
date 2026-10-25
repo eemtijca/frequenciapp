@@ -3,12 +3,12 @@ import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { ErroHttp } from "@/infra/erros";
-import { renovarAcesso } from "@/infra/google-oauth";
+import { renovarAcesso } from "@/infra/google/oauth";
 import {
   conferirPlanilhaIndicadores,
   criarPlanilhaIndicadores,
   substituirIndicadores,
-} from "@/infra/google-indicadores";
+} from "@/infra/google/indicadores";
 import { comTravaPlanilha, type ControleTravaPlanilha } from "@/infra/trava-planilha";
 import { diaLocal } from "@/domain/frequencia";
 import { disciplinasDoHorario } from "@/domain/horarios-semanais";

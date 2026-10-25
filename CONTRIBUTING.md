@@ -201,7 +201,7 @@ A descrição deve conter:
 
 Quando a mudança tocar dependências, autenticação, permissões, workflows ou dados sensíveis, descreva o risco e como ele foi tratado.
 
-Capturas de tela oficiais do README ficam em `docs/imagens/`, são geradas pelo spec `tests/e2e/imagens.spec.ts` com `pnpm run capturas:readme` e entram no versionamento; não edite os PNGs à mão. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento, e não entram nos commits.
+Capturas de tela oficiais do README ficam em `docs/imagens/`, são geradas pelo spec `tests/ponta-a-ponta/interface/imagens.spec.ts` com `pnpm run capturas:readme` e entram no versionamento; não edite os PNGs à mão. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento, e não entram nos commits.
 
 Antes de abrir, rode as verificações locais:
 
@@ -248,7 +248,7 @@ Mescle por squash, em um único commit por pull request. Apague a branch após o
 - Camadas: `src/domain` não importa nada de fora; `src/application` orquestra domínio e infraestrutura; `src/infra` isola Prisma, autenticação e HTTP; `src/app` e `src/components` são apresentação.
 - TypeScript estrito, sem `any` e sem asserções não nulas; o ESLint reprova ambos.
 - Segredos apenas via ambiente, validados na partida por zod (`src/infra/ambiente.ts`).
-- Sem travessão (em-dash ou meia-risca) em nenhum arquivo do repositório: a guarda editorial em `tests/unit/texto-editorial.test.ts` reprova. Use ponto, vírgula ou parênteses.
+- Sem travessão (em-dash ou meia-risca) em nenhum arquivo do repositório: a guarda editorial em `tests/unidade/interface/texto-editorial.test.ts` reprova. Use ponto, vírgula ou parênteses.
 - Cada arquivo próprio começa com um cabeçalho curto, de uma a duas linhas, descrevendo seu papel.
 - Comente apenas trechos não óbvios, como decisões de segurança e cálculos.
 
@@ -292,7 +292,7 @@ pnpm run test:pwa:docker            # PWA
 
 A variável `TEST_BASE_URL` aponta para o aplicativo (padrão `http://localhost:3000`), e `tests/playwright-container.sh` aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Mantenha a versão da imagem igual à do `@playwright/test` em `package.json`.
 
-As capturas oficiais do README são geradas por `tests/e2e/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente aplicada. Regenera pelo comando `pnpm run capturas:readme` (ou `pnpm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; capturas locais de validação vão para `docs/imagens/locais/`.
+As capturas oficiais do README são geradas por `tests/ponta-a-ponta/interface/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente aplicada. Regenera pelo comando `pnpm run capturas:readme` (ou `pnpm run capturas:readme:docker`, na imagem oficial). Os PNGs são versionados e não devem ser editados à mão; capturas locais de validação vão para `docs/imagens/locais/`.
 
 A instalação local de navegadores fica como alternativa:
 
@@ -311,7 +311,7 @@ Mudanças estruturais ganham uma nota curta em [docs/adr/](docs/adr/), com estad
 
 Toda mudança de rota ou de contrato atualiza [docs/openapi.json](docs/openapi.json). Mudanças de convenção também atualizam [docs/api.md](docs/api.md), servido em `GET /api/docs/api.md`, e as orientações de uso por agentes em [public/llms.txt](public/llms.txt). A interface em `GET /api/docs` e a especificação em `GET /api/docs/openapi.json` refletem esses arquivos na hora.
 
-Antes do pull request, rode `pnpm run lint:api` e `pnpm exec vitest run tests/unit/openapi.test.ts`; a guarda reprova rota sem documentação e a repetição do título no topo da descrição.
+Antes do pull request, rode `pnpm run lint:api` e `pnpm exec vitest run tests/unidade/interface/openapi.test.ts`; a guarda reprova rota sem documentação e a repetição do título no topo da descrição.
 
 ### Padrão da documentação
 

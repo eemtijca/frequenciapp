@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
 const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({
-  testDir: "./tests/e2e",
+  testDir: "./tests/ponta-a-ponta",
   testMatch: /pwa.*\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,

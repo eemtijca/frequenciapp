@@ -5,7 +5,7 @@ import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ambiente } from "@/infra/ambiente";
-import { cifrarToken, conferirEstado, trocarCodigo } from "@/infra/google-oauth";
+import { cifrarToken, conferirEstado, trocarCodigo } from "@/infra/google/oauth";
 import { exigirAdmin } from "@/infra/http";
 import { idDaIntegracao } from "@/application/planilha-comum";
 import { concluirReconexaoGoogle } from "@/application/planilha-reconexao";

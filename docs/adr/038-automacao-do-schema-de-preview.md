@@ -13,7 +13,7 @@ O Preview compartilha o database da produção e usa um schema próprio, com os 
 - A limpeza roda no fechamento do pull request e uma faxina semanal derruba schemas órfãos, consultando os pull requests abertos pela API do GitHub.
 - O apontamento da branch é opcional: com `VERCEL_TOKEN`, `VERCEL_PROJECT_ID` e a branch do pull request, o workflow define `DATABASE_SCHEMA=preview_pr_<número>` no escopo da branch e dispara um deployment. Sem o token, o schema é criado e migrado, e a branch usa o fallback até o ajuste manual.
 - O aplicativo continua agnóstico: a seleção de schema vem de `DATABASE_SCHEMA` ou do parâmetro da URL, sem variável de plataforma no código.
-- O script `scripts/preview-schema.mjs` concentra criar, limpar e fiscalizar; o migrador e o `criar-admin` são reaproveitados, com a trava consultiva alinhada ao Prisma CLI.
+- O script `scripts/banco/preview-schema.mjs` concentra criar, limpar e fiscalizar; o migrador e o `criar-admin` são reaproveitados, com a trava consultiva alinhada ao Prisma CLI.
 
 ## Alternativas
 

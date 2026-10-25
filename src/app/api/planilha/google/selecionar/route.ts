@@ -6,8 +6,8 @@ import { idDaIntegracao } from "@/application/planilha-comum";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { renovarAcesso } from "@/infra/google-oauth";
-import { lerPlanilhaEscolhida } from "@/infra/google-planilhas";
+import { renovarAcesso } from "@/infra/google/oauth";
+import { lerPlanilhaEscolhida } from "@/infra/google/planilhas";
 import { corpoJson, erroApi, executarRota, exigirAdmin, json, origemPermitida } from "@/infra/http";
 
 export const dynamic = "force-dynamic";

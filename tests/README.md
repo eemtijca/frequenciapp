@@ -4,7 +4,7 @@ Para os contratos de notificações, gerar chaves sintéticas com `node tests/ge
 
 Suítes do FrequenciApp com Vitest e Playwright.
 
-`tests/api/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/e2e/notificacoes.spec.ts` valida a Gestão e a coordenação; `pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
+`tests/api/notificacoes/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/ponta-a-ponta/notificacoes/notificacoes.spec.ts` valida a Gestão e a coordenação; `tests/ponta-a-ponta/pwa/pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
 
 | Suíte            | Comando              | Pré-requisitos                                             |
 | ---------------- | -------------------- | ---------------------------------------------------------- |
@@ -99,9 +99,9 @@ pnpm run dev            # ou docker compose up -d
 pnpm exec playwright test    # headless, execução serial
 ```
 
-- `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/e2e/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
+- `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/ponta-a-ponta/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
 - `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
-- Helpers em `tests/e2e/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
+- Helpers em `tests/ponta-a-ponta/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
 - Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, seção ativa na barra lateral e no menu do aplicativo, abas da Gestão com toque e teclado, integração com Google Planilhas contra OAuth e Sheets API simulados (conexão Google, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
 - `estados.spec.ts`: verifica 404 e reentrada com aviso de sessão expirada. A consulta de atualização do Painel recebe um 401 real depois do clique; a limpeza do cookie ocorre nessa consulta, para não concorrer com pedidos de fundo. O service worker é bloqueado nesse spec para permitir a interceptação.
 - `entradas.spec.ts`: calendário brasileiro mesmo em navegador inglês, navegação diária, seleção de momento e responsável, chegada atrasada, recarga, remoção confirmada e fluxo de aba/prévia/envio com API falsa. Esse spec e `planilha.spec.ts` bloqueiam o service worker para permitir interceptação de requisições. O PWA continua coberto pela suíte própria.
@@ -115,11 +115,11 @@ O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL
 
 Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, campos de senha com exibir e ocultar, lembrar o acesso no dispositivo (sessão persistente e e-mail preenchido), banco vazio, chamada diária com falta justificada, chamada por aula com saída parcial, painel com gráficos, seletor de período próprio em popover, troca de visão com seção ativa, barra lateral no desktop e menu lateral no celular, abas da Gestão com toque e teclado, histórico, grade com divisórias e períodos, gestão completa (série, turma com aulas, aluno, contas e configurações), saídas antecipadas, cópia de segurança, troca de senha, tema de três opções, login simétrico, campos do login com margem no celular, PWA e larguras de celular e desktop.
 
-As capturas oficiais do README ficam em `docs/imagens/` e são geradas por `tests/e2e/imagens.spec.ts`, com o aplicativo no ar e a semente aplicada:
+As capturas oficiais do README ficam em `docs/imagens/` e são geradas por `tests/ponta-a-ponta/interface/imagens.spec.ts`, com o aplicativo no ar e a semente aplicada:
 
 ```bash
 pnpm run capturas:readme         # Playwright local
 pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
 ```
 
-O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. A galeria fica em `docs/imagens/README.md` e o teste `tests/unit/readme-imagens.test.ts` limita a largura e o peso das imagens do README. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.
+O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. A galeria fica em `docs/imagens/README.md` e o teste `tests/unidade/interface/readme-imagens.test.ts` limita a largura e o peso das imagens do README. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.

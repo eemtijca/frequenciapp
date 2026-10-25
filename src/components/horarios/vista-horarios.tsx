@@ -26,7 +26,7 @@ import { ouvirOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import DialogoAulas from "@/components/gestao/dialogo-aulas";
+import DialogoAulas from "@/components/gestao/cadastros/dialogo-aulas";
 import { EditorAula, type RascunhoAula } from "@/components/horarios/editor-aula";
 import {
   AlertDialog,

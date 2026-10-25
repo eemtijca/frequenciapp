@@ -29,7 +29,7 @@ server.log
 /coverage
 
 # Playwright
-/tests/e2e/.auth/
+/tests/ponta-a-ponta/.auth/
 /playwright-report/
 /test-results/
 
@@ -43,9 +43,6 @@ yarn-error.log*
 
 # Plataforma
 .vercel
-
-# Apps Script local
-gas/.clasp.json
 
 # Sandbox local (não fazem parte do entregável)
 bun.lock

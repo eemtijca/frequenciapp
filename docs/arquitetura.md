@@ -108,17 +108,21 @@ src/
     layout.tsx              metadados, manifest da PWA e fontes
   components/
     aplicacao.tsx           shell com visões, barra lateral e menu responsivo
-    auth/                   tela de entrada
+    entrada/                tela de entrada
     painel/                 indicadores do dia com gráficos
-    frequencia/             vista da chamada diária
+    chamada/                vista da chamada diária
     horarios/               consulta semanal das disciplinas por turma
-    frequencia-parcial/     vista e formulários da presença parcial
-    saidas/                 registro e relatórios das saídas antecipadas
-    relatorios/             sub-abas de histórico, grade e por aluno
-    historico/              vista do histórico
+    chamada-parcial/        vista e formulários da presença parcial
+    movimentacoes/          registro de saídas e entradas
+    relatorios/             sub-abas de resumo, histórico, grade e por aluno
+    relatorios/historico/   vista do histórico
     grade/                  grade por turma de origem com modos de período
     alunos/                 lista de consulta da coordenação
-    gestao/                 área do administrador (abas, diálogos e configurações)
+    gestao/                 área do administrador
+    gestao/abas/            abas de séries, turmas, alunos, equipe, diretores e configurações
+    gestao/cadastros/       diálogos de aulas, importação e ordenação
+    gestao/configuracoes/   rascunho, seções e controles de configuração
+    gestao/planilhas/       integrações, seletores e diálogos de planilha
     conta/                  diálogo de troca de senha
     pwa/                    registro do service worker e avisos
     ui/                     conjunto shadcn/ui personalizado
@@ -156,7 +160,7 @@ src/
     erros.ts                tradução de exceções para português
     transacoes.ts           transações ACID com repetição
     auditoria.ts            trilha de ações administrativas
-    planilha-erros.ts       diagnóstico limitado dos erros de integração
+    google/                 OAuth, Sheets API, planilhas e diagnóstico da integração
     auth/
       hash.ts               scrypt de senhas
       sessao.ts             sessões opacas em cookie HttpOnly
@@ -168,9 +172,19 @@ generated/                  cliente Prisma gerado (fora do git)
 public/                     manifest, service worker, offline e ícones em PNG (gerados)
 design/icone/               desenho mestre do ícone em SVG; `pnpm run icones:gerar` produz os PNGs de `public/`
 docker/                     entrypoint e migrador do contêiner
-scripts/                    criar-admin, criar-coordenacao, seed e gerar-icones
+scripts/
+  administracao/            criar-admin, criar-coordenacao, decisão e senha
+  banco/                    schema de preview e SQL de provisionamento
+  backup/                   backup externo, pacote portátil e ações do runner
+  assets/                   cópia do Swagger UI e geração de ícones
+  github/                   sincronização de etiquetas
+  seed/                     semente de demonstração
 docs/                       esta documentação
-tests/                      Vitest (unidade e contratos)
+tests/
+  unidade/                  Vitest sem banco, agrupado por área
+  api/                      contratos HTTP agrupados por área
+  ponta-a-ponta/            Playwright, com helpers e setup global
+  helpers/                  dublês compartilhados de Google e cores
 ```
 
 ## Decisões registradas

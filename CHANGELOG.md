@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Diretórios reorganizados para reduzir listas extensas na raiz: `tests/unidade` e `tests/ponta-a-ponta` agrupam as suítes por área, `components/gestao` passa a ter `abas`, `cadastros`, `configuracoes` e `planilhas`, os adaptadores do Google ficam em `src/infra/google`, e `scripts` passa a ter `administracao`, `banco`, `backup`, `assets`, `github` e `seed`. As visões foram renomeadas para `entrada`, `chamada`, `chamada-parcial` e `movimentacoes`, com `historico` dentro de `relatorios`.
+
 - O README deixa de exibir as capturas em tamanho natural. A entrada usa duas miniaturas com largura controlada, cada uma com link para o arquivo completo, e as demais imagens ficam na galeria em `docs/imagens/README.md`. Um teste limita largura, existência e peso dos arquivos.
 
 - Rolagem no celular deixa de executar JavaScript a cada evento: a posição é lida uma única vez ao sair da visão. O indicador de abas passa a usar `transform` em vez de animação de layout, as listas deixam de fazer aparição com Motion, e os grupos longos usam `content-visibility` com tamanho intrínseco reservado. `scrollbar-gutter` e `overscroll-behavior` estabilizam os painéis.
@@ -179,6 +181,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - O `postinstall` também copia os assets do Swagger UI para `public/vendor/swagger-ui`, e `@scarf/scarf` (telemetria transitiva) fica explicitamente negado nos scripts de instalação.
 
 ### Removido
+
+- Os últimos arquivos locais do Apps Script saem do repositório: `gas/.clasp.json.example`, `gas/appsscript.json` e `gas/exemplos/payload.json`. A integração já havia sido substituída por OAuth e Sheets API; as ADRs antigas permanecem como registro histórico.
 
 - Acabamento de vidro em toda a interface: desfoque, reflexos, brilho interno, transparência de superfície e gradientes decorativos. Superfícies, controles, botões, estados selecionados, roscas e camadas flutuantes passam a usar preenchimento sólido, borda de 1 pixel e raio único, com sombra apenas em diálogos, popovers, menus e toasts. A decisão está na ADR-054.
 

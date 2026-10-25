@@ -14,7 +14,7 @@ A rotina roda fora da Vercel e do processo que atende o celular, em executor Lin
 - A chave do pacote e as credenciais da aplicação não são repassadas ao processo do rclone. O processo recebe somente o ambiente necessário ao transporte e à leitura da configuração privada.
 - O diretório temporário é removido ao terminar ou falhar normalmente. Uma interrupção forçada da máquina pode impedir essa limpeza. Usar executor com disco criptografado e pasta temporária efêmera, preferencialmente em memória, sob controle da escola.
 
-O código operacional está em `scripts/backup-externo.mjs`, com uma porta de transporte substituível. `scripts/pacote-backup.mjs` produz e confere o formato portátil, sem consultar provedores, banco ou API da aplicação. O formato permite recuperação com ferramentas compatíveis com ZIP AES-256, como 7-Zip.
+O código operacional está em `scripts/backup/backup-externo.mjs`, com uma porta de transporte substituível. `scripts/backup/pacote-backup.mjs` produz e confere o formato portátil, sem consultar provedores, banco ou API da aplicação. O formato permite recuperação com ferramentas compatíveis com ZIP AES-256, como 7-Zip.
 
 ## Preparar os perfis
 
@@ -52,7 +52,7 @@ Gerar uma chave aleatória forte, por exemplo com `openssl rand -base64 32`, e g
 Executar a partir do checkout instalado:
 
 ```bash
-node --env-file=/etc/frequenciapp-backup/backup.env scripts/backup-externo.mjs
+node --env-file=/etc/frequenciapp-backup/backup.env scripts/backup/backup-externo.mjs
 ```
 
 Sucesso retorna JSON com nome genérico do pacote, data, hash, tamanho e quantidade de arquivos. Não retorna nomes originais nem destinos. Considerar como concluídos somente os pacotes acompanhados de `.confirmado.json` e uma execução com código 0. Um ZIP sem comprovante pode ter sido enviado antes de uma falha; não deve ser tratado como backup confirmado sem conferência.
@@ -87,7 +87,7 @@ Os outros secrets podem ser cadastrados pela interface do GitHub. O arquivo inte
 
 ### O arquivo dentro do runner
 
-`scripts/backup-actions.sh` valida a presença dos secrets antes da instalação, sem criar arquivos nessa etapa. Uma configuração ausente ou inválida faz a execução falhar, para não apresentar como concluído um backup que não ocorreu. Os secrets não são disponibilizados às etapas de checkout, setup ou instalação de dependências.
+`scripts/backup/backup-actions.sh` valida a presença dos secrets antes da instalação, sem criar arquivos nessa etapa. Uma configuração ausente ou inválida faz a execução falhar, para não apresentar como concluído um backup que não ocorreu. Os secrets não são disponibilizados às etapas de checkout, setup ou instalação de dependências.
 
 Na etapa de execução, o script cria uma pasta privada `700` dentro de `RUNNER_TEMP` e grava o conteúdo do secret em `rclone.conf`, com permissão `600`. O texto é escrito literalmente, sem interpolação como código shell. Somente então a variável `BACKUP_RCLONE_CONFIG` recebe o caminho gerado para a rotina existente. A variável com o conteúdo original é retirada do ambiente antes de iniciar o backup. Os arquivos de trabalho, o cache e os temporários do próprio rclone também ficam nessa pasta privada, com caminhos explícitos de transporte.
 
@@ -110,7 +110,7 @@ Agendar uma execução diária após o expediente no executor, por cron ou timer
 Exemplo de crontab para 22h30 no fuso do executor, com checkout em `/opt/frequenciapp`. Ajustar o horário e os caminhos dos executáveis e garantir que a conta da rotina possa ler a configuração privada e criar a trava:
 
 ```cron
-30 22 * * * /usr/bin/flock -n /etc/frequenciapp-backup/execucao.lock /usr/bin/node --env-file=/etc/frequenciapp-backup/backup.env /opt/frequenciapp/scripts/backup-externo.mjs
+30 22 * * * /usr/bin/flock -n /etc/frequenciapp-backup/execucao.lock /usr/bin/node --env-file=/etc/frequenciapp-backup/backup.env /opt/frequenciapp/scripts/backup/backup-externo.mjs
 ```
 
 Escolher um único agendador para o mesmo destino, evitando executar o cron próprio junto ao workflow diário. A configuração real deve ser testada primeiro com arquivos sintéticos, e depois com os arquivos autorizados pela escola.
@@ -123,7 +123,7 @@ Não há expurgo automático. A escola define o prazo de guarda e revisa a capac
 2. Validar o pacote sem escrever nos arquivos escolares:
 
    ```bash
-   node --env-file=/etc/frequenciapp-backup/backup.env scripts/backup-externo.mjs --conferir /caminho/backup.zip
+   node --env-file=/etc/frequenciapp-backup/backup.env scripts/backup/backup-externo.mjs --conferir /caminho/backup.zip
    ```
 
    Essa operação não precisa dos perfis nem de conexão ao armazenamento. Confere senha, autenticação AES, manifesto, quantidade, tamanhos e SHA-256 de cada arquivo e retorna apenas a quantidade validada.

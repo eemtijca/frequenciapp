@@ -59,11 +59,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SeletorTema } from "@/components/ui/seletor-tema";
-import VistaFrequencia from "@/components/frequencia/vista-frequencia";
-import VistaChamadaParcial from "@/components/frequencia-parcial/vista-frequencia-parcial";
+import VistaFrequencia from "@/components/chamada/vista-frequencia";
+import VistaChamadaParcial from "@/components/chamada-parcial/vista-frequencia-parcial";
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import VistaPainel from "@/components/painel/vista-painel";
-import VistaMovimentacoes from "@/components/saidas/vista-movimentacoes";
+import VistaMovimentacoes from "@/components/movimentacoes/vista-movimentacoes";
 import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";

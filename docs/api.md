@@ -16,7 +16,7 @@ O workflow de build executa o comando de instalação de `vercel.json` com um am
 
 - Em desenvolvimento: `http://localhost:3000/api/docs`.
 - Lint da especificação: `pnpm run lint:api`, com o ruleset em `redocly.yaml`.
-- Guarda de cobertura: `tests/unit/openapi.test.ts` confere a especificação contra as rotas. A decisão está no [ADR-043](adr/043-documentacao-interativa-e-csp.md).
+- Guarda de cobertura: `tests/unidade/interface/openapi.test.ts` confere a especificação contra as rotas. A decisão está no [ADR-043](adr/043-documentacao-interativa-e-csp.md).
 
 ## Consumo por agentes de IA
 
