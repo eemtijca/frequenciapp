@@ -5,7 +5,7 @@ import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
-import { diaLocal, ehDiaValido, ehMomentoValido } from "@/domain/frequencia";
+import { diaLocal, ehDiaValido, ehDomingo, ehMomentoValido } from "@/domain/frequencia";
 import { ehHorarioEntrada, type EntradaAtrasada } from "@/domain/entradas";
 import type { Identidade } from "@/domain/usuarios";
 
@@ -86,6 +86,8 @@ export async function criarEntrada(
 ): Promise<{ dia: string }> {
   const dados = esquemaCriarEntrada.safeParse(entrada);
   if (!dados.success) throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
+  if (ehDomingo(dados.data.dia))
+    throw new ErroHttp("Domingo não tem aula. Escolha um dia de segunda a sábado.", 400);
   if (dados.data.dia > diaLocal(new Date(), ambiente.fuso))
     throw new ErroHttp("Não é possível registrar entrada em dia futuro.", 400);
   try {
