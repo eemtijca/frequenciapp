@@ -12,6 +12,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
@@ -91,6 +92,9 @@ export default function VistaRelatorios({
   return (
     <section aria-label="Relatórios" className="flex flex-col gap-4 pb-6">
       <h1 className="sr-only">Relatórios</h1>
+      <div className="flex justify-end">
+        <AtualizadoDaVisao fuso={fuso} />
+      </div>
 
       <AbasDeslizantes
         rotuloAcessivel="Relatórios"

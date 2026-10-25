@@ -8,11 +8,13 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   celulasDoMes,
+  celulasDoMesSegundaDomingo,
   celulasDoMesSemDomingo,
   diaDaSemanaIso,
   diaDeChamadaVizinho,
   diaSeguinte,
   diasDoMes,
+  ehDomingo,
   mesSeguinte,
   nomeDoMes,
   rotuloMes,
@@ -35,6 +37,10 @@ interface Props {
   mostrarSelo?: boolean;
   /** Calendário de segunda a sábado: o domingo não aparece e a navegação o pula. */
   semDomingo?: boolean;
+  /** Calendário de segunda a domingo, com dias adjacentes e domingo de resumo. */
+  calendarioSemanal?: boolean;
+  /** Avisa o resumo para pausar enquanto o calendário está aberto. */
+  onAbertoChange?: (aberto: boolean) => void;
   /**
    * Atalho Hoje da tela. No domingo, a Chamada, o Painel e a Chamada Parcial
    * abrem o resumo da semana em vez de escolher o sábado.
@@ -46,6 +52,7 @@ interface Props {
 }
 
 const SEMANAS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const SEMANAS_SEGUNDA_DOMINGO = ["S", "T", "Q", "Q", "S", "S", "D"];
 const SEMANAS_SEM_DOMINGO = SEMANAS.slice(1);
 const MESES = Array.from({ length: 12 }, (_, indice) => indice + 1);
 
@@ -70,11 +77,14 @@ export function SeletorPeriodo({
   detalhe,
   mostrarSelo = true,
   semDomingo = false,
+  calendarioSemanal = false,
+  onAbertoChange,
   aoHoje,
   hojeAtivo = false,
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
+  const semanal = calendarioSemanal && !semDomingo;
   // Sem valor, o painel abre no dia de referência, mas nenhum dia fica marcado.
   const corrente = atual ?? max;
   const inicial = valor || corrente;
@@ -112,6 +122,10 @@ export function SeletorPeriodo({
     botoes.current.get(foco)?.focus();
   }, [aberto, foco]);
 
+  useEffect(() => {
+    onAbertoChange?.(aberto);
+  }, [aberto, onAbertoChange]);
+
   function registrar(chave: string, elemento: HTMLButtonElement | null) {
     if (!elemento) {
       botoes.current.delete(chave);
@@ -142,17 +156,23 @@ export function SeletorPeriodo({
     else if (evento.key === "PageUp") proximo = mesmoDiaNoMes(foco, -1);
     else if (evento.key === "PageDown") proximo = mesmoDiaNoMes(foco, 1);
     else if (evento.key === "Home")
-      proximo = semDomingo
-        ? diaSeguinte(foco, 1 - diaDaSemanaIso(foco))
-        : diaSeguinte(foco, -(diaDaSemanaIso(foco) % 7));
+      proximo =
+        semDomingo || semanal
+          ? diaSeguinte(foco, 1 - diaDaSemanaIso(foco))
+          : diaSeguinte(foco, -(diaDaSemanaIso(foco) % 7));
     else if (evento.key === "End")
       proximo = semDomingo
         ? diaSeguinte(foco, 6 - diaDaSemanaIso(foco))
-        : diaSeguinte(foco, 6 - (diaDaSemanaIso(foco) % 7));
+        : semanal
+          ? diaSeguinte(foco, 7 - diaDaSemanaIso(foco))
+          : diaSeguinte(foco, 6 - (diaDaSemanaIso(foco) % 7));
     else return;
     evento.preventDefault();
     proximo = aprumar(proximo);
+    // O foco nunca para num domingo futuro desabilitado: recua para o sábado.
+    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
     if (proximo > limite) proximo = limite;
+    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
     if (piso && proximo < piso) proximo = piso;
     setFoco(proximo);
     setMesVisivel(proximo.slice(0, 7));
@@ -182,23 +202,35 @@ export function SeletorPeriodo({
     setMesVisivel(proximoMes);
     const ultimo = diasDoMes(proximoMes).length;
     const numero = Math.min(Number(foco.slice(8)), ultimo);
-    const proximo = aprumar(`${proximoMes}-${String(numero).padStart(2, "0")}`);
-    const comPiso = piso && proximo < piso ? piso : proximo;
-    setFoco(comPiso > limite ? limite : comPiso);
+    let proximo = aprumar(`${proximoMes}-${String(numero).padStart(2, "0")}`);
+    if (piso && proximo < piso) proximo = piso;
+    if (proximo > limite) proximo = limite;
+    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
+    setFoco(proximo);
   }
 
   function mudarAno(deslocamento: number) {
     const proximoAno = String(Number(anoVisivel) + deslocamento);
-    const proximo = `${proximoAno}-${foco.slice(5)}`;
+    let proximo = `${proximoAno}-${foco.slice(5)}`;
     setAnoVisivel(proximoAno);
-    const comPiso = piso && proximo < piso ? piso : proximo;
-    setFoco(comPiso > max ? max : comPiso);
+    if (piso && proximo < piso) proximo = piso;
+    if (proximo > limite) proximo = limite;
+    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
+    setFoco(proximo);
   }
 
-  function classeCelula(selecionado: boolean, futuro: boolean, corrente: boolean) {
+  function classeCelula(
+    selecionado: boolean,
+    futuro: boolean,
+    corrente: boolean,
+    foraDoMes = false,
+    domingoResumo = false,
+  ) {
     return cn(
-      "pressionavel focus-visible:ring-ring/50 flex items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
+      "pressionavel focus-visible:ring-ring/50 relative flex items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
       futuro && "text-muted-foreground/40 cursor-not-allowed",
+      foraDoMes && !selecionado && !corrente && "text-muted-foreground/55",
+      domingoResumo && !selecionado && "bg-primary/5",
       selecionado && "selecionado font-semibold",
       !selecionado && corrente && "controle text-primary font-semibold",
       !selecionado && !corrente && "discreto",
@@ -241,52 +273,88 @@ export function SeletorPeriodo({
             className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}
             aria-hidden="true"
           >
-            {(semDomingo ? SEMANAS_SEM_DOMINGO : SEMANAS).map((letra, indice) => (
-              <span
-                key={`${letra}-${indice}`}
-                className="text-muted-foreground flex h-7 w-full items-center justify-center text-[11px] font-medium"
-              >
-                {letra}
-              </span>
-            ))}
-          </div>
-          <div className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}>
-            {(semDomingo ? celulasDoMesSemDomingo(mesVisivel) : celulasDoMes(mesVisivel)).map(
-              (dia, indice) => {
-                if (!dia)
-                  return (
-                    <span
-                      key={`vazio-${indice}`}
-                      aria-hidden="true"
-                      className="aspect-square w-full"
-                    />
-                  );
-                const selecionado = dia === valor;
-                const futuro = dia > max;
-                const bloqueado = futuro || Boolean(piso && dia < piso);
-                const noDiaAtual = dia === corrente;
-                const numero = Number(dia.slice(8));
+            {(semDomingo ? SEMANAS_SEM_DOMINGO : semanal ? SEMANAS_SEGUNDA_DOMINGO : SEMANAS).map(
+              (letra, indice) => {
+                const domingoResumo = semanal && indice === 6;
                 return (
-                  <button
-                    key={dia}
-                    ref={(elemento) => registrar(dia, elemento)}
-                    type="button"
-                    tabIndex={dia === foco ? 0 : -1}
-                    disabled={bloqueado}
-                    aria-pressed={selecionado}
-                    aria-label={`${numero} de ${nomeDoMes(mesVisivel).toLowerCase()} de ${mesVisivel.slice(0, 4)}${noDiaAtual ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
-                    onClick={() => escolher(dia)}
+                  <span
+                    key={`${letra}-${indice}`}
                     className={cn(
-                      "aspect-square w-full",
-                      classeCelula(selecionado, bloqueado, noDiaAtual),
+                      "text-muted-foreground flex w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
+                      semanal ? "h-9" : "h-7",
                     )}
                   >
-                    {numero}
-                  </button>
+                    <span>{letra}</span>
+                    {domingoResumo && (
+                      <span className="text-primary text-[9px] leading-none font-semibold">
+                        Resumo
+                      </span>
+                    )}
+                  </span>
                 );
               },
             )}
           </div>
+          <div className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}>
+            {(semanal
+              ? celulasDoMesSegundaDomingo(mesVisivel)
+              : semDomingo
+                ? celulasDoMesSemDomingo(mesVisivel)
+                : celulasDoMes(mesVisivel)
+            ).map((dia, indice) => {
+              if (!dia)
+                return (
+                  <span
+                    key={`vazio-${indice}`}
+                    aria-hidden="true"
+                    className="aspect-square w-full"
+                  />
+                );
+              const selecionado = dia === valor;
+              const futuro = dia > max;
+              const domingoResumo = semanal && ehDomingo(dia);
+              const domingoFuturo = domingoResumo && dia > corrente;
+              const bloqueado = futuro || domingoFuturo || Boolean(piso && dia < piso);
+              const foraDoMes = semanal && dia.slice(0, 7) !== mesVisivel;
+              const noDiaAtual = dia === corrente;
+              const numero = Number(dia.slice(8));
+              return (
+                <button
+                  key={dia}
+                  ref={(elemento) => registrar(dia, elemento)}
+                  type="button"
+                  tabIndex={dia === foco ? 0 : -1}
+                  disabled={bloqueado}
+                  aria-pressed={selecionado}
+                  aria-label={`${numero} de ${nomeDoMes(dia.slice(0, 7)).toLowerCase()} de ${dia.slice(0, 4)}${domingoResumo ? ", resumo da semana anterior" : ""}${noDiaAtual ? ", hoje" : ""}${selecionado ? ", selecionado" : ""}`}
+                  onClick={() => escolher(dia)}
+                  data-dia={dia}
+                  data-fora-do-mes={foraDoMes ? "true" : undefined}
+                  data-domingo-resumo={domingoResumo ? "true" : undefined}
+                  className={cn(
+                    "aspect-square w-full",
+                    classeCelula(selecionado, bloqueado, noDiaAtual, foraDoMes, domingoResumo),
+                  )}
+                >
+                  {numero}
+                  {domingoResumo && (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "absolute bottom-1.5 size-1 rounded-full",
+                        bloqueado ? "bg-muted-foreground/40" : "bg-primary",
+                      )}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {semanal && (
+            <p className="text-muted-foreground text-xs">
+              Domingos, na última coluna, abrem o resumo da semana anterior.
+            </p>
+          )}
         </div>
       ) : (
         <div

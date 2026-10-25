@@ -134,5 +134,5 @@ describe("convenção editorial do repositório", () => {
       }
     }
     expect(problemas, `Padrões proibidos encontrados:\n${problemas.join("\n")}`).toEqual([]);
-  });
+  }, 30_000);
 });

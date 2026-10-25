@@ -2,7 +2,7 @@
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
 import type {
   Aluno,
   Turma,
@@ -13,7 +13,6 @@ import {
   horaNoFuso,
   rotuloData,
   rotuloDiaSemana,
-  diaSeguinte,
   MOMENTOS_SAIDA,
   partesDoMotivo,
   rotuloMomento,
@@ -22,13 +21,17 @@ import type { EntradaAtrasada } from "@/domain/entradas";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { avisarSucesso } from "@/lib/avisos";
+import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
+import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
+import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +50,7 @@ interface Props {
   alunos: Aluno[];
   liberadores: LiberadorConfigurado[];
   catalogoJustificativas: JustificativaConfigurada[];
+  ativo?: boolean;
   atualizacao?: number;
 }
 const OPCOES_MOMENTO = MOMENTOS_SAIDA.map((item) => ({ valor: item.codigo, rotulo: item.rotulo }));
@@ -58,9 +62,16 @@ export default function VistaEntradas({
   alunos,
   liberadores,
   catalogoJustificativas,
+  ativo = true,
   atualizacao = 0,
 }: Props) {
-  const [dia, setDia] = useState(diaCorrente);
+  const nav = useNavegacaoDoDia({
+    diaCorrente,
+    max: diaCorrente,
+    domingoComoResumo: true,
+  });
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
+  const dia = nav.dia;
   const [turma, setTurma] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [horario, setHorario] = useState(() => horaNoFuso(new Date().toISOString(), fuso));
@@ -75,6 +86,10 @@ export default function VistaEntradas({
   const [recorteCarregado, setRecorteCarregado] = useState("");
   const [versao, setVersao] = useState(0);
   const [remover, setRemover] = useState<EntradaAtrasada | null>(null);
+  const [verDomingo, setVerDomingo] = useState(false);
+  const [entradasDomingo, setEntradasDomingo] = useState<EntradaAtrasada[]>([]);
+  const [carregandoDomingo, setCarregandoDomingo] = useState(false);
+  const marcarAtualizado = useContextoAtualizacao()?.marcarAtualizado;
   const mensagemErro = useCallback(
     (erro: unknown) =>
       erro instanceof ErroApi
@@ -83,14 +98,17 @@ export default function VistaEntradas({
     [],
   );
   const recorte = `${dia}|${turma}|${versao}|${atualizacao}`;
-  const carregando = recorteCarregado !== recorte;
+  const carregando = !nav.resumo && recorteCarregado !== recorte;
   useEffect(() => {
+    if (nav.resumo) return;
     let viva = true;
     pedir<{ entradas: EntradaAtrasada[] }>(
       `/api/entradas?de=${dia}&ate=${dia}${turma ? `&turmaId=${turma}` : ""}`,
     )
       .then((dados) => {
-        if (viva) setEntradas(dados.entradas);
+        if (!viva) return;
+        setEntradas(dados.entradas);
+        marcarAtualizado?.("saidas");
       })
       .catch((erro: unknown) => {
         if (viva) {
@@ -104,7 +122,26 @@ export default function VistaEntradas({
     return () => {
       viva = false;
     };
-  }, [dia, turma, versao, recorte, mensagemErro]);
+  }, [dia, turma, versao, recorte, mensagemErro, nav.resumo, marcarAtualizado]);
+
+  useEffect(() => {
+    if (!verDomingo || !nav.domingo) return;
+    let viva = true;
+    pedir<{ entradas: EntradaAtrasada[] }>(`/api/entradas?de=${nav.domingo}&ate=${nav.domingo}`)
+      .then((dados) => {
+        if (viva) setEntradasDomingo(dados.entradas);
+      })
+      .catch(() => {
+        if (viva) setEntradasDomingo([]);
+      })
+      .finally(() => {
+        if (viva) setCarregandoDomingo(false);
+      });
+    return () => {
+      viva = false;
+    };
+  }, [verDomingo, nav.domingo, versao, atualizacao]);
+
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const executando = chaveAtiva !== null;
   const executar = (acao: () => Promise<void>) =>
@@ -163,8 +200,8 @@ export default function VistaEntradas({
     [alunos, dia, turma, turmasPorId],
   );
   function escolherDia(valor: string) {
-    setDia(valor);
     setErro("");
+    nav.escolherDia(valor);
   }
   return (
     <div className="space-y-5 pb-6">
@@ -176,7 +213,10 @@ export default function VistaEntradas({
           className="size-11 shrink-0"
           aria-label="Dia anterior"
           disabled={executando}
-          onClick={() => escolherDia(diaSeguinte(dia, -1))}
+          onClick={() => {
+            setVerDomingo(false);
+            nav.anterior();
+          }}
         >
           <ChevronLeft size={18} />
         </Button>
@@ -184,13 +224,19 @@ export default function VistaEntradas({
           <SeletorPeriodo
             id="entrada-dia"
             modo="dia"
-            valor={dia}
+            valor={nav.resumo ? (nav.domingo ?? "") : dia}
             max={diaCorrente}
-            rotuloAcessivel="Data da entrada"
-            rotulo={dia.split("-").reverse().join("/")}
-            detalhe={rotuloDiaSemana(dia).replace("-feira", "")}
+            calendarioSemanal
+            mostrarSelo={!nav.resumo}
+            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da entrada"}
+            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
+            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
             disabled={executando}
-            onValor={escolherDia}
+            onAbertoChange={setCalendarioAberto}
+            onValor={(proximo) => {
+              setVerDomingo(false);
+              escolherDia(proximo);
+            }}
           />
         </div>
         <Button
@@ -198,251 +244,341 @@ export default function VistaEntradas({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia seguinte"
-          disabled={executando || dia >= diaCorrente}
-          onClick={() => escolherDia(diaSeguinte(dia, 1))}
+          disabled={executando || nav.seguinteDesabilitado}
+          onClick={() => {
+            setVerDomingo(false);
+            nav.seguinte();
+          }}
         >
           <ChevronRight size={18} />
         </Button>
       </div>
-      <form
-        className="superficie flex flex-col gap-4 p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void executar(async () => {
-            await pedir("/api/entradas", {
-              method: "POST",
-              ...corpoJson({
-                alunoId,
-                dia,
-                horario,
-                momento,
-                responsavelRegistroCodigo: responsavelCodigo,
-                ...(formaJustificativa === "texto"
-                  ? { motivo }
-                  : { justificativa, observacao: observacao || undefined }),
-              }),
-            });
-            setAlunoId("");
-            setMotivo("");
-            setMomento("");
-            setResponsavelCodigo("");
-            setJustificativa("");
-            setObservacao("");
-            setFormaJustificativa("catalogo");
-            setVersao((valor) => valor + 1);
-            avisarSucesso("Entrada registrada.");
-          });
-        }}
-      >
-        <h2 className="font-medium">Registrar entrada</h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="entrada-turma">Turma</Label>
-            <Selecionar
-              id="entrada-turma"
-              value={turma || "todas"}
-              disabled={executando}
-              onValueChange={(valor) => {
-                setTurma(valor === "todas" ? "" : valor);
-                setErro("");
-                setAlunoId("");
-              }}
-              opcoes={opcoesTurma}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
-            <Label htmlFor="entrada-aluno">Aluno</Label>
-            <Selecionar
-              id="entrada-aluno"
-              value={alunoId}
-              onValueChange={setAlunoId}
-              disabled={executando}
-              buscavel
-              opcoes={opcoesAluno}
-              placeholder="Selecione o aluno"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="entrada-momento">Momento da entrada</Label>
-            <Selecionar
-              id="entrada-momento"
-              value={momento}
-              disabled={executando}
-              onValueChange={setMomento}
-              placeholder="Selecione a aula ou pausa"
-              opcoes={OPCOES_MOMENTO}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="entrada-horario">Horário da chegada</Label>
-            <SeletorHorario
-              id="entrada-horario"
-              valor={horario}
-              onValor={setHorario}
-              rotuloAcessivel="Horário da chegada"
-              agora={horaNoFuso(new Date().toISOString(), fuso)}
-              disabled={executando}
-            />
-          </div>
-          <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
-            <legend className="text-sm font-medium">Justificativa</legend>
-            <div
-              role="radiogroup"
-              aria-label="Forma da justificativa"
-              className="flex flex-wrap gap-2"
-            >
-              {(
-                [
-                  { valor: "texto", rotulo: "Escrever" },
-                  { valor: "catalogo", rotulo: "Selecionar tipo" },
-                ] as const
-              ).map((item) => (
-                <button
-                  key={item.valor}
-                  type="button"
-                  role="radio"
-                  aria-checked={formaJustificativa === item.valor}
-                  disabled={executando}
-                  onClick={() => {
-                    setFormaJustificativa(item.valor);
-                    setMotivo("");
-                    setJustificativa("");
-                    setObservacao("");
-                  }}
-                  className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : ""}`}
-                >
-                  {item.rotulo}
-                </button>
-              ))}
-            </div>
-            {formaJustificativa === "texto" ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-motivo">Texto da justificativa</Label>
-                <Input
-                  id="entrada-motivo"
-                  required
-                  minLength={2}
-                  maxLength={100}
-                  value={motivo}
-                  disabled={executando}
-                  onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="Descreva o motivo"
-                  className="h-11"
-                />
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="entrada-justificativa">Tipo</Label>
-                  <Selecionar
-                    id="entrada-justificativa"
-                    value={justificativa}
-                    disabled={executando}
-                    onValueChange={setJustificativa}
-                    placeholder="Selecione a justificativa"
-                    opcoes={opcoesJustificativa}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="entrada-observacao">Observação</Label>
-                  <Input
-                    id="entrada-observacao"
-                    value={observacao}
-                    disabled={executando}
-                    maxLength={100}
-                    onChange={(e) => setObservacao(e.target.value)}
-                    placeholder="Opcional: descreva brevemente o motivo"
-                    className="h-11"
-                  />
-                </div>
-              </>
-            )}
-          </fieldset>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="entrada-responsavel">Responsável pelo registro</Label>
-            <Selecionar
-              id="entrada-responsavel"
-              value={responsavelCodigo}
-              disabled={executando}
-              onValueChange={setResponsavelCodigo}
-              placeholder="Selecione quem registrou"
-              opcoes={opcoesResponsavel}
-            />
-            {opcoesResponsavel.length === 0 && (
-              <p className="text-muted-foreground text-xs">
-                Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
-              </p>
-            )}
-          </div>
-        </div>
+      {!nav.resumo && (
         <div className="flex justify-end">
-          <Button
-            className="h-11 w-full px-6 sm:w-auto"
-            size="lg"
-            type="submit"
-            disabled={
-              executando ||
-              !alunoId ||
-              !momento ||
-              !responsavelCodigo ||
-              carregando ||
-              opcoesResponsavel.length === 0 ||
-              (formaJustificativa === "catalogo" && !justificativa)
-            }
-          >
-            Registrar entrada
-          </Button>
+          <AtualizadoDaVisao fuso={fuso} />
         </div>
-      </form>
-      {erro && (
-        <p role="alert" className="text-falta-texto rounded-lg border p-3 text-sm">
-          {erro}
-        </p>
       )}
-      <section aria-label="Entradas registradas" className="space-y-3">
-        <h2 className="font-semibold">
-          Entradas em {rotuloData(dia)}{" "}
-          <span className="text-muted-foreground">({entradas.length})</span>
-        </h2>
-        {carregando ? (
-          <p role="status">Carregando entradas...</p>
-        ) : entradas.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhuma entrada registrada neste recorte.</p>
-        ) : (
-          entradas.map((entrada) => (
-            <article
-              key={entrada.id}
-              className="superficie flex items-start justify-between gap-3 p-4"
+      {nav.resumo && nav.semana ? (
+        <VistaResumoMovimentacoes
+          tipo="entrada"
+          turmas={turmas}
+          alunos={alunos}
+          dias={nav.semana}
+          domingo={nav.domingo}
+          versao={atualizacao}
+          ativo={ativo}
+          pausado={calendarioAberto}
+          fuso={fuso}
+          onAbrirDia={(proximo) => {
+            setTurma("");
+            setAlunoId("");
+            setVerDomingo(false);
+            nav.escolherDia(proximo);
+          }}
+          onVerDomingo={() => {
+            setCarregandoDomingo(true);
+            setVerDomingo(true);
+          }}
+        />
+      ) : null}
+      {nav.resumo && verDomingo && nav.domingo ? (
+        <section className="superficie flex flex-col gap-3 p-4" aria-label="Registros do domingo">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Entradas de {rotuloData(nav.domingo)}</h2>
+            <Button
+              type="button"
+              variant="link"
+              className="min-h-11 px-0"
+              onClick={() => setVerDomingo(false)}
             >
-              <div className="min-w-0">
-                <h3 className="font-semibold break-words">{entrada.nome}</h3>
-                <CaixasDeInfo
-                  partes={[
-                    entrada.turmaRotulo,
-                    entrada.horario,
-                    entrada.momento ? rotuloMomento(entrada.momento) : "",
-                  ]}
-                  className="mt-1"
+              Voltar ao resumo
+            </Button>
+          </div>
+          {carregandoDomingo ? (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              Carregando entradas...
+            </p>
+          ) : entradasDomingo.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Nenhuma entrada registrada neste domingo.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {entradasDomingo.map((entrada) => (
+                <li key={entrada.id} className="flex items-start justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium break-words">{entrada.nome}</p>
+                    <CaixasDeInfo
+                      partes={[
+                        entrada.turmaRotulo,
+                        entrada.horario,
+                        entrada.momento ? rotuloMomento(entrada.momento) : "",
+                      ]}
+                      className="mt-1"
+                    />
+                    <CaixasDeInfo partes={partesDoMotivo(entrada.motivo)} className="mt-2" />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remover entrada de ${entrada.nome}`}
+                    disabled={executando}
+                    onClick={() => setRemover(entrada)}
+                  >
+                    <Trash2 size={18} />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+      {!nav.resumo && (
+        <>
+          <form
+            className="superficie flex flex-col gap-4 p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void executar(async () => {
+                await pedir("/api/entradas", {
+                  method: "POST",
+                  ...corpoJson({
+                    alunoId,
+                    dia,
+                    horario,
+                    momento,
+                    responsavelRegistroCodigo: responsavelCodigo,
+                    ...(formaJustificativa === "texto"
+                      ? { motivo }
+                      : { justificativa, observacao: observacao || undefined }),
+                  }),
+                });
+                setAlunoId("");
+                setMotivo("");
+                setMomento("");
+                setResponsavelCodigo("");
+                setJustificativa("");
+                setObservacao("");
+                setFormaJustificativa("catalogo");
+                setVersao((valor) => valor + 1);
+                avisarSucesso("Entrada registrada.");
+              });
+            }}
+          >
+            <h2 className="font-medium">Registrar entrada</h2>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="entrada-turma">Turma</Label>
+                <Selecionar
+                  id="entrada-turma"
+                  value={turma || "todas"}
+                  disabled={executando}
+                  onValueChange={(valor) => {
+                    setTurma(valor === "todas" ? "" : valor);
+                    setErro("");
+                    setAlunoId("");
+                  }}
+                  opcoes={opcoesTurma}
                 />
-                <CaixasDeInfo partes={partesDoMotivo(entrada.motivo)} className="mt-2" />
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Responsável pelo registro:{" "}
-                  {entrada.responsavelRegistroNome ?? entrada.registradoPorNome}
-                </p>
               </div>
+              <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
+                <Label htmlFor="entrada-aluno">Aluno</Label>
+                <Selecionar
+                  id="entrada-aluno"
+                  value={alunoId}
+                  onValueChange={setAlunoId}
+                  disabled={executando}
+                  buscavel
+                  opcoes={opcoesAluno}
+                  placeholder="Selecione o aluno"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="entrada-momento">Momento da entrada</Label>
+                <Selecionar
+                  id="entrada-momento"
+                  value={momento}
+                  disabled={executando}
+                  onValueChange={setMomento}
+                  placeholder="Selecione a aula ou pausa"
+                  opcoes={OPCOES_MOMENTO}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="entrada-horario">Horário da chegada</Label>
+                <SeletorHorario
+                  id="entrada-horario"
+                  valor={horario}
+                  onValor={setHorario}
+                  rotuloAcessivel="Horário da chegada"
+                  agora={horaNoFuso(new Date().toISOString(), fuso)}
+                  disabled={executando}
+                />
+              </div>
+              <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
+                <legend className="text-sm font-medium">Justificativa</legend>
+                <div
+                  role="radiogroup"
+                  aria-label="Forma da justificativa"
+                  className="flex flex-wrap gap-2"
+                >
+                  {(
+                    [
+                      { valor: "texto", rotulo: "Escrever" },
+                      { valor: "catalogo", rotulo: "Selecionar tipo" },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.valor}
+                      type="button"
+                      role="radio"
+                      aria-checked={formaJustificativa === item.valor}
+                      disabled={executando}
+                      onClick={() => {
+                        setFormaJustificativa(item.valor);
+                        setMotivo("");
+                        setJustificativa("");
+                        setObservacao("");
+                      }}
+                      className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : ""}`}
+                    >
+                      {item.rotulo}
+                    </button>
+                  ))}
+                </div>
+                {formaJustificativa === "texto" ? (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="entrada-motivo">Texto da justificativa</Label>
+                    <Input
+                      id="entrada-motivo"
+                      required
+                      minLength={2}
+                      maxLength={100}
+                      value={motivo}
+                      disabled={executando}
+                      onChange={(e) => setMotivo(e.target.value)}
+                      placeholder="Descreva o motivo"
+                      className="h-11"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="entrada-justificativa">Tipo</Label>
+                      <Selecionar
+                        id="entrada-justificativa"
+                        value={justificativa}
+                        disabled={executando}
+                        onValueChange={setJustificativa}
+                        placeholder="Selecione a justificativa"
+                        opcoes={opcoesJustificativa}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="entrada-observacao">Observação</Label>
+                      <Input
+                        id="entrada-observacao"
+                        value={observacao}
+                        disabled={executando}
+                        maxLength={100}
+                        onChange={(e) => setObservacao(e.target.value)}
+                        placeholder="Opcional: descreva brevemente o motivo"
+                        className="h-11"
+                      />
+                    </div>
+                  </>
+                )}
+              </fieldset>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="entrada-responsavel">Responsável pelo registro</Label>
+                <Selecionar
+                  id="entrada-responsavel"
+                  value={responsavelCodigo}
+                  disabled={executando}
+                  onValueChange={setResponsavelCodigo}
+                  placeholder="Selecione quem registrou"
+                  opcoes={opcoesResponsavel}
+                />
+                {opcoesResponsavel.length === 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end">
               <Button
-                variant="ghost"
-                size="icon"
-                aria-label={`Remover entrada de ${entrada.nome}`}
-                disabled={executando}
-                onClick={() => setRemover(entrada)}
+                className="h-11 w-full px-6 sm:w-auto"
+                size="lg"
+                type="submit"
+                disabled={
+                  executando ||
+                  !alunoId ||
+                  !momento ||
+                  !responsavelCodigo ||
+                  carregando ||
+                  opcoesResponsavel.length === 0 ||
+                  (formaJustificativa === "catalogo" && !justificativa)
+                }
               >
-                <Trash2 size={18} />
+                Registrar entrada
               </Button>
-            </article>
-          ))
-        )}
-      </section>
+            </div>
+          </form>
+          {erro && (
+            <p role="alert" className="text-falta-texto rounded-lg border p-3 text-sm">
+              {erro}
+            </p>
+          )}
+          <section aria-label="Entradas registradas" className="space-y-3">
+            <h2 className="font-semibold">
+              Entradas em {rotuloData(dia)}{" "}
+              <span className="text-muted-foreground">({entradas.length})</span>
+            </h2>
+            {carregando ? (
+              <p role="status">Carregando entradas...</p>
+            ) : entradas.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Nenhuma entrada registrada neste recorte.
+              </p>
+            ) : (
+              entradas.map((entrada) => (
+                <article
+                  key={entrada.id}
+                  className="superficie flex items-start justify-between gap-3 p-4"
+                >
+                  <div className="min-w-0">
+                    <h3 className="font-semibold break-words">{entrada.nome}</h3>
+                    <CaixasDeInfo
+                      partes={[
+                        entrada.turmaRotulo,
+                        entrada.horario,
+                        entrada.momento ? rotuloMomento(entrada.momento) : "",
+                      ]}
+                      className="mt-1"
+                    />
+                    <CaixasDeInfo partes={partesDoMotivo(entrada.motivo)} className="mt-2" />
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Responsável pelo registro:{" "}
+                      {entrada.responsavelRegistroNome ?? entrada.registradoPorNome}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remover entrada de ${entrada.nome}`}
+                    disabled={executando}
+                    onClick={() => setRemover(entrada)}
+                  >
+                    <Trash2 size={18} />
+                  </Button>
+                </article>
+              ))
+            )}
+          </section>
+        </>
+      )}
       <AlertDialog
         open={Boolean(remover)}
         onOpenChange={(aberto) => {

@@ -13,6 +13,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import AbaSeries from "@/components/gestao/abas/aba-series";
 import AbaTurmas from "@/components/gestao/abas/aba-turmas";
 import AbaAlunos from "@/components/gestao/abas/aba-alunos";
@@ -35,6 +36,7 @@ interface Props {
   justificativas: JustificativaConfigurada[];
   liberadores: LiberadorConfigurado[];
   diaCorrente: string;
+  fuso: string;
   onSeriesMudaram: () => Promise<void>;
   onTurmasMudaram: () => Promise<void>;
   onAlunosMudaram: () => Promise<void>;
@@ -68,6 +70,7 @@ export default function VistaGestao({
   justificativas,
   liberadores,
   diaCorrente,
+  fuso,
   onSeriesMudaram,
   onTurmasMudaram,
   onAlunosMudaram,
@@ -109,6 +112,9 @@ export default function VistaGestao({
   return (
     <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
       <h1 className="sr-only">Gestão</h1>
+      <div className="flex justify-end">
+        <AtualizadoDaVisao fuso={fuso} />
+      </div>
 
       <AbasDeslizantes
         rotuloAcessivel="Áreas de gestão"
@@ -149,6 +155,7 @@ export default function VistaGestao({
                 liberadores={liberadores}
                 turmas={turmas}
                 diaCorrente={diaCorrente}
+                fuso={fuso}
                 atualizacao={atualizacao}
                 onMudanca={onConfiguracoesMudaram}
                 onJustificativasMudaram={onJustificativasMudaram}

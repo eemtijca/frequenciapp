@@ -2,10 +2,10 @@
 // dia pulam do sábado para a segunda e, aos domingos, as telas abrem no resumo da semana.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
+  celulasDoMesSegundaDomingo,
   diaDaSemanaIso,
   diaLocal,
   diaSeguinte,
-  diasDoMes,
   ehDomingo,
   rotuloData,
   rotuloDataCurta,
@@ -83,51 +83,51 @@ function rotuloAcessivelDe(prefixo: string, dia: string): RegExp {
   return new RegExp(`^${prefixo}: ${rotuloData(dia)}(,|$)`);
 }
 
-test("o calendário da Chamada vai de segunda a sábado e não oferece o domingo", async ({
-  page,
-}) => {
+test("o calendário da Chamada vai de segunda a domingo e destaca o resumo", async ({ page }) => {
   const secao = await abrirChamada(page);
   await secao.locator("#dia-frequencia").click();
   const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
   const grade = calendario.getByRole("group", { name: /^Dias de / });
   const mes = hoje.slice(0, 7);
-  const domingos = diasDoMes(mes).filter(ehDomingo);
-  expect(domingos.length).toBeGreaterThan(0);
 
-  await expect(grade.getByRole("button")).toHaveCount(diasDoMes(mes).length - domingos.length);
-  // Os rótulos das colunas ficam num bloco escondido dos leitores de tela: seis, de S a S.
-  await expect(grade.locator("div[aria-hidden='true'] > span")).toHaveText([
+  await expect(grade.getByRole("button")).toHaveCount(celulasDoMesSegundaDomingo(mes).length);
+  // Os rótulos das colunas ficam num bloco escondido dos leitores de tela: sete, de segunda a domingo.
+  await expect(grade.locator("div[aria-hidden='true'] > span > span:first-child")).toHaveText([
     "S",
     "T",
     "Q",
     "Q",
     "S",
     "S",
+    "D",
   ]);
-  for (const domingo of domingos) {
-    const numero = Number(domingo.slice(8));
-    await expect(grade.getByRole("button", { name: new RegExp(`^${numero} de `) })).toHaveCount(0);
-  }
+  await expect(grade.locator('[data-domingo-resumo="true"]').first()).toBeVisible();
+  await expect(grade.locator('[data-domingo-resumo="true"]').first()).toHaveAttribute(
+    "aria-label",
+    /resumo da semana anterior/,
+  );
 });
 
-test("as setas de dia pulam o domingo entre o sábado e a segunda", async ({ page }) => {
+test("as setas levam ao domingo e voltam para a segunda", async ({ page }) => {
   const secao = await abrirChamada(page);
-  const segunda = segundaAnterior();
-  await escolherDia(page, secao, segunda);
+  const segunda = diaSeguinte(segundaAnterior(), -7);
+  const sabado = diaSeguinte(segunda, 5);
+  const domingo = diaSeguinte(segunda, 6);
+  const semana = [0, 1, 2, 3, 4, 5].map((deslocamento) => diaSeguinte(domingo, -6 + deslocamento));
+  await escolherDia(page, secao, sabado);
   const seletor = secao.locator("#dia-frequencia");
-  await expect(seletor).toHaveAttribute(
-    "aria-label",
-    rotuloAcessivelDe("Data da chamada", segunda),
-  );
-
-  const sabado = diaSeguinte(segunda, -2);
-  await secao.getByRole("button", { name: "Dia anterior", exact: true }).click();
   await expect(seletor).toHaveAttribute("aria-label", rotuloAcessivelDe("Data da chamada", sabado));
 
   await secao.getByRole("button", { name: "Dia seguinte", exact: true }).click();
   await expect(seletor).toHaveAttribute(
     "aria-label",
-    rotuloAcessivelDe("Data da chamada", segunda),
+    `Resumo da semana: ${rotuloDataCurta(semana[0] ?? "")} a ${rotuloDataCurta(semana[5] ?? "")}`,
+  );
+
+  await secao.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+  await expect(seletor).toHaveAttribute(
+    "aria-label",
+    rotuloAcessivelDe("Data da chamada", diaSeguinte(domingo, 1)),
   );
 });
 

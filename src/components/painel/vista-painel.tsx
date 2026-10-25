@@ -27,6 +27,7 @@ import {
   desistenciasNoDia,
   distribuicaoDoDia,
   distribuicaoPorOrigem,
+  limiaresDoPainel,
   marcasDoDia,
   nivelInfrequencia,
   resumoDoDia,
@@ -36,6 +37,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
@@ -43,11 +45,15 @@ import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
 import { IndicadorFeriado } from "@/components/painel/indicador-feriado";
-import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import {
+  useContextoAtualizacao,
+  useAtualizacaoTela,
+} from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
   ativo: boolean;
   diaCorrente: string;
+  fuso: string;
   mes: string;
   series: Serie[];
   turmas: Turma[];
@@ -56,6 +62,7 @@ interface Props {
   saidas: SaidaAntecipada[];
   configuracoes: Configuracoes;
   onRecarregar: (mes: string) => Promise<void>;
+  onRecarregarConfiguracoes: () => Promise<void>;
 }
 
 const percentual = new Intl.NumberFormat("pt-BR", {
@@ -87,6 +94,7 @@ const NIVEIS = {
 export default function VistaPainel({
   ativo,
   diaCorrente,
+  fuso,
   mes,
   series,
   turmas,
@@ -95,9 +103,15 @@ export default function VistaPainel({
   saidas,
   configuracoes,
   onRecarregar,
+  onRecarregarConfiguracoes,
 }: Props) {
   // No domingo, o painel abre no resumo da semana encerrada.
-  const nav = useNavegacaoDoDia({ diaCorrente, max: diaCorrente });
+  const nav = useNavegacaoDoDia({
+    diaCorrente,
+    max: diaCorrente,
+    domingoComoResumo: true,
+  });
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
   const dia = nav.dia;
   const [doDia, setDoDia] = useState<{
     dia: string;
@@ -110,6 +124,7 @@ export default function VistaPainel({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [recarregar, setRecarregar] = useState(0);
+  const marcarPainelAtualizado = useContextoAtualizacao()?.marcarAtualizado;
 
   const compartilhado = dia.startsWith(mes);
   const feriadoCadastrado = feriadoNaData(configuracoes.feriados, dia);
@@ -148,6 +163,7 @@ export default function VistaPainel({
           feriado: respostaFrequencias.feriado,
           nomeFeriadoNoCadastro,
         });
+        marcarPainelAtualizado?.("painel");
       } catch (excecao) {
         if (viva) {
           setErro(
@@ -164,7 +180,15 @@ export default function VistaPainel({
       viva = false;
       controlador.abort();
     };
-  }, [ativo, compartilhado, dia, recarregar, nomeFeriadoNoCadastro, nav.resumo]);
+  }, [
+    ativo,
+    compartilhado,
+    dia,
+    recarregar,
+    nomeFeriadoNoCadastro,
+    nav.resumo,
+    marcarPainelAtualizado,
+  ]);
 
   const frequenciasDoDia = useMemo(
     () =>
@@ -223,19 +247,19 @@ export default function VistaPainel({
     if (emAtualizacao.current) return;
     emAtualizacao.current = true;
     try {
-      if (compartilhado) await onRecarregar(mes);
-    } catch {
-      // Mantém os números atuais até a próxima tentativa.
+      const tarefas: Promise<unknown>[] = [onRecarregarConfiguracoes()];
+      if (!nav.resumo && compartilhado) tarefas.push(onRecarregar(mes));
+      await Promise.allSettled(tarefas);
     } finally {
       setRecarregar((valor) => valor + 1);
       emAtualizacao.current = false;
     }
-  }, [compartilhado, mes, onRecarregar]);
+  }, [compartilhado, mes, nav.resumo, onRecarregar, onRecarregarConfiguracoes]);
 
   useAtualizacaoTela("painel", atualizarEmSilencio);
 
   useEffect(() => {
-    if (!ativo) return;
+    if (!ativo || calendarioAberto || nav.resumo) return;
     const quandoVisivel = () => {
       if (document.visibilityState === "visible" && navigator.onLine) void atualizarEmSilencio();
     };
@@ -245,7 +269,7 @@ export default function VistaPainel({
       window.clearInterval(intervalo);
       document.removeEventListener("visibilitychange", quandoVisivel);
     };
-  }, [ativo, atualizarEmSilencio]);
+  }, [ativo, calendarioAberto, nav.resumo, atualizarEmSilencio]);
 
   const [cartaoAtivo, setCartaoAtivo] = useState("escola");
   const serieAtiva = series.find((item) => item.id === cartaoAtivo) ?? null;
@@ -364,9 +388,10 @@ export default function VistaPainel({
           <SeletorPeriodo
             id="dia-painel"
             modo="dia"
-            valor={nav.resumo ? "" : dia}
+            valor={nav.resumo ? (nav.domingo ?? "") : dia}
             max={diaCorrente}
-            semDomingo
+            calendarioSemanal
+            mostrarSelo={!nav.resumo}
             rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Dia do painel"}
             rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
             detalhe={nav.resumo ? "semana" : diaDaSemana}
@@ -374,7 +399,8 @@ export default function VistaPainel({
               setCarregando(false);
               nav.voltarParaHoje();
             }}
-            hojeAtivo={nav.resumo || dia === diaCorrente}
+            hojeAtivo={nav.hojeAtivo}
+            onAbertoChange={setCalendarioAberto}
             onValor={(proximo) => nav.escolherDia(proximo)}
           />
         </div>
@@ -389,6 +415,11 @@ export default function VistaPainel({
           <ChevronRight size={18} />
         </Button>
       </div>
+      {!nav.resumo && (
+        <div className="flex justify-end">
+          <AtualizadoDaVisao fuso={fuso} />
+        </div>
+      )}
       {nav.mostrarVoltar && (
         <button
           type="button"
@@ -407,9 +438,17 @@ export default function VistaPainel({
           turmas={turmas}
           alunos={alunos}
           dias={nav.semana}
+          domingo={nav.domingo}
           feriados={configuracoes.feriados}
+          configuracoes={configuracoes}
           mostrarSaidas={configuracoes.saidaAntecipada}
           versao={recarregar}
+          contexto="painel"
+          ativo={ativo}
+          pausado={calendarioAberto}
+          viewId="painel"
+          fuso={fuso}
+          onRecarregarConfiguracoes={onRecarregarConfiguracoes}
           onAbrirDia={(proximo) => nav.escolherDia(proximo)}
         />
       ) : (
@@ -438,7 +477,9 @@ export default function VistaPainel({
                 ) : (
                   (() => {
                     const nivel =
-                      resumo.registrados > 0 ? nivelInfrequencia(resumo.infrequencia) : null;
+                      resumo.registrados > 0
+                        ? nivelInfrequencia(resumo.infrequencia, limiaresDoPainel(configuracoes))
+                        : null;
                     const config = nivel ? NIVEIS[nivel] : null;
                     const Icone = config?.Icone;
                     const largura = Math.min(100, Math.max(0, resumo.infrequencia * 100));

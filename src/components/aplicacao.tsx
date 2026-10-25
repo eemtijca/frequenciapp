@@ -84,6 +84,7 @@ export type Visao =
 
 interface Props {
   usuario: Identidade;
+  carregadoEm: string;
   diaCorrente: string;
   fuso: string;
   visaoInicial?: string;
@@ -298,6 +299,7 @@ function MenuMovel({
 
 export default function Aplicacao({
   usuario,
+  carregadoEm,
   diaCorrente,
   fuso,
   visaoInicial,
@@ -389,6 +391,11 @@ export default function Aplicacao({
   const recarregarEscopo = useCallback(async () => {
     const dados = await pedir<{ turmas: Turma[] }>("/api/turmas");
     setTurmas(dados.turmas);
+  }, []);
+
+  const recarregarConfiguracoes = useCallback(async () => {
+    const dados = await pedir<{ configuracoes: Configuracoes }>("/api/configuracoes");
+    setConfiguracoes(dados.configuracoes);
   }, []);
 
   const recarregarFrequencias = useCallback(
@@ -664,6 +671,7 @@ export default function Aplicacao({
           <VistaPainel
             ativo={ativo}
             diaCorrente={diaCorrente}
+            fuso={fuso}
             mes={mes}
             series={series}
             turmas={turmas}
@@ -672,11 +680,13 @@ export default function Aplicacao({
             saidas={saidas}
             configuracoes={configuracoes}
             onRecarregar={recarregarMes}
+            onRecarregarConfiguracoes={recarregarConfiguracoes}
           />
         )}
         {alvoVisao === "chamada" && (
           <VistaFrequencia
             usuario={usuario}
+            ativo={ativo}
             turmas={turmas}
             alunos={alunos}
             diaCorrente={diaCorrente}
@@ -703,12 +713,14 @@ export default function Aplicacao({
             justificativas={justificativas}
             onFrequenciasMudaram={() => recarregarFrequencias(mes)}
             onPendencia={registrarPendenciaParcial}
+            onAbrirChamada={abrirFrequencia}
           />
         )}
         {alvoVisao === "horarios" && (
           <VistaHorarios
             turmas={turmas}
             diaCorrente={diaCorrente}
+            fuso={fuso}
             editavel={false}
             onMudanca={recarregarEscopo}
           />
@@ -757,6 +769,7 @@ export default function Aplicacao({
           <VistaAlunos
             alunos={alunos}
             turmas={turmas}
+            fuso={fuso}
             onAtualizar={async () => {
               await Promise.all([recarregarAlunos(), recarregarEscopo()]);
             }}
@@ -772,6 +785,7 @@ export default function Aplicacao({
             alunos={alunos}
             configuracoes={configuracoes}
             diaCorrente={diaCorrente}
+            fuso={fuso}
             justificativas={justificativas}
             liberadores={liberadores}
             onSeriesMudaram={async () => {
@@ -888,7 +902,7 @@ export default function Aplicacao({
   }
 
   return (
-    <ProvedorAtualizacao ativo={visao}>
+    <ProvedorAtualizacao ativo={visao} atualizadoEmInicial={carregadoEm}>
       <>
         <div
           ref={raizRef}

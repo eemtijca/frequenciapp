@@ -58,6 +58,7 @@ import {
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -85,6 +86,7 @@ type Filtro = "todos" | "faltas" | "justificadas" | "presentes";
 
 interface Props {
   usuario: Identidade;
+  ativo: boolean;
   turmas: Turma[];
   alunos: Aluno[];
   diaCorrente: string;
@@ -142,6 +144,7 @@ const MARCAS = {
 
 export default function VistaFrequencia({
   usuario,
+  ativo,
   turmas,
   alunos,
   diaCorrente,
@@ -162,7 +165,9 @@ export default function VistaFrequencia({
     diaCorrente,
     max: diaCorrente,
     diaInicial: alvo?.dia ?? null,
+    domingoComoResumo: true,
   });
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
   const dia = nav.dia;
   const [ausencias, setAusencias] = useState<Map<string, Set<string>>>(new Map());
   const [justificativas, setJustificativas] = useState<Map<string, string>>(new Map());
@@ -201,7 +206,7 @@ export default function VistaFrequencia({
     }
     setRecarregar((valor) => valor + 1);
   }, [sujo]);
-  useAtualizacaoTela("chamada", atualizarTela);
+  const marcarChamadaAtualizada = useAtualizacaoTela("chamada", atualizarTela);
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
   // A prop é comparada durante o render, como o React recomenda para estado
@@ -221,6 +226,7 @@ export default function VistaFrequencia({
   if (turmaId === "" && primeiraTurma !== undefined) setTurmaId(primeiraTurma.id);
 
   const turma = turmas.find((t) => t.id === turmaId);
+  const turmasDoResumo = useMemo(() => (turma ? [turma] : []), [turma]);
   const chave = `${dia}|${turmaId}`;
   const ehSabado = diaDaSemanaIso(dia) === 6;
   const leituraConfirmada = frequenciasDoDia?.chave === chave;
@@ -283,6 +289,7 @@ export default function VistaFrequencia({
         const frequencias = dados.frequencias.filter((item) => item.dia === dia);
         const frequencia = frequencias.find((item) => item.turmaId === turmaId) ?? null;
         setFrequenciasDoDia({ chave, frequencias, feriado: dados.feriado, nomeFeriadoNoCadastro });
+        marcarChamadaAtualizada();
         const agendadas = frequencia
           ? []
           : (dados.justificativasAntecipadas ?? []).filter((j) => j.turmaId === turmaId);
@@ -357,7 +364,17 @@ export default function VistaFrequencia({
     return () => {
       viva = false;
     };
-  }, [chave, recarregar, usuario.id, dia, turmaId, turma, nomeFeriadoNoCadastro, nav.resumo]);
+  }, [
+    chave,
+    recarregar,
+    usuario.id,
+    dia,
+    turmaId,
+    turma,
+    nomeFeriadoNoCadastro,
+    nav.resumo,
+    marcarChamadaAtualizada,
+  ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Grava rascunho enquanto houver marcação não salva.
@@ -850,9 +867,10 @@ export default function VistaFrequencia({
               <SeletorPeriodo
                 id="dia-frequencia"
                 modo="dia"
-                valor={nav.resumo ? "" : dia}
+                valor={nav.resumo ? (nav.domingo ?? "") : dia}
                 max={diaCorrente}
-                semDomingo
+                calendarioSemanal
+                mostrarSelo={!nav.resumo}
                 disabled={travado}
                 rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada"}
                 rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
@@ -861,7 +879,8 @@ export default function VistaFrequencia({
                   setCarregando(false);
                   nav.voltarParaHoje();
                 }}
-                hojeAtivo={nav.resumo || dia === diaCorrente}
+                hojeAtivo={nav.hojeAtivo}
+                onAbertoChange={setCalendarioAberto}
                 onValor={(proximo) => nav.escolherDia(proximo)}
               />
             </div>
@@ -876,6 +895,11 @@ export default function VistaFrequencia({
               <ChevronRight size={18} />
             </Button>
           </div>
+          {!nav.resumo && (
+            <div className="flex justify-end">
+              <AtualizadoDaVisao fuso={fuso} />
+            </div>
+          )}
           {nav.mostrarVoltar && (
             <button
               type="button"
@@ -1020,12 +1044,19 @@ export default function VistaFrequencia({
         <div className="flex min-w-0 flex-col gap-4 pb-24 xl:order-1">
           {nav.resumo && nav.semana ? (
             <VistaResumoSemana
-              turmas={turma ? [turma] : []}
+              turmas={turmasDoResumo}
               alunos={alunos}
               dias={nav.semana}
+              domingo={nav.domingo}
               feriados={configuracoes.feriados}
+              configuracoes={configuracoes}
               mostrarSaidas={configuracoes.saidaAntecipada}
               versao={versaoFrequencias + recarregar}
+              contexto="chamada"
+              ativo={ativo}
+              pausado={calendarioAberto}
+              viewId="chamada"
+              fuso={fuso}
               onAbrirDia={(proximo) => nav.escolherDia(proximo)}
             />
           ) : (

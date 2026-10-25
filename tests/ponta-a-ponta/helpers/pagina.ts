@@ -48,7 +48,7 @@ export async function abrirNavegacao(page: Page): Promise<Locator> {
   return menu.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
 }
 
-const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial"]);
+const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial", "saidas"]);
 
 /**
  * No domingo a Chamada, o Painel e a Chamada Parcial abrem no resumo da semana.
@@ -57,13 +57,15 @@ const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial"]);
 export async function abrirDiaSeResumo(page: Page): Promise<void> {
   if (!hojeEDomingo()) return;
   const visao = await page.locator("main").getAttribute("data-visao");
-  const seletor = {
-    painel: "#dia-painel",
-    chamada: "#dia-frequencia",
-    "chamada-parcial": "#dia-chamada-parcial",
-  }[visao ?? ""];
-  if (!seletor) return;
-  const gatilho = page.locator(seletor).locator("visible=true").first();
+  const seletores: Record<string, string[]> = {
+    painel: ["#dia-painel"],
+    chamada: ["#dia-frequencia"],
+    "chamada-parcial": ["#dia-chamada-parcial"],
+    saidas: ["#dia-saidas", "#entrada-dia"],
+  };
+  const lista = seletores[visao ?? ""] ?? [];
+  if (lista.length === 0) return;
+  const gatilho = page.locator(lista.map((seletor) => `${seletor}:visible`).join(", ")).first();
   const vazio = page.getByText("Nenhuma turma cadastrada", { exact: true }).locator("visible=true");
   await expect
     .poll(
@@ -72,7 +74,9 @@ export async function abrirDiaSeResumo(page: Page): Promise<void> {
           ? ((await gatilho.getAttribute("aria-label")) ?? "")
           : "";
         if (
-          /^(Resumo da semana:|Data da chamada|Dia do painel|Data da chamada parcial)/.test(rotulo)
+          /^(Resumo da semana:|Data da chamada|Dia do painel|Data da chamada parcial|Data da saída|Data da entrada)/.test(
+            rotulo,
+          )
         )
           return "dia";
         if (
@@ -90,7 +94,11 @@ export async function abrirDiaSeResumo(page: Page): Promise<void> {
   if (!(await gatilho.count())) return;
   const rotulo = (await gatilho.getAttribute("aria-label")) ?? "";
   if (!rotulo.startsWith("Resumo da semana")) return;
-  await page.getByRole("button", { name: /^Dia anterior/ }).click();
+  await page
+    .getByRole("button", { name: /^Dia anterior/ })
+    .locator("visible=true")
+    .first()
+    .click();
   await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeHidden();
 }
 
@@ -151,6 +159,8 @@ export async function abrirAbaMovimentacao(
   rotulo: "Saídas" | "Entradas",
 ): Promise<void> {
   await page.getByRole("tab", { name: rotulo, exact: true }).click();
+  // Cada aba tem o próprio calendário e, no domingo, abre no resumo.
+  await abrirDiaSeResumo(page);
 }
 
 /** Escolhe o cartão de gráfico indicado no seletor da faixa. */

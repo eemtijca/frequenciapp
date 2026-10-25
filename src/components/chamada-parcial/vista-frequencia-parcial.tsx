@@ -34,7 +34,7 @@ import {
   type FrequenciaDaChamada,
   type FrequenciaDaSaida,
 } from "@/domain/frequencia-personalizada";
-import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
+import { VistaResumoParcial } from "@/components/chamada-parcial/resumo-semana-parcial";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
@@ -42,6 +42,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { BarraBusca } from "@/components/ui/barra-busca";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -79,6 +80,7 @@ interface Props {
   justificativas: JustificativaConfigurada[];
   onFrequenciasMudaram?: () => Promise<void>;
   onPendencia?: (pendente: boolean) => void;
+  onAbrirChamada?: (dia: string, turmaId: string) => void;
 }
 
 interface EstadoPlanilha {
@@ -145,10 +147,17 @@ export default function VistaFrequenciaParcial({
   justificativas,
   onFrequenciasMudaram,
   onPendencia,
+  onAbrirChamada,
 }: Props) {
   // No domingo, a abertura é o resumo da semana encerrada.
   const limite = limiteAgendamentoParcial(diaInicial);
-  const nav = useNavegacaoDoDia({ diaCorrente: diaInicial, max: limite });
+  const nav = useNavegacaoDoDia({
+    diaCorrente: diaInicial,
+    max: limite,
+    domingoComoResumo: true,
+    resumoMax: diaInicial,
+  });
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
   const dia = nav.dia;
   const formatadorConfirmacao = useMemo(
     () =>
@@ -203,7 +212,7 @@ export default function VistaFrequenciaParcial({
     }
     setRecarregar((valor) => valor + 1);
   }, [sujo]);
-  useAtualizacaoTela("chamada-parcial", atualizarTela);
+  const marcarParcialAtualizada = useAtualizacaoTela("chamada-parcial", atualizarTela);
 
   const turmasOrdenadas = useMemo(() => {
     const ordem = new Map(series.map((serie) => [serie.id, serie.ordem]));
@@ -291,14 +300,15 @@ export default function VistaFrequenciaParcial({
       `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
     )
       .then((dados) => {
-        if (atual)
-          setCarga({
-            chave: chaveCarga,
-            registros: dados.registros,
-            erro: "",
-            variante: "indisponivel",
-            feriado: dados.feriado,
-          });
+        if (!atual) return;
+        setCarga({
+          chave: chaveCarga,
+          registros: dados.registros,
+          erro: "",
+          variante: "indisponivel",
+          feriado: dados.feriado,
+        });
+        marcarParcialAtualizada();
       })
       .catch((excecao: unknown) => {
         if (!atual) return;
@@ -312,7 +322,7 @@ export default function VistaFrequenciaParcial({
     return () => {
       atual = false;
     };
-  }, [ativa, dia, turmaId, chaveCarga, nav.resumo]);
+  }, [ativa, dia, turmaId, chaveCarga, nav.resumo, marcarParcialAtualizada]);
 
   useEffect(() => {
     if (!ativa) return;
@@ -564,16 +574,18 @@ export default function VistaFrequenciaParcial({
           <SeletorPeriodo
             id="dia-chamada-parcial"
             modo="dia"
-            valor={nav.resumo ? "" : dia}
+            valor={nav.resumo ? (nav.domingo ?? "") : dia}
             max={limite}
             atual={diaInicial}
-            semDomingo
+            calendarioSemanal
+            mostrarSelo={!nav.resumo}
             rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
             detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
             rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada parcial"}
             onValor={(proximo) => nav.escolherDia(proximo)}
             aoHoje={() => nav.voltarParaHoje()}
-            hojeAtivo={nav.resumo || dia === diaInicial}
+            hojeAtivo={nav.hojeAtivo}
+            onAbertoChange={setCalendarioAberto}
             disabled={ocupado || editorAberto}
           />
         </div>
@@ -589,6 +601,11 @@ export default function VistaFrequenciaParcial({
           <ChevronRight size={18} />
         </Button>
       </div>
+      {!nav.resumo && (
+        <div className="flex justify-end">
+          <AtualizadoDaVisao fuso={fuso} />
+        </div>
+      )}
       {nav.mostrarVoltar && (
         <button
           type="button"
@@ -600,14 +617,19 @@ export default function VistaFrequenciaParcial({
         </button>
       )}
       {nav.resumo && nav.semana ? (
-        <VistaResumoSemana
-          turmas={turma ? [turma] : []}
+        <VistaResumoParcial
+          turma={turma ?? null}
           alunos={alunos}
           dias={nav.semana}
+          domingo={nav.domingo}
           feriados={feriados}
           mostrarSaidas={mostrarSaidas}
           versao={recarregar}
+          ativa={ativa}
+          pausado={calendarioAberto}
+          fuso={fuso}
           onAbrirDia={(proximo) => nav.escolherDia(proximo)}
+          onAbrirChamada={(dia) => onAbrirChamada?.(dia, turmaId)}
         />
       ) : (
         <>
