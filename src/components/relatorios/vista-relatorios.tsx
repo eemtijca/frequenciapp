@@ -96,7 +96,6 @@ export default function VistaRelatorios({
         rotuloAcessivel="Relatórios"
         abaInicial={inicial}
         abas={ABAS}
-        chaveIndicador="indicador-relatorio"
         dataPager="relatorios"
       >
         {(aba, ativa) => (

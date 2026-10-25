@@ -4,7 +4,6 @@
 // emissão da palavra-chave (mostrada uma única vez), revogação com motivo e
 // situação da conta. Só leitura de estatísticas para o diretor (ADR-021).
 import { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import {
   Ban,
   Copy,
@@ -82,7 +81,6 @@ function dataCurta(iso: string | null): string {
 
 export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: Props) {
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
-  const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<DiretorDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
@@ -330,11 +328,8 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           ) : (
             <ul className="flex flex-col gap-3">
               {filtrados.map((diretor) => (
-                <motion.li
+                <li
                   key={diretor.id}
-                  initial={semMovimento ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
                   className={`superficie overflow-hidden ${diretor.ativo ? "" : "opacity-60"}`}
                   data-diretor={diretor.identificador}
                 >
@@ -418,7 +413,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                       )}
                     </div>
                   </div>
-                </motion.li>
+                </li>
               ))}
             </ul>
           )}

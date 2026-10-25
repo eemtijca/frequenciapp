@@ -2,8 +2,7 @@
 
 // Abas com pílula indicadora: troca instantânea por toque, teclado e botões,
 // com deslize curto do conteúdo no desktop.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { motion, useAnimationControls, useReducedMotion } from "motion/react";
+import { useCallback, useRef, useState, type CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
 
 export interface AbaItem<T extends string> {
@@ -18,7 +17,6 @@ interface Props<T extends string> {
   rotuloAcessivel: string;
   abaInicial: T;
   abas: AbaItem<T>[];
-  chaveIndicador: string;
   dataPager: string;
   /** Bloqueia só a troca de abas, preservando a edição no conteúdo ativo. */
   bloqueada?: boolean;
@@ -33,7 +31,6 @@ export default function AbasDeslizantes<T extends string>({
   rotuloAcessivel,
   abaInicial,
   abas,
-  chaveIndicador,
   dataPager,
   bloqueada = false,
   aoTrocar,
@@ -42,41 +39,23 @@ export default function AbasDeslizantes<T extends string>({
 }: Props<T>) {
   const [aba, setAba] = useState<T>(abaInicial);
   const [visitadas, setVisitadas] = useState<Set<T>>(() => new Set([abaInicial]));
-  const [ehDesktop, setEhDesktop] = useState(false);
   const abasRef = useRef<(HTMLButtonElement | null)[]>([]);
-  const controles = useAnimationControls();
-  const semMovimento = useReducedMotion() ?? false;
-
-  // A troca por toque é instantânea em qualquer largura. No desktop o
-  // conteúdo faz um deslize curto.
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    const atualizar = () => setEhDesktop(media.matches);
-    atualizar();
-    media.addEventListener("change", atualizar);
-    return () => media.removeEventListener("change", atualizar);
-  }, []);
+  const indiceAtivo = Math.max(
+    0,
+    abas.findIndex((item) => item.valor === aba),
+  );
 
   const trocarAba = useCallback(
     (proxima: T, focar = false) => {
       if (bloqueada) return;
       const indice = abas.findIndex((item) => item.valor === proxima);
       if (indice < 0) return;
-      const indiceAtual = abas.findIndex((item) => item.valor === aba);
       setAba(proxima);
       aoTrocar?.(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
-      if (ehDesktop && !semMovimento && indice !== indiceAtual) {
-        controles.set({ x: (indice > indiceAtual ? 1 : -1) * 24, opacity: 0.65 });
-        void controles.start({
-          x: 0,
-          opacity: 1,
-          transition: { duration: 0.15, ease: [0.22, 1, 0.36, 1] },
-        });
-      }
       if (focar) abasRef.current[indice]?.focus();
     },
-    [aba, abas, aoTrocar, controles, ehDesktop, semMovimento, bloqueada],
+    [abas, aoTrocar, bloqueada],
   );
 
   function aoTeclar(evento: React.KeyboardEvent) {
@@ -95,9 +74,21 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`superficie grid gap-0.5 p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
-          style={{ gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))` }}
+          className={`superficie relative grid gap-0.5 p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          style={
+            {
+              gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))`,
+              "--aba-indice": indiceAtivo,
+            } as CSSProperties
+          }
         >
+          <span
+            aria-hidden="true"
+            className="indicador-abas"
+            style={{
+              width: `calc((100% - 0.5rem - ${Math.max(0, abas.length - 1)} * var(--aba-gap)) / ${abas.length})`,
+            }}
+          />
           {abas.map((item, indice) => {
             const Icone = item.icone;
             const ativo = aba === item.valor;
@@ -116,18 +107,8 @@ export default function AbasDeslizantes<T extends string>({
                 tabIndex={ativo ? 0 : -1}
                 disabled={bloqueada}
                 onClick={() => trocarAba(item.valor)}
-                className="discreto focus-visible:ring-ring/50 pressionavel relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold transition-colors focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs"
+                className={`${ativo ? "" : "discreto"} focus-visible:ring-ring/50 pressionavel relative z-10 flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs`}
               >
-                {ativo &&
-                  (semMovimento ? (
-                    <span className="selecionado absolute inset-0" />
-                  ) : (
-                    <motion.span
-                      layoutId={chaveIndicador}
-                      className="selecionado absolute inset-0"
-                      transition={{ type: "spring", stiffness: 500, damping: 40 }}
-                    />
-                  ))}
                 <Icone
                   size={15}
                   className={`relative z-10 ${ativo ? "text-primary" : "text-muted-foreground"}`}
@@ -152,7 +133,7 @@ export default function AbasDeslizantes<T extends string>({
         {acao}
       </div>
 
-      <motion.div animate={controles} initial={false} className="min-w-0">
+      <div className="min-w-0">
         <div data-pager={dataPager} className="min-w-0">
           {abas.map((item) => {
             const ativo = item.valor === aba;
@@ -166,14 +147,14 @@ export default function AbasDeslizantes<T extends string>({
                 aria-hidden={!ativo}
                 inert={!ativo}
                 hidden={!ativo}
-                className="pagina-painel min-w-0"
+                className="pagina-painel aba-painel min-w-0"
               >
                 {children(item.valor, ativo)}
               </div>
             );
           })}
         </div>
-      </motion.div>
+      </div>
     </>
   );
 }

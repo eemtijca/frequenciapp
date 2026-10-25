@@ -3,7 +3,6 @@
 // Aba de turmas: criar, renomear, mover de série e excluir, sempre
 // agrupadas por série para leitura rápida.
 import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { Clock, LoaderCircle, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -53,7 +52,6 @@ interface Formulario {
 
 export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
-  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Turma | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({ serieId: "", nome: "" });
   const { chaveAtiva, executar } = useAcoesPorChave();
@@ -204,15 +202,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
             </div>
           ) : (
             gruposFiltrados.map(([serieId, grupo]) => (
-              <motion.div
-                key={serieId}
-                initial={semMovimento ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={
-                  semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                }
-                className="superficie overflow-hidden"
-              >
+              <div key={serieId} className="superficie overflow-hidden">
                 <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
                   <h2 className="font-medium">{grupo.serie?.nome ?? "Série"}</h2>
                   <span className="numerais-tabulares text-muted-foreground text-xs">
@@ -290,7 +280,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                     );
                   })}
                 </ul>
-              </motion.div>
+              </div>
             ))
           )}
         </div>

@@ -2,7 +2,6 @@
 
 // Aba de séries: criar, renomear, reordenar e excluir.
 import { useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -49,7 +48,6 @@ const VAZIO: Formulario = { nome: "", ordem: "1" };
 
 export default function AbaSeries({ series, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
-  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
   const { chaveAtiva, executar } = useAcoesPorChave();
@@ -154,11 +152,8 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       ) : (
         <ul className="superficie divide-y overflow-hidden">
           {filtradas.map((serie) => (
-            <motion.li
+            <li
               key={serie.id}
-              initial={semMovimento ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
               className="flex items-center gap-3 px-4 py-3 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
             >
               <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">
@@ -209,7 +204,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
-            </motion.li>
+            </li>
           ))}
         </ul>
       )}

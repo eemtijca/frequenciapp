@@ -2,7 +2,6 @@
 
 // Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, History } from "lucide-react";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
@@ -51,7 +50,6 @@ export default function VistaHistorico({
   bloqueado,
   rotuloTurma,
 }: Props) {
-  const semMovimento = useReducedMotion() ?? false;
   const [busca, setBusca] = useState("");
   const [serieFiltro, setSerieFiltro] = useState("");
 
@@ -210,13 +208,8 @@ export default function VistaHistorico({
                   ? ` · salva às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
                   : "";
                 return (
-                  <motion.li
+                  <li
                     key={`${frequencia.dia}|${frequencia.turmaId}`}
-                    initial={semMovimento ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={
-                      semMovimento ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
-                    }
                     className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
                   >
                     <button
@@ -247,7 +240,7 @@ export default function VistaHistorico({
                       </span>
                       <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />
                     </button>
-                  </motion.li>
+                  </li>
                 );
               })}
             </ul>

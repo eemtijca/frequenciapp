@@ -508,7 +508,11 @@ export default function PorAluno({
                   gruposTurma.map(({ turma, linhas: linhasTurma }) => {
                     const turmaAberta = buscando || !turmasFechadas.has(turma.id);
                     return (
-                      <section key={turma.id} aria-label={turma.rotulo} className="border-t">
+                      <section
+                        key={turma.id}
+                        aria-label={turma.rotulo}
+                        className="grupo-distante border-t"
+                      >
                         <CabecalhoGrupo
                           nivel="turma"
                           titulo={turma.rotulo}

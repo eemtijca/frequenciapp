@@ -436,6 +436,29 @@ test("buscar e percorrer horários com teclado rola apenas o painel de opções"
   expect(await posicaoDaTela(page)).toEqual(posicaoHorario);
 });
 
+test("preserva a rolagem ao trocar de visão", async ({ page }) => {
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Relatórios", "relatorios");
+  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Relatório por aluno", exact: true }),
+  ).toBeVisible();
+
+  const painel = painelDaTela(page);
+  await painel.evaluate((elemento) => {
+    elemento.scrollTop = Math.min(600, elemento.scrollHeight - elemento.clientHeight);
+  });
+  const antes = await painel.evaluate((elemento) => elemento.scrollTop);
+  expect(antes).toBeGreaterThan(0);
+
+  await trocarVisao(page, "Painel", "painel");
+  await trocarVisao(page, "Relatórios", "relatorios");
+  await expect
+    .poll(() => painelDaTela(page).evaluate((elemento) => elemento.scrollTop))
+    .toBeGreaterThanOrEqual(antes - 1);
+});
+
 test("a confirmação de exclusão permite alcançar as ações na tela baixa e cancelar", async ({
   page,
 }) => {

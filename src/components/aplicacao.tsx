@@ -465,13 +465,23 @@ export default function Aplicacao({
     setLiberadores(dados.liberadores);
   }, []);
 
+  // Guarda a rolagem uma única vez, ao sair da visão. Ler em cada evento de
+  // rolagem custa layout e aparece no perfil de quadros do celular.
+  const guardarRolagemAtual = useCallback(() => {
+    const item = itens.find((candidato) => candidato.visao === visao);
+    if (!item) return;
+    const painel = pagerRef.current?.querySelector<HTMLElement>(`[aria-label="${item.rotulo}"]`);
+    if (painel) posicoes.current.set(visao, painel.scrollTop);
+  }, [itens, visao]);
+
   const ativarVisao = useCallback(
     (proxima: Visao) => {
       if (!itens.some((item) => item.visao === proxima)) return;
+      guardarRolagemAtual();
       setVisao(proxima);
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
     },
-    [itens],
+    [guardarRolagemAtual, itens],
   );
   // A Chamada Parcial guarda o rascunho na própria visão; a edição de horários, em Gestão.
   const visaoComRascunho = useCallback(
@@ -527,12 +537,6 @@ export default function Aplicacao({
       return pendente ? [...semHorarios, "horarios"] : semHorarios;
     });
   }, []);
-  // Guarda e devolve a rolagem de cada painel, para os painéis distantes que
-  // saem da pintura não perderem a posição ao voltar.
-  const guardarRolagem = useCallback((alvo: Visao, evento: React.UIEvent<HTMLElement>) => {
-    posicoes.current.set(alvo, evento.currentTarget.scrollTop);
-  }, []);
-
   useEffect(() => {
     const indice = itens.findIndex((item) => item.visao === visao);
     if (indice < 0) return;
@@ -970,7 +974,6 @@ export default function Aplicacao({
                       inert={!ativo}
                       data-distante={distante ? "true" : undefined}
                       hidden={!ativo}
-                      onScroll={(evento) => guardarRolagem(item.visao, evento)}
                       className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                     >
                       {renderizarVisao(item.visao, ativo)}

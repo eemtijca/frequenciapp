@@ -3,7 +3,6 @@
 // Alunos: lista de consulta do professor, agrupada por turma atual ou por
 // turma de origem. O cadastro e a edição acontecem na área de Gestão.
 import { memo, useDeferredValue, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
@@ -27,24 +26,12 @@ interface PropsGrupo {
   turma: Turma | undefined;
   lista: Aluno[];
   agrupamento: Agrupamento;
-  semMovimento: boolean;
   rotuloDe: (id: string, fallback: string) => string;
 }
 
-const GrupoAlunos = memo(function GrupoAlunos({
-  turma,
-  lista,
-  agrupamento,
-  semMovimento,
-  rotuloDe,
-}: PropsGrupo) {
+const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotuloDe }: PropsGrupo) {
   return (
-    <motion.div
-      initial={semMovimento ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={semMovimento ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-      className="superficie overflow-hidden"
-    >
+    <div className="superficie grupo-distante overflow-hidden">
       <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
         <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
         <span className="numerais-tabulares text-muted-foreground text-xs">
@@ -81,13 +68,12 @@ const GrupoAlunos = memo(function GrupoAlunos({
           </li>
         ))}
       </ul>
-    </motion.div>
+    </div>
   );
 });
 
 export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
-  const semMovimento = useReducedMotion() ?? false;
   const [busca, setBusca] = useState("");
   const buscaAplicada = useDeferredValue(busca);
   useAtualizacaoTela("alunos", onAtualizar);
@@ -216,7 +202,6 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
             turma={turma}
             lista={lista}
             agrupamento={agrupamento}
-            semMovimento={semMovimento}
             rotuloDe={rotuloDe}
           />
         ))

@@ -644,7 +644,6 @@ export default function VistaHorarios({
               aulasDoTurno("manha") === 0 && aulasDoTurno("tarde") > 0 ? "tarde" : "manha"
             }
             abas={TURNOS}
-            chaveIndicador={editavel ? "horarios-turno-edicao" : "horarios-turno"}
             dataPager={editavel ? "horarios-turnos-edicao" : "horarios-turnos"}
             bloqueada={navegacaoBloqueada}
           >
