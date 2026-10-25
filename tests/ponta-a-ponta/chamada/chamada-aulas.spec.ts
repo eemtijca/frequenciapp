@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -88,6 +88,7 @@ test("mantém faltas e retrato quando a grade ganha aulas", async ({ page }) => 
 
   await page.reload();
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
 
   // Painel: a falta integral continua contando e a parcial fica visível.
   const resumoDia = page.getByRole("group", { name: "Resumo do dia" });

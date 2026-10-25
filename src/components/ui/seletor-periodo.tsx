@@ -35,6 +35,13 @@ interface Props {
   mostrarSelo?: boolean;
   /** Calendário de segunda a sábado: o domingo não aparece e a navegação o pula. */
   semDomingo?: boolean;
+  /**
+   * Atalho Hoje da tela. No domingo, a Chamada, o Painel e a Chamada Parcial
+   * abrem o resumo da semana em vez de escolher o sábado.
+   */
+  aoHoje?: () => void;
+  /** Hoje já está em foco: o atalho fica desabilitado. */
+  hojeAtivo?: boolean;
   onValor: (valor: string) => void;
 }
 
@@ -63,6 +70,8 @@ export function SeletorPeriodo({
   detalhe,
   mostrarSelo = true,
   semDomingo = false,
+  aoHoje,
+  hojeAtivo = false,
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
@@ -75,9 +84,14 @@ export function SeletorPeriodo({
   const botoes = useRef(new Map<string, HTMLButtonElement>());
   const focoPendente = useRef(false);
 
-  // Sem domingo, qualquer data que caia nele vale pelo sábado anterior,
-  // inclusive o limite: se hoje é domingo, o último dia escolhível é o sábado.
+  // Sem domingo, a grade e o limite ignoram o dia: se o máximo é domingo,
+  // o último dia escolhível continua sendo o sábado. O atalho Hoje não faz
+  // esse salto quando a tela trata o domingo à parte.
   const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
+  const hojeNoDomingoSemAcao =
+    modo === "dia" && semDomingo && diaDaSemanaIso(corrente) === 7 && !aoHoje;
+  const hojeDesabilitado =
+    hojeNoDomingoSemAcao || (aoHoje ? hojeAtivo : valor === aprumar(corrente));
   const limite = aprumar(max);
   const piso = min ? aprumar(min) : null;
   const referencia = aprumar((valor || corrente) > max ? max : valor || corrente);
@@ -308,8 +322,16 @@ export function SeletorPeriodo({
       <div className="flex items-center justify-between gap-2 border-t pt-3">
         <button
           type="button"
-          disabled={valor === aprumar(corrente)}
-          onClick={() => escolher(aprumar(corrente))}
+          disabled={hojeDesabilitado}
+          onClick={() => {
+            if (hojeDesabilitado) return;
+            if (aoHoje) {
+              aoHoje();
+              setAberto(false);
+              return;
+            }
+            escolher(aprumar(corrente));
+          }}
           className="discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
         >
           {modo === "dia" ? "Hoje" : "Este mês"}

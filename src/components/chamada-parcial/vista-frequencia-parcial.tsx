@@ -22,8 +22,6 @@ import type {
 import {
   JUSTIFICATIVA_OUTROS,
   alunoDesistenteNoDia,
-  diaDeChamadaVizinho,
-  ultimoDiaDeChamada,
   normalizar,
   rotuloDiaSemana,
 } from "@/domain/frequencia";
@@ -36,7 +34,9 @@ import {
   type FrequenciaDaChamada,
   type FrequenciaDaSaida,
 } from "@/domain/frequencia-personalizada";
+import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -75,6 +75,7 @@ interface Props {
   ativa: boolean;
   fuso: string;
   feriados: Feriado[];
+  mostrarSaidas: boolean;
   justificativas: JustificativaConfigurada[];
   onFrequenciasMudaram?: () => Promise<void>;
   onPendencia?: (pendente: boolean) => void;
@@ -140,13 +141,15 @@ export default function VistaFrequenciaParcial({
   ativa,
   fuso,
   feriados,
+  mostrarSaidas,
   justificativas,
   onFrequenciasMudaram,
   onPendencia,
 }: Props) {
-  // Domingo não tem chamada: abrir num domingo mostra o sábado anterior.
-  const diaPadrao = ultimoDiaDeChamada(diaInicial);
-  const [dia, setDia] = useState(diaPadrao);
+  // No domingo, a abertura é o resumo da semana encerrada.
+  const limite = limiteAgendamentoParcial(diaInicial);
+  const nav = useNavegacaoDoDia({ diaCorrente: diaInicial, max: limite });
+  const dia = nav.dia;
   const formatadorConfirmacao = useMemo(
     () =>
       new Intl.DateTimeFormat("pt-BR", {
@@ -175,7 +178,7 @@ export default function VistaFrequenciaParcial({
   const feriado =
     carga.chave === chaveCarga && carga.feriado !== undefined ? carga.feriado : feriadoCadastrado;
   const registros = carga.chave === chaveCarga ? carga.registros : REGISTROS_VAZIOS;
-  const carregando = turmaId !== "" && carga.chave !== chaveCarga;
+  const carregando = !nav.resumo && turmaId !== "" && carga.chave !== chaveCarga;
   const erro = carga.chave === chaveCarga ? carga.erro : "";
   const [editorAberto, setEditorAberto] = useState(false);
   const [baseEdicao, setBaseEdicao] = useState<FrequenciaDaChamada | null>(null);
@@ -282,7 +285,7 @@ export default function VistaFrequenciaParcial({
   useEffect(() => () => onPendencia?.(false), [onPendencia]);
 
   useEffect(() => {
-    if (!ativa || !dia || !turmaId) return;
+    if (!ativa || nav.resumo || !dia || !turmaId) return;
     let atual = true;
     pedir<{ registros: RegistroPersonalizado[]; feriado?: Feriado | null }>(
       `/api/frequencias-personalizadas?dia=${dia}&turmaId=${encodeURIComponent(turmaId)}`,
@@ -309,7 +312,7 @@ export default function VistaFrequenciaParcial({
     return () => {
       atual = false;
     };
-  }, [ativa, dia, turmaId, chaveCarga]);
+  }, [ativa, dia, turmaId, chaveCarga, nav.resumo]);
 
   useEffect(() => {
     if (!ativa) return;
@@ -404,7 +407,7 @@ export default function VistaFrequenciaParcial({
       setEditorAberto(false);
       if (dados.aviso) avisarInfo(dados.aviso);
       if (edicao.tipo === "JUSTIFICADA") {
-        setDia(dados.registro.dia);
+        nav.escolherDia(dados.registro.dia);
         setRecarregar((v) => v + 1);
         avisarSucesso(
           `${dados.registros?.length ?? 1} ${(dados.registros?.length ?? 1) === 1 ? "dia justificado" : "dias justificados"}.`,
@@ -551,7 +554,7 @@ export default function VistaFrequenciaParcial({
           variant="outline"
           size="icon"
           aria-label="Dia anterior da chamada parcial"
-          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, -1))}
+          onClick={() => nav.anterior()}
           disabled={ocupado || editorAberto}
           className="size-11 shrink-0"
         >
@@ -561,14 +564,16 @@ export default function VistaFrequenciaParcial({
           <SeletorPeriodo
             id="dia-chamada-parcial"
             modo="dia"
-            valor={dia}
-            max={limiteAgendamentoParcial(diaInicial)}
+            valor={nav.resumo ? "" : dia}
+            max={limite}
             atual={diaInicial}
             semDomingo
-            rotulo={dia.split("-").reverse().join("/")}
-            detalhe={rotuloDiaSemana(dia).replace("-feira", "")}
-            rotuloAcessivel="Data da chamada parcial"
-            onValor={setDia}
+            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
+            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada parcial"}
+            onValor={(proximo) => nav.escolherDia(proximo)}
+            aoHoje={() => nav.voltarParaHoje()}
+            hojeAtivo={nav.resumo || dia === diaInicial}
             disabled={ocupado || editorAberto}
           />
         </div>
@@ -577,214 +582,243 @@ export default function VistaFrequenciaParcial({
           variant="outline"
           size="icon"
           aria-label="Dia seguinte da chamada parcial"
-          onClick={() => setDia((atual) => diaDeChamadaVizinho(atual, 1))}
-          disabled={ocupado || editorAberto || dia >= limiteAgendamentoParcial(diaInicial)}
+          onClick={() => nav.seguinte()}
+          disabled={ocupado || editorAberto || nav.seguinteDesabilitado}
           className="size-11 shrink-0"
         >
           <ChevronRight size={18} />
         </Button>
       </div>
-      {feriado && (
-        <div
-          role="status"
-          className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+      {nav.mostrarVoltar && (
+        <button
+          type="button"
+          disabled={ocupado || editorAberto || sujo}
+          onClick={() => nav.voltarParaHoje()}
+          className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
         >
-          <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
-          <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
-        </div>
+          Voltar para hoje
+        </button>
       )}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <BarraBusca
-          id="parcial-busca"
-          valor={busca}
-          onValor={setBusca}
-          placeholder="Buscar aluno"
-          className="min-w-0 flex-1"
+      {nav.resumo && nav.semana ? (
+        <VistaResumoSemana
+          turmas={turma ? [turma] : []}
+          alunos={alunos}
+          dias={nav.semana}
+          feriados={feriados}
+          mostrarSaidas={mostrarSaidas}
+          versao={recarregar}
+          onAbrirDia={(proximo) => nav.escolherDia(proximo)}
         />
-        <div className="sm:w-48">
-          <Selecionar
-            id="parcial-filtro"
-            ariaLabel="Situação da frequência parcial"
-            value={filtro}
-            onValueChange={setFiltro}
-            opcoes={[
-              { valor: "todos", rotulo: "Todos os alunos" },
-              { valor: "sem-registro", rotulo: "Sem registro" },
-              { valor: "pendentes", rotulo: "Pendentes na Seduc" },
-              { valor: "registrados", rotulo: "Registrados na Seduc" },
-            ]}
-          />
-        </div>
-      </div>
-      {erro ? (
-        <AvisoCompacto
-          variante={carga.variante}
-          titulo="Chamada parcial indisponível"
-          descricao={erro}
-          acao={{ rotulo: "Tentar de novo", onClick: () => setRecarregar((valor) => valor + 1) }}
-        />
-      ) : carregando ? (
-        <p
-          role="status"
-          className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
-        >
-          <LoaderCircle size={18} className="animate-spin" />
-          Carregando chamada parcial...
-        </p>
       ) : (
-        <div className="superficie overflow-hidden">
-          <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
-            <span className="numerais-tabulares">
-              {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
-            </span>
-            {(filtro !== "todos" || busca !== "") && (
-              <button
-                type="button"
-                className="text-primary pressionavel font-medium hover:underline"
-                onClick={() => {
-                  setFiltro("todos");
-                  setBusca("");
-                }}
-              >
-                Ver todos
-              </button>
-            )}
+        <>
+          {feriado && (
+            <div
+              role="status"
+              className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+            >
+              <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
+              <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
+            </div>
+          )}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <BarraBusca
+              id="parcial-busca"
+              valor={busca}
+              onValor={setBusca}
+              placeholder="Buscar aluno"
+              className="min-w-0 flex-1"
+            />
+            <div className="sm:w-48">
+              <Selecionar
+                id="parcial-filtro"
+                ariaLabel="Situação da frequência parcial"
+                value={filtro}
+                onValueChange={setFiltro}
+                opcoes={[
+                  { valor: "todos", rotulo: "Todos os alunos" },
+                  { valor: "sem-registro", rotulo: "Sem registro" },
+                  { valor: "pendentes", rotulo: "Pendentes na Seduc" },
+                  { valor: "registrados", rotulo: "Registrados na Seduc" },
+                ]}
+              />
+            </div>
           </div>
-          {alunosFiltrados.length === 0 ? (
-            <p className="text-muted-foreground px-6 py-8 text-center text-sm">
-              {listaAlunos.length === 0
-                ? "Nenhum aluno ativo nesta turma."
-                : "Nenhum aluno encontrado com estes filtros."}
+          {erro ? (
+            <AvisoCompacto
+              variante={carga.variante}
+              titulo="Chamada parcial indisponível"
+              descricao={erro}
+              acao={{
+                rotulo: "Tentar de novo",
+                onClick: () => setRecarregar((valor) => valor + 1),
+              }}
+            />
+          ) : carregando ? (
+            <p
+              role="status"
+              className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
+            >
+              <LoaderCircle size={18} className="animate-spin" />
+              Carregando chamada parcial...
             </p>
           ) : (
-            <div>
-              <div className="text-muted-foreground bg-secondary/40 hidden grid-cols-[minmax(0,1fr)_11rem_9rem_auto] items-center gap-3 border-b px-4 py-2 text-xs font-medium md:grid">
-                <span>Aluno</span>
-                <span>Situação</span>
-                <span>Registro na Seduc</span>
-                <span className="text-right">Ações</span>
+            <div className="superficie overflow-hidden">
+              <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
+                <span className="numerais-tabulares">
+                  {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
+                </span>
+                {(filtro !== "todos" || busca !== "") && (
+                  <button
+                    type="button"
+                    className="text-primary pressionavel font-medium hover:underline"
+                    onClick={() => {
+                      setFiltro("todos");
+                      setBusca("");
+                    }}
+                  >
+                    Ver todos
+                  </button>
+                )}
               </div>
-              <ul className="divide-y">
-                {alunosFiltrados.map((aluno) => {
-                  const registro = aluno.registro;
-                  const resumo = resumoDoRegistro(registro, justificativas);
-                  return (
-                    <li
-                      key={aluno.id}
-                      className="px-4 py-2.5"
-                      data-testid={`parcial-aluno-${aluno.id}`}
-                    >
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 md:grid-cols-[minmax(0,1fr)_11rem_9rem_auto] md:items-center">
-                        <div className="min-w-0">
-                          <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
-                          {aluno.desistente && (
-                            <span className="text-muted-foreground text-xs">Desistente</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 md:col-start-2">
-                          <span
-                            title={resumo}
-                            className={cn(
-                              "line-clamp-2 inline-block max-w-full rounded-lg border px-2 py-0.5 text-xs font-medium wrap-anywhere",
-                              !registro
-                                ? "bg-muted/30 text-muted-foreground"
-                                : registro.tipo === "SAIDA" && !registro.aulasConferiveis
-                                  ? "bg-muted/30 text-muted-foreground"
-                                  : registro.tipo === "SAIDA" && registro.aulas.length === 0
-                                    ? "border-falta/25 bg-falta-fraca text-falta-texto"
-                                    : registro.tipo === "JUSTIFICADA"
-                                      ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                      : registro.tipo !== "CHAMADA" || registro.marca === "P"
-                                        ? "border-primary/25 bg-primary/10 text-primary"
-                                        : registro.marca === "FJ"
+              {alunosFiltrados.length === 0 ? (
+                <p className="text-muted-foreground px-6 py-8 text-center text-sm">
+                  {listaAlunos.length === 0
+                    ? "Nenhum aluno ativo nesta turma."
+                    : "Nenhum aluno encontrado com estes filtros."}
+                </p>
+              ) : (
+                <div>
+                  <div className="text-muted-foreground bg-secondary/40 hidden grid-cols-[minmax(0,1fr)_11rem_9rem_auto] items-center gap-3 border-b px-4 py-2 text-xs font-medium md:grid">
+                    <span>Aluno</span>
+                    <span>Situação</span>
+                    <span>Registro na Seduc</span>
+                    <span className="text-right">Ações</span>
+                  </div>
+                  <ul className="divide-y">
+                    {alunosFiltrados.map((aluno) => {
+                      const registro = aluno.registro;
+                      const resumo = resumoDoRegistro(registro, justificativas);
+                      return (
+                        <li
+                          key={aluno.id}
+                          className="px-4 py-2.5"
+                          data-testid={`parcial-aluno-${aluno.id}`}
+                        >
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 md:grid-cols-[minmax(0,1fr)_11rem_9rem_auto] md:items-center">
+                            <div className="min-w-0">
+                              <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
+                              {aluno.desistente && (
+                                <span className="text-muted-foreground text-xs">Desistente</span>
+                              )}
+                            </div>
+                            <div className="min-w-0 md:col-start-2">
+                              <span
+                                title={resumo}
+                                className={cn(
+                                  "line-clamp-2 inline-block max-w-full rounded-lg border px-2 py-0.5 text-xs font-medium wrap-anywhere",
+                                  !registro
+                                    ? "bg-muted/30 text-muted-foreground"
+                                    : registro.tipo === "SAIDA" && !registro.aulasConferiveis
+                                      ? "bg-muted/30 text-muted-foreground"
+                                      : registro.tipo === "SAIDA" && registro.aulas.length === 0
+                                        ? "border-falta/25 bg-falta-fraca text-falta-texto"
+                                        : registro.tipo === "JUSTIFICADA"
                                           ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                          : "border-falta/25 bg-falta-fraca text-falta-texto",
-                            )}
-                          >
-                            {resumo}
-                          </span>
-                        </div>
-                        <div className="col-span-2 flex min-h-10 items-center gap-2 md:col-span-1 md:col-start-3">
-                          {exigeConferenciaSeduc(registro) ? (
-                            <>
-                              <Label
-                                htmlFor={`parcial-seduc-${aluno.id}`}
-                                className="text-xs md:sr-only"
-                                title="Registro na Seduc"
+                                          : registro.tipo !== "CHAMADA" || registro.marca === "P"
+                                            ? "border-primary/25 bg-primary/10 text-primary"
+                                            : registro.marca === "FJ"
+                                              ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                              : "border-falta/25 bg-falta-fraca text-falta-texto",
+                                )}
                               >
-                                Registro na Seduc
-                              </Label>
-                              <Switch
-                                id={`parcial-seduc-${aluno.id}`}
-                                aria-label={`Registro na Seduc: ${aluno.nome}`}
-                                title="Registro na Seduc"
-                                checked={registro.registradoSeduc}
+                                {resumo}
+                              </span>
+                            </div>
+                            <div className="col-span-2 flex min-h-10 items-center gap-2 md:col-span-1 md:col-start-3">
+                              {exigeConferenciaSeduc(registro) ? (
+                                <>
+                                  <Label
+                                    htmlFor={`parcial-seduc-${aluno.id}`}
+                                    className="text-xs md:sr-only"
+                                    title="Registro na Seduc"
+                                  >
+                                    Registro na Seduc
+                                  </Label>
+                                  <Switch
+                                    id={`parcial-seduc-${aluno.id}`}
+                                    aria-label={`Registro na Seduc: ${aluno.nome}`}
+                                    title="Registro na Seduc"
+                                    checked={registro.registradoSeduc}
+                                    disabled={
+                                      ocupado ||
+                                      editorAberto ||
+                                      (registro.tipo === "SAIDA" && !registro.aulasConferiveis)
+                                    }
+                                    onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
+                                  />
+                                </>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </div>
+                            <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:col-start-4">
+                              <Button
+                                type="button"
+                                variant={registro ? "ghost" : "outline"}
+                                size="sm"
+                                onClick={() => abrirEditor(registro ?? null, aluno.id)}
+                                aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
                                 disabled={
                                   ocupado ||
                                   editorAberto ||
-                                  (registro.tipo === "SAIDA" && !registro.aulasConferiveis)
+                                  Boolean(feriado) ||
+                                  (!registro && aluno.desistente)
                                 }
-                                onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
-                              />
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">-</span>
+                                className="h-10"
+                              >
+                                {registro ? <Pencil size={15} /> : <Plus size={15} />}
+                                {registro ? "Editar" : "Registrar"}
+                              </Button>
+                              {registro &&
+                                registro.tipo !== "CHAMADA" &&
+                                registro.tipo !== "SAIDA" && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setRegistroRemover(registro)}
+                                    aria-label={`Remover frequência parcial de ${aluno.nome}`}
+                                    disabled={ocupado || editorAberto}
+                                    className="text-falta-texto h-10"
+                                  >
+                                    <Trash2 size={15} />
+                                    Remover
+                                  </Button>
+                                )}
+                            </div>
+                          </div>
+                          {exigeConferenciaSeduc(registro) && registro.registradoSeduc && (
+                            <p className="text-muted-foreground mt-1 text-xs" role="status">
+                              {`Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`}
+                            </p>
                           )}
-                        </div>
-                        <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:col-start-4">
-                          <Button
-                            type="button"
-                            variant={registro ? "ghost" : "outline"}
-                            size="sm"
-                            onClick={() => abrirEditor(registro ?? null, aluno.id)}
-                            aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
-                            disabled={
-                              ocupado ||
-                              editorAberto ||
-                              Boolean(feriado) ||
-                              (!registro && aluno.desistente)
-                            }
-                            className="h-10"
-                          >
-                            {registro ? <Pencil size={15} /> : <Plus size={15} />}
-                            {registro ? "Editar" : "Registrar"}
-                          </Button>
-                          {registro && registro.tipo !== "CHAMADA" && registro.tipo !== "SAIDA" && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setRegistroRemover(registro)}
-                              aria-label={`Remover frequência parcial de ${aluno.nome}`}
-                              disabled={ocupado || editorAberto}
-                              className="text-falta-texto h-10"
-                            >
-                              <Trash2 size={15} />
-                              Remover
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      {exigeConferenciaSeduc(registro) && registro.registradoSeduc && (
-                        <p className="text-muted-foreground mt-1 text-xs" role="status">
-                          {`Confirmado por ${registro.registradoSeducPorNome ?? "registro anterior"}${registro.registradoSeducEm ? ` em ${momentoDaConfirmacao(registro, formatadorConfirmacao)}` : ""}`}
-                        </p>
-                      )}
-                      {registro &&
-                        registro.tipo !== "CHAMADA" &&
-                        registro.tipo !== "JUSTIFICADA" &&
-                        registro.observacao && (
-                          <p className="text-muted-foreground mt-1 text-xs break-words">
-                            {registro.observacao}
-                          </p>
-                        )}
-                    </li>
-                  );
-                })}
-              </ul>
+                          {registro &&
+                            registro.tipo !== "CHAMADA" &&
+                            registro.tipo !== "JUSTIFICADA" &&
+                            registro.observacao && (
+                              <p className="text-muted-foreground mt-1 text-xs break-words">
+                                {registro.observacao}
+                              </p>
+                            )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
       <DialogoFrequenciaParcial
         aberto={ativa && editorAberto}

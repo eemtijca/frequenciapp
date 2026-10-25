@@ -4,7 +4,12 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaDeChamada } from "../helpers/dia";
 import { comBanco } from "../helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
-import { aguardarHidratacao, liberarSabadoSeNecessario, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "../helpers/pagina";
 
 // As leituras interceptadas passam pelo navegador; a cobertura do worker é separada.
 test.use({ serviceWorkers: "block" });
@@ -262,6 +267,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await expect(percentual).toHaveText("0%");
   await expect(serie.getByText("100%", { exact: true })).toHaveCount(0);
   await secao.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
+  await abrirDiaSeResumo(page);
   await expect(serie).toHaveAttribute("data-situacao", "concluida");
 });
 
