@@ -339,9 +339,25 @@ export function VistaResumoParcial({
                     }
                     contagens={
                       dia.registros > 0 ? (
-                        <span className="text-muted-foreground text-xs">
-                          {dia.registros} {dia.registros === 1 ? "registro" : "registros"}
-                        </span>
+                        <div className="flex w-full flex-col gap-1.5">
+                          <span className="text-muted-foreground text-xs">
+                            {dia.registros} {dia.registros === 1 ? "registro" : "registros"}
+                          </span>
+                          <div aria-hidden="true" className="flex w-full gap-0.5">
+                            {dia.ajustes > 0 ? (
+                              <span
+                                className="bg-primary h-1 rounded-full"
+                                style={{ flexGrow: dia.ajustes }}
+                              />
+                            ) : null}
+                            {dia.pendentes > 0 ? (
+                              <span
+                                className="bg-alerta h-1 rounded-full"
+                                style={{ flexGrow: dia.pendentes }}
+                              />
+                            ) : null}
+                          </div>
+                        </div>
                       ) : undefined
                     }
                     detalhe={

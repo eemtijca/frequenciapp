@@ -372,6 +372,15 @@ export function VistaResumoSemana({
     );
   }, [alunos, dados, mostrarSaidas, turmas]);
 
+  const movimentacoesPorDia = useMemo(
+    () =>
+      dias.map((dia) => ({
+        dia,
+        total: movimentacoes.filter((movimento) => movimento.dia === dia).length,
+      })),
+    [dias, movimentacoes],
+  );
+
   const pendenciasSeduc = useMemo(() => {
     if (!dados) return [];
     return dados.parciais
@@ -741,6 +750,19 @@ export function VistaResumoSemana({
               {dados.avisoEntradas}
             </p>
           ) : null}
+          <ul aria-label="Movimentações por dia" className="grid grid-cols-3 gap-1 sm:grid-cols-6">
+            {movimentacoesPorDia.map((item) => (
+              <li
+                key={item.dia}
+                className="bg-secondary/40 flex flex-col items-center gap-0.5 rounded-lg border px-2 py-1.5"
+              >
+                <span className="text-muted-foreground text-[11px]">
+                  {rotuloCurtoDoDia(item.dia)}
+                </span>
+                <span className="numerais-tabulares text-sm font-semibold">{item.total}</span>
+              </li>
+            ))}
+          </ul>
           <ListaMovimentacoes itens={movimentacoes} />
         </SecaoResumo>
       ) : null}

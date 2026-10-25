@@ -157,6 +157,7 @@ export default function VistaSaidas({
   // Enquanto a leitura do dia escolhido não chega, a lista fica carregando.
   const carregandoDia = !nav.resumo && !compartilhado && doDia?.dia !== dia;
   const listaBloqueada = diaLiberado !== dia;
+  const domingoBloqueado = diaLiberado !== nav.domingo;
 
   useEffect(() => {
     if (nav.resumo || compartilhado) return;
@@ -415,6 +416,7 @@ export default function VistaSaidas({
             nav.escolherDia(proximo);
           }}
           onVerDomingo={() => {
+            setDiaLiberado(null);
             setCarregandoDomingo(true);
             setVerDomingo(true);
           }}
@@ -425,14 +427,27 @@ export default function VistaSaidas({
         <section className="superficie flex flex-col gap-3 p-4" aria-label="Registros do domingo">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Saídas de {rotuloData(nav.domingo)}</h2>
-            <Button
-              type="button"
-              variant="link"
-              className="min-h-11 px-0"
-              onClick={() => setVerDomingo(false)}
-            >
-              Voltar ao resumo
-            </Button>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 rounded-full px-4"
+                aria-label={`${domingoBloqueado ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloData(nav.domingo)}`}
+                disabled={removendoId !== null}
+                onClick={() => setDiaLiberado(domingoBloqueado ? nav.domingo : null)}
+              >
+                {domingoBloqueado ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
+                {domingoBloqueado ? "Desbloquear" : "Bloquear"}
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                className="min-h-11 px-0"
+                onClick={() => setVerDomingo(false)}
+              >
+                Voltar ao resumo
+              </Button>
+            </div>
           </div>
           {carregandoDomingo ? (
             <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -454,15 +469,17 @@ export default function VistaSaidas({
                         className="mt-1"
                       />
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Remover saída de ${aluno?.nome ?? "aluno"}`}
-                      disabled={removendoId === saida.id}
-                      onClick={() => setSaidaRemover(saida)}
-                    >
-                      <Trash2 size={18} />
-                    </Button>
+                    {!domingoBloqueado && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remover saída de ${aluno?.nome ?? "aluno"}`}
+                        disabled={removendoId === saida.id}
+                        onClick={() => setSaidaRemover(saida)}
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                    )}
                   </li>
                 );
               })}
