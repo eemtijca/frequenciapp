@@ -176,16 +176,18 @@ A unicidade de (aluno, dia) impede dois registros no mesmo dia; a correção é 
 
 ## Configuração (configuracao)
 
-| Campo             | Tipo     | Observação                                                        |
-| ----------------- | -------- | ----------------------------------------------------------------- |
-| id                | texto    | Linha única `principal`, criada na migração.                      |
-| frequenciaPorAula | booleano | Liga a chamada por aula, os chips de aulas e a marca S.           |
-| saidaAntecipada   | booleano | Mostra a área de saídas antecipadas e o relatório semanal.        |
-| origemNaChamada   | booleano | Habilita a indicação de origem nas séries ou turmas selecionadas. |
-| atualizadoEm      | data     | Momento da última alteração.                                      |
-| atualizadoPorId   | uuid     | Quem alterou; anulável.                                           |
+| Campo                         | Tipo     | Observação                                                        |
+| ----------------------------- | -------- | ----------------------------------------------------------------- |
+| id                            | texto    | Linha única `principal`, criada na migração.                      |
+| frequenciaPorAula             | booleano | Liga a chamada por aula, os chips de aulas e a marca S.           |
+| saidaAntecipada               | booleano | Mostra a área de saídas antecipadas e o relatório semanal.        |
+| origemNaChamada               | booleano | Habilita a indicação de origem nas séries ou turmas selecionadas. |
+| infrequenciaAtencaoPercentual | inteiro  | Fim da faixa verde do card de Infrequência; padrão 10.            |
+| infrequenciaCriticaPercentual | inteiro  | Fim da faixa âmbar e início da vermelha; padrão 20.               |
+| atualizadoEm                  | data     | Momento da última alteração.                                      |
+| atualizadoPorId               | uuid     | Quem alterou; anulável.                                           |
 
-Os recursos são ligados e desligados na Gestão, com auditoria. Desligar não apaga dados: a chamada por aula volta a valer quando religada, e as saídas permanecem consultáveis pelos relatórios.
+Os recursos são ligados e desligados na Gestão, com auditoria. Desligar não apaga dados: a chamada por aula volta a valer quando religada, e as saídas permanecem consultáveis pelos relatórios. Os dois limites de infrequência são inteiros de 0 a 100, com atenção menor que crítica, e valem para o card do Painel e para a linha de referência do resumo semanal; os percentuais brutos de Relatórios, FrequenciBI e benefícios não mudam.
 
 A seleção de origem é armazenada nas relações `configuracoes_origem_series` e `configuracoes_origem_turmas`, com referências ao cadastro e chave composta com a configuração. A Chamada usa a união das duas seleções, condicionada a `origemNaChamada`. Uma série selecionada inclui suas turmas atuais e futuras. Reativar recupera a seleção preservada; o recurso não modifica o nome ou a turma original do aluno.
 

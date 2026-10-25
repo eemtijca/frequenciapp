@@ -62,3 +62,6 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-054](adr/054-interface-plana.md): design plano sem desfoque, com superfícies sólidas e sombra apenas em camadas flutuantes.
 - [ADR-055](adr/055-saidas-na-chamada-parcial.md): saídas na conferência parcial, aulas concluídas e confirmação na SEDUC vinculada à base exibida.
 - [ADR-056](adr/056-resumo-da-semana-no-domingo.md): no domingo, a abertura mostra o resumo da semana encerrada.
+- [ADR-057](adr/057-resumo-semanal-no-painel.md): resumo semanal compartilhado pelas quatro telas, calendário de segunda a domingo, seções recolhíveis e atualização silenciosa.
+- [ADR-058](adr/058-domingo-sem-novos-registros.md): domingo recusa criação e edição de chamada, saída e entrada, mas preserva a remoção de registros históricos.
+- [ADR-059](adr/059-infrequencia-configuravel.md): limites percentuais do card de Infrequência configurados pela Gestão e usados no Painel.
