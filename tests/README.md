@@ -122,4 +122,4 @@ pnpm run capturas:readme         # Playwright local
 pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
 ```
 
-O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.
+O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. A galeria fica em `docs/imagens/README.md` e o teste `tests/unit/readme-imagens.test.ts` limita a largura e o peso das imagens do README. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.

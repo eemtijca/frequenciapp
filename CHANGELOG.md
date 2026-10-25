@@ -107,6 +107,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O README deixa de exibir as capturas em tamanho natural. A entrada usa duas miniaturas com largura controlada, cada uma com link para o arquivo completo, e as demais imagens ficam na galeria em `docs/imagens/README.md`. Um teste limita largura, existência e peso dos arquivos.
+
 - Rolagem no celular deixa de executar JavaScript a cada evento: a posição é lida uma única vez ao sair da visão. O indicador de abas passa a usar `transform` em vez de animação de layout, as listas deixam de fazer aparição com Motion, e os grupos longos usam `content-visibility` com tamanho intrínseco reservado. `scrollbar-gutter` e `overscroll-behavior` estabilizam os painéis.
 
 - Interface revisada de ponta a ponta, com foco em consistência e uso no celular: login com favicon e conteúdo centralizado; conta em menu flutuante, com o tema no desktop; Painel com um gráfico por vez, seletor e setas, sem rolagem lateral; Chamada com alerta de benefício em popover e ações empilhadas; Chamada Parcial em tabela compacta; Saídas e Entradas com formulário em grade e envio único; Relatórios abrindo em Resumo e Grade com título; Gestão com descrições nas seções recolhíveis; FrequenciBI com título centralizado, seletor de seção e Mais ações no celular. Configurações de recursos e origem passam a usar rascunho local, confirmação explícita e revisão otimista, com `atualizadoEm` na API e resposta 409 em conflito.

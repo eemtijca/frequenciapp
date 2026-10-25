@@ -5,11 +5,6 @@
 [![CodeQL](https://github.com/eemtijca/frequenciapp/actions/workflows/codeql.yml/badge.svg)](https://github.com/eemtijca/frequenciapp/actions/workflows/codeql.yml)
 [![Licença](https://img.shields.io/github/license/eemtijca/frequenciapp)](LICENSE)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/imagens/chamada-mobile-escuro.png">
-  <img alt="Chamada diária no celular" src="docs/imagens/chamada-mobile-claro.png">
-</picture>
-
 Aplicativo da coordenação escolar: chamada única diária, saídas antecipadas e indicadores da escola. Mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a chamada salva.
 
 Aplicação publicada em https://frequenciappjca.vercel.app.
@@ -45,10 +40,24 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 
 A aplicação publicada fica em https://frequenciappjca.vercel.app. Para experimentar localmente com dados sintéticos, siga a seção [Começando](#começando): o Compose cria o administrador e a semente gera séries, turmas, alunos e alguns dias de chamadas e saídas.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/imagens/painel-desktop-escuro.png">
-  <img alt="Painel do dia no desktop" src="docs/imagens/painel-desktop-claro.png">
-</picture>
+<p align="center">
+  <a href="docs/imagens/painel-desktop-claro.png">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/imagens/painel-desktop-escuro.png">
+      <img alt="Painel do dia no desktop" src="docs/imagens/painel-desktop-claro.png" width="560">
+    </picture>
+  </a>
+  <a href="docs/imagens/chamada-mobile-claro.png">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/imagens/chamada-mobile-escuro.png">
+      <img alt="Chamada diária no celular" src="docs/imagens/chamada-mobile-claro.png" width="180">
+    </picture>
+  </a>
+</p>
+
+<p align="center">
+  <a href="docs/imagens/README.md">Ver a galeria de capturas</a>
+</p>
 
 ## Recursos
 
