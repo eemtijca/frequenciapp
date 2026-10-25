@@ -1,4 +1,4 @@
-# ADR-055: resumo da semana no domingo
+# ADR-056: resumo da semana no domingo
 
 - Status: aceita
 - Data: 2026-10-25

@@ -214,4 +214,5 @@ tests/
 
 - [ADR-034: Chamada Parcial e confirmação manual da Seduc](adr/034-chamada-parcial-e-confirmacao-seduc.md)
 - [ADR-054: interface plana sem desfoque](adr/054-interface-plana.md)
-- [ADR-055: resumo da semana no domingo](adr/055-resumo-da-semana-no-domingo.md)
+- [ADR-055: saídas antecipadas na Chamada Parcial](adr/055-saidas-na-chamada-parcial.md)
+- [ADR-056: resumo da semana no domingo](adr/056-resumo-da-semana-no-domingo.md)

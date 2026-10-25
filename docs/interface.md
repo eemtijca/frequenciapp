@@ -138,3 +138,5 @@ Filtros têm aplicação explícita de período, recortes adicionais recolhidos 
 ## Sobre e proteção de dados
 
 O diálogo Sobre mantém altura limitada à tela, rolagem interna e retorno do foco ao controle de abertura, inclusive na tela de entrada e na área do diretor. A seção Proteção de dados e LGPD reúne o compromisso institucional, o consentimento informado pela escola, salvaguardas existentes e o link para a documentação de tratamento dos dados.
+
+- **Saídas na Chamada Parcial**: a lista mostra automaticamente as saídas antigas e novas, com as aulas concluídas até o horário registrado. Aulas em andamento não entram. A saída mantém sua origem, o ajuste manual prevalece e Registro na Seduc continua sendo uma conferência manual. Sem horário ou grade válidos, o selo pede conferir as aulas e a confirmação fica desabilitada até a personalização. A remoção da origem é feita em Saídas; ajustes manuais independentes são preservados.

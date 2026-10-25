@@ -1,7 +1,7 @@
 // Contratos da lista combinada: histórico diário, ajustes independentes e confirmação por fonte.
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import pg from "pg";
-import type { RegistroPersonalizado } from "@/domain/frequencia-personalizada";
+import type { FrequenciaDaSaida, RegistroPersonalizado } from "@/domain/frequencia-personalizada";
 import type { FrequenciaParcial } from "@/domain/frequencia-parcial";
 
 const url = process.env.APP_URL ?? "http://localhost:3000";
@@ -158,7 +158,10 @@ beforeEach(async () => {
     turmaId,
     alunos,
   ]);
-  await cliente.query("update horarios set ativo = true where id = any($1::uuid[])", [horarios]);
+  await cliente.query(
+    "update horarios set ativo = true, inicio=to_char(time '07:00' + (ordem-1)*interval '50 minutes','HH24:MI'), fim=to_char(time '07:50' + (ordem-1)*interval '50 minutes','HH24:MI') where id = any($1::uuid[])",
+    [horarios],
+  );
   await cliente.query("update justificativas set ativo = true where codigo = any($1::text[])", [
     [codigoJustificativa, codigoOutraJustificativa],
   ]);
@@ -199,7 +202,7 @@ it("não supõe presença sem chamada salva nem inclui alunos fora da lista hist
   });
 });
 
-it("preserva P, F, FJ e aulas parcialmente ausentes sem inferir presença a partir das saídas", async () => {
+it("preserva P, F, FJ e aulas parcialmente ausentes na chamada salva", async () => {
   const frequenciaId = await salvarBase();
   for (const horarioId of horarios) {
     await cliente.query(
@@ -210,10 +213,6 @@ it("preserva P, F, FJ e aulas parcialmente ausentes sem inferir presença a part
   await cliente.query(
     "insert into faltas (frequencia_id, aluno_id, horario_id) values ($1, $2, $3)",
     [frequenciaId, alunoDe(3), horarios[1]],
-  );
-  await cliente.query(
-    "insert into saidas_antecipadas (aluno_id, dia, momento, horario, texto) values ($1, $2, 'aula_2', '08:00', 'QA Chamada Personalizada saída')",
-    [alunoDe(0), dia],
   );
   const registros = await listar();
   expect(registros.map((item) => item.tipo === "CHAMADA" && item.marca)).toEqual([
@@ -385,4 +384,122 @@ it("consulta o intervalo sem criar cópias ou alterar frequências e confirmaç�
   expect(registros).toHaveLength(5);
   expect(registros.at(-1)).toMatchObject({ alunoId: alunoDe(4), dia: "2026-06-16" });
   expect((await consultar()).rows[0]?.snapshot).toEqual(antes);
+});
+
+async function saidaHistorica(horario: string | null = "08:10") {
+  const criada = await cliente.query<{ id: string }>(
+    "insert into saidas_antecipadas (aluno_id,dia,momento,horario,texto) values ($1,$2,'aula_2',$3,'QA saída para conferência') returning id",
+    [alunoDe(0), dia, horario],
+  );
+  return criada.rows[0]?.id ?? "";
+}
+
+async function saidaProjetada(): Promise<FrequenciaDaSaida> {
+  const registro = (await listar()).find((r) => r.alunoId === alunoDe(0));
+  if (registro?.tipo !== "SAIDA") throw new Error("Saída sintética não projetada.");
+  return registro;
+}
+
+function confirmarSaida(registro: FrequenciaDaSaida, registrado = true, sessao = cookie) {
+  return chamar(
+    `/api/saidas/${registro.id}/seduc`,
+    "POST",
+    {
+      assinatura: registro.assinatura,
+      revisao: registro.revisaoSeduc,
+      registrado,
+    },
+    sessao,
+  );
+}
+
+it("inclui saídas antigas sem chamada salva e conta só aulas concluídas", async () => {
+  const id = await saidaHistorica();
+  expect(await saidaProjetada()).toMatchObject({
+    id,
+    tipo: "SAIDA",
+    aulas: [1],
+    aulasConferiveis: true,
+    registradoSeduc: false,
+  });
+  expect(await listar()).toHaveLength(1);
+  expect(await listar()).toEqual(await listar());
+  expect(
+    (
+      await cliente.query(
+        "select count(*)::int as total from frequencias_parciais where aluno_id=$1",
+        [alunoDe(0)],
+      )
+    ).rows[0]?.total,
+  ).toBe(0);
+  expect((await chamar(`/api/saidas/${id}`, "DELETE")).status).toBe(200);
+  expect(await listar()).toEqual([]);
+});
+
+it("não inventa presença para saída antiga sem horário e exige conferência das aulas", async () => {
+  await saidaHistorica(null);
+  const registro = await saidaProjetada();
+  expect(registro).toMatchObject({ aulas: [], aulasConferiveis: false });
+  expect((await confirmarSaida(registro)).status).toBe(409);
+});
+
+it("confirma na Seduc por assinatura e rejeita a revisão ou grade desatualizadas", async () => {
+  await saidaHistorica();
+  const inicial = await saidaProjetada();
+  expect((await confirmarSaida(inicial, true, "")).status).toBe(401);
+  expect((await confirmarSaida(inicial)).status).toBe(200);
+  const confirmada = await saidaProjetada();
+  expect(confirmada).toMatchObject({ registradoSeduc: true, revisaoSeduc: 1 });
+  expect((await confirmarSaida(inicial, false)).status).toBe(409);
+  await cliente.query("update horarios set fim='08:20' where id=$1", [horarios[0]]);
+  expect(await saidaProjetada()).toMatchObject({ aulas: [], registradoSeduc: false });
+  expect((await confirmarSaida(confirmada)).status).toBe(409);
+});
+
+it("preserva faltas da chamada, usa sua turma histórica e mantém ajustes manuais", async () => {
+  const chamadaId = await salvarBase();
+  await cliente.query("insert into faltas (frequencia_id,aluno_id,horario_id) values ($1,$2,$3)", [
+    chamadaId,
+    alunoDe(0),
+    horarios[0],
+  ]);
+  const id = await saidaHistorica();
+  await cliente.query("update alunos set turma_id=$1 where id=$2", [outraTurmaId, alunoDe(0)]);
+  const origem = await saidaProjetada();
+  expect(origem).toMatchObject({ turmaId, aulas: [] });
+  const resposta = await chamar("/api/frequencias-parciais", "POST", {
+    alunoId: alunoDe(0),
+    turmaId,
+    dia,
+    tipo: "AULAS",
+    aulas: [2],
+    revisao: 0,
+    baseSaida: { id, assinatura: origem.assinatura },
+  });
+  expect(resposta.status).toBe(200);
+  expect((await listar())[0]).toMatchObject({ tipo: "AULAS", turmaId, aulas: [2] });
+  expect((await confirmarSaida(origem)).status).toBe(409);
+  expect((await chamar(`/api/saidas/${id}`, "DELETE")).status).toBe(200);
+  expect((await listar())[0]).toMatchObject({ tipo: "AULAS", aulas: [2] });
+  expect(
+    (
+      await cliente.query("select count(*)::int as total from faltas where frequencia_id=$1", [
+        chamadaId,
+      ])
+    ).rows[0]?.total,
+  ).toBe(1);
+});
+
+it("não restaura confirmação antiga após remover uma personalização manual", async () => {
+  await saidaHistorica();
+  expect((await confirmarSaida(await saidaProjetada())).status).toBe(200);
+  const parcial = await salvarPersonalizacao();
+  expect(
+    (
+      await chamar(`/api/frequencias-parciais/${parcial.id}`, "DELETE", {
+        revisao: parcial.revisao,
+      })
+    ).status,
+  ).toBe(200);
+  expect(await saidaProjetada()).toMatchObject({ registradoSeduc: false });
 });

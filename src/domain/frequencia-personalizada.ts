@@ -24,13 +24,23 @@ export interface FrequenciaDaChamada {
   atualizadoEm: string;
 }
 
-export type RegistroPersonalizado = FrequenciaParcial | FrequenciaDaChamada;
+/** Saída projetada para conferência; a assinatura protege as aulas exibidas. */
+export interface FrequenciaDaSaida extends Omit<FrequenciaParcial, "tipo" | "turno"> {
+  tipo: "SAIDA";
+  horario: string | null;
+  aulasConferiveis: boolean;
+  assinatura: string;
+  revisaoSeduc: number;
+}
+
+export type RegistroPersonalizado = FrequenciaParcial | FrequenciaDaChamada | FrequenciaDaSaida;
 
 /** Registros que precisam de conferência manual na Seduc, inclusive presença em parte do dia. */
 export function exigeConferenciaSeduc(
   registro: RegistroPersonalizado | undefined,
 ): registro is RegistroPersonalizado {
   return (
+    registro?.tipo === "SAIDA" ||
     registro?.tipo === "TURNO" ||
     registro?.tipo === "AULAS" ||
     registro?.tipo === "JUSTIFICADA" ||
@@ -40,5 +50,10 @@ export function exigeConferenciaSeduc(
 }
 
 export function rotuloFrequenciaPersonalizada(registro: RegistroPersonalizado): string {
+  if (registro.tipo === "SAIDA") {
+    if (!registro.aulasConferiveis) return "Saída · conferir aulas";
+    if (registro.aulas.length === 0) return "Saída · nenhuma aula concluída";
+    return `Presente · ${rotuloFrequenciaParcial({ ...registro, tipo: "AULAS", turno: null })}`;
+  }
   return registro.tipo === "CHAMADA" ? registro.descricao : rotuloFrequenciaParcial(registro);
 }
