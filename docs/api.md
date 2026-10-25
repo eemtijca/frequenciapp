@@ -444,7 +444,7 @@ As rotas exigem sessão da equipe (administração ou coordenação); diretores 
 
 Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` opcional. Sem datas, consulta o dia corrente da escola. Períodos aceitam até 92 dias.
 
-- 200 `{ "registros": RegistroPersonalizado[] }`, em ordem de dia, nome e identificador. Cada item é uma `FrequenciaParcial` ou uma `FrequenciaDaChamada`.
+- 200 `{ "registros": RegistroPersonalizado[] }`, em ordem de dia, nome e identificador. Cada item é uma `FrequenciaParcial`, uma `FrequenciaDaChamada` ou uma `FrequenciaDaSaida`.
 - 400 datas inválidas, período incompleto ou invertido, uso simultâneo de dia e período ou turma inválida.
 
 Quando `dia` é informado, a resposta inclui também `feriado: Feriado | null`, consultado no servidor. Consultas por período preservam o formato sem esse campo.
@@ -453,7 +453,9 @@ FrequenciaDaChamada: `{ tipo: "CHAMADA", id, alunoId, dia, turmaId, alunoNome, t
 
 A consulta combina chamadas salvas com personalizações sem copiar nem gravar dados. A personalização prevalece por aluno e dia antes do filtro de turma. Se o aluno integrou mais de uma chamada no dia, vale a mais recentemente atualizada, com desempate pelo identificador. A lista histórica da chamada define os alunos da base, usando seus nomes e os nomes da turma na consulta; sem chamada salva nem personalização, não há registro de presença. Nomes e turma de personalizações existentes continuam históricos.
 
-Para confirmar itens `CHAMADA`, usar `/api/frequencias/seduc` com ambas as revisões. Para personalizações, usar `/api/frequencias-parciais/{id}/seduc`.
+Itens `SAIDA` incluem `aulas` concluídas antes do horário da saída, `aulasConferiveis`, `assinatura` e `revisaoSeduc`. Personalizações manuais prevalecem sobre saídas, que prevalecem sobre a chamada normal. Sem horário ou grade válidos, a saída pede conferência, sem inventar aulas.
+
+Para confirmar itens `SAIDA`, usar `/api/saidas/{id}/seduc`. Para confirmar itens `CHAMADA`, usar `/api/frequencias/seduc` com ambas as revisões. Para personalizações, usar `/api/frequencias-parciais/{id}/seduc`.
 
 ### GET /api/frequencias-parciais
 
@@ -467,6 +469,8 @@ Filtros: `dia` ou o par inclusivo `de` e `ate`, com `turmaId` histórico opciona
 FrequenciaParcial: `{ id, alunoId, dia, turmaId, alunoNome, turmaNome, tipo, justificativa, turno, aulas, observacao, registradoSeduc, registradoSeducEm, registradoSeducPorNome, revisao, criadoEm, atualizadoEm }`. Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601. Os nomes e a turma retratam a criação, mesmo depois de transferência ou renomeação. Identificadores internos de autoria não são expostos.
 
 ### POST /api/frequencias-parciais
+
+Ao personalizar uma saída, incluir `baseSaida: { id, assinatura }` conforme a consulta anterior, com a turma histórica do item. Não combinar com `baseChamada` nem com intervalo de vários dias. Alteração da origem responde 409.
 
 Corpo: `{ alunoId: uuid, turmaId?: uuid, dia: "YYYY-MM-DD", tipo: "DIA_INTEIRO" | "TURNO" | "AULAS" | "JUSTIFICADA", ate?: "YYYY-MM-DD", justificativa?: string | null, turno?: "MANHA" | "TARDE" | null, aulas?: number[], observacao?: string | null, revisao?: number, baseChamada?: { turmaId: uuid, revisao: number } }`.
 
@@ -509,6 +513,10 @@ Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma 
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
 Saida: `{ id, alunoId, dia, momento, horario, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
+
+### POST /api/saidas/{id}/seduc
+
+Sessão da operação e origem confiável. Corpo `{ "registrado": true, "revisao": 0, "assinatura": "<64 caracteres hexadecimais>" }`, usando a assinatura e a revisão da consulta de registros personalizados. Responde 200 `{ "registro": FrequenciaDaSaida }`. Revisão ou aulas alteradas, origem removida, falta de grade ou existência de personalização respondem 409. Confirmar não envia dados à SEDUC. Alterar a grade ou as faltas da base invalida a confirmação exibida; personalizar exige nova conferência se a saída voltar a ser a base.
 
 ### POST /api/saidas
 

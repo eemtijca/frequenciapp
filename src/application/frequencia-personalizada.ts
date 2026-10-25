@@ -3,6 +3,7 @@
 import { z } from "zod";
 import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { esquemaFiltrosParciais } from "./frequencia-parcial";
+import { consultarSaidasParciais } from "./saidas-parciais";
 import {
   diaLocal,
   horariosDaChamada,
@@ -119,6 +120,10 @@ export async function listarFrequenciasPersonalizadas(
     for (const personalizada of personalizadas) {
       const registro = apresentarPersonalizacao(personalizada, catalogo);
       porAlunoDia.set(`${registro.alunoId}:${registro.dia}`, registro);
+    }
+    for (const saida of await consultarSaidasParciais(tx, periodo)) {
+      const chave = `${saida.alunoId}:${saida.dia}`;
+      if (!porAlunoDia.has(chave)) porAlunoDia.set(chave, saida);
     }
     for (const chamada of chamadas) {
       const dia = chamada.dia.toISOString().slice(0, 10);

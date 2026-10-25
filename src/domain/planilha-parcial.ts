@@ -46,7 +46,9 @@ function valoresDaFrequencia(
     codigo,
     frequencia.tipo === "CHAMADA"
       ? `chamada:${frequencia.revisao}:seduc:${frequencia.revisaoSeduc}`
-      : String(frequencia.revisao),
+      : frequencia.tipo === "SAIDA"
+        ? `saida:${frequencia.assinatura}:seduc:${frequencia.revisaoSeduc}`
+        : String(frequencia.revisao),
   ];
 }
 

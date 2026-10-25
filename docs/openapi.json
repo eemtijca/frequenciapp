@@ -3498,7 +3498,7 @@
       "get": {
         "operationId": "listarFrequenciasPersonalizadas",
         "summary": "Consultar registros personalizados",
-        "description": "Sessão da equipe. Combina chamadas salvas e personalizações sem gravar dados; sem datas, consulta o dia corrente da escola.",
+        "description": "Sessão da equipe. Combina chamadas salvas, saídas antecipadas e personalizações sem gravar dados; ajustes manuais prevalecem por aluno e dia. Sem datas, consulta o dia corrente da escola.",
         "tags": ["frequencias-personalizadas"],
         "parameters": [
           {
@@ -11821,9 +11821,18 @@
                       ],
                       "chavesBi": [],
                       "planilhas": {
-                        "frequencia": { "ativa": true, "envioAutomatico": false },
-                        "saidas": { "ativa": true, "envioAutomatico": false },
-                        "parcial": { "ativa": false, "envioAutomatico": false }
+                        "frequencia": {
+                          "ativa": true,
+                          "envioAutomatico": false
+                        },
+                        "saidas": {
+                          "ativa": true,
+                          "envioAutomatico": false
+                        },
+                        "parcial": {
+                          "ativa": false,
+                          "envioAutomatico": false
+                        }
                       },
                       "revisoes": {
                         "configuracao": "hash-da-configuracao",
@@ -11973,9 +11982,18 @@
                         ],
                         "chavesBi": [],
                         "planilhas": {
-                          "frequencia": { "ativa": true, "envioAutomatico": false },
-                          "saidas": { "ativa": true, "envioAutomatico": false },
-                          "parcial": { "ativa": false, "envioAutomatico": false }
+                          "frequencia": {
+                            "ativa": true,
+                            "envioAutomatico": false
+                          },
+                          "saidas": {
+                            "ativa": true,
+                            "envioAutomatico": false
+                          },
+                          "parcial": {
+                            "ativa": false,
+                            "envioAutomatico": false
+                          }
                         },
                         "revisoes": {
                           "configuracao": "hash-da-configuracao",
@@ -11991,6 +12009,70 @@
                         }
                       },
                       "segredosBi": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/saidas/{id}/seduc": {
+      "post": {
+        "operationId": "confirmarSaidaSeduc",
+        "summary": "Confirmar saída na Seduc",
+        "description": "Sessão da operação e origem confiável. Registra a conferência manual das aulas exibidas na Chamada Parcial. Mudanças na assinatura, revisão ou existência de personalização respondem 409.",
+        "tags": ["saidas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identificador da saída.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "7c4e2a10-5b6d-4f8e-9a0b-1c2d3e4f5a6b"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaidaSeducCorpo"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conferência atualizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["registro"],
+                  "properties": {
+                    "registro": {
+                      "$ref": "#/components/schemas/FrequenciaDaSaida"
                     }
                   }
                 }
@@ -14483,10 +14565,13 @@
           },
           {
             "$ref": "#/components/schemas/FrequenciaDaChamada"
+          },
+          {
+            "$ref": "#/components/schemas/FrequenciaDaSaida"
           }
         ],
         "title": "Registro personalizado",
-        "description": "Cada item da consulta é uma FrequenciaParcial ou uma FrequenciaDaChamada."
+        "description": "Cada item deriva da chamada salva, da saída antecipada ou de uma personalização manual, que prevalece por aluno e dia."
       },
       "FrequenciaParcialCorpo": {
         "type": "object",
@@ -14589,6 +14674,9 @@
             "format": "date",
             "description": "Fim inclusivo, somente para criar um período JUSTIFICADA. Sem este campo, salva apenas dia.",
             "example": "2026-10-16"
+          },
+          "baseSaida": {
+            "$ref": "#/components/schemas/BaseSaida"
           }
         }
       },
@@ -19373,6 +19461,200 @@
                 }
               }
             }
+          }
+        }
+      },
+      "FrequenciaDaSaida": {
+        "type": "object",
+        "title": "Frequência da saída",
+        "description": "Item automático da saída antecipada, com aulas concluídas e assinatura da base exibida.",
+        "required": [
+          "id",
+          "alunoId",
+          "dia",
+          "turmaId",
+          "tipo",
+          "aulas",
+          "aulasConferiveis",
+          "assinatura",
+          "revisaoSeduc"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b9c"
+          },
+          "alunoId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-10-13"
+          },
+          "turmaId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "alunoNome": {
+            "type": "string",
+            "description": "Nome histórico do aluno.",
+            "example": "Carlos Eduardo Lima"
+          },
+          "turmaNome": {
+            "type": "string",
+            "description": "Rótulo histórico da turma.",
+            "example": "1º ano A"
+          },
+          "tipo": {
+            "const": "SAIDA",
+            "example": "SAIDA"
+          },
+          "aulas": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 30
+            },
+            "example": [1, 2]
+          },
+          "observacao": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Até 300 caracteres.",
+            "example": null
+          },
+          "registradoSeduc": {
+            "type": "boolean",
+            "example": false
+          },
+          "registradoSeducEm": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": null
+          },
+          "registradoSeducPorNome": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": null
+          },
+          "revisao": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-13T17:30:00.000Z"
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-10-13T17:30:00.000Z"
+          },
+          "justificativa": {
+            "oneOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Código estável do catálogo compartilhado com a Chamada. Obrigatório para JUSTIFICADA.",
+            "example": "CM"
+          },
+          "justificativaRotulo": {
+            "type": ["string", "null"],
+            "description": "Rótulo do catálogo, incluído na consulta de frequências personalizadas.",
+            "example": "Consulta Médica"
+          },
+          "horario": {
+            "type": ["string", "null"],
+            "example": "08:10"
+          },
+          "aulasConferiveis": {
+            "type": "boolean",
+            "description": "Falso quando faltam horário ou grade válidos, ou quando a data não é letiva.",
+            "example": true
+          },
+          "assinatura": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "revisaoSeduc": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0
+          }
+        }
+      },
+      "BaseSaida": {
+        "type": "object",
+        "title": "Base da saída",
+        "description": "Identifica a origem e as aulas exibidas antes de uma personalização.",
+        "additionalProperties": false,
+        "required": ["id", "assinatura"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "7c4e2a10-5b6d-4f8e-9a0b-1c2d3e4f5a6b"
+          },
+          "assinatura": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "SaidaSeducCorpo": {
+        "type": "object",
+        "title": "Conferência da saída",
+        "description": "Confirma as aulas da base vigente; revisão ou assinatura desatualizadas respondem 409.",
+        "additionalProperties": false,
+        "required": ["registrado", "revisao", "assinatura"],
+        "properties": {
+          "registrado": {
+            "type": "boolean",
+            "example": true
+          },
+          "revisao": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0
+          },
+          "assinatura": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
           }
         }
       }

@@ -34,6 +34,7 @@ import {
   rotuloFrequenciaPersonalizada,
   type RegistroPersonalizado,
   type FrequenciaDaChamada,
+  type FrequenciaDaSaida,
 } from "@/domain/frequencia-personalizada";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
@@ -99,6 +100,7 @@ function resumoDoRegistro(
   catalogo: JustificativaConfigurada[],
 ): string {
   if (!registro) return "Sem registro";
+  if (registro.tipo === "SAIDA") return rotuloFrequenciaPersonalizada(registro);
   if (registro.tipo === "JUSTIFICADA") {
     const motivo =
       catalogo.find((j) => j.codigo === registro.justificativa)?.rotulo ??
@@ -177,6 +179,7 @@ export default function VistaFrequenciaParcial({
   const erro = carga.chave === chaveCarga ? carga.erro : "";
   const [editorAberto, setEditorAberto] = useState(false);
   const [baseEdicao, setBaseEdicao] = useState<FrequenciaDaChamada | null>(null);
+  const [baseSaida, setBaseSaida] = useState<FrequenciaDaSaida | null>(null);
   const [registroEditado, setRegistroEditado] = useState<FrequenciaParcial | null>(null);
   const [edicao, setEdicao] = useState<EdicaoParcial>(edicaoDoRegistro());
   const [assinaturaInicial, setAssinaturaInicial] = useState(
@@ -333,8 +336,15 @@ export default function VistaFrequenciaParcial({
   function abrirEditor(registro: RegistroPersonalizado | null, alunoId: string) {
     if (feriado) return;
     const base = registro?.tipo === "CHAMADA" ? registro : null;
-    const personalizado = registro?.tipo === "CHAMADA" ? null : registro;
+    const saida = registro?.tipo === "SAIDA" ? registro : null;
+    const personalizado =
+      registro?.tipo === "CHAMADA" || registro?.tipo === "SAIDA" ? null : registro;
     const inicial: EdicaoParcial = { ...edicaoDoRegistro(personalizado ?? undefined), alunoId };
+    if (saida) {
+      inicial.tipo = "AULAS";
+      inicial.aulas = saida.aulas;
+      inicial.observacao = saida.observacao ?? "";
+    }
     inicial.de = dia;
     inicial.ate = dia;
     if (base) {
@@ -345,6 +355,7 @@ export default function VistaFrequenciaParcial({
     }
     if (dia > diaInicial) inicial.tipo = "JUSTIFICADA";
     setBaseEdicao(base);
+    setBaseSaida(saida);
     setRegistroEditado(personalizado);
     setEdicao(inicial);
     setAssinaturaInicial(assinaturaDaEdicao(inicial));
@@ -374,12 +385,15 @@ export default function VistaFrequenciaParcial({
           ...(edicao.tipo === "JUSTIFICADA"
             ? { ate: edicao.ate, justificativa: edicao.justificativa }
             : {}),
-          turmaId: registroEditado?.turmaId ?? turmaId,
+          turmaId: registroEditado?.turmaId ?? baseSaida?.turmaId ?? turmaId,
           tipo: edicao.tipo,
           turno: edicao.tipo === "TURNO" ? edicao.turno : null,
           aulas: edicao.tipo === "AULAS" ? edicao.aulas : [],
           observacao: edicao.observacao.trim() || null,
           revisao: registroEditado?.revisao ?? 0,
+          ...(baseSaida
+            ? { baseSaida: { id: baseSaida.id, assinatura: baseSaida.assinatura } }
+            : {}),
           ...(baseEdicao &&
           (edicao.tipo !== "JUSTIFICADA" || (edicao.de === dia && edicao.ate === dia))
             ? { baseChamada: { turmaId: baseEdicao.turmaId, revisao: baseEdicao.revisao } }
@@ -450,6 +464,16 @@ export default function VistaFrequenciaParcial({
             }),
           );
           atualizarRegistro({ ...registro, ...dados.confirmacao });
+        } else if (registro.tipo === "SAIDA") {
+          const dados = await pedir<{ registro: FrequenciaDaSaida }>(
+            `/api/saidas/${registro.id}/seduc`,
+            corpoJson({
+              registrado,
+              revisao: registro.revisaoSeduc,
+              assinatura: registro.assinatura,
+            }),
+          );
+          atualizarRegistro(dados.registro);
         } else {
           const dados = await pedir<{ registro: FrequenciaParcial }>(
             `/api/frequencias-parciais/${registro.id}/seduc`,
@@ -664,13 +688,17 @@ export default function VistaFrequenciaParcial({
                               "line-clamp-2 inline-block max-w-full rounded-lg border px-2 py-0.5 text-xs font-medium wrap-anywhere",
                               !registro
                                 ? "bg-muted/30 text-muted-foreground"
-                                : registro.tipo === "JUSTIFICADA"
-                                  ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                  : registro.tipo !== "CHAMADA" || registro.marca === "P"
-                                    ? "border-primary/25 bg-primary/10 text-primary"
-                                    : registro.marca === "FJ"
+                                : registro.tipo === "SAIDA" && !registro.aulasConferiveis
+                                  ? "bg-muted/30 text-muted-foreground"
+                                  : registro.tipo === "SAIDA" && registro.aulas.length === 0
+                                    ? "border-falta/25 bg-falta-fraca text-falta-texto"
+                                    : registro.tipo === "JUSTIFICADA"
                                       ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                      : "border-falta/25 bg-falta-fraca text-falta-texto",
+                                      : registro.tipo !== "CHAMADA" || registro.marca === "P"
+                                        ? "border-primary/25 bg-primary/10 text-primary"
+                                        : registro.marca === "FJ"
+                                          ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                          : "border-falta/25 bg-falta-fraca text-falta-texto",
                             )}
                           >
                             {resumo}
@@ -691,7 +719,11 @@ export default function VistaFrequenciaParcial({
                                 aria-label={`Registro na Seduc: ${aluno.nome}`}
                                 title="Registro na Seduc"
                                 checked={registro.registradoSeduc}
-                                disabled={ocupado || editorAberto}
+                                disabled={
+                                  ocupado ||
+                                  editorAberto ||
+                                  (registro.tipo === "SAIDA" && !registro.aulasConferiveis)
+                                }
                                 onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
                               />
                             </>
@@ -717,7 +749,7 @@ export default function VistaFrequenciaParcial({
                             {registro ? <Pencil size={15} /> : <Plus size={15} />}
                             {registro ? "Editar" : "Registrar"}
                           </Button>
-                          {registro && registro.tipo !== "CHAMADA" && (
+                          {registro && registro.tipo !== "CHAMADA" && registro.tipo !== "SAIDA" && (
                             <Button
                               type="button"
                               variant="ghost"
