@@ -304,7 +304,20 @@ input[type="month"] {
 
 /* Painéis distantes saem da pintura até chegarem perto. A rolagem vertical
    de cada painel é guardada e devolvida pelo shell. */
+.pagina-painel {
+  overscroll-behavior: contain;
+}
+
+/* Em telas com barra lateral, reserva as duas bordas para o conteúdo
+   continuar centralizado quando a barra de rolagem aparece. */
+@media (min-width: 1024px) {
+  .pagina-painel {
+    scrollbar-gutter: stable both-edges;
+  }
+}
+
 .pagina-painel[data-distante="true"] {
   content-visibility: auto;
   contain: layout paint style;
+  contain-intrinsic-size: auto 800px;
 }

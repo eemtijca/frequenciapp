@@ -85,7 +85,6 @@ export default function VistaMovimentacoes({
         rotuloAcessivel="Tipo de registro"
         abaInicial={abaInicial}
         abas={ABAS}
-        chaveIndicador="indicador-movimentacoes"
         dataPager="movimentacoes"
         aoTrocar={aoTrocar}
         acao={

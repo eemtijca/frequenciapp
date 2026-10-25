@@ -3,7 +3,6 @@
 // Aba de equipe: contas da coordenação e da administração, com papel,
 // senha e situação. Sem atribuições de turma.
 import { useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -55,7 +54,6 @@ const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO"
 
 export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
-  const semMovimento = useReducedMotion() ?? false;
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
@@ -238,11 +236,8 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                 const ultimoAdmin =
                   usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
                 return (
-                  <motion.li
+                  <li
                     key={usuario.id}
-                    initial={semMovimento ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={semMovimento ? { duration: 0 } : { duration: 0.2 }}
                     className={`superficie overflow-hidden ${usuario.ativo ? "" : "opacity-60"}`}
                   >
                     <div className="flex items-center gap-3 px-4 py-3">
@@ -331,7 +326,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                         )}
                       </div>
                     </div>
-                  </motion.li>
+                  </li>
                 );
               })}
             </ul>

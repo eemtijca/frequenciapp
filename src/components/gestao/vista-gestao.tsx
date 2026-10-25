@@ -114,7 +114,6 @@ export default function VistaGestao({
         rotuloAcessivel="Áreas de gestão"
         abaInicial={abaInicial}
         abas={ABAS}
-        chaveIndicador="indicador-aba"
         dataPager="gestao"
       >
         {(aba) => (

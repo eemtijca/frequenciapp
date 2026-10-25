@@ -97,7 +97,7 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 
 Animações discretas, todas com propósito de confirmar estado:
 
-- Troca de visão pelos botões da barra lateral ou do menu do aplicativo, com rolagem vertical própria e estado preservado.
+- Troca de visão pelos botões da barra lateral ou do menu do aplicativo, com rolagem vertical própria e estado preservado. A posição é lida uma única vez ao sair da visão, não a cada evento de rolagem.
 - Listas com aparição direta, sem animação de entrada.
 - Indicador da navegação: a seção ativa recebe fundo de superfície, sem pílula vertical, respeitando movimento reduzido. A marca é estática; o menu fecha ao trocar de seção.
 - Abas da Gestão e dos Relatórios: troca por toque, botões e teclado; no desktop o conteúdo faz um deslize curto de 0,15 s.

@@ -81,6 +81,54 @@
     fill: var(--cor-fatia);
   }
 
+  .grupo-distante {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 320px;
+  }
+
+  .indicador-abas {
+    --aba-gap: 0.125rem;
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    left: 0.25rem;
+    z-index: 0;
+    border: 1px solid color-mix(in oklab, var(--primary) 55%, var(--border));
+    border-radius: var(--superficie-raio);
+    background-color: color-mix(in oklab, var(--primary) 12%, var(--card));
+    transform: translateX(calc(var(--aba-indice) * (100% + var(--aba-gap))));
+    transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @media (min-width: 640px) {
+    .indicador-abas {
+      --aba-gap: 0.25rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .indicador-abas {
+      transition: none;
+    }
+  }
+
+  @keyframes aba-entra {
+    from {
+      opacity: 0;
+      transform: translate3d(12px, 0, 0);
+    }
+  }
+
+  .aba-painel:not([hidden]) {
+    animation: aba-entra 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aba-painel:not([hidden]) {
+      animation: none;
+    }
+  }
+
   @media (hover: hover) {
     .controle:where(:not(:disabled, [aria-disabled="true"]):hover),
     .discreto:where(:not(:disabled, [aria-disabled="true"]):hover) {

@@ -3,7 +3,6 @@
 // Aba de alunos: criar, editar, mover de turma, ativar, desativar e
 // excluir, agrupados por turma com busca por nome.
 import { memo, useCallback, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import {
   Check,
   FileDown,
@@ -69,7 +68,6 @@ interface PropsLinhaAluno {
   modoSelecao: boolean;
   selecionado: boolean;
   ocupado: boolean;
-  semMovimento: boolean;
   onSelecionar: (id: string) => void;
   onEditar: (aluno: Aluno) => void;
   onAlternarAtivo: (aluno: Aluno) => void;
@@ -82,19 +80,13 @@ const LinhaAluno = memo(function LinhaAluno({
   modoSelecao,
   selecionado,
   ocupado,
-  semMovimento,
   onSelecionar,
   onEditar,
   onAlternarAtivo,
   onExcluir,
 }: PropsLinhaAluno) {
   return (
-    <motion.li
-      initial={semMovimento ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={semMovimento ? { duration: 0 } : { duration: 0.18 }}
-      className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
-    >
+    <li className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}>
       {modoSelecao && (
         <button
           type="button"
@@ -180,13 +172,12 @@ const LinhaAluno = memo(function LinhaAluno({
           </AlertDialog>
         </div>
       )}
-    </motion.li>
+    </li>
   );
 });
 
 export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
-  const semMovimento = useReducedMotion() ?? false;
   const [emEdicao, setEmEdicao] = useState<Aluno | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({
     nome: "",
@@ -571,7 +562,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           gruposFiltrados
             .filter(([, , lista]) => lista.length > 0)
             .map(([id, turma, lista]) => (
-              <div key={id}>
+              <div key={id} className="grupo-distante">
                 <div className="bg-secondary/50 flex items-center justify-between border-y px-4 py-2.5 first:border-t-0">
                   <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
                   <span className="numerais-tabulares text-muted-foreground text-xs">
@@ -587,7 +578,6 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                       modoSelecao={modoSelecao}
                       selecionado={selecionados.has(aluno.id)}
                       ocupado={chaveAtiva === aluno.id}
-                      semMovimento={semMovimento}
                       onSelecionar={alternarSelecao}
                       onEditar={abrirEdicao}
                       onAlternarAtivo={alternarAtivo}
