@@ -441,13 +441,20 @@ test.describe("infrequência do dia", () => {
       })
       .click();
     const resumo = page.getByRole("group", { name: "Resumo do dia" });
+    const barra = resumo.getByRole("progressbar", { name: "Infrequência do dia" });
     await expect(resumo).toHaveAttribute("aria-busy", "false");
     await expect(resumo.getByText("Sem dados", { exact: true })).toBeVisible();
     await expect(resumo.getByText("0%", { exact: true })).toHaveCount(0);
+    await expect(barra).toHaveAttribute("aria-valuetext", "Sem dados");
+    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-muted/);
 
     estado = "falta";
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
     await expect(resumo.getByText("33,3%", { exact: true })).toBeVisible();
+    await expect(barra).toHaveAttribute("aria-valuenow", "33");
+    await expect(barra).toHaveAttribute("aria-valuetext", /33,3% de infrequência, acima do limite/);
+    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-falta/);
+    await expect(resumo.getByText("Acima do limite", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("article", { name: /: Toda a escola$/ }).getByText(/faltas \(F \+ FJ\)/),
     ).toHaveCount(0);
@@ -477,6 +484,10 @@ test.describe("infrequência do dia", () => {
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
     await expect(resumo.getByText("0%", { exact: true })).toBeVisible();
     await expect(resumo.getByText("Sem dados", { exact: true })).toHaveCount(0);
+    await expect(barra).toHaveAttribute("aria-valuenow", "0");
+    await expect(barra).toHaveAttribute("aria-valuetext", /0% de infrequência, dentro do esperado/);
+    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-primary/);
+    await expect(resumo.getByText("Dentro do esperado", { exact: true })).toBeVisible();
   });
 });
 
