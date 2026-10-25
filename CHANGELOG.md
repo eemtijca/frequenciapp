@@ -183,6 +183,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- O favicon vetorial volta a usar o mesmo enquadramento do mestre e dos PNGs. A composição deixou de ser ampliada e o contorno extra do retângulo externo saiu, eliminando a linha vertical na borda direita e o deslocamento do desenho.
+
 - Erros 4xx de catálogo deixam de mostrar "A chamada foi salva em outro aparelho" e a dica genérica de internet. Justificativa e responsável em uso ganham título próprio e a contagem de registros; a dica de rede fica restrita a falha de conexão ou de servidor.
 
 - A busca exibe apenas o botão próprio de limpar; o X nativo do navegador deixa de aparecer ao lado.
