@@ -26,6 +26,18 @@ export const esquemaAtualizarConfiguracoes = z
       .max(500, "Selecione até 500 turmas.")
       .transform((ids) => [...new Set(ids)])
       .optional(),
+    infrequenciaAtencaoPercentual: z
+      .number("Informe o limite de atenção em porcentagem.")
+      .int("O limite de atenção deve ser um número inteiro.")
+      .min(0, "O limite de atenção deve ficar entre 0 e 100.")
+      .max(100, "O limite de atenção deve ficar entre 0 e 100.")
+      .optional(),
+    infrequenciaCriticaPercentual: z
+      .number("Informe o limite crítico em porcentagem.")
+      .int("O limite crítico deve ser um número inteiro.")
+      .min(0, "O limite crítico deve ficar entre 0 e 100.")
+      .max(100, "O limite crítico deve ficar entre 0 e 100.")
+      .optional(),
     atualizadoEm: z.iso.datetime("Versão inválida.").optional(),
   })
   .refine((dados) => Object.values(dados).some((valor) => valor !== undefined), {
@@ -36,6 +48,8 @@ interface LinhaConfiguracao {
   frequenciaPorAula: boolean;
   saidaAntecipada: boolean;
   origemNaChamada: boolean;
+  infrequenciaAtencaoPercentual: number;
+  infrequenciaCriticaPercentual: number;
   origemSeries: { serieId: string }[];
   origemTurmas: { turmaId: string }[];
   atualizadoEm: Date;
@@ -45,6 +59,8 @@ const SELECAO = {
   frequenciaPorAula: true,
   saidaAntecipada: true,
   origemNaChamada: true,
+  infrequenciaAtencaoPercentual: true,
+  infrequenciaCriticaPercentual: true,
   origemSeries: { select: { serieId: true }, orderBy: { serieId: "asc" } },
   origemTurmas: { select: { turmaId: true }, orderBy: { turmaId: "asc" } },
   atualizadoEm: true,
@@ -57,6 +73,8 @@ function paraConfiguracoes(linha: LinhaConfiguracao, feriados: Feriado[]): Confi
     origemNaChamada: linha.origemNaChamada,
     origemNaChamadaSerieIds: linha.origemSeries.map((item) => item.serieId),
     origemNaChamadaTurmaIds: linha.origemTurmas.map((item) => item.turmaId),
+    infrequenciaAtencaoPercentual: linha.infrequenciaAtencaoPercentual,
+    infrequenciaCriticaPercentual: linha.infrequenciaCriticaPercentual,
     feriados,
     atualizadoEm: linha.atualizadoEm.toISOString(),
   };
@@ -97,6 +115,29 @@ export async function atualizarConfiguracoes(
     ) {
       throw new ErroHttp("Uma turma selecionada não existe mais. Atualize o cadastro.", 400);
     }
+    if (
+      dados.data.infrequenciaAtencaoPercentual !== undefined ||
+      dados.data.infrequenciaCriticaPercentual !== undefined
+    ) {
+      const atual = await tx.configuracao.findUnique({
+        where: { id: ID },
+        select: {
+          infrequenciaAtencaoPercentual: true,
+          infrequenciaCriticaPercentual: true,
+        },
+      });
+      const atencao =
+        dados.data.infrequenciaAtencaoPercentual ??
+        atual?.infrequenciaAtencaoPercentual ??
+        CONFIGURACOES_PADRAO.infrequenciaAtencaoPercentual;
+      const critica =
+        dados.data.infrequenciaCriticaPercentual ??
+        atual?.infrequenciaCriticaPercentual ??
+        CONFIGURACOES_PADRAO.infrequenciaCriticaPercentual;
+      if (atencao >= critica) {
+        throw new ErroHttp("O limite de atenção deve ser menor que o limite crítico.", 400);
+      }
+    }
     if (dados.data.atualizadoEm) {
       const atual = await tx.configuracao.findUnique({
         where: { id: ID },
@@ -122,6 +163,12 @@ export async function atualizarConfiguracoes(
         ...(dados.data.origemNaChamada !== undefined
           ? { origemNaChamada: dados.data.origemNaChamada }
           : {}),
+        ...(dados.data.infrequenciaAtencaoPercentual !== undefined
+          ? { infrequenciaAtencaoPercentual: dados.data.infrequenciaAtencaoPercentual }
+          : {}),
+        ...(dados.data.infrequenciaCriticaPercentual !== undefined
+          ? { infrequenciaCriticaPercentual: dados.data.infrequenciaCriticaPercentual }
+          : {}),
         ...(serieIds !== undefined
           ? { origemSeries: { deleteMany: {}, create: serieIds.map((serieId) => ({ serieId })) } }
           : {}),
@@ -135,6 +182,12 @@ export async function atualizarConfiguracoes(
         frequenciaPorAula: dados.data.frequenciaPorAula ?? CONFIGURACOES_PADRAO.frequenciaPorAula,
         saidaAntecipada: dados.data.saidaAntecipada ?? CONFIGURACOES_PADRAO.saidaAntecipada,
         origemNaChamada: dados.data.origemNaChamada ?? CONFIGURACOES_PADRAO.origemNaChamada,
+        infrequenciaAtencaoPercentual:
+          dados.data.infrequenciaAtencaoPercentual ??
+          CONFIGURACOES_PADRAO.infrequenciaAtencaoPercentual,
+        infrequenciaCriticaPercentual:
+          dados.data.infrequenciaCriticaPercentual ??
+          CONFIGURACOES_PADRAO.infrequenciaCriticaPercentual,
         origemSeries: { create: (serieIds ?? []).map((serieId) => ({ serieId })) },
         origemTurmas: { create: (turmaIds ?? []).map((turmaId) => ({ turmaId })) },
         atualizadoPorId: admin.id,

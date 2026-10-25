@@ -37,7 +37,8 @@ export type SecaoConfiguracao =
   | "liberadores"
   | "feriados"
   | "chavesBi"
-  | "planilhas";
+  | "planilhas"
+  | "infrequencia";
 
 export interface ConfiguracoesCompletas {
   configuracoes: Configuracoes;

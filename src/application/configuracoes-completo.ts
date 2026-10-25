@@ -165,6 +165,11 @@ async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
       where: { id: "principal" },
       select: {
         atualizadoEm: true,
+        frequenciaPorAula: true,
+        saidaAntecipada: true,
+        origemNaChamada: true,
+        infrequenciaAtencaoPercentual: true,
+        infrequenciaCriticaPercentual: true,
         origemSeries: { select: { serieId: true }, orderBy: { serieId: "asc" } },
         origemTurmas: { select: { turmaId: true }, orderBy: { turmaId: "asc" } },
       },
@@ -215,9 +220,15 @@ async function lerRevisoes(): Promise<Record<SecaoConfiguracao, string>> {
 
   return {
     configuracao: hash({
-      atualizadoEm: configuracao?.atualizadoEm ?? null,
+      frequenciaPorAula: configuracao?.frequenciaPorAula ?? null,
+      saidaAntecipada: configuracao?.saidaAntecipada ?? null,
+      origemNaChamada: configuracao?.origemNaChamada ?? null,
       series: configuracao?.origemSeries.map((item) => item.serieId) ?? [],
       turmas: configuracao?.origemTurmas.map((item) => item.turmaId) ?? [],
+    }),
+    infrequencia: hash({
+      atencao: configuracao?.infrequenciaAtencaoPercentual ?? null,
+      critica: configuracao?.infrequenciaCriticaPercentual ?? null,
     }),
     notificacoes: hash(notificacoes?.atualizadoEm ?? null),
     acesso: hash(acesso?.atualizadoEm ?? null),
@@ -325,6 +336,7 @@ export async function salvarConfiguracoesCompletas(
       if (divergentes.length > 0) {
         const rotulos: Record<SecaoConfiguracao, string> = {
           configuracao: "Recursos da escola",
+          infrequencia: "Infrequência do Painel",
           notificacoes: "Notificações",
           acesso: "Acesso dos diretores",
           ordemAlmoco: "Ordem do almoço",

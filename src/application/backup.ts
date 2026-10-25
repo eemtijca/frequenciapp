@@ -301,6 +301,8 @@ const esquemaCopia = z.object({
       origemNaChamada: z.boolean().optional(),
       origemNaChamadaSerieIds: z.array(z.uuid()).optional(),
       origemNaChamadaTurmaIds: z.array(z.uuid()).optional(),
+      infrequenciaAtencaoPercentual: z.number().int().min(0).max(100).optional(),
+      infrequenciaCriticaPercentual: z.number().int().min(0).max(100).optional(),
       // Ausente em cópias anteriores; a restauração nunca limpa o calendário atual.
       feriados: z
         .array(esquemaCriarFeriado)
@@ -311,6 +313,15 @@ const esquemaCopia = z.object({
         )
         .optional(),
     })
+    .refine(
+      (config) =>
+        (config.infrequenciaAtencaoPercentual === undefined &&
+          config.infrequenciaCriticaPercentual === undefined) ||
+        (config.infrequenciaAtencaoPercentual !== undefined &&
+          config.infrequenciaCriticaPercentual !== undefined &&
+          config.infrequenciaAtencaoPercentual < config.infrequenciaCriticaPercentual),
+      "Os limites de infrequência devem vir juntos, com atenção menor que crítica.",
+    )
     .optional(),
 });
 
@@ -623,6 +634,23 @@ async function mesclarCopia(
       });
       feriadosAtuais.set(feriado.dia, criada);
       resultado.adicionadas += 1;
+    }
+    if (
+      copia.configuracoes?.infrequenciaAtencaoPercentual !== undefined &&
+      copia.configuracoes.infrequenciaCriticaPercentual !== undefined
+    ) {
+      await tx.configuracao.upsert({
+        where: { id: "principal" },
+        update: {
+          infrequenciaAtencaoPercentual: copia.configuracoes.infrequenciaAtencaoPercentual,
+          infrequenciaCriticaPercentual: copia.configuracoes.infrequenciaCriticaPercentual,
+        },
+        create: {
+          id: "principal",
+          infrequenciaAtencaoPercentual: copia.configuracoes.infrequenciaAtencaoPercentual,
+          infrequenciaCriticaPercentual: copia.configuracoes.infrequenciaCriticaPercentual,
+        },
+      });
     }
     // Justificativas do catálogo
     const justificativasAtuais = new Map(

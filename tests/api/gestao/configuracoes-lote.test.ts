@@ -112,6 +112,7 @@ describe("leitura agregada", () => {
         "chavesBi",
         "configuracao",
         "feriados",
+        "infrequencia",
         "justificativas",
         "liberadores",
         "notificacoes",
