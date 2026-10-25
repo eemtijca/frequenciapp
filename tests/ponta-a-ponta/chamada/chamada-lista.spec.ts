@@ -1,7 +1,7 @@
 // Lista da Chamada: justificativas bloqueadas, linhas alternadas e acumulado mensal.
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -153,6 +153,7 @@ test("troca o acumulado com o mês consultado e ignora respostas atrasadas", asy
   await mesPassado(page);
   await expect(linha.getByRole("img", { name: "2 faltas", exact: true })).toBeVisible();
   await secao.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
+  await abrirDiaSeResumo(page);
   await expect(linha.getByRole("img", { name: "1 falta", exact: true })).toBeVisible();
   let liberar: () => void = () => {};
   const pendente = new Promise<void>((r) => {
@@ -166,6 +167,7 @@ test("troca o acumulado com o mês consultado e ignora respostas atrasadas", asy
   await expect(secao.getByRole("button", { name: "Voltar para hoje", exact: true })).toBeEnabled();
   const resposta = page.waitForResponse((r) => r.url().includes(`resumo?de=${mesAnterior}-01`));
   await secao.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
+  await abrirDiaSeResumo(page);
   await expect(linha.getByRole("img", { name: "1 falta", exact: true })).toBeVisible();
   liberar();
   await (await resposta).finished();

@@ -1,5 +1,5 @@
-// Dia de referência dos testes de ponta a ponta. As telas do aplicativo abrem
-// no último dia com chamada, então aos domingos a referência é o sábado anterior.
+// Dia de referência dos testes de ponta a ponta. Aos domingos a abertura mostra
+// o resumo da semana; quem segue até a chamada usa o sábado anterior.
 import { diaLocal, ehDomingo, ultimoDiaDeChamada } from "@/domain/frequencia";
 
 /** Dia civil corrente no fuso da escola. */
@@ -7,7 +7,7 @@ export function diaCorrente(): string {
   return diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
 }
 
-/** Último dia com chamada: o sábado anterior quando hoje é domingo. */
+/** Último dia com chamada. No domingo é o sábado, depois de sair do resumo. */
 export function diaDeChamada(): string {
   return ultimoDiaDeChamada(diaCorrente());
 }

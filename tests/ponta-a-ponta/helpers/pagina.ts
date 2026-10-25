@@ -1,5 +1,6 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
+import { hojeEDomingo } from "./dia";
 
 /**
  * Aguarda a hidratação do React. O HTML do servidor pode estar visível antes
@@ -47,8 +48,33 @@ export async function abrirNavegacao(page: Page): Promise<Locator> {
   return menu.getByRole("navigation", { name: "Seções do aplicativo", exact: true });
 }
 
+const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial"]);
+
+/**
+ * No domingo a Chamada, o Painel e a Chamada Parcial abrem no resumo da semana.
+ * Quem precisa da chamada do dia segue para o sábado com a seta anterior.
+ */
+export async function abrirDiaSeResumo(page: Page): Promise<void> {
+  if (!hojeEDomingo()) return;
+  const gatilho = page
+    .locator("#dia-frequencia, #dia-painel, #dia-chamada-parcial")
+    .locator("visible=true");
+  await expect
+    .poll(async () => (await gatilho.first().getAttribute("aria-label")) ?? "", { timeout: 5000 })
+    .toMatch(/^(Resumo da semana:|Data da chamada|Dia do painel|Data da chamada parcial)/);
+  const rotulo = (await gatilho.first().getAttribute("aria-label")) ?? "";
+  if (!rotulo.startsWith("Resumo da semana")) return;
+  await page.getByRole("button", { name: /^Dia anterior/ }).click();
+  await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeHidden();
+}
+
 /** Troca de visão pelo mesmo menu no desktop e no celular. */
-export async function trocarVisao(page: Page, rotulo: string, visao: string): Promise<void> {
+export async function trocarVisao(
+  page: Page,
+  rotulo: string,
+  visao: string,
+  opcoes?: { manterResumo?: boolean },
+): Promise<void> {
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
@@ -57,6 +83,7 @@ export async function trocarVisao(page: Page, rotulo: string, visao: string): Pr
     .click();
   await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
   await expect(page.locator("main")).toHaveAttribute("data-visao", visao);
+  if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);
 }
 
 /**

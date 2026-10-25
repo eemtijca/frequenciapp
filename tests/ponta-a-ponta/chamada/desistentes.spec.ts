@@ -10,11 +10,11 @@ import {
   trocarVisao,
 } from "../helpers/pagina";
 
-// A desistência marcada hoje aparece na chamada a partir de hoje; aos domingos
-// a chamada abre no sábado anterior e o fluxo não pode ser conferido.
+// A desistência marcada hoje aparece na chamada a partir de hoje. No domingo
+// não há chamada do dia, então o fluxo não pode ser conferido.
 test.skip(
   hojeEDomingo(),
-  "Aos domingos a chamada abre no sábado e a desistência do dia não aparece.",
+  "No domingo não há chamada do dia e a desistência de hoje não aparece na lista.",
 );
 
 async function limparMassa(): Promise<void> {

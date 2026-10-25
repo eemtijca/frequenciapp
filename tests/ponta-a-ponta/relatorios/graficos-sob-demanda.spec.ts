@@ -2,7 +2,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
-import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  rolarAteGrafico,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(async () => {
@@ -80,6 +85,7 @@ test("continua exibindo gráficos quando a observação de visibilidade não est
   });
   await page.goto("/");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   const escola = page.getByRole("article", { name: /: Toda a escola$/ });
   await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
 });

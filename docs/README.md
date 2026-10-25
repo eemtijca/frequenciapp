@@ -60,3 +60,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-051](adr/051-ordem-do-almoco.md): ordem das turmas no almoço por dia, com horário opcional e mesclagem na cópia JSON.
 - [ADR-052](adr/052-envio-automatico-com-simulacao-unica.md): envio automático com uma simulação sob a trava, token de acesso guardado e releitura da estrutura numa ação.
 - [ADR-054](adr/054-interface-plana.md): design plano sem desfoque, com superfícies sólidas e sombra apenas em camadas flutuantes.
+- [ADR-055](adr/055-resumo-da-semana-no-domingo.md): no domingo, a abertura mostra o resumo da semana encerrada.

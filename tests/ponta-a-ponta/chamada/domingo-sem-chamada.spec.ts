@@ -1,5 +1,5 @@
 // Domingo não tem chamada: o calendário da Chamada não mostra a coluna do domingo, as setas de
-// dia pulam do sábado para a segunda e, aos domingos, as telas abrem no sábado anterior.
+// dia pulam do sábado para a segunda e, aos domingos, as telas abrem no resumo da semana.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   diaDaSemanaIso,
@@ -8,8 +8,10 @@ import {
   diasDoMes,
   ehDomingo,
   rotuloData,
+  rotuloDataCurta,
   ultimoDiaDeChamada,
 } from "@/domain/frequencia";
+import { semanaEncerrada } from "@/domain/resumo-semana";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
 
@@ -129,30 +131,67 @@ test("as setas de dia pulam o domingo entre o sábado e a segunda", async ({ pag
   );
 });
 
-test("Chamada, Chamada Parcial e Painel abrem no último dia de chamada, nunca num domingo", async ({
-  page,
-}) => {
+test("Chamada, Chamada Parcial e Painel não abrem a chamada de domingo", async ({ page }) => {
   const esperado = ultimoDiaDeChamada(hoje);
   await page.goto("/");
   await aguardarHidratacao(page);
 
-  await trocarVisao(page, "Painel", "painel");
+  if (!ehDomingo(hoje)) {
+    await trocarVisao(page, "Painel", "painel");
+    await expect(page.locator("#dia-painel")).toHaveAttribute(
+      "aria-label",
+      rotuloAcessivelDe("Dia do painel", esperado),
+    );
+    await trocarVisao(page, "Chamada", "chamada");
+    await expect(page.locator("#dia-frequencia")).toHaveAttribute(
+      "aria-label",
+      rotuloAcessivelDe("Data da chamada", esperado),
+    );
+    await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
+    await expect(page.locator("#dia-chamada-parcial")).toHaveAttribute(
+      "aria-label",
+      rotuloAcessivelDe("Data da chamada parcial", esperado),
+    );
+    return;
+  }
+
+  const semana = semanaEncerrada(hoje);
+  const inicio = semana?.[0];
+  const fim = semana?.[semana.length - 1];
+  expect(inicio).toBeTruthy();
+  expect(fim).toBe(esperado);
+  const rotuloResumo = new RegExp(
+    `^Resumo da semana: ${rotuloDataCurta(inicio ?? "")} a ${rotuloDataCurta(fim ?? "")}$`,
+  );
+
+  await trocarVisao(page, "Painel", "painel", { manterResumo: true });
+  await expect(page.locator("#dia-painel")).toHaveAttribute("aria-label", rotuloResumo);
+  await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dia seguinte", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Dia anterior", exact: true }).click();
   await expect(page.locator("#dia-painel")).toHaveAttribute(
     "aria-label",
     rotuloAcessivelDe("Dia do painel", esperado),
   );
+  await page.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
+  await expect(page.locator("#dia-painel")).toHaveAttribute("aria-label", rotuloResumo);
 
-  await trocarVisao(page, "Chamada", "chamada");
-  await expect(page.locator("#dia-frequencia")).toHaveAttribute(
-    "aria-label",
-    rotuloAcessivelDe("Data da chamada", esperado),
-  );
+  await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
+  await expect(page.locator("#dia-frequencia")).toHaveAttribute("aria-label", rotuloResumo);
+  await expect(page.getByRole("button", { name: "Dia seguinte", exact: true })).toBeDisabled();
 
-  await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
+  await trocarVisao(page, "Chamada Parcial", "chamada-parcial", { manterResumo: true });
+  await expect(page.locator("#dia-chamada-parcial")).toHaveAttribute("aria-label", rotuloResumo);
+  await expect(
+    page.getByRole("button", { name: "Dia seguinte da chamada parcial", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Dia anterior da chamada parcial", exact: true }).click();
   await expect(page.locator("#dia-chamada-parcial")).toHaveAttribute(
     "aria-label",
     rotuloAcessivelDe("Data da chamada parcial", esperado),
   );
+  await page.getByRole("button", { name: "Voltar para hoje", exact: true }).click();
+  await expect(page.locator("#dia-chamada-parcial")).toHaveAttribute("aria-label", rotuloResumo);
 });
 
 test("a API recusa a chamada de domingo mesmo com domingo na grade da turma", async ({
