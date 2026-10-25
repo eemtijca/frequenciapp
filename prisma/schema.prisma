@@ -436,22 +436,26 @@ model Falta {
 // Quem libera é um código do catálogo de liberadores; a conta antiga fica em
 // liberadoPor.
 model SaidaAntecipada {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  alunoId           String   @map("aluno_id") @db.Uuid
-  dia               DateTime @db.Date
-  momento           String   @db.VarChar(20)
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alunoId                String    @map("aluno_id") @db.Uuid
+  dia                    DateTime  @db.Date
+  momento                String    @db.VarChar(20)
   // HH:MM em que o aluno saiu; anulável para registros anteriores ao campo.
-  horario           String?  @db.VarChar(5)
-  justificativa     String?  @db.VarChar(10)
-  observacao        String?  @db.VarChar(200)
-  texto             String?  @db.VarChar(100)
-  liberadoPorId     String?  @map("liberado_por_id") @db.Uuid
-  liberadoPorCodigo String?  @map("liberado_por_codigo") @db.VarChar(20)
-  criadoPorId       String?  @map("criado_por_id") @db.Uuid
-  criadoEm          DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  aluno             Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
-  liberadoPor       Usuario? @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
-  criadoPor         Usuario? @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  horario                String?   @db.VarChar(5)
+  justificativa          String?   @db.VarChar(10)
+  observacao             String?   @db.VarChar(200)
+  texto                  String?   @db.VarChar(100)
+  liberadoPorId          String?   @map("liberado_por_id") @db.Uuid
+  liberadoPorCodigo      String?   @map("liberado_por_codigo") @db.VarChar(20)
+  criadoPorId            String?   @map("criado_por_id") @db.Uuid
+  criadoEm               DateTime  @default(now()) @map("criado_em") @db.Timestamptz
+  assinaturaSeduc        String?   @map("assinatura_seduc") @db.VarChar(64)
+  registradoSeducEm      DateTime? @map("registrado_seduc_em") @db.Timestamptz
+  registradoSeducPorNome String?   @map("registrado_seduc_por_nome") @db.VarChar(200)
+  revisaoSeduc           Int       @default(0) @map("revisao_seduc")
+  aluno                  Aluno     @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  liberadoPor            Usuario?  @relation("SaidaLiberadaPor", fields: [liberadoPorId], references: [id], onDelete: SetNull)
+  criadoPor              Usuario?  @relation("SaidaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   @@unique([alunoId, dia])
   @@index([dia])

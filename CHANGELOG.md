@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Saídas antecipadas antigas e novas aparecem automaticamente na Chamada Parcial e em sua planilha, com apenas as aulas concluídas antes do horário registrado. Ajustes manuais têm prioridade; transferências usam a turma da chamada salva quando disponível. Sem horário ou grade válidos, o registro pede conferência. A confirmação manual na SEDUC é auditada e vinculada às aulas exibidas; mudanças da base exigem nova conferência. A cópia JSON preserva essa confirmação.
+
 - O cartão de Infrequência do Painel passa a usar uma barra de medição, com percentual acima, uma única cor por nível e rótulo textual. Até 10% fica verde e Dentro do esperado; acima de 10% até 20% fica âmbar e Atenção; acima de 20% fica vermelho e Acima do limite. A barra tem nome acessível e `aria-valuetext`, e o estado sem chamada salva mostra Sem dados. Os limites ficam em constantes de domínio com teste de fronteira.
 
 - Configurações usam um rascunho único que reúne recursos, origem, notificações globais, acesso dos diretores, ordem do almoço, benefícios, justificativas, liberadores, feriados e chaves do BI. Catálogos deixam de gravar a cada edição: o diálogo de revisão mostra as seções e o salvamento envia um único lote atômico, com revisão otimista por seção e conflito 409 sem gravar nada. Chaves do BI pedem a senha no lote e o segredo aparece uma única vez. Novas rotas `GET /api/configuracoes/completo` e `POST /api/configuracoes/lote`; a migração `20261024123045_revisoes_catalogos` acrescenta `atualizado_em` a justificativas, liberadores e chaves do BI.
