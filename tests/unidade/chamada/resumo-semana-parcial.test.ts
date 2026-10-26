@@ -129,6 +129,36 @@ describe("resumo semanal da Chamada Parcial", () => {
     });
   });
 
+  it("conta marca FJ e marca S da chamada nos tipos de registro", () => {
+    const justificada = chamada("ana", "2026-10-19", "Ana");
+    justificada.marca = "FJ";
+    justificada.justificativas = ["D"];
+    const parcial = chamada("bruno", "2026-10-19", "Bruno");
+    parcial.marca = "S";
+    const resumo = resumirSemanaParcial(
+      turma(),
+      [aluno("ana", "Ana"), aluno("bruno", "Bruno")],
+      DIAS,
+      [justificada, parcial],
+      [],
+    );
+    expect(resumo.totais).toMatchObject({
+      ajustes: 2,
+      pendentes: 2,
+      justificadas: 1,
+      presencasParciais: 1,
+      saidas: 0,
+    });
+    expect(resumo.alunos.find((item) => item.alunoId === "ana")).toMatchObject({
+      justificadas: 1,
+      presencasParciais: 0,
+    });
+    expect(resumo.alunos.find((item) => item.alunoId === "bruno")).toMatchObject({
+      justificadas: 0,
+      presencasParciais: 1,
+    });
+  });
+
   it("não considera dia sem aula como pendência de chamada", () => {
     const semGrade = { ...turma(), horarios: [] };
     const resumo = resumirSemanaParcial(semGrade, [aluno("ana", "Ana")], DIAS, [], []);

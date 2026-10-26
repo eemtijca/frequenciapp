@@ -92,9 +92,17 @@ export function resumirSemanaParcial(
       registrados: registrados.length,
       presencasParciais: doDia.filter(
         (registro) =>
-          registro.tipo === "TURNO" || registro.tipo === "AULAS" || registro.tipo === "DIA_INTEIRO",
+          registro.tipo === "TURNO" ||
+          registro.tipo === "AULAS" ||
+          registro.tipo === "DIA_INTEIRO" ||
+          (registro.tipo === "CHAMADA" && registro.marca === "S"),
       ).length,
-      justificadas: doDia.filter((registro) => registro.tipo === "JUSTIFICADA").length,
+      justificadas: doDia.filter(
+        (registro) =>
+          registro.tipo === "JUSTIFICADA" ||
+          (registro.tipo === "CHAMADA" &&
+            (registro.marca === "FJ" || registro.justificativas.length > 0)),
+      ).length,
       saidas: doDia.filter((registro) => registro.tipo === "SAIDA").length,
       // Dias sem aula não entram na conta de alunos sem registro.
       semRegistro: previsto ? ativos.filter((aluno) => !idsComRegistro.has(aluno.id)).length : 0,
@@ -130,9 +138,19 @@ export function resumirSemanaParcial(
       justificadas: 0,
       saidas: 0,
     };
-    if (registro.tipo === "TURNO" || registro.tipo === "AULAS" || registro.tipo === "DIA_INTEIRO")
+    if (
+      registro.tipo === "TURNO" ||
+      registro.tipo === "AULAS" ||
+      registro.tipo === "DIA_INTEIRO" ||
+      (registro.tipo === "CHAMADA" && registro.marca === "S")
+    )
       atual.presencasParciais += 1;
-    if (registro.tipo === "JUSTIFICADA") atual.justificadas += 1;
+    if (
+      registro.tipo === "JUSTIFICADA" ||
+      (registro.tipo === "CHAMADA" &&
+        (registro.marca === "FJ" || registro.justificativas.length > 0))
+    )
+      atual.justificadas += 1;
     if (registro.tipo === "SAIDA") atual.saidas += 1;
     if (exigeConferenciaSeduc(registro)) {
       atual.ajustes += 1;
