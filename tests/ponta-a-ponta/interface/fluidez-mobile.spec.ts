@@ -1,7 +1,7 @@
 // Regressões de fluidez no celular: busca, relatórios, foco e rolagem dos controles.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 const serie = "E2E Fluidez";
 const turmaA = `${serie} A`;
@@ -382,6 +382,7 @@ test("buscar e percorrer horários com teclado rola apenas o painel de opções"
   await page.setViewportSize({ width: 360, height: 500 });
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   const aluno = page.locator("#saida-aluno");
   await aluno.scrollIntoViewIfNeeded();
   await painelDaTela(page).evaluate((elemento) => {
