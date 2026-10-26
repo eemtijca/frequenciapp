@@ -525,7 +525,7 @@ Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": 
 A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
 - 201 `{"saida": Saida}`.
-- 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, data futura ou responsável fora do catálogo.
+- 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, domingo, data futura ou responsável fora do catálogo. Domingo responde com a mensagem Domingo não tem aula. Escolha um dia de segunda a sábado.
 - 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
 
 ### DELETE /api/saidas/{id}
@@ -548,11 +548,11 @@ Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pe
 
 ### GET /api/configuracoes
 
-- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "feriados": Feriado[], "atualizadoEm": string}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data. `atualizadoEm` é a versão da última gravação.
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "infrequenciaAtencaoPercentual": number, "infrequenciaCriticaPercentual": number, "feriados": Feriado[], "atualizadoEm": string}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data. Os limites de infrequência são inteiros de 0 a 100, com atenção menor que crítica, e começam em 10 e 20. `atualizadoEm` é a versão da última gravação.
 
 ### PATCH /api/configuracoes
 
-Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origemNaChamadaSerieIds?, origemNaChamadaTurmaIds?, atualizadoEm? }`. Apenas administração, com auditoria.
+Corpo parcial: `{ frequenciaPorAula?, saidaAntecipada?, origemNaChamada?, origemNaChamadaSerieIds?, origemNaChamadaTurmaIds?, infrequenciaAtencaoPercentual?, infrequenciaCriticaPercentual?, atualizadoEm? }`. Apenas administração, com auditoria. Os limites devem ser inteiros de 0 a 100 e a atenção deve ficar abaixo da crítica; quando só um deles é enviado, a API compara com o valor vigente e recusa a dupla inválida.
 
 As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A seleção é a união das séries completas com as turmas avulsas. Lista vazia não habilita nenhuma turma; alterar somente `origemNaChamada` preserva as seleções. Desligar controla apenas a exibição, sem modificar alunos, chamadas ou planilhas. Seleção inexistente responde 400 e não altera a configuração. Ao enviar `atualizadoEm`, a gravação só acontece se a versão ainda for a vigente; caso contrário responde 409 com a mensagem para revisar antes de salvar.
 
@@ -563,7 +563,7 @@ As listas aceitam até 500 UUIDs existentes cada, sem duplicatas na resposta. A 
 Apenas administração. Devolve o conjunto usado pelo rascunho único:
 
 - 200 `{ configuracoes, notificacoes, acesso, ordemAlmoco, beneficios, justificativas, liberadores, feriados, chavesBi, planilhas, revisoes }`.
-- `revisoes` é um mapa por seção (`configuracao`, `notificacoes`, `acesso`, `ordemAlmoco`, `beneficios`, `justificativas`, `liberadores`, `feriados`, `chavesBi`, `planilhas`). As chaves do BI saem sem segredo e a revisão ignora os contadores de uso, que mudam a cada consulta.
+- `revisoes` é um mapa por seção (`configuracao`, `infrequencia`, `notificacoes`, `acesso`, `ordemAlmoco`, `beneficios`, `justificativas`, `liberadores`, `feriados`, `chavesBi`, `planilhas`). As chaves do BI saem sem segredo e a revisão ignora os contadores de uso, que mudam a cada consulta. A seção `infrequencia` cobre os dois limites do Painel, separada de `configuracao` para não marcar duas seções pelo mesmo motivo.
 - `planilhas` traz `ativa` e `envioAutomatico` de `frequencia`, `saidas` e `parcial`. Estrutura, mapa, modo completo e visibilidade mensal continuam imediatos porque dependem de leitura ou ação no Google.
 - 401 sem sessão; 403 sem papel de administração; 503 falha temporária.
 
@@ -966,7 +966,7 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 - 200 `{"adicionadas": number, "identicas": number, "conflitos": number}`. A mesclagem cria o que falta por identificador e nunca sobrescreve o que já existe.
 - As frequências da cópia JSON podem incluir `confirmacoesSeduc`, com autoria, data e revisão por aluno. Cópias anteriores sem esse campo continuam válidas. A mesclagem preserva confirmações divergentes existentes e relata conflito, sem sobrescrever.
 - `frequenciasParciais` é opcional na versão 1. Cópias anteriores continuam válidas e não removem os registros parciais atuais. Os itens preservam identidade, nomes históricos, presença, revisão, datas, autoria e confirmação da Seduc; não contêm conexões Google.
-- `configuracoes.feriados` é opcional na versão 1 e traz datas e nomes do calendário exportado. Ausência ou lista vazia preserva o calendário vigente. A restauração mescla por data: nome igual conta como idêntico e nome divergente conta como conflito, sem sobrescrita. Novo feriado com frequência regular ou parcial no banco ou na própria cópia conta como conflito; o histórico da cópia tem prioridade sobre esse novo feriado. Frequências da cópia em feriado já cadastrado também contam como conflitos. A restauração com feriados compartilha a trava das planilhas e a transação serializável, sem restaurar os demais recursos configuráveis. Feriado importado entra na cópia só como data e nome; a restauração o grava como cadastro manual e não recria, sozinha, o bloqueio da sincronização.
+- `configuracoes.infrequenciaAtencaoPercentual` e `configuracoes.infrequenciaCriticaPercentual` são opcionais em cópias antigas; quando presentes, são inteiros de 0 a 100 e a restauração usa os valores atuais se o campo estiver ausente. `configuracoes.feriados` é opcional na versão 1 e traz datas e nomes do calendário exportado. Ausência ou lista vazia preserva o calendário vigente. A restauração mescla por data: nome igual conta como idêntico e nome divergente conta como conflito, sem sobrescrita. Novo feriado com frequência regular ou parcial no banco ou na própria cópia conta como conflito; o histórico da cópia tem prioridade sobre esse novo feriado. Frequências da cópia em feriado já cadastrado também contam como conflitos. A restauração com feriados compartilha a trava das planilhas e a transação serializável, sem restaurar os demais recursos configuráveis, exceto os dois limites de infrequência quando presentes e válidos na cópia. Feriado importado entra na cópia só como data e nome; a restauração o grava como cadastro manual e não recria, sozinha, o bloqueio da sincronização.
 - A mesclagem de parciais procura por identificador ou por aluno e dia. Dados existentes nunca são substituídos; divergências e referências de aluno ou turma ausentes contam como conflitos. Contas históricas inexistentes ficam nulas, mantendo o nome da confirmação.
 - Tipo (`DIA_INTEIRO`, `TURNO` ou `AULAS`), turno, aulas únicas ordenadas entre 1 e 30, calendário e confirmação coerente são validados antes da transação. Marcação verdadeira exige instante e nome; falsa exige dados de confirmação vazios.
 - 400 quando o documento não está no formato do aplicativo; 403 sem papel de administração; 413 acima de 25 MB.
@@ -1007,14 +1007,14 @@ As rotas exigem a capacidade `operar`; criar a aba exige `administrar`.
 | Rota                                   | Corpo ou consulta                                                                                               | Resultado                                                                            |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `GET /api/entradas`                    | `de`, `ate`, `turmaId` opcional                                                                                 | `{ entradas: EntradaAtrasada[] }`, com turma do registro                             |
-| `POST /api/entradas`                   | `{ alunoId, dia, horario: "HH:mm", momento, responsavelRegistroCodigo, motivo? , justificativa?, observacao? }` | 201; 409 para aluno desativado, desistente na data ou entrada repetida               |
+| `POST /api/entradas`                   | `{ alunoId, dia, horario: "HH:mm", momento, responsavelRegistroCodigo, motivo? , justificativa?, observacao? }` | 201; 400 para domingo; 409 para aluno desativado, desistente na data ou repetida     |
 | `DELETE /api/entradas/:id`             | Identificador                                                                                                   | Remove com auditoria; preserva chamada e planilha                                    |
 | `GET /api/planilha-entradas/estado`    | Nenhum                                                                                                          | Disponibilidade da conexão Google e nome da planilha, sem credenciais                |
 | `POST /api/planilha-entradas/preparar` | Nenhum                                                                                                          | Cria ou organiza Entradas, realinha o formato anterior e remove somente Sheet1 vazia |
 | `POST /api/planilha-entradas/simular`  | `{ de, ate, turmaId? }`                                                                                         | Prévia com hash, avisos e até 20 amostras; no máximo 92 dias                         |
 | `POST /api/planilha-entradas/enviar`   | Período e `planoHash`                                                                                           | Recalcula a prévia e cria somente linhas novas; 409 se dados mudaram                 |
 
-Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos.
+Novas entradas exigem momento de aula/pausa e responsável ativo do catálogo de Quem libera. A justificativa é um motivo escrito ou um tipo ativo do catálogo com observação opcional. O responsável é um retrato do nome escolhido, separado da autoria autenticada. Campos novos ausentes em cópias antigas são aceitos. Criar entrada com data de domingo responde 400 com a mensagem Domingo não tem aula. Escolha um dia de segunda a sábado; a consulta e a remoção de registros antigos de domingo continuam permitidas.
 
 A integração usa a planilha Google selecionada para saídas. O código de cada linha combina aluno e data, permitindo reenvio sem duplicação após restauração. Falta de confirmação gera 502 com orientação para conferir a aba, sem repetir o envio automaticamente.
 

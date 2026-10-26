@@ -11,6 +11,7 @@ import {
   evolucaoDoPeriodo,
   infrequencia,
   indexarPorDia,
+  limiaresDoPainel,
   marcasDoDia,
   nivelInfrequencia,
   resumoDoDia,
@@ -689,5 +690,21 @@ describe("níveis de infrequência do Painel", () => {
     expect(nivelInfrequencia(-1)).toBe("baixa");
     expect(nivelInfrequencia(2)).toBe("critica");
     expect(nivelInfrequencia(Number.NaN)).toBe("baixa");
+  });
+
+  it("usa os limites configurados e as fronteiras exatas", () => {
+    const limiares = limiaresDoPainel({
+      infrequenciaAtencaoPercentual: 5,
+      infrequenciaCriticaPercentual: 15,
+    });
+    expect(nivelInfrequencia(0.05, limiares)).toBe("baixa");
+    expect(nivelInfrequencia(0.051, limiares)).toBe("atencao");
+    expect(nivelInfrequencia(0.15, limiares)).toBe("atencao");
+    expect(nivelInfrequencia(0.151, limiares)).toBe("critica");
+  });
+
+  it("tolera limites invertidos sem perder a faixa crítica", () => {
+    expect(nivelInfrequencia(0.5, { atencao: 0.4, critica: 0.2 })).toBe("critica");
+    expect(nivelInfrequencia(0.1, { atencao: 1, critica: 2 })).toBe("baixa");
   });
 });

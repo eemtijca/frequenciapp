@@ -31,6 +31,7 @@ const transacao = vi.hoisted(() => ({
     findFirst: vi.fn(() => (dados.parcialSalva ? { id: "parcial" } : null)),
     create: vi.fn(),
   },
+  configuracao: { upsert: vi.fn() },
 }));
 const trava = vi.hoisted(() => vi.fn((tarefa: () => Promise<unknown>) => tarefa()));
 const conferirTrava = vi.hoisted(() => vi.fn());
@@ -53,6 +54,17 @@ const admin = { id: "d41d42a1-533d-482d-a78c-d2bf07170219" };
 const turmaId = "fa751844-76b1-47e9-9cf7-387df59d2c5b";
 const alunoId = "a4d984db-93f6-4204-a8b8-95bbd79c2c50";
 const dia = "1990-05-01";
+
+function copiaComLimites(atencao: number, critica: number): CopiaFrequenciapp {
+  const base = copia();
+  base.configuracoes = {
+    frequenciaPorAula: false,
+    saidaAntecipada: true,
+    infrequenciaAtencaoPercentual: atencao,
+    infrequenciaCriticaPercentual: critica,
+  };
+  return base;
+}
 
 function copia(feriados?: { dia: string; nome: string }[]): CopiaFrequenciapp {
   return {
@@ -208,5 +220,42 @@ describe("calendário na restauração da cópia", () => {
       "Proteção de envio perdida.",
     );
     expect(transacao.feriado.create).not.toHaveBeenCalled();
+  });
+
+  it("restaura os limites de infrequência quando a cópia os traz", async () => {
+    await expect(importarCopia(admin, copiaComLimites(5, 15))).resolves.toEqual({
+      adicionadas: 0,
+      identicas: 0,
+      conflitos: 0,
+    });
+    expect(transacao.configuracao.upsert).toHaveBeenCalledWith({
+      where: { id: "principal" },
+      update: {
+        infrequenciaAtencaoPercentual: 5,
+        infrequenciaCriticaPercentual: 15,
+      },
+      create: {
+        id: "principal",
+        infrequenciaAtencaoPercentual: 5,
+        infrequenciaCriticaPercentual: 15,
+      },
+    });
+  });
+
+  it("preserva os limites atuais quando a cópia antiga não traz os campos", async () => {
+    await importarCopia(admin, copia([{ dia, nome: "QA Calendário" }]));
+    expect(transacao.configuracao.upsert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [20, 20],
+    [30, 20],
+    [-1, 20],
+    [10, 101],
+  ])("recusa limites inválidos antes da mesclagem: %s e %s", async (atencao, critica) => {
+    await expect(importarCopia(admin, copiaComLimites(atencao, critica))).rejects.toThrow(
+      "A cópia não está no formato do FrequenciApp.",
+    );
+    expect(transacao.configuracao.upsert).not.toHaveBeenCalled();
   });
 });

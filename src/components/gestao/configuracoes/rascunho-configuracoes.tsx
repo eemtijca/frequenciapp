@@ -67,6 +67,7 @@ const Contexto = createContext<ContextoRascunho | null>(null);
 
 const ROTULOS_SECOES: Record<SecaoConfiguracao, string> = {
   configuracao: "Recursos da escola",
+  infrequencia: "Infrequência do Painel",
   notificacoes: "Notificações",
   acesso: "Acesso dos diretores",
   ordemAlmoco: "Ordem do almoço",
@@ -80,6 +81,7 @@ const ROTULOS_SECOES: Record<SecaoConfiguracao, string> = {
 
 const ORDEM_SECOES: SecaoConfiguracao[] = [
   "configuracao",
+  "infrequencia",
   "notificacoes",
   "acesso",
   "ordemAlmoco",
@@ -112,9 +114,28 @@ function igual(a: unknown, b: unknown): boolean {
 
 function configuracoesComparaveis(
   configuracoes: Configuracoes,
-): Omit<Configuracoes, "feriados" | "atualizadoEm"> {
-  const { feriados: _feriados, atualizadoEm: _atualizadoEm, ...resto } = configuracoes;
+): Omit<
+  Configuracoes,
+  "feriados" | "atualizadoEm" | "infrequenciaAtencaoPercentual" | "infrequenciaCriticaPercentual"
+> {
+  const {
+    feriados: _feriados,
+    atualizadoEm: _atualizadoEm,
+    infrequenciaAtencaoPercentual: _atencao,
+    infrequenciaCriticaPercentual: _critica,
+    ...resto
+  } = configuracoes;
   return resto;
+}
+
+function infrequenciaComparavel(configuracoes: Configuracoes): {
+  atencao: number;
+  critica: number;
+} {
+  return {
+    atencao: configuracoes.infrequenciaAtencaoPercentual,
+    critica: configuracoes.infrequenciaCriticaPercentual,
+  };
 }
 
 export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNode }) {
@@ -197,6 +218,14 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
     ) {
       alteradas.push("configuracao");
     }
+    if (
+      !igual(
+        infrequenciaComparavel(base.configuracoes),
+        infrequenciaComparavel(rascunho.configuracoes),
+      )
+    ) {
+      alteradas.push("infrequencia");
+    }
     if (!igual(base.notificacoes, rascunho.notificacoes)) alteradas.push("notificacoes");
     if (!igual(base.acesso, rascunho.acesso)) alteradas.push("acesso");
     if (!igual(base.ordemAlmoco, rascunho.ordemAlmoco)) alteradas.push("ordemAlmoco");
@@ -243,6 +272,10 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
         !igual(
           configuracoesComparaveis(base.configuracoes),
           configuracoesComparaveis(rascunho.configuracoes),
+        ) ||
+        !igual(
+          infrequenciaComparavel(base.configuracoes),
+          infrequenciaComparavel(rascunho.configuracoes),
         )
       ) {
         desejado.configuracoes = rascunho.configuracoes;

@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
+import { AtualizadoEm } from "@/components/ui/atualizado-em";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { Selecionar } from "@/components/ui/selecionar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -125,6 +126,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const [erroEdicao, setErroEdicao] = useState("");
   const [retrato, setRetrato] = useState<RetratoVista | null>(null);
   const [atualizacao, setAtualizacao] = useState(0);
+  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null);
   const forcar = useRef(false);
   const [extra, setExtra] = useState<RecursoBi | null>(null);
   const [comparacao, setComparacao] = useState<"nenhuma" | "anterior" | "ano">("nenhuma");
@@ -249,6 +251,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
         }
       }
       setRetrato({ id: assinatura, dados, datas, falhas });
+      setAtualizadoEm(new Date().toISOString());
     });
     return () => {
       atual = false;
@@ -764,6 +767,11 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                     variante="outline"
                     tamanho="sm"
                     comRotulo
+                  />
+                  <AtualizadoEm
+                    instante={atualizadoEm ?? undefined}
+                    fuso={fuso}
+                    className="self-center px-1"
                   />
                   <div className="hidden flex-wrap gap-1 sm:flex">
                     <Button variant="ghost" size="sm" onClick={() => void compartilhar()}>

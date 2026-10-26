@@ -216,3 +216,6 @@ tests/
 - [ADR-054: interface plana sem desfoque](adr/054-interface-plana.md)
 - [ADR-055: saídas antecipadas na Chamada Parcial](adr/055-saidas-na-chamada-parcial.md)
 - [ADR-056: resumo da semana no domingo](adr/056-resumo-da-semana-no-domingo.md)
+- [ADR-057: resumo semanal nas quatro telas](adr/057-resumo-semanal-no-painel.md)
+- [ADR-058: domingo sem novos registros](adr/058-domingo-sem-novos-registros.md)
+- [ADR-059: infrequência configurável](adr/059-infrequencia-configuravel.md)

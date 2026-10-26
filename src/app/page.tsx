@@ -37,7 +37,14 @@ export default async function Pagina({
   // escola; o diretor de turma tem a própria tela, só de leitura.
   if (!temCapacidade(usuario.papel, "operar")) {
     if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
-      return <AplicacaoDiretor usuario={usuario} contexto={await contextoDoDiretor(usuario.id)} />;
+      return (
+        <AplicacaoDiretor
+          usuario={usuario}
+          contexto={await contextoDoDiretor(usuario.id)}
+          fuso={ambiente.fuso}
+          carregadoEm={new Date().toISOString()}
+        />
+      );
     }
     return <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />;
   }
@@ -66,9 +73,11 @@ export default async function Pagina({
     lerConfiguracoes(),
     resumoAcumulado(dia),
   ]);
+  const carregadoEm = new Date().toISOString();
   return (
     <Aplicacao
       usuario={usuario}
+      carregadoEm={carregadoEm}
       diaCorrente={dia}
       fuso={ambiente.fuso}
       visaoInicial={parametros.visao}

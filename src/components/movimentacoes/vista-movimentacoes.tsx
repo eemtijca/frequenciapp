@@ -118,6 +118,7 @@ export default function VistaMovimentacoes({
             <VistaEntradas
               diaCorrente={props.diaCorrente}
               fuso={props.fuso}
+              ativo={props.ativo && ativa}
               turmas={props.turmas}
               alunos={props.alunos}
               liberadores={props.liberadores}

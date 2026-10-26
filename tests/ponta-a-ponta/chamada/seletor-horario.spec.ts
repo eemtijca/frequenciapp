@@ -2,7 +2,12 @@
 // horário na saída, em desktop e em 360 px.
 import { test, expect } from "@playwright/test";
 import { criarMassaE2E, criarLiberadoresE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, escolherHorario, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  escolherHorario,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.beforeAll(async () => {
   await criarMassaE2E();
@@ -25,6 +30,7 @@ test("abas refletem a URL e sobrevivem ao recarregamento", async ({ page }) => {
 
   await page.reload();
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   await expect(page.getByRole("tab", { name: "Entradas", exact: true })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -46,11 +52,13 @@ test("saídas e entradas têm o mesmo campo de horário e o título não tem íc
 }) => {
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   await expect(
     page.getByRole("heading", { level: 1, name: "Saiu mais cedo" }).locator("svg"),
   ).toHaveCount(0);
   await expect(page.locator("#saida-horario")).toBeVisible();
   await page.getByRole("tab", { name: "Entradas", exact: true }).click();
+  await abrirDiaSeResumo(page);
   await expect(page.locator("#entrada-horario")).toBeVisible();
   await expect(page.locator('input[type="time"]')).toHaveCount(0);
   await expect(page.locator('input[type="date"]')).toHaveCount(0);
@@ -59,6 +67,7 @@ test("saídas e entradas têm o mesmo campo de horário e o título não tem íc
 test("seletor de horário: teclado, foco e fechamento", async ({ page }) => {
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   const gatilho = page.locator("#saida-horario");
   await gatilho.click();
   const painel = page.getByRole("dialog", { name: "Horário da saída" });
@@ -85,6 +94,7 @@ test("seletor de horário: teclado, foco e fechamento", async ({ page }) => {
 test("registra a saída com o horário escolhido e mostra na lista", async ({ page }) => {
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   await page.locator("#saida-turma").click();
   await page.getByRole("option", { name: "E2E Ano A" }).click();
   await page.locator("#saida-aluno").click();
@@ -108,6 +118,7 @@ test("tocar em uma hora atualiza o campo na hora e mantém o painel nos minutos"
 }) => {
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
   const gatilho = page.locator("#saida-horario");
   await gatilho.click();
   const painel = page.getByRole("dialog", { name: "Horário da saída" });
@@ -134,6 +145,7 @@ test.describe("360 px", () => {
   test("popover cabe na tela e a página não rola na horizontal", async ({ page }) => {
     await page.goto("/?visao=saidas&aba=entradas");
     await aguardarHidratacao(page);
+    await abrirDiaSeResumo(page);
     await page.locator("#entrada-horario").click();
     const painel = page.getByRole("dialog", { name: "Horário da chegada" });
     await expect(painel).toBeVisible();

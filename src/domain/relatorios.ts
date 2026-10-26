@@ -67,18 +67,48 @@ export function infrequencia(contagem: ContagemDia): number {
   return contagem.registrados > 0 ? ausencias(contagem) / contagem.registrados : 0;
 }
 
-/** Faixas do cartão de Infrequência do Painel. */
+/** Faixas padrão do cartão de Infrequência do Painel. */
 export const LIMIAR_INFREQUENCIA_ATENCAO = 0.1;
 export const LIMIAR_INFREQUENCIA_CRITICA = 0.2;
+
+export interface LimiaresInfrequencia {
+  atencao: number;
+  critica: number;
+}
+
+export const LIMIARES_INFREQUENCIA_PADRAO: LimiaresInfrequencia = {
+  atencao: LIMIAR_INFREQUENCIA_ATENCAO,
+  critica: LIMIAR_INFREQUENCIA_CRITICA,
+};
 
 export type NivelInfrequencia = "baixa" | "atencao" | "critica";
 
 /** Classifica a taxa de infrequência em baixa, atenção ou crítica. */
-export function nivelInfrequencia(taxa: number): NivelInfrequencia {
+export function nivelInfrequencia(
+  taxa: number,
+  limiares: LimiaresInfrequencia = LIMIARES_INFREQUENCIA_PADRAO,
+): NivelInfrequencia {
   const normalizada = Number.isFinite(taxa) ? Math.min(1, Math.max(0, taxa)) : 0;
-  if (normalizada <= LIMIAR_INFREQUENCIA_ATENCAO) return "baixa";
-  if (normalizada <= LIMIAR_INFREQUENCIA_CRITICA) return "atencao";
+  const atencao = Number.isFinite(limiares.atencao)
+    ? Math.min(1, Math.max(0, limiares.atencao))
+    : LIMIAR_INFREQUENCIA_ATENCAO;
+  const critica = Number.isFinite(limiares.critica)
+    ? Math.min(1, Math.max(atencao, limiares.critica))
+    : LIMIAR_INFREQUENCIA_CRITICA;
+  if (normalizada <= atencao) return "baixa";
+  if (normalizada <= critica) return "atencao";
   return "critica";
+}
+
+/** Converte os percentuais da Gestão nos limites fracionários do card. */
+export function limiaresDoPainel(percentuais: {
+  infrequenciaAtencaoPercentual: number;
+  infrequenciaCriticaPercentual: number;
+}): LimiaresInfrequencia {
+  return {
+    atencao: percentuais.infrequenciaAtencaoPercentual / 100,
+    critica: percentuais.infrequenciaCriticaPercentual / 100,
+  };
 }
 
 /** Resumo do dia com ausências, saídas e taxa. */

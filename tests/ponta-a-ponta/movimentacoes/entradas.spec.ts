@@ -84,10 +84,20 @@ test("data brasileira e navegação diária seguem a saída mesmo com navegador 
   await expect(page.locator("#entrada-dia")).toContainText(dataSaida ?? "");
   await expect(page.locator('input[type="date"]')).toHaveCount(0);
   const painel = page.locator('[data-pager="principal"] > section:not([hidden])');
-  await expect(painel.getByRole("button", { name: "Dia seguinte", exact: true })).toBeDisabled();
-  await painel.getByRole("button", { name: "Dia anterior", exact: true }).click();
-  await expect(painel.getByRole("button", { name: "Dia seguinte", exact: true })).toBeEnabled();
-  await painel.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+  const seguinte = painel.getByRole("button", { name: "Dia seguinte", exact: true });
+  const anterior = painel.getByRole("button", { name: "Dia anterior", exact: true });
+  const rotuloInicial = await page.locator("#entrada-dia").getAttribute("aria-label");
+  if (await seguinte.isDisabled()) {
+    await anterior.click();
+    await expect(seguinte).toBeEnabled();
+    await seguinte.click();
+  } else {
+    // No domingo, sábado leva ao resumo e a seta anterior volta ao dia.
+    await seguinte.click();
+    await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeVisible();
+    await anterior.click();
+  }
+  await expect(page.locator("#entrada-dia")).toHaveAttribute("aria-label", rotuloInicial ?? "");
   await expect(page.locator("#entrada-dia")).toContainText(dataSaida ?? "");
   await expect(page.getByLabel("Momento da entrada", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Responsável pelo registro", { exact: true })).toBeVisible();
@@ -281,7 +291,7 @@ test("revê o envio em confirmação própria", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Preparar aba Entradas" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Organizar apresentação/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
-  const dialogo = page.getByRole("dialog");
+  const dialogo = page.getByRole("dialog", { name: /Enviar saídas e entradas/ });
   await expect(dialogo.getByText("Aba Entradas", { exact: true })).toBeVisible();
   await expect(dialogo).toContainText("1 linha nova");
   expect(enviou).toBe(0);

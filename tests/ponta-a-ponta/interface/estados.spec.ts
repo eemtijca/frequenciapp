@@ -1,6 +1,6 @@
 // Telas de estado: página 404 e aviso de sessão expirada na entrada.
 import { expect, test } from "@playwright/test";
-import { aguardarHidratacao } from "../helpers/pagina";
+import { abrirDiaSeResumo, aguardarHidratacao } from "../helpers/pagina";
 
 test.describe("telas de estado", () => {
   // A consulta interceptada deve passar pelo navegador; o worker tem suíte própria.
@@ -17,6 +17,8 @@ test.describe("telas de estado", () => {
   test("a sessão expirada avisa na tela de entrada", async ({ page, context }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
+    // No domingo o Painel abre no resumo; o refresh do dia só existe fora dele.
+    await abrirDiaSeResumo(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
 
     // Expira somente quando a consulta já foi iniciada: o cookie só é apagado

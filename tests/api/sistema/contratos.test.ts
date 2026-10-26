@@ -1122,6 +1122,38 @@ describe("chamada com justificativa, período e acumulado", () => {
 });
 
 describe("saídas antecipadas", () => {
+  it("recusa saída com data de domingo", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        horario: "08:30",
+        alunoId: alunoQA?.id,
+        dia: "2026-06-14",
+        momento: "aula_2",
+        justificativa: "CM",
+        liberadoPorCodigo: "QADIR",
+      }),
+    });
+    expect(resposta.status).toBe(400);
+    const dados = (await resposta.json()) as { error: string };
+    expect(dados.error).toContain("Domingo não tem aula");
+  });
+
+  it("aceita saída no sábado anterior ao domingo corrente", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        horario: "08:30",
+        alunoId: alunoQA?.id,
+        dia: "2026-06-13",
+        momento: "aula_2",
+        justificativa: "CM",
+        liberadoPorCodigo: "QADIR",
+      }),
+    });
+    expect(resposta.status).toBe(201);
+  });
+
   it("coordenação registra a saída com quem liberou", async () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
@@ -1438,6 +1470,53 @@ describe("configurações e responsáveis", () => {
       configuracoes: { frequenciaPorAula: boolean };
     };
     expect(dadosDesligar.configuracoes.frequenciaPorAula).toBe(false);
+  });
+
+  it("valida e grava os limites de infrequência", async () => {
+    const antes = await autenticado(cookieAdmin, "/api/configuracoes");
+    const inicial = (await antes.json()) as { configuracoes: Configuracoes };
+    try {
+      for (const corpo of [
+        { infrequenciaAtencaoPercentual: 20, infrequenciaCriticaPercentual: 20 },
+        { infrequenciaAtencaoPercentual: 30, infrequenciaCriticaPercentual: 20 },
+        { infrequenciaAtencaoPercentual: -1, infrequenciaCriticaPercentual: 20 },
+        { infrequenciaAtencaoPercentual: 10, infrequenciaCriticaPercentual: 101 },
+      ]) {
+        const resposta = await autenticado(cookieAdmin, "/api/configuracoes", {
+          method: "PATCH",
+          body: JSON.stringify(corpo),
+        });
+        expect(resposta.status).toBe(400);
+      }
+      const valido = await autenticado(cookieAdmin, "/api/configuracoes", {
+        method: "PATCH",
+        body: JSON.stringify({
+          infrequenciaAtencaoPercentual: 5,
+          infrequenciaCriticaPercentual: 15,
+        }),
+      });
+      expect(valido.status).toBe(200);
+      const dados = (await valido.json()) as {
+        configuracoes: {
+          infrequenciaAtencaoPercentual: number;
+          infrequenciaCriticaPercentual: number;
+        };
+      };
+      expect(dados.configuracoes.infrequenciaAtencaoPercentual).toBe(5);
+      expect(dados.configuracoes.infrequenciaCriticaPercentual).toBe(15);
+    } finally {
+      const atual = await autenticado(cookieAdmin, "/api/configuracoes");
+      const corpoAtual = (await atual.json()) as { configuracoes: Configuracoes };
+      const restaurar = await autenticado(cookieAdmin, "/api/configuracoes", {
+        method: "PATCH",
+        body: JSON.stringify({
+          infrequenciaAtencaoPercentual: inicial.configuracoes.infrequenciaAtencaoPercentual,
+          infrequenciaCriticaPercentual: inicial.configuracoes.infrequenciaCriticaPercentual,
+          atualizadoEm: corpoAtual.configuracoes.atualizadoEm,
+        }),
+      });
+      expect(restaurar.status).toBe(200);
+    }
   });
 
   it("lista a equipe ativa como responsável", async () => {

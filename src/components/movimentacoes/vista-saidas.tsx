@@ -26,18 +26,20 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import {
-  diaSeguinte,
   ehMomentoDeAula,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
   LIMITE_TEXTO_SAIDA,
   MOMENTOS_SAIDA,
   partesJustificativaSaida,
+  rotuloData,
   rotuloDiaSemana,
   rotuloMomento,
 } from "@/domain/frequencia";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
 import {
   AlertDialog,
@@ -54,6 +56,8 @@ import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
+import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
+import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 
 interface Props {
   diaCorrente: string;
@@ -85,10 +89,17 @@ export default function VistaSaidas({
   liberadores,
   saidas,
   onSaidasMudaram,
+  ativo = true,
   atualizacao = 0,
   onMesVisivel,
 }: Props) {
-  const [dia, setDia] = useState(diaCorrente);
+  const nav = useNavegacaoDoDia({
+    diaCorrente,
+    max: diaCorrente,
+    domingoComoResumo: true,
+  });
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
+  const dia = nav.dia;
   const [turmaFiltro, setTurmaFiltro] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
@@ -104,10 +115,15 @@ export default function VistaSaidas({
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
+  const [verDomingo, setVerDomingo] = useState(false);
+  const [registrosDomingo, setRegistrosDomingo] = useState<SaidaAntecipada[]>([]);
+  const [carregandoDomingo, setCarregandoDomingo] = useState(false);
+  const marcarAtualizado = useContextoAtualizacao()?.marcarAtualizado;
 
+  const diaReferencia = nav.resumo ? (nav.domingo ?? dia) : dia;
   useEffect(() => {
-    onMesVisivel?.(dia.slice(0, 7));
-  }, [dia, onMesVisivel]);
+    onMesVisivel?.(diaReferencia.slice(0, 7));
+  }, [diaReferencia, onMesVisivel]);
   // Dia cuja lista foi desbloqueada: trocar de dia volta a bloquear.
   const [diaLiberado, setDiaLiberado] = useState<string | null>(null);
 
@@ -139,15 +155,18 @@ export default function VistaSaidas({
   const compartilhado = dia.startsWith(mes);
   const duranteAula = ehMomentoDeAula(momento);
   // Enquanto a leitura do dia escolhido não chega, a lista fica carregando.
-  const carregandoDia = !compartilhado && doDia?.dia !== dia;
+  const carregandoDia = !nav.resumo && !compartilhado && doDia?.dia !== dia;
   const listaBloqueada = diaLiberado !== dia;
+  const domingoBloqueado = diaLiberado !== nav.domingo;
 
   useEffect(() => {
-    if (compartilhado) return;
+    if (nav.resumo || compartilhado) return;
     let viva = true;
     pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`)
       .then((dados) => {
-        if (viva) setDoDia({ dia, saidas: dados.saidas });
+        if (!viva) return;
+        setDoDia({ dia, saidas: dados.saidas });
+        marcarAtualizado?.("saidas");
       })
       .catch((excecao: unknown) => {
         if (viva) {
@@ -161,7 +180,25 @@ export default function VistaSaidas({
     return () => {
       viva = false;
     };
-  }, [compartilhado, dia, recarregarDia, atualizacao]);
+  }, [compartilhado, dia, recarregarDia, atualizacao, nav.resumo, marcarAtualizado]);
+
+  useEffect(() => {
+    if (!verDomingo || !nav.domingo) return;
+    let viva = true;
+    pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${nav.domingo}`)
+      .then((dados) => {
+        if (viva) setRegistrosDomingo(dados.saidas);
+      })
+      .catch(() => {
+        if (viva) setRegistrosDomingo([]);
+      })
+      .finally(() => {
+        if (viva) setCarregandoDomingo(false);
+      });
+    return () => {
+      viva = false;
+    };
+  }, [verDomingo, nav.domingo, recarregarDia, atualizacao]);
 
   const saidasDoDia = useMemo(() => {
     if (compartilhado) return saidas.filter((saida) => saida.dia === dia);
@@ -172,7 +209,7 @@ export default function VistaSaidas({
   const opcoesTurma = useMemo(() => {
     const comAlunos = new Set(alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaId));
     return [
-      { valor: "", rotulo: "Todas as turmas" },
+      { valor: "todas", rotulo: "Todas as turmas" },
       ...turmas
         .filter((turma) => comAlunos.has(turma.id))
         .map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
@@ -316,7 +353,10 @@ export default function VistaSaidas({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia anterior"
-          onClick={() => setDia((atual) => diaSeguinte(atual, -1))}
+          onClick={() => {
+            setVerDomingo(false);
+            nav.anterior();
+          }}
         >
           <ChevronLeft size={18} />
         </Button>
@@ -324,12 +364,18 @@ export default function VistaSaidas({
           <SeletorPeriodo
             id="dia-saidas"
             modo="dia"
-            valor={dia}
+            valor={nav.resumo ? (nav.domingo ?? "") : dia}
             max={diaCorrente}
-            rotuloAcessivel="Data da saída"
-            rotulo={rotuloDia}
-            detalhe={rotuloDiaSemana(dia).replace("-feira", "")}
-            onValor={setDia}
+            calendarioSemanal
+            mostrarSelo={!nav.resumo}
+            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da saída"}
+            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
+            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+            onAbertoChange={setCalendarioAberto}
+            onValor={(proximo) => {
+              setVerDomingo(false);
+              nav.escolherDia(proximo);
+            }}
           />
         </div>
         <Button
@@ -337,146 +383,222 @@ export default function VistaSaidas({
           size="icon"
           className="size-11 shrink-0"
           aria-label="Dia seguinte"
-          disabled={dia >= diaCorrente}
-          onClick={() => setDia((atual) => diaSeguinte(atual, 1))}
+          disabled={nav.seguinteDesabilitado}
+          onClick={() => {
+            setVerDomingo(false);
+            nav.seguinte();
+          }}
         >
           <ChevronRight size={18} />
         </Button>
       </div>
+      {!nav.resumo && (
+        <div className="flex justify-end">
+          <AtualizadoDaVisao fuso={fuso} />
+        </div>
+      )}
 
-      <form
-        className="superficie flex flex-col gap-4 p-4"
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          void registrar();
-        }}
-        noValidate
-      >
-        <h2 className="font-medium">Registrar saída</h2>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-turma">Turma</Label>
-            <Selecionar
-              id="saida-turma"
-              value={turmaFiltro}
-              onValueChange={setTurmaFiltro}
-              placeholder="Todas as turmas"
-              opcoes={opcoesTurma}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
-            <Label htmlFor="saida-aluno">Aluno</Label>
-            <Selecionar
-              id="saida-aluno"
-              value={alunoId}
-              onValueChange={setAlunoId}
-              buscavel
-              placeholder="Selecione o aluno"
-              opcoes={opcoesAluno}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-momento">Momento da saída</Label>
-            <Selecionar
-              id="saida-momento"
-              value={momento}
-              onValueChange={setMomento}
-              placeholder="Selecione a aula ou pausa"
-              opcoes={MOMENTOS_SAIDA.map((item) => ({
-                valor: item.codigo,
-                rotulo: item.rotulo,
-              }))}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-horario">Horário da saída</Label>
-            <SeletorHorario
-              id="saida-horario"
-              valor={horario}
-              onValor={setHorario}
-              rotuloAcessivel="Horário da saída"
-              agora={horaNoFuso(new Date().toISOString(), fuso)}
-              disabled={enviando}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
-            <Selecionar
-              id="saida-responsavel"
-              value={responsavelCodigo}
-              onValueChange={setResponsavelCodigo}
-              placeholder="Selecione quem liberou"
-              opcoes={opcoesLiberador}
-            />
-            {opcoesLiberador.length === 0 && (
-              <p className="text-muted-foreground text-xs">
-                Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
-              </p>
-            )}
-          </div>
-          <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
-            <legend className="text-sm font-medium">Justificativa</legend>
-            <div
-              role="radiogroup"
-              aria-label="Forma da justificativa"
-              className="flex flex-wrap gap-2"
-            >
-              <button
+      {nav.resumo && nav.semana ? (
+        <VistaResumoMovimentacoes
+          tipo="saida"
+          turmas={turmas}
+          alunos={alunos}
+          dias={nav.semana}
+          domingo={nav.domingo}
+          versao={atualizacao}
+          ativo={ativo}
+          pausado={calendarioAberto}
+          fuso={fuso}
+          onAbrirDia={(proximo) => {
+            setTurmaFiltro("");
+            setAlunoId("");
+            setVerDomingo(false);
+            nav.escolherDia(proximo);
+          }}
+          onVerDomingo={() => {
+            setTurmaFiltro("");
+            setAlunoId("");
+            setDiaLiberado(null);
+            setCarregandoDomingo(true);
+            setVerDomingo(true);
+          }}
+        />
+      ) : null}
+
+      {nav.resumo && verDomingo && nav.domingo ? (
+        <section className="superficie flex flex-col gap-3 p-4" aria-label="Registros do domingo">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Saídas de {rotuloData(nav.domingo)}</h2>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button
                 type="button"
-                role="radio"
-                aria-checked={formaJustificativa === "texto"}
-                onClick={() => {
-                  setFormaJustificativa("texto");
-                  setJustificativa("");
-                  setObservacao("");
-                }}
-                className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : ""}`}
+                variant="outline"
+                className="min-h-11 rounded-full px-4"
+                aria-label={`${domingoBloqueado ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloData(nav.domingo)}`}
+                disabled={removendoId !== null}
+                onClick={() => setDiaLiberado(domingoBloqueado ? nav.domingo : null)}
               >
-                Escrever
-              </button>
-              <button
+                {domingoBloqueado ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
+                {domingoBloqueado ? "Desbloquear" : "Bloquear"}
+              </Button>
+              <Button
                 type="button"
-                role="radio"
-                aria-checked={formaJustificativa === "catalogo"}
-                onClick={() => {
-                  setFormaJustificativa("catalogo");
-                  setTexto("");
-                }}
-                className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : ""}`}
+                variant="link"
+                className="min-h-11 px-0"
+                onClick={() => setVerDomingo(false)}
               >
-                Selecionar tipo
-              </button>
+                Voltar ao resumo
+              </Button>
             </div>
-            {formaJustificativa === "texto" ? (
+          </div>
+          {carregandoDomingo ? (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              Carregando saídas...
+            </p>
+          ) : registrosDomingo.length === 0 ? (
+            <p className="text-muted-foreground text-sm">Nenhuma saída registrada neste domingo.</p>
+          ) : (
+            <ul className="divide-y">
+              {registrosDomingo.map((saida) => {
+                const aluno = alunosPorId.get(saida.alunoId);
+                return (
+                  <li key={saida.id} className="flex items-start justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium break-words">{aluno?.nome ?? "Aluno"}</p>
+                      <CaixasDeInfo
+                        partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaId ?? ""))}
+                        className="mt-1"
+                      />
+                    </div>
+                    {!domingoBloqueado && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Remover saída de ${aluno?.nome ?? "aluno"}`}
+                        disabled={removendoId === saida.id}
+                        onClick={() => setSaidaRemover(saida)}
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      {!nav.resumo && (
+        <>
+          <form
+            className="superficie flex flex-col gap-4 p-4"
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              void registrar();
+            }}
+            noValidate
+          >
+            <h2 className="font-medium">Registrar saída</h2>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="saida-texto">Texto da justificativa</Label>
-                  <span className="text-muted-foreground numerais-tabulares text-xs">
-                    {texto.length}/{LIMITE_TEXTO_SAIDA}
-                  </span>
-                </div>
-                <Input
-                  id="saida-texto"
-                  value={texto}
-                  maxLength={LIMITE_TEXTO_SAIDA}
-                  onChange={(evento) => setTexto(evento.target.value)}
-                  placeholder="Descreva o motivo"
-                  className="h-11"
+                <Label htmlFor="saida-turma">Turma</Label>
+                <Selecionar
+                  id="saida-turma"
+                  value={turmaFiltro || "todas"}
+                  onValueChange={(valor) => {
+                    setTurmaFiltro(valor === "todas" ? "" : valor);
+                    setAlunoId("");
+                  }}
+                  placeholder="Todas as turmas"
+                  opcoes={opcoesTurma}
                 />
               </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="saida-justificativa">Tipo</Label>
-                  <Selecionar
-                    id="saida-justificativa"
-                    value={justificativa}
-                    onValueChange={setJustificativa}
-                    placeholder="Selecione a justificativa"
-                    opcoes={opcoesJustificativa}
-                  />
+              <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
+                <Label htmlFor="saida-aluno">Aluno</Label>
+                <Selecionar
+                  id="saida-aluno"
+                  value={alunoId}
+                  onValueChange={setAlunoId}
+                  buscavel
+                  placeholder="Selecione o aluno"
+                  opcoes={opcoesAluno}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="saida-momento">Momento da saída</Label>
+                <Selecionar
+                  id="saida-momento"
+                  value={momento}
+                  onValueChange={setMomento}
+                  placeholder="Selecione a aula ou pausa"
+                  opcoes={MOMENTOS_SAIDA.map((item) => ({
+                    valor: item.codigo,
+                    rotulo: item.rotulo,
+                  }))}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="saida-horario">Horário da saída</Label>
+                <SeletorHorario
+                  id="saida-horario"
+                  valor={horario}
+                  onValor={setHorario}
+                  rotuloAcessivel="Horário da saída"
+                  agora={horaNoFuso(new Date().toISOString(), fuso)}
+                  disabled={enviando}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
+                <Selecionar
+                  id="saida-responsavel"
+                  value={responsavelCodigo}
+                  onValueChange={setResponsavelCodigo}
+                  placeholder="Selecione quem liberou"
+                  opcoes={opcoesLiberador}
+                />
+                {opcoesLiberador.length === 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
+                  </p>
+                )}
+              </div>
+              <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
+                <legend className="text-sm font-medium">Justificativa</legend>
+                <div
+                  role="radiogroup"
+                  aria-label="Forma da justificativa"
+                  className="flex flex-wrap gap-2"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={formaJustificativa === "texto"}
+                    onClick={() => {
+                      setFormaJustificativa("texto");
+                      setJustificativa("");
+                      setObservacao("");
+                    }}
+                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : ""}`}
+                  >
+                    Escrever
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={formaJustificativa === "catalogo"}
+                    onClick={() => {
+                      setFormaJustificativa("catalogo");
+                      setTexto("");
+                    }}
+                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : ""}`}
+                  >
+                    Selecionar tipo
+                  </button>
                 </div>
-                {duranteAula ? (
+                {formaJustificativa === "texto" ? (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <Label htmlFor="saida-texto">Texto da justificativa</Label>
@@ -489,99 +611,130 @@ export default function VistaSaidas({
                       value={texto}
                       maxLength={LIMITE_TEXTO_SAIDA}
                       onChange={(evento) => setTexto(evento.target.value)}
-                      placeholder="Opcional"
+                      placeholder="Descreva o motivo"
                       className="h-11"
                     />
                   </div>
-                ) : justificativa === JUSTIFICATIVA_OUTROS ? (
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="saida-observacao">Observação</Label>
-                    <Input
-                      id="saida-observacao"
-                      value={observacao}
-                      maxLength={200}
-                      onChange={(evento) => setObservacao(evento.target.value)}
-                      placeholder="Descreva brevemente o motivo"
-                      className="h-11"
-                    />
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="saida-justificativa">Tipo</Label>
+                      <Selecionar
+                        id="saida-justificativa"
+                        value={justificativa}
+                        onValueChange={setJustificativa}
+                        placeholder="Selecione a justificativa"
+                        opcoes={opcoesJustificativa}
+                      />
+                    </div>
+                    {duranteAula ? (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label htmlFor="saida-texto">Texto da justificativa</Label>
+                          <span className="text-muted-foreground numerais-tabulares text-xs">
+                            {texto.length}/{LIMITE_TEXTO_SAIDA}
+                          </span>
+                        </div>
+                        <Input
+                          id="saida-texto"
+                          value={texto}
+                          maxLength={LIMITE_TEXTO_SAIDA}
+                          onChange={(evento) => setTexto(evento.target.value)}
+                          placeholder="Opcional"
+                          className="h-11"
+                        />
+                      </div>
+                    ) : justificativa === JUSTIFICATIVA_OUTROS ? (
+                      <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="saida-observacao">Observação</Label>
+                        <Input
+                          id="saida-observacao"
+                          value={observacao}
+                          maxLength={200}
+                          onChange={(evento) => setObservacao(evento.target.value)}
+                          placeholder="Descreva brevemente o motivo"
+                          className="h-11"
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            )}
-          </fieldset>
-        </div>
-        {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-        <div className="flex justify-end">
-          <Button
-            type="submit"
-            size="lg"
-            className="h-11 w-full px-6 sm:w-auto"
-            disabled={enviando || opcoesLiberador.length === 0}
-          >
-            {enviando && <LoaderCircle size={16} className="animate-spin" />}
-            Registrar saída
-          </Button>
-        </div>
-      </form>
-
-      {carregandoDia ? (
-        <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-          Carregando saídas...
-        </p>
-      ) : (
-        saidasDoDia.length > 0 && (
-          <>
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-medium">Saídas de {rotuloDia}</h2>
+                )}
+              </fieldset>
+            </div>
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+            <div className="flex justify-end">
               <Button
-                type="button"
-                variant="outline"
-                className="rounded-full px-4"
-                aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
-                disabled={removendoId !== null}
-                onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
+                type="submit"
+                size="lg"
+                className="h-11 w-full px-6 sm:w-auto"
+                disabled={enviando || opcoesLiberador.length === 0}
               >
-                {listaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
-                {listaBloqueada ? "Desbloquear" : "Bloquear"}
+                {enviando && <LoaderCircle size={16} className="animate-spin" />}
+                Registrar saída
               </Button>
             </div>
-            <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
-              {saidasDoDia.map((saida) => {
-                const aluno = alunosPorId.get(saida.alunoId);
-                const nome = aluno?.nome ?? "Aluno";
-                return (
-                  <li key={saida.id} className="superficie p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold break-words">{nome}</p>
-                        <CaixasDeInfo
-                          partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaOriginalId ?? ""))}
-                          className="mt-1"
-                        />
-                        <p className="text-muted-foreground mt-1 text-xs">
-                          Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                          {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
-                        </p>
-                      </div>
-                      {!listaBloqueada && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Remover saída de ${nome}`}
-                          disabled={removendoId === saida.id}
-                          onClick={() => remover(saida)}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )
+          </form>
+
+          {carregandoDia ? (
+            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+              Carregando saídas...
+            </p>
+          ) : (
+            saidasDoDia.length > 0 && (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-medium">Saídas de {rotuloDia}</h2>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full px-4"
+                    aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
+                    disabled={removendoId !== null}
+                    onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
+                  >
+                    {listaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
+                    {listaBloqueada ? "Desbloquear" : "Bloquear"}
+                  </Button>
+                </div>
+                <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
+                  {saidasDoDia.map((saida) => {
+                    const aluno = alunosPorId.get(saida.alunoId);
+                    const nome = aluno?.nome ?? "Aluno";
+                    return (
+                      <li key={saida.id} className="superficie p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold break-words">{nome}</p>
+                            <CaixasDeInfo
+                              partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaId ?? ""))}
+                              className="mt-1"
+                            />
+                            <p className="text-muted-foreground mt-1 text-xs">
+                              Liberado por {saida.liberadoPorNome ?? "registro anterior"}
+                              {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
+                            </p>
+                          </div>
+                          {!listaBloqueada && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remover saída de ${nome}`}
+                              disabled={removendoId === saida.id}
+                              onClick={() => remover(saida)}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )
+          )}
+        </>
       )}
       <AlertDialog
         open={saidaRemover !== null}

@@ -60,6 +60,7 @@ import IntegracaoParcial from "@/components/gestao/planilhas/integracao-parcial"
 import SecaoFilaPlanilha from "@/components/gestao/planilhas/secao-fila-planilha";
 import SecaoCalendarioLetivo from "@/components/gestao/configuracoes/secao-calendario-letivo";
 import SecaoBeneficiosFrequencia from "@/components/gestao/configuracoes/secao-beneficios-frequencia";
+import SecaoInfrequencia from "@/components/gestao/configuracoes/secao-infrequencia";
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import SecaoOrdemAlmoco from "@/components/gestao/configuracoes/secao-ordem-almoco";
 import {
@@ -94,6 +95,7 @@ interface Props {
   series: Serie[];
   turmas: Turma[];
   diaCorrente: string;
+  fuso: string;
   /** Incrementado pelo botão global de atualização. */
   atualizacao?: number;
   onMudanca: (configuracoes: Configuracoes) => void;
@@ -158,6 +160,7 @@ function ConteudoConfiguracoes({
   series,
   turmas,
   diaCorrente,
+  fuso,
   atualizacao = 0,
   onMudanca,
   onJustificativasMudaram,
@@ -511,6 +514,9 @@ function ConteudoConfiguracoes({
       }
       return mudancas.join(", ");
     }
+    if (chave === "infrequencia") {
+      return `Dentro do esperado até ${configuracoesAtuais.infrequenciaAtencaoPercentual}% e atenção até ${configuracoesAtuais.infrequenciaCriticaPercentual}%.`;
+    }
     if (chave === "notificacoes") return "Regras e horários dos avisos.";
     if (chave === "acesso") return "Limites e visibilidade dos diretores.";
     if (chave === "ordemAlmoco") {
@@ -751,6 +757,8 @@ function ConteudoConfiguracoes({
           )}
         </div>
       </SecaoRecolhivel>
+
+      <SecaoInfrequencia configuracoes={atual.configuracoes} onMudar={mutarConfiguracoes} />
 
       <SecaoCalendarioLetivo
         feriados={atual.feriados}
@@ -1265,6 +1273,7 @@ function ConteudoConfiguracoes({
             <VistaHorarios
               turmas={turmas}
               diaCorrente={diaCorrente}
+              fuso={fuso}
               editavel
               onMudanca={onHorariosMudaram}
               onPendencia={onPendenciaHorarios}

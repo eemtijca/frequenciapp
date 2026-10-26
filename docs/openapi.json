@@ -4028,7 +4028,7 @@
       "post": {
         "operationId": "registrarSaida",
         "summary": "Registrar uma saída antecipada",
-        "description": "Sessão da operação, com origem confiável. O aluno desativado ou com saída no dia responde 409.",
+        "description": "Sess?o da opera??o, com origem confi?vel. O aluno desativado ou com sa?da no dia responde 409. Domingo n?o tem aula e responde 400.",
         "tags": ["saidas"],
         "requestBody": {
           "required": true,
@@ -4233,7 +4233,7 @@
       "post": {
         "operationId": "registrarEntrada",
         "summary": "Registrar uma entrada atrasada",
-        "description": "Sessão da operação, com origem confiável. Aluno desativado, desistente na data ou entrada repetida responde 409.",
+        "description": "Sess?o da opera??o, com origem confi?vel. Domingo n?o tem aula e responde 400; aluno desativado, desistente na data ou entrada repetida responde 409.",
         "tags": ["entradas"],
         "requestBody": {
           "required": true,
@@ -4442,7 +4442,7 @@
       "get": {
         "operationId": "obterConfiguracoes",
         "summary": "Consultar as configurações da escola",
-        "description": "Qualquer sessão. O calendário traz todos os anos, em ordem de data.",
+        "description": "Qualquer sess?o. O calend?rio traz todos os anos e os dois limites de infrequ?ncia do Painel v?m em porcentagem inteira.",
         "tags": ["configuracoes"],
         "responses": {
           "200": {
@@ -4463,7 +4463,9 @@
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
                         "feriados": [],
-                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z",
+                        "infrequenciaAtencaoPercentual": 10,
+                        "infrequenciaCriticaPercentual": 20
                       }
                     }
                   }
@@ -4485,7 +4487,7 @@
       "patch": {
         "operationId": "atualizarConfiguracoes",
         "summary": "Editar as configurações da escola",
-        "description": "Apenas administração, com auditoria. As listas aceitam até 500 identificadores existentes e são a união de séries completas com turmas avulsas.",
+        "description": "Apenas administra??o, com auditoria. As listas aceitam at? 500 identificadores existentes. Os limites de infrequ?ncia devem ser inteiros de 0 a 100, com aten??o menor que cr?tica.",
         "tags": ["configuracoes"],
         "requestBody": {
           "required": true,
@@ -4526,7 +4528,9 @@
                         "origemNaChamadaSerieIds": ["5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b"],
                         "origemNaChamadaTurmaIds": [],
                         "feriados": [],
-                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z",
+                        "infrequenciaAtencaoPercentual": 10,
+                        "infrequenciaCriticaPercentual": 20
                       }
                     }
                   }
@@ -11250,7 +11254,9 @@
                       "origemNaChamadaSerieIds": [],
                       "origemNaChamadaTurmaIds": [],
                       "feriados": [],
-                      "atualizadoEm": "2026-10-13T17:30:00.000Z"
+                      "atualizadoEm": "2026-10-13T17:30:00.000Z",
+                      "infrequenciaAtencaoPercentual": 10,
+                      "infrequenciaCriticaPercentual": 20
                     }
                   }
                 }
@@ -11368,7 +11374,9 @@
                         "origemNaChamadaSerieIds": [],
                         "origemNaChamadaTurmaIds": [],
                         "feriados": [],
-                        "atualizadoEm": "2026-10-13T17:30:00.000Z"
+                        "atualizadoEm": "2026-10-13T17:30:00.000Z",
+                        "infrequenciaAtencaoPercentual": 10,
+                        "infrequenciaCriticaPercentual": 20
                       }
                     }
                   }
@@ -11765,7 +11773,9 @@
                             "nome": "Independência do Brasil"
                           }
                         ],
-                        "atualizadoEm": "2026-10-24T12:00:00.000Z"
+                        "atualizadoEm": "2026-10-24T12:00:00.000Z",
+                        "infrequenciaAtencaoPercentual": 10,
+                        "infrequenciaCriticaPercentual": 20
                       },
                       "notificacoes": {
                         "resumoDiario": true,
@@ -11926,7 +11936,9 @@
                               "nome": "Independência do Brasil"
                             }
                           ],
-                          "atualizadoEm": "2026-10-24T12:00:00.000Z"
+                          "atualizadoEm": "2026-10-24T12:00:00.000Z",
+                          "infrequenciaAtencaoPercentual": 10,
+                          "infrequenciaCriticaPercentual": 20
                         },
                         "notificacoes": {
                           "resumoDiario": true,
@@ -15149,13 +15161,15 @@
       "Configuracoes": {
         "type": "object",
         "title": "Configurações da escola",
-        "description": "Recursos configuráveis da operação escolar, com o calendário de feriados.",
+        "description": "Recursos configur?veis da opera??o escolar, com o calend?rio de feriados e os limites de infrequ?ncia do Painel.",
         "required": [
           "frequenciaPorAula",
           "saidaAntecipada",
           "origemNaChamada",
           "feriados",
-          "atualizadoEm"
+          "atualizadoEm",
+          "infrequenciaAtencaoPercentual",
+          "infrequenciaCriticaPercentual"
         ],
         "properties": {
           "frequenciaPorAula": {
@@ -15197,13 +15211,27 @@
             "format": "date-time",
             "description": "Versão da última gravação, usada na revisão otimista.",
             "example": "2026-10-13T17:30:00.000Z"
+          },
+          "infrequenciaAtencaoPercentual": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Fim da faixa verde do card de Infrequ?ncia. Padr?o 10.",
+            "example": 10
+          },
+          "infrequenciaCriticaPercentual": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Fim da faixa ?mbar e in?cio da vermelha. Padr?o 20.",
+            "example": 20
           }
         }
       },
       "ConfiguracoesCorpo": {
         "type": "object",
         "title": "Edição das configurações",
-        "description": "Campos parciais das configurações, com listas de séries e turmas para a origem na Chamada.",
+        "description": "Campos parciais das configura??es, com listas de s?ries e turmas para a origem na Chamada e os limites de infrequ?ncia do Painel.",
         "properties": {
           "frequenciaPorAula": {
             "type": "boolean",
@@ -15242,6 +15270,20 @@
             "format": "date-time",
             "description": "Versão lida em GET. Se divergir da vigente, a API responde 409.",
             "example": "2026-10-13T17:30:00.000Z"
+          },
+          "infrequenciaAtencaoPercentual": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Inteiro de 0 a 100, menor que o limite cr?tico.",
+            "example": 10
+          },
+          "infrequenciaCriticaPercentual": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Inteiro de 0 a 100, maior que o limite de aten??o.",
+            "example": 20
           }
         }
       },
@@ -19090,7 +19132,7 @@
       "ConfiguracoesCompletas": {
         "type": "object",
         "title": "Conjunto completo de configurações",
-        "description": "Seções da tela de Configurações com o mapa de revisões usado no salvamento otimista.",
+        "description": "Se??es da tela de Configura??es, incluindo Infrequ?ncia do Painel, com o mapa de revis?es usado no salvamento otimista.",
         "required": [
           "configuracoes",
           "notificacoes",
@@ -19338,7 +19380,7 @@
         "properties": {
           "revisoes": {
             "type": "object",
-            "description": "Mapa de revisões por seção.",
+            "description": "Mapa de revis?es por se??o, incluindo configuracao, infrequencia, notificacoes, acesso, ordemAlmoco, beneficios, justificativas, liberadores, feriados, chavesBi e planilhas.",
             "additionalProperties": {
               "type": "string"
             }
@@ -19348,7 +19390,8 @@
             "description": "Seções alteradas, com catálogos completos quando presentes.",
             "properties": {
               "configuracoes": {
-                "$ref": "#/components/schemas/ConfiguracoesCorpo"
+                "$ref": "#/components/schemas/ConfiguracoesCorpo",
+                "description": "Recursos da escola e limites de infrequ?ncia, quando a se??o correspondente mudou."
               },
               "notificacoes": {
                 "type": "object"

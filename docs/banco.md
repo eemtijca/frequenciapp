@@ -21,7 +21,7 @@ PostgreSQL 17 com Prisma ORM 7, gerador `prisma-client` e adaptador `pg`. O sche
 | `aulas_chamada`               | Retrato congelado das aulas previstas no dia de cada chamada.                                                          |
 | `faltas`                      | Ausências por frequência, aluno e aula, com justificativa e observação opcionais.                                      |
 | `saidas_antecipadas`          | Saídas antes do fim do dia: aluno, momento, horário, justificativa, responsável e autoria.                             |
-| `configuracoes`               | Linha única com os recursos ligados: chamada por aula, saída antecipada e origem na Chamada.                           |
+| `configuracoes`               | Linha única com os recursos ligados, a origem na Chamada e os limites de infrequência do Painel.                       |
 | `configuracoes_origem_series` | Séries completas selecionadas para exibir a origem na Chamada.                                                         |
 | `configuracoes_origem_turmas` | Turmas específicas selecionadas para exibir a origem na Chamada.                                                       |
 | `justificativas`              | Catálogo de justificativas: código estável, rótulo e situação, editável na Gestão.                                     |
@@ -50,7 +50,7 @@ Restrições de integridade relevantes:
 - `aulas_chamada` tem chave composta (`frequencia_id`, `horario_id`) e exclusão em cascata com a frequência e com a aula. A migração `aulas_da_chamada` preenche as chamadas já salvas com as aulas que têm falta registrada e com as aulas ativas do dia da semana criadas até a chamada, incluindo a regra do sábado letivo. O retrato fica congelado no primeiro salvamento, para a grade atual não reclassificar o histórico ([ADR-044](adr/044-retratos-da-chamada.md)).
 - `faltas` tem chave composta (`frequencia_id`, `aluno_id`, `horario_id`) e exclusão em cascata com a frequência e com o aluno; a aula é protegida por `ON DELETE RESTRICT`.
 - `saidas_antecipadas` tem unicidade de (aluno, dia) e exclusão em cascata com o aluno; o responsável e a autoria usam `ON DELETE SET NULL`. A linha exige código de justificativa ou texto livre, e `liberado_por_codigo`, quando preenchido, aponta para o catálogo `liberadores`, validado na aplicação.
-- `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável.
+- `configuracoes` é uma linha única (`principal`) criada na migração, com autoria anulável. A migração `infrequencia_configuravel` acrescenta `infrequencia_atencao_percentual` e `infrequencia_critica_percentual`, inteiros com padrão 10 e 20, restrição de 0 a 100 e ordem atenção menor que crítica.
 - As seleções de origem têm chave composta e referências para a configuração e para a série ou turma. Excluir uma série ou turma retira somente a respectiva seleção em cascata. Desativar o recurso não remove seleções. A migração `origem_chamada_configuravel` seleciona apenas as séries existentes com ordinal 3 para compatibilidade; em base vazia, o recurso permanece desligado e sem seleção ([ADR-026](adr/026-origem-configuravel-na-chamada.md)).
 - `justificativas` tem unicidade funcional em `lower(codigo)` e é o catálogo usado na validação da chamada e da saída.
 - `beneficios_frequencia` tem unicidade funcional em `lower(nome)`, restrição de percentual entre 1 e 100 e uma linha inicial inserida pela migração, editável pela administração.

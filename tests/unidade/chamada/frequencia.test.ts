@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   alunoDesistenteNoDia,
   celulasDoMes,
+  celulasDoMesSegundaDomingo,
   celulasDoMesSemDomingo,
   CONFIGURACOES_PADRAO,
   diaDaSemanaIso,
@@ -420,6 +421,38 @@ describe("celulasDoMes", () => {
     expect(celulas[0]).toBe("2026-02-01");
     expect(celulas[27]).toBe("2026-02-28");
     expect(celulas.filter(Boolean).length).toBe(28);
+  });
+});
+
+describe("celulasDoMesSegundaDomingo", () => {
+  it("alinha o dia 1 e completa as semanas de segunda a domingo", () => {
+    const celulas = celulasDoMesSegundaDomingo("2026-09");
+    expect(celulas).toHaveLength(35);
+    expect(celulas[0]).toBe("2026-08-31");
+    expect(celulas[1]).toBe("2026-09-01");
+    expect(celulas[34]).toBe("2026-10-04");
+    expect(celulas.every((dia) => diaDaSemanaIso(dia) >= 1 && diaDaSemanaIso(dia) <= 7)).toBe(true);
+    expect(celulas[6]).toBe("2026-09-06");
+    expect(diaDaSemanaIso(celulas[6] ?? "")).toBe(7);
+  });
+
+  it("preenche as bordas do mês que começa no domingo", () => {
+    const celulas = celulasDoMesSegundaDomingo("2026-02");
+    expect(celulas).toHaveLength(35);
+    expect(celulas[0]).toBe("2026-01-26");
+    expect(celulas[34]).toBe("2026-03-01");
+    expect(celulas.filter(Boolean)).toHaveLength(35);
+  });
+
+  it("gera seis semanas quando o mês ocupa a grade inteira", () => {
+    const celulas = celulasDoMesSegundaDomingo("2026-08");
+    expect(celulas).toHaveLength(42);
+    expect(celulas[0]).toBe("2026-07-27");
+    expect(celulas[41]).toBe("2026-09-06");
+  });
+
+  it("não devolve células para mês inválido", () => {
+    expect(celulasDoMesSegundaDomingo("2026-13")).toEqual([]);
   });
 });
 

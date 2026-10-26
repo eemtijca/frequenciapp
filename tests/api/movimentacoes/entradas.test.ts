@@ -141,6 +141,35 @@ describe("entradas atrasadas", () => {
       expect((await chamar("/api/entradas", "POST", dados)).status).toBe(400);
     expect((await chamar(`/api/entradas?de=${dia}&ate=2026-06-14`)).status).toBe(400);
   });
+  it("recusa entrada com data de domingo", async () => {
+    const resposta = await chamar("/api/entradas", "POST", {
+      alunoId: aluno,
+      dia: "2026-06-14",
+      momento: "aula_2",
+      responsavelRegistroCodigo: "QAENTREG",
+      horario: "08:15",
+      motivo: "Domingo",
+    });
+    expect(resposta.status).toBe(400);
+    const corpo = (await resposta.json()) as { error: string };
+    expect(corpo.error).toContain("Domingo não tem aula");
+  });
+  it("aceita entrada no sábado anterior ao domingo corrente", async () => {
+    const sabado = "2026-06-13";
+    const resposta = await chamar("/api/entradas", "POST", {
+      alunoId: aluno,
+      dia: sabado,
+      momento: "aula_2",
+      responsavelRegistroCodigo: "QAENTREG",
+      horario: "08:15",
+      motivo: "Sábado letivo",
+    });
+    expect(resposta.status).toBe(201);
+    const consulta = (await (
+      await chamar(`/api/entradas?de=${sabado}&ate=${sabado}&turmaId=${turma}`)
+    ).json()) as { entradas: EntradaAtrasada[] };
+    expect(consulta.entradas[0]?.dia).toBe(sabado);
+  });
   it("registra uma entrada por aluno e dia sem criar frequência ou saída", async () => {
     const dados = {
       alunoId: aluno,

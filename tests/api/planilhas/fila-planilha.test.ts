@@ -321,7 +321,7 @@ describe("falhas e retentativas", () => {
   it("a falha confirmada agenda nova tentativa e o item de trás espera a vez", async () => {
     await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
     google?.recusarGravacoes(true);
-    await registrar(5, "2026-09-06");
+    await registrar(5, "2026-09-05");
     expect(
       await esperar(async () => {
         const itens = await fila();
@@ -330,7 +330,7 @@ describe("falhas e retentativas", () => {
     ).toBe(true);
     await registrar(3, "2026-09-07");
     const [frente, atras] = await fila();
-    expect(frente).toMatchObject({ resultado: "falhou", tentativas: 1, dia: "2026-09-06" });
+    expect(frente).toMatchObject({ resultado: "falhou", tentativas: 1, dia: "2026-09-05" });
     // O item de trás não passa à frente enquanto o da frente espera a nova tentativa.
     const bloqueada = await processar();
     expect(bloqueada.processados).toBe(0);

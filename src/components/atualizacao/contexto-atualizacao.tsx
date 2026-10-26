@@ -1,5 +1,3 @@
-"use client";
-
 // Registro da atualização da tela ativa: cada visão informa como recarregar os
 // próprios dados e o botão global executa apenas esse registro.
 import {
@@ -16,9 +14,22 @@ import { avisarErro, avisarInfo } from "@/lib/avisos";
 
 type Atualizador = () => Promise<void> | void;
 
+const VISOES = [
+  "painel",
+  "chamada",
+  "chamada-parcial",
+  "horarios",
+  "saidas",
+  "relatorios",
+  "alunos",
+  "gestao",
+] as const;
+
 interface ContextoAtualizacao {
   registrar: (id: string, atualizar: Atualizador | null) => void;
   atualizar: () => Promise<void>;
+  marcarAtualizado: (id: string) => void;
+  atualizadoEm: string | undefined;
   ocupado: boolean;
   disponivel: boolean;
 }
@@ -29,11 +40,23 @@ export function useContextoAtualizacao(): ContextoAtualizacao | null {
   return useContext(Contexto);
 }
 
-export function ProvedorAtualizacao({ ativo, children }: { ativo: string; children: ReactNode }) {
+export function ProvedorAtualizacao({
+  ativo,
+  atualizadoEmInicial,
+  children,
+}: {
+  ativo: string;
+  atualizadoEmInicial?: string;
+  children: ReactNode;
+}) {
   const atualizadores = useRef(new Map<string, Atualizador>());
   const [ids, setIds] = useState<Set<string>>(() => new Set());
   const [ocupado, setOcupado] = useState(false);
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [atualizadoEm, setAtualizadoEm] = useState<Record<string, string>>(() => {
+    if (!atualizadoEmInicial) return {};
+    return Object.fromEntries(VISOES.map((visao) => [visao, atualizadoEmInicial]));
+  });
 
   useEffect(() => {
     const marcarOffline = () => setOnline(false);
@@ -52,6 +75,10 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
     setIds(new Set(atualizadores.current.keys()));
   }, []);
 
+  const marcarAtualizado = useCallback((id: string) => {
+    setAtualizadoEm((atual) => ({ ...atual, [id]: new Date().toISOString() }));
+  }, []);
+
   const disponivel = ids.has(ativo);
   const atualizarRef = useRef<() => Promise<void>>(async () => {});
 
@@ -66,6 +93,7 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
     setOcupado(true);
     try {
       await executar();
+      marcarAtualizado(ativo);
     } catch (excecao) {
       avisarErro(excecao, {
         contexto: "Não foi possível atualizar a tela.",
@@ -74,15 +102,22 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
     } finally {
       setOcupado(false);
     }
-  }, [ativo, ocupado, online]);
+  }, [ativo, ocupado, online, marcarAtualizado]);
 
   useEffect(() => {
     atualizarRef.current = atualizar;
   }, [atualizar]);
 
   const valor = useMemo(
-    () => ({ registrar, atualizar, ocupado, disponivel }),
-    [registrar, atualizar, ocupado, disponivel],
+    () => ({
+      registrar,
+      atualizar,
+      marcarAtualizado,
+      atualizadoEm: atualizadoEm[ativo],
+      ocupado,
+      disponivel,
+    }),
+    [registrar, atualizar, marcarAtualizado, atualizadoEm, ativo, ocupado, disponivel],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
@@ -91,10 +126,12 @@ export function ProvedorAtualizacao({ ativo, children }: { ativo: string; childr
 /**
  * Registra a atualização da visão. O wrapper lê sempre a versão mais recente
  * do manipulador, para não exigir dependências instáveis nos efeitos das telas.
+ * Devolve a função que a própria visão usa para marcar uma leitura bem-sucedida.
  */
-export function useAtualizacaoTela(id: string, atualizar: Atualizador): void {
+export function useAtualizacaoTela(id: string, atualizar: Atualizador): () => void {
   const contexto = useContext(Contexto);
   const registrar = contexto?.registrar;
+  const marcarAtualizado = contexto?.marcarAtualizado;
   const referencia = useRef(atualizar);
 
   useEffect(() => {
@@ -106,4 +143,11 @@ export function useAtualizacaoTela(id: string, atualizar: Atualizador): void {
     registrar(id, () => referencia.current());
     return () => registrar(id, null);
   }, [id, registrar]);
+
+  return useCallback(() => marcarAtualizado?.(id), [id, marcarAtualizado]);
+}
+
+/** Horário da última leitura da visão ativa, quando o shell principal está montado. */
+export function useAtualizadoEm(): string | undefined {
+  return useContext(Contexto)?.atualizadoEm;
 }

@@ -296,6 +296,10 @@ export interface Configuracoes {
   origemNaChamadaSerieIds: string[];
   origemNaChamadaTurmaIds: string[];
   feriados: Feriado[];
+  /** Limite percentual do fim da faixa verde do card de Infrequência. */
+  infrequenciaAtencaoPercentual: number;
+  /** Limite percentual do fim da faixa âmbar e início da vermelha. */
+  infrequenciaCriticaPercentual: number;
   /** Versão da última gravação, usada no salvamento otimista. */
   atualizadoEm?: string;
 }
@@ -308,6 +312,8 @@ export const CONFIGURACOES_PADRAO: Configuracoes = {
   origemNaChamadaSerieIds: [],
   origemNaChamadaTurmaIds: [],
   feriados: [],
+  infrequenciaAtencaoPercentual: 10,
+  infrequenciaCriticaPercentual: 20,
 };
 
 /** Acumulado de um aluno dentro do período consultado. */
@@ -563,6 +569,27 @@ export function celulasDoMes(mes: string): (string | null)[] {
   celulas.push(...dias);
   const total = Math.ceil(celulas.length / 7) * 7;
   while (celulas.length < total) celulas.push(null);
+  return celulas;
+}
+
+/**
+ * Células da grade do mês em semanas completas de segunda a domingo, com os
+ * dias do mês anterior e do mês seguinte nas pontas. Sem células vazias.
+ */
+export function celulasDoMesSegundaDomingo(mes: string): string[] {
+  if (!ehMesValido(mes)) return [];
+  const dias = diasDoMes(mes);
+  const primeiro = dias[0];
+  const ultimo = dias[dias.length - 1];
+  if (!primeiro || !ultimo) return [];
+  const inicio = diaSeguinte(primeiro, -(diaDaSemanaIso(primeiro) - 1));
+  const fim = diaSeguinte(ultimo, 7 - diaDaSemanaIso(ultimo));
+  const celulas: string[] = [];
+  let atual = inicio;
+  while (atual <= fim) {
+    celulas.push(atual);
+    atual = diaSeguinte(atual, 1);
+  }
   return celulas;
 }
 

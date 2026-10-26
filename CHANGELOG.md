@@ -10,10 +10,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- No domingo, no fuso America/Fortaleza, a Chamada, a Chamada Parcial e o Painel abrem no resumo somente leitura da semana encerrada, de segunda a sábado anteriores, em vez de abrir o sábado. O resumo mostra, por turma visível, os dias com chamada salva, faltas e faltas justificadas, os alunos com mais faltas, as saídas antecipadas quando houver e os dias letivos sem chamada. Voltar para hoje e o atalho Hoje do calendário voltam a esse resumo. As setas continuam permitindo escolher outras datas. Horários e Saídas e entradas permanecem no dia civil. A decisão está na ADR-056.
+- Painel, Chamada, Chamada Parcial e Saídas e Entradas usam calendário de segunda a domingo, com dias dos meses vizinhos, cinco ou seis semanas e domingo destacado como resumo. Qualquer domingo encerrado abre a semana de segunda a sábado anterior; as setas andam dia a dia e o atalho Hoje volta ao resumo no domingo. O Painel reúne frequência, saídas, entradas e pendências da Seduc de todas as turmas visíveis; a Chamada mostra frequência e saídas da turma; a Chamada Parcial usa os registros efetivos, com pendentes, dias sem chamada e atalho Abrir na Chamada; Saídas e Entradas mostra a aba ativa com todas as turmas. As seções são recolhíveis, a Visão geral começa aberta, os gráficos só montam na seção aberta e visível e a expansão é preservada no refresh. Os resumos atualizam a cada dois minutos sem desmontar a tela, com consultas canceláveis e sem ciclos sobrepostos. O rótulo Atualizado às HH:MM passa a ficar no conteúdo de todas as telas. As decisões estão nas ADR-056 e ADR-057.
+- Criar saída ou entrada com data de domingo passa a ser recusado pela interface e pela API, com a mensagem Domingo não tem aula. Escolha um dia de segunda a sábado. A regra olha a data alvo: se hoje é domingo, sábado e os dias anteriores continuam registráveis. Remover registros históricos de domingo e confirmar registros antigos na Seduc continuam permitidos. Em Saídas e Entradas, o formulário não aparece no domingo e Ver registros do domingo abre a lista de todas as turmas, sem filtro, com desbloqueio e remoção. A decisão está na ADR-058.
+
 - Saídas antecipadas antigas e novas aparecem automaticamente na Chamada Parcial e em sua planilha, com apenas as aulas concluídas antes do horário registrado. Ajustes manuais têm prioridade; transferências usam a turma da chamada salva quando disponível. Sem horário ou grade válidos, o registro pede conferência. A confirmação manual na SEDUC é auditada e vinculada às aulas exibidas; mudanças da base exigem nova conferência. A cópia JSON preserva essa confirmação.
 
-- O cartão de Infrequência do Painel passa a usar uma barra de medição, com percentual acima, uma única cor por nível e rótulo textual. Até 10% fica verde e Dentro do esperado; acima de 10% até 20% fica âmbar e Atenção; acima de 20% fica vermelho e Acima do limite. A barra tem nome acessível e `aria-valuetext`, e o estado sem chamada salva mostra Sem dados. Os limites ficam em constantes de domínio com teste de fronteira.
+- O cartão de Infrequência do Painel usa os limites configurados na Gestão, com padrão de 10% e 20%. A seção Infrequência do Painel aceita dois inteiros de 0 a 100, exige atenção menor que crítica e entra no rascunho único, na revisão por seção, na auditoria e na cópia de segurança. O card e as linhas de referência do resumo semanal usam os valores; Relatórios, FrequenciBI e benefícios continuam com percentuais brutos. A barra tem nome acessível e `aria-valuetext`, e o estado sem chamada salva mostra Sem dados. A decisão está na ADR-059.
 
 - Configurações usam um rascunho único que reúne recursos, origem, notificações globais, acesso dos diretores, ordem do almoço, benefícios, justificativas, liberadores, feriados e chaves do BI. Catálogos deixam de gravar a cada edição: o diálogo de revisão mostra as seções e o salvamento envia um único lote atômico, com revisão otimista por seção e conflito 409 sem gravar nada. Chaves do BI pedem a senha no lote e o segredo aparece uma única vez. Novas rotas `GET /api/configuracoes/completo` e `POST /api/configuracoes/lote`; a migração `20261024123045_revisoes_catalogos` acrescenta `atualizado_em` a justificativas, liberadores e chaves do BI.
 
@@ -110,6 +112,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A atualização das telas deixa de recarregar o resumo de forma visível. Os resumos semanais mantêm conteúdo, foco, rolagem e seções abertas durante a consulta, mostram carregamento apenas ao trocar de semana e preservam a frequência quando uma consulta extra falha. O Atualizar tela continua sendo o único botão, agora acompanhado do rótulo Atualizado às HH:MM no conteúdo. O Painel do dia mantém o ciclo de sessenta segundos e o resumo usa dois minutos.
+
 - Diretórios reorganizados para reduzir listas extensas na raiz: `tests/unidade` e `tests/ponta-a-ponta` agrupam as suítes por área, `components/gestao` passa a ter `abas`, `cadastros`, `configuracoes` e `planilhas`, os adaptadores do Google ficam em `src/infra/google`, e `scripts` passa a ter `administracao`, `banco`, `backup`, `assets`, `github` e `seed`. As visões foram renomeadas para `entrada`, `chamada`, `chamada-parcial` e `movimentacoes`, com `historico` dentro de `relatorios`.
 
 - O README deixa de exibir as capturas em tamanho natural. A entrada usa duas miniaturas com largura controlada, cada uma com link para o arquivo completo, e as demais imagens ficam na galeria em `docs/imagens/README.md`. Um teste limita largura, existência e peso dos arquivos.
@@ -197,6 +201,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Saídas e Entradas deixa de aceitar novos registros no domingo. A API responde 400 com a mensagem Domingo não tem aula, enquanto a consulta e a remoção de registros históricos de domingo continuam disponíveis. A lista do domingo mostra todas as turmas e não exibe o formulário.
 
 - O favicon vetorial volta a usar o mesmo enquadramento do mestre e dos PNGs. A composição deixou de ser ampliada e o contorno extra do retângulo externo saiu, eliminando a linha vertical na borda direita e o deslocamento do desenho.
 

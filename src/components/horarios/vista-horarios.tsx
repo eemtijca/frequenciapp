@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
@@ -53,6 +54,7 @@ const TURNOS: AbaItem<"manha" | "tarde">[] = [
 interface Props {
   turmas: Turma[];
   diaCorrente: string;
+  fuso: string;
   /** Falso na consulta (aba Horários); verdadeiro na edição, em Gestão, Configurações. */
   editavel: boolean;
   onMudanca: () => Promise<void> | void;
@@ -220,6 +222,7 @@ function AulasDoDia({
 export default function VistaHorarios({
   turmas,
   diaCorrente,
+  fuso,
   editavel,
   onMudanca,
   onPendencia,
@@ -434,6 +437,11 @@ export default function VistaHorarios({
         <h2 className="sr-only">Horários das turmas</h2>
       ) : (
         <h1 className="sr-only">Horários</h1>
+      )}
+      {!editavel && (
+        <div className="flex justify-end">
+          <AtualizadoDaVisao fuso={fuso} />
+        </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-1.5">

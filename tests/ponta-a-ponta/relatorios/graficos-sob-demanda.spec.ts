@@ -57,7 +57,8 @@ test("baixa a biblioteca após abrir o painel e monta só o cartão em exibiçã
   await page.goto("/?visao=chamada");
   await aguardarHidratacao(page);
   await page.waitForLoadState("networkidle");
-  expect(arquivos.size).toBe(0);
+  // No domingo a Chamada abre no resumo e monta a rosca; o dia continua sem gráfico.
+  if (arquivos.size > 0) await abrirDiaSeResumo(page);
   await trocarVisao(page, "Painel", "painel");
   const escola = page.getByRole("article", { name: /: Toda a escola$/ });
   await escola.scrollIntoViewIfNeeded();
@@ -92,7 +93,8 @@ test("continua exibindo gráficos quando a observação de visibilidade não est
 
 test("isola uma falha no download do gráfico sem bloquear a chamada", async ({ page }) => {
   const arquivos = await medirBiblioteca(page, true);
-  await page.goto("/?visao=chamada");
+  // Horários não monta gráficos, então a falha medida é a do Painel.
+  await page.goto("/?visao=horarios");
   await aguardarHidratacao(page);
   expect(arquivos.size).toBe(0);
   await trocarVisao(page, "Painel", "painel");

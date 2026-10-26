@@ -561,6 +561,8 @@ model Configuracao {
   frequenciaPorAula Boolean                   @default(false) @map("frequencia_por_aula")
   saidaAntecipada   Boolean                   @default(true) @map("saida_antecipada")
   origemNaChamada   Boolean                   @default(false) @map("origem_na_chamada")
+  infrequenciaAtencaoPercentual Int           @default(10) @map("infrequencia_atencao_percentual")
+  infrequenciaCriticaPercentual Int           @default(20) @map("infrequencia_critica_percentual")
   origemSeries      ConfiguracaoOrigemSerie[]
   origemTurmas      ConfiguracaoOrigemTurma[]
   atualizadoEm      DateTime                  @updatedAt @map("atualizado_em") @db.Timestamptz

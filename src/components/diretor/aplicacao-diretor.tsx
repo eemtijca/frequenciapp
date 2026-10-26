@@ -14,6 +14,7 @@ import type { ContextoDiretor } from "@/domain/estatisticas-diretor";
 import { Button } from "@/components/ui/button";
 import { SeletorTema } from "@/components/ui/seletor-tema";
 import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
+import { AtualizadoEm } from "@/components/ui/atualizado-em";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
@@ -23,14 +24,17 @@ import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 interface Props {
   usuario: Identidade;
   contexto: ContextoDiretor;
+  fuso: string;
+  carregadoEm: string;
 }
 
-export default function AplicacaoDiretor({ usuario, contexto }: Props) {
+export default function AplicacaoDiretor({ usuario, contexto, fuso, carregadoEm }: Props) {
   const router = useRouter();
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [sobreAberto, setSobreAberto] = useState(false);
   const [atualizacao, setAtualizacao] = useState(0);
+  const [atualizadoEm, setAtualizadoEm] = useState(carregadoEm);
 
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
@@ -52,9 +56,15 @@ export default function AplicacaoDiretor({ usuario, contexto }: Props) {
             <p className="text-muted-foreground truncate text-xs">
               {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
             </p>
+            <AtualizadoEm instante={atualizadoEm} fuso={fuso} className="mt-0.5" />
           </div>
           <div className="flex items-center gap-1">
-            <BotaoAtualizar onAtualizar={() => setAtualizacao((valor) => valor + 1)} />
+            <BotaoAtualizar
+              onAtualizar={() => {
+                setAtualizacao((valor) => valor + 1);
+                setAtualizadoEm(new Date().toISOString());
+              }}
+            />
             <SeletorTema />
             {!contexto.trocaObrigatoria ? (
               <Button

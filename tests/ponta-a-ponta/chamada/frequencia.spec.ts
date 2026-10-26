@@ -121,7 +121,10 @@ test.describe("chamada com saída por aula", () => {
       timeout: 15_000,
     });
 
-    // O dia futuro fica bloqueado na própria navegação de data.
+    // Do sábado, a seta seguinte abre o resumo; ali ela fica bloqueada no domingo corrente.
+    await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeEnabled();
+    await painel.getByRole("button", { name: "Dia seguinte" }).click();
+    await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeVisible();
     await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeDisabled();
 
     // A marcação sobrevive à recarga.
@@ -164,7 +167,12 @@ test.describe("chamada com saída por aula", () => {
 
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Histórico" }).click();
-    await expect(page.getByText(/saída parcial/).first()).toBeVisible();
+    await expect(
+      page
+        .locator('[data-pager="principal"] > section:not([hidden])')
+        .getByText(/saída parcial/)
+        .first(),
+    ).toBeVisible();
 
     // O seletor de mês abre em painel, aceita teclado e volta para este mês.
     const historico = page.locator('section[aria-label="Histórico de frequências"]');
@@ -229,7 +237,8 @@ test.describe("chamada com saída por aula", () => {
       await pilula.click();
     }
     const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
-    await painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ }).click();
+    const desbloquear = painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ });
+    if (await desbloquear.isVisible().catch(() => false)) await desbloquear.click();
     await liberarSabadoSeNecessario(painel);
     await linha.locator("button[aria-pressed]").first().click();
     await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();

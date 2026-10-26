@@ -7,11 +7,13 @@ import { UserRound, Users } from "lucide-react";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { BarraBusca } from "@/components/ui/barra-busca";
+import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
   alunos: Aluno[];
   turmas: Turma[];
+  fuso: string;
   onAtualizar: () => Promise<void>;
 }
 
@@ -72,7 +74,7 @@ const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotul
   );
 });
 
-export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
+export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props) {
   const [agrupamento, setAgrupamento] = useState<Agrupamento>("atual");
   const [busca, setBusca] = useState("");
   const buscaAplicada = useDeferredValue(busca);
@@ -145,6 +147,9 @@ export default function VistaAlunos({ alunos, turmas, onAtualizar }: Props) {
           </p>
         </div>
         <Users size={22} className="text-muted-foreground" aria-hidden="true" />
+      </div>
+      <div className="flex justify-end">
+        <AtualizadoDaVisao fuso={fuso} />
       </div>
 
       <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">

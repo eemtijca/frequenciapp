@@ -10,6 +10,7 @@ import {
   camposJustificativaSaida,
   diaLocal,
   ehDiaValido,
+  ehDomingo,
   ehLiberadorValido,
   ehMomentoValido,
   LIMITE_TEXTO_SAIDA,
@@ -143,6 +144,9 @@ export async function criarSaida(
   const { alunoId, dia, momento, horario } = dados.data;
   const campos = camposJustificativaSaida(momento, dados.data);
   if (!campos.ok) throw new ErroHttp(campos.mensagem, 400);
+  if (ehDomingo(dia)) {
+    throw new ErroHttp("Domingo não tem aula. Escolha um dia de segunda a sábado.", 400);
+  }
   if (dia > diaLocal(new Date(), ambiente.fuso)) {
     throw new ErroHttp("Não é possível registrar saída em dia futuro.", 400);
   }

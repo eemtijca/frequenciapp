@@ -355,10 +355,11 @@ test("no celular, as setas acima dos cartões percorrem os gráficos e respeitam
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Painel", "painel");
-  const total = await page.getByRole("article", { includeHidden: true }).count();
-  const anterior = page.getByRole("button", { name: "Gráfico anterior", exact: true });
-  const proximo = page.getByRole("button", { name: "Próximo gráfico", exact: true });
-  const faixa = page.getByRole("group", { name: "Cartões de gráficos" });
+  const painelAtivo = page.locator('[data-pager="principal"] > section:not([hidden])');
+  const total = await painelAtivo.getByRole("article", { includeHidden: true }).count();
+  const anterior = painelAtivo.getByRole("button", { name: "Gráfico anterior", exact: true });
+  const proximo = painelAtivo.getByRole("button", { name: "Próximo gráfico", exact: true });
+  const faixa = painelAtivo.getByRole("group", { name: "Cartões de gráficos" });
   await expect(anterior).toBeDisabled();
   // Ficam acima dos cartões e dentro da tela, sem cobrir os textos.
   const [caixaAnterior, caixaProximo, caixaFaixa] = await Promise.all([
@@ -377,18 +378,20 @@ test("no celular, as setas acima dos cartões percorrem os gráficos e respeitam
   for (let posicao = 2; posicao <= total; posicao += 1) {
     await proximo.click();
     await expect(
-      page.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
+      painelAtivo.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
     ).toBeInViewport();
   }
   await expect(proximo).toBeDisabled();
   for (let posicao = total - 1; posicao >= 1; posicao -= 1) {
     await anterior.click();
     await expect(
-      page.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
+      painelAtivo.getByRole("article", { name: new RegExp(`^${posicao} de ${total}: `) }),
     ).toBeInViewport();
   }
   await expect(anterior).toBeDisabled();
-  await expect(page.getByRole("article", { name: /^1 de \d+: Toda a escola$/ })).toBeInViewport();
+  await expect(
+    painelAtivo.getByRole("article", { name: /^1 de \d+: Toda a escola$/ }),
+  ).toBeInViewport();
 });
 
 test.describe("infrequência do dia", () => {
