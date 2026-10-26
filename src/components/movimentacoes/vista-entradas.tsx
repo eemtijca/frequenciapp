@@ -276,6 +276,8 @@ export default function VistaEntradas({
             nav.escolherDia(proximo);
           }}
           onVerDomingo={() => {
+            setTurma("");
+            setAlunoId("");
             setCarregandoDomingo(true);
             setVerDomingo(true);
           }}

@@ -416,6 +416,8 @@ export default function VistaSaidas({
             nav.escolherDia(proximo);
           }}
           onVerDomingo={() => {
+            setTurmaFiltro("");
+            setAlunoId("");
             setDiaLiberado(null);
             setCarregandoDomingo(true);
             setVerDomingo(true);
