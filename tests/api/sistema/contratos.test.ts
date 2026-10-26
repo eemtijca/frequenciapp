@@ -1139,6 +1139,21 @@ describe("saídas antecipadas", () => {
     expect(dados.error).toContain("Domingo não tem aula");
   });
 
+  it("aceita saída no sábado anterior ao domingo corrente", async () => {
+    const resposta = await autenticado(cookieCoord, "/api/saidas", {
+      method: "POST",
+      body: JSON.stringify({
+        horario: "08:30",
+        alunoId: alunoQA?.id,
+        dia: "2026-06-13",
+        momento: "aula_2",
+        justificativa: "CM",
+        liberadoPorCodigo: "QADIR",
+      }),
+    });
+    expect(resposta.status).toBe(201);
+  });
+
   it("coordenação registra a saída com quem liberou", async () => {
     const resposta = await autenticado(cookieCoord, "/api/saidas", {
       method: "POST",
