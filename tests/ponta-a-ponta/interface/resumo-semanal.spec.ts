@@ -70,6 +70,33 @@ test("o Painel abre a semana escolhida com a Visão geral aberta e as demais se�
   await expect(pendencias).toHaveAttribute("data-state", "open");
 });
 
+test("o resumo se atualiza em silêncio e preserva a seção aberta", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = window.setInterval.bind(window);
+    window.setInterval = ((handler: TimerHandler, timeout = 0, ...args: unknown[]) =>
+      original(handler, timeout >= 120_000 ? 200 : timeout, ...args)) as typeof window.setInterval;
+  });
+  let cargas = 0;
+  page.on("request", (requisicao) => {
+    if (new URL(requisicao.url()).pathname === "/api/frequencias") cargas += 1;
+  });
+
+  const domingo = ultimoDomingo();
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel", { manterResumo: true });
+  await escolherDomingo(page, "#dia-painel", domingo);
+  const resumo = page.getByRole("region", { name: "Resumo da semana", exact: true });
+  await expect(resumo).toBeVisible();
+  const movimentacoes = resumo.locator('[data-secao="resumo-movimentacoes"]');
+  await movimentacoes.locator("button").first().click();
+  await expect(movimentacoes).toHaveAttribute("data-state", "open");
+  const antes = cargas;
+  await expect.poll(() => cargas, { timeout: 5_000 }).toBeGreaterThan(antes);
+  await expect(movimentacoes).toHaveAttribute("data-state", "open");
+  await expect(page.getByText(/Resumo atualizado/)).toHaveCount(0);
+});
+
 test("Saídas e Entradas usa o resumo da aba e limpa o filtro de turma ao abrir um dia", async ({
   page,
 }) => {
