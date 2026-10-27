@@ -716,24 +716,30 @@ export default function VistaFrequenciaParcial({
                     <span>Registro na Seduc</span>
                     <span className="text-right">Ações</span>
                   </div>
-                  <ul className="divide-y">
-                    {alunosFiltrados.map((aluno) => {
+                  <ul>
+                    {alunosFiltrados.map((aluno, indice) => {
                       const registro = aluno.registro;
                       const resumo = resumoDoRegistro(registro, justificativas);
                       return (
                         <li
                           key={aluno.id}
-                          className="px-4 py-2.5"
+                          // Linhas alternadas, como na Chamada, para separar os nomes.
+                          className={cn(
+                            "px-4 py-2",
+                            indice % 2 === 0 ? "bg-card" : "bg-secondary/60",
+                          )}
                           data-testid={`parcial-aluno-${aluno.id}`}
                         >
-                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 md:grid-cols-[minmax(0,1fr)_11rem_9rem_auto] md:items-center">
-                            <div className="min-w-0">
+                          {/* No celular: nome e situação à esquerda, ações à direita e a
+                              Seduc embaixo, só quando existe. No desktop, uma coluna para cada. */}
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 md:grid-cols-[minmax(0,1fr)_11rem_9rem_auto]">
+                            <div className="col-start-1 row-start-1 min-w-0">
                               <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
                               {aluno.desistente && (
                                 <span className="text-muted-foreground text-xs">Desistente</span>
                               )}
                             </div>
-                            <div className="min-w-0 md:col-start-2">
+                            <div className="col-start-1 row-start-2 min-w-0 md:col-start-2 md:row-start-1">
                               <span
                                 title={resumo}
                                 className={cn(
@@ -756,34 +762,30 @@ export default function VistaFrequenciaParcial({
                                 {resumo}
                               </span>
                             </div>
-                            <div className="col-span-2 flex min-h-10 items-center gap-2 md:col-span-1 md:col-start-3">
-                              {exigeConferenciaSeduc(registro) ? (
-                                <>
-                                  <Label
-                                    htmlFor={`parcial-seduc-${aluno.id}`}
-                                    className="text-xs md:sr-only"
-                                    title="Registro na Seduc"
-                                  >
-                                    Registro na Seduc
-                                  </Label>
-                                  <Switch
-                                    id={`parcial-seduc-${aluno.id}`}
-                                    aria-label={`Registro na Seduc: ${aluno.nome}`}
-                                    title="Registro na Seduc"
-                                    checked={registro.registradoSeduc}
-                                    disabled={
-                                      ocupado ||
-                                      editorAberto ||
-                                      (registro.tipo === "SAIDA" && !registro.aulasConferiveis)
-                                    }
-                                    onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
-                                  />
-                                </>
-                              ) : (
-                                <span className="text-muted-foreground text-xs">-</span>
-                              )}
-                            </div>
-                            <div className="col-span-2 flex justify-end gap-1 md:col-span-1 md:col-start-4">
+                            {exigeConferenciaSeduc(registro) && (
+                              <div className="col-span-2 row-start-3 flex items-center gap-2 pt-1 md:col-span-1 md:col-start-3 md:row-start-1 md:pt-0">
+                                <Label
+                                  htmlFor={`parcial-seduc-${aluno.id}`}
+                                  className="text-xs md:sr-only"
+                                  title="Registro na Seduc"
+                                >
+                                  Registro na Seduc
+                                </Label>
+                                <Switch
+                                  id={`parcial-seduc-${aluno.id}`}
+                                  aria-label={`Registro na Seduc: ${aluno.nome}`}
+                                  title="Registro na Seduc"
+                                  checked={registro.registradoSeduc}
+                                  disabled={
+                                    ocupado ||
+                                    editorAberto ||
+                                    (registro.tipo === "SAIDA" && !registro.aulasConferiveis)
+                                  }
+                                  onCheckedChange={(valor) => confirmarSeduc(registro, valor)}
+                                />
+                              </div>
+                            )}
+                            <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1 md:col-start-4 md:row-span-1">
                               <Button
                                 type="button"
                                 variant={registro ? "ghost" : "outline"}
