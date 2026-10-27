@@ -1,13 +1,15 @@
 // Chamada com saída por aula: marcação parcial, persistência, histórico,
 // grade e falta justificada. O modo por aula é ligado pela configuração.
 import { expect, test } from "@playwright/test";
-import { rotuloData } from "@/domain/frequencia";
+import { diaDaSemanaIso, rotuloData } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaCorrente, diaDeChamada, tituloResumoDoDia } from "../helpers/dia";
 import {
   abrirDiaSeResumo,
   aguardarHidratacao,
+  desbloquearChamada,
   liberarSabadoSeNecessario,
+  salvarChamada,
   trocarVisao,
 } from "../helpers/pagina";
 
@@ -109,7 +111,7 @@ test.describe("chamada com saída por aula", () => {
     const chips = linha.locator("button[aria-pressed]");
     const total = await chips.count();
     await chips.nth(total - 1).click();
-    await painel.getByRole("button", { name: "Salvar" }).click();
+    await salvarChamada(painel);
     await expect(painel.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
     await expect(
       painel.getByRole("button", { name: /^Desbloquear chamada de E2E Ano A/ }),
@@ -122,10 +124,15 @@ test.describe("chamada com saída por aula", () => {
     });
 
     // Do sábado, a seta seguinte abre o resumo; ali ela fica bloqueada no domingo corrente.
-    await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeEnabled();
-    await painel.getByRole("button", { name: "Dia seguinte" }).click();
-    await expect(page.getByRole("region", { name: "Resumo da semana", exact: true })).toBeVisible();
-    await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeDisabled();
+    // Em outro dia da semana, a seta apenas avança para o dia seguinte.
+    if (diaDaSemanaIso(diaDeChamada()) === 6) {
+      await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeEnabled();
+      await painel.getByRole("button", { name: "Dia seguinte" }).click();
+      await expect(
+        page.getByRole("region", { name: "Resumo da semana", exact: true }),
+      ).toBeVisible();
+      await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeDisabled();
+    }
 
     // A marcação sobrevive à recarga.
     await page.reload();
@@ -238,13 +245,17 @@ test.describe("chamada com saída por aula", () => {
     }
     const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
     const desbloquear = painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ });
-    if (await desbloquear.isVisible().catch(() => false)) await desbloquear.click();
+    // Espera a leitura decidir entre a chamada bloqueada e a lista editável.
+    await expect(
+      desbloquear.or(painel.locator("ul li button[aria-pressed]:not([disabled])").first()),
+    ).toBeVisible({ timeout: 15_000 });
+    if (await desbloquear.isVisible().catch(() => false)) await desbloquearChamada(painel);
     await liberarSabadoSeNecessario(painel);
     await linha.locator("button[aria-pressed]").first().click();
     await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();
     await page.getByRole("option", { name: "D · Doente" }).click();
-    await painel.getByRole("button", { name: "Salvar" }).click();
-    await expect(linha.getByText("FJ")).toBeVisible({ timeout: 15_000 });
+    await salvarChamada(painel);
+    await expect(linha.getByText("FJ", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(linha.getByText("Doente").first()).toBeVisible();
   });
 });

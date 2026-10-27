@@ -4,7 +4,7 @@
 // remoção para corrigir um registro. A lista abre bloqueada, sem o botão de
 // remover, e só o botão Desbloquear a libera. Separado da chamada. O relatório
 // por aluno fica em Relatórios, Saídas e entradas.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -57,6 +57,7 @@ import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
+import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 
 interface Props {
@@ -110,6 +111,7 @@ export default function VistaSaidas({
   const [observacao, setObservacao] = useState("");
   const [responsavelCodigo, setResponsavelCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
@@ -246,20 +248,36 @@ export default function VistaSaidas({
     ].filter(Boolean);
   }
 
-  async function registrar() {
-    if (enviando) return;
+  function validarRegistro(): boolean {
     if (!alunoId || !momento || !responsavelCodigo) {
       setErro("Escolha o aluno, o momento da saída e quem liberou.");
-      return;
+      return false;
     }
     if (formaJustificativa === "catalogo" && !justificativa) {
       setErro("Escolha o tipo de justificativa.");
-      return;
+      return false;
     }
     if (formaJustificativa === "texto" && texto.trim() === "") {
       setErro("Escreva a justificativa em poucas palavras.");
+      return false;
+    }
+    return true;
+  }
+
+  function abrirConfirmacao(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (enviando) return;
+    if (!validarRegistro()) return;
+    setConfirmacaoAberta(true);
+  }
+
+  async function registrar() {
+    if (enviando) return;
+    if (!validarRegistro()) {
+      setConfirmacaoAberta(false);
       return;
     }
+    setConfirmacaoAberta(false);
     setEnviando(true);
     setErro("");
     try {
@@ -342,6 +360,20 @@ export default function VistaSaidas({
   }
 
   const rotuloDia = dia.split("-").reverse().join("/");
+  const alunoConfirmacao = alunosPorId.get(alunoId);
+  const turmaConfirmacao = alunoConfirmacao ? rotuloTurma(alunoConfirmacao.turmaId) : "";
+  const justificativaConfirmacao =
+    formaJustificativa === "catalogo"
+      ? [
+          catalogoJustificativas.find((item) => item.codigo === justificativa)?.rotulo ??
+            justificativa,
+          duranteAula ? texto.trim() : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : texto.trim();
+  const responsavelConfirmacao =
+    liberadores.find((item) => item.codigo === responsavelCodigo)?.rotulo ?? "";
 
   return (
     <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
@@ -494,10 +526,7 @@ export default function VistaSaidas({
         <>
           <form
             className="superficie flex flex-col gap-4 p-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void registrar();
-            }}
+            onSubmit={abrirConfirmacao}
             noValidate
           >
             <h2 className="font-medium">Registrar saída</h2>
@@ -736,6 +765,32 @@ export default function VistaSaidas({
           )}
         </>
       )}
+      <DialogoConfirmarMovimentacao
+        aberto={confirmacaoAberta}
+        onAbrir={setConfirmacaoAberta}
+        titulo="Registrar saída?"
+        descricao="Confira os dados antes de registrar. Depois de salvo, o lançamento aparece na lista do dia e nos relatórios."
+        rotuloConfirmar="Registrar saída"
+        onConfirmar={() => void registrar()}
+        itens={[
+          { rotulo: "Aluno", valor: alunoConfirmacao?.nome ?? "" },
+          { rotulo: "Turma", valor: turmaConfirmacao },
+          { rotulo: "Dia", valor: rotuloDia },
+          { rotulo: "Momento", valor: momento ? rotuloMomento(momento) : "" },
+          { rotulo: "Horário", valor: horario },
+          { rotulo: "Justificativa", valor: justificativaConfirmacao },
+          {
+            rotulo: "Observação",
+            valor:
+              formaJustificativa === "catalogo" &&
+              justificativa === JUSTIFICATIVA_OUTROS &&
+              !duranteAula
+                ? observacao.trim()
+                : "",
+          },
+          { rotulo: "Responsável", valor: responsavelConfirmacao },
+        ]}
+      />
       <AlertDialog
         open={saidaRemover !== null}
         onOpenChange={(aberto) => !aberto && setSaidaRemover(null)}

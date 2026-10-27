@@ -1,7 +1,13 @@
 // Lista da Chamada: justificativas bloqueadas, linhas alternadas e acumulado mensal.
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
-import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  desbloquearChamada,
+  salvarChamada,
+  trocarVisao,
+} from "../helpers/pagina";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -132,12 +138,10 @@ test("simplifica a chamada bloqueada, alterna as linhas e atualiza o mês após 
     await page.emulateMedia({ colorScheme: tema });
     await lista.screenshot({ path: info.outputPath(`lista-${tema}.png`), animations: "disabled" });
   }
-  await secao
-    .getByRole("button", { name: new RegExp(`^Desbloquear chamada de ${prefixo}`) })
-    .click();
+  await desbloquearChamada(secao);
   await falta.getByRole("combobox").click();
   await page.getByRole("option", { name: "D · Doente", exact: true }).click();
-  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(secao);
   await expect(falta.getByRole("combobox")).toBeDisabled();
   await expect(falta.getByRole("img", { name: "1 falta justificada", exact: true })).toBeVisible();
   await expect(falta.getByRole("img", { name: "1 falta", exact: true })).toHaveCount(0);

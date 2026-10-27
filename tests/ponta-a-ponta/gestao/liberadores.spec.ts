@@ -2,7 +2,7 @@
 // antecipado, com o nome novo aparecendo na lista do dia.
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, registrarSaida, trocarVisao } from "../helpers/pagina";
 import {
   descartarConfiguracoes,
   enviarRascunhoConfiguracoes,
@@ -40,6 +40,8 @@ test.describe("quem libera as saídas", () => {
     await page.locator("#liberador-rotulo").fill("E2E Porteiro");
     await secao.getByRole("button", { name: "Adicionar" }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
+    // O aviso flutua sobre o rodapé e pausa a própria saída enquanto o ponteiro o cobre.
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
     await salvarConfiguracoes(page);
 
     await trocarVisao(page, "Saídas e Entradas", "saidas");
@@ -53,7 +55,7 @@ test.describe("quem libera as saídas", () => {
     await page.getByRole("option", { name: "D · Doente" }).click();
     await page.locator("#saida-responsavel").click();
     await page.getByRole("option", { name: "E2E Porteiro" }).click();
-    await page.getByRole("button", { name: "Registrar saída" }).click();
+    await registrarSaida(page);
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     await expect(page.getByText("Liberado por E2E Porteiro").first()).toBeVisible();
 

@@ -6,6 +6,7 @@ import {
   abrirDiaSeResumo,
   aguardarHidratacao,
   escolherHorario,
+  registrarSaida,
   trocarVisao,
 } from "../helpers/pagina";
 
@@ -106,7 +107,7 @@ test("registra a saída com o horário escolhido e mostra na lista", async ({ pa
   await page.getByRole("option", { name: "D · Doente" }).click();
   await page.locator("#saida-responsavel").click();
   await page.getByRole("option", { name: "Diretor E2E" }).click();
-  await page.getByRole("button", { name: "Registrar saída" }).click();
+  await registrarSaida(page);
   await expect(page.getByText("Saída registrada.")).toBeVisible();
   const itens = page.getByRole("list", { name: /^Saídas de / });
   await expect(itens.getByText("09:20", { exact: true }).first()).toBeVisible();

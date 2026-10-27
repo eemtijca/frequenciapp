@@ -7,6 +7,8 @@ import {
   aguardarHidratacao,
   escolherTurmaNaChamada,
   liberarSabadoSeNecessario,
+  salvarChamada,
+  salvarFrequenciaParcial,
   trocarVisao,
 } from "../helpers/pagina";
 
@@ -167,7 +169,7 @@ test("retira RS da Chamada e confirma a frequência diária na Parcial, preserva
   await page.setViewportSize({ width: 360, height: 800 });
   const chamada = await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);
-  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(chamada);
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await expect(chamada.getByRole("switch")).toHaveCount(0);
 
@@ -238,7 +240,7 @@ test("recusa na Parcial uma confirmação desatualizada da Chamada e recarrega a
   page,
 }) => {
   const chamada = await abrirChamada(page);
-  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(chamada);
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await salvarJustificadas(page);
   const secao = await abrirParcial(page);
@@ -281,7 +283,7 @@ test("confirma presença por turno na Seduc e preserva a chamada justificada da 
   page,
 }) => {
   const chamada = await abrirChamada(page);
-  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(chamada);
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   await salvarJustificadas(page);
   const secao = await abrirParcial(page);
@@ -303,8 +305,7 @@ test("confirma presença por turno na Seduc e preserva a chamada justificada da 
   await dialogo.getByRole("radio", { name: "Turno inteiro", exact: true }).click();
   await dialogo.locator("#parcial-turno").click();
   await page.getByRole("option", { name: "Tarde", exact: true }).click();
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
-  await expect(dialogo).toBeHidden();
+  await salvarFrequenciaParcial(dialogo);
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
   await expect(confirmacao).toBeVisible();
   await expect(confirmacao).not.toBeChecked();

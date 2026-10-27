@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, salvarFrequenciaParcial, trocarVisao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 const prefixo = "E2E Saída Parcial";
@@ -100,8 +100,7 @@ test("migra a saída, confirma na Seduc e preserva a edição após remover a or
     editor.getByRole("checkbox", { name: "1ª aula frequentada", exact: true }),
   ).toBeChecked();
   await editor.getByRole("checkbox", { name: "2ª aula frequentada", exact: true }).click();
-  await editor.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
-  await expect(editor).toBeHidden();
+  await salvarFrequenciaParcial(editor);
   await expect(linha.getByText("Presente · 1ª à 2ª aula", { exact: true })).toBeVisible();
   await expect(confirmar).not.toBeChecked();
   expect((await page.request.delete(`/api/saidas/${saida.id}`)).status()).toBe(200);

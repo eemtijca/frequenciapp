@@ -4,7 +4,12 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
-import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  salvarChamada,
+  trocarVisao,
+} from "../helpers/pagina";
 import { enviarRascunhoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
@@ -354,7 +359,7 @@ test("recusa transformar chamada salva em feriado e preserva a frequência após
   const aluno = secaoChamada.getByRole("button", { name: new RegExp(`^${PREFIXO} Aluna A:`) });
   await expect(aluno).toBeEnabled();
   await aluno.click();
-  await secaoChamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(secaoChamada);
   await expect(secaoChamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   const antes = await lerChamada(page, diaProtegido);
   const secaoCalendario = await abrirCalendario(page);
@@ -491,7 +496,7 @@ test("preserva o rascunho quando outro administrador cadastra feriado e permite 
   await expect(secao.getByRole("button", { name: nomeDoAluno })).toBeEnabled();
   const salvar = secao.getByRole("button", { name: "Salvar", exact: true });
   await expect(salvar).toBeEnabled();
-  await salvar.click();
+  await salvarChamada(secao);
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   expect(await lerChamada(page, diaUtil)).toMatchObject({
     frequencia: { dia: diaUtil, turmaId, faltas: [{ alunoId }] },
@@ -576,7 +581,7 @@ test("falha de leitura em dia útil bloqueia a edição e preserva o rascunho at
   expect(await page.evaluate((chave) => sessionStorage.getItem(chave), rascunho.chave)).toBe(
     rascunho.bruto,
   );
-  await salvar.click();
+  await salvarChamada(secao);
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   expect(await lerChamada(page, diaUtil)).toMatchObject({
     frequencia: { dia: diaUtil, turmaId, faltas: [{ alunoId }] },

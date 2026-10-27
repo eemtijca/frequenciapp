@@ -70,6 +70,32 @@ test("o Painel abre a semana escolhida com a Visão geral aberta e as demais se�
   await expect(pendencias).toHaveAttribute("data-state", "open");
 });
 
+test("o cabeçalho do resumo cabe no celular sem cortar o selo", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  const domingo = ultimoDomingo();
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Painel", "painel", { manterResumo: true });
+  await escolherDomingo(page, "#dia-painel", domingo);
+
+  const resumo = page.getByRole("region", { name: "Resumo da semana", exact: true });
+  await expect(resumo).toHaveClass(/superficie/);
+  const cabecalho = resumo.locator("header");
+  const selo = cabecalho.getByText("Somente leitura", { exact: true });
+  await expect(selo).toBeVisible();
+  await expect(cabecalho.getByText(/Atualizado às \d{2}:\d{2}|Ainda não atualizado/)).toBeVisible();
+
+  expect(
+    await resumo.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+  ).toBe(true);
+  expect(
+    await cabecalho.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+  ).toBe(true);
+  expect(await selo.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1)).toBe(
+    true,
+  );
+});
+
 test("o resumo se atualiza em silêncio e preserva a seção aberta", async ({ page }) => {
   await page.addInitScript(() => {
     const original = window.setInterval.bind(window);

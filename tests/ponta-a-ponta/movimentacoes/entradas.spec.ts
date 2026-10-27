@@ -7,6 +7,7 @@ import {
   abrirNavegacao,
   aguardarHidratacao,
   escolherHorario,
+  registrarEntrada,
   trocarVisao,
 } from "../helpers/pagina";
 // O worker encaminha fetch fora do page.route; a suíte PWA o testa separadamente.
@@ -119,7 +120,7 @@ test("registra chegada, preserva após recarregar e remove para correção", asy
   await page.locator("#entrada-motivo").fill("Transporte atrasou");
   await page.getByLabel("Responsável pelo registro", { exact: true }).click();
   await page.getByRole("option", { name: "Coordenadora E2E", exact: true }).click();
-  await page.getByRole("button", { name: "Registrar entrada", exact: true }).click();
+  await registrarEntrada(page);
   await expect(page.getByText("Entrada registrada.", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Entradas registradas" }).getByText("Transporte atrasou"),
@@ -158,7 +159,7 @@ test("registra justificativa do catálogo com observação e responsável escolh
   await page.locator("#entrada-observacao").fill("Ônibus atrasou");
   await page.locator("#entrada-responsavel").click();
   await page.getByRole("option", { name: "Diretor E2E", exact: true }).click();
-  await page.getByRole("button", { name: "Registrar entrada", exact: true }).click();
+  await registrarEntrada(page);
   const lista = page.getByRole("region", { name: "Entradas registradas" });
   await expect(lista.getByText("Transporte", { exact: true })).toBeVisible();
   await expect(lista.getByText("Ônibus atrasou", { exact: true })).toBeVisible();

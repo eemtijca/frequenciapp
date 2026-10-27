@@ -26,6 +26,11 @@ test.describe("toasts e toque duplo", () => {
     await chamada.locator("ul.divide-y li").first().waitFor();
     await chamada.locator("ul.divide-y li button[aria-pressed]").first().click();
     await chamada.getByRole("button", { name: "Salvar" }).click({ clickCount: 2, delay: 30 });
+    const confirmar = page.getByRole("alertdialog", { name: /^Salvar chamada\?$/ });
+    await expect(confirmar).toBeVisible();
+    await confirmar
+      .getByRole("button", { name: "Salvar chamada", exact: true })
+      .click({ clickCount: 2, delay: 30 });
     const avisos = page.locator("[data-sonner-toast]").filter({ hasText: "Chamada salva" });
     await expect(avisos).toHaveCount(1);
     await page.waitForTimeout(1200);

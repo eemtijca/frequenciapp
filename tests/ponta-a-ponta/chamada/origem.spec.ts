@@ -179,6 +179,9 @@ test.describe("origem em massa (administração)", () => {
     await page.locator("#origem-em-massa").click();
     await page.getByRole("option", { name: "E2E Origem B" }).click();
     await painel.getByRole("button", { name: "Aplicar origem" }).click();
+    const dialogo = page.getByRole("alertdialog", { name: "Aplicar origem em massa?" });
+    await expect(dialogo).toBeVisible();
+    await dialogo.getByRole("button", { name: "Aplicar origem", exact: true }).click();
     await expect(page.getByText("Origem de 2 alunos atualizada.")).toBeVisible();
     await expect(painel.getByText("Origem 3º ano E2E Origem B").first()).toBeVisible();
   });

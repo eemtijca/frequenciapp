@@ -21,7 +21,11 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Todas as telas ganham o botão Atualizar tela no cabeçalho, que recarrega só a visão ativa e preserva filtros. Com rascunho pendente, orienta a salvar ou descartar antes de atualizar. O FrequenciBI usa o mesmo botão no desktop e Minhas turmas repete no cabeçalho do diretor.
 
-- A barra de salvamento da Chamada passa a ter largura pelo conteúdo, alinhada à direita no desktop e centralizada no celular, com texto truncado e respeito à área segura inferior.
+- A barra de salvamento da Chamada passa a ocupar a largura da coluna direita no desktop, abaixo dos controles, e a flutuar no rodapé do celular. Salvar abre uma confirmação com o resumo de faltas, justificadas e presentes. O desbloqueio da chamada e a liberação do sábado letivo exigem a senha da própria conta, com limite de cinco tentativas em 15 minutos.
+
+- Saídas e Entradas, o salvamento da Chamada Parcial, as justificativas antecipadas, a desativação e reativação de aluno e a aplicação de origem em massa passam a pedir confirmação explícita antes de gravar.
+
+- Nova rota `POST /api/conta/confirmar-senha`, sem efeito colateral, para conferir a senha da própria conta em ações sensíveis da interface.
 
 - A criação de chave do FrequenciBI usa os seletores próprios de data e hora, lado a lado, no lugar do campo nativo. O escopo abre por um botão recolhível com resumo das séries, turmas e bases escolhidas.
 
@@ -112,6 +116,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O resumo semanal inteiro passa a usar uma superfície única, com o cabeçalho como faixa superior e as seções internas como subpainéis com borda. O cabeçalho tem ícone, título, período, descrição, selo Somente leitura e horário de atualização; no celular, os metadados ocupam a largura e alinham à esquerda, sem cortar o selo.
+
+- O diálogo Sobre ganha folha inferior no celular, cabeçalho com marca, escola e descrição curta, cartões de Privacidade e LGPD, Projeto e Licença, com salvaguardas em linhas, ações de largura total, desenvolvedores em chips, versão no rodapé e coluna mais larga no desktop. A aprovação institucional e o consentimento deixam de ser exibidos.
+
+- A entrada troca os três destaques por chamada em poucos toques, resumo semanal e funcionamento offline, com título e descrição. Os destaques ficam apenas no desktop.
+
+- O `docs/lgpd.md` é corrigido para refletir o Sobre atual, as notificações push, as chaves do FrequenciBI, as entradas atrasadas e a situação do painel externo legado.
+
 - A atualização das telas deixa de recarregar o resumo de forma visível. Os resumos semanais mantêm conteúdo, foco, rolagem e seções abertas durante a consulta, mostram carregamento apenas ao trocar de semana e preservam a frequência quando uma consulta extra falha. O Atualizar tela continua sendo o único botão, agora acompanhado do rótulo Atualizado às HH:MM no conteúdo. O Painel do dia mantém o ciclo de sessenta segundos e o resumo usa dois minutos.
 
 - Diretórios reorganizados para reduzir listas extensas na raiz: `tests/unidade` e `tests/ponta-a-ponta` agrupam as suítes por área, `components/gestao` passa a ter `abas`, `cadastros`, `configuracoes` e `planilhas`, os adaptadores do Google ficam em `src/infra/google`, e `scripts` passa a ter `administracao`, `banco`, `backup`, `assets`, `github` e `seed`. As visões foram renomeadas para `entrada`, `chamada`, `chamada-parcial` e `movimentacoes`, com `historico` dentro de `relatorios`.
@@ -201,6 +213,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- O selo Somente leitura do resumo semanal deixa de ser truncado e fica alinhado à esquerda no celular, sem estouro horizontal do cabeçalho.
 
 - Saídas e Entradas deixa de aceitar novos registros no domingo. A API responde 400 com a mensagem Domingo não tem aula, enquanto a consulta e a remoção de registros históricos de domingo continuam disponíveis. A lista do domingo mostra todas as turmas e não exibe o formulário.
 

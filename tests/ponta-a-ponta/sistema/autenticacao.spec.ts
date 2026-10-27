@@ -76,6 +76,66 @@ test.describe("autenticação", () => {
     expect(cookie?.expires).toBe(-1);
   });
 
+  test("a entrada mostra os três destaques no desktop", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const lateral = page.locator("aside");
+    for (const titulo of [
+      "Chamada em poucos toques",
+      "Resumo semanal da escola",
+      "Funciona offline",
+    ]) {
+      await expect(lateral.getByText(titulo, { exact: true })).toBeVisible();
+    }
+  });
+
+  test("no celular os destaques da entrada ficam ocultos", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await expect(page.locator("aside")).toBeHidden();
+    await expect(page.getByText("Chamada em poucos toques", { exact: true })).toBeHidden();
+  });
+
+  test("o Sobre abre como folha no celular e devolve o foco", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const abrir = page.getByRole("button", { name: "Sobre", exact: true });
+    await abrir.click();
+
+    const sobre = page.getByRole("dialog", { name: "Sobre o FrequenciApp" });
+    await expect(sobre).toBeVisible();
+    await expect(
+      sobre.getByRole("heading", { name: "Privacidade e LGPD", exact: true }),
+    ).toBeVisible();
+    await expect(sobre.getByRole("heading", { name: "Projeto", exact: true })).toBeVisible();
+    await expect(sobre.getByRole("heading", { name: "Licença", exact: true })).toBeVisible();
+    await expect(sobre.getByRole("link", { name: "Como os dados são tratados" })).toBeVisible();
+    await expect(
+      sobre.getByRole("link", { name: "Repositório no GitHub", exact: true }),
+    ).toBeVisible();
+    await expect(sobre.getByRole("link", { name: "Emanuel Lázaro", exact: true })).toBeVisible();
+    await expect(sobre.getByRole("link", { name: "Ler a licença", exact: true })).toBeVisible();
+    await expect(sobre.getByText(/^Versão \d+\.\d+\.\d+$/)).toBeVisible();
+
+    const estilo = await sobre.evaluate((elemento) => {
+      const calculado = getComputedStyle(elemento);
+      return { posicao: calculado.position, inferior: calculado.bottom };
+    });
+    expect(estilo.posicao).toBe("fixed");
+    expect(Number.parseFloat(estilo.inferior)).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 320, height: 720 });
+    await expect(sobre).toBeVisible();
+    expect(
+      await sobre.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+    ).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(sobre).toBeHidden();
+    await expect(abrir).toBeFocused();
+  });
+
   test("campos de senha mostram e ocultam", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
