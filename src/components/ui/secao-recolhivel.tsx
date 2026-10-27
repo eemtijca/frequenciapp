@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useId } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { ChevronDown, type LucideIcon } from "lucide-react";
+import { ConteudoRecolhivel } from "@/components/ui/conteudo-recolhivel";
 
 interface Props {
   titulo: string;
@@ -87,9 +88,14 @@ export function SecaoRecolhivel({
         </Collapsible.Trigger>
         {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
       </div>
-      <Collapsible.Content role="region" aria-label={titulo} className="flex flex-col">
+      <ConteudoRecolhivel
+        aberto={aberto}
+        role="region"
+        aria-label={titulo}
+        className="secao-animada flex flex-col"
+      >
         <div className="flex flex-col gap-4 border-t px-3 pt-4 pb-4 sm:px-4">{children}</div>
-      </Collapsible.Content>
+      </ConteudoRecolhivel>
     </Collapsible.Root>
   );
 }

@@ -104,7 +104,8 @@ Animações discretas, todas com propósito de confirmar estado:
 - Abas da Gestão e dos Relatórios: troca por toque, botões e teclado; no desktop o conteúdo faz um deslize curto de 0,15 s.
 - Marca P/F/FJ da chamada troca com mola rápida (escala e opacidade), confirmando o toque sem chamar atenção.
 - Botões, chips, abas e controles respondem ao toque encolhendo de leve por 150 ms; com movimento reduzido, a escala some e só a cor responde.
-- Diálogos seguem as animações padrão do Radix; a barra de salvamento da Chamada flutua com cantos arredondados no fim da rolagem. Controles mantêm pelo menos 44 pixels de altura para toque; o cartão da lista termina visível e arredondado.
+- Diálogos centrais seguem as animações padrão do Radix; as folhas inferiores deslizam discretamente pela base no celular. Quando o conteúdo precisa ser desmontado imediatamente, a saída pode ser interrompida para preservar o ciclo de vida dos dados e das operações. A barra de salvamento da Chamada flutua com cantos arredondados no fim da rolagem. Controles mantêm pelo menos 44 pixels de altura para toque; o cartão da lista termina visível e arredondado.
+- O painel Turmas, as turmas de cada série e as seções recolhíveis animam a expansão e o recolhimento, sem animar cada item. Com movimento reduzido, a mudança ocorre imediatamente; a seleção e as ações continuam disponíveis sem espera.
 
 Nada de parallax, rotação ou animação decorativa: o design permanece o mesmo, o movimento só explica o que mudou.
 

@@ -8,6 +8,7 @@ import * as Collapsible from "@radix-ui/react-collapsible";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia } from "@/domain/relatorios";
 import { Button } from "@/components/ui/button";
+import { ConteudoRecolhivel } from "@/components/ui/conteudo-recolhivel";
 import estilos from "./seletor-turma-chamada.module.css";
 
 interface Props {
@@ -213,7 +214,7 @@ export function SeletorTurmaChamada({
           </span>
         </Button>
       </Collapsible.Trigger>
-      <Collapsible.Content>
+      <ConteudoRecolhivel aberto={aberto} className={estilos.conteudo}>
         <div role="group" aria-label="Séries" className={estilos.lista}>
           {resumos.map(({ grupo, nome, situacao, percentual, descricao }) => {
             const ehAtiva = grupo.id === ativa?.id;
@@ -248,7 +249,10 @@ export function SeletorTurmaChamada({
                     </span>
                   </Button>
                 </Collapsible.Trigger>
-                <Collapsible.Content>
+                <ConteudoRecolhivel
+                  aberto={ehAtiva && serieRecolhida !== grupo.id}
+                  className={estilos.conteudo}
+                >
                   <div role="group" aria-label={`Turmas de ${nome}`} className={estilos.faixa}>
                     {grupo.turmas.map((opcao) => {
                       const ativo = opcao.id === turmaId;
@@ -307,12 +311,12 @@ export function SeletorTurmaChamada({
                       );
                     })}
                   </div>
-                </Collapsible.Content>
+                </ConteudoRecolhivel>
               </Collapsible.Root>
             );
           })}
         </div>
-      </Collapsible.Content>
+      </ConteudoRecolhivel>
     </Collapsible.Root>
   );
 }
