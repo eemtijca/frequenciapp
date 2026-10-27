@@ -176,6 +176,12 @@ test("libera apenas o sábado selecionado, salva e exige o desbloqueio comum par
   await expect(liberar).toBeEnabled();
   await expect(aluno(secao, "A")).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
+  await liberar.click();
+  const confirmacao = page.getByRole("alertdialog", { name: "Desbloquear sábado letivo?" });
+  await expect(confirmacao).toBeVisible();
+  await expect(confirmacao.locator('input[type="password"]')).toHaveCount(0);
+  await confirmacao.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(aluno(secao, "A")).toBeDisabled();
   await liberarSabadoSeNecessario(secao);
   const liberado = secao.getByRole("button", { name: "Sábado letivo", exact: true });
   await expect(liberado).toHaveAttribute("aria-pressed", "true");
