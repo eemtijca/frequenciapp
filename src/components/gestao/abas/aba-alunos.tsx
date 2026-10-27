@@ -129,16 +129,37 @@ const LinhaAluno = memo(function LinhaAluno({
           >
             <Pencil size={16} />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-11"
-            aria-label={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
-            onClick={() => onAlternarAtivo(aluno)}
-            disabled={ocupado || Boolean(aluno.desistenteEm)}
-          >
-            <Power size={16} />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-11"
+                aria-label={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
+                disabled={ocupado || Boolean(aluno.desistenteEm)}
+              >
+                <Power size={16} />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {aluno.ativo ? `Desativar ${aluno.nome}?` : `Reativar ${aluno.nome}?`}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {aluno.ativo
+                    ? "O aluno sai das chamadas futuras, mas o histórico existente é preservado. Para apagar os dados, use a exclusão."
+                    : "O aluno volta a aparecer nas chamadas futuras. O histórico existente é preservado."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onAlternarAtivo(aluno)} disabled={ocupado}>
+                  {aluno.ativo ? "Desativar" : "Reativar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -516,18 +537,38 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                 opcoes={opcoesTurma}
               />
             </div>
-            <Button
-              className="h-11 sm:w-auto"
-              onClick={() => void aplicarOrigem()}
-              disabled={aplicando || selecionados.size === 0 || origemEmMassa === ""}
-            >
-              {aplicando ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : (
-                <Check size={16} />
-              )}
-              Aplicar origem
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  className="h-11 sm:w-auto"
+                  disabled={aplicando || selecionados.size === 0 || origemEmMassa === ""}
+                >
+                  {aplicando ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : (
+                    <Check size={16} />
+                  )}
+                  Aplicar origem
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Aplicar origem em massa?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    A origem de {selecionados.size}{" "}
+                    {selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"} passa a
+                    ser {rotulo(origemEmMassa)}. A turma atual não muda; a Grade e a planilha usam a
+                    nova origem.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => void aplicarOrigem()} disabled={aplicando}>
+                    Aplicar origem
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       )}
