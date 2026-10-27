@@ -253,7 +253,7 @@ test.describe("chamada com saída por aula", () => {
     await liberarSabadoSeNecessario(painel);
     await linha.locator("button[aria-pressed]").first().click();
     await linha.getByRole("combobox", { name: /Justificativa da falta/ }).click();
-    await page.getByRole("option", { name: "D · Doente" }).click();
+    await page.getByRole("option", { name: "Doente", exact: true }).click();
     await salvarChamada(painel);
     await expect(linha.getByText("FJ", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(linha.getByText("Doente").first()).toBeVisible();

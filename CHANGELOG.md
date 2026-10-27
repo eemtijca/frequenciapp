@@ -8,6 +8,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+### Alterado
+
+- A Chamada mostra somente o nome da justificativa, sem sigla ou repetição. Após salvar, a linha exibe o nome; ao desbloquear, o seletor e a observação voltam a ficar disponíveis.
+
 ### Adicionado
 
 - O seletor de turmas da Chamada e as seções recolhíveis animam discretamente a expansão e o recolhimento; folhas inferiores deslizam pela base no celular. O movimento reduzido continua respeitado e os estados são preservados.
