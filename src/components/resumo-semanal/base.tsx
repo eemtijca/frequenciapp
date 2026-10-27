@@ -27,21 +27,32 @@ export function CabecalhoResumo({
   const de = dias[0] ?? "";
   const ate = dias[dias.length - 1] ?? "";
   return (
-    <header className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="text-lg font-semibold tracking-tight">{titulo}</h2>
-        <p className="text-muted-foreground text-sm">
-          {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
-          {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
-        </p>
-        {descricao && <p className="text-muted-foreground text-xs">{descricao}</p>}
+    <header className="flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span className="controle text-secondary-foreground mt-0.5 flex size-9 shrink-0 items-center justify-center">
+          <CalendarDays size={16} aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">{titulo}</h2>
+          <p className="text-muted-foreground mt-0.5 text-sm">
+            {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
+            {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
+          </p>
+          {descricao && <p className="text-muted-foreground text-xs">{descricao}</p>}
+        </div>
       </div>
-      <div className="flex flex-col items-end gap-1">
-        <Selo>Somente leitura</Selo>
+      <div className="flex w-full shrink-0 flex-col items-start gap-1 sm:w-auto sm:items-end">
+        <span className="shrink-0">
+          <Selo>Somente leitura</Selo>
+        </span>
         <AtualizadoEm instante={atualizadoEm ?? undefined} fuso={fuso} />
       </div>
     </header>
   );
+}
+
+export function CorpoResumo({ children }: { children: ReactNode }) {
+  return <div className="flex flex-col gap-5 border-t px-3 pt-4 pb-4 sm:px-4">{children}</div>;
 }
 
 export function SecaoResumo({
