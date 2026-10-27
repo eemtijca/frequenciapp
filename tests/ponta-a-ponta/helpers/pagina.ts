@@ -1,6 +1,5 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { ADMIN_E2E } from "./banco";
 import { hojeEDomingo } from "./dia";
 
 /**
@@ -186,12 +185,14 @@ export async function salvarJustificativaParcial(dialogo: Locator): Promise<void
   await expect(confirmacao).toBeHidden({ timeout: 15_000 });
 }
 
-/** Desbloqueia a chamada salva com a senha da conta usada pela suíte. */
-export async function desbloquearChamada(secao: Locator, senha = ADMIN_E2E.senha): Promise<void> {
+/** Desbloqueia a chamada salva após confirmação. */
+export async function desbloquearChamada(secao: Locator): Promise<void> {
   await secao.getByRole("button", { name: /^Desbloquear chamada de/ }).click();
-  const dialogo = secao.page().getByRole("dialog", { name: "Desbloquear chamada?", exact: true });
+  const dialogo = secao
+    .page()
+    .getByRole("alertdialog", { name: "Desbloquear chamada?", exact: true });
   await expect(dialogo).toBeVisible();
-  await dialogo.getByLabel("Senha da sua conta").fill(senha);
+  await expect(dialogo.locator('input[type="password"]')).toHaveCount(0);
   await dialogo.getByRole("button", { name: "Desbloquear", exact: true }).click();
   await expect(dialogo).toBeHidden();
 }
@@ -200,19 +201,16 @@ export async function desbloquearChamada(secao: Locator, senha = ADMIN_E2E.senha
  * Aos sábados a chamada começa bloqueada, mesmo com aula na grade: libera o
  * sábado letivo da turma aberta. Nos demais dias o botão não existe e nada muda.
  */
-export async function liberarSabadoSeNecessario(
-  secao: Locator,
-  senha = ADMIN_E2E.senha,
-): Promise<void> {
+export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   if (!(await liberar.isVisible().catch(() => false))) return;
   await expect(liberar).toBeEnabled();
   await liberar.click();
   const dialogo = secao
     .page()
-    .getByRole("dialog", { name: "Desbloquear sábado letivo?", exact: true });
+    .getByRole("alertdialog", { name: "Desbloquear sábado letivo?", exact: true });
   await expect(dialogo).toBeVisible();
-  await dialogo.getByLabel("Senha da sua conta").fill(senha);
+  await expect(dialogo.locator('input[type="password"]')).toHaveCount(0);
   await dialogo.getByRole("button", { name: "Desbloquear", exact: true }).click();
   await expect(dialogo).toBeHidden();
   await expect(secao.getByRole("button", { name: "Sábado letivo", exact: true })).toHaveAttribute(

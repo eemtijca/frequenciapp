@@ -114,7 +114,14 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
   await expect(aluno).toBeDisabled();
 
-  await desbloquearChamada(secao);
+  await botaoBloqueio.click();
+  const confirmacao = page.getByRole("alertdialog", { name: "Desbloquear chamada?" });
+  await expect(confirmacao).toBeVisible();
+  await expect(confirmacao.locator('input[type="password"]')).toHaveCount(0);
+  await confirmacao.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(aluno).toBeDisabled();
+  await botaoBloqueio.click();
+  await confirmacao.getByRole("button", { name: "Desbloquear", exact: true }).click();
   await expect(aluno).toBeEnabled();
   await secao.getByRole("button", { name: /Bloquear chamada de E2E Bloqueio A/ }).click();
   await expect(aluno).toBeDisabled();

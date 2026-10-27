@@ -21,11 +21,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Todas as telas ganham o botão Atualizar tela no cabeçalho, que recarrega só a visão ativa e preserva filtros. Com rascunho pendente, orienta a salvar ou descartar antes de atualizar. O FrequenciBI usa o mesmo botão no desktop e Minhas turmas repete no cabeçalho do diretor.
 
-- A barra de salvamento da Chamada passa a ocupar a largura da coluna direita no desktop, abaixo dos controles, e a flutuar no rodapé do celular. Salvar abre uma confirmação com o resumo de faltas, justificadas e presentes. O desbloqueio da chamada e a liberação do sábado letivo exigem a senha da própria conta, com limite de cinco tentativas em 15 minutos.
+- A barra de salvamento da Chamada passa a ocupar a largura da coluna direita no desktop, abaixo dos controles, e a flutuar no rodapé do celular. Salvar abre uma confirmação com o resumo de faltas, justificadas e presentes. O desbloqueio da chamada e a liberação do sábado letivo usam confirmação com botões.
 
 - Saídas e Entradas, o salvamento da Chamada Parcial, as justificativas antecipadas, a desativação e reativação de aluno e a aplicação de origem em massa passam a pedir confirmação explícita antes de gravar.
-
-- Nova rota `POST /api/conta/confirmar-senha`, sem efeito colateral, para conferir a senha da própria conta em ações sensíveis da interface.
 
 - A criação de chave do FrequenciBI usa os seletores próprios de data e hora, lado a lado, no lugar do campo nativo. O escopo abre por um botão recolhível com resumo das séries, turmas e bases escolhidas.
 
@@ -115,6 +113,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Capturas do README com dados: o Painel e a Chamada passam a exigir a semente aplicada e a mostrar o último dia letivo com chamada, e entram o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão.
 
 ### Alterado
+
+- O desbloqueio de chamada salva e a liberação de sábado letivo usam confirmação simples, sem pedir a senha da conta. A rota `POST /api/conta/confirmar-senha` foi removida; as demais proteções por senha permanecem.
 
 - O resumo semanal inteiro passa a usar uma superfície única, com o cabeçalho como faixa superior e as seções internas como subpainéis com borda. O cabeçalho tem ícone, título, período, descrição, selo Somente leitura e horário de atualização; no celular, os metadados ocupam a largura e alinham à esquerda, sem cortar o selo.
 

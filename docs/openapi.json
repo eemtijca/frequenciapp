@@ -480,98 +480,6 @@
         }
       }
     },
-    "/api/conta/confirmar-senha": {
-      "post": {
-        "operationId": "confirmarSenhaDaConta",
-        "summary": "Confirmar a senha da própria conta",
-        "description": "Exige sessão com a capacidade operar e confere a senha atual com até cinco tentativas em 15 minutos por conta. Não altera a sessão nem grava dados; a interface usa a confirmação para liberar uma edição sensível.",
-        "tags": ["conta"],
-        "requestBody": {
-          "required": true,
-          "description": "Senha atual da conta.",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ConfirmacaoSenha"
-              },
-              "examples": {
-                "Confirmação": {
-                  "summary": "Confirmação",
-                  "value": {
-                    "senha": "DirecaoFrequencia2026"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Senha confirmada.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Ok"
-                },
-                "examples": {
-                  "Exemplo": {
-                    "summary": "Exemplo",
-                    "value": {
-                      "ok": true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Senha incorreta ou corpo inválido.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                },
-                "examples": {
-                  "Exemplo": {
-                    "summary": "Exemplo",
-                    "value": {
-                      "error": "Senha incorreta."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Erro401"
-          },
-          "403": {
-            "description": "Sessão sem a capacidade operar ou origem não confiável.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                },
-                "examples": {
-                  "Exemplo": {
-                    "summary": "Exemplo",
-                    "value": {
-                      "error": "Seu acesso não permite esta operação."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "$ref": "#/components/responses/Erro429"
-          },
-          "503": {
-            "$ref": "#/components/responses/Erro503"
-          }
-        }
-      }
-    },
     "/api/diretores": {
       "get": {
         "operationId": "listarDiretores",
@@ -12572,19 +12480,6 @@
             "deprecated": true,
             "description": "Campo antigo aceito no lugar de login.",
             "example": "direcao@escola.exemplo"
-          }
-        }
-      },
-      "ConfirmacaoSenha": {
-        "type": "object",
-        "title": "Confirmação da própria senha",
-        "description": "Senha atual da conta, usada para liberar uma edição sensível na interface.",
-        "required": ["senha"],
-        "properties": {
-          "senha": {
-            "type": "string",
-            "description": "Senha vigente da conta.",
-            "example": "DirecaoFrequencia2026"
           }
         }
       },

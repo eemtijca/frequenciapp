@@ -75,15 +75,6 @@ Troca a própria senha. Corpo: `{ "senhaAtual": string, "senhaNova": string }`. 
 - 400 quando a senha atual não confere, a nova está fora da política (mínimo 8 caracteres, uma letra e um número) ou o corpo é inválido.
 - 429 depois de cinco tentativas em 15 minutos para a mesma conta; o contador é limpo quando a senha atual confere.
 
-### POST /api/conta/confirmar-senha
-
-Confere a senha da própria conta sem alterar a sessão nem gravar dados. Exige a capacidade `operar`. Corpo: `{ "senha": string }`.
-
-- 200 `{"ok": true}`.
-- 400 quando a senha não confere ou o corpo é inválido.
-- 401 sem sessão; 403 com sessão sem a capacidade `operar` ou origem não confiável.
-- 429 depois de cinco tentativas em 15 minutos para a mesma conta; o contador é limpo quando a senha confere.
-
 ## Diretores de turma (administração)
 
 Contas só de leitura das estatísticas das turmas de origem do vínculo ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)). Todas exigem `administrar`.

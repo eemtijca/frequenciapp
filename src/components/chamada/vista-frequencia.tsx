@@ -61,7 +61,6 @@ import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
-import { DialogoConfirmarSenha } from "@/components/ui/dialogo-confirmar-senha";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
@@ -784,8 +783,7 @@ export default function VistaFrequencia({
     });
   }
 
-  async function confirmarSenhaDesbloqueio(senha: string): Promise<void> {
-    await pedir<{ ok: boolean }>("/api/conta/confirmar-senha", corpoJson({ senha }));
+  function confirmarDesbloqueio(): void {
     if (desbloqueio === "sabado") {
       setSabadoDesbloqueado(chave);
     } else if (desbloqueio === "chamada") {
@@ -804,8 +802,8 @@ export default function VistaFrequencia({
     ? "Desbloquear sábado letivo?"
     : "Desbloquear chamada?";
   const descricaoDesbloqueio = desbloqueioSabado
-    ? `Informe a senha da sua conta para liberar a chamada de ${turma?.rotulo ?? "turma"} neste sábado letivo.`
-    : `A chamada de ${turma?.rotulo ?? "turma"} em ${rotuloDia} está salva e bloqueada. Informe a senha da sua conta para liberar uma correção.`;
+    ? `Deseja liberar a chamada de ${turma?.rotulo ?? "turma"} neste sábado letivo?`
+    : `A chamada de ${turma?.rotulo ?? "turma"} em ${rotuloDia} está salva e bloqueada. Deseja liberar uma correção?`;
 
   const tituloEstado = carregando
     ? "Carregando..."
@@ -1621,16 +1619,23 @@ export default function VistaFrequencia({
         </AlertDialogContent>
       </AlertDialog>
 
-      <DialogoConfirmarSenha
-        aberto={desbloqueio !== null}
-        onAbrir={(aberto) => {
+      <AlertDialog
+        open={desbloqueio !== null}
+        onOpenChange={(aberto) => {
           if (!aberto) setDesbloqueio(null);
         }}
-        titulo={tituloDesbloqueio}
-        descricao={descricaoDesbloqueio}
-        rotuloConfirmar="Desbloquear"
-        onConfirmar={confirmarSenhaDesbloqueio}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{tituloDesbloqueio}</AlertDialogTitle>
+            <AlertDialogDescription>{descricaoDesbloqueio}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarDesbloqueio}>Desbloquear</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
