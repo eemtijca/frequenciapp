@@ -109,6 +109,12 @@ export function DialogoFrequenciaParcial({
   const [aulaInicial, setAulaInicial] = useState("1");
   const [aulaFinal, setAulaFinal] = useState("9");
   const [limiteAulas, setLimiteAulas] = useState(9);
+  const [confirmando, setConfirmando] = useState(false);
+  const [abertoAnterior, setAbertoAnterior] = useState(aberto);
+  if (aberto !== abertoAnterior) {
+    setAbertoAnterior(aberto);
+    if (!aberto) setConfirmando(false);
+  }
   const aulasVisiveis = useMemo(() => {
     const maiorOrdem = Math.max(0, ...(turma?.horarios ?? []).map((aula) => aula.ordem));
     const maiorSelecionada = Math.max(0, ...edicao.aulas);
@@ -130,6 +136,33 @@ export function DialogoFrequenciaParcial({
     : [];
   const futuro = dia > hoje;
   const limite = limiteAgendamentoParcial(hoje);
+  const podeSalvar =
+    !salvando &&
+    !bloqueado &&
+    Boolean(edicao.alunoId) &&
+    !(justificando && (!edicao.justificativa || !intervaloValido || !dias.length)) &&
+    !(edicao.tipo === "AULAS" && edicao.aulas.length === 0) &&
+    !conflito &&
+    !(registro !== null && !sujo);
+  const alunoSelecionado = alunos.find((aluno) => aluno.id === edicao.alunoId);
+  const justificativaSelecionada =
+    justificativas.find((item) => item.codigo === edicao.justificativa)?.rotulo ??
+    edicao.justificativa;
+  const tipoRotulo =
+    edicao.tipo === "DIA_INTEIRO"
+      ? "Dia inteiro"
+      : edicao.tipo === "TURNO"
+        ? "Turno inteiro"
+        : edicao.tipo === "AULAS"
+          ? "Por aulas"
+          : "Justificativa";
+  const turnoRotulo = edicao.turno === "TARDE" ? "Tarde" : "Manhã";
+
+  function fechar() {
+    if (salvando) return;
+    setConfirmando(false);
+    onFechar();
+  }
 
   function alternarAula(aula: number) {
     const marcadas = edicao.aulas.includes(aula)
@@ -150,272 +183,340 @@ export function DialogoFrequenciaParcial({
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={(valor) => !valor && !salvando && onFechar()}>
+    <Dialog open={aberto} onOpenChange={(valor) => !valor && fechar()}>
       <DialogContent folha showCloseButton={!salvando}>
         <DialogHeader>
           <DialogTitle>
-            {registro ? "Editar frequência parcial" : "Registrar frequência parcial"}
+            {confirmando
+              ? justificando
+                ? "Confirmar justificativa"
+                : "Confirmar frequência parcial"
+              : registro
+                ? "Editar frequência parcial"
+                : "Registrar frequência parcial"}
           </DialogTitle>
           <DialogDescription>
             {turma?.rotulo} · {dia.split("-").reverse().join("/")}
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(evento) => {
-            evento.preventDefault();
-            onSalvar();
-          }}
-        >
-          <div className="flex flex-col gap-1.5">
-            <p className="text-sm font-medium">Aluno</p>
-            <p id="parcial-aluno" className="bg-secondary rounded-lg px-3 py-2 text-sm break-words">
-              {alunos.find((aluno) => aluno.id === edicao.alunoId)?.nome}
+        {confirmando ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-muted-foreground text-sm">
+              Confira os dados antes de salvar. A alteração passa a valer imediatamente.
             </p>
-          </div>
-          <fieldset disabled={salvando} className="flex flex-col gap-2">
-            <legend className="mb-2 text-sm font-medium">Registro da frequência</legend>
-            <div
-              role="radiogroup"
-              aria-label="Forma da frequência parcial"
-              className="grid grid-cols-2 gap-2"
-            >
-              {(
-                [
-                  ["DIA_INTEIRO", "Dia inteiro"],
-                  ["TURNO", "Turno inteiro"],
-                  ["AULAS", "Por aulas"],
-                  ["JUSTIFICADA", "Justificativa"],
-                ] as const
-              ).map(([tipo, rotulo]) => (
-                <button
-                  key={tipo}
-                  type="button"
-                  role="radio"
-                  aria-checked={edicao.tipo === tipo}
-                  disabled={futuro && tipo !== "JUSTIFICADA"}
-                  onClick={() => onEdicao({ ...edicao, tipo })}
-                  className="controle pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {rotulo}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          {justificando ? (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Data inicial</Label>
-                  <SeletorPeriodo
-                    id="parcial-justificativa-de"
-                    modo="dia"
-                    valor={edicao.de || dia}
-                    max={limite}
-                    atual={hoje}
-                    semDomingo
-                    mostrarSelo={false}
-                    rotulo={(edicao.de || dia).split("-").reverse().join("/")}
-                    rotuloAcessivel="Data inicial da justificativa"
-                    onValor={(de) =>
-                      onEdicao({ ...edicao, de, ate: edicao.ate < de ? de : edicao.ate })
-                    }
-                    disabled={salvando || registro !== null}
+            <dl className="flex flex-col gap-2 text-sm">
+              <ItemResumo rotulo="Aluno" valor={alunoSelecionado?.nome ?? ""} />
+              <ItemResumo rotulo="Turma" valor={turma?.rotulo ?? ""} />
+              <ItemResumo rotulo="Dia" valor={dia.split("-").reverse().join("/")} />
+              {justificando ? (
+                <>
+                  <ItemResumo
+                    rotulo="Período"
+                    valor={`${edicao.de.split("-").reverse().join("/")} a ${edicao.ate.split("-").reverse().join("/")}`}
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Data final</Label>
-                  <SeletorPeriodo
-                    id="parcial-justificativa-ate"
-                    modo="dia"
-                    valor={edicao.ate || dia}
-                    max={limite}
-                    atual={hoje}
-                    semDomingo
-                    mostrarSelo={false}
-                    rotulo={(edicao.ate || dia).split("-").reverse().join("/")}
-                    rotuloAcessivel="Data final da justificativa"
-                    onValor={(ate) => onEdicao({ ...edicao, ate })}
-                    disabled={salvando || registro !== null}
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="parcial-justificativa">Justificativa</Label>
-                <Selecionar
-                  id="parcial-justificativa"
-                  value={edicao.justificativa}
-                  onValueChange={(justificativa) =>
-                    onEdicao({
-                      ...edicao,
-                      justificativa,
-                      observacao: justificativa === JUSTIFICATIVA_OUTROS ? edicao.observacao : "",
-                    })
-                  }
-                  opcoes={justificativas
-                    .filter((j) => j.ativo || j.codigo === edicao.justificativa)
-                    .map((j) => ({ valor: j.codigo, rotulo: j.rotulo }))}
-                  disabled={salvando}
-                  placeholder="Selecione"
-                />
-              </div>
-              <p className="text-muted-foreground text-sm" role="status">
-                {intervaloValido
-                  ? `${dias.length} ${dias.length === 1 ? "dia incluído" : "dias incluídos"}. Domingos e feriados ficam fora.`
-                  : "Escolha um período de até 31 dias, em ordem de data."}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                Dia inteiro. Em chamadas salvas, altera apenas a justificativa deste aluno.
-              </p>
-            </div>
-          ) : edicao.tipo === "TURNO" ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="parcial-turno">Turno frequentado</Label>
-              <Selecionar
-                id="parcial-turno"
-                value={edicao.turno}
-                onValueChange={(valor) =>
-                  onEdicao({ ...edicao, turno: valor === "TARDE" ? "TARDE" : "MANHA" })
-                }
-                opcoes={[
-                  { valor: "MANHA", rotulo: "Manhã" },
-                  { valor: "TARDE", rotulo: "Tarde" },
-                ]}
-                disabled={salvando}
-              />
-            </div>
-          ) : edicao.tipo === "AULAS" ? (
-            <fieldset disabled={salvando} className="flex flex-col gap-3">
-              <legend className="mb-2 text-sm font-medium">Aulas frequentadas</legend>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                {aulasVisiveis.map((aula) => (
-                  <button
-                    key={aula}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={edicao.aulas.includes(aula)}
-                    aria-label={`${aula}ª aula frequentada`}
-                    onClick={() => alternarAula(aula)}
-                    className="controle pressionavel flex h-11 items-center justify-center text-sm font-medium"
-                  >
-                    {aula}ª aula
-                  </button>
-                ))}
-              </div>
-              {aulasVisiveis.length < LIMITE_AULAS_PARCIAL && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setLimiteAulas(LIMITE_AULAS_PARCIAL)}
-                  className="h-11"
-                >
-                  Mostrar mais aulas
-                </Button>
+                  <ItemResumo rotulo="Justificativa" valor={justificativaSelecionada} />
+                </>
+              ) : (
+                <>
+                  <ItemResumo rotulo="Tipo" valor={tipoRotulo} />
+                  {edicao.tipo === "TURNO" && <ItemResumo rotulo="Turno" valor={turnoRotulo} />}
+                  {edicao.tipo === "AULAS" && (
+                    <ItemResumo rotulo="Aulas" valor={edicao.aulas.join(", ")} />
+                  )}
+                </>
               )}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="parcial-aula-inicial">A partir da aula</Label>
-                  <Selecionar
-                    id="parcial-aula-inicial"
-                    value={aulaInicial}
-                    onValueChange={setAulaInicial}
-                    opcoes={Array.from({ length: LIMITE_AULAS_PARCIAL }, (_, indice) => ({
-                      valor: String(indice + 1),
-                      rotulo: `${indice + 1}ª aula`,
-                    }))}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="parcial-aula-final">Até a aula</Label>
-                  <Selecionar
-                    id="parcial-aula-final"
-                    value={aulaFinal}
-                    onValueChange={setAulaFinal}
-                    opcoes={Array.from({ length: LIMITE_AULAS_PARCIAL }, (_, indice) => ({
-                      valor: String(indice + 1),
-                      rotulo: `${indice + 1}ª aula`,
-                    }))}
-                  />
-                </div>
-              </div>
+              {edicao.observacao.trim() && (
+                <ItemResumo rotulo="Observação" valor={edicao.observacao.trim()} />
+              )}
+            </dl>
+            {registro?.registradoSeduc && sujo && (
+              <p role="status" className="text-muted-foreground rounded-lg border p-3 text-sm">
+                A alteração deixará este registro pendente de conferência na Seduc.
+              </p>
+            )}
+            {erro && (
+              <AvisoCompacto
+                variante={conflito ? "conflito" : "indisponivel"}
+                descricao={erro}
+                tamanho="linha"
+              />
+            )}
+            <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={marcarAPartir}
-                disabled={Number(aulaInicial) > Number(aulaFinal)}
+                onClick={() => setConfirmando(false)}
+                disabled={salvando}
                 className="h-11"
               >
-                Marcar intervalo de aulas
+                Voltar
               </Button>
-              <p className="text-muted-foreground text-xs">
-                {edicao.aulas.length === 0
-                  ? "Selecione as aulas em que houve presença."
-                  : `${edicao.aulas.length} ${edicao.aulas.length === 1 ? "aula selecionada" : "aulas selecionadas"}.`}
-              </p>
-            </fieldset>
-          ) : (
-            <p className="text-muted-foreground text-sm">Presença em todas as aulas do dia.</p>
-          )}
-          {(!justificando || edicao.justificativa === JUSTIFICATIVA_OUTROS) && (
+              <Button type="button" onClick={onSalvar} disabled={!podeSalvar} className="h-11">
+                {salvando && <LoaderCircle size={16} className="animate-spin" />}
+                {justificando
+                  ? "Confirmar e salvar justificativa"
+                  : "Confirmar e salvar frequência"}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              if (podeSalvar) setConfirmando(true);
+            }}
+          >
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="parcial-observacao">Observação</Label>
-              <Input
-                id="parcial-observacao"
-                value={edicao.observacao}
-                onChange={(evento) => onEdicao({ ...edicao, observacao: evento.target.value })}
-                maxLength={justificando ? 200 : LIMITE_OBSERVACAO_PARCIAL}
-                disabled={salvando}
-                placeholder="Opcional"
-                className="h-11"
-              />
+              <p className="text-sm font-medium">Aluno</p>
+              <p
+                id="parcial-aluno"
+                className="bg-secondary rounded-lg px-3 py-2 text-sm break-words"
+              >
+                {alunos.find((aluno) => aluno.id === edicao.alunoId)?.nome}
+              </p>
             </div>
-          )}
-          {registro?.registradoSeduc && sujo && (
-            <p role="status" className="text-muted-foreground rounded-lg border p-3 text-sm">
-              A alteração deixará este registro pendente de conferência na Seduc.
-            </p>
-          )}
-          {erro && (
-            <AvisoCompacto
-              variante={conflito ? "conflito" : "indisponivel"}
-              descricao={erro}
-              tamanho="linha"
-            />
-          )}
-          {conflito && (
-            <Button type="button" variant="outline" onClick={onRecarregar} disabled={salvando}>
-              Carregar versão salva
-            </Button>
-          )}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onFechar}
-              disabled={salvando}
-              className="h-11"
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                salvando ||
-                bloqueado ||
-                !edicao.alunoId ||
-                (justificando && (!edicao.justificativa || !intervaloValido || !dias.length)) ||
-                (edicao.tipo === "AULAS" && edicao.aulas.length === 0) ||
-                conflito ||
-                (registro !== null && !sujo)
-              }
-              className="h-11"
-            >
-              {salvando && <LoaderCircle size={16} className="animate-spin" />}
-              {justificando ? "Salvar justificativa" : "Salvar frequência parcial"}
-            </Button>
-          </DialogFooter>
-        </form>
+            <fieldset disabled={salvando} className="flex flex-col gap-2">
+              <legend className="mb-2 text-sm font-medium">Registro da frequência</legend>
+              <div
+                role="radiogroup"
+                aria-label="Forma da frequência parcial"
+                className="grid grid-cols-2 gap-2"
+              >
+                {(
+                  [
+                    ["DIA_INTEIRO", "Dia inteiro"],
+                    ["TURNO", "Turno inteiro"],
+                    ["AULAS", "Por aulas"],
+                    ["JUSTIFICADA", "Justificativa"],
+                  ] as const
+                ).map(([tipo, rotulo]) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    role="radio"
+                    aria-checked={edicao.tipo === tipo}
+                    disabled={futuro && tipo !== "JUSTIFICADA"}
+                    onClick={() => onEdicao({ ...edicao, tipo })}
+                    className="controle pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            {justificando ? (
+              <div className="flex flex-col gap-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Data inicial</Label>
+                    <SeletorPeriodo
+                      id="parcial-justificativa-de"
+                      modo="dia"
+                      valor={edicao.de || dia}
+                      max={limite}
+                      atual={hoje}
+                      semDomingo
+                      mostrarSelo={false}
+                      rotulo={(edicao.de || dia).split("-").reverse().join("/")}
+                      rotuloAcessivel="Data inicial da justificativa"
+                      onValor={(de) =>
+                        onEdicao({ ...edicao, de, ate: edicao.ate < de ? de : edicao.ate })
+                      }
+                      disabled={salvando || registro !== null}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Data final</Label>
+                    <SeletorPeriodo
+                      id="parcial-justificativa-ate"
+                      modo="dia"
+                      valor={edicao.ate || dia}
+                      max={limite}
+                      atual={hoje}
+                      semDomingo
+                      mostrarSelo={false}
+                      rotulo={(edicao.ate || dia).split("-").reverse().join("/")}
+                      rotuloAcessivel="Data final da justificativa"
+                      onValor={(ate) => onEdicao({ ...edicao, ate })}
+                      disabled={salvando || registro !== null}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="parcial-justificativa">Justificativa</Label>
+                  <Selecionar
+                    id="parcial-justificativa"
+                    value={edicao.justificativa}
+                    onValueChange={(justificativa) =>
+                      onEdicao({
+                        ...edicao,
+                        justificativa,
+                        observacao: justificativa === JUSTIFICATIVA_OUTROS ? edicao.observacao : "",
+                      })
+                    }
+                    opcoes={justificativas
+                      .filter((j) => j.ativo || j.codigo === edicao.justificativa)
+                      .map((j) => ({ valor: j.codigo, rotulo: j.rotulo }))}
+                    disabled={salvando}
+                    placeholder="Selecione"
+                  />
+                </div>
+                <p className="text-muted-foreground text-sm" role="status">
+                  {intervaloValido
+                    ? `${dias.length} ${dias.length === 1 ? "dia incluído" : "dias incluídos"}. Domingos e feriados ficam fora.`
+                    : "Escolha um período de até 31 dias, em ordem de data."}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  Dia inteiro. Em chamadas salvas, altera apenas a justificativa deste aluno.
+                </p>
+              </div>
+            ) : edicao.tipo === "TURNO" ? (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="parcial-turno">Turno frequentado</Label>
+                <Selecionar
+                  id="parcial-turno"
+                  value={edicao.turno}
+                  onValueChange={(valor) =>
+                    onEdicao({ ...edicao, turno: valor === "TARDE" ? "TARDE" : "MANHA" })
+                  }
+                  opcoes={[
+                    { valor: "MANHA", rotulo: "Manhã" },
+                    { valor: "TARDE", rotulo: "Tarde" },
+                  ]}
+                  disabled={salvando}
+                />
+              </div>
+            ) : edicao.tipo === "AULAS" ? (
+              <fieldset disabled={salvando} className="flex flex-col gap-3">
+                <legend className="mb-2 text-sm font-medium">Aulas frequentadas</legend>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {aulasVisiveis.map((aula) => (
+                    <button
+                      key={aula}
+                      type="button"
+                      role="checkbox"
+                      aria-checked={edicao.aulas.includes(aula)}
+                      aria-label={`${aula}ª aula frequentada`}
+                      onClick={() => alternarAula(aula)}
+                      className="controle pressionavel flex h-11 items-center justify-center text-sm font-medium"
+                    >
+                      {aula}ª aula
+                    </button>
+                  ))}
+                </div>
+                {aulasVisiveis.length < LIMITE_AULAS_PARCIAL && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setLimiteAulas(LIMITE_AULAS_PARCIAL)}
+                    className="h-11"
+                  >
+                    Mostrar mais aulas
+                  </Button>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="parcial-aula-inicial">A partir da aula</Label>
+                    <Selecionar
+                      id="parcial-aula-inicial"
+                      value={aulaInicial}
+                      onValueChange={setAulaInicial}
+                      opcoes={Array.from({ length: LIMITE_AULAS_PARCIAL }, (_, indice) => ({
+                        valor: String(indice + 1),
+                        rotulo: `${indice + 1}ª aula`,
+                      }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="parcial-aula-final">Até a aula</Label>
+                    <Selecionar
+                      id="parcial-aula-final"
+                      value={aulaFinal}
+                      onValueChange={setAulaFinal}
+                      opcoes={Array.from({ length: LIMITE_AULAS_PARCIAL }, (_, indice) => ({
+                        valor: String(indice + 1),
+                        rotulo: `${indice + 1}ª aula`,
+                      }))}
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={marcarAPartir}
+                  disabled={Number(aulaInicial) > Number(aulaFinal)}
+                  className="h-11"
+                >
+                  Marcar intervalo de aulas
+                </Button>
+                <p className="text-muted-foreground text-xs">
+                  {edicao.aulas.length === 0
+                    ? "Selecione as aulas em que houve presença."
+                    : `${edicao.aulas.length} ${edicao.aulas.length === 1 ? "aula selecionada" : "aulas selecionadas"}.`}
+                </p>
+              </fieldset>
+            ) : (
+              <p className="text-muted-foreground text-sm">Presença em todas as aulas do dia.</p>
+            )}
+            {(!justificando || edicao.justificativa === JUSTIFICATIVA_OUTROS) && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="parcial-observacao">Observação</Label>
+                <Input
+                  id="parcial-observacao"
+                  value={edicao.observacao}
+                  onChange={(evento) => onEdicao({ ...edicao, observacao: evento.target.value })}
+                  maxLength={justificando ? 200 : LIMITE_OBSERVACAO_PARCIAL}
+                  disabled={salvando}
+                  placeholder="Opcional"
+                  className="h-11"
+                />
+              </div>
+            )}
+            {registro?.registradoSeduc && sujo && (
+              <p role="status" className="text-muted-foreground rounded-lg border p-3 text-sm">
+                A alteração deixará este registro pendente de conferência na Seduc.
+              </p>
+            )}
+            {erro && (
+              <AvisoCompacto
+                variante={conflito ? "conflito" : "indisponivel"}
+                descricao={erro}
+                tamanho="linha"
+              />
+            )}
+            {conflito && (
+              <Button type="button" variant="outline" onClick={onRecarregar} disabled={salvando}>
+                Carregar versão salva
+              </Button>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={fechar}
+                disabled={salvando}
+                className="h-11"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!podeSalvar} className="h-11">
+                {salvando && <LoaderCircle size={16} className="animate-spin" />}
+                {justificando ? "Salvar justificativa" : "Salvar frequência parcial"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ItemResumo({ rotulo, valor }: { rotulo: string; valor: string }) {
+  return (
+    <div className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-2">
+      <dt className="text-muted-foreground">{rotulo}</dt>
+      <dd className="min-w-0 break-words">{valor}</dd>
+    </div>
   );
 }

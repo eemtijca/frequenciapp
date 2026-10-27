@@ -7,6 +7,9 @@ import {
   trocarVisao,
   escolherTurmaNaChamada,
   liberarSabadoSeNecessario,
+  salvarChamada,
+  salvarFrequenciaParcial,
+  salvarJustificativaParcial,
 } from "../helpers/pagina";
 import {
   diaDeChamadaVizinho,
@@ -210,7 +213,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
     .click();
   const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial", exact: true });
   await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   await expect(primeiro.getByRole("switch")).toBeVisible();
   await expect(segundo.getByRole("switch")).toHaveCount(0);
   await expect(linhas).toHaveCount(3);
@@ -233,7 +236,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await editar.locator("#parcial-justificativa").click();
   await page.getByRole("option", { name: "Outros", exact: true }).click();
   await editar.locator("#parcial-observacao").fill("E2E Justificativa para conferência");
-  await editar.getByRole("button", { name: "Salvar justificativa", exact: true }).click();
+  await salvarJustificativaParcial(editar);
   await expect(editar).toBeHidden();
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Pendentes na Seduc", exact: true }).click();
@@ -248,7 +251,7 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
 
 test("preserva a linha histórica após transferência e desativação do aluno", async ({ page }) => {
   const { dialogo } = await abrirRegistro(page);
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   await expect(dialogo).toBeHidden();
   await comBanco((cliente) =>
     cliente.query(
@@ -274,7 +277,7 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
   const { secao, dialogo } = await abrirRegistro(page);
   await dialogo.locator("#parcial-turno").click();
   await page.getByRole("option", { name: "Tarde", exact: true }).click();
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Presente · Tarde", { exact: true })).toBeVisible();
   const dados = await registrosDoDia(page);
@@ -320,7 +323,7 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
   await expect(
     editar.getByText("A alteração deixará este registro pendente de conferência na Seduc."),
   ).toBeVisible();
-  await editar.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(editar);
   await expect(controle).toBeVisible();
   await expect(controle).not.toBeChecked();
   await expect(linha.getByText("Presente · Aulas 3, 4, 6", { exact: true })).toBeVisible();
@@ -343,7 +346,7 @@ test("registra o dia inteiro sem controle da Seduc e invalida confirmação anti
 }) => {
   const { secao, dialogo } = await abrirRegistro(page);
   await dialogo.getByRole("radio", { name: "Dia inteiro", exact: true }).click();
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
+  await salvarFrequenciaParcial(dialogo);
   await expect(dialogo).toBeHidden();
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Presente", { exact: true })).toBeVisible();
@@ -381,7 +384,7 @@ test("registra o dia inteiro sem controle da Seduc e invalida confirmação anti
   await expect(
     editar.getByText("A alteração deixará este registro pendente de conferência na Seduc."),
   ).toBeVisible();
-  await editar.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
+  await salvarFrequenciaParcial(editar);
   await expect(editar).toBeHidden();
   await expect(linha.getByText("Presente · 2ª à 3ª aula", { exact: true })).toBeVisible();
   await expect(confirmacao).toBeVisible();
@@ -415,7 +418,7 @@ test("marca um intervalo e permite retirar aulas específicas antes de salvar", 
   ).toBeChecked();
   await dialogo.getByRole("checkbox", { name: "4ª aula frequentada", exact: true }).click();
   await dialogo.locator("#parcial-observacao").fill("Presença nas aulas informadas");
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   await expect(secao.getByText("Presente · Aulas 3, 5", { exact: true })).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.aulas).toEqual([3, 5]);
   await page.reload();
@@ -439,7 +442,7 @@ test("pede confirmação para descartar o rascunho e para remover um registro", 
     .getByRole("button", { name: "Registrar frequência parcial de E2E Parcial Um", exact: true })
     .click();
   await expect(dialogo.locator("#parcial-aluno")).toHaveText("E2E Parcial Um");
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await linha.getByRole("button", { name: "Remover frequência parcial de E2E Parcial Um" }).click();
   const remover = page.getByRole("alertdialog", { name: "Remover a frequência parcial?" });
@@ -459,7 +462,7 @@ test("mantém a edição local em um conflito e carrega a versão salva antes de
   page,
 }) => {
   const { secao, dialogo } = await abrirRegistro(page);
-  await dialogo.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(dialogo);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }).click();
   const editar = page.getByRole("dialog", { name: "Editar frequência parcial" });
@@ -478,15 +481,18 @@ test("mantém a edição local em um conflito e carrega a versão salva antes de
   });
   expect(concorrente.ok()).toBe(true);
   await editar.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  const confirmacao = page.getByRole("dialog").last();
+  await confirmacao.getByRole("button", { name: "Confirmar e salvar frequência" }).click();
   await expect(
-    editar.getByText("Este registro mudou. Recarregue a lista antes de corrigir."),
+    confirmacao.getByText("Este registro mudou. Recarregue a lista antes de corrigir."),
   ).toBeVisible();
+  await confirmacao.getByRole("button", { name: "Voltar", exact: true }).click();
   await expect(editar.locator("#parcial-observacao")).toHaveValue("Edição deste aparelho");
   await expect(editar.getByRole("button", { name: "Salvar frequência parcial" })).toBeDisabled();
   await editar.getByRole("button", { name: "Carregar versão salva" }).click();
   await expect(editar.locator("#parcial-observacao")).toHaveValue("Edição salva em outro aparelho");
   await editar.locator("#parcial-observacao").fill("Correção após a conferência");
-  await editar.getByRole("button", { name: "Salvar frequência parcial" }).click();
+  await salvarFrequenciaParcial(editar);
   await expect(linha.getByText("Correção após a conferência")).toBeVisible();
   expect((await registrosDoDia(page)).registros[0]?.turno).toBe("TARDE");
 });
@@ -654,7 +660,7 @@ test("agenda uma justificativa futura por início e fim, sem criar presenças e 
   expect(largura.caixa).toBeLessThanOrEqual(largura.tela);
   expect(largura.interna).toBeLessThanOrEqual(Math.ceil(largura.caixa));
   await dialogo.screenshot({ path: info.outputPath("justificativa-por-periodo.png") });
-  await dialogo.getByRole("button", { name: "Salvar justificativa", exact: true }).click();
+  await salvarJustificativaParcial(dialogo);
   await expect(dialogo).toBeHidden();
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Outros: E2E Motivo do período", { exact: true })).toBeVisible();
@@ -732,15 +738,13 @@ test("preenche a primeira Chamada com o motivo agendado e mantém datas futuras 
   const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
   const futuro = diaDeChamadaVizinho(dia, 1);
   if (futuro.slice(0, 7) === dia.slice(0, 7)) {
-    await expect(
-      calendario.getByRole("button", { name: new RegExp(`^${Number(futuro.slice(8))} de `) }),
-    ).toBeDisabled();
+    await expect(calendario.locator(`[data-dia="${futuro}"]`)).toBeDisabled();
   } else
     await expect(
       calendario.getByRole("button", { name: "Mês seguinte", exact: true }),
     ).toBeDisabled();
   await calendario.getByRole("button", { name: "Fechar", exact: true }).click();
-  await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(chamada);
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   const depois = await page.request.get(`/api/frequencias?dia=${dia}&turmaId=${turmaId}`);
   expect((await depois.json()).frequencia.faltas).toEqual([
