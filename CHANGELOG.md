@@ -116,6 +116,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada Parcial fica mais compacta: as linhas alternam o fundo, como na Chamada, e o traço some quando a chave Registro na SEDUC não se aplica. No celular, nome e situação ficam à esquerda e Editar à direita, e a chave só ganha linha própria quando aparece, o que reduz a altura de cada aluno sem ela à metade. No desktop, as colunas continuam alinhadas.
+
 - O desbloqueio de chamada salva e a liberação de sábado letivo usam confirmação simples, sem pedir a senha da conta. A rota `POST /api/conta/confirmar-senha` foi removida; as demais proteções por senha permanecem.
 
 - O resumo semanal inteiro passa a usar uma superfície única, com o cabeçalho como faixa superior e as seções internas como subpainéis com borda. O cabeçalho tem ícone, título, período, descrição, selo Somente leitura e horário de atualização; no celular, os metadados ocupam a largura e alinham à esquerda, sem cortar o selo.
