@@ -3,7 +3,7 @@
 // Tela de entrada: marca e recursos no desktop, formulário único no celular.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, DoorOpen, LoaderCircle, WifiOff } from "lucide-react";
+import { CalendarCheck, CalendarDays, LoaderCircle, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
@@ -19,9 +19,21 @@ const CHAVE_EMAIL = "frequenciapp:email";
 const CHAVE_AVISO = "frequenciapp:aviso-entrada";
 
 const DESTAQUES = [
-  { Icone: CalendarCheck, texto: "Chamada do dia com saída por aula" },
-  { Icone: DoorOpen, texto: "Saídas e entradas registradas na hora" },
-  { Icone: WifiOff, texto: "Rascunho local quando a rede falha" },
+  {
+    Icone: CalendarCheck,
+    titulo: "Chamada em poucos toques",
+    texto: "Todos começam presentes. Marque só quem faltou e salve.",
+  },
+  {
+    Icone: CalendarDays,
+    titulo: "Resumo semanal da escola",
+    texto: "Frequência, movimentações e pendências da Seduc em um só lugar.",
+  },
+  {
+    Icone: WifiOff,
+    titulo: "Funciona offline",
+    texto: "Instale no celular e continue com o rascunho local quando a rede falhar.",
+  },
 ];
 
 interface Props {
@@ -119,15 +131,17 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
             </p>
           </div>
           <ul className="flex flex-col gap-3">
-            {DESTAQUES.map(({ Icone, texto }) => (
-              <li
-                key={texto}
-                className="superficie text-muted-foreground flex items-center gap-3 rounded-2xl border border-[var(--border)] px-4 py-3 text-sm"
-              >
-                <span className="selecionado text-primary flex size-9 shrink-0 items-center justify-center rounded-xl">
-                  <Icone size={17} aria-hidden="true" />
+            {DESTAQUES.map(({ Icone, titulo, texto }) => (
+              <li key={titulo} className="superficie flex items-start gap-3 p-4">
+                <span className="selecionado text-primary flex size-10 shrink-0 items-center justify-center">
+                  <Icone size={18} aria-hidden="true" />
                 </span>
-                {texto}
+                <span className="min-w-0">
+                  <span className="text-foreground block text-sm font-semibold">{titulo}</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                    {texto}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
