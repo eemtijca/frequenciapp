@@ -1,7 +1,7 @@
 "use client";
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ChevronLeft, ChevronRight, LoaderCircle, Trash2 } from "lucide-react";
 import type {
   Aluno,
@@ -31,6 +31,7 @@ import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
+import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import {
   AlertDialog,
@@ -82,6 +83,7 @@ export default function VistaEntradas({
   const [justificativa, setJustificativa] = useState("");
   const [observacao, setObservacao] = useState("");
   const [entradas, setEntradas] = useState<EntradaAtrasada[]>([]);
+  const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erro, setErro] = useState("");
   const [recorteCarregado, setRecorteCarregado] = useState("");
   const [versao, setVersao] = useState(0);
@@ -203,6 +205,72 @@ export default function VistaEntradas({
     setErro("");
     nav.escolherDia(valor);
   }
+
+  function validarEntrada(): boolean {
+    if (!alunoId || !momento || !responsavelCodigo) {
+      setErro("Escolha o aluno, o momento da entrada e o responsável.");
+      return false;
+    }
+    if (formaJustificativa === "texto" && motivo.trim().length < 2) {
+      setErro("Escreva a justificativa em poucas palavras.");
+      return false;
+    }
+    if (formaJustificativa === "catalogo" && !justificativa) {
+      setErro("Escolha o tipo de justificativa.");
+      return false;
+    }
+    return true;
+  }
+
+  function abrirConfirmacao(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    if (executando) return;
+    if (!validarEntrada()) return;
+    setConfirmacaoAberta(true);
+  }
+
+  async function registrarEntrada() {
+    if (executando) return;
+    if (!validarEntrada()) {
+      setConfirmacaoAberta(false);
+      return;
+    }
+    setConfirmacaoAberta(false);
+    await executar(async () => {
+      await pedir("/api/entradas", {
+        method: "POST",
+        ...corpoJson({
+          alunoId,
+          dia,
+          horario,
+          momento,
+          responsavelRegistroCodigo: responsavelCodigo,
+          ...(formaJustificativa === "texto"
+            ? { motivo }
+            : { justificativa, observacao: observacao || undefined }),
+        }),
+      });
+      setAlunoId("");
+      setMotivo("");
+      setMomento("");
+      setResponsavelCodigo("");
+      setJustificativa("");
+      setObservacao("");
+      setFormaJustificativa("catalogo");
+      setVersao((valor) => valor + 1);
+      avisarSucesso("Entrada registrada.");
+    });
+  }
+
+  const alunoConfirmacao = alunos.find((item) => item.id === alunoId);
+  const justificativaConfirmacao =
+    formaJustificativa === "texto"
+      ? motivo.trim()
+      : (catalogoJustificativas.find((item) => item.codigo === justificativa)?.rotulo ??
+        justificativa);
+  const responsavelConfirmacao =
+    liberadores.find((item) => item.codigo === responsavelCodigo)?.rotulo ?? "";
+
   return (
     <div className="space-y-5 pb-6">
       <h1 className="sr-only">Entradas atrasadas</h1>
@@ -340,33 +408,8 @@ export default function VistaEntradas({
         <>
           <form
             className="superficie flex flex-col gap-4 p-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void executar(async () => {
-                await pedir("/api/entradas", {
-                  method: "POST",
-                  ...corpoJson({
-                    alunoId,
-                    dia,
-                    horario,
-                    momento,
-                    responsavelRegistroCodigo: responsavelCodigo,
-                    ...(formaJustificativa === "texto"
-                      ? { motivo }
-                      : { justificativa, observacao: observacao || undefined }),
-                  }),
-                });
-                setAlunoId("");
-                setMotivo("");
-                setMomento("");
-                setResponsavelCodigo("");
-                setJustificativa("");
-                setObservacao("");
-                setFormaJustificativa("catalogo");
-                setVersao((valor) => valor + 1);
-                avisarSucesso("Entrada registrada.");
-              });
-            }}
+            onSubmit={abrirConfirmacao}
+            noValidate
           >
             <h2 className="font-medium">Registrar entrada</h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -581,6 +624,30 @@ export default function VistaEntradas({
           </section>
         </>
       )}
+      <DialogoConfirmarMovimentacao
+        aberto={confirmacaoAberta}
+        onAbrir={setConfirmacaoAberta}
+        titulo="Registrar entrada?"
+        descricao="Confira os dados antes de registrar. Depois de salvo, o lançamento aparece na lista do dia e nos relatórios."
+        rotuloConfirmar="Registrar entrada"
+        onConfirmar={() => void registrarEntrada()}
+        itens={[
+          { rotulo: "Aluno", valor: alunoConfirmacao?.nome ?? "" },
+          {
+            rotulo: "Turma",
+            valor: alunoConfirmacao ? (turmasPorId.get(alunoConfirmacao.turmaId) ?? "") : "",
+          },
+          { rotulo: "Dia", valor: rotuloData(dia) },
+          { rotulo: "Momento", valor: momento ? rotuloMomento(momento) : "" },
+          { rotulo: "Horário", valor: horario },
+          { rotulo: "Justificativa", valor: justificativaConfirmacao },
+          {
+            rotulo: "Observação",
+            valor: formaJustificativa === "catalogo" ? observacao.trim() : "",
+          },
+          { rotulo: "Responsável", valor: responsavelConfirmacao },
+        ]}
+      />
       <AlertDialog
         open={Boolean(remover)}
         onOpenChange={(aberto) => {

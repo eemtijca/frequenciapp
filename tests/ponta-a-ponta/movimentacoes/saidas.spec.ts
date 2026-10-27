@@ -2,7 +2,7 @@
 // escrita no intervalo e o nome de quem liberou vindo do catálogo da Gestão.
 import { expect, test } from "@playwright/test";
 import { criarLiberadoresE2E, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, registrarSaida, trocarVisao } from "../helpers/pagina";
 
 test.describe("saída durante a aula", () => {
   test.beforeAll(async () => {
@@ -34,7 +34,7 @@ test.describe("saída durante a aula", () => {
     await expect(campoTexto).toBeVisible();
     await campoTexto.fill("Saiu para a coordenação");
     await expect(page.getByText("23/100")).toBeVisible();
-    await page.getByRole("button", { name: "Registrar saída" }).click();
+    await registrarSaida(page);
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await expect(lista.getByText("Saiu para a coordenação").first()).toBeVisible();
@@ -59,7 +59,7 @@ test.describe("saída durante a aula", () => {
     await page.locator("#saida-texto").fill("Foi buscar o irmão");
     await page.locator("#saida-responsavel").click();
     await page.getByRole("option", { name: "Coordenadora E2E" }).click();
-    await page.getByRole("button", { name: "Registrar saída" }).click();
+    await registrarSaida(page);
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await expect(lista.getByText("Foi buscar o irmão").first()).toBeVisible();
