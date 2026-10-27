@@ -141,6 +141,7 @@ test("Chamada: Turmas recolhe todo o painel e cada série contém suas turmas", 
   ).toBeVisible();
   if (isMobile) await turmaB.click();
   else {
+    await expect(turmaB).toBeEnabled();
     await turmaB.focus();
     await page.keyboard.press("Enter");
   }
@@ -330,6 +331,10 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
   await expect(turmaB()).toBeDisabled();
+  // O ponteiro sobre o aviso pausa sua duração; aguarda a saída antes do toque.
+  await page.mouse.move(0, 0);
+  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+  await recarregar.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
   await recarregar.click();
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");
   await expect(serie().getByText("100%", { exact: true })).toBeVisible();

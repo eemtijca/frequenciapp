@@ -6,13 +6,14 @@ Suítes do FrequenciApp com Vitest e Playwright.
 
 `tests/api/notificacoes/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/ponta-a-ponta/notificacoes/notificacoes.spec.ts` valida a Gestão e a coordenação; `tests/ponta-a-ponta/pwa/pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
 
-| Suíte            | Comando              | Pré-requisitos                                             |
-| ---------------- | -------------------- | ---------------------------------------------------------- |
-| Unidade          | `pnpm run test:unit` | Nenhum.                                                    |
-| Contratos de API | `pnpm run test:api`  | Aplicativo no ar, banco migrado, contas de teste.          |
-| Ponta a ponta    | `pnpm run test:e2e`  | Aplicativo no ar e navegadores instalados.                 |
-| PWA              | `pnpm run test:pwa`  | Build de produção no ar (`pnpm run build` e `pnpm start`). |
-| API e unidade    | `pnpm test`          | Idem, na ordem.                                            |
+| Suíte            | Comando                     | Pré-requisitos                                               |
+| ---------------- | --------------------------- | ------------------------------------------------------------ |
+| Unidade          | `pnpm run test:unit`        | Nenhum.                                                      |
+| Componentes      | `pnpm run test:componentes` | Chromium instalado pelo Playwright; sem aplicativo ou banco. |
+| Contratos de API | `pnpm run test:api`         | Aplicativo no ar, banco migrado, contas de teste.            |
+| Ponta a ponta    | `pnpm run test:e2e`         | Aplicativo no ar e navegadores instalados.                   |
+| PWA              | `pnpm run test:pwa`         | Build de produção no ar (`pnpm run build` e `pnpm start`).   |
+| API e unidade    | `pnpm test`                 | Idem, na ordem.                                              |
 
 ## Unidade
 

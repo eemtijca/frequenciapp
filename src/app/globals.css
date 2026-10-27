@@ -205,6 +205,61 @@
   }
 }
 
+/* A altura medida pelo Radix acompanha o conteúdo sem limitar sua dimensão. */
+@keyframes secao-entra {
+  from {
+    height: var(--altura-recolhivel-inicial, 0px);
+    overflow: hidden;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    overflow: hidden;
+  }
+}
+
+@keyframes secao-sai {
+  from {
+    height: var(--altura-recolhivel-inicial, var(--radix-collapsible-content-height));
+    overflow: hidden;
+  }
+  to {
+    height: 0;
+    overflow: hidden;
+  }
+}
+
+.secao-animada {
+  --altura-recolhivel-inicial: initial;
+}
+.secao-animada[data-state="open"] {
+  animation: secao-entra 200ms ease-out;
+}
+.secao-animada[data-state="closed"] {
+  animation: secao-sai 160ms ease-in;
+}
+
+/* A folha móvel desliza sem alterar a centralização horizontal do diálogo. */
+@keyframes folha-entra {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes folha-sai {
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@media (width < 40rem) {
+  .folha-inferior[data-state="open"] {
+    animation: folha-entra 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .folha-inferior[data-state="closed"] {
+    animation: folha-sai 160ms cubic-bezier(0.4, 0, 1, 1);
+  }
+}
+
 /* Gaveta lateral do menu e véu: só transform e opacidade, que o navegador anima fora
    da thread principal. */
 @keyframes gaveta-entra {

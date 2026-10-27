@@ -18,6 +18,7 @@
     "tsc": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts && vitest run --config vitest.api.config.ts",
     "test:unit": "vitest run --config vitest.config.ts",
+    "test:componentes": "vitest run --config tests/componentes/vitest.config.ts",
     "test:api": "vitest run --config vitest.api.config.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
