@@ -1,5 +1,6 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
+import { ADMIN_E2E } from "./banco";
 import { hojeEDomingo } from "./dia";
 
 /**
@@ -120,15 +121,100 @@ export async function trocarVisao(
   if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);
 }
 
+/** Clica em Salvar e confirma o resumo, sem esperar o resultado da gravação. */
+export async function confirmarSalvarChamada(secao: Locator): Promise<void> {
+  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  const dialogo = secao
+    .page()
+    .getByRole("alertdialog", { name: /^Salvar (chamada|correção da chamada)\?$/ });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+}
+
+/** Salva a chamada e aguarda a confirmação de que ela voltou a ficar bloqueada. */
+export async function salvarChamada(secao: Locator): Promise<void> {
+  await confirmarSalvarChamada(secao);
+  await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
+/** Clica em Registrar saída, confirma o resumo e aguarda o formulário limpar. */
+export async function registrarSaida(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Registrar saída", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", { name: "Registrar saída?", exact: true });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByRole("button", { name: "Registrar saída", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+  await expect(page.locator("#saida-aluno")).toContainText("Selecione o aluno");
+}
+
+/** Clica em Registrar entrada, confirma o resumo e aguarda o formulário limpar. */
+export async function registrarEntrada(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Registrar entrada", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", { name: "Registrar entrada?", exact: true });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByRole("button", { name: "Registrar entrada", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+  await expect(page.locator("#entrada-aluno")).toContainText("Selecione o aluno");
+}
+
+/** Confirma o salvamento de uma frequência parcial no diálogo já aberto. */
+export async function salvarFrequenciaParcial(dialogo: Locator): Promise<void> {
+  await dialogo.getByRole("button", { name: "Salvar frequência parcial", exact: true }).click();
+  const confirmacao = dialogo.page().getByRole("dialog").last();
+  await expect(
+    confirmacao.getByRole("button", { name: "Confirmar e salvar frequência", exact: true }),
+  ).toBeVisible();
+  await confirmacao
+    .getByRole("button", { name: "Confirmar e salvar frequência", exact: true })
+    .click();
+  await expect(confirmacao).toBeHidden({ timeout: 15_000 });
+}
+
+/** Confirma o agendamento de uma justificativa no diálogo já aberto. */
+export async function salvarJustificativaParcial(dialogo: Locator): Promise<void> {
+  await dialogo.getByRole("button", { name: "Salvar justificativa", exact: true }).click();
+  const confirmacao = dialogo.page().getByRole("dialog").last();
+  await expect(
+    confirmacao.getByRole("button", { name: "Confirmar e salvar justificativa", exact: true }),
+  ).toBeVisible();
+  await confirmacao
+    .getByRole("button", { name: "Confirmar e salvar justificativa", exact: true })
+    .click();
+  await expect(confirmacao).toBeHidden({ timeout: 15_000 });
+}
+
+/** Desbloqueia a chamada salva com a senha da conta usada pela suíte. */
+export async function desbloquearChamada(secao: Locator, senha = ADMIN_E2E.senha): Promise<void> {
+  await secao.getByRole("button", { name: /^Desbloquear chamada de/ }).click();
+  const dialogo = secao.page().getByRole("dialog", { name: "Desbloquear chamada?", exact: true });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByLabel("Senha da sua conta").fill(senha);
+  await dialogo.getByRole("button", { name: "Desbloquear", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+}
+
 /**
  * Aos sábados a chamada começa bloqueada, mesmo com aula na grade: libera o
  * sábado letivo da turma aberta. Nos demais dias o botão não existe e nada muda.
  */
-export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
+export async function liberarSabadoSeNecessario(
+  secao: Locator,
+  senha = ADMIN_E2E.senha,
+): Promise<void> {
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   if (!(await liberar.isVisible().catch(() => false))) return;
   await expect(liberar).toBeEnabled();
   await liberar.click();
+  const dialogo = secao
+    .page()
+    .getByRole("dialog", { name: "Desbloquear sábado letivo?", exact: true });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByLabel("Senha da sua conta").fill(senha);
+  await dialogo.getByRole("button", { name: "Desbloquear", exact: true }).click();
+  await expect(dialogo).toBeHidden();
   await expect(secao.getByRole("button", { name: "Sábado letivo", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",

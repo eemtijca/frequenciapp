@@ -7,7 +7,10 @@ import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/co
 import {
   abrirDiaSeResumo,
   aguardarHidratacao,
+  confirmarSalvarChamada,
+  desbloquearChamada,
   liberarSabadoSeNecessario,
+  salvarChamada,
   trocarVisao,
 } from "../helpers/pagina";
 
@@ -225,7 +228,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await expect(turmaB).toHaveAccessibleDescription(/3 alunos.*pendente/i);
 
   await liberarSabadoSeNecessario(secao);
-  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(secao);
   await expect(turmaA).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "pendente");
   await expect(percentual).toHaveText("25%");
@@ -251,7 +254,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   await turmaB.click();
   await liberarSabadoSeNecessario(secao);
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeEnabled();
-  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  await salvarChamada(secao);
   await expect(turmaB).toHaveAttribute("data-situacao", "concluida");
   await expect(serie).toHaveAttribute("data-situacao", "concluida");
   await expect(percentual).toHaveText("100%");
@@ -280,7 +283,7 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   const turmaA = () => grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true });
   const turmaB = () => grupo.getByRole("button", { name: "Faixa Um E2E Serie B", exact: true });
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");
-  await secao.getByRole("button", { name: /^Desbloquear chamada de Faixa Um/ }).click();
+  await desbloquearChamada(secao);
   await secao.getByRole("button", { name: /^E2E Serie 1A:/ }).click();
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
@@ -317,11 +320,11 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   grupo = await abrirPrimeiraSerie(secao);
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
-  await secao.getByRole("button", { name: /^Desbloquear chamada de Faixa Um/ }).click();
+  await desbloquearChamada(secao);
 
   // Outra pessoa salva uma revisão posterior, enquanto o rascunho continua local.
   await salvarPelaApi(page, "A", 1);
-  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  await confirmarSalvarChamada(secao);
   const recarregar = secao.getByRole("button", { name: "Recarregar versão salva", exact: true });
   await expect(recarregar).toBeVisible();
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");

@@ -61,6 +61,7 @@ import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Input } from "@/components/ui/input";
 import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
+import { DialogoConfirmarSenha } from "@/components/ui/dialogo-confirmar-senha";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
@@ -193,6 +194,8 @@ export default function VistaFrequencia({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
+  const [confirmarSalvamento, setConfirmarSalvamento] = useState(false);
+  const [desbloqueio, setDesbloqueio] = useState<"chamada" | "sabado" | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const justificativasAntecipadasRef = useRef<RevisaoJustificativaAntecipada[]>([]);
   const [recarregar, setRecarregar] = useState(0);
@@ -781,10 +784,28 @@ export default function VistaFrequencia({
     });
   }
 
+  async function confirmarSenhaDesbloqueio(senha: string): Promise<void> {
+    await pedir<{ ok: boolean }>("/api/conta/confirmar-senha", corpoJson({ senha }));
+    if (desbloqueio === "sabado") {
+      setSabadoDesbloqueado(chave);
+    } else if (desbloqueio === "chamada") {
+      setEdicaoLiberada(true);
+      setAulasAbertas(null);
+    }
+  }
+
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia).replace("-feira", "") : "";
   const tituloResumo = dia === diaCorrente ? "Resumo de hoje" : "Resumo do dia";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
+  const correcao = revisaoSalva > 0;
+  const desbloqueioSabado = desbloqueio === "sabado";
+  const tituloDesbloqueio = desbloqueioSabado
+    ? "Desbloquear sábado letivo?"
+    : "Desbloquear chamada?";
+  const descricaoDesbloqueio = desbloqueioSabado
+    ? `Informe a senha da sua conta para liberar a chamada de ${turma?.rotulo ?? "turma"} neste sábado letivo.`
+    : `A chamada de ${turma?.rotulo ?? "turma"} em ${rotuloDia} está salva e bloqueada. Informe a senha da sua conta para liberar uma correção.`;
 
   const tituloEstado = carregando
     ? "Carregando..."
@@ -951,14 +972,16 @@ export default function VistaFrequencia({
                 </p>
               )}
 
-              <div className="flex flex-col gap-2">
+              <div className={`flex flex-col gap-2 ${ehSabado ? "" : "sm:flex-row"}`}>
                 <Button
                   type="button"
                   variant="outline"
                   aria-expanded={resumoAberto}
                   aria-controls={idResumo}
                   onClick={() => setResumoAberto((atual) => !atual)}
-                  className="selecionado h-11 w-full justify-center rounded-full px-4"
+                  className={`selecionado h-11 w-full justify-center rounded-full px-4 ${
+                    ehSabado ? "" : "sm:w-auto sm:min-w-0 sm:flex-1 sm:shrink"
+                  }`}
                 >
                   <span>{tituloResumo}</span>
                   <ChevronDown
@@ -983,7 +1006,7 @@ export default function VistaFrequencia({
                     onClick={() => {
                       if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas)
                         return;
-                      setSabadoDesbloqueado(chave);
+                      setDesbloqueio("sabado");
                     }}
                   >
                     {sabadoLiberado ? (
@@ -998,13 +1021,19 @@ export default function VistaFrequencia({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 w-full justify-center rounded-full px-4"
+                    className={`h-11 w-full justify-center rounded-full px-4 ${
+                      ehSabado ? "" : "sm:w-auto sm:min-w-0 sm:flex-1 sm:shrink"
+                    }`}
                     aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}`}
                     disabled={ocupado || (edicaoLiberada && sujo)}
                     onClick={() => {
                       if (ocupado || (edicaoLiberada && sujo)) return;
-                      setEdicaoLiberada((atual) => !atual);
-                      setAulasAbertas(null);
+                      if (chamadaBloqueada) {
+                        setDesbloqueio("chamada");
+                      } else {
+                        setEdicaoLiberada(false);
+                        setAulasAbertas(null);
+                      }
                     }}
                   >
                     {chamadaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
@@ -1037,6 +1066,62 @@ export default function VistaFrequencia({
                     }
                   />
                 ))}
+              <div
+                aria-label="Barra de salvamento"
+                className="superficie fixed left-1/2 z-30 flex w-fit max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-2xl p-2 xl:static xl:left-auto xl:z-auto xl:w-full xl:translate-x-0"
+                style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+              >
+                <p
+                  aria-live="polite"
+                  className="text-muted-foreground max-w-48 min-w-0 truncate px-2 text-xs font-medium xl:max-w-none xl:flex-1"
+                  title={feriado?.nome}
+                >
+                  {feriado ? "Feriado" : tituloEstado}
+                </p>
+                {sujo && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Descartar"
+                        title="Descartar alterações"
+                        disabled={salvando}
+                        className="size-11 shrink-0"
+                      >
+                        <RotateCcw size={16} aria-hidden="true" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          As marcações não salvas serão descartadas e a última versão salva será
+                          recarregada.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
+                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  className="h-11 shrink-0 px-4"
+                  onClick={() => setConfirmarSalvamento(true)}
+                  disabled={!podeSalvar}
+                >
+                  {salvando ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : atualizadoEm && !sujo ? (
+                    <CloudCheck size={16} />
+                  ) : (
+                    <Save size={16} />
+                  )}
+                  {salvando ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
             </>
           )}
         </div>
@@ -1493,62 +1578,59 @@ export default function VistaFrequencia({
                   </ul>
                 )}
               </div>
-              <div
-                aria-label="Barra de salvamento"
-                className="superficie sticky z-20 mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
-                style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-              >
-                <p
-                  aria-live="polite"
-                  className="text-muted-foreground max-w-48 min-w-0 truncate px-2 text-xs font-medium"
-                  title={feriado?.nome}
-                >
-                  {feriado ? "Feriado" : tituloEstado}
-                </p>
-                {sujo && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Descartar"
-                        title="Descartar alterações"
-                        disabled={salvando}
-                        className="size-11 shrink-0"
-                      >
-                        <RotateCcw size={16} aria-hidden="true" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          As marcações não salvas serão descartadas e a última versão salva será
-                          recarregada.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
-                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-                <Button className="h-11 shrink-0 px-4" onClick={salvar} disabled={!podeSalvar}>
-                  {salvando ? (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  ) : atualizadoEm && !sujo ? (
-                    <CloudCheck size={16} />
-                  ) : (
-                    <Save size={16} />
-                  )}
-                  {salvando ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
             </>
           )}
         </div>
       </div>
+
+      <AlertDialog open={confirmarSalvamento} onOpenChange={setConfirmarSalvamento}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {correcao ? "Salvar correção da chamada?" : "Salvar chamada?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {correcao
+                ? `A versão salva de ${turma?.rotulo ?? "turma"} em ${rotuloDia} será substituída pelas marcações atuais e a chamada voltará a ficar bloqueada.`
+                : `Confira as marcações de ${turma?.rotulo ?? "turma"} em ${rotuloDia}. A chamada será bloqueada para edição depois do salvamento.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <dl className="bg-card grid grid-cols-3 divide-x rounded-[14px] border">
+            {[
+              ["Faltas", contagemFaltas, "text-falta-texto"],
+              ["Justificadas", contagemJustificadas, "text-justificada-texto"],
+              ["Presentes", contagemPresencas, "text-primary"],
+            ].map(([rotulo, valor, classe]) => (
+              <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2 py-3">
+                <dt className="text-muted-foreground text-xs font-medium">{rotulo}</dt>
+                <dd className={`numerais-tabulares text-xl font-semibold ${classe}`}>{valor}</dd>
+              </div>
+            ))}
+          </dl>
+          {sabadoLiberado && (
+            <p className="text-muted-foreground text-xs">
+              Sábado letivo liberado para esta turma e data.
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar revisando</AlertDialogCancel>
+            <AlertDialogAction onClick={salvar} disabled={!podeSalvar || salvando}>
+              Salvar chamada
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <DialogoConfirmarSenha
+        aberto={desbloqueio !== null}
+        onAbrir={(aberto) => {
+          if (!aberto) setDesbloqueio(null);
+        }}
+        titulo={tituloDesbloqueio}
+        descricao={descricaoDesbloqueio}
+        rotuloConfirmar="Desbloquear"
+        onConfirmar={confirmarSenhaDesbloqueio}
+      />
     </section>
   );
 }

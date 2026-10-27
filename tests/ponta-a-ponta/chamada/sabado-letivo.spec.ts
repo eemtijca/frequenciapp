@@ -3,7 +3,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaDaSemanaIso, diaLocal, diaSeguinte } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
-import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  desbloquearChamada,
+  escolherTurmaNaChamada,
+  liberarSabadoSeNecessario,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 
@@ -101,12 +107,17 @@ function aluno(secao: Locator, turma: string): Locator {
 }
 
 async function salvar(page: Page, secao: Locator) {
+  await secao.getByRole("button", { name: "Salvar", exact: true }).click();
+  const dialogo = page.getByRole("alertdialog", {
+    name: /^Salvar (chamada|correção da chamada)\?$/,
+  });
+  await expect(dialogo).toBeVisible();
   const [requisicao] = await Promise.all([
     page.waitForRequest(
       (pedido) =>
         pedido.method() === "POST" && new URL(pedido.url()).pathname === "/api/frequencias",
     ),
-    secao.getByRole("button", { name: "Salvar", exact: true }).click(),
+    dialogo.getByRole("button", { name: "Salvar chamada", exact: true }).click(),
   ]);
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   return requisicao.postDataJSON() as {
@@ -165,7 +176,7 @@ test("libera apenas o sábado selecionado, salva e exige o desbloqueio comum par
   await expect(liberar).toBeEnabled();
   await expect(aluno(secao, "A")).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
-  await liberar.click();
+  await liberarSabadoSeNecessario(secao);
   const liberado = secao.getByRole("button", { name: "Sábado letivo", exact: true });
   await expect(liberado).toHaveAttribute("aria-pressed", "true");
   await expect(aluno(secao, "A")).toBeEnabled();
@@ -185,7 +196,7 @@ test("libera apenas o sábado selecionado, salva e exige o desbloqueio comum par
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
   await expect(liberado).toHaveAttribute("aria-pressed", "true");
 
-  await secao.getByRole("button", { name: /^Desbloquear chamada de E2E Sábado Letivo A/ }).click();
+  await desbloquearChamada(secao);
   await expect(aluno(secao, "A")).toBeEnabled();
   await aluno(secao, "A").click();
   const correcao = await salvar(page, secao);
@@ -240,7 +251,7 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
       });
     }
   }
-  await liberar.click();
+  await liberarSabadoSeNecessario(secao);
   await escolherTurmaNaChamada(secao, new RegExp(`^${SERIE} B$`));
   await expect(
     secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true }),
@@ -256,7 +267,7 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
     secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true }),
   ).toBeEnabled();
   await expect(aluno(secao, "A")).toBeDisabled();
-  await secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true }).click();
+  await liberarSabadoSeNecessario(secao);
   await aluno(secao, "A").click();
   await expect
     .poll(() =>
@@ -292,7 +303,7 @@ test("sábado com grade também começa bloqueado e não mostra a ação nos dia
   await expect(liberar).toBeVisible();
   await expect(aluno(secao, "C")).toBeDisabled();
   await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeDisabled();
-  await liberar.click();
+  await liberarSabadoSeNecessario(secao);
   await expect(secao.getByRole("button", { name: "Sábado letivo", exact: true })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -322,7 +333,7 @@ test("falha de leitura bloqueia a liberação e preserva o rascunho até tentar 
 }) => {
   const dia = ultimoSabado();
   let secao = await abrirTurma(page, "A", dia);
-  await secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true }).click();
+  await liberarSabadoSeNecessario(secao);
   await aluno(secao, "A").click();
   const turmaId = turmas.get("A")?.id;
   await expect
