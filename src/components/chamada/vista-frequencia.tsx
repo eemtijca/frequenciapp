@@ -539,7 +539,7 @@ export default function VistaFrequencia({
       { valor: "", rotulo: "Sem justificativa" },
       ...catalogoJustificativas
         .filter((item) => item.ativo)
-        .map((item) => ({ valor: item.codigo, rotulo: `${item.codigo} · ${item.rotulo}` })),
+        .map((item) => ({ valor: item.codigo, rotulo: item.rotulo })),
     ],
     [catalogoJustificativas],
   );
@@ -1487,35 +1487,37 @@ export default function VistaFrequencia({
                             <div className="border-t px-4 py-2.5">
                               {mostrarJustificativa && (
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-muted-foreground text-xs font-medium">
-                                    Justificativa
-                                  </span>
-                                  <Selecionar
-                                    id={`justificativa-${aluno.id}`}
-                                    value={codigo}
-                                    onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
-                                    disabled={bloqueado}
-                                    ariaLabel={`Justificativa da falta de ${nomeExibido}`}
-                                    opcoes={opcoesJustificativa}
-                                    className="h-9 max-w-64"
-                                  />
-                                  {codigo === JUSTIFICATIVA_OUTROS && (
-                                    <Input
-                                      value={observacoes.get(aluno.id) ?? ""}
-                                      maxLength={200}
-                                      disabled={bloqueado}
-                                      onChange={(evento) =>
-                                        definirObservacao(aluno.id, evento.target.value)
-                                      }
-                                      placeholder="Observação"
-                                      aria-label={`Observação da falta de ${nomeExibido}`}
-                                      className="h-9 max-w-64"
-                                    />
-                                  )}
-                                  {codigo && (
+                                  {chamadaBloqueada ? (
                                     <span className="text-primary text-xs font-medium">
                                       {rotuloJustificativa(codigo, catalogoJustificativas)}
                                     </span>
+                                  ) : (
+                                    <>
+                                      <Selecionar
+                                        id={`justificativa-${aluno.id}`}
+                                        value={codigo}
+                                        onValueChange={(valor) =>
+                                          definirJustificativa(aluno.id, valor)
+                                        }
+                                        disabled={bloqueado}
+                                        ariaLabel={`Justificativa da falta de ${nomeExibido}`}
+                                        opcoes={opcoesJustificativa}
+                                        className="h-9 max-w-64"
+                                      />
+                                      {codigo === JUSTIFICATIVA_OUTROS && (
+                                        <Input
+                                          value={observacoes.get(aluno.id) ?? ""}
+                                          maxLength={200}
+                                          disabled={bloqueado}
+                                          onChange={(evento) =>
+                                            definirObservacao(aluno.id, evento.target.value)
+                                          }
+                                          placeholder="Observação"
+                                          aria-label={`Observação da falta de ${nomeExibido}`}
+                                          className="h-9 max-w-64"
+                                        />
+                                      )}
+                                    </>
                                   )}
                                 </div>
                               )}

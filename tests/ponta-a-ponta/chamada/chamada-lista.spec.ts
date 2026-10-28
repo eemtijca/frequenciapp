@@ -122,10 +122,9 @@ test("simplifica a chamada bloqueada, alterna as linhas e atualiza o mês após 
   await expect(secao.getByRole("searchbox")).toHaveCount(0);
   await expect(lista.locator("..").getByText(/^\d+ alunos$/)).toHaveCount(0);
   await expect(falta.getByRole("combobox")).toHaveCount(0);
-  await expect(justificada.getByRole("combobox")).toBeDisabled();
-  await expect(justificada.getByRole("textbox", { name: /Observação da falta/ })).toHaveValue(
-    "Motivo de demonstração",
-  );
+  await expect(justificada.getByRole("combobox")).toHaveCount(0);
+  await expect(justificada.getByRole("textbox", { name: /Observação da falta/ })).toHaveCount(0);
+  await expect(justificada.getByText("Outros", { exact: true })).toHaveCount(1);
   await expect(falta.getByRole("img", { name: "1 falta", exact: true })).toBeVisible();
   await expect(
     justificada.getByRole("img", { name: "1 falta justificada", exact: true }),
@@ -139,10 +138,16 @@ test("simplifica a chamada bloqueada, alterna as linhas e atualiza o mês após 
     await lista.screenshot({ path: info.outputPath(`lista-${tema}.png`), animations: "disabled" });
   }
   await desbloquearChamada(secao);
+  await expect(justificada.getByRole("textbox", { name: /Observação da falta/ })).toHaveValue(
+    "Motivo de demonstração",
+  );
   await falta.getByRole("combobox").click();
-  await page.getByRole("option", { name: "D · Doente", exact: true }).click();
+  await page.getByRole("option", { name: "Doente", exact: true }).click();
+  await expect(falta.getByRole("combobox")).toHaveText("Doente");
+  await expect(falta.getByText("Doente", { exact: true })).toHaveCount(1);
   await salvarChamada(secao);
-  await expect(falta.getByRole("combobox")).toBeDisabled();
+  await expect(falta.getByRole("combobox")).toHaveCount(0);
+  await expect(falta.getByText("Doente", { exact: true })).toHaveCount(1);
   await expect(falta.getByRole("img", { name: "1 falta justificada", exact: true })).toBeVisible();
   await expect(falta.getByRole("img", { name: "1 falta", exact: true })).toHaveCount(0);
 });
