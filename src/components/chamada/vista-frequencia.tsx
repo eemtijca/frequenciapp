@@ -42,6 +42,7 @@ import type {
 } from "@/domain/frequencia";
 import {
   alunoDesistenteNoDia,
+  dataNoFuso,
   diaDaSemanaIso,
   diasDoMes,
   exibirOrigemNaChamada,
@@ -795,6 +796,7 @@ export default function VistaFrequencia({
   const rotuloDia = dia ? dia.split("-").reverse().join("/") : "";
   const diaDaSemana = dia ? rotuloDiaSemana(dia).replace("-feira", "") : "";
   const tituloResumo = dia === diaCorrente ? "Resumo de hoje" : "Resumo do dia";
+  const dataSalva = atualizadoEm ? dataNoFuso(atualizadoEm, fuso) : "";
   const horaSalva = atualizadoEm ? horaNoFuso(atualizadoEm, fuso) : "";
   const correcao = revisaoSalva > 0;
   const desbloqueioSabado = desbloqueio === "sabado";
@@ -818,7 +820,9 @@ export default function VistaFrequencia({
           : sujo
             ? "Pendente"
             : atualizadoEm
-              ? `Salva às ${horaSalva}`
+              ? dataSalva && horaSalva
+                ? `Salva em ${dataSalva} às ${horaSalva}`
+                : "Chamada salva"
               : "Nova chamada";
 
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
@@ -1071,7 +1075,7 @@ export default function VistaFrequencia({
               >
                 <p
                   aria-live="polite"
-                  className="text-muted-foreground max-w-48 min-w-0 truncate px-2 text-xs font-medium xl:max-w-none xl:flex-1"
+                  className="text-muted-foreground min-w-0 px-2 text-xs font-medium xl:flex-1"
                   title={feriado?.nome}
                 >
                   {feriado ? "Feriado" : tituloEstado}

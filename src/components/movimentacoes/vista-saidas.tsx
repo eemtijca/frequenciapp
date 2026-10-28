@@ -27,6 +27,7 @@ import type {
 } from "@/domain/frequencia";
 import {
   ehMomentoDeAula,
+  dataNoFuso,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
   LIMITE_TEXTO_SAIDA,
@@ -730,6 +731,8 @@ export default function VistaSaidas({
                   {saidasDoDia.map((saida) => {
                     const aluno = alunosPorId.get(saida.alunoId);
                     const nome = aluno?.nome ?? "Aluno";
+                    const dataRegistro = dataNoFuso(saida.criadoEm, fuso);
+                    const horaRegistro = horaNoFuso(saida.criadoEm, fuso);
                     return (
                       <li key={saida.id} className="superficie p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -741,7 +744,9 @@ export default function VistaSaidas({
                             />
                             <p className="text-muted-foreground mt-1 text-xs">
                               Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                              {saida.criadoEm ? ` às ${horaNoFuso(saida.criadoEm, fuso)}` : ""}
+                              {dataRegistro && horaRegistro
+                                ? ` em ${dataRegistro} às ${horaRegistro}`
+                                : ""}
                             </p>
                           </div>
                           {!listaBloqueada && (
