@@ -228,6 +228,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Um conflito de serialização numa consulta SQL direta, como em Reorganizar turmas, volta a ser repetido automaticamente. Antes, o Prisma o entregava embrulhado no código P2010, a transação não era refeita e a resposta era 500.
+
 - O selo Somente leitura do resumo semanal deixa de ser truncado e fica alinhado à esquerda no celular, sem estouro horizontal do cabeçalho.
 
 - Saídas e Entradas deixa de aceitar novos registros no domingo. A API responde 400 com a mensagem Domingo não tem aula, enquanto a consulta e a remoção de registros históricos de domingo continuam disponíveis. A lista do domingo mostra todas as turmas e não exibe o formulário.
