@@ -438,6 +438,99 @@ it.each([503, 500])(
   },
 );
 
+it.each([200, 401])(
+  "não deixa uma comparação anterior com resposta %s sobrescrever a atualização mais recente no cache",
+  async (statusAnterior) => {
+    const page = await abrir();
+    let liberarAnterior: () => void = () => {};
+    const respostaAnterior = new Promise<void>((resolve) => {
+      liberarAnterior = resolve;
+    });
+    try {
+      await expect
+        .poll(async () => page.getByText(/Atualizado em/).count(), { timeout: 30000 })
+        .toBe(1);
+      let inicioComparacao = "";
+      let comparacoes = 0;
+      await page.route("**/api/bi?*", async (rota) => {
+        const parametros = new URL(rota.request().url()).searchParams;
+        const recurso = parametros.get("recurso");
+        if (recurso === "chamadas" && !inicioComparacao)
+          inicioComparacao = parametros.get("inicio") ?? "";
+        const comparativa = recurso === "chamadas" && parametros.get("inicio") === inicioComparacao;
+        if (comparativa) comparacoes += 1;
+        const antiga = comparativa && comparacoes === 1;
+        if (antiga) await respostaAnterior;
+        if (antiga && statusAnterior === 401) {
+          await rota.fulfill({ status: 401, json: { error: "Resposta antiga" } });
+          return;
+        }
+        await rota.fulfill({
+          json: {
+            recurso,
+            linhas: [],
+            pagina: 1,
+            proximaPagina: null,
+            consultadoEm: antiga ? "2026-10-08T12:00:00Z" : "2026-10-11T12:00:00Z",
+            escopo: {},
+            recursos: RECURSOS_BI,
+          },
+        });
+      });
+      await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
+      await page.getByRole("option", { name: "Período anterior" }).click();
+      await expect.poll(() => comparacoes).toBe(1);
+      await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+      await expect.poll(() => comparacoes, { timeout: 10000 }).toBeGreaterThan(1);
+      await expect
+        .poll(
+          async () => page.getByText("Atualizado em 11/10/2026 às 12:00", { exact: true }).count(),
+          { timeout: 10000 },
+        )
+        .toBe(1);
+      const redeAntiga = page.waitForResponse((resposta) =>
+        resposta.url().includes(`inicio=${inicioComparacao}`),
+      );
+      liberarAnterior();
+      await redeAntiga;
+      await page.waitForTimeout(800);
+      const dataGuardada = await page.evaluate(
+        (inicio) =>
+          new Promise<string | undefined>((resolve, reject) => {
+            const abertura = indexedDB.open("frequencibi-dados-v1", 1);
+            abertura.onerror = () => reject(abertura.error);
+            abertura.onsuccess = () => {
+              const db = abertura.result;
+              const tx = db.transaction("retratos", "readonly");
+              const cursor = tx.objectStore("retratos").openCursor();
+              let data: string | undefined;
+              cursor.onsuccess = () => {
+                const item = cursor.result;
+                if (!item) return;
+                if (String(item.key).includes(`:chamadas:${inicio}:`))
+                  data = item.value.consultadoEm;
+                item.continue();
+              };
+              tx.oncomplete = () => {
+                db.close();
+                resolve(data);
+              };
+              tx.onerror = () => reject(tx.error);
+            };
+          }),
+        inicioComparacao,
+      );
+      expect(dataGuardada).toBe("2026-10-11T12:00:00Z");
+      expect(
+        await page.getByText("Atualizado em 11/10/2026 às 12:00", { exact: true }).count(),
+      ).toBe(1);
+    } finally {
+      liberarAnterior();
+      await page.close();
+    }
+  },
+);
+
 it("não apresenta horário completo quando um recurso falha sem fallback", async () => {
   const page = await abrir();
   try {
