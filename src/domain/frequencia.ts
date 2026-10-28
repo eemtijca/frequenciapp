@@ -378,12 +378,6 @@ export function rotuloDeTurma(serieNome: string, turmaNome: string): string {
   return `${serieNome.trim()} ${turmaNome.trim()}`.trim();
 }
 
-/** Rótulo curto para os círculos: só o ordinal da série e a turma, "3º A". */
-export function rotuloCurtoDeTurma(serieNome: string, turmaNome: string): string {
-  const [ordinal = ""] = serieNome.trim().split(/\s+/);
-  return `${ordinal} ${turmaNome.trim()}`.trim();
-}
-
 /** A seleção de série inclui todas as suas turmas; turmas avulsas se somam. */
 export function exibirOrigemNaChamada(
   configuracoes: Configuracoes,

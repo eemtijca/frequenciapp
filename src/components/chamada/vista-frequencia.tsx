@@ -50,7 +50,6 @@ import {
   horariosDaChamada,
   JUSTIFICATIVA_OUTROS,
   nomeNaChamada,
-  rotuloCurtoDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
   type FaltaAluno,
@@ -61,7 +60,7 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Input } from "@/components/ui/input";
-import { CirculoValor, CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
+import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
@@ -442,12 +441,6 @@ export default function VistaFrequencia({
   );
 
   const mostrarOrigem = exibirOrigemNaChamada(configuracoes, turma);
-  const rotuloCurtoDe = useMemo(() => {
-    const mapa = new Map(
-      turmas.map((item) => [item.id, rotuloCurtoDeTurma(item.serieNome, item.nome)]),
-    );
-    return (id: string) => mapa.get(id) ?? "";
-  }, [turmas]);
 
   const aulasDoDia = useMemo(
     () => (turma ? horariosDaChamada(turma.horarios, dia, sabadoLiberado) : []),
@@ -1404,12 +1397,6 @@ export default function VistaFrequencia({
                                         <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
                                           DESISTENTE
                                         </span>
-                                      )}
-                                      {mostrarOrigem && rotuloCurtoDe(aluno.turmaOriginalId) && (
-                                        <CirculoValor
-                                          texto={rotuloCurtoDe(aluno.turmaOriginalId)}
-                                          rotulo={`Turma original ${rotuloOrigemDe(aluno.turmaOriginalId)}`}
-                                        />
                                       )}
                                     </button>
                                   </span>

@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A lista da Chamada deixa de mostrar o círculo com a turma de origem ao lado do nome de cada aluno. O asterisco continua marcando o aluno vindo de outra turma, e a origem segue no nome acessível da linha e na lista de ausentes do resumo do dia.
+
 - Minhas turmas só registra a atualização após receber as estatísticas. O FrequenciBI informa a consulta mais antiga dos dados exibidos e não atribui uma atualização completa quando há falha ou data incompleta.
 
 - A Chamada e o Histórico exibem a data e a hora reais do salvamento; os rótulos de atualização mostram a data e a hora da última leitura no fuso da escola. A lista de saídas também informa a data do registro.

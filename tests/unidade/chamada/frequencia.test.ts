@@ -37,7 +37,6 @@ import {
   partesNoFuso,
   rotuloAula,
   rotuloDataCurta,
-  rotuloCurtoDeTurma,
   rotuloDeTurma,
   rotuloDiaSemana,
   rotuloJustificativa,
@@ -147,13 +146,6 @@ describe("ehHoraValida", () => {
     expect(ehHoraValida("7:00")).toBe(false);
     expect(ehHoraValida("07:60")).toBe(false);
     expect(ehHoraValida("")).toBe(false);
-  });
-});
-
-describe("rotuloCurtoDeTurma", () => {
-  it("usa só o ordinal da série e a turma", () => {
-    expect(rotuloCurtoDeTurma("3º ano", "A")).toBe("3º A");
-    expect(rotuloCurtoDeTurma(" 1ª série ", " B ")).toBe("1ª B");
   });
 });
 

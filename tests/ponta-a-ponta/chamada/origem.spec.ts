@@ -123,11 +123,14 @@ test.describe("consulta por origem (coordenação)", () => {
     await expect(secao.getByRole("searchbox")).toHaveCount(0);
     await expect(secao.getByText("E2E Origem Um")).toBeVisible();
     await expect(secao.getByText("E2E Origem Dois")).toBeVisible();
-    const circulo = secao.getByRole("img", { name: "Turma original 3º ano E2E Origem B" });
-    await expect(circulo).toHaveText("3º B");
+    // A origem não ocupa espaço ao lado do nome: o asterisco marca quem veio de outra turma.
+    await expect(secao.getByRole("img", { name: /Turma original/ })).toHaveCount(0);
+    await expect(secao.getByText("E2E Origem Um*", { exact: true })).toBeVisible();
   });
 
-  test("mostra a turma original em círculo para toda a turma reorganizada", async ({ page }) => {
+  test("anuncia a turma original no nome acessível de toda a turma reorganizada", async ({
+    page,
+  }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
