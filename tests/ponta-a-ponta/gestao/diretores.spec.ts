@@ -192,6 +192,7 @@ test.describe("diretores de turma na Gestão", () => {
     const contexto = await browser.newContext({
       baseURL,
       storageState: { cookies: [], origins: [] },
+      serviceWorkers: "block",
     });
     const diretor = await contexto.newPage();
     await diretor.goto("/");
@@ -202,6 +203,7 @@ test.describe("diretores de turma na Gestão", () => {
 
     const troca = diretor.getByRole("dialog");
     await expect(troca.getByRole("heading", { name: "Crie sua palavra-chave" })).toBeVisible();
+    await expect(diretor.locator("header").getByText("Ainda não atualizado")).toBeVisible();
     await expect(
       diretor.getByText("Crie sua palavra-chave para ver as estatísticas."),
     ).toBeVisible();
@@ -220,6 +222,32 @@ test.describe("diretores de turma na Gestão", () => {
     const tabela = diretor.getByRole("table");
     await expect(tabela.getByRole("rowheader", { name: /E2E Aluno Um/ })).toContainText("em risco");
     await expect(tabela.getByRole("columnheader", { name: "Justificadas" })).toHaveCount(0);
+
+    // A marca de atualização só avança depois da leitura bem-sucedida.
+    const marca = diretor.locator('header span[title^="Atualizado em"]');
+    await expect(marca).toBeVisible();
+    const anterior = await marca.textContent();
+    await diretor.clock.setFixedTime(new Date("2035-01-02T15:30:00.000Z"));
+    let liberarFalha: () => void = () => {};
+    let solicitada = false;
+    const aguardando = new Promise<void>((resolve) => {
+      liberarFalha = resolve;
+    });
+    await diretor.route("**/api/diretor/estatisticas?*", async (rota) => {
+      solicitada = true;
+      await aguardando;
+      await rota.fulfill({ status: 500, json: { error: "Falha sintética." } });
+    });
+    await diretor.getByRole("button", { name: "Atualizar tela" }).click();
+    await expect.poll(() => solicitada).toBe(true);
+    await expect(marca).toHaveText(anterior ?? "");
+    liberarFalha();
+    await expect(diretor.getByText("Falha sintética.")).toBeVisible();
+    await expect(marca).toHaveText(anterior ?? "");
+    await diretor.unroute("**/api/diretor/estatisticas?*");
+    await diretor.clock.setFixedTime(new Date("2035-01-02T15:31:00.000Z"));
+    await diretor.getByRole("button", { name: "Atualizar tela" }).click();
+    await expect(marca).toHaveText("Atualizado em 02/01/2035 às 12:31");
 
     // Nada de navegação da equipe nem de edição.
     await expect(diretor.getByRole("navigation", { name: "Seções do aplicativo" })).toHaveCount(0);

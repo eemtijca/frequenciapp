@@ -87,4 +87,6 @@ export async function limparTudoBi() {
 }
 export interface RetratoBi extends PaginaBi {
   completo: true;
+  datasCompletas?: boolean;
+  falhaAtualizacao?: boolean;
 }

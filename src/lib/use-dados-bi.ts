@@ -198,18 +198,22 @@ export function useDadosBi() {
         let antigo: RetratoBi | undefined;
         try {
           antigo = await cacheBi<RetratoBi>("ler", id);
+          // Retratos anteriores não registravam as datas de todas as páginas.
+          if (antigo && !antigo.datasCompletas) antigo = { ...antigo, consultadoEm: "" };
         } catch {
           armazenamentoFalhou();
         }
         if (!atualizar && antigo?.completo) return antigo;
         if (!navigator.onLine) {
-          if (antigo?.completo) return antigo;
+          if (antigo?.completo) return atualizar ? { ...antigo, falhaAtualizacao: true } : antigo;
           throw new Error(
             "Este recorte ainda não foi baixado. Conecte à internet para consultá-lo.",
           );
         }
         const linhas = new Map<string, PaginaBi["linhas"][number]>();
         let pagina = 1;
+        let consultadoEm: string | undefined;
+        let dataInvalida = false;
         let ultima: PaginaBi;
         try {
           do {
@@ -256,6 +260,10 @@ export function useDadosBi() {
                 "O escopo da chave mudou. Confira a chave novamente para atualizar o acesso.",
               );
             }
+            const instante = Date.parse(ultima.consultadoEm);
+            if (!Number.isFinite(instante)) dataInvalida = true;
+            else if (!consultadoEm || instante < Date.parse(consultadoEm))
+              consultadoEm = ultima.consultadoEm;
             for (const linha of ultima.linhas) linhas.set(linha.id, linha);
             pagina = ultima.proximaPagina ?? 0;
           } while (pagina);
@@ -276,11 +284,17 @@ export function useDadosBi() {
             (!(e instanceof ErroApi) || e.status === 503)
           ) {
             setOffline(true);
-            return antigo;
+            return { ...antigo, falhaAtualizacao: true };
           }
           throw e;
         }
-        const retrato: RetratoBi = { ...ultima, linhas: [...linhas.values()], completo: true };
+        const retrato: RetratoBi = {
+          ...ultima,
+          consultadoEm: dataInvalida ? "" : (consultadoEm ?? ""),
+          linhas: [...linhas.values()],
+          completo: true,
+          datasCompletas: !dataInvalida && Boolean(consultadoEm),
+        };
         try {
           await cacheBi("gravar", id, retrato);
         } catch {
@@ -289,12 +303,14 @@ export function useDadosBi() {
         return retrato;
       })()
         .then((retrato) => {
+          if (retrato.falhaAtualizacao && tarefas.current.get(id) === tarefa)
+            tarefas.current.delete(id);
           if (acessoRef.current === atual && !signal?.aborted)
             setRetratos((r) => ({ ...r, [recurso]: retrato }));
           return retrato;
         })
         .catch((e: unknown) => {
-          tarefas.current.delete(id);
+          if (tarefas.current.get(id) === tarefa) tarefas.current.delete(id);
           throw e;
         });
       tarefas.current.set(id, tarefa);

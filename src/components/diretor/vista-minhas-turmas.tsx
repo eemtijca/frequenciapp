@@ -22,6 +22,7 @@ import { GraficoAlunos, GraficoSemanas } from "@/components/graficos/graficos-so
 interface Props {
   contexto: ContextoDiretor;
   atualizacao?: number;
+  onAtualizado: () => void;
 }
 
 type Exibicao = "grafico" | "tabela";
@@ -113,7 +114,7 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
   );
 }
 
-export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) {
+export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualizado }: Props) {
   const mesCorrente = contexto.diaCorrente.slice(0, 7);
   const [turmaId, setTurmaId] = useState(contexto.turmas[0]?.turmaId ?? "");
   const [mes, setMes] = useState(mesCorrente);
@@ -136,7 +137,10 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
         const resposta = await pedir<EstatisticasDoDiretor>(
           `/api/diretor/estatisticas?turmaId=${turmaId}&de=${de}&ate=${ate}`,
         );
-        if (viva) setDados(resposta);
+        if (viva) {
+          setDados(resposta);
+          onAtualizado();
+        }
       } catch (excecao) {
         if (!viva) return;
         setDados(null);
@@ -154,7 +158,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0 }: Props) 
     return () => {
       viva = false;
     };
-  }, [turmaId, mes, atualizacao]);
+  }, [turmaId, mes, atualizacao, onAtualizado]);
 
   if (contexto.turmas.length === 0) {
     return (

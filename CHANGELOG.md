@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Minhas turmas só registra a atualização após receber as estatísticas. O FrequenciBI informa a consulta mais antiga dos dados exibidos e não atribui uma atualização completa quando há falha ou data incompleta.
+
 - A Chamada e o Histórico exibem a data e a hora reais do salvamento; os rótulos de atualização mostram a data e a hora da última leitura no fuso da escola. A lista de saídas também informa a data do registro.
 
 - A Chamada mostra somente o nome da justificativa, sem sigla ou repetição. Após salvar, a linha exibe o nome; ao desbloquear, o seletor e a observação voltam a ficar disponíveis.
