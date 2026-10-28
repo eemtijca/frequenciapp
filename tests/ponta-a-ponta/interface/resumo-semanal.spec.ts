@@ -49,7 +49,7 @@ test("o Painel abre a semana escolhida com a Visão geral aberta e as demais se�
   await expect(resumo).toContainText(
     `${rotuloDataCurta(semana[0] ?? "")} a ${rotuloDataCurta(semana[5] ?? "")}`,
   );
-  await expect(resumo.getByText(/Atualizado às \d{2}:\d{2}/)).toBeVisible();
+  await expect(resumo.getByText(/Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}/)).toBeVisible();
 
   const visao = resumo.locator('[data-secao$="-visao"]').first();
   await expect(visao).toHaveAttribute("data-state", "open");
@@ -83,7 +83,17 @@ test("o cabeçalho do resumo cabe no celular sem cortar o selo", async ({ page }
   const cabecalho = resumo.locator("header");
   const selo = cabecalho.getByText("Somente leitura", { exact: true });
   await expect(selo).toBeVisible();
-  await expect(cabecalho.getByText(/Atualizado às \d{2}:\d{2}|Ainda não atualizado/)).toBeVisible();
+  const atualizado = cabecalho.getByText(/Atualizado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}/);
+  await expect(atualizado).toBeVisible();
+  expect(
+    await atualizado.evaluate((elemento) => {
+      const caixa = elemento.getBoundingClientRect();
+      const cabecalho = elemento.closest("header")?.getBoundingClientRect();
+      return (
+        cabecalho !== undefined && caixa.left >= cabecalho.left && caixa.right <= cabecalho.right
+      );
+    }),
+  ).toBe(true);
 
   expect(
     await resumo.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),

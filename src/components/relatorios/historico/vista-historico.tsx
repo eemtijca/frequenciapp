@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, History } from "lucide-react";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
+  dataNoFuso,
   horaNoFuso,
   horariosDaChamada,
   mesSeguinte,
@@ -179,6 +180,7 @@ export default function VistaHistorico({
             <ul className="superficie divide-y overflow-hidden">
               {filtradas.map((frequencia) => {
                 const rotulo = rotuloDia(frequencia.dia);
+                const dataSalva = dataNoFuso(frequencia.atualizadoEm, fuso);
                 const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
                 const turma = turmas.find((item) => item.id === frequencia.turmaId);
                 const aulasDoDia = horariosDaChamada(turma?.horarios ?? [], frequencia.dia, true);
@@ -204,9 +206,10 @@ export default function VistaHistorico({
                           ? ` · ${parciais} ${parciais === 1 ? "saída parcial" : "saídas parciais"}`
                           : ""
                       }`;
-                const autoria = hora
-                  ? ` · salva às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
-                  : "";
+                const autoria =
+                  dataSalva && hora
+                    ? ` · salva em ${dataSalva} às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
+                    : "";
                 return (
                   <li
                     key={`${frequencia.dia}|${frequencia.turmaId}`}
@@ -233,7 +236,7 @@ export default function VistaHistorico({
                             {rotulo.mesAno}
                           </span>
                         </span>
-                        <span className="text-muted-foreground block truncate text-sm">
+                        <span className="text-muted-foreground block text-sm break-words">
                           {resumo}
                           {autoria}
                         </span>

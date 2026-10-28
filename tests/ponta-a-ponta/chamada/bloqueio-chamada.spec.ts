@@ -56,7 +56,7 @@ test.afterAll(async () => {
   await limparMassa();
 });
 
-test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page }) => {
+test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page }, testInfo) => {
   let salvamentos = 0;
   page.on("request", (requisicao) => {
     if (
@@ -78,6 +78,43 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
 
   await aluno.click();
   await salvarChamada(secao);
+  const barra = secao.getByLabel("Barra de salvamento");
+  const instanteSalvo = await comBanco(async (cliente) => {
+    const resultado = await cliente.query<{ atualizado_em: Date }>(
+      "select f.atualizado_em from frequencias f join turmas t on t.id = f.turma_id join series s on s.id = t.serie_id where s.nome = 'E2E Bloqueio' and t.nome = 'A' order by f.atualizado_em desc limit 1",
+    );
+    return resultado.rows[0]?.atualizado_em;
+  });
+  expect(instanteSalvo).toBeDefined();
+  if (!instanteSalvo) throw new Error("Chamada não encontrada no banco de teste.");
+  const data = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Fortaleza",
+    dateStyle: "short",
+  }).format(instanteSalvo);
+  const hora = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Fortaleza",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(instanteSalvo);
+  for (const largura of [320, 360, 1280]) {
+    await page.setViewportSize({ width: largura, height: 800 });
+    const estado = barra.locator("p[aria-live]");
+    await expect(estado).toHaveText(`Salva em ${data} às ${hora}`);
+    expect(
+      await estado.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1),
+    ).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    if (largura === 320 || largura === 1280) {
+      await testInfo.attach(`barra-${largura}`, {
+        body: await page.screenshot(),
+        contentType: "image/png",
+      });
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   expect(salvamentos).toBe(1);
   await expect(aluno).toBeDisabled();
@@ -142,4 +179,15 @@ test("salva, bloqueia, libera correção e bloqueia novamente", async ({ page })
   await trocarVisao(page, "Chamada", "chamada");
   await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
   await expect(aluno).toBeDisabled();
+  await comBanco(async (cliente) => {
+    await cliente.query(
+      "update frequencias set atualizado_em = $1 where turma_id in (select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'E2E Bloqueio' and t.nome = 'A')",
+      ["2026-01-01T01:30:00.000Z"],
+    );
+  });
+  await page.reload();
+  await aguardarHidratacao(page);
+  await trocarVisao(page, "Chamada", "chamada");
+  await escolherTurmaNaChamada(secao, /^E2E Bloqueio A$/);
+  await expect(barra.locator("p[aria-live]")).toHaveText("Salva em 31/12/2025 às 22:30");
 });

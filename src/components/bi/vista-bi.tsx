@@ -97,6 +97,7 @@ const VAZIOS: DadosBi = {};
 const RECURSOS_VAZIOS: RecursoBi[] = [];
 interface RetratoVista {
   id: string;
+  acesso: NonNullable<ReturnType<typeof useDadosBi>["acesso"]>;
   dados: DadosBi;
   datas: string[];
   falhas: string[];
@@ -126,7 +127,6 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const [erroEdicao, setErroEdicao] = useState("");
   const [retrato, setRetrato] = useState<RetratoVista | null>(null);
   const [atualizacao, setAtualizacao] = useState(0);
-  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null);
   const forcar = useRef(false);
   const [extra, setExtra] = useState<RecursoBi | null>(null);
   const [comparacao, setComparacao] = useState<"nenhuma" | "anterior" | "ano">("nenhuma");
@@ -135,6 +135,9 @@ export default function VistaBi({ fuso }: { fuso: string }) {
     valor: number | null;
     inicio: string;
     fim: string;
+    consultadoEm?: string;
+    falhaAtualizacao?: boolean;
+    acesso: NonNullable<typeof acesso>;
     erro?: string;
   } | null>(null);
   const [confirmacao, setConfirmacao] = useState<{
@@ -243,6 +246,10 @@ export default function VistaBi({ fuso }: { fuso: string }) {
         if (resultado?.status === "fulfilled") {
           dados[resultado.value.r] = resultado.value.retrato.linhas;
           datas.push(resultado.value.retrato.consultadoEm);
+          if (resultado.value.retrato.falhaAtualizacao)
+            falhas.push(
+              `${ROTULOS_RECURSOS_BI[resultado.value.r]}: exibindo dados guardados após falha na atualização.`,
+            );
         } else if (resultado?.status === "rejected") {
           const nome = ROTULOS_RECURSOS_BI[lista[i] ?? "contexto"];
           falhas.push(
@@ -250,18 +257,15 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           );
         }
       }
-      setRetrato({ id: assinatura, dados, datas, falhas });
-      setAtualizadoEm(new Date().toISOString());
+      setRetrato({ id: assinatura, acesso, dados, datas, falhas });
     });
     return () => {
       atual = false;
     };
   }, [assinatura, atualizacao, carregar, acesso, prontoLocal, filtros.inicio, filtros.fim]);
-  const carregando = Boolean(acesso) && retrato?.id !== assinatura;
-  const dados = useMemo(
-    () => enriquecerBi(retrato?.id === assinatura ? retrato.dados : VAZIOS),
-    [retrato, assinatura],
-  );
+  const retratoAtual = retrato?.id === assinatura && retrato.acesso === acesso ? retrato : null;
+  const carregando = Boolean(acesso) && !retratoAtual;
+  const dados = useMemo(() => enriquecerBi(retratoAtual?.dados ?? VAZIOS), [retratoAtual]);
   const recortes = useMemo(
     () =>
       Object.fromEntries(
@@ -483,7 +487,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
     }
   };
   const geracaoComparada = useRef(0);
-  const idComparacao = JSON.stringify([comparacao, filtros, atualizacao]);
+  const idComparacao = JSON.stringify([assinatura, comparacao, filtros, atualizacao]);
   const alunosComparacao = dados.alunos;
   useEffect(() => {
     if (comparacao === "nenhuma" || !acesso || aba !== "geral" || !recursos.includes("chamadas"))
@@ -508,6 +512,9 @@ export default function VistaBi({ fuso }: { fuso: string }) {
               : null,
             inicio: f.inicio,
             fim: f.fim,
+            acesso,
+            consultadoEm: r.consultadoEm,
+            falhaAtualizacao: r.falhaAtualizacao,
             erro: recorte.disponivel ? undefined : recorte.motivo,
           });
         }
@@ -519,6 +526,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
             valor: null,
             inicio: f.inicio,
             fim: f.fim,
+            acesso,
             erro: "Comparação indisponível. Tente atualizar os dados.",
           });
       });
@@ -536,7 +544,8 @@ export default function VistaBi({ fuso }: { fuso: string }) {
     idComparacao,
     alunosComparacao,
   ]);
-  const comparacaoVisivel = comparativo?.id === idComparacao ? comparativo : null;
+  const comparacaoVisivel =
+    comparativo?.id === idComparacao && comparativo.acesso === acesso ? comparativo : null;
   const numero = (v: number | null) =>
     v === null ? "Sem dados" : v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   const chamadaRecortada = recortes.chamadas;
@@ -561,8 +570,24 @@ export default function VistaBi({ fuso }: { fuso: string }) {
     const recorte = recortes[recurso];
     return recorte.disponivel ? totalBi(recorte.linhas, medida, recorte.filtros) : null;
   };
+  const comparacaoAtiva =
+    aba === "geral" && comparacao !== "nenhuma" && recursos.includes("chamadas");
+  const datasVisiveis =
+    comparacaoAtiva && comparacaoVisivel?.consultadoEm
+      ? [...(retratoAtual?.datas ?? []), comparacaoVisivel.consultadoEm]
+      : (retratoAtual?.datas ?? []);
   const ultimaData =
-    retrato?.id === assinatura ? retrato.datas.filter(Boolean).sort()[0] : undefined;
+    retratoAtual &&
+    retratoAtual.falhas.length === 0 &&
+    (!comparacaoAtiva ||
+      (comparacaoVisivel &&
+        !comparacaoVisivel.erro &&
+        !comparacaoVisivel.falhaAtualizacao &&
+        comparacaoVisivel.consultadoEm)) &&
+    datasVisiveis.length > 0 &&
+    datasVisiveis.every((data) => Number.isFinite(Date.parse(data)))
+      ? [...datasVisiveis].sort((a, b) => Date.parse(a) - Date.parse(b))[0]
+      : undefined;
   const destaques = useMemo(() => destaquesBi(dados, filtros), [dados, filtros]);
   const mostrarGrafico = (g: GraficoBi) => {
     if (!recursos.includes(g.recurso)) return null;
@@ -768,11 +793,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                     tamanho="sm"
                     comRotulo
                   />
-                  <AtualizadoEm
-                    instante={atualizadoEm ?? undefined}
-                    fuso={fuso}
-                    className="self-center px-1"
-                  />
+                  <AtualizadoEm instante={ultimaData} fuso={fuso} className="self-center px-1" />
                   <div className="hidden flex-wrap gap-1 sm:flex">
                     <Button variant="ghost" size="sm" onClick={() => void compartilhar()}>
                       <Link2 size={15} />
@@ -859,7 +880,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 "Retrato consultado"
               )}
               {ultimaData
-                ? new Date(ultimaData).toLocaleString("pt-BR")
+                ? new Date(ultimaData).toLocaleString("pt-BR", { timeZone: fuso })
                 : "Ainda sem retrato completo"}
               {carregando && <span>{fonte.progresso || "Carregando conjuntos..."}</span>}
             </div>
@@ -871,12 +892,12 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 {fonte.erro}
               </p>
             )}
-            {retrato?.id === assinatura && retrato.falhas.length > 0 && (
+            {retratoAtual && retratoAtual.falhas.length > 0 && (
               <div
                 role="alert"
                 className="bg-falta-fraca text-falta-texto mb-4 rounded-2xl p-3 text-sm"
               >
-                {retrato.falhas.map((f) => (
+                {retratoAtual.falhas.map((f) => (
                   <p key={f}>{f}</p>
                 ))}
               </div>

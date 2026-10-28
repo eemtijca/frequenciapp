@@ -45,8 +45,13 @@ export async function cacheBi<T>(
   acao: "ler" | "gravar" | "limpar",
   id: string,
   valor?: T,
+  aindaValido?: () => boolean,
 ): Promise<T | undefined> {
   const db = await abrirBanco();
+  if (aindaValido && !aindaValido()) {
+    db.close();
+    return undefined;
+  }
   return new Promise((resolve, reject) => {
     const tx = db.transaction("retratos", acao === "ler" ? "readonly" : "readwrite");
     const store = tx.objectStore("retratos");
@@ -87,4 +92,6 @@ export async function limparTudoBi() {
 }
 export interface RetratoBi extends PaginaBi {
   completo: true;
+  datasCompletas?: boolean;
+  falhaAtualizacao?: boolean;
 }

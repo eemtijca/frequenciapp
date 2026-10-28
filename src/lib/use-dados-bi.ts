@@ -32,6 +32,7 @@ export function useDadosBi() {
   const acessoRef = useRef<AcessoBi | null>(null);
   const controlador = useRef<AbortController | null>(null);
   const tarefas = useRef(new Map<string, Promise<RetratoBi>>());
+  const geracoes = useRef(new Map<string, object>());
   const rede = useCallback(
     async (chave: string, parametros: URLSearchParams, signal?: AbortSignal) =>
       pedir<PaginaBi>(`/api/bi?${parametros}`, {
@@ -55,6 +56,7 @@ export function useDadosBi() {
     setAcesso(null);
     setRetratos({});
     tarefas.current.clear();
+    geracoes.current.clear();
     setProgresso("");
     try {
       esquecerSegredoBi();
@@ -134,6 +136,7 @@ export function useDadosBi() {
         setAcesso(novo);
         setRetratos({});
         tarefas.current.clear();
+        geracoes.current.clear();
         try {
           guardarSegredoBi(chave);
         } catch {
@@ -193,23 +196,31 @@ export function useDadosBi() {
       const id = `${atual.id}:${JSON.stringify(escopo)}:${recurso}:${temporal ? `${consulta.inicio}:${consulta.fim}` : "cadastro"}`;
       const existente = tarefas.current.get(id);
       if (!atualizar && existente) return existente;
+      const geracao = {};
+      geracoes.current.set(id, geracao);
       const signal = controlador.current?.signal;
-      const tarefa = (async () => {
+      // Preserva a falha para leituras repetidas da mesma geração. Uma atualização
+      // explícita ignora a tarefa anterior e tenta novamente.
+      const tarefa: Promise<RetratoBi> = (async () => {
         let antigo: RetratoBi | undefined;
         try {
           antigo = await cacheBi<RetratoBi>("ler", id);
+          // Retratos anteriores não registravam as datas de todas as páginas.
+          if (antigo && !antigo.datasCompletas) antigo = { ...antigo, consultadoEm: "" };
         } catch {
           armazenamentoFalhou();
         }
         if (!atualizar && antigo?.completo) return antigo;
         if (!navigator.onLine) {
-          if (antigo?.completo) return antigo;
+          if (antigo?.completo) return atualizar ? { ...antigo, falhaAtualizacao: true } : antigo;
           throw new Error(
             "Este recorte ainda não foi baixado. Conecte à internet para consultá-lo.",
           );
         }
         const linhas = new Map<string, PaginaBi["linhas"][number]>();
         let pagina = 1;
+        let consultadoEm: string | undefined;
+        let dataInvalida = false;
         let ultima: PaginaBi;
         try {
           do {
@@ -247,7 +258,11 @@ export function useDadosBi() {
                 });
               }
             }
-            if (acessoRef.current !== atual || signal?.aborted)
+            if (
+              geracoes.current.get(id) !== geracao ||
+              acessoRef.current !== atual ||
+              signal?.aborted
+            )
               throw new DOMException("Consulta interrompida", "AbortError");
             if (JSON.stringify(ultima.escopo) !== JSON.stringify(escopo)) {
               await esquecer();
@@ -256,10 +271,20 @@ export function useDadosBi() {
                 "O escopo da chave mudou. Confira a chave novamente para atualizar o acesso.",
               );
             }
+            const instante = Date.parse(ultima.consultadoEm);
+            if (!Number.isFinite(instante)) dataInvalida = true;
+            else if (!consultadoEm || instante < Date.parse(consultadoEm))
+              consultadoEm = ultima.consultadoEm;
             for (const linha of ultima.linhas) linhas.set(linha.id, linha);
             pagina = ultima.proximaPagina ?? 0;
           } while (pagina);
         } catch (e) {
+          if (
+            geracoes.current.get(id) !== geracao ||
+            acessoRef.current !== atual ||
+            signal?.aborted
+          )
+            throw e;
           if (e instanceof ErroApi && (e.status === 401 || e.status === 403)) {
             await esquecer();
             setErro("O acesso foi encerrado. Peça uma chave à Gestão.");
@@ -276,27 +301,36 @@ export function useDadosBi() {
             (!(e instanceof ErroApi) || e.status === 503)
           ) {
             setOffline(true);
-            return antigo;
+            return { ...antigo, falhaAtualizacao: true };
           }
           throw e;
         }
-        const retrato: RetratoBi = { ...ultima, linhas: [...linhas.values()], completo: true };
+        const retrato: RetratoBi = {
+          ...ultima,
+          consultadoEm: dataInvalida ? "" : (consultadoEm ?? ""),
+          linhas: [...linhas.values()],
+          completo: true,
+          datasCompletas: !dataInvalida && Boolean(consultadoEm),
+        };
         try {
-          await cacheBi("gravar", id, retrato);
+          await cacheBi(
+            "gravar",
+            id,
+            retrato,
+            () =>
+              geracoes.current.get(id) === geracao &&
+              acessoRef.current === atual &&
+              !signal?.aborted,
+          );
         } catch {
           armazenamentoFalhou();
         }
         return retrato;
-      })()
-        .then((retrato) => {
-          if (acessoRef.current === atual && !signal?.aborted)
-            setRetratos((r) => ({ ...r, [recurso]: retrato }));
-          return retrato;
-        })
-        .catch((e: unknown) => {
-          tarefas.current.delete(id);
-          throw e;
-        });
+      })().then((retrato) => {
+        if (geracoes.current.get(id) === geracao && acessoRef.current === atual && !signal?.aborted)
+          setRetratos((r) => ({ ...r, [recurso]: retrato }));
+        return retrato;
+      });
       tarefas.current.set(id, tarefa);
       return tarefa;
     },
@@ -318,6 +352,7 @@ export function useDadosBi() {
       const atual = acessoRef.current;
       if (atual) await cacheBi("limpar", `${atual.id}:`);
       tarefas.current.clear();
+      geracoes.current.clear();
       setRetratos({});
     },
   };

@@ -38,7 +38,9 @@ test.describe("saída durante a aula", () => {
     await expect(page.getByText("Saída registrada.")).toBeVisible();
     const lista = page.getByRole("list", { name: /^Saídas de / });
     await expect(lista.getByText("Saiu para a coordenação").first()).toBeVisible();
-    await expect(lista.getByText("Liberado por Diretor E2E").first()).toBeVisible();
+    await expect(
+      lista.getByText(/Liberado por Diretor E2E em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2}/).first(),
+    ).toBeVisible();
     // O resumo por turma e o relatório por aluno saíram da aba; o relatório fica em Relatórios.
     await expect(page.getByRole("heading", { name: "Saídas por turma" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Relatório por aluno" })).toHaveCount(0);

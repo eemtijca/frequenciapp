@@ -663,6 +663,22 @@ export function mesSeguinte(mes: string, deslocamento: number): string {
   return data.toISOString().slice(0, 7);
 }
 
+/** Data de um instante ISO no fuso da escola, formato DD/MM/AAAA. */
+export function dataNoFuso(instanteIso: string, fuso: string): string {
+  const data = new Date(instanteIso);
+  if (Number.isNaN(data.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: fuso,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(data);
+  } catch {
+    return "";
+  }
+}
+
 /** Hora local de um instante ISO no fuso da escola, formato HH:MM. */
 export function horaNoFuso(instanteIso: string, fuso: string): string {
   const data = new Date(instanteIso);

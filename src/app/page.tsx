@@ -42,7 +42,6 @@ export default async function Pagina({
           usuario={usuario}
           contexto={await contextoDoDiretor(usuario.id)}
           fuso={ambiente.fuso}
-          carregadoEm={new Date().toISOString()}
         />
       );
     }

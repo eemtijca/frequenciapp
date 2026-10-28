@@ -2,7 +2,7 @@
 
 // Tela do diretor de turma: só leitura das estatísticas das turmas do vínculo.
 // No primeiro acesso, a troca da palavra-chave vem antes de qualquer dado.
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Info, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -25,16 +25,16 @@ interface Props {
   usuario: Identidade;
   contexto: ContextoDiretor;
   fuso: string;
-  carregadoEm: string;
 }
 
-export default function AplicacaoDiretor({ usuario, contexto, fuso, carregadoEm }: Props) {
+export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   const router = useRouter();
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [sobreAberto, setSobreAberto] = useState(false);
   const [atualizacao, setAtualizacao] = useState(0);
-  const [atualizadoEm, setAtualizadoEm] = useState(carregadoEm);
+  const [atualizadoEm, setAtualizadoEm] = useState<string>();
+  const marcarAtualizado = useCallback(() => setAtualizadoEm(new Date().toISOString()), []);
 
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
@@ -62,7 +62,6 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso, carregadoEm 
             <BotaoAtualizar
               onAtualizar={() => {
                 setAtualizacao((valor) => valor + 1);
-                setAtualizadoEm(new Date().toISOString());
               }}
             />
             <SeletorTema />
@@ -119,7 +118,11 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso, carregadoEm 
             Crie sua palavra-chave para ver as estatísticas.
           </div>
         ) : (
-          <VistaMinhasTurmas contexto={contexto} atualizacao={atualizacao} />
+          <VistaMinhasTurmas
+            contexto={contexto}
+            atualizacao={atualizacao}
+            onAtualizado={marcarAtualizado}
+          />
         )}
       </main>
 
