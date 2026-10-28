@@ -39,3 +39,7 @@ A recuperação incrementa a revisão e atualiza a data somente das chamadas com
 - A frequência na API ganha `alunos`, a lista da chamada. Dados sem lista, como cópias antigas, seguem a regra anterior pela turma atual.
 - A cópia de segurança exporta a lista; ao importar uma cópia antiga, a lista é deduzida da turma e das faltas.
 - A regra da marca continua única em `src/domain/frequencia.ts`, compartilhada pelo servidor e pela interface.
+
+## Adendo: sem círculo ao lado do nome
+
+A pedido da coordenação, a lista da Chamada deixa de mostrar o círculo com a turma original ao lado do nome, que se repetia em todos os alunos e tomava espaço no celular. O asterisco continua marcando quem tem origem diferente da turma da chamada, a turma original segue no nome acessível da linha e na lista de ausentes do resumo do dia, e a configuração da [ADR-026](026-origem-configuravel-na-chamada.md) continua decidindo onde essas indicações aparecem.

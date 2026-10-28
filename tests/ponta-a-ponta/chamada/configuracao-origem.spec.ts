@@ -110,7 +110,8 @@ async function conferir(
   const nome = `E2E Config ${nomes[indice]} ${turma}`;
   const linha = chamada.locator("ul li").filter({ hasText: nome });
   await expect(linha.getByText(`${nome}${exibe ? "*" : ""}`, { exact: true })).toBeVisible();
-  await expect(linha.getByRole("img", { name: /Turma original/ })).toHaveCount(exibe ? 1 : 0);
+  // A turma original não aparece mais em círculo, com ou sem a indicação.
+  await expect(linha.getByRole("img", { name: /Turma original/ })).toHaveCount(0);
 }
 
 test("desligada ou ligada sem seleção não mostra origem nem asterisco", async ({ page }) => {
