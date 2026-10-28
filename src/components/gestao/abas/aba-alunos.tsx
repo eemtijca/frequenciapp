@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoImportarRelacao from "@/components/gestao/cadastros/dialogo-importar-relacao";
+import DialogoRestaurarOrigens from "@/components/gestao/cadastros/dialogo-restaurar-origens";
 import { relacaoParaCsv } from "@/domain/importacao-alunos";
 import {
   Dialog,
@@ -506,6 +507,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               <Check size={16} />
               Definir origem
             </Button>
+            <DialogoRestaurarOrigens turmas={turmas} alunos={alunos} onMudanca={onMudanca} />
             <Button
               size="lg"
               className="h-11 whitespace-nowrap"

@@ -236,4 +236,17 @@ describe("classificadores", () => {
     expect(ehConflitoDeSerializacao(new Error("TransactionWriteConflict"))).toBe(false);
     expect(ehConflitoDeSerializacao(null)).toBe(false);
   });
+
+  it("reconhece o conflito de uma consulta SQL direta, embrulhado no P2010", () => {
+    const conflito = erroDoAdaptador({ kind: "TransactionWriteConflict" });
+    expect(ehConflitoDeSerializacao(erroConhecido("P2010", { driverAdapterError: conflito }))).toBe(
+      true,
+    );
+    const duplicidade = erroDoAdaptador({ kind: "UniqueConstraintViolation" });
+    expect(
+      ehConflitoDeSerializacao(erroConhecido("P2010", { driverAdapterError: duplicidade })),
+    ).toBe(false);
+    expect(ehConflitoDeSerializacao(erroConhecido("P2010"))).toBe(false);
+    expect(traduzirErro(erroConhecido("P2010", { driverAdapterError: conflito })).status).toBe(409);
+  });
 });

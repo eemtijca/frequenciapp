@@ -224,10 +224,14 @@ export function traduzirErro(erro: unknown): { mensagem: string; status: number 
  * PostgreSQL. O Prisma o entrega como P2034 na maioria dos casos, mas uma falha
  * no meio de uma consulta SQL direta ou no commit chega do adaptador pg como
  * DriverAdapterError, com a causa TransactionWriteConflict (SQLSTATE 40001) ou
- * o código original de serialização e deadlock.
+ * o código original de serialização e deadlock. Em `$executeRaw` e `$queryRaw`,
+ * esse erro do adaptador vem embrulhado no P2010, em `meta.driverAdapterError`.
  */
 export function ehConflitoDeSerializacao(erro: unknown): boolean {
-  if (erro instanceof PrismaClientKnownRequestError) return erro.code === "P2034";
+  if (erro instanceof PrismaClientKnownRequestError) {
+    if (erro.code === "P2034") return true;
+    return erro.code === "P2010" && ehConflitoDeSerializacao(erro.meta?.driverAdapterError);
+  }
   if (!(erro instanceof Error) || erro.name !== "DriverAdapterError") return false;
   const causa = erro.cause;
   if (typeof causa !== "object" || causa === null) return false;

@@ -284,6 +284,18 @@ Corpo: `{ "ids": uuid[], "turmaOriginalId": uuid }`, de 1 a 500 alunos.
 
 - 200 `{"atualizados": number}`; 400 seleção vazia ou inválida; 403 sem papel de administração; 404 turma ou aluno inexistente.
 
+### POST /api/alunos/restaurar-origens
+
+Corpo: `{ "serieId": uuid, "previa": [{ "id": uuid, "turmaId": uuid, "turmaOriginalId": uuid }], "confirmar": true }`, com 1 a 1.000 itens em `previa`. Apenas administração, com origem confiável e auditoria. Devolve à turma de origem cada aluno da série cuja turma atual e cuja turma de origem pertencem à série e são diferentes, ativos e inativos; quem cruzou de série não é tocado. Renumera em ordem alfabética, pela mesma regra de `POST /api/turmas/ordenar`, só as turmas que perdem ou recebem alunos. Turmas e séries intocadas mantêm a numeração.
+
+`previa` é a relação conferida na Gestão, aluno por aluno. Tudo roda em uma única transação, que começa travando a tabela de alunos contra outras gravações e recalcula a relação: se ela não for exatamente a da prévia, mesmo com a mesma quantidade, nada é alterado. Antes do commit, a transação confere que ninguém da série ficou fora da origem e que não há numeração repetida nas turmas afetadas.
+
+- 200 `{ "alunos", "turmas", "jaAplicado": false }`, contando alunos devolvidos e turmas renumeradas.
+- 200 `{ "alunos": 0, "turmas": 0, "jaAplicado": true }` quando a mesma prévia já foi aplicada: todos os alunos dela estão na turma de origem e ninguém da série está fora. Nada é gravado.
+- 400 corpo inválido, prévia vazia ou sem confirmação; 401 sem sessão; 403 sem autorização ou com origem inválida; 404 série inexistente; 409 relação diferente da prévia.
+- Preserva códigos, nomes, turma original, situação e histórico: faltas, chamadas salvas, com a lista do dia, entradas atrasadas e registros parciais continuam como estão. As saídas não guardam a turma e passam a aparecer na turma de origem em `GET /api/relatorios/movimentacoes` e no próximo envio da planilha de saídas. Não altera as linhas das planilhas Google existentes.
+- Auditoria: `aluno.restaurar_origens` com `serie:<id>:alunos:N:turmas:M` e uma linha `aluno.restaurar_origem` por aluno atingido, com `aluno:<id>`, `de:<turma>:para:<turma>` para quem voltou e `ordem:<antes>:<depois>` para quem teve a numeração alterada, só com identificadores.
+
 ### POST /api/alunos/importacao
 
 Importa a relação de alunos em CSV, no schema padrão descrito em [operacao.md](operacao.md#schema-da-relação-de-alunos) e usado também pela exportação da Gestão. Apenas administração.

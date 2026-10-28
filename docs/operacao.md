@@ -70,7 +70,7 @@ Revogue a palavra-chave com o motivo e retire as turmas do diretor. Vínculo ini
 
 ### Virada do ano letivo
 
-1. Primeiro, a estrutura: séries, turmas novas e a turma de origem dos alunos (Alunos, Definir origem, quando a 3ª série reorganiza as turmas).
+1. Primeiro, a estrutura: séries, turmas novas e a turma de origem dos alunos (Alunos, Definir origem, quando a 3ª série reorganiza as turmas). Quando o remanejamento temporário termina, Alunos, Restaurar origens devolve os alunos da série às turmas de origem de uma vez, com prévia por turma. Ela só toca quem foi remanejado dentro da série; quem mudou de série fica como está. Uma transferência permanente dentro da série também voltaria, então ajuste antes a origem desse aluno em Definir origem. A restauração não substitui Definir origem quando a escola usa a turma de origem como turma de entrada do ano letivo. As saídas já registradas dos alunos restaurados passam a aparecer na turma de origem no relatório de saídas e entradas e na planilha de saídas.
 2. Depois, em Diretores, revise cada conta: retire as turmas encerradas e vincule as novas. O vínculo novo vale a partir do dia em que foi criado, e o diretor não vê dados anteriores a ele.
 3. Quem não continua na função: revogue a palavra-chave e retire as turmas. A lista marca "Sem turma vinculada" para quem ficou sem vínculo; uma conta assim entra, mas não vê turma alguma.
 4. Confira os parâmetros de acesso, em especial as categorias visíveis e o limite de risco.
