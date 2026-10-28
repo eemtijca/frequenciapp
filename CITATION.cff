@@ -1,0 +1,28 @@
+# Metadados de citação do FrequenciApp no padrão Citation File Format 1.2.0.
+cff-version: 1.2.0
+message: "Se o FrequenciApp for usado em trabalhos, relatórios ou pesquisas, cite conforme os metadados deste arquivo."
+title: "FrequenciApp"
+abstract: "Aplicativo de frequência escolar para a coordenação de uma escola brasileira, com chamada diária, saídas antecipadas, entradas atrasadas, painel e relatórios."
+authors:
+  - name: "EEMTI José Cláudio de Araújo"
+    city: Mucambo
+    region: Ceará
+    country: BR
+    website: "https://github.com/eemtijca"
+contact:
+  - name: "Equipe do FrequenciApp"
+    website: "https://github.com/eemtijca/frequenciapp"
+type: software
+license: MIT
+repository-code: "https://github.com/eemtijca/frequenciapp"
+url: "https://frequenciappjca.vercel.app"
+keywords:
+  - frequência escolar
+  - chamada
+  - coordenação escolar
+  - PWA
+  - Next.js
+  - PostgreSQL
+  - educação
+version: "0.1.0"
+date-released: "2026-09-25"

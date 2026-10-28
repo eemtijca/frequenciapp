@@ -53,6 +53,7 @@ const EXTENSOES = new Set([
   ".yaml",
   ".sql",
   ".prisma",
+  ".cff",
   ".example",
   ".sh",
 ]);
