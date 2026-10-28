@@ -32,6 +32,7 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - [Contribuindo](#contribuindo)
 - [Suporte](#suporte)
 - [Créditos](#créditos)
+- [Como citar](#como-citar)
 - [Licença](#licença)
 
 </details>
@@ -247,6 +248,50 @@ Dúvidas e problemas são bem-vindos nas [issues do repositório](https://github
 ## Créditos
 
 Projeto mantido pela equipe do FrequenciApp na EEMTI José Cláudio de Araújo.
+
+## Como citar
+
+O FrequenciApp pode ser citado em trabalhos, relatórios e pesquisas. Os metadados oficiais ficam em [CITATION.cff](CITATION.cff). O GitHub lê esse arquivo e oferece o botão **Cite this repository**, com as versões em APA e BibTeX; as versões em ABNT e RIS estão abaixo.
+
+### ABNT (NBR 6023:2018)
+
+> EEMTI JOSÉ CLÁUDIO DE ARAÚJO. **FrequenciApp**: aplicativo de frequência escolar. Versão 0.1.0. [S. l.], 2026. Disponível em: https://github.com/eemtijca/frequenciapp. Acesso em: 27 out. 2026.
+
+No texto, use (EEMTI JOSÉ CLÁUDIO DE ARAÚJO, 2026).
+
+### APA (7ª edição)
+
+> EEMTI José Cláudio de Araújo. (2026). _FrequenciApp_ (Versão 0.1.0) [Computer software]. https://github.com/eemtijca/frequenciapp
+
+No texto, use (EEMTI José Cláudio de Araújo, 2026).
+
+### BibTeX
+
+```bibtex
+@software{EEMTI_Jose_Claudio_de_Araujo_FrequenciApp_2026,
+  author = {{EEMTI José Cláudio de Araújo}},
+  license = {MIT},
+  month = {9},
+  title = {{FrequenciApp}},
+  url = {https://github.com/eemtijca/frequenciapp},
+  version = {0.1.0},
+  year = {2026}
+}
+```
+
+### RIS
+
+```text
+TY  - COMP
+AU  - EEMTI José Cláudio de Araújo
+TI  - FrequenciApp: aplicativo de frequência escolar
+PY  - 2026
+ET  - Versão 0.1.0
+UR  - https://github.com/eemtijca/frequenciapp
+ER  -
+```
+
+A data de acesso da ABNT deve ser a do dia da consulta.
 
 ## Licença
 

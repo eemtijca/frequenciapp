@@ -14,6 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- O repositório passa a ter CITATION.cff e uma seção Como citar no README, com ABNT, APA, BibTeX e RIS.
+
 - O seletor de turmas da Chamada e as seções recolhíveis animam discretamente a expansão e o recolhimento; folhas inferiores deslizam pela base no celular. O movimento reduzido continua respeitado e os estados são preservados.
 
 - Painel, Chamada, Chamada Parcial e Saídas e Entradas usam calendário de segunda a domingo, com dias dos meses vizinhos, cinco ou seis semanas e domingo destacado como resumo. Qualquer domingo encerrado abre a semana de segunda a sábado anterior; as setas andam dia a dia e o atalho Hoje volta ao resumo no domingo. O Painel reúne frequência, saídas, entradas e pendências da Seduc de todas as turmas visíveis; a Chamada mostra frequência e saídas da turma; a Chamada Parcial usa os registros efetivos, com pendentes, dias sem chamada e atalho Abrir na Chamada; Saídas e Entradas mostra a aba ativa com todas as turmas. As seções são recolhíveis, a Visão geral começa aberta, os gráficos só montam na seção aberta e visível e a expansão é preservada no refresh. Os resumos atualizam a cada dois minutos sem desmontar a tela, com consultas canceláveis e sem ciclos sobrepostos. O rótulo Atualizado às HH:MM passa a ficar no conteúdo de todas as telas. As decisões estão nas ADR-056 e ADR-057.
