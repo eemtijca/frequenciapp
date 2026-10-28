@@ -44,6 +44,8 @@ O diálogo avisa a reorganização das turmas afetadas e o reagrupamento das sa�
 ## Consequências
 
 - Turmas e séries intocadas mantêm a numeração, inclusive os alunos que não se moveram nas turmas fora da prévia.
+- A trava vale para a tabela inteira de alunos, não só para a série: duas restaurações de séries diferentes, a importação, a edição de aluno e Reorganizar turmas esperam umas pelas outras. A transação é curta, com duas atualizações em lote e duas conferências, e escritas simultâneas em alunos são raras numa escola; uma trava por série exigiria travas de linha em todas as rotas que gravam alunos.
+- A prévia aceita até 1.000 alunos. Com 1.000 itens, o corpo JSON enviado pelo diálogo tem cerca de 152 kB, 76% do limite de 200 kB das rotas; uma série com mais de 1.000 alunos teria mais de vinte turmas de 50. Passar desse tamanho exigiria dividir a restauração ou subir o limite do corpo desta rota, como já fazem as rotas de importação de cópia.
 - Uma transferência permanente dentro da própria série também volta; nesse caso, a origem precisa ser ajustada antes, em Definir origem. Transferências entre séries ficam como estão.
 - A restauração não deve substituir Definir origem quando a escola usa a turma de origem como turma de entrada do ano letivo.
 - Enquanto a saída não guardar a turma do registro, qualquer mudança de turma, inclusive esta, reagrupa as saídas antigas do aluno.
