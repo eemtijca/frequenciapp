@@ -371,66 +371,72 @@ it("ignora uma leitura atrasada após a troca de seção", async () => {
   }
 });
 
-it("preserva a falha da comparação após terminar a leitura principal", async () => {
-  const page = await abrir();
-  let liberarPrincipal: () => void = () => {};
-  const principalPendente = new Promise<void>((resolve) => {
-    liberarPrincipal = resolve;
-  });
-  try {
-    await expect
-      .poll(async () => page.getByText(/Atualizado em/).count(), { timeout: 30000 })
-      .toBe(1);
-    let inicioComparacao = "";
-    const capturarComparacao = (requisicao: import("@playwright/test").Request) => {
-      const url = new URL(requisicao.url());
-      if (url.pathname === "/api/bi" && url.searchParams.get("recurso") === "chamadas")
-        inicioComparacao = url.searchParams.get("inicio") ?? "";
-    };
-    page.on("request", capturarComparacao);
-    await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
-    await page.getByRole("option", { name: "Período anterior" }).click();
-    await expect.poll(() => inicioComparacao).not.toBe("");
-    page.off("request", capturarComparacao);
-    await expect.poll(async () => page.getByText(/Atualizado em/).count()).toBe(1);
-    let falhou = false;
-    await page.route("**/api/bi?*", async (rota) => {
-      const parametros = new URL(rota.request().url()).searchParams;
-      const recurso = parametros.get("recurso");
-      if (recurso === "chamadas" && parametros.get("inicio") === inicioComparacao) {
-        falhou = true;
-        await rota.fulfill({ status: 503, json: { error: "Indisponível" } });
-        return;
-      }
-      if (recurso === "alunos") await principalPendente;
-      await rota.fulfill({
-        json: {
-          recurso,
-          linhas: [],
-          pagina: 1,
-          proximaPagina: null,
-          consultadoEm: "2026-10-10T12:00:00Z",
-          escopo: {},
-          recursos: RECURSOS_BI,
-        },
-      });
+it.each([503, 500])(
+  "preserva a falha %s da comparação após terminar a leitura principal",
+  async (codigo) => {
+    const page = await abrir();
+    let liberarPrincipal: () => void = () => {};
+    const principalPendente = new Promise<void>((resolve) => {
+      liberarPrincipal = resolve;
     });
-    await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
-    await expect.poll(() => falhou, { timeout: 10000 }).toBe(true);
-    await expect.poll(async () => page.getByText(/Consulta offline/).count()).toBeGreaterThan(0);
-    await page.waitForTimeout(400);
-    const respostaPrincipal = page.waitForResponse((resposta) =>
-      resposta.url().includes("recurso=alunos"),
-    );
-    liberarPrincipal();
-    await respostaPrincipal;
-    await page.waitForTimeout(800);
-    expect(await page.getByText("Ainda não atualizado", { exact: true }).count()).toBe(1);
-  } finally {
-    liberarPrincipal();
-    await page.close();
-  }
-});
+    try {
+      await expect
+        .poll(async () => page.getByText(/Atualizado em/).count(), { timeout: 30000 })
+        .toBe(1);
+      let inicioComparacao = "";
+      const capturarComparacao = (requisicao: import("@playwright/test").Request) => {
+        const url = new URL(requisicao.url());
+        if (url.pathname === "/api/bi" && url.searchParams.get("recurso") === "chamadas")
+          inicioComparacao = url.searchParams.get("inicio") ?? "";
+      };
+      page.on("request", capturarComparacao);
+      await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
+      await page.getByRole("option", { name: "Período anterior" }).click();
+      await expect.poll(() => inicioComparacao).not.toBe("");
+      page.off("request", capturarComparacao);
+      await expect.poll(async () => page.getByText(/Atualizado em/).count()).toBe(1);
+      let falhou = false;
+      await page.route("**/api/bi?*", async (rota) => {
+        const parametros = new URL(rota.request().url()).searchParams;
+        const recurso = parametros.get("recurso");
+        if (recurso === "chamadas" && parametros.get("inicio") === inicioComparacao) {
+          falhou = true;
+          await rota.fulfill({ status: codigo, json: { error: "Indisponível" } });
+          return;
+        }
+        if (recurso === "alunos") await principalPendente;
+        await rota.fulfill({
+          json: {
+            recurso,
+            linhas: [],
+            pagina: 1,
+            proximaPagina: null,
+            consultadoEm: "2026-10-10T12:00:00Z",
+            escopo: {},
+            recursos: RECURSOS_BI,
+          },
+        });
+      });
+      await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+      await expect.poll(() => falhou, { timeout: 10000 }).toBe(true);
+      if (codigo === 503)
+        await expect
+          .poll(async () => page.getByText(/Consulta offline/).count())
+          .toBeGreaterThan(0);
+      await page.waitForTimeout(800);
+      const respostaPrincipal = page.waitForResponse((resposta) =>
+        resposta.url().includes("recurso=alunos"),
+      );
+      liberarPrincipal();
+      await respostaPrincipal;
+      await page.waitForTimeout(800);
+      expect(await page.getByText("Ainda não atualizado", { exact: true }).count()).toBe(1);
+    } finally {
+      liberarPrincipal();
+      await page.close();
+    }
+  },
+);
 
 it("não apresenta horário completo quando um recurso falha sem fallback", async () => {
   const page = await abrir();
@@ -438,9 +444,10 @@ it("não apresenta horário completo quando um recurso falha sem fallback", asyn
     await expect
       .poll(async () => page.getByText(/Atualizado em/).count(), { timeout: 30000 })
       .toBe(1);
+    let falhar = true;
     await page.route("**/api/bi?*", async (rota) => {
       const recurso = new URL(rota.request().url()).searchParams.get("recurso");
-      if (recurso === "chamadas") {
+      if (recurso === "chamadas" && falhar) {
         await rota.fulfill({ status: 500, json: { error: "Falha sintética" } });
         return;
       }
@@ -462,6 +469,14 @@ it("não apresenta horário completo quando um recurso falha sem fallback", asyn
       .toBeGreaterThan(0);
     await expect
       .poll(async () => page.getByText("Ainda não atualizado", { exact: true }).count())
+      .toBe(1);
+    falhar = false;
+    await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+    await expect
+      .poll(
+        async () => page.getByText("Atualizado em 10/10/2026 às 12:00", { exact: true }).count(),
+        { timeout: 10000 },
+      )
       .toBe(1);
   } finally {
     await page.close();

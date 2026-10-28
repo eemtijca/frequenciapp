@@ -194,6 +194,8 @@ export function useDadosBi() {
       const existente = tarefas.current.get(id);
       if (!atualizar && existente) return existente;
       const signal = controlador.current?.signal;
+      // Preserva a falha para leituras repetidas da mesma geração. Uma atualização
+      // explícita ignora a tarefa anterior e tenta novamente.
       const tarefa = (async () => {
         let antigo: RetratoBi | undefined;
         try {
@@ -301,16 +303,11 @@ export function useDadosBi() {
           armazenamentoFalhou();
         }
         return retrato;
-      })()
-        .then((retrato) => {
-          if (acessoRef.current === atual && !signal?.aborted)
-            setRetratos((r) => ({ ...r, [recurso]: retrato }));
-          return retrato;
-        })
-        .catch((e: unknown) => {
-          if (tarefas.current.get(id) === tarefa) tarefas.current.delete(id);
-          throw e;
-        });
+      })().then((retrato) => {
+        if (acessoRef.current === atual && !signal?.aborted)
+          setRetratos((r) => ({ ...r, [recurso]: retrato }));
+        return retrato;
+      });
       tarefas.current.set(id, tarefa);
       return tarefa;
     },
