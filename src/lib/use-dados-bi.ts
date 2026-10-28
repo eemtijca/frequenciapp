@@ -303,8 +303,6 @@ export function useDadosBi() {
         return retrato;
       })()
         .then((retrato) => {
-          if (retrato.falhaAtualizacao && tarefas.current.get(id) === tarefa)
-            tarefas.current.delete(id);
           if (acessoRef.current === atual && !signal?.aborted)
             setRetratos((r) => ({ ...r, [recurso]: retrato }));
           return retrato;
