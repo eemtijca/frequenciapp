@@ -34,8 +34,8 @@ afterAll(async () => {
   await browser?.close();
   await servidor?.close();
 });
-async function abrir(paginado = false): Promise<Page> {
-  const page = await browser.newPage({ serviceWorkers: "block" });
+async function abrir(paginado = false, timezoneId = "UTC"): Promise<Page> {
+  const page = await browser.newPage({ serviceWorkers: "block", timezoneId });
   await page.route("**/api/bi?*", async (rota) => {
     const parametros = new URL(rota.request().url()).searchParams;
     const recurso = parametros.get("recurso");
@@ -70,6 +70,27 @@ it("o horário corresponde ao retrato recebido, não ao relógio da abertura", a
         { timeout: 3000 },
       )
       .toBe(1);
+  } finally {
+    await page.close();
+  }
+});
+
+it("mostra o retrato no fuso da escola mesmo com navegador em outro fuso", async () => {
+  const page = await abrir(false, "America/Sao_Paulo");
+  try {
+    await expect
+      .poll(
+        async () => page.getByText("Atualizado em 09/10/2026 às 12:00", { exact: true }).count(),
+        {
+          timeout: 30000,
+        },
+      )
+      .toBe(1);
+    await expect
+      .poll(async () =>
+        page.getByRole("status").filter({ hasText: "Retrato consultado" }).textContent(),
+      )
+      .toContain("09/10/2026, 12:00");
   } finally {
     await page.close();
   }

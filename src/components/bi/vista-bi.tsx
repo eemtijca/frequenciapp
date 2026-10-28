@@ -880,7 +880,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 "Retrato consultado"
               )}
               {ultimaData
-                ? new Date(ultimaData).toLocaleString("pt-BR")
+                ? new Date(ultimaData).toLocaleString("pt-BR", { timeZone: fuso })
                 : "Ainda sem retrato completo"}
               {carregando && <span>{fonte.progresso || "Carregando conjuntos..."}</span>}
             </div>
