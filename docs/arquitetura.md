@@ -219,3 +219,4 @@ tests/
 - [ADR-057: resumo semanal nas quatro telas](adr/057-resumo-semanal-no-painel.md)
 - [ADR-058: domingo sem novos registros](adr/058-domingo-sem-novos-registros.md)
 - [ADR-059: infrequência configurável](adr/059-infrequencia-configuravel.md)
+- [ADR-060: restauração das turmas de origem](adr/060-restauracao-das-turmas-de-origem.md)

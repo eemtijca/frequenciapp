@@ -14,3 +14,16 @@ export async function auditar(
 ): Promise<void> {
   await tx.auditoria.create({ data: { usuarioId, acao, alvo } }).catch(() => undefined);
 }
+
+/** Registra várias linhas de uma mesma ação, numa única instrução. */
+export async function auditarVarios(
+  tx: Cliente,
+  usuarioId: string | null,
+  acao: string,
+  alvos: readonly string[],
+): Promise<void> {
+  if (alvos.length === 0) return;
+  await tx.auditoria
+    .createMany({ data: alvos.map((alvo) => ({ usuarioId, acao, alvo })) })
+    .catch(() => undefined);
+}

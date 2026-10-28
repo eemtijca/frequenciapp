@@ -2541,6 +2541,104 @@
         }
       }
     },
+    "/api/alunos/restaurar-origens": {
+      "post": {
+        "operationId": "restaurarTurmasDeOrigem",
+        "summary": "Restaurar as turmas de origem de uma série",
+        "description": "Apenas administração, com origem confiável. Devolve à turma de origem cada aluno da série cuja turma atual e cuja turma de origem pertencem à série e são diferentes, e renumera em ordem alfabética só as turmas que perdem ou recebem alunos, em uma única transação que trava a tabela de alunos contra outras gravações. A relação atual precisa ser exatamente a da prévia; repetir uma prévia já aplicada responde 200 com jaAplicado.",
+        "tags": ["alunos"],
+        "requestBody": {
+          "required": true,
+          "description": "Série, prévia conferida e confirmação.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestaurarOrigens"
+              },
+              "examples": {
+                "Confirmacao": {
+                  "summary": "Confirmacao",
+                  "value": {
+                    "serieId": "00000000-0000-4000-8000-000000000003",
+                    "previa": [
+                      {
+                        "id": "00000000-0000-4000-8000-000000000101",
+                        "turmaId": "00000000-0000-4000-8000-000000000011",
+                        "turmaOriginalId": "00000000-0000-4000-8000-000000000010"
+                      }
+                    ],
+                    "confirmar": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Alunos devolvidos às turmas de origem.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestaurarOrigensResposta"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "alunos": 38,
+                      "turmas": 3,
+                      "jaAplicado": false
+                    }
+                  },
+                  "JaAplicado": {
+                    "summary": "JaAplicado",
+                    "value": {
+                      "alunos": 0,
+                      "turmas": 0,
+                      "jaAplicado": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "description": "Sem autorização ou com origem inválida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "error": "Origem não permitida."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
     "/api/usuarios": {
       "get": {
         "operationId": "listarUsuarios",
@@ -19698,6 +19796,80 @@
             "type": "string",
             "pattern": "^[a-f0-9]{64}$",
             "example": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      },
+      "RestaurarOrigens": {
+        "type": "object",
+        "title": "Restauração das turmas de origem",
+        "description": "Série cujas turmas voltam à composição de origem, com a prévia conferida aluno por aluno.",
+        "required": ["serieId", "previa", "confirmar"],
+        "additionalProperties": false,
+        "properties": {
+          "serieId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Série das turmas atuais e de origem dos alunos que voltam.",
+            "example": "00000000-0000-4000-8000-000000000003"
+          },
+          "previa": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1000,
+            "description": "Alunos fora da origem mostrados na prévia, com a turma atual e a de origem conferidas. A relação atual precisa ser exatamente esta.",
+            "items": {
+              "type": "object",
+              "required": ["id", "turmaId", "turmaOriginalId"],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Aluno.",
+                  "example": "00000000-0000-4000-8000-000000000101"
+                },
+                "turmaId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Turma atual vista na prévia.",
+                  "example": "00000000-0000-4000-8000-000000000011"
+                },
+                "turmaOriginalId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Turma de origem vista na prévia.",
+                  "example": "00000000-0000-4000-8000-000000000010"
+                }
+              }
+            }
+          },
+          "confirmar": {
+            "const": true,
+            "description": "Precisa ser verdadeiro para executar.",
+            "example": true
+          }
+        }
+      },
+      "RestaurarOrigensResposta": {
+        "type": "object",
+        "title": "Resultado da restauração",
+        "description": "Contagens da volta dos alunos às turmas de origem.",
+        "required": ["alunos", "turmas", "jaAplicado"],
+        "properties": {
+          "alunos": {
+            "type": "integer",
+            "description": "Alunos devolvidos à turma de origem.",
+            "example": 38
+          },
+          "turmas": {
+            "type": "integer",
+            "description": "Turmas renumeradas por perder ou receber alunos.",
+            "example": 3
+          },
+          "jaAplicado": {
+            "type": "boolean",
+            "description": "Verdadeiro quando a mesma prévia já tinha sido aplicada; nada foi gravado e as contagens são zero.",
+            "example": false
           }
         }
       }

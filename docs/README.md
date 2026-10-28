@@ -65,3 +65,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-057](adr/057-resumo-semanal-no-painel.md): resumo semanal compartilhado pelas quatro telas, calendário de segunda a domingo, seções recolhíveis e atualização silenciosa.
 - [ADR-058](adr/058-domingo-sem-novos-registros.md): domingo recusa criação e edição de chamada, saída e entrada, mas preserva a remoção de registros históricos.
 - [ADR-059](adr/059-infrequencia-configuravel.md): limites percentuais do card de Infrequência configurados pela Gestão e usados no Painel.
+- [ADR-060](adr/060-restauracao-das-turmas-de-origem.md): volta dos alunos remanejados de uma série às turmas de origem, com prévia conferida e renumeração só das turmas afetadas.

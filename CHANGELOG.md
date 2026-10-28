@@ -18,6 +18,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Gestão, Alunos, ganha o botão Restaurar origens, para encerrar um remanejamento temporário como o da 3ª série. Ele lista só as séries com alunos fora da turma de origem, mostra quantos alunos voltam a cada turma e de onde saem, e, depois da confirmação, devolve todos de uma vez e renumera em ordem alfabética só as turmas afetadas. Só entram alunos com turma atual e de origem na mesma série; quem mudou de série fica como está. O diálogo avisa que as turmas afetadas são reorganizadas e que as saídas já registradas passam a aparecer na turma de origem. Faltas, chamadas salvas, entradas e registros parciais continuam como estão. Nova rota `POST /api/alunos/restaurar-origens`, que recebe a prévia aluno por aluno, recusa qualquer diferença, trava a tabela de alunos durante a volta, confere o resultado antes de gravar, audita cada aluno atingido e responde `jaAplicado` ao repetir uma prévia já aplicada.
+
 - O repositório passa a ter CITATION.cff e uma seção Como citar no README, com ABNT, APA, BibTeX e RIS.
 
 - O seletor de turmas da Chamada e as seções recolhíveis animam discretamente a expansão e o recolhimento; folhas inferiores deslizam pela base no celular. O movimento reduzido continua respeitado e os estados são preservados.
@@ -227,6 +229,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- Um conflito de serialização numa consulta SQL direta, como em Reorganizar turmas, volta a ser repetido automaticamente. Antes, o Prisma o entregava embrulhado no código P2010, a transação não era refeita e a resposta era 500.
 
 - O selo Somente leitura do resumo semanal deixa de ser truncado e fica alinhado à esquerda no celular, sem estouro horizontal do cabeçalho.
 
