@@ -7,7 +7,7 @@ test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
 test.afterAll(limparMassaE2E);
 
-async function abrir(page: Page, completo: boolean) {
+async function abrir(page: Page, completo: boolean, toque = false) {
   const turmaId = await comBanco(
     async (banco) =>
       (
@@ -19,6 +19,13 @@ async function abrir(page: Page, completo: boolean) {
   expect(turmaId).not.toBe("");
   const previas: Record<string, unknown>[] = [];
   const envios: Record<string, unknown>[] = [];
+  let liberado = completo;
+  await page.route("**/api/planilha/modo-completo", (rota) => {
+    liberado = true;
+    return rota.fulfill({
+      json: { modo: "completo", modoCompletoAte: new Date(Date.now() + 3600000).toISOString() },
+    });
+  });
   await page.route("**/api/planilha", (rota) =>
     rota.fulfill({
       json: {
@@ -26,8 +33,8 @@ async function abrir(page: Page, completo: boolean) {
           ativa: true,
           googleConectado: true,
           googlePlanilha: { id: "sintetico", nome: "E2E Planilha" },
-          modo: completo ? "completo" : "conservador",
-          modoCompletoAte: completo ? new Date(Date.now() + 3600000).toISOString() : null,
+          modo: liberado ? "completo" : "conservador",
+          modoCompletoAte: liberado ? new Date(Date.now() + 3600000).toISOString() : null,
           fuso: "America/Fortaleza",
           alteradasDepois: 0,
           sincronizacoes: [],
@@ -101,12 +108,16 @@ async function abrir(page: Page, completo: boolean) {
     editor.getByRole("button", { name: "Adicionar alunos", exact: true }),
   ).toBeDisabled();
   expect(previas).toHaveLength(0);
-  // O seletor fica no fim da seção. Sem centralizar, o menu abre abaixo da
-  // viewport e a opção não recebe o clique.
   const turma = editor.getByRole("combobox", { name: "Turma da planilha para editar" });
-  await turma.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
-  await turma.click();
-  await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
+  if (toque) await turma.tap();
+  else await turma.click();
+  await expect(turma).toHaveAttribute("aria-expanded", "true");
+  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
+  await expect(busca).toBeVisible();
+  await busca.fill("E2E Ano A");
+  const opcao = page.getByRole("option", { name: "E2E Ano A", exact: true });
+  if (toque) await opcao.tap();
+  else await opcao.click();
   await expect(editor.getByRole("status")).toHaveText("Destino: E2E Aba A.");
   return { editor, previas, envios, turmaId };
 }
@@ -175,4 +186,38 @@ test("editor compacto mantém ações acessíveis no celular e recolhe a ajuda",
   await expect(ajuda).toBeVisible();
   await editor.getByText("Ajuda", { exact: true }).click();
   await expect(ajuda).toBeHidden();
+});
+
+test("liberar o modo completo atualiza as ações sem perder a turma escolhida", async ({ page }) => {
+  const { editor, envios } = await abrir(page, false);
+  await expect(editor.getByRole("button", { name: "Corrigir dados", exact: true })).toBeDisabled();
+  const cartao = page.locator('[data-secao="planilha-frequencia"]');
+  await cartao.getByRole("button", { name: /^Modo completo/ }).click();
+  await cartao.getByRole("button", { name: "Liberar modo completo", exact: true }).click();
+  const dialogo = page.getByRole("dialog", { name: "Liberar modo completo", exact: true });
+  await dialogo.getByLabel("Digite EDITAR PLANILHA").fill("EDITAR PLANILHA");
+  await dialogo.getByLabel("Senha do administrador", { exact: true }).fill("SenhaSintetica2026");
+  await dialogo.getByRole("button", { name: "Liberar", exact: true }).click();
+  await expect(dialogo).toBeHidden();
+  await expect(editor.getByRole("button", { name: "Corrigir dados", exact: true })).toBeEnabled();
+  await expect(
+    editor.getByRole("button", { name: "Retirar linhas ou colunas", exact: true }),
+  ).toBeEnabled();
+  await editor.getByRole("button", { name: "Corrigir dados", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Editar planilha de E2E Ano A", exact: true }),
+  ).toBeVisible();
+  expect(envios).toHaveLength(0);
+});
+
+test.describe("seleção por toque", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  test("abre a turma no fim da página e permite editar no celular", async ({ page }) => {
+    const { editor, envios } = await abrir(page, true, true);
+    await editor.getByRole("button", { name: "Corrigir dados", exact: true }).tap();
+    await expect(
+      page.getByRole("dialog", { name: "Editar planilha de E2E Ano A", exact: true }),
+    ).toBeVisible();
+    expect(envios).toHaveLength(0);
+  });
 });

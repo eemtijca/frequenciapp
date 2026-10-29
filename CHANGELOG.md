@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O seletor de turma do editor de planilhas passa a usar busca e painel adaptado ao espaço da tela, permitindo escolher a turma por clique ou toque no fim da página.
+
 - O editor de planilhas usa botões com ícones para adicionar alunos, corrigir dados e retirar linhas ou colunas, inclusive no celular. As explicações ficam recolhidas em Ajuda; os avisos de exclusão permanecem na confirmação.
 
 - Gestão reúne a edição das planilhas de chamada por turma e mês, com identificação da aba e ações para adicionar alunos, corrigir dados e retirar linhas ou colunas. As ações abrem prévias com opções próprias; correções e exclusões exigem liberar o modo completo.

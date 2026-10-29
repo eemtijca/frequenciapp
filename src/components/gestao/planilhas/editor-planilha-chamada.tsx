@@ -49,6 +49,7 @@ export function EditorPlanilhaChamada({
       <div className="grid gap-3 sm:grid-cols-2">
         <Selecionar
           id="editor-planilha-turma"
+          buscavel
           value={turmaId}
           onValueChange={setTurmaId}
           placeholder="Escolha a turma"
