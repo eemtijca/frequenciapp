@@ -101,7 +101,11 @@ async function abrir(page: Page, completo: boolean) {
     editor.getByRole("button", { name: "Adicionar alunos", exact: true }),
   ).toBeDisabled();
   expect(previas).toHaveLength(0);
-  await editor.getByRole("combobox", { name: "Turma da planilha para editar" }).click();
+  // O seletor fica no fim da seção. Sem centralizar, o menu abre abaixo da
+  // viewport e a opção não recebe o clique.
+  const turma = editor.getByRole("combobox", { name: "Turma da planilha para editar" });
+  await turma.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
+  await turma.click();
   await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
   await expect(editor.getByRole("status")).toHaveText("Destino: E2E Aba A.");
   return { editor, previas, envios, turmaId };

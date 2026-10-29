@@ -67,12 +67,12 @@ export function Selecionar({
         <SelectPrimitive.Content
           position="popper"
           sideOffset={4}
-          className="superficie flutuante text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden"
+          className="superficie flutuante text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 relative z-50 max-h-[min(18rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden"
         >
           <SelectPrimitive.ScrollUpButton className="flex h-7 items-center justify-center">
             <ChevronUp size={14} aria-hidden="true" />
           </SelectPrimitive.ScrollUpButton>
-          <SelectPrimitive.Viewport className="p-1">
+          <SelectPrimitive.Viewport className="max-h-[min(18rem,var(--radix-select-content-available-height))] p-1">
             {opcoes.length === 0 ? (
               <p className="text-muted-foreground px-2 py-3 text-center text-sm">
                 Nenhuma opção encontrada.
