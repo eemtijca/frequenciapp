@@ -192,6 +192,9 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await expect(
     secao.getByTestId(`parcial-aluno-${desistenteId}`).getByRole("button"),
   ).toBeDisabled();
+  await expect(
+    secao.getByTestId(`parcial-aluno-${desistenteId}`).getByText("D", { exact: true }),
+  ).toBeVisible();
   await expect(secao.getByText("E2E Parcial Inativo", { exact: true })).toHaveCount(0);
   await expect(secao.getByText("E2E Parcial Outra Turma", { exact: true })).toHaveCount(0);
   expect((await registrosDoDia(page)).registros).toHaveLength(0);
@@ -247,6 +250,31 @@ test("mostra a turma na ordem da chamada antes de salvar e registra diretamente 
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Registrados na Seduc", exact: true }).click();
   await expect(primeiro.getByRole("switch")).toBeChecked();
+});
+
+test("mostra D para o desistente da chamada salva, sem presença nem edição", async ({ page }) => {
+  // A chamada gravada guarda o desistente na lista do dia, sem falta.
+  await comBanco(async (cliente) => {
+    const chamada = await cliente.query<{ id: string }>(
+      "insert into frequencias (turma_id, dia, revisao, atualizado_em) values ($1, $2, 1, now()) returning id",
+      [turmaId, diaDeChamada()],
+    );
+    for (const id of [alunoId, segundoAlunoId, desistenteId])
+      await cliente.query("insert into alunos_chamada (frequencia_id, aluno_id) values ($1, $2)", [
+        chamada.rows[0]?.id,
+        id,
+      ]);
+  });
+  const secao = await abrirParcial(page);
+  const desistente = secao.getByTestId(`parcial-aluno-${desistenteId}`);
+  await expect(desistente.getByText("D", { exact: true })).toBeVisible();
+  await expect(desistente.getByText("Presente", { exact: true })).toHaveCount(0);
+  await expect(
+    desistente.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Desistente" }),
+  ).toBeDisabled();
+  await expect(
+    secao.getByTestId(`parcial-aluno-${alunoId}`).getByText("Presente", { exact: true }),
+  ).toBeVisible();
 });
 
 test("preserva a linha histórica após transferência e desativação do aluno", async ({ page }) => {

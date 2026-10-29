@@ -105,7 +105,7 @@ export async function listarFrequenciasPersonalizadas(
         faltas: {
           select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
         },
-        alunos: { include: { aluno: { select: { nome: true } } } },
+        alunos: { include: { aluno: { select: { nome: true, desistenteEm: true } } } },
       },
       // Se o aluno integrou mais de uma lista no dia, a chamada mais recente é a base.
       orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
@@ -131,6 +131,9 @@ export async function listarFrequenciasPersonalizadas(
         const chave = `${aluno.alunoId}:${dia}`;
         if (porAlunoDia.has(chave)) continue;
         const faltas = chamada.faltas.filter((falta) => falta.alunoId === aluno.alunoId);
+        // O desistente segue na lista gravada da chamada, mas não esteve presente.
+        const desistenteEm = aluno.aluno.desistenteEm?.toISOString().slice(0, 10);
+        const desistente = desistenteEm !== undefined && desistenteEm <= dia;
         porAlunoDia.set(chave, {
           tipo: "CHAMADA",
           id: `chamada:${chave}`,
@@ -139,14 +142,16 @@ export async function listarFrequenciasPersonalizadas(
           turmaId: chamada.turmaId,
           alunoNome: aluno.aluno.nome,
           turmaNome: `${chamada.turma.serie.nome} ${chamada.turma.nome}`,
-          ...descreverChamada(
-            faltas,
-            chamada.turma.horarios.map((horario) => ({
-              ...horario,
-              disciplinas: disciplinasDoHorario(horario.disciplinas),
-            })),
-            dia,
-          ),
+          ...(desistente
+            ? { marca: "D" as const, descricao: "Desistente" }
+            : descreverChamada(
+                faltas,
+                chamada.turma.horarios.map((horario) => ({
+                  ...horario,
+                  disciplinas: disciplinasDoHorario(horario.disciplinas),
+                })),
+                dia,
+              )),
           justificativas: motivosDasFaltas(faltas, catalogo),
           justificativa:
             new Set(faltas.map((f) => f.justificativa)).size === 1
