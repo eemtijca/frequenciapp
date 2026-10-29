@@ -221,11 +221,18 @@ async function limparAntigos(): Promise<void> {
   });
 }
 
-/** Contagens por estado e os itens mais recentes, sem nomes de alunos. */
+/**
+ * Contagens por estado e os itens ainda não enviados, na ordem de processamento, sem
+ * nomes de alunos. Concluídos e descartados entram só nas contagens.
+ */
 export async function lerEstadoDaFila(): Promise<EstadoDaFila> {
   const [grupos, itens] = await Promise.all([
     banco().filaPlanilha.groupBy({ by: ["estado"], _count: { _all: true } }),
-    banco().filaPlanilha.findMany({ orderBy: { sequencia: "desc" }, take: ITENS_LISTADOS }),
+    banco().filaPlanilha.findMany({
+      where: { estado: { in: ["AGUARDANDO", "EM_ANDAMENTO", "FALHOU"] } },
+      orderBy: { sequencia: "asc" },
+      take: ITENS_LISTADOS,
+    }),
   ]);
   const contagens: Record<EstadoItemFila, number> = {
     AGUARDANDO: 0,

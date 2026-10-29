@@ -1,7 +1,7 @@
 "use client";
 
-// Fila FIFO dos envios automáticos às planilhas: contagens por estado, os itens mais
-// recentes e as ações da administração (processar agora, reenfileirar e descartar).
+// Fila FIFO dos envios automáticos às planilhas: contagens por estado, os envios ainda
+// pendentes e as ações da administração (processar agora, reenfileirar e descartar).
 import { useCallback, useEffect, useState } from "react";
 import { ListOrdered, LoaderCircle, Play, RefreshCw, RotateCcw, X } from "lucide-react";
 import { rotuloData } from "@/domain/frequencia";
@@ -193,7 +193,9 @@ export default function SecaoFilaPlanilha() {
             Detalhes da fila
           </summary>
           <p className="mb-3">
-            Envios processados por ordem de chegada, com até cinco tentativas automáticas.
+            Envios processados por ordem de chegada, com até cinco tentativas automáticas. A lista
+            mostra só os pendentes e os que falharam; os enviados e descartados entram apenas nas
+            contagens.
           </p>
           {estado && (
             <CaixasDeInfo
@@ -205,7 +207,7 @@ export default function SecaoFilaPlanilha() {
           )}
         </details>
         {estado && estado.itens.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhum envio automático registrado.</p>
+          <p className="text-muted-foreground text-sm">Nenhum envio pendente na fila.</p>
         ) : (
           <ul aria-label="Itens da fila" className="divide-y rounded-lg border">
             {estado?.itens.map((item) => (
@@ -233,7 +235,7 @@ export default function SecaoFilaPlanilha() {
                       Descartar
                     </Button>
                   )}
-                  {(item.estado === "FALHOU" || item.estado === "DESCARTADO") && (
+                  {item.estado === "FALHOU" && (
                     <Button
                       type="button"
                       variant="outline"

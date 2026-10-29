@@ -8097,7 +8097,7 @@
       "get": {
         "operationId": "obterFila",
         "summary": "Consultar a fila de envios automáticos",
-        "description": "Apenas administração. Contagens por estado e os 50 itens mais recentes, sem nome de aluno.",
+        "description": "Apenas administração. Contagens por estado e até 50 itens ainda não enviados (aguardando, em andamento e com falha), na ordem de processamento, sem nome de aluno. Concluídos e descartados entram só nas contagens.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -16709,7 +16709,7 @@
       "FilaEstado": {
         "type": "object",
         "title": "Estado da fila",
-        "description": "Contagens por estado e os 50 itens mais recentes, sem nome de aluno.",
+        "description": "Contagens por estado e até 50 itens ainda não enviados, na ordem de processamento, sem nome de aluno.",
         "properties": {
           "contagens": {
             "type": "object",
