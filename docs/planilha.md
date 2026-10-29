@@ -189,7 +189,7 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 
 ## Edição na Gestão
 
-Em Gestão, Configurações, Planilhas, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
+Em Gestão, Configurações, Planilhas, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. As três ações aparecem como botões com ícones; as explicações podem ser abertas em Ajuda. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
 
 Adicionar alunos funciona no modo conservador. Correções e exclusões exigem liberar o modo completo no bloco logo abaixo. Cada ação lê a planilha e abre uma prévia; a gravação só ocorre na confirmação. O envio geral e as ferramentas de estrutura, apresentação e abas continuam na mesma área da Gestão.
 

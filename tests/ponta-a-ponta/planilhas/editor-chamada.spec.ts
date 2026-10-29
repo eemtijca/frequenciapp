@@ -153,3 +153,26 @@ test("retirada exige selecionar e confirmar linhas antes de aplicar", async ({ p
   await expect.poll(() => envios.length).toBe(1);
   expect(envios[0]).toMatchObject({ removerLinhas: [4] });
 });
+
+test("editor compacto mantém ações acessíveis no celular e recolhe a ajuda", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const { editor } = await abrir(page, false);
+  const ajuda = editor.getByText(
+    "Adicionar alunos cria as linhas que faltam e preenche as chamadas do mês.",
+    { exact: true },
+  );
+  await expect(ajuda).toBeHidden();
+  const adicionar = editor.getByRole("button", { name: "Adicionar alunos", exact: true });
+  const remover = editor.getByRole("button", { name: "Retirar linhas ou colunas", exact: true });
+  const limitesAdicionar = await adicionar.boundingBox();
+  const limitesRemover = await remover.boundingBox();
+  expect(limitesAdicionar).not.toBeNull();
+  expect(limitesRemover).not.toBeNull();
+  expect(limitesAdicionar?.height).toBeGreaterThanOrEqual(44);
+  expect(limitesAdicionar?.y).toBe(limitesRemover?.y);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await editor.getByText("Ajuda", { exact: true }).click();
+  await expect(ajuda).toBeVisible();
+  await editor.getByText("Ajuda", { exact: true }).click();
+  await expect(ajuda).toBeHidden();
+});

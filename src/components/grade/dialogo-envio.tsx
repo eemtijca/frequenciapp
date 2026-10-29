@@ -358,13 +358,13 @@ export default function DialogoEnvio({
           {objetivo && (
             <p className="text-muted-foreground text-sm">
               {objetivo === "adicionar"
-                ? "Confira os alunos que ganharão uma linha e as chamadas que serão preenchidas no mês."
+                ? "Novas linhas e chamadas do mês."
                 : objetivo === "corrigir"
-                  ? "Confira os nomes, as turmas e os valores que serão atualizados com os dados do aplicativo."
-                  : "Selecione as linhas ou colunas que devem sair desta aba e confira as demais alterações do mês."}
+                  ? "Correções de nomes, turmas e chamadas."
+                  : "Marque as linhas ou colunas para retirar."}
             </p>
           )}
-          {modoCompleto && (
+          {modoCompleto && !objetivo && (
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
               Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao
               marcar.
