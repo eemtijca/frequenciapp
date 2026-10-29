@@ -2,7 +2,15 @@
 
 // Configuração do terceiro arquivo Google para chamadas parciais e conferência Seduc.
 import { useCallback, useEffect, useState } from "react";
-import { ClipboardList, LoaderCircle } from "lucide-react";
+import {
+  ClipboardList,
+  LoaderCircle,
+  Plus,
+  RotateCcw,
+  Send,
+  Settings2,
+  Unplug,
+} from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -21,6 +29,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
+import { PainelAcoesPlanilha } from "./painel-acoes-planilha";
 
 interface IntegracaoParcialAdmin {
   ativa: boolean;
@@ -42,6 +51,7 @@ export default function IntegracaoParcial({
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(abertoInicial);
+  const [painel, setPainel] = useState<string | null>(abertoInicial ? "configuracao" : null);
   const [confirmacao, setConfirmacao] = useState(false);
   const { chaveAtiva, executar } = useAcoesPorChave();
   const { base, rascunho, mutarPlanilha } = useRascunhoConfiguracoes();
@@ -120,7 +130,6 @@ export default function IntegracaoParcial({
       <SecaoRecolhivel
         dataSecao="planilha-parcial"
         titulo="Planilha de chamada parcial"
-        descricao="Envio das confirmações da Seduc."
         icone={ClipboardList}
         aberto={aberto}
         onAbertoChange={setAberto}
@@ -129,8 +138,18 @@ export default function IntegracaoParcial({
             <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
               {ativaRascunho ? "Ligada" : "Desligada"}
             </Selo>
-            <Selo variante={integracao?.preparada ? "sucesso" : "neutro"}>
-              {integracao?.preparada ? "Aba preparada" : "Preparação pendente"}
+            <Selo
+              variante={
+                integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
+                  ? "sucesso"
+                  : "atencao"
+              }
+            >
+              {!integracao?.contaGoogle || !integracao.googlePlanilha
+                ? "Sem conexão"
+                : integracao.preparada
+                  ? "Configurada"
+                  : "Preparar aba"}
             </Selo>
           </>
         }
@@ -146,45 +165,91 @@ export default function IntegracaoParcial({
         {carregando ? (
           <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
         ) : (
-          <>
-            <p className="text-muted-foreground text-xs">
-              Escolha um terceiro arquivo, separado da frequência e das saídas.
-            </p>
-            <SeletorPlanilhaGoogle
-              finalidade="PARCIAL"
-              conectado={integracao?.contaGoogle ?? false}
-              planilha={integracao?.googlePlanilha ?? null}
-              onAtualizar={carregar}
-            />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={ocupado || !integracao?.googlePlanilha}
-                onClick={() => setConfirmacao(true)}
-              >
-                {integracao?.preparada ? "Conferir aba parcial" : "Preparar aba parcial"}
-              </Button>
-              {onAbrirParcial && (
-                <Button type="button" onClick={onAbrirParcial}>
-                  Abrir Chamada Parcial
-                </Button>
-              )}
-              {integracao?.googlePlanilha && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={ocupado}
-                  onClick={() => void desconectar()}
-                >
-                  Desconectar
-                </Button>
-              )}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              O envio exige prévia. O registro na Seduc é confirmado manualmente na Chamada Parcial.
-            </p>
-          </>
+          <PainelAcoesPlanilha
+            rotulo="Ações da planilha de chamada parcial"
+            valor={
+              painel ??
+              (integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
+                ? "envio"
+                : "configuracao")
+            }
+            onValor={setPainel}
+            itens={[
+              {
+                valor: "envio",
+                rotulo: "Enviar",
+                icone: Send,
+                conteudo: (
+                  <div className="flex flex-col gap-3">
+                    {onAbrirParcial && (
+                      <Button
+                        type="button"
+                        className="min-h-11 self-start"
+                        onClick={onAbrirParcial}
+                      >
+                        <ClipboardList size={18} aria-hidden="true" />
+                        Abrir Chamada Parcial
+                      </Button>
+                    )}
+                    <p className="text-muted-foreground text-xs">
+                      Confira a prévia e confirme o registro na Seduc pela Chamada Parcial.
+                    </p>
+                    {!integracao?.podeEnviar && (
+                      <p className="text-muted-foreground text-sm">
+                        Configure e ative a planilha para enviar.
+                      </p>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                valor: "configuracao",
+                rotulo: "Configurar",
+                icone: Settings2,
+                conteudo: (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-muted-foreground text-xs">
+                      Use um arquivo separado da frequência e das saídas.
+                    </p>
+                    <SeletorPlanilhaGoogle
+                      finalidade="PARCIAL"
+                      conectado={integracao?.contaGoogle ?? false}
+                      planilha={integracao?.googlePlanilha ?? null}
+                      onAtualizar={carregar}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11"
+                        disabled={ocupado || !integracao?.googlePlanilha}
+                        onClick={() => setConfirmacao(true)}
+                      >
+                        {integracao?.preparada ? (
+                          <RotateCcw size={18} aria-hidden="true" />
+                        ) : (
+                          <Plus size={18} aria-hidden="true" />
+                        )}
+                        {integracao?.preparada ? "Conferir aba parcial" : "Preparar aba parcial"}
+                      </Button>
+                      {integracao?.googlePlanilha && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="min-h-11"
+                          disabled={ocupado}
+                          onClick={() => void desconectar()}
+                        >
+                          <Unplug size={18} aria-hidden="true" />
+                          Desconectar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ),
+              },
+            ]}
+          />
         )}
         {erro && <AvisoCompacto variante="indisponivel" descricao={erro} tamanho="linha" />}
       </SecaoRecolhivel>

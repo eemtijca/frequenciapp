@@ -1,16 +1,23 @@
 "use client";
 
-// Blocos compartilhados dos cards de Google Planilhas: conexão em etapa
-// recolhível, modo completo com prazo e zona de risco com cópias.
+// Controles compartilhados de edição temporária e ações de risco das planilhas.
 import { useState } from "react";
-import { LoaderCircle, Lock, TriangleAlert } from "lucide-react";
+import {
+  Archive,
+  History,
+  LoaderCircle,
+  Lock,
+  LockOpen,
+  Trash2,
+  TriangleAlert,
+  Unplug,
+} from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
-import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,13 +57,12 @@ export function BlocoModoCompletoPlanilha({
   ate: string | null;
   onMudou: () => Promise<void> | void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [destrave, setDestrave] = useState(false);
   const [frase, setFrase] = useState("");
   const [duracao, setDuracao] = useState(15);
   const [destravando, setDestravando] = useState(false);
   const [senha, setSenha] = useState("");
-  const { executar: executarPorChave } = useAcoesPorChave();
+  const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const minutoCorrente = useMinutoCorrente();
 
   // O prazo é comparado com o minuto do cliente, nunca com o relógio no render.
@@ -109,31 +115,36 @@ export function BlocoModoCompletoPlanilha({
 
   return (
     <>
-      <SecaoRecolhivel
-        nivel="interna"
-        titulo="Modo completo"
-        icone={Lock}
-        aberto={aberto}
-        onAbertoChange={setAberto}
-        resumo={
-          <Selo variante={ativo ? "atencao" : "neutro"}>
-            {ativo ? `Janela aberta até ${hora}` : "Bloqueado"}
-          </Selo>
-        }
+      <section
+        aria-label="Modo completo"
+        className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
       >
-        {ativo && restanteMinutos !== null && (
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            Expira às {hora}
-            {restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}.
-          </p>
-        )}
+        <div className="flex min-w-0 items-center gap-2">
+          {ativo ? (
+            <LockOpen size={20} aria-hidden="true" />
+          ) : (
+            <Lock size={20} aria-hidden="true" />
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium">
+              {ativo ? "Modo completo ativo" : "Edição protegida"}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {ativo
+                ? `Até ${hora}${restanteMinutos !== null && restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}`
+                : "Correções e exclusões exigem liberação."}
+            </p>
+          </div>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
             className="h-11"
             onClick={() => setDestrave(true)}
+            disabled={chaveAtiva !== null}
           >
+            <LockOpen size={16} aria-hidden="true" />
             {ativo ? "Estender" : "Liberar modo completo"}
           </Button>
           {ativo && (
@@ -142,12 +153,14 @@ export function BlocoModoCompletoPlanilha({
               variant="ghost"
               className="h-11"
               onClick={() => void voltarConservador()}
+              disabled={chaveAtiva !== null}
             >
-              Voltar ao conservador
+              <Lock size={16} aria-hidden="true" />
+              Encerrar modo completo
             </Button>
           )}
         </div>
-      </SecaoRecolhivel>
+      </section>
 
       <Dialog open={destrave} onOpenChange={setDestrave}>
         <DialogContent className="max-w-md">
@@ -327,22 +340,19 @@ export function BlocoRiscoPlanilha({
         icone={TriangleAlert}
         aberto={aberto}
         onAbertoChange={setAberto}
-        resumo={<Selo variante="perigo">Altera a planilha</Selo>}
       >
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-medium">Cópias antigas</p>
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Novas abas de backup não são criadas.
-              </p>
             </div>
             <Button
               type="button"
               variant="outline"
-              className="h-10"
+              className="h-11"
               onClick={() => void carregarCopias()}
             >
+              <Archive size={16} aria-hidden="true" />
               Listar cópias
             </Button>
           </div>
@@ -368,9 +378,10 @@ export function BlocoRiscoPlanilha({
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-8"
+                      className="h-11"
                       onClick={() => setRestaurar({ aba: item.aba, copia: copia.nome })}
                     >
+                      <History size={16} aria-hidden="true" />
                       Restaurar
                     </Button>
                   </div>
@@ -389,9 +400,10 @@ export function BlocoRiscoPlanilha({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-8"
+                  className="text-falta-texto h-11"
                   onClick={() => setAbaRemover(nome)}
                 >
+                  <Trash2 size={16} aria-hidden="true" />
                   Remover
                 </Button>
               </div>
@@ -408,9 +420,10 @@ export function BlocoRiscoPlanilha({
               <Button
                 type="button"
                 variant="outline"
-                className="border-falta/40 text-falta-texto h-10"
+                className="border-falta/40 text-falta-texto h-11"
                 disabled={chaveAtiva === "desconectar"}
               >
+                <Unplug size={16} aria-hidden="true" />
                 {chaveAtiva === "desconectar" ? "Desconectando..." : "Desconectar"}
               </Button>
             </AlertDialogTrigger>
@@ -418,7 +431,8 @@ export function BlocoRiscoPlanilha({
               <AlertDialogHeader>
                 <AlertDialogTitle>Desconectar a planilha?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  O token e a estrutura salva são apagados. Nada é removido da planilha.
+                  A conexão e a configuração serão removidas do app. O arquivo no Google será
+                  mantido.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

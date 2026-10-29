@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { colunasDeApresentacao } from "../../../src/domain/planilha-apresentacao";
 import { CABECALHO_ENTRADAS } from "../../../src/domain/planilha-entradas";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 test.use({ serviceWorkers: "block" });
 
 test("admin confere, cancela e aplica a apresentação com rolagem das colunas", async ({
@@ -65,6 +66,7 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
     .click();
   const cartao = page.locator('[data-secao="planilha-saidas"]');
   await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
+  await selecionarAcaoPlanilha(cartao, "Organizar");
   const secao = cartao.locator('[data-secao="planilha-entradas-preparo"]');
   await secao.screenshot({
     path: `docs/imagens/locais/planilha-apresentacao-acesso-${contexto.project.name}.png`,

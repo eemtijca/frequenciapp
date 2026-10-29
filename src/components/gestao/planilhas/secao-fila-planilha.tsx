@@ -3,7 +3,7 @@
 // Fila FIFO dos envios automáticos às planilhas: contagens por estado, os itens mais
 // recentes e as ações da administração (processar agora, reenfileirar e descartar).
 import { useCallback, useEffect, useState } from "react";
-import { ListOrdered, LoaderCircle } from "lucide-react";
+import { ListOrdered, LoaderCircle, Play, RefreshCw, RotateCcw, X } from "lucide-react";
 import { rotuloData } from "@/domain/frequencia";
 import type {
   EstadoDaFila,
@@ -114,7 +114,11 @@ export default function SecaoFilaPlanilha() {
           corpoJson({}),
         );
         if (resumo.processados === 0) avisarInfo("Nada a processar agora.");
-        else avisarSucesso("Fila processada.", `${resumo.processados} item(ns) tratado(s).`);
+        else
+          avisarSucesso(
+            "Fila processada.",
+            `${resumo.processados} ${resumo.processados === 1 ? "envio processado" : "envios processados"}.`,
+          );
         carregar();
       } catch (excecao) {
         avisarErro(excecao, { contexto: "Não foi possível processar a fila." });
@@ -138,39 +142,33 @@ export default function SecaoFilaPlanilha() {
     <SecaoRecolhivel
       dataSecao="planilha-fila"
       titulo="Fila de envios automáticos"
-      descricao="Envios pendentes e em processamento."
       icone={ListOrdered}
       aberto={aberto}
       onAbertoChange={setAberto}
       resumo={
         <>
-          <Selo variante={abertos > 0 ? "atencao" : "sucesso"}>
-            {abertos > 0 ? `${abertos} na fila` : "Fila vazia"}
+          <Selo
+            variante={erro ? "perigo" : !estado ? "neutro" : abertos > 0 ? "atencao" : "sucesso"}
+          >
+            {erro
+              ? "Falha ao consultar"
+              : !estado
+                ? "Conferindo..."
+                : abertos > 0
+                  ? `${abertos} na fila`
+                  : "Fila vazia"}
           </Selo>
           {falhos > 0 && <Selo variante="perigo">{falhos} com falha</Selo>}
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-muted-foreground text-sm">
-          Cada envio automático entra na fila e sai na ordem em que chegou, um de cada vez. Uma
-          falha confirmada é tentada de novo, até cinco vezes, e depois fica marcada como falha, sem
-          travar os envios seguintes.
-        </p>
         {erro && (
           <p role="alert" className="text-falta-texto text-sm">
             {erro}
           </p>
         )}
-        {estado && (
-          <CaixasDeInfo
-            rotulo="Itens por estado"
-            partes={(Object.keys(ROTULO_ESTADO) as EstadoItemFila[]).map(
-              (chave) => `${ROTULO_ESTADO[chave]}: ${estado.contagens[chave]}`,
-            )}
-          />
-        )}
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
@@ -178,10 +176,34 @@ export default function SecaoFilaPlanilha() {
             disabled={chaveAtiva === "processar"}
             onClick={processarAgora}
           >
-            {chaveAtiva === "processar" && <LoaderCircle size={16} className="animate-spin" />}
+            {chaveAtiva === "processar" ? (
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Play size={16} aria-hidden="true" />
+            )}
             Processar agora
           </Button>
+          <Button type="button" variant="ghost" className="h-11" onClick={carregar}>
+            <RefreshCw size={16} aria-hidden="true" />
+            Atualizar fila
+          </Button>
         </div>
+        <details className="text-muted-foreground text-xs">
+          <summary className="min-h-11 cursor-pointer content-center font-medium">
+            Detalhes da fila
+          </summary>
+          <p className="mb-3">
+            Envios processados por ordem de chegada, com até cinco tentativas automáticas.
+          </p>
+          {estado && (
+            <CaixasDeInfo
+              rotulo="Itens por estado"
+              partes={(Object.keys(ROTULO_ESTADO) as EstadoItemFila[]).map(
+                (chave) => `${ROTULO_ESTADO[chave]}: ${estado.contagens[chave]}`,
+              )}
+            />
+          )}
+        </details>
         {estado && estado.itens.length === 0 ? (
           <p className="text-muted-foreground text-sm">Nenhum envio automático registrado.</p>
         ) : (
@@ -194,17 +216,20 @@ export default function SecaoFilaPlanilha() {
                       {ROTULO_ESTADO[item.estado]}
                     </Selo>
                   </div>
-                  <CaixasDeInfo partes={partesDoItem(item)} />
+                  <p className="text-muted-foreground text-xs wrap-anywhere">
+                    {partesDoItem(item).join(" · ")}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   {item.estado === "AGUARDANDO" && (
                     <Button
                       type="button"
                       variant="ghost"
-                      className="h-10"
+                      className="h-11"
                       disabled={chaveAtiva === `descartar:${item.id}`}
                       onClick={() => agir(item, "descartar")}
                     >
+                      <X size={16} aria-hidden="true" />
                       Descartar
                     </Button>
                   )}
@@ -212,11 +237,12 @@ export default function SecaoFilaPlanilha() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-10"
+                      className="h-11"
                       disabled={chaveAtiva === `reenfileirar:${item.id}`}
                       onClick={() => agir(item, "reenfileirar")}
                     >
-                      Reenfileirar
+                      <RotateCcw size={16} aria-hidden="true" />
+                      Tentar novamente
                     </Button>
                   )}
                 </div>

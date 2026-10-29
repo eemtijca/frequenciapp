@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 // A resposta simulada por page.route exige que o service worker não intercepte a requisição.
 // O funcionamento com service worker é verificado na suíte própria de PWA.
@@ -70,6 +71,7 @@ test.describe("Google Planilhas", () => {
       .click();
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+    await selecionarAcaoPlanilha(cartao, "Configurar");
     await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
@@ -83,7 +85,8 @@ test.describe("Google Planilhas", () => {
       .getByRole("button", { name: "Planilhas", exact: true })
       .click();
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
-    await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
+    await selecionarAcaoPlanilha(cartao, "Configurar");
+    await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
@@ -93,6 +96,7 @@ test.describe("Google Planilhas", () => {
     await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
 
     // Organização visual com prévia, cancelamento sem escrita e confirmação.
+    await selecionarAcaoPlanilha(cartao, "Organizar");
     await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
     await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
     const organizar = cartao.getByRole("button", { name: "Organizar apresentação de E2E Ano A" });
@@ -183,6 +187,7 @@ test.describe("Google Planilhas", () => {
     await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
 
     // O envio ao salvar permanece desligado e o mapa continua disponível.
+    await selecionarAcaoPlanilha(cartao, "Enviar");
     const envioAoSalvar = cartao.getByRole("switch", { name: "Enviar ao salvar a chamada" });
     await expect(envioAoSalvar).toBeEnabled();
     await expect(envioAoSalvar).not.toBeChecked();
@@ -245,6 +250,7 @@ test.describe("Google Planilhas", () => {
       .getByRole("navigation", { name: "Categorias de configurações" })
       .getByRole("button", { name: "Planilhas", exact: true })
       .click();
+    await selecionarAcaoPlanilha(cartao, "Configurar");
     await cartao.getByRole("button", { name: "Zona de risco" }).click();
     await cartao.getByRole("button", { name: "Desconectar" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Desconectar" }).click();

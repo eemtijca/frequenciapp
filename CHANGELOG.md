@@ -10,6 +10,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A troca do mês na prévia de entradas e saídas cancela a leitura anterior e bloqueia o envio até concluir a nova conferência, evitando exibir ou aplicar dados de outro período.
+
+- Gestão organiza as Planilhas em ações com ícones: Enviar, Editar, Organizar e Configurar, conforme a finalidade. Conexão, histórico e fila ficam mais compactos; a liberação do modo completo fica junto da edição e as seleções são preservadas ao alternar as ações.
+
 - O seletor de turma do editor de planilhas passa a usar busca e painel adaptado ao espaço da tela, permitindo escolher a turma por clique ou toque no fim da página.
 
 - O editor de planilhas usa botões com ícones para adicionar alunos, corrigir dados e retirar linhas ou colunas, inclusive no celular. As explicações ficam recolhidas em Ajuda; os avisos de exclusão permanecem na confirmação.

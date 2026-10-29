@@ -12,6 +12,7 @@ import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { descartarConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 test.use({ serviceWorkers: "block" });
 
@@ -81,6 +82,7 @@ async function abrirPlanilha(page: Page) {
     .click();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  await selecionarAcaoPlanilha(cartao, "Configurar");
   return cartao;
 }
 
@@ -164,9 +166,7 @@ test("confere o mês sem gravar, identifica a turma ausente e leva à revisão c
   await conferir(page, dialogo);
   await dialogo.getByRole("button", { name: "Revisar turmas e mês", exact: true }).click();
   await expect(dialogo).toHaveCount(0);
-  const etapa = cartao
-    .locator('[tabindex="-1"]')
-    .filter({ hasText: "Estrutura e mapa por turma de origem" });
+  const etapa = cartao.locator('[tabindex="-1"]').filter({ hasText: "Abas e turmas" });
   await expect(etapa).toBeFocused();
   await expect(
     etapa.getByRole("button", { name: "Conferir estrutura", exact: true }),

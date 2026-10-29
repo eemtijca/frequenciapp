@@ -2,6 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -52,7 +53,7 @@ async function abrir(page: Page, completo: boolean, toque = false) {
     previas.push(entrada);
     return rota.fulfill({
       json: {
-        modalidade: completo ? "completo" : "conservador",
+        modalidade: liberado ? "completo" : "conservador",
         planoHashGeral: "a".repeat(64),
         planos: [
           {
@@ -103,6 +104,7 @@ async function abrir(page: Page, completo: boolean, toque = false) {
     .click();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  await selecionarAcaoPlanilha(cartao, "Editar");
   const editor = page.getByRole("region", { name: "Editar planilhas de chamada", exact: true });
   await expect(
     editor.getByRole("button", { name: "Adicionar alunos", exact: true }),
@@ -192,7 +194,6 @@ test("liberar o modo completo atualiza as ações sem perder a turma escolhida",
   const { editor, envios } = await abrir(page, false);
   await expect(editor.getByRole("button", { name: "Corrigir dados", exact: true })).toBeDisabled();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
-  await cartao.getByRole("button", { name: /^Modo completo/ }).click();
   await cartao.getByRole("button", { name: "Liberar modo completo", exact: true }).click();
   const dialogo = page.getByRole("dialog", { name: "Liberar modo completo", exact: true });
   await dialogo.getByLabel("Digite EDITAR PLANILHA").fill("EDITAR PLANILHA");
@@ -220,4 +221,33 @@ test.describe("seleção por toque", () => {
     ).toBeVisible();
     expect(envios).toHaveLength(0);
   });
+});
+
+test("navega por tarefa no celular e preserva a turma ao usar o teclado", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  const { editor, envios, previas } = await abrir(page, false);
+  const cartao = page.locator('[data-secao="planilha-frequencia"]');
+  const navegacao = cartao.getByRole("navigation", { name: "Ações da planilha de frequência" });
+  for (const acao of ["Enviar", "Organizar", "Configurar"] as const) {
+    const botao = navegacao.getByRole("button", { name: acao, exact: true });
+    await botao.focus();
+    await page.keyboard.press("Enter");
+    await expect(botao).toHaveAttribute("aria-pressed", "true");
+    await expect(editor).toBeHidden();
+    const limites = await botao.boundingBox();
+    expect(limites?.height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }
+  await expect(
+    cartao.getByRole("button", { name: "Escolher planilha", exact: true }),
+  ).toBeVisible();
+  await selecionarAcaoPlanilha(cartao, "Editar");
+  await expect(
+    editor.getByRole("combobox", { name: "Turma da planilha para editar" }),
+  ).toContainText("E2E Ano A");
+  await expect(editor.getByRole("button", { name: "Adicionar alunos", exact: true })).toBeEnabled();
+  expect(previas).toHaveLength(0);
+  expect(envios).toHaveLength(0);
 });
