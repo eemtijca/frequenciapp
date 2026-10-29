@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Gestão reúne a edição das planilhas de chamada por turma e mês, com identificação da aba e ações para adicionar alunos, corrigir dados e retirar linhas ou colunas. As ações abrem prévias com opções próprias; correções e exclusões exigem liberar o modo completo.
+
 - A prévia da planilha identifica a aba e as linhas dos alunos que saíram da turma, explica que a exclusão afeta as frequências na planilha e preserva o cadastro e as chamadas no aplicativo. Aplicar exclusões exige conferir a prévia, com nova confirmação após alterar as opções.
 
 - A lista da Chamada deixa de mostrar o círculo com a turma de origem ao lado do nome de cada aluno. O asterisco continua marcando o aluno vindo de outra turma, e a origem segue no nome acessível da linha e na lista de ausentes do resumo do dia.

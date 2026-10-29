@@ -31,6 +31,7 @@ import {
   BlocoModoCompletoPlanilha,
   BlocoRiscoPlanilha,
 } from "@/components/gestao/planilhas/planilha-blocos";
+import { EditorPlanilhaChamada } from "./editor-planilha-chamada";
 import DialogoEnvio from "@/components/grade/dialogo-envio";
 import { SeletorPlanilhaGoogle } from "@/components/gestao/planilhas/seletor-planilha-google";
 
@@ -730,6 +731,15 @@ export default function IntegracaoPlanilha({
           </div>
         </EtapaPlanilha>
       </div>
+
+      <EditorPlanilhaChamada
+        turmas={turmas}
+        mapa={integracao?.esquema?.mapa ?? []}
+        diaCorrente={diaCorrente}
+        modoCompleto={completoAtivo}
+        disponivel={podeEnviar && estruturaSalva}
+        aoConcluir={() => void carregar()}
+      />
 
       <BlocoModoCompletoPlanilha
         idPrefixo="planilha"

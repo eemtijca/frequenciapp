@@ -59,7 +59,10 @@ interface Simulacao {
   planos: PlanoResumo[];
 }
 
+export type ObjetivoEdicaoPlanilha = "adicionar" | "corrigir" | "remover";
+
 interface Props {
+  objetivo?: ObjetivoEdicaoPlanilha;
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
   /** Ausente quando o envio é de todas as turmas mapeadas. */
@@ -154,6 +157,7 @@ function useOnline(): boolean {
 }
 
 export default function DialogoEnvio({
+  objetivo,
   aberto,
   onAbrir,
   turmaOriginalId,
@@ -168,16 +172,18 @@ export default function DialogoEnvio({
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
-  const [criarColunas, setCriarColunas] = useState(true);
-  const [novosAlunos, setNovosAlunos] = useState(true);
-  const [substituir, setSubstituir] = useState(false);
+  const [criarColunas, setCriarColunas] = useState(!objetivo);
+  const [novosAlunos, setNovosAlunos] = useState(!objetivo || objetivo === "adicionar");
+  const [substituir, setSubstituir] = useState(objetivo === "corrigir");
   const [exclusoesConferidas, setExclusoesConferidas] = useState(false);
   const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
     {},
   );
   const [alcance, setAlcance] = useState<"pendentes" | "periodo" | null>(null);
   // A correção manual precisa reler também linhas sem chamada pendente.
-  const somenteAlteradas = alcance ? alcance === "pendentes" : !(modoCompleto && !todas);
+  const somenteAlteradas = alcance
+    ? alcance === "pendentes"
+    : !objetivo && !(modoCompleto && !todas);
   const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
   const abaUnica = simulacao?.planos.length === 1 ? simulacao.planos[0]?.aba : undefined;
@@ -342,10 +348,22 @@ export default function DialogoEnvio({
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Enviar {rotulo}</DialogTitle>
+          <DialogTitle>
+            {objetivo ? "Editar planilha de " : "Enviar "}
+            {rotulo}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
+          {objetivo && (
+            <p className="text-muted-foreground text-sm">
+              {objetivo === "adicionar"
+                ? "Confira os alunos que ganharão uma linha e as chamadas que serão preenchidas no mês."
+                : objetivo === "corrigir"
+                  ? "Confira os nomes, as turmas e os valores que serão atualizados com os dados do aplicativo."
+                  : "Selecione as linhas ou colunas que devem sair desta aba e confira as demais alterações do mês."}
+            </p>
+          )}
           {modoCompleto && (
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
               Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao
@@ -359,36 +377,38 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
-            <legend className="sr-only">O que enviar</legend>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
-                <input
-                  type="radio"
-                  name="alcance-envio"
-                  checked={somenteAlteradas}
-                  onChange={() => setAlcance("pendentes")}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                />
-                <span>Só chamadas pendentes</span>
-              </label>
-              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
-                <input
-                  type="radio"
-                  name="alcance-envio"
-                  checked={!somenteAlteradas}
-                  onChange={() => setAlcance("periodo")}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                />
-                <span>O período inteiro ({periodo})</span>
-              </label>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {somenteAlteradas
-                ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
-                : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
-            </p>
-          </fieldset>
+          {!objetivo && (
+            <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
+              <legend className="sr-only">O que enviar</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                  <input
+                    type="radio"
+                    name="alcance-envio"
+                    checked={somenteAlteradas}
+                    onChange={() => setAlcance("pendentes")}
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                  />
+                  <span>Só chamadas pendentes</span>
+                </label>
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                  <input
+                    type="radio"
+                    name="alcance-envio"
+                    checked={!somenteAlteradas}
+                    onChange={() => setAlcance("periodo")}
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                  />
+                  <span>O período inteiro ({periodo})</span>
+                </label>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {somenteAlteradas
+                  ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
+                  : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
+              </p>
+            </fieldset>
+          )}
 
           {carregando && (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -411,8 +431,14 @@ export default function DialogoEnvio({
           {simulacao && !carregando && nadaAEnviar && (
             <div className="bg-secondary/40 flex flex-col items-start gap-2 rounded-lg px-3 py-2 text-sm">
               <p>
-                Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
-                inteiro, escolha a segunda opção.
+                {objetivo ? (
+                  "Nenhuma alteração necessária para esta turma e mês."
+                ) : (
+                  <>
+                    Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o
+                    período inteiro, escolha a segunda opção.
+                  </>
+                )}
               </p>
               {!todas && somenteAlteradas && (
                 <Button type="button" variant="outline" onClick={() => setAlcance("periodo")}>
@@ -476,6 +502,23 @@ export default function DialogoEnvio({
             </ul>
           )}
 
+          {objetivo === "adicionar" && !carregando && !enviou && plano && (
+            <div className="superficie flex flex-col gap-2 p-3">
+              <p className="text-sm font-medium">Alunos sem linha na aba {plano.aba}</p>
+              {plano.novosAlunos.length > 0 ? (
+                <ul aria-label="Alunos que serão adicionados" className="text-sm">
+                  {plano.novosAlunos.map((aluno, indice) => (
+                    <li key={`${aluno.nome}-${indice}`}>{aluno.nome}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  Nenhum aluno precisa de uma linha nova.
+                </p>
+              )}
+            </div>
+          )}
+
           {temDetalhes && !enviou && plano && (
             <details className="text-xs">
               <summary className="text-muted-foreground cursor-pointer py-1">
@@ -522,7 +565,7 @@ export default function DialogoEnvio({
 
           <details className="text-sm">
             <summary className="text-muted-foreground cursor-pointer py-1 text-xs">
-              Opções do envio
+              {objetivo ? "Opções da edição" : "Opções do envio"}
             </summary>
             <div className="mt-1 flex flex-col gap-2">
               <label className="flex items-center gap-2">
@@ -710,7 +753,11 @@ export default function DialogoEnvio({
             }
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {enviou ? "Nova prévia" : totalExclusoes > 0 ? "Aplicar alterações" : "Enviar"}
+            {enviou
+              ? "Nova prévia"
+              : totalExclusoes > 0 || objetivo
+                ? "Aplicar alterações"
+                : "Enviar"}
           </Button>
         </DialogFooter>
       </DialogContent>

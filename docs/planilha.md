@@ -187,6 +187,12 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 - Uma agenda de cinco minutos (`fila-planilha.yml`, com `CRON_SECRET`) recolhe o que sobrou. Em Gestão, Configurações, Planilhas, a seção Fila de envios automáticos mostra contagens e itens, e permite Processar agora, Descartar e Reenfileirar.
 - A fila não guarda nome de aluno nem dados da planilha, e não cobre os envios manuais com prévia.
 
+## Edição na Gestão
+
+Em Gestão, Configurações, Planilhas, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
+
+Adicionar alunos funciona no modo conservador. Correções e exclusões exigem liberar o modo completo no bloco logo abaixo. Cada ação lê a planilha e abre uma prévia; a gravação só ocorre na confirmação. O envio geral e as ferramentas de estrutura, apresentação e abas continuam na mesma área da Gestão.
+
 ## Modo completo
 
 Na prévia de uma turma, o modo completo seleciona "O período inteiro" por padrão para conferir também as linhas de alunos que saíram da turma, mesmo sem chamadas pendentes. Ao marcar uma remoção ou mudar as opções, a prévia é recalculada e o envio aguarda a nova leitura; uma falha nessa leitura impede a confirmação do plano anterior. No modo conservador, "Conferir linhas da turma" abre essa conferência, mas a seleção de remoções permanece bloqueada até liberar o modo completo. Uma solicitação de remoção com a janela expirada é recusada, sem apresentar a exclusão como concluída.
