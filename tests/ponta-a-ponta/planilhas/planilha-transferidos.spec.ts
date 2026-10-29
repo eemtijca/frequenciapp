@@ -94,14 +94,27 @@ test("modo completo mostra a linha transferida sem pendências e só envia a rem
 }) => {
   const { dialogo, envios } = await abrir(page, true);
   await expect(dialogo.getByLabel(/O período inteiro/)).toBeChecked();
-  const remover = dialogo.getByLabel("Remover E2E Transferida (linha 4)", { exact: true });
+  const remover = dialogo.getByLabel("Retirar E2E Transferida da planilha (linha 4)", {
+    exact: true,
+  });
   await expect(remover).toBeVisible();
   await expect(remover).not.toBeChecked();
   expect(envios).toHaveLength(0);
-  await expect(dialogo.getByText(/confira primeiro a aba de destino/)).toBeVisible();
+  await expect(
+    dialogo.getByText(/O cadastro e as chamadas no aplicativo são preservados/),
+  ).toBeVisible();
   await remover.check();
-  await expect(dialogo.getByText("Excluir: 1 linha e 0 colunas", { exact: true })).toBeVisible();
-  await dialogo.getByRole("button", { name: "Enviar", exact: true }).click();
+  await expect(dialogo.getByText("Excluir: 1 linha", { exact: true })).toBeVisible();
+  const aplicar = dialogo.getByRole("button", { name: "Aplicar alterações", exact: true });
+  await expect(aplicar).toBeDisabled();
+  await dialogo.getByLabel(/Conferi as exclusões na aba/).check();
+  await expect(aplicar).toBeEnabled();
+  await dialogo.getByText("Opções do envio", { exact: true }).click();
+  await dialogo.getByLabel("Criar colunas para dias sem coluna", { exact: true }).uncheck();
+  await expect(dialogo.getByLabel(/Conferi as exclusões na aba/)).not.toBeChecked();
+  await expect(aplicar).toBeDisabled();
+  await dialogo.getByLabel(/Conferi as exclusões na aba/).check();
+  await aplicar.click();
   await expect.poll(() => envios.length).toBe(1);
   expect(envios[0]).toMatchObject({
     removerLinhas: [4],
@@ -112,14 +125,18 @@ test("modo completo mostra a linha transferida sem pendências e só envia a rem
 
 test("falha ao reler a remoção impede enviar o plano anterior", async ({ page }) => {
   const { dialogo, envios } = await abrir(page, true, true);
-  await dialogo.getByLabel("Remover E2E Transferida (linha 4)", { exact: true }).check();
+  await dialogo
+    .getByLabel("Retirar E2E Transferida da planilha (linha 4)", { exact: true })
+    .check();
   await expect(
     dialogo.getByText("Não foi possível conferir a linha selecionada.", { exact: true }),
   ).toBeVisible();
-  await expect(dialogo.getByRole("button", { name: "Enviar", exact: true })).toBeDisabled();
+  await expect(
+    dialogo.getByRole("button", { name: "Aplicar alterações", exact: true }),
+  ).toBeDisabled();
   await expect(dialogo.getByRole("button", { name: "Repetir prévia", exact: true })).toBeEnabled();
   await expect(
-    dialogo.getByLabel("Remover E2E Transferida (linha 4)", { exact: true }),
+    dialogo.getByLabel("Retirar E2E Transferida da planilha (linha 4)", { exact: true }),
   ).toBeChecked();
   expect(envios).toHaveLength(0);
 });
@@ -129,9 +146,9 @@ test("modo conservador oferece conferência sem permitir marcar exclusões", asy
   await expect(dialogo.getByText(/Nenhuma chamada pendente/)).toBeVisible();
   await dialogo.getByRole("button", { name: "Conferir linhas da turma", exact: true }).click();
   await expect(dialogo.getByLabel(/O período inteiro/)).toBeChecked();
-  await expect(dialogo.getByLabel("Remover E2E Transferida (linha 4)")).toBeDisabled();
+  await expect(dialogo.getByLabel("Retirar E2E Transferida da planilha (linha 4)")).toBeDisabled();
   await expect(dialogo.getByLabel("Remover coluna Total antigo (C)")).toBeDisabled();
-  await expect(dialogo.getByText(/exige liberar o modo completo na Gestão/)).toBeVisible();
+  await expect(dialogo.getByText(/Para selecionar exclusões/)).toBeVisible();
   await dialogo.getByRole("button", { name: "Cancelar", exact: true }).click();
   expect(envios).toHaveLength(0);
 });

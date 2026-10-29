@@ -10,6 +10,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Gestão reúne a edição das planilhas de chamada por turma e mês, com identificação da aba e ações para adicionar alunos, corrigir dados e retirar linhas ou colunas. As ações abrem prévias com opções próprias; correções e exclusões exigem liberar o modo completo.
+
+- A prévia da planilha identifica a aba e as linhas dos alunos que saíram da turma, explica que a exclusão afeta as frequências na planilha e preserva o cadastro e as chamadas no aplicativo. Aplicar exclusões exige conferir a prévia, com nova confirmação após alterar as opções.
+
 - A lista da Chamada deixa de mostrar o círculo com a turma de origem ao lado do nome de cada aluno. O asterisco continua marcando o aluno vindo de outra turma, e a origem segue no nome acessível da linha e na lista de ausentes do resumo do dia.
 
 - Minhas turmas só registra a atualização após receber as estatísticas. O FrequenciBI informa a consulta mais antiga dos dados exibidos e não atribui uma atualização completa quando há falha ou data incompleta.
@@ -231,6 +235,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Resumo "Saídas por turma" e relatório semanal por aluno da aba Saídas; no lugar do resumo fica a lista simples das saídas do dia, com remoção para correção.
 
 ### Corrigido
+
+- O seletor passa a limitar a lista à altura disponível e a rolá-la, para que uma opção fora da primeira tela continue alcançável. Antes, a lista era cortada e o clique não chegava nela.
 
 - A Chamada Parcial mostra D para o aluno desistente, como a Chamada, no lugar de Presente. A rota de registros personalizados devolve a marca D com a descrição Desistente para quem segue na lista gravada da chamada, e a planilha da Chamada Parcial passa a receber Desistente em vez de Dia inteiro. O desistente também não pode mais ser editado pela Chamada Parcial.
 

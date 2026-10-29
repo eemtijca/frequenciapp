@@ -187,11 +187,17 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 - Uma agenda de cinco minutos (`fila-planilha.yml`, com `CRON_SECRET`) recolhe o que sobrou. Em Gestão, Configurações, Planilhas, a seção Fila de envios automáticos mostra contagens e itens, e permite Processar agora, Descartar e Reenfileirar.
 - A fila não guarda nome de aluno nem dados da planilha, e não cobre os envios manuais com prévia.
 
+## Edição na Gestão
+
+Em Gestão, Configurações, Planilhas, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
+
+Adicionar alunos funciona no modo conservador. Correções e exclusões exigem liberar o modo completo no bloco logo abaixo. Cada ação lê a planilha e abre uma prévia; a gravação só ocorre na confirmação. O envio geral e as ferramentas de estrutura, apresentação e abas continuam na mesma área da Gestão.
+
 ## Modo completo
 
 Na prévia de uma turma, o modo completo seleciona "O período inteiro" por padrão para conferir também as linhas de alunos que saíram da turma, mesmo sem chamadas pendentes. Ao marcar uma remoção ou mudar as opções, a prévia é recalculada e o envio aguarda a nova leitura; uma falha nessa leitura impede a confirmação do plano anterior. No modo conservador, "Conferir linhas da turma" abre essa conferência, mas a seleção de remoções permanece bloqueada até liberar o modo completo. Uma solicitação de remoção com a janela expirada é recusada, sem apresentar a exclusão como concluída.
 
-Depois de alterar a turma atual e a turma de origem em Gestão, Alunos, o envio passa a usar a nova origem. A linha antiga permanece até a remoção explícita: conferir o envio na aba de destino, liberar o modo completo, abrir Relatórios, Grade, selecionar a turma antiga e o mês, abrir "Enviar para a planilha", marcar "Remover" para a linha desejada e confirmar a prévia. Só linhas criadas pela integração são oferecidas; a exclusão inclui as frequências da linha. A alteração da origem reorganiza também o histórico no aplicativo, sem separar a transferência por data. Linhas manuais são conferidas diretamente no Google Planilhas.
+Depois de alterar a turma atual e a turma de origem em Gestão, Alunos, o envio passa a usar a nova origem. A linha antiga permanece até a remoção explícita: conferir o envio na aba de destino, liberar o modo completo, abrir Relatórios, Grade, selecionar a turma antiga e o mês, abrir "Enviar para a planilha", selecionar as linhas em "Retirar linhas de alunos da planilha", conferir a aba indicada, marcar a confirmação das exclusões e clicar em "Aplicar alterações". A prévia diferencia a retirada de linhas da exclusão de alunos do cadastro; o cadastro e as chamadas no aplicativo são preservados. Alterar a seleção ou as opções exige conferir novamente a prévia. Só linhas criadas pela integração são oferecidas; a exclusão inclui as frequências da linha. A alteração da origem reorganiza também o histórico no aplicativo, sem separar a transferência por data. Linhas manuais são conferidas diretamente no Google Planilhas.
 
 O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 

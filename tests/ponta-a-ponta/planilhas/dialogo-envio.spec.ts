@@ -106,7 +106,7 @@ test("a prévia mostra só o que tem valor e recolhe as opções", async ({ page
   await expect(dialogo.getByLabel("Criar colunas para dias sem coluna")).toBeChecked();
   await expect(dialogo.getByLabel("Acrescentar alunos sem linha")).toBeChecked();
   await expect(dialogo.getByLabel(/^Remover coluna/).first()).toBeDisabled();
-  await expect(dialogo.getByText(/exige liberar o modo completo na Gestão/)).toBeVisible();
+  await expect(dialogo.getByText(/Para selecionar exclusões/)).toBeVisible();
   await expect(dialogo.getByLabel(/Atualizar divergências/)).toHaveCount(0);
 });
 
@@ -119,7 +119,7 @@ test("no modo completo as colunas de dia cabem em caixas e vão marcadas no envi
     await rota.fulfill({ json: { resultados: [{ resultado: "sucesso" }] } });
   });
   const dialogo = await abrirEnvio(page, "completo");
-  await expect(dialogo.getByText(/Modo completo ativo/)).toBeVisible();
+  await expect(dialogo.getByText(/Edição da planilha liberada/)).toBeVisible();
   await expect(dialogo.getByLabel(/^Remover coluna/)).toHaveCount(11);
   await dialogo.getByRole("button", { name: "Marcar todas", exact: true }).click();
   await expect(dialogo.getByLabel(/^Remover coluna/).first()).toBeChecked();
@@ -127,7 +127,8 @@ test("no modo completo as colunas de dia cabem em caixas e vão marcadas no envi
   await expect(dialogo.getByLabel(/^Remover coluna/).first()).not.toBeChecked();
   await dialogo.getByLabel("Remover coluna 02/10/2026 (B)").check();
   await dialogo.getByLabel("Remover coluna 03/10/2026 (C)").check();
-  await dialogo.getByRole("button", { name: "Enviar", exact: true }).click();
+  await dialogo.getByLabel(/Conferi as exclusões na aba/).check();
+  await dialogo.getByRole("button", { name: "Aplicar alterações", exact: true }).click();
   await expect.poll(() => corpos.length).toBe(1);
   expect(corpos[0]?.removerColunas).toEqual([2, 3]);
   await page.setViewportSize({ width: 360, height: 780 });

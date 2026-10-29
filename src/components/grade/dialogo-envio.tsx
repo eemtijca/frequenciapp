@@ -59,7 +59,10 @@ interface Simulacao {
   planos: PlanoResumo[];
 }
 
+export type ObjetivoEdicaoPlanilha = "adicionar" | "corrigir" | "remover";
+
 interface Props {
+  objetivo?: ObjetivoEdicaoPlanilha;
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
   /** Ausente quando o envio é de todas as turmas mapeadas. */
@@ -118,7 +121,12 @@ function chipsDoPlano(item: PlanoResumo, modoCompleto: boolean): string[] {
       : "",
     modoCompleto && r.substituir > 0 ? plural(r.substituir, "substituição", "substituições") : "",
     modoCompleto && (r.removerLinhas > 0 || r.removerColunas > 0)
-      ? `Excluir: ${plural(r.removerLinhas, "linha", "linhas")} e ${plural(r.removerColunas, "coluna", "colunas")}`
+      ? `Excluir: ${[
+          r.removerLinhas > 0 ? plural(r.removerLinhas, "linha", "linhas") : "",
+          r.removerColunas > 0 ? plural(r.removerColunas, "coluna", "colunas") : "",
+        ]
+          .filter(Boolean)
+          .join(" e ")}`
       : "",
     (r.jaPresentes ?? 0) > 0
       ? plural(r.jaPresentes ?? 0, "célula já estava na planilha", "células já estavam na planilha")
@@ -149,6 +157,7 @@ function useOnline(): boolean {
 }
 
 export default function DialogoEnvio({
+  objetivo,
   aberto,
   onAbrir,
   turmaOriginalId,
@@ -163,15 +172,18 @@ export default function DialogoEnvio({
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
-  const [criarColunas, setCriarColunas] = useState(true);
-  const [novosAlunos, setNovosAlunos] = useState(true);
-  const [substituir, setSubstituir] = useState(false);
+  const [criarColunas, setCriarColunas] = useState(!objetivo);
+  const [novosAlunos, setNovosAlunos] = useState(!objetivo || objetivo === "adicionar");
+  const [substituir, setSubstituir] = useState(objetivo === "corrigir");
+  const [exclusoesConferidas, setExclusoesConferidas] = useState(false);
   const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
     {},
   );
   const [alcance, setAlcance] = useState<"pendentes" | "periodo" | null>(null);
   // A correção manual precisa reler também linhas sem chamada pendente.
-  const somenteAlteradas = alcance ? alcance === "pendentes" : !(modoCompleto && !todas);
+  const somenteAlteradas = alcance
+    ? alcance === "pendentes"
+    : !objetivo && !(modoCompleto && !todas);
   const [andamento, setAndamento] = useState<Record<string, Andamento>>({});
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
   const abaUnica = simulacao?.planos.length === 1 ? simulacao.planos[0]?.aba : undefined;
@@ -209,6 +221,7 @@ export default function DialogoEnvio({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
+    setExclusoesConferidas(false);
     setAndamento({});
     setDetalhes({});
     try {
@@ -229,7 +242,7 @@ export default function DialogoEnvio({
 
   // Uma requisição por aba: a falha de um mês não impede os demais envios.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
-    if (!simulacao) return;
+    if (!simulacao || (totalExclusoes > 0 && !exclusoesConferidas)) return;
     setErro("");
     const pendentes = simulacao.planos.filter((item) => !item.semEnvio);
     setAndamento(Object.fromEntries(pendentes.map((item) => [item.aba, "aguardando"])));
@@ -309,6 +322,10 @@ export default function DialogoEnvio({
   const podeRemover = detalhado && !bloqueado;
   const colunasRemoviveis = plano?.candidatosRemocaoColunas ?? [];
   const linhasRemoviveis = plano?.candidatosRemocaoLinhas ?? [];
+  const totalExclusoes =
+    !todas && modoCompleto
+      ? (removerMarcadas?.length ?? 0) + (removerColunasMarcadas?.length ?? 0)
+      : 0;
   const temDetalhes =
     detalhado &&
     !bloqueado &&
@@ -331,13 +348,26 @@ export default function DialogoEnvio({
     <Dialog open={aberto} onOpenChange={onAbrir}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Enviar {rotulo}</DialogTitle>
+          <DialogTitle>
+            {objetivo ? "Editar planilha de " : "Enviar "}
+            {rotulo}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-3">
+          {objetivo && (
+            <p className="text-muted-foreground text-sm">
+              {objetivo === "adicionar"
+                ? "Confira os alunos que ganharão uma linha e as chamadas que serão preenchidas no mês."
+                : objetivo === "corrigir"
+                  ? "Confira os nomes, as turmas e os valores que serão atualizados com os dados do aplicativo."
+                  : "Selecione as linhas ou colunas que devem sair desta aba e confira as demais alterações do mês."}
+            </p>
+          )}
           {modoCompleto && (
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Modo completo ativo. As opções destrutivas vêm desmarcadas.
+              Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao
+              marcar.
             </p>
           )}
 
@@ -347,36 +377,38 @@ export default function DialogoEnvio({
             </p>
           )}
 
-          <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
-            <legend className="sr-only">O que enviar</legend>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
-                <input
-                  type="radio"
-                  name="alcance-envio"
-                  checked={somenteAlteradas}
-                  onChange={() => setAlcance("pendentes")}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                />
-                <span>Só chamadas pendentes</span>
-              </label>
-              <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
-                <input
-                  type="radio"
-                  name="alcance-envio"
-                  checked={!somenteAlteradas}
-                  onChange={() => setAlcance("periodo")}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                />
-                <span>O período inteiro ({periodo})</span>
-              </label>
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {somenteAlteradas
-                ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
-                : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
-            </p>
-          </fieldset>
+          {!objetivo && (
+            <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
+              <legend className="sr-only">O que enviar</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                  <input
+                    type="radio"
+                    name="alcance-envio"
+                    checked={somenteAlteradas}
+                    onChange={() => setAlcance("pendentes")}
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                  />
+                  <span>Só chamadas pendentes</span>
+                </label>
+                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                  <input
+                    type="radio"
+                    name="alcance-envio"
+                    checked={!somenteAlteradas}
+                    onChange={() => setAlcance("periodo")}
+                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                  />
+                  <span>O período inteiro ({periodo})</span>
+                </label>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {somenteAlteradas
+                  ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
+                  : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
+              </p>
+            </fieldset>
+          )}
 
           {carregando && (
             <p className="text-muted-foreground flex items-center gap-2 text-sm">
@@ -399,8 +431,14 @@ export default function DialogoEnvio({
           {simulacao && !carregando && nadaAEnviar && (
             <div className="bg-secondary/40 flex flex-col items-start gap-2 rounded-lg px-3 py-2 text-sm">
               <p>
-                Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o período
-                inteiro, escolha a segunda opção.
+                {objetivo ? (
+                  "Nenhuma alteração necessária para esta turma e mês."
+                ) : (
+                  <>
+                    Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o
+                    período inteiro, escolha a segunda opção.
+                  </>
+                )}
               </p>
               {!todas && somenteAlteradas && (
                 <Button type="button" variant="outline" onClick={() => setAlcance("periodo")}>
@@ -464,6 +502,23 @@ export default function DialogoEnvio({
             </ul>
           )}
 
+          {objetivo === "adicionar" && !carregando && !enviou && plano && (
+            <div className="superficie flex flex-col gap-2 p-3">
+              <p className="text-sm font-medium">Alunos sem linha na aba {plano.aba}</p>
+              {plano.novosAlunos.length > 0 ? (
+                <ul aria-label="Alunos que serão adicionados" className="text-sm">
+                  {plano.novosAlunos.map((aluno, indice) => (
+                    <li key={`${aluno.nome}-${indice}`}>{aluno.nome}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  Nenhum aluno precisa de uma linha nova.
+                </p>
+              )}
+            </div>
+          )}
+
           {temDetalhes && !enviou && plano && (
             <details className="text-xs">
               <summary className="text-muted-foreground cursor-pointer py-1">
@@ -510,7 +565,7 @@ export default function DialogoEnvio({
 
           <details className="text-sm">
             <summary className="text-muted-foreground cursor-pointer py-1 text-xs">
-              Opções do envio
+              {objetivo ? "Opções da edição" : "Opções do envio"}
             </summary>
             <div className="mt-1 flex flex-col gap-2">
               <label className="flex items-center gap-2">
@@ -551,19 +606,25 @@ export default function DialogoEnvio({
           {podeRemover && (linhasRemoviveis.length > 0 || colunasRemoviveis.length > 0) && (
             <p className="text-muted-foreground text-xs">
               {modoCompleto
-                ? "A exclusão de linhas remove também as frequências delas; confira primeiro a aba de destino."
-                : "A exclusão de linhas e colunas exige liberar o modo completo na Gestão."}
+                ? "As exclusões abaixo afetam somente a aba indicada na prévia. O cadastro e as chamadas no aplicativo são preservados."
+                : "Para selecionar exclusões, abra Gestão, Configurações, Planilha de frequência e libere o modo completo. Depois, reabra esta prévia."}
             </p>
           )}
           {podeRemover && linhasRemoviveis.length > 0 && (
             <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
               <legend className="text-muted-foreground mb-1 text-xs">
-                Remover alunos que saíram da turma
+                Retirar linhas de alunos da planilha
               </legend>
+              <p className="text-muted-foreground text-xs">
+                Alunos que não pertencem mais a esta turma. Selecione somente as linhas que devem
+                sair da aba {plano?.aba}. A linha inteira será apagada, incluindo as frequências
+                registradas nela.
+              </p>
               {linhasRemoviveis.map((item) => (
                 <label key={item.linha} className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    aria-label={`Retirar ${item.nome} da planilha (linha ${item.linha})`}
                     checked={removerMarcadas?.includes(item.linha) ?? false}
                     onChange={(evento) => {
                       const marcado = evento.target.checked;
@@ -576,7 +637,10 @@ export default function DialogoEnvio({
                     }}
                     className="size-4 accent-[var(--primary)]"
                   />
-                  Remover {item.nome} (linha {item.linha})
+                  <span>
+                    <span className="block text-sm font-medium">{item.nome}</span>
+                    <span className="text-muted-foreground text-xs">Linha {item.linha}</span>
+                  </span>
                 </label>
               ))}
             </fieldset>
@@ -637,6 +701,19 @@ export default function DialogoEnvio({
             </fieldset>
           )}
 
+          {totalExclusoes > 0 && !carregando && !enviou && !erro && (
+            <label className="bg-falta-fraca text-falta-texto flex items-start gap-2 rounded-lg p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={exclusoesConferidas}
+                disabled={enviando}
+                onChange={(evento) => setExclusoesConferidas(evento.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+              />
+              Conferi as exclusões na aba {plano?.aba} e confirmo que podem ser aplicadas.
+            </label>
+          )}
+
           {erro && (
             <div className="flex flex-col items-start gap-2">
               <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
@@ -671,11 +748,16 @@ export default function DialogoEnvio({
               Boolean(erro) ||
               bloqueado ||
               !online ||
+              (totalExclusoes > 0 && !exclusoesConferidas && !enviou) ||
               (nadaAEnviar && !enviou)
             }
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {enviou ? "Nova prévia" : "Enviar"}
+            {enviou
+              ? "Nova prévia"
+              : totalExclusoes > 0 || objetivo
+                ? "Aplicar alterações"
+                : "Enviar"}
           </Button>
         </DialogFooter>
       </DialogContent>
