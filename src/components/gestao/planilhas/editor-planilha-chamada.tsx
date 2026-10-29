@@ -2,6 +2,14 @@
 
 // Centraliza a revisão de linhas e valores da chamada por turma e mês na Gestão.
 import { useState } from "react";
+import {
+  FileSpreadsheet,
+  HelpCircle,
+  LockKeyhole,
+  PencilLine,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
@@ -37,13 +45,7 @@ export function EditorPlanilhaChamada({
       aria-label="Editar planilhas de chamada"
       className="superficie flex flex-col gap-3 p-4"
     >
-      <div>
-        <h3 className="font-medium">Editar planilhas de chamada</h3>
-        <p className="text-muted-foreground text-sm">
-          Escolha a turma e o mês, depois a alteração desejada. Cada ação abre uma prévia antes de
-          gravar no Google.
-        </p>
-      </div>
+      <h3 className="font-medium">Editar planilhas de chamada</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <Selecionar
           id="editor-planilha-turma"
@@ -63,55 +65,76 @@ export function EditorPlanilhaChamada({
           onValor={setMes}
         />
       </div>
-      <p role="status" className="text-muted-foreground text-sm">
-        {!disponivel
-          ? "Conecte a planilha, ative a integração e salve a estrutura para editar."
-          : !turma
-            ? "Selecione uma turma para identificar a aba de destino."
-            : vinculos.length === 0
-              ? "Esta turma não tem aba vinculada para o mês. Prepare o mês ou revise a estrutura acima."
-              : `Destino: ${vinculos.map((item) => item.aba).join(", ")}.`}
+      <p
+        role="status"
+        className="text-muted-foreground flex items-start gap-2 text-xs wrap-anywhere"
+      >
+        <FileSpreadsheet aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <span>
+          {!disponivel
+            ? "Conecte e configure a planilha para editar."
+            : !turma
+              ? "Escolha a turma e o mês."
+              : vinculos.length === 0
+                ? "Sem aba neste mês. Prepare o mês ou revise a estrutura."
+                : `Destino: ${vinculos.map((item) => item.aba).join(", ")}.`}
+        </span>
       </p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2">
         {(
           [
-            [
-              "adicionar",
-              "Adicionar alunos",
-              "Cria linhas para os alunos que ainda não aparecem na aba e preenche suas chamadas.",
-            ],
-            [
-              "corrigir",
-              "Corrigir dados",
-              "Atualiza nomes, turma atual e valores divergentes com os dados do aplicativo.",
-            ],
-            [
-              "remover",
-              "Retirar linhas ou colunas",
-              "Permite selecionar linhas de alunos que saíram da turma e colunas criadas pelo aplicativo.",
-            ],
+            ["adicionar", "Adicionar alunos", UserPlus],
+            ["corrigir", "Corrigir dados", PencilLine],
+            ["remover", "Retirar linhas ou colunas", Trash2],
           ] as const
-        ).map(([acao, titulo, descricao]) => (
-          <div key={acao} className="flex flex-col gap-2 rounded-lg border p-3">
-            <p className="text-muted-foreground flex-1 text-sm">{descricao}</p>
+        ).map(([acao, titulo, Icone]) => {
+          const protegida = acao !== "adicionar" && !modoCompleto;
+          return (
             <Button
+              key={acao}
               type="button"
-              className="h-auto min-h-11 whitespace-normal"
               variant="outline"
-              disabled={!habilitado || (acao !== "adicionar" && !modoCompleto)}
+              className="relative h-auto min-h-28 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
+              disabled={!habilitado || protegida}
               onClick={() => setObjetivo(acao)}
             >
-              {titulo}
+              <span
+                className={`flex size-10 items-center justify-center rounded-full ${acao === "remover" ? "bg-falta-fraca text-falta-texto" : "bg-primary/10 text-primary"}`}
+              >
+                <Icone aria-hidden="true" className="size-5" />
+              </span>
+              <span className="text-center text-xs leading-4 sm:text-sm">{titulo}</span>
+              {protegida && (
+                <LockKeyhole
+                  aria-hidden="true"
+                  className="text-muted-foreground absolute top-2 right-2 size-3"
+                />
+              )}
             </Button>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <p className="text-muted-foreground text-xs">
-        {modoCompleto
-          ? "Edição completa liberada. Confira o destino e as exclusões na prévia."
-          : "Adicionar alunos está disponível sem liberar a edição completa. Para corrigir dados ou excluir, libere o modo completo logo abaixo."}{" "}
-        O cadastro dos alunos e as chamadas no aplicativo são preservados.
-      </p>
+      {!modoCompleto && (
+        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+          <LockKeyhole aria-hidden="true" className="size-3.5 shrink-0" />
+          Para corrigir ou excluir, libere o modo completo abaixo.
+        </p>
+      )}
+      <details className="text-muted-foreground text-xs">
+        <summary className="flex min-h-9 cursor-pointer items-center gap-2 font-medium">
+          <HelpCircle aria-hidden="true" className="size-4" />
+          Ajuda
+        </summary>
+        <ul className="mt-1 flex flex-col gap-2">
+          <li>Adicionar alunos cria as linhas que faltam e preenche as chamadas do mês.</li>
+          <li>Corrigir dados atualiza nomes, turmas e chamadas com os dados do aplicativo.</li>
+          <li>Retirar linhas ou colunas abre a seleção de exclusões.</li>
+          <li>
+            Cada ação abre uma prévia antes de gravar. O cadastro e as chamadas no aplicativo são
+            preservados.
+          </li>
+        </ul>
+      </details>
       {objetivo && turma && (
         <DialogoEnvio
           key={`${turmaId}-${mes}-${objetivo}`}
