@@ -119,6 +119,7 @@ function resumoDoRegistro(
       ? "Presente"
       : `Presente · ${rotuloFrequenciaPersonalizada(registro)}`;
   }
+  if (registro.marca === "D") return "D";
   if (registro.marca === "P") return "Presente";
   const motivos = registro.justificativas.join(" · ");
   if (registro.marca === "FJ") return motivos || "Falta justificada";
@@ -719,7 +720,10 @@ export default function VistaFrequenciaParcial({
                   <ul>
                     {alunosFiltrados.map((aluno, indice) => {
                       const registro = aluno.registro;
-                      const resumo = resumoDoRegistro(registro, justificativas);
+                      // Desistente mostra D, como na Chamada, com ou sem chamada salva.
+                      const resumo = aluno.desistente
+                        ? "D"
+                        : resumoDoRegistro(registro, justificativas);
                       return (
                         <li
                           key={aluno.id}
@@ -741,10 +745,10 @@ export default function VistaFrequenciaParcial({
                             </div>
                             <div className="col-start-1 row-start-2 min-w-0 md:col-start-2 md:row-start-1">
                               <span
-                                title={resumo}
+                                title={aluno.desistente ? "Desistente" : resumo}
                                 className={cn(
                                   "line-clamp-2 inline-block max-w-full rounded-lg border px-2 py-0.5 text-xs font-medium wrap-anywhere",
-                                  !registro
+                                  !registro || aluno.desistente
                                     ? "bg-muted/30 text-muted-foreground"
                                     : registro.tipo === "SAIDA" && !registro.aulasConferiveis
                                       ? "bg-muted/30 text-muted-foreground"
@@ -793,10 +797,7 @@ export default function VistaFrequenciaParcial({
                                 onClick={() => abrirEditor(registro ?? null, aluno.id)}
                                 aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
                                 disabled={
-                                  ocupado ||
-                                  editorAberto ||
-                                  Boolean(feriado) ||
-                                  (!registro && aluno.desistente)
+                                  ocupado || editorAberto || Boolean(feriado) || aluno.desistente
                                 }
                                 className="h-10"
                               >

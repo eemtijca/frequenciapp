@@ -10,7 +10,8 @@ export interface FrequenciaDaChamada {
   turmaId: string;
   alunoNome: string;
   turmaNome: string;
-  marca: Marca;
+  /** D: aluno desistente no dia, que continua na lista gravada da chamada. */
+  marca: Marca | "D";
   descricao: string;
   justificativas: string[];
   justificativa?: string | null;

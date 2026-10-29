@@ -154,10 +154,10 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await limparRegistros();
-  await cliente.query("update alunos set turma_id = $1, ativo = true where id = any($2::uuid[])", [
-    turmaId,
-    alunos,
-  ]);
+  await cliente.query(
+    "update alunos set turma_id = $1, ativo = true, desistente_em = null where id = any($2::uuid[])",
+    [turmaId, alunos],
+  );
   await cliente.query(
     "update horarios set ativo = true, inicio=to_char(time '07:00' + (ordem-1)*interval '50 minutes','HH24:MI'), fim=to_char(time '07:50' + (ordem-1)*interval '50 minutes','HH24:MI') where id = any($1::uuid[])",
     [horarios],
@@ -199,6 +199,31 @@ it("não supõe presença sem chamada salva nem inclui alunos fora da lista hist
     justificativas: [],
     revisao: 3,
     revisaoSeduc: 0,
+  });
+});
+
+it("marca D o desistente que segue na lista gravada, e não presença", async () => {
+  await salvarBase();
+  // Desistiu antes do dia: aparece como D. Desistir depois não muda o dia já passado.
+  await cliente.query("update alunos set desistente_em = $2 where id = $1", [
+    alunoDe(0),
+    "2026-06-10",
+  ]);
+  await cliente.query("update alunos set desistente_em = $2 where id = $1", [
+    alunoDe(1),
+    "2026-06-20",
+  ]);
+  const registros = await listar();
+  expect(registros.find((item) => item.alunoId === alunoDe(0))).toMatchObject({
+    tipo: "CHAMADA",
+    marca: "D",
+    descricao: "Desistente",
+    justificativas: [],
+  });
+  expect(registros.find((item) => item.alunoId === alunoDe(1))).toMatchObject({
+    tipo: "CHAMADA",
+    marca: "P",
+    descricao: "Dia inteiro",
   });
 });
 
