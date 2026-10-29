@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A prévia da planilha identifica a aba e as linhas dos alunos que saíram da turma, explica que a exclusão afeta as frequências na planilha e preserva o cadastro e as chamadas no aplicativo. Aplicar exclusões exige conferir a prévia, com nova confirmação após alterar as opções.
+
 - A lista da Chamada deixa de mostrar o círculo com a turma de origem ao lado do nome de cada aluno. O asterisco continua marcando o aluno vindo de outra turma, e a origem segue no nome acessível da linha e na lista de ausentes do resumo do dia.
 
 - Minhas turmas só registra a atualização após receber as estatísticas. O FrequenciBI informa a consulta mais antiga dos dados exibidos e não atribui uma atualização completa quando há falha ou data incompleta.

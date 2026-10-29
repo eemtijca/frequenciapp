@@ -118,7 +118,12 @@ function chipsDoPlano(item: PlanoResumo, modoCompleto: boolean): string[] {
       : "",
     modoCompleto && r.substituir > 0 ? plural(r.substituir, "substituição", "substituições") : "",
     modoCompleto && (r.removerLinhas > 0 || r.removerColunas > 0)
-      ? `Excluir: ${plural(r.removerLinhas, "linha", "linhas")} e ${plural(r.removerColunas, "coluna", "colunas")}`
+      ? `Excluir: ${[
+          r.removerLinhas > 0 ? plural(r.removerLinhas, "linha", "linhas") : "",
+          r.removerColunas > 0 ? plural(r.removerColunas, "coluna", "colunas") : "",
+        ]
+          .filter(Boolean)
+          .join(" e ")}`
       : "",
     (r.jaPresentes ?? 0) > 0
       ? plural(r.jaPresentes ?? 0, "célula já estava na planilha", "células já estavam na planilha")
@@ -166,6 +171,7 @@ export default function DialogoEnvio({
   const [criarColunas, setCriarColunas] = useState(true);
   const [novosAlunos, setNovosAlunos] = useState(true);
   const [substituir, setSubstituir] = useState(false);
+  const [exclusoesConferidas, setExclusoesConferidas] = useState(false);
   const [remocoes, setRemocoes] = useState<Record<string, { linhas: number[]; colunas: number[] }>>(
     {},
   );
@@ -209,6 +215,7 @@ export default function DialogoEnvio({
 
   const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
     setErro("");
+    setExclusoesConferidas(false);
     setAndamento({});
     setDetalhes({});
     try {
@@ -229,7 +236,7 @@ export default function DialogoEnvio({
 
   // Uma requisição por aba: a falha de um mês não impede os demais envios.
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
-    if (!simulacao) return;
+    if (!simulacao || (totalExclusoes > 0 && !exclusoesConferidas)) return;
     setErro("");
     const pendentes = simulacao.planos.filter((item) => !item.semEnvio);
     setAndamento(Object.fromEntries(pendentes.map((item) => [item.aba, "aguardando"])));
@@ -309,6 +316,10 @@ export default function DialogoEnvio({
   const podeRemover = detalhado && !bloqueado;
   const colunasRemoviveis = plano?.candidatosRemocaoColunas ?? [];
   const linhasRemoviveis = plano?.candidatosRemocaoLinhas ?? [];
+  const totalExclusoes =
+    !todas && modoCompleto
+      ? (removerMarcadas?.length ?? 0) + (removerColunasMarcadas?.length ?? 0)
+      : 0;
   const temDetalhes =
     detalhado &&
     !bloqueado &&
@@ -337,7 +348,8 @@ export default function DialogoEnvio({
         <div className="flex flex-col gap-3">
           {modoCompleto && (
             <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Modo completo ativo. As opções destrutivas vêm desmarcadas.
+              Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao
+              marcar.
             </p>
           )}
 
@@ -551,19 +563,25 @@ export default function DialogoEnvio({
           {podeRemover && (linhasRemoviveis.length > 0 || colunasRemoviveis.length > 0) && (
             <p className="text-muted-foreground text-xs">
               {modoCompleto
-                ? "A exclusão de linhas remove também as frequências delas; confira primeiro a aba de destino."
-                : "A exclusão de linhas e colunas exige liberar o modo completo na Gestão."}
+                ? "As exclusões abaixo afetam somente a aba indicada na prévia. O cadastro e as chamadas no aplicativo são preservados."
+                : "Para selecionar exclusões, abra Gestão, Configurações, Planilha de frequência e libere o modo completo. Depois, reabra esta prévia."}
             </p>
           )}
           {podeRemover && linhasRemoviveis.length > 0 && (
             <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
               <legend className="text-muted-foreground mb-1 text-xs">
-                Remover alunos que saíram da turma
+                Retirar linhas de alunos da planilha
               </legend>
+              <p className="text-muted-foreground text-xs">
+                Alunos que não pertencem mais a esta turma. Selecione somente as linhas que devem
+                sair da aba {plano?.aba}. A linha inteira será apagada, incluindo as frequências
+                registradas nela.
+              </p>
               {linhasRemoviveis.map((item) => (
                 <label key={item.linha} className="flex items-center gap-2">
                   <input
                     type="checkbox"
+                    aria-label={`Retirar ${item.nome} da planilha (linha ${item.linha})`}
                     checked={removerMarcadas?.includes(item.linha) ?? false}
                     onChange={(evento) => {
                       const marcado = evento.target.checked;
@@ -576,7 +594,10 @@ export default function DialogoEnvio({
                     }}
                     className="size-4 accent-[var(--primary)]"
                   />
-                  Remover {item.nome} (linha {item.linha})
+                  <span>
+                    <span className="block text-sm font-medium">{item.nome}</span>
+                    <span className="text-muted-foreground text-xs">Linha {item.linha}</span>
+                  </span>
                 </label>
               ))}
             </fieldset>
@@ -637,6 +658,19 @@ export default function DialogoEnvio({
             </fieldset>
           )}
 
+          {totalExclusoes > 0 && !carregando && !enviou && !erro && (
+            <label className="bg-falta-fraca text-falta-texto flex items-start gap-2 rounded-lg p-3 text-sm">
+              <input
+                type="checkbox"
+                checked={exclusoesConferidas}
+                disabled={enviando}
+                onChange={(evento) => setExclusoesConferidas(evento.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+              />
+              Conferi as exclusões na aba {plano?.aba} e confirmo que podem ser aplicadas.
+            </label>
+          )}
+
           {erro && (
             <div className="flex flex-col items-start gap-2">
               <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
@@ -671,11 +705,12 @@ export default function DialogoEnvio({
               Boolean(erro) ||
               bloqueado ||
               !online ||
+              (totalExclusoes > 0 && !exclusoesConferidas && !enviou) ||
               (nadaAEnviar && !enviou)
             }
           >
             {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {enviou ? "Nova prévia" : "Enviar"}
+            {enviou ? "Nova prévia" : totalExclusoes > 0 ? "Aplicar alterações" : "Enviar"}
           </Button>
         </DialogFooter>
       </DialogContent>
