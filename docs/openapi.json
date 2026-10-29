@@ -14587,8 +14587,9 @@
           },
           "marca": {
             "type": "string",
-            "enum": ["P", "F", "FJ", "S"],
-            "example": "FJ"
+            "enum": ["P", "F", "FJ", "S", "D"],
+            "example": "FJ",
+            "description": "P presente, F falta, FJ falta justificada, S falta em parte das aulas, D aluno desistente no dia."
           },
           "descricao": {
             "type": "string",
