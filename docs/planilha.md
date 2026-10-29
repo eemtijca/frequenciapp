@@ -2,6 +2,19 @@
 
 Integração opcional da administração com a planilha da escola. A frequência e as saídas antecipadas usam OAuth 2.0, Google Picker e a Sheets API. Desligada por padrão, a integração reorganiza a frequência das turmas atuais por turma de origem. Uma segunda finalidade registra saídas e entradas em outro arquivo. A finalidade `PARCIAL` registra a frequência para conferência na Seduc em um terceiro arquivo distinto, com aba própria, combinando a chamada salva e as personalizações.
 
+## Ações na Gestão
+
+Em **Gestão > Configurações > Planilhas**, cada arquivo tem botões com ícones:
+
+- **Enviar**: envio manual, automação e histórico recolhido.
+- **Editar**: alunos, correções e exclusões da chamada, com liberação do modo completo no mesmo painel.
+- **Organizar**: meses, abas e apresentação da frequência ou das entradas e saídas.
+- **Configurar**: conexão Google, estrutura, diagnóstico e manutenção.
+
+A chamada parcial reúne **Enviar** e **Configurar**. Arquivos pendentes e o retorno do Google abrem a configuração; arquivos prontos abrem o envio. Alternar as ações preserva turma, mês e campos preenchidos. Os interruptores continuam sujeitos ao salvamento global das configurações. As prévias e confirmações permanecem obrigatórias nas operações que as exigem. No envio de entradas e saídas, trocar o mês cancela a leitura anterior e mantém Enviar bloqueado até terminar a conferência do novo período.
+
+O histórico e os detalhes da fila ficam recolhidos. Erros e pendências continuam visíveis no resumo. Em **Conta e acesso** ficam a troca de conta e a orientação sobre permissões.
+
 ## Princípios
 
 - A chamada continua sendo feita nas turmas atuais; a planilha recebe o recorte por turma de origem, o mesmo da Grade.
@@ -17,7 +30,7 @@ Integração opcional da administração com a planilha da escola. A frequência
 3. Crie um cliente OAuth do tipo Aplicativo da Web. Cadastre a origem pública do FrequenciApp e o URI de redirecionamento exato `https://SEU-DOMINIO/api/planilha/google/retorno`.
 4. Crie uma chave de API restrita à Google Picker API. Nas restrições de site, inclua a origem do FrequenciApp e `https://docs.google.com/*`, pois o Picker abre em um quadro desse domínio.
 5. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_PICKER_API_KEY` e `GOOGLE_PROJECT_NUMBER` no servidor. O número do projeto é usado pelo Picker para dar acesso apenas aos arquivos escolhidos. Não coloque o segredo OAuth no navegador nem no repositório.
-6. Como administrador, abra Gestão, Configurações, Planilha de frequência. Use Conectar conta Google, autorize a conta e escolha uma planilha no seletor. Ative a integração, confira as abas, salve o mapa e faça uma prévia antes do primeiro envio. Na Planilha de saídas, escolha a planilha da mesma conta ou conecte outra conta, ative e confira a aba do registro.
+6. Como administrador, abra Gestão, Configurações, Planilhas, Planilha de frequência, Configurar. Use Conectar conta Google, autorize a conta e escolha uma planilha no seletor. Ative a integração, confira as abas, salve o mapa e faça uma prévia antes do primeiro envio. Na Planilha de saídas, escolha a planilha da mesma conta ou conecte outra conta, ative e confira a aba do registro.
 
 O escopo solicitado é `drive.file`: o aplicativo recebe acesso aos arquivos escolhidos pelo Picker. Para trocar de planilha, escolha outro arquivo e confira novamente o mapa. A troca desliga a integração e o envio automático, encerra o modo completo e invalida a estrutura anterior. Selecionar o mesmo arquivo preserva essas opções; a reativação do arquivo novo é explícita. As três finalidades mantêm seleção e estrutura próprias. A conta da frequência pode ser usada para selecionar os arquivos de saídas e chamada parcial sem uma segunda autorização.
 
@@ -31,7 +44,7 @@ Na leitura da Sheets API, o aplicativo consulta os marcadores pela operação `s
 
 ## Configuração assistida
 
-Em Gestão, Configurações, Planilha de frequência, **Configuração assistida** permite escolher o mês e usar **Conferir configuração**. A consulta funciona também com a integração pausada e apenas lê a planilha. O resultado reúne três etapas:
+Em Gestão, Configurações, Planilha de frequência, **Configurar > Configuração assistida** permite escolher o mês e usar **Conferir configuração**. A consulta funciona também com a integração pausada e apenas lê a planilha. O resultado reúne três etapas:
 
 1. **Arquivo e conexão**: confirma o acesso ao arquivo escolhido e oferece acesso à conexão quando houver pendência.
 2. **Turmas e mês**: mostra a aba de cada turma e diferencia estrutura conferida, aba ausente, cabeçalho alterado, vínculo bloqueado e leitura indisponível. Uma turma que já usa abas mensais precisa ter o mês escolhido preparado; a conferência não recorre à aba antiga sem mês.
@@ -47,7 +60,7 @@ O diagnóstico não prepara abas, não habilita envios, não apaga conteúdo e n
 
 Presenças dependem da lista histórica da chamada. A recuperação de listas anteriores à migração original restaura P na Grade e na fonte das planilhas, preservando F e FJ. Somente chamadas efetivamente complementadas ganham nova revisão e ficam pendentes de reenvio. Depois da migração, selecionar o período afetado na Grade, conferir a prévia e enviar para preencher células vazias. A recuperação não escreve na planilha do Google nem altera listas modernas ([ADR-022](adr/022-lista-da-chamada-e-turma-reorganizada.md)).
 
-Em Gestão, Configurações, Planilhas, Planilha de frequência, usar **Preparar mês**. Escolher o mês e confirmar a preparação das turmas. Cada turma de origem recebe uma aba como `1º A · Outubro`, com Aluno, datas de segunda a sexta e sábados com chamada salva para aquela origem em `dd/mm/aaaa`, sem Turma atual. A lista de alunos ativos e os vínculos são preparados; as marcações ficam vazias até o envio. A interface acompanha uma turma por requisição e informa abas criadas, atualizadas, reutilizadas e pendências. Cancelar antes de confirmar não grava nada.
+Em Gestão, Configurações, Planilhas, Planilha de frequência, **Organizar**, usar **Preparar mês**. Escolher o mês e confirmar a preparação das turmas. Cada turma de origem recebe uma aba como `1º A · Outubro`, com Aluno, datas de segunda a sexta e sábados com chamada salva para aquela origem em `dd/mm/aaaa`, sem Turma atual. A lista de alunos ativos e os vínculos são preparados; as marcações ficam vazias até o envio. A interface acompanha uma turma por requisição e informa abas criadas, atualizadas, reutilizadas e pendências. Cancelar antes de confirmar não grava nada.
 
 Para atualizar um mês já preparado, abrir **Preparar mês**, selecionar novamente o mês e confirmar. O aplicativo renomeia a mesma aba e exclui as colunas próprias de Turma atual, domingos e sábados sem chamada salva para aquela origem, inclusive os valores dessas colunas na planilha. Abas novas incluem sábados com chamada salva. Nas existentes, essas colunas são preservadas ao preparar novamente e o envio insere as datas que ainda faltam. As frequências dos demais dias, as fórmulas nessas células, a lista de alunos e os vínculos são mantidos; não há reconstrução das linhas nem cópia de backup. As chamadas salvas no aplicativo permanecem disponíveis. Colunas sem identificação da integração são preservadas; cabeçalho inesperado ou mesclagens que cruzem colunas removidas exigem conferência.
 
@@ -184,12 +197,12 @@ Todo envio automático (chamada salva, saída e entrada registradas) vira um ite
 - Falha confirmada tenta de novo depois de 30 segundos, 2, 10 e 30 minutos, até cinco tentativas; esgotadas, o item fica como `FALHOU` e a fila segue.
 - Enquanto o item da frente espera a nova tentativa, os de trás aguardam, para as linhas chegarem à planilha na ordem dos registros.
 - Envio sem confirmação (`PARCIAL`), plano que pede conferência manual, turma sem aba vinculada e integração desligada encerram o item sem repetir; a conferência manual retoma a automação.
-- Uma agenda de cinco minutos (`fila-planilha.yml`, com `CRON_SECRET`) recolhe o que sobrou. Em Gestão, Configurações, Planilhas, a seção Fila de envios automáticos mostra contagens e itens, e permite Processar agora, Descartar e Reenfileirar.
+- Uma agenda de cinco minutos (`fila-planilha.yml`, com `CRON_SECRET`) recolhe o que sobrou. Em Gestão, Configurações, Planilhas, a seção Fila de envios automáticos mostra contagens e itens, e permite Processar agora, Descartar e Tentar novamente.
 - A fila não guarda nome de aluno nem dados da planilha, e não cobre os envios manuais com prévia.
 
 ## Edição na Gestão
 
-Em Gestão, Configurações, Planilhas, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. As três ações aparecem como botões com ícones; as explicações podem ser abertas em Ajuda. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
+Em Gestão, Configurações, Planilhas, Planilha de frequência, **Editar**, a seção Editar planilhas de chamada permite escolher turma e mês e conferir a aba de destino. A turma é escolhida por um seletor com busca, disponível também no celular. As três ações aparecem como botões com ícones; as explicações podem ser abertas em Ajuda. Adicionar alunos abre a lista de alunos sem linha e a prévia das chamadas que serão preenchidas. Corrigir dados prepara a atualização de nomes, turma atual e valores divergentes. Retirar linhas ou colunas abre a seleção de exclusões, sem acrescentar alunos nem criar colunas por padrão.
 
 Adicionar alunos funciona no modo conservador. Correções e exclusões exigem liberar o modo completo no bloco logo abaixo. Cada ação lê a planilha e abre uma prévia; a gravação só ocorre na confirmação. O envio geral e as ferramentas de estrutura, apresentação e abas continuam na mesma área da Gestão.
 
@@ -199,7 +212,7 @@ Na prévia de uma turma, o modo completo seleciona "O período inteiro" por padr
 
 Depois de alterar a turma atual e a turma de origem em Gestão, Alunos, o envio passa a usar a nova origem. A linha antiga permanece até a remoção explícita: conferir o envio na aba de destino, liberar o modo completo, abrir Relatórios, Grade, selecionar a turma antiga e o mês, abrir "Enviar para a planilha", selecionar as linhas em "Retirar linhas de alunos da planilha", conferir a aba indicada, marcar a confirmação das exclusões e clicar em "Aplicar alterações". A prévia diferencia a retirada de linhas da exclusão de alunos do cadastro; o cadastro e as chamadas no aplicativo são preservados. Alterar a seleção ou as opções exige conferir novamente a prévia. Só linhas criadas pela integração são oferecidas; a exclusão inclui as frequências da linha. A alteração da origem reorganiza também o histórico no aplicativo, sem separar a transferência por data. Linhas manuais são conferidas diretamente no Google Planilhas.
 
-O destrave é feito em Gestão, Configurações, Planilha de frequência, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
+O destrave é feito em Gestão, Configurações, Planilhas, Planilha de frequência, **Editar**, por um administrador, com a frase `EDITAR PLANILHA`, a senha e a duração entre 5, 15, 30 e 60 minutos, padrão 15. Enquanto a janela estiver aberta, admin e coordenação podem enviar:
 
 - atualização de células divergentes, inclusive nome e turma atual do aluno encontrado pelo código da linha ou, antes do primeiro vínculo, pelo nome único;
 - limpeza de células indicadas;

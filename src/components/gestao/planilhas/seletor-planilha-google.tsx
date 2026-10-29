@@ -2,7 +2,15 @@
 
 // Conexão OAuth e seleção explícita da planilha pelo Google Picker.
 import { useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import {
+  ExternalLink,
+  FileSpreadsheet,
+  FolderOpen,
+  Link,
+  LoaderCircle,
+  RefreshCw,
+  UserRound,
+} from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
@@ -192,34 +200,81 @@ export function SeletorPlanilhaGoogle({
 
   return (
     <div className="superficie flex flex-col gap-3 p-3">
-      <p className="text-sm font-medium">Conta Google</p>
-      <p className="text-muted-foreground text-xs">
-        Autorize a conta da escola e escolha a planilha. O acesso é limitado aos arquivos
-        escolhidos.
-      </p>
-      {planilha && <p className="text-xs">Planilha escolhida: {planilha.nome ?? planilha.id}</p>}
+      <div className="flex min-w-0 items-center gap-2">
+        <FileSpreadsheet size={20} className="text-primary shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium wrap-anywhere">
+            {planilha ? (planilha.nome ?? "Planilha selecionada") : "Nenhuma planilha escolhida"}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            {conectado ? "Conta Google conectada" : "Conecte a conta Google da escola."}
+          </p>
+        </div>
+        {planilha && (
+          <Button asChild variant="ghost" className="h-11 shrink-0">
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(planilha.id)}/edit`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Abrir planilha no Google"
+            >
+              <ExternalLink size={16} aria-hidden="true" />
+              Abrir
+            </a>
+          </Button>
+        )}
+      </div>
       <div className="flex flex-wrap gap-2">
+        {conectado ? (
+          <Button type="button" className="h-11" onClick={() => void escolher()} disabled={ocupado}>
+            {ocupado ? (
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <FolderOpen size={16} aria-hidden="true" />
+            )}
+            Escolher planilha
+          </Button>
+        ) : (
+          <Button type="button" className="h-11" onClick={() => void conectar()} disabled={ocupado}>
+            {ocupado ? (
+              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Link size={16} aria-hidden="true" />
+            )}
+            Conectar conta Google
+          </Button>
+        )}
         {conectado && planilha && (
           <Button
             type="button"
             variant="outline"
+            className="h-11"
             onClick={() => void conectar(true)}
             disabled={ocupado}
           >
-            {ocupado && <LoaderCircle size={14} className="animate-spin" />}
+            <RefreshCw size={16} aria-hidden="true" />
             Reconectar conta Google
           </Button>
         )}
-        <Button type="button" variant="outline" onClick={() => void conectar()} disabled={ocupado}>
-          {ocupado && <LoaderCircle size={14} className="animate-spin" />}
-          {conectado ? "Trocar conta Google" : "Conectar conta Google"}
-        </Button>
+      </div>
+      <details className="text-muted-foreground text-xs">
+        <summary className="min-h-11 cursor-pointer content-center font-medium">
+          Conta e acesso
+        </summary>
+        <p className="mb-2">O acesso é limitado aos arquivos escolhidos.</p>
         {conectado && (
-          <Button type="button" onClick={() => void escolher()} disabled={ocupado}>
-            Escolher planilha
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            onClick={() => void conectar()}
+            disabled={ocupado}
+          >
+            <UserRound size={16} aria-hidden="true" />
+            Trocar conta Google
           </Button>
         )}
-      </div>
+      </details>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 // Planilha de saídas na interface: configuração na Gestão e envio pela vista
 // Saídas, contra a Sheets API sintética.
 import { expect, test } from "@playwright/test";
+import { mesSeguinte, nomeDoMes, rotuloMes } from "@/domain/frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 const ABA = "Saiu mais cedo";
 
@@ -56,6 +58,7 @@ test.describe("Google Planilhas de saídas", () => {
       .click();
     const cartao = page.locator('[data-secao="planilha-saidas"]');
     await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
+    await selecionarAcaoPlanilha(cartao, "Configurar");
     await expect(cartao.getByRole("button", { name: "Conectar conta Google" })).toBeVisible();
     await expect(cartao.getByText("Conexão por Apps Script")).toHaveCount(0);
     await expect(cartao.getByRole("button", { name: "Conferir estrutura" })).toBeDisabled();
@@ -69,7 +72,8 @@ test.describe("Google Planilhas de saídas", () => {
       .getByRole("button", { name: "Planilhas", exact: true })
       .click();
     await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
-    await expect(cartao.getByText("Google conectado", { exact: true })).toBeVisible();
+    await selecionarAcaoPlanilha(cartao, "Configurar");
+    await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();
 
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
     await expect(cartao.getByText(ABA, { exact: true }).first()).toBeVisible();
@@ -77,6 +81,7 @@ test.describe("Google Planilhas de saídas", () => {
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 
     // As duas abas são preparadas e organizadas no mesmo cartão, com as mesmas colunas.
+    await selecionarAcaoPlanilha(cartao, "Organizar");
     const preparo = cartao.locator('[data-secao="planilha-entradas-preparo"]');
     await expect(
       preparo.getByRole("button", { name: "Organizar apresentação de Entradas", exact: true }),
@@ -121,8 +126,13 @@ test.describe("Google Planilhas de saídas", () => {
     );
     expect(abasTurmas.every((nome) => google.apresentacao(nome).congeladasLinhas === 1)).toBe(true);
 
-    // O segundo envio do mesmo mês não duplica linhas.
+    // A reabertura volta ao mês corrente; a duplicação precisa ser conferida em agosto.
     await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
+    await page.getByRole("button", { name: /Mês do envio das saídas e entradas/ }).click();
+    await page
+      .getByRole("dialog", { name: "Mês do envio das saídas e entradas" })
+      .getByRole("button", { name: "Agosto", exact: true })
+      .click();
     // Saídas e Entradas (já preparada) mostram, cada uma, zero linhas novas.
     await expect(page.getByRole("dialog").getByText(/0 linhas novas/)).toHaveCount(2);
     await page.getByRole("dialog").getByRole("button", { name: "Enviar" }).click();
@@ -130,5 +140,124 @@ test.describe("Google Planilhas de saídas", () => {
     expect(
       google.abas().filter((nome) => google.formulaDe(nome, 1, 1).startsWith("=VSTACK(")),
     ).toEqual(abasTurmas);
+  });
+});
+
+test.describe("troca de mês durante a prévia de saídas", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("descarta a resposta anterior e só envia a prévia do mês escolhido", async ({ page }) => {
+    let liberarAntiga = () => {};
+    let liberarAtual = () => {};
+    const antiga = new Promise<void>((resolver) => {
+      liberarAntiga = resolver;
+    });
+    const atual = new Promise<void>((resolver) => {
+      liberarAtual = resolver;
+    });
+    const leituras: string[] = [];
+    const envios: unknown[] = [];
+    let antigaRespondida = false;
+    await page.route("**/api/planilha-saidas/estado", (rota) =>
+      rota.fulfill({
+        json: {
+          estado: {
+            ativa: true,
+            podeEnviar: true,
+            configurada: true,
+            modo: "conservador",
+            modoCompletoAte: null,
+          },
+        },
+      }),
+    );
+    await page.route("**/api/planilha-saidas/simular", async (rota) => {
+      const { de } = rota.request().postDataJSON() as { de: string };
+      const primeira = leituras.length === 0;
+      leituras.push(de.slice(0, 7));
+      await (primeira ? antiga : atual);
+      await rota.fulfill({
+        json: {
+          modalidade: "conservador",
+          planoHash: primeira ? "anterior" : "atual",
+          aba: ABA,
+          bloqueado: false,
+          resumo: {
+            criar: primeira ? 9 : 1,
+            preencher: 0,
+            substituir: 0,
+            remover: 0,
+            puladasOcupadas: 0,
+            puladasFormula: 0,
+            ambiguidades: 0,
+          },
+          avisos: [],
+          preencher: [],
+          substituir: [],
+          candidatosRemocao: [],
+          criar: [
+            { nome: primeira ? "E2E Prévia anterior" : "E2E Prévia atual", dia: de, linha: 2 },
+          ],
+        },
+      });
+      if (primeira) antigaRespondida = true;
+    });
+    await page.route("**/api/planilha-entradas/simular", (rota) =>
+      rota.fulfill({
+        status: 400,
+        json: { error: "E2E Entradas indisponíveis." },
+      }),
+    );
+    await page.route("**/api/planilha-saidas/aplicar", (rota) => {
+      envios.push(rota.request().postDataJSON());
+      return rota.fulfill({ json: { resultado: "sucesso", contagens: { linhasCriadas: 1 } } });
+    });
+    try {
+      await page.goto("/");
+      await aguardarHidratacao(page);
+      await trocarVisao(page, "Saídas e Entradas", "saidas");
+      await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
+      await expect.poll(() => leituras.length).toBe(1);
+      const primeiroMes = leituras[0] ?? "";
+      const mesEscolhido = mesSeguinte(primeiroMes, -1);
+      await page.getByRole("button", { name: /Mês do envio das saídas e entradas/ }).click();
+      const seletor = page.getByRole("dialog", {
+        name: "Mês do envio das saídas e entradas",
+        exact: true,
+      });
+      if (primeiroMes.slice(0, 4) !== mesEscolhido.slice(0, 4)) {
+        await seletor.getByRole("button", { name: "Ano anterior", exact: true }).click();
+      }
+      await seletor.getByRole("button", { name: nomeDoMes(mesEscolhido), exact: true }).click();
+      const dialogo = page.getByRole("dialog", {
+        name: `Enviar saídas e entradas · ${rotuloMes(mesEscolhido)}`,
+        exact: true,
+      });
+      await expect.poll(() => leituras).toEqual([primeiroMes, mesEscolhido]);
+      const enviar = dialogo.getByRole("button", { name: "Enviar", exact: true });
+      await expect(enviar).toBeDisabled();
+      liberarAntiga();
+      await expect.poll(() => antigaRespondida).toBe(true);
+      await expect(enviar).toBeDisabled();
+      await expect(dialogo.getByText(/E2E Prévia anterior/)).toBeHidden();
+      expect(envios).toHaveLength(0);
+      liberarAtual();
+      await expect(dialogo.getByText(/1 linha nova/)).toBeVisible();
+      await expect(dialogo.getByText(/E2E Prévia atual/)).toBeVisible();
+      await expect(
+        dialogo.getByText("Entradas: E2E Entradas indisponíveis.", { exact: true }),
+      ).toBeVisible();
+      await expect(enviar).toBeEnabled();
+      await enviar.evaluate((elemento) => {
+        (elemento as HTMLButtonElement).click();
+        (elemento as HTMLButtonElement).click();
+      });
+      await expect(dialogo).toBeHidden();
+      expect(envios).toHaveLength(1);
+      expect(envios[0]).toMatchObject({ de: `${mesEscolhido}-01`, planoHash: "atual" });
+    } finally {
+      liberarAntiga();
+      liberarAtual();
+    }
   });
 });

@@ -1,10 +1,19 @@
 "use client";
 
-// Card da planilha de entradas e saídas: etapas de conexão, aba do registro e envio,
-// preparo das duas abas, modo completo e zona de risco. Restrito à administração.
+// Ações de envio, organização e configuração da planilha de entradas e saídas.
 import { OrganizarPlanilha } from "@/components/gestao/planilhas/dialogo-organizar-planilha";
 import { useCallback, useEffect, useState } from "react";
-import { DoorOpen, LoaderCircle, RotateCcw } from "lucide-react";
+import {
+  DoorOpen,
+  History,
+  LayoutGrid,
+  LoaderCircle,
+  Plus,
+  RotateCcw,
+  Save,
+  Send,
+  Settings2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -23,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { CABECALHO_SAIDAS, type AbaSaidaEsquema } from "@/domain/planilha-saidas";
-import { rotuloInstante, rotuloUltimoEnvio } from "@/domain/planilha";
+import { rotuloInstante } from "@/domain/planilha";
 import { rotuloData } from "@/domain/frequencia";
 import { Button } from "@/components/ui/button";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
@@ -33,6 +42,7 @@ import { Switch } from "@/components/ui/switch";
 import { Selecionar } from "@/components/ui/selecionar";
 import { Selo } from "@/components/ui/selo";
 import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import { PainelAcoesPlanilha } from "./painel-acoes-planilha";
 import { EtapaPlanilha } from "@/components/gestao/planilhas/planilha-etapa";
 import { SeletorPlanilhaGoogle } from "@/components/gestao/planilhas/seletor-planilha-google";
 import {
@@ -82,6 +92,7 @@ export default function IntegracaoSaidas({
   const [integracao, setIntegracao] = useState<IntegracaoSaidasAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(abertoInicial);
+  const [painel, setPainel] = useState<string | null>(abertoInicial ? "configuracao" : null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
@@ -303,7 +314,6 @@ export default function IntegracaoSaidas({
     <SecaoRecolhivel
       dataSecao="planilha-saidas"
       titulo="Planilha de entradas e saídas"
-      descricao="Envio das movimentações para o Google Planilhas."
       icone={DoorOpen}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -312,18 +322,10 @@ export default function IntegracaoSaidas({
           <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
             {ativaRascunho ? "Ligada" : "Desligada"}
           </Selo>
-          <Selo variante={conectada ? "sucesso" : "atencao"}>
-            {conectada ? "Google conectado" : "Sem conexão"}
-          </Selo>
-          <Selo variante={estruturaSalva ? "sucesso" : "neutro"}>
-            {estruturaSalva ? `Aba ${integracao?.esquema?.aba}` : "Estrutura pendente"}
+          <Selo variante={conectada && estruturaSalva ? "sucesso" : "atencao"}>
+            {!conectada ? "Sem conexão" : estruturaSalva ? "Configurada" : "Escolher aba"}
           </Selo>
           {completoAtivo && <Selo variante="atencao">Modo completo</Selo>}
-          <Selo>
-            {integracao
-              ? rotuloUltimoEnvio(integracao.sincronizacoes, integracao.fuso)
-              : "Sem envios"}
-          </Selo>
           {integracao?.ultimoErro && <Selo variante="perigo">Último envio com erro</Selo>}
         </>
       }
@@ -336,240 +338,300 @@ export default function IntegracaoSaidas({
         />
       }
     >
-      <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
-        <SeletorPlanilhaGoogle
-          finalidade="SAIDAS"
-          conectado={integracao?.contaGoogle ?? false}
-          planilha={integracao?.googlePlanilha ?? null}
-          onAtualizar={carregar}
-        />
-      </EtapaPlanilha>
-
-      <EtapaPlanilha
-        numero={2}
-        titulo="Aba do registro"
-        estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
-        resumo={
-          estruturaSalva && !estruturaEmEdicao
-            ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
-            : podeEnviar
-              ? "Escolha a aba para as saídas."
-              : "Conecte e ative a integração."
-        }
-        acoes={
-          estruturaEmEdicao ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10"
-              onClick={() => void lerEstrutura()}
-              disabled={lendo || !podeEnviar}
-              title={podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."}
-            >
-              {lendo ? (
-                <LoaderCircle size={16} className="animate-spin" />
-              ) : (
-                <RotateCcw size={16} />
-              )}
-              Conferir estrutura
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10"
-              onClick={() => setEditandoEstrutura(true)}
-            >
-              Revisar estrutura
-            </Button>
-          )
-        }
-      >
-        {estruturaEmEdicao ? (
-          <>
-            {planilha && (
-              <p className="text-muted-foreground text-xs">
-                {planilha.nome} · fuso {planilha.fuso}
-              </p>
-            )}
-            {abas.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <div className="w-full sm:w-72">
-                  <Selecionar
-                    id="saidas-aba"
-                    value={abaSelecionada}
-                    onValueChange={setAbaSelecionada}
-                    placeholder="Escolha a aba"
-                    ariaLabel="Aba do registro de saídas"
-                    opcoes={abas
-                      .filter((aba) => !aba.oculta)
-                      .map((aba) => ({ valor: aba.nome, rotulo: aba.nome }))}
-                  />
-                </div>
-                {abaEscolhida && (
-                  <div className="text-muted-foreground flex flex-col gap-1 text-xs">
-                    <span>Colunas reconhecidas:</span>
-                    {abaEscolhida.colunas.some((coluna) => coluna.atributo) ? (
-                      <CaixasDeInfo
-                        rotulo="Colunas reconhecidas"
-                        partes={abaEscolhida.colunas
-                          .filter((coluna) => coluna.atributo)
-                          .map((coluna) => coluna.rotulo || coluna.letra)}
-                      />
-                    ) : (
-                      <span>nenhuma</span>
-                    )}
-                    {abaEscolhida.bloqueio && (
-                      <span className="text-falta-texto">{abaEscolhida.bloqueio}</span>
+      <PainelAcoesPlanilha
+        rotulo="Ações da planilha de entradas e saídas"
+        valor={painel ?? (conectada && estruturaSalva ? "envio" : "configuracao")}
+        onValor={setPainel}
+        itens={[
+          {
+            valor: "envio",
+            rotulo: "Enviar",
+            icone: Send,
+            conteudo: (
+              <>
+                <section
+                  aria-label="Envio de entradas e saídas"
+                  className="flex min-w-0 flex-col gap-3"
+                >
+                  {!estruturaSalva && (
+                    <p className="text-muted-foreground text-sm">
+                      Configure a aba antes de enviar.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {onAbrirSaidas && (
+                      <Button
+                        type="button"
+                        className="h-11"
+                        disabled={!estruturaSalva}
+                        title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
+                        onClick={onAbrirSaidas}
+                      >
+                        <DoorOpen size={18} aria-hidden="true" />
+                        Abrir a vista Saídas
+                      </Button>
                     )}
                   </div>
-                )}
-                <Button
-                  type="button"
-                  className="h-11 self-start"
-                  onClick={() => void salvarMapa()}
-                  disabled={salvando || !abaEscolhida || Boolean(abaEscolhida.bloqueio)}
-                >
-                  Salvar estrutura
-                </Button>
-              </div>
-            )}
-            <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-end">
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <Label htmlFor="saidas-nova-aba">Criar aba com o cabeçalho padrão</Label>
-                <Input
-                  id="saidas-nova-aba"
-                  value={novaAba}
-                  onChange={(evento) => setNovaAba(evento.target.value)}
-                  autoComplete="off"
-                  className="h-11"
+                  <div className="superficie flex items-start justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Enviar ao registrar</p>
+                      <p className="text-muted-foreground text-xs">
+                        Acrescenta os novos registros automaticamente.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={envioRascunho}
+                      disabled={salvando || !ativaRascunho || !conectada || !estruturaSalva}
+                      onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
+                      aria-label="Enviar ao registrar saídas e entradas"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 text-xs">
+                    {integracao?.ultimoErro && (
+                      <p className="text-falta-texto">
+                        {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}:{" "}
+                        {integracao.ultimoErro.erro ?? "sem detalhe"}
+                      </p>
+                    )}
+                    <details className="rounded-xl border p-3">
+                      <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
+                        <History size={18} aria-hidden="true" />
+                        Histórico de envios
+                      </summary>
+                      {integracao && integracao.sincronizacoes.length > 0 ? (
+                        <ul className="text-muted-foreground mt-2 flex flex-col gap-2">
+                          {integracao.sincronizacoes.slice(0, 5).map((item) => (
+                            <li key={item.id}>
+                              {rotuloData(item.de)} a {rotuloData(item.ate)} ·{" "}
+                              {item.modalidade.toLowerCase()} · {item.linhasCriadas} linhas criadas
+                              · {item.substituidas} corrigidas · {item.removidasLinhas} removidas ·{" "}
+                              {item.resultado.toLowerCase()}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted-foreground mt-2">Nenhum envio registrado.</p>
+                      )}
+                    </details>
+                  </div>
+                </section>
+
+                <BlocoModoCompletoPlanilha
+                  idPrefixo="planilha-saidas"
+                  urlBase="/api/planilha-saidas"
+                  ativo={completoAtivo}
+                  ate={integracao?.modoCompletoAte ?? null}
+                  onMudou={carregar}
                 />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11"
-                onClick={() => void criarAba()}
-                disabled={chaveAtiva === "criar-aba-saidas" || novaAba.trim() === ""}
-              >
-                {chaveAtiva === "criar-aba-saidas" ? "Criando..." : "Criar aba"}
-              </Button>
-            </div>
-          </>
-        ) : null}
-      </EtapaPlanilha>
+              </>
+            ),
+          },
+          {
+            valor: "organizacao",
+            rotulo: "Organizar",
+            icone: LayoutGrid,
+            conteudo: (
+              <>
+                {!conectada && (
+                  <p className="text-muted-foreground text-sm">
+                    Conecte uma planilha em Configurar.
+                  </p>
+                )}
+                {(abaSelecionada || integracao?.esquema?.aba) && (
+                  <div className="superficie flex flex-col gap-2 p-3">
+                    <h3 className="text-sm font-medium">Saídas</h3>
+                    <div>
+                      <OrganizarPlanilha
+                        rota="/api/planilha-saidas/organizar"
+                        aba={abaSelecionada || integracao?.esquema?.aba || ""}
+                        disabled={!podeEnviar}
+                      />
+                    </div>
+                  </div>
+                )}
 
-      {(abaSelecionada || integracao?.esquema?.aba) && (
-        <div className="superficie flex flex-col gap-2 p-3">
-          <div>
-            <OrganizarPlanilha
-              rota="/api/planilha-saidas/organizar"
-              aba={abaSelecionada || integracao?.esquema?.aba || ""}
-              disabled={!podeEnviar}
-            />
-          </div>
-        </div>
-      )}
+                {conectada && (
+                  <div
+                    data-secao="planilha-entradas-preparo"
+                    className="superficie flex flex-col gap-2 p-3"
+                  >
+                    <h3 className="text-sm font-medium">Entradas</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11"
+                        disabled={!podeEnviar || chaveAtiva === "preparar-entradas"}
+                        onClick={() => setConfirmarEntradas(true)}
+                      >
+                        <Plus size={18} aria-hidden="true" />
+                        Preparar aba Entradas
+                      </Button>
+                      <OrganizarPlanilha
+                        rota="/api/planilha-entradas/organizar"
+                        aba="Entradas"
+                        disabled={!podeEnviar}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            valor: "configuracao",
+            rotulo: "Configurar",
+            icone: Settings2,
+            conteudo: (
+              <>
+                <EtapaPlanilha
+                  numero={1}
+                  titulo="Conexão"
+                  estado={conectada ? "concluida" : "atual"}
+                >
+                  <SeletorPlanilhaGoogle
+                    finalidade="SAIDAS"
+                    conectado={integracao?.contaGoogle ?? false}
+                    planilha={integracao?.googlePlanilha ?? null}
+                    onAtualizar={carregar}
+                  />
+                </EtapaPlanilha>
 
-      {conectada && (
-        <div data-secao="planilha-entradas-preparo" className="superficie flex flex-col gap-2 p-3">
-          <p className="text-muted-foreground text-xs">
-            A aba Entradas tem as mesmas colunas da aba de saídas.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              disabled={!podeEnviar || chaveAtiva === "preparar-entradas"}
-              onClick={() => setConfirmarEntradas(true)}
-            >
-              Preparar aba Entradas
-            </Button>
-            <OrganizarPlanilha
-              rota="/api/planilha-entradas/organizar"
-              aba="Entradas"
-              disabled={!podeEnviar}
-            />
-          </div>
-        </div>
-      )}
+                <EtapaPlanilha
+                  numero={2}
+                  titulo="Aba do registro"
+                  estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
+                  resumo={
+                    estruturaSalva && !estruturaEmEdicao
+                      ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
+                      : podeEnviar
+                        ? "Escolha a aba para as saídas."
+                        : "Conecte e ative a integração."
+                  }
+                  acoes={
+                    estruturaEmEdicao ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => void lerEstrutura()}
+                        disabled={lendo || !podeEnviar}
+                        title={
+                          podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."
+                        }
+                      >
+                        {lendo ? (
+                          <LoaderCircle size={16} className="animate-spin" />
+                        ) : (
+                          <RotateCcw size={16} />
+                        )}
+                        Conferir estrutura
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        onClick={() => setEditandoEstrutura(true)}
+                      >
+                        <Settings2 size={16} aria-hidden="true" />
+                        Revisar estrutura
+                      </Button>
+                    )
+                  }
+                >
+                  {estruturaEmEdicao ? (
+                    <>
+                      {planilha && (
+                        <p className="text-muted-foreground text-xs">
+                          {planilha.nome} · fuso {planilha.fuso}
+                        </p>
+                      )}
+                      {abas.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                          <div className="w-full sm:w-72">
+                            <Selecionar
+                              id="saidas-aba"
+                              buscavel
+                              value={abaSelecionada}
+                              onValueChange={setAbaSelecionada}
+                              placeholder="Escolha a aba"
+                              ariaLabel="Aba do registro de saídas"
+                              opcoes={abas
+                                .filter((aba) => !aba.oculta)
+                                .map((aba) => ({ valor: aba.nome, rotulo: aba.nome }))}
+                            />
+                          </div>
+                          {abaEscolhida && (
+                            <div className="text-muted-foreground flex flex-col gap-1 text-xs">
+                              <span>Colunas reconhecidas:</span>
+                              {abaEscolhida.colunas.some((coluna) => coluna.atributo) ? (
+                                <CaixasDeInfo
+                                  rotulo="Colunas reconhecidas"
+                                  partes={abaEscolhida.colunas
+                                    .filter((coluna) => coluna.atributo)
+                                    .map((coluna) => coluna.rotulo || coluna.letra)}
+                                />
+                              ) : (
+                                <span>nenhuma</span>
+                              )}
+                              {abaEscolhida.bloqueio && (
+                                <span className="text-falta-texto">{abaEscolhida.bloqueio}</span>
+                              )}
+                            </div>
+                          )}
+                          <Button
+                            type="button"
+                            className="h-11 self-start"
+                            onClick={() => void salvarMapa()}
+                            disabled={salvando || !abaEscolhida || Boolean(abaEscolhida.bloqueio)}
+                          >
+                            <Save size={18} aria-hidden="true" />
+                            Salvar estrutura
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-end">
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                          <Label htmlFor="saidas-nova-aba">Nome da nova aba</Label>
+                          <Input
+                            id="saidas-nova-aba"
+                            value={novaAba}
+                            onChange={(evento) => setNovaAba(evento.target.value)}
+                            autoComplete="off"
+                            className="h-11"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-11"
+                          onClick={() => void criarAba()}
+                          disabled={chaveAtiva === "criar-aba-saidas" || novaAba.trim() === ""}
+                        >
+                          <Plus size={18} aria-hidden="true" />
+                          {chaveAtiva === "criar-aba-saidas" ? "Criando..." : "Criar aba"}
+                        </Button>
+                      </div>
+                    </>
+                  ) : null}
+                </EtapaPlanilha>
 
-      <EtapaPlanilha
-        numero={3}
-        titulo="Envio pela vista Saídas"
-        estado={estruturaSalva ? "atual" : "pendente"}
-        resumo={estruturaSalva ? "Envio mensal com prévia." : "Salve a estrutura antes de enviar."}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          {onAbrirSaidas && (
-            <Button
-              type="button"
-              className="h-11"
-              disabled={!estruturaSalva}
-              title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
-              onClick={onAbrirSaidas}
-            >
-              Abrir a vista Saídas
-            </Button>
-          )}
-        </div>
-        <div className="superficie flex items-start justify-between gap-3 p-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Enviar ao registrar</p>
-            <p className="text-muted-foreground text-xs">
-              Cada saída e cada entrada registrada segue para a planilha sozinha, só acrescentando
-              linhas. O que pedir revisão fica para o envio manual.
-            </p>
-          </div>
-          <Switch
-            checked={envioRascunho}
-            disabled={salvando || !ativaRascunho || !conectada || !estruturaSalva}
-            onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
-            aria-label="Enviar ao registrar saídas e entradas"
-          />
-        </div>
-        <div className="flex flex-col gap-1 text-xs">
-          {integracao?.ultimoErro && (
-            <p className="text-falta-texto">
-              {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}:{" "}
-              {integracao.ultimoErro.erro ?? "sem detalhe"}
-            </p>
-          )}
-          {integracao && integracao.sincronizacoes.length > 0 ? (
-            <ul className="text-muted-foreground flex flex-col gap-0.5">
-              {integracao.sincronizacoes.slice(0, 5).map((item) => (
-                <li key={item.id}>
-                  {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()} ·{" "}
-                  {item.linhasCriadas} linhas criadas · {item.substituidas} corrigidas ·{" "}
-                  {item.removidasLinhas} removidas · {item.resultado.toLowerCase()}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">Nenhum envio registrado.</p>
-          )}
-        </div>
-      </EtapaPlanilha>
-
-      <BlocoModoCompletoPlanilha
-        idPrefixo="planilha-saidas"
-        urlBase="/api/planilha-saidas"
-        ativo={completoAtivo}
-        ate={integracao?.modoCompletoAte ?? null}
-        onMudou={carregar}
-      />
-
-      <BlocoRiscoPlanilha
-        idPrefixo="planilha-saidas"
-        urlBase="/api/planilha-saidas"
-        copiasDe={
-          integracao?.esquema?.aba
-            ? [integracao.esquema.aba]
-            : abas.filter((aba) => !aba.oculta).map((aba) => aba.nome)
-        }
-        abasCriadas={abas.filter((aba) => aba.criada).map((aba) => aba.nome)}
-        onMudou={carregar}
+                <BlocoRiscoPlanilha
+                  idPrefixo="planilha-saidas"
+                  urlBase="/api/planilha-saidas"
+                  copiasDe={
+                    integracao?.esquema?.aba
+                      ? [integracao.esquema.aba]
+                      : abas.filter((aba) => !aba.oculta).map((aba) => aba.nome)
+                  }
+                  abasCriadas={abas.filter((aba) => aba.criada).map((aba) => aba.nome)}
+                  onMudou={carregar}
+                />
+              </>
+            ),
+          },
+        ]}
       />
 
       {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}

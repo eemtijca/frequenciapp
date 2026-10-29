@@ -34,6 +34,13 @@ test.describe("abas da Gestão", () => {
           "aria-expanded",
           secao === retorno.secao ? "true" : "false",
         );
+        if (secao === retorno.secao) {
+          await expect(
+            cartao
+              .getByRole("navigation", { name: /^Ações da planilha/ })
+              .getByRole("button", { name: "Configurar", exact: true }),
+          ).toHaveAttribute("aria-pressed", "true");
+        }
       }
     });
   }

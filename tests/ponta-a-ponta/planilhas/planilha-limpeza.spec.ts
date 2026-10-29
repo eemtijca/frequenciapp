@@ -1,6 +1,7 @@
 // Limpeza de backups antigos na Gestão: prévia, cancelamento e toque duplo.
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 test.use({ serviceWorkers: "block" });
 const copia = "_frequenciapp_backup_QA_20260930-130258-674";
 async function abrir(page: Page) {
@@ -36,6 +37,7 @@ async function abrir(page: Page) {
     .click();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  await selecionarAcaoPlanilha(cartao, "Configurar");
   await cartao.getByRole("button", { name: /Zona de risco/ }).click();
   return cartao;
 }

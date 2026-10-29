@@ -80,6 +80,8 @@ test("mostra as contagens e os itens e permite processar, descartar e reenfileir
   });
   const secao = await abrirSecao(page);
 
+  await expect(secao.getByText("Aguardando: 1", { exact: true })).toBeHidden();
+  await secao.getByText("Detalhes da fila", { exact: true }).click();
   await expect(secao.getByText("Aguardando: 1", { exact: true })).toBeVisible();
   await expect(secao.getByText("Concluído: 2", { exact: true })).toBeVisible();
   await expect(secao.getByText("Falhou: 1", { exact: true })).toBeVisible();
@@ -92,15 +94,15 @@ test("mostra as contagens e os itens e permite processar, descartar e reenfileir
   await expect(itens.nth(2)).toContainText("Enviado");
   // Cada ação só aparece no estado em que vale.
   await expect(itens.nth(0).getByRole("button", { name: "Descartar" })).toBeVisible();
-  await expect(itens.nth(0).getByRole("button", { name: "Reenfileirar" })).toHaveCount(0);
-  await expect(itens.nth(1).getByRole("button", { name: "Reenfileirar" })).toBeVisible();
+  await expect(itens.nth(0).getByRole("button", { name: "Tentar novamente" })).toHaveCount(0);
+  await expect(itens.nth(1).getByRole("button", { name: "Tentar novamente" })).toBeVisible();
   await expect(itens.nth(2).getByRole("button")).toHaveCount(0);
 
   await secao.getByRole("button", { name: "Processar agora" }).click();
   await expect(page.getByText("Fila processada.", { exact: true })).toBeVisible();
   await itens.nth(0).getByRole("button", { name: "Descartar" }).click();
   await expect(page.getByText("Item descartado.", { exact: true })).toBeVisible();
-  await itens.nth(1).getByRole("button", { name: "Reenfileirar" }).click();
+  await itens.nth(1).getByRole("button", { name: "Tentar novamente" }).click();
   await expect(page.getByText("Item voltou ao fim da fila.", { exact: true })).toBeVisible();
   expect(chamadas).toEqual([
     "POST /api/planilha/fila/processar",

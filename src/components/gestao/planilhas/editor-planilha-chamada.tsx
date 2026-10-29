@@ -45,10 +45,11 @@ export function EditorPlanilhaChamada({
       aria-label="Editar planilhas de chamada"
       className="superficie flex flex-col gap-3 p-4"
     >
-      <h3 className="font-medium">Editar planilhas de chamada</h3>
+      <h3 className="font-medium">Editar chamada</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <Selecionar
           id="editor-planilha-turma"
+          buscavel
           value={turmaId}
           onValueChange={setTurmaId}
           placeholder="Escolha a turma"
@@ -114,12 +115,6 @@ export function EditorPlanilhaChamada({
           );
         })}
       </div>
-      {!modoCompleto && (
-        <p className="text-muted-foreground flex items-center gap-2 text-xs">
-          <LockKeyhole aria-hidden="true" className="size-3.5 shrink-0" />
-          Para corrigir ou excluir, libere o modo completo abaixo.
-        </p>
-      )}
       <details className="text-muted-foreground text-xs">
         <summary className="flex min-h-9 cursor-pointer items-center gap-2 font-medium">
           <HelpCircle aria-hidden="true" className="size-4" />

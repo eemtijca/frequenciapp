@@ -101,6 +101,7 @@ export default function DialogoEnvioSaidas({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [removerMarcadas, setRemoverMarcadas] = useState<number[]>([]);
+  const [carregando, setCarregando] = useState(true);
 
   const dias = diasDoMes(mes);
   const de = dias[0] ?? mes;
@@ -115,34 +116,58 @@ export default function DialogoEnvioSaidas({
     [de, ate, modoCompleto, removerMarcadas],
   );
 
-  const { executando: carregando, executar: simular } = useAcaoUnica(async () => {
+  const chavePrevia = JSON.stringify([aberto, modoCompleto, entradas()]);
+  const [chaveAnterior, setChaveAnterior] = useState(chavePrevia);
+  // Invalida a prévia no mesmo render da troca, antes de permitir outro envio.
+  if (chaveAnterior !== chavePrevia) {
+    setChaveAnterior(chavePrevia);
+    setCarregando(true);
+    setSimulacao(null);
+    setPreviaEntradas(null);
     setErro("");
     setAvisoEntradas("");
-    const [saidas, entradasPrevia] = await Promise.allSettled([
-      pedir<SimulacaoSaidas>("/api/planilha-saidas/simular", corpoJson(entradas())),
-      pedir<PreviaEntradas>("/api/planilha-entradas/simular", corpoJson({ de, ate })),
-    ]);
-    if (saidas.status === "fulfilled") setSimulacao(saidas.value);
-    else {
-      setSimulacao(null);
-      const excecao = saidas.reason;
-      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.");
-      setErroVariante(estadoDeErro(excecao));
-    }
-    // As entradas dependem da aba Entradas preparada; sem ela, só as saídas seguem.
-    if (entradasPrevia.status === "fulfilled") setPreviaEntradas(entradasPrevia.value);
-    else {
-      setPreviaEntradas(null);
-      const excecao = entradasPrevia.reason;
-      setAvisoEntradas(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar as entradas.",
-      );
-    }
-  });
+  }
 
   useEffect(() => {
-    if (aberto) void simular();
-  }, [aberto, mes, simular]);
+    if (!aberto) return;
+    const controle = new AbortController();
+    const { signal } = controle;
+    async function simular() {
+      const [saidas, entradasPrevia] = await Promise.allSettled([
+        pedir<SimulacaoSaidas>("/api/planilha-saidas/simular", {
+          ...corpoJson(entradas()),
+          signal,
+        }),
+        pedir<PreviaEntradas>("/api/planilha-entradas/simular", {
+          ...corpoJson({ de, ate }),
+          signal,
+        }),
+      ]);
+      // A troca do período cancela a leitura anterior, inclusive suas mensagens e resultados.
+      if (signal.aborted) return;
+      if (saidas.status === "fulfilled") setSimulacao(saidas.value);
+      else {
+        setSimulacao(null);
+        const excecao = saidas.reason;
+        setErro(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a prévia.",
+        );
+        setErroVariante(estadoDeErro(excecao));
+      }
+      // As entradas dependem da aba Entradas preparada; sem ela, só as saídas seguem.
+      if (entradasPrevia.status === "fulfilled") setPreviaEntradas(entradasPrevia.value);
+      else {
+        setPreviaEntradas(null);
+        const excecao = entradasPrevia.reason;
+        setAvisoEntradas(
+          excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar as entradas.",
+        );
+      }
+      setCarregando(false);
+    }
+    void simular();
+    return () => controle.abort();
+  }, [aberto, entradas, de, ate]);
 
   function trocarMes(novo: string) {
     setRemoverMarcadas([]);
@@ -153,7 +178,7 @@ export default function DialogoEnvioSaidas({
   const podeEntradas = Boolean(previaEntradas && !previaEntradas.bloqueado);
 
   const { executando: enviando, executar: enviar } = useAcaoUnica(async () => {
-    if (!podeSaidas && !podeEntradas) return;
+    if (carregando || (!podeSaidas && !podeEntradas)) return;
     setErro("");
     const feitos: string[] = [];
     const problemas: string[] = [];
@@ -238,6 +263,7 @@ export default function DialogoEnvioSaidas({
               modo="mes"
               valor={mes}
               max={mes}
+              disabled={enviando}
               rotuloAcessivel="Mês do envio das saídas e entradas"
               rotulo={rotuloMes(mes)}
               onValor={trocarMes}
@@ -263,7 +289,7 @@ export default function DialogoEnvioSaidas({
             </p>
           )}
 
-          {bloqueado && (
+          {!carregando && bloqueado && (
             <AvisoCompacto
               variante="dados_invalidos"
               descricao={

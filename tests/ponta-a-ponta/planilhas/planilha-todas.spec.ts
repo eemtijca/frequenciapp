@@ -2,6 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { colunasDeApresentacao } from "../../../src/domain/planilha-apresentacao";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 test.use({ serviceWorkers: "block" });
 const nomes = ["QA Ano A", "QA Ano B", "QA Ano C"];
 
@@ -40,6 +41,7 @@ async function abrir(page: Page, comMapa = true) {
     .click();
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
+  await selecionarAcaoPlanilha(cartao, "Organizar");
   await cartao.getByRole("combobox", { name: "Aba para organizar a apresentação" }).click();
   return cartao;
 }
