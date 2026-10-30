@@ -920,7 +920,7 @@ Fila FIFO durável dos envios automáticos de frequência, saídas e entradas ([
 
 | Método e rota                               | Quem                   | O que faz                                                                          |
 | ------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
-| `GET /api/planilha/fila`                    | Administração          | Contagens por estado e os 50 itens mais recentes.                                  |
+| `GET /api/planilha/fila`                    | Administração          | Contagens por estado e até 50 itens não enviados, na ordem de processamento.       |
 | `POST /api/planilha/fila/processar`         | Administração          | Processa até 20 itens agora e devolve o resumo.                                    |
 | `POST /api/planilha/fila/{id}/descartar`    | Administração          | Descarta um item que aguarda a vez; outro estado responde 409.                     |
 | `POST /api/planilha/fila/{id}/reenfileirar` | Administração          | Devolve ao fim da fila um item com falha ou descartado; outro estado responde 409. |
