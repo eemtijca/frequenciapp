@@ -3,7 +3,7 @@
 // Benefícios e frequência mínima no rascunho: a administração cria, edita,
 // desativa e remove as regras que alimentam o alerta da Chamada.
 import { useState } from "react";
-import { Pencil, Percent, Plus, Power, Trash2 } from "lucide-react";
+import { Check, HelpCircle, Pencil, Percent, Plus, Power, Trash2, X } from "lucide-react";
 import {
   PERCENTUAL_MINIMO_MAIOR,
   PERCENTUAL_MINIMO_MENOR,
@@ -154,7 +154,6 @@ export default function SecaoBeneficiosFrequencia({
   return (
     <SecaoRecolhivel
       titulo="Benefícios e frequência mínima"
-      descricao="Regras que acendem o alerta de faltas na Chamada."
       icone={Percent}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -165,25 +164,18 @@ export default function SecaoBeneficiosFrequencia({
         </Selo>
       }
     >
-      <p className="text-muted-foreground text-sm">
-        Cada benefício tem o percentual mínimo de frequência das aulas do mês. Quando as faltas de
-        um aluno passam do que esse percentual permite, a Chamada mostra um alerta com o nome do
-        benefício.
-      </p>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => abrirFormulario(null)}>
+        <Button type="button" className="min-h-11" onClick={() => abrirFormulario(null)}>
           <Plus size={16} aria-hidden="true" />
           Novo benefício
         </Button>
       </div>
       {beneficios.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          Nenhum benefício cadastrado. Sem benefício ativo, a Chamada não mostra alerta de faltas.
-        </p>
+        <p className="text-muted-foreground text-sm">Nenhum benefício cadastrado.</p>
       ) : (
-        <ul aria-label="Benefícios" className="flex flex-col divide-y rounded-2xl border">
+        <ul aria-label="Benefícios" className="flex flex-col gap-3">
           {beneficios.map((beneficio) => (
-            <li key={beneficio.id} className="flex flex-col gap-2 px-3 py-3">
+            <li key={beneficio.id} className="superficie flex min-w-0 flex-col gap-3 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="min-w-0 text-sm font-medium break-words">{beneficio.nome}</span>
                 <Selo variante={beneficio.ativo ? "sucesso" : "neutro"}>
@@ -191,20 +183,23 @@ export default function SecaoBeneficiosFrequencia({
                 </Selo>
                 {beneficio.id.startsWith("novo-") && <Selo>Novo</Selo>}
               </div>
-              <p className="text-muted-foreground text-xs">
-                Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência. Faltas justificadas{" "}
-                {beneficio.faltasJustificadasContam ? "contam" : "não contam"}.
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Selo>Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência</Selo>
+                <span className="text-muted-foreground">
+                  Faltas justificadas {beneficio.faltasJustificadasContam ? "contam" : "não contam"}
+                  .
+                </span>
+              </div>
               <p className="text-muted-foreground text-xs">
                 {beneficio.aulasPorDia === null
                   ? "Projeção pela grade da turma."
                   : `Projeção de ${beneficio.aulasPorDia} aulas por dia.`}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
+                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
                   aria-label={`Editar ${beneficio.nome}`}
                   onClick={() => abrirFormulario(beneficio)}
                 >
@@ -214,7 +209,7 @@ export default function SecaoBeneficiosFrequencia({
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
+                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
                   aria-label={`${beneficio.ativo ? "Desativar" : "Ativar"} ${beneficio.nome}`}
                   onClick={() => alternarSituacao(beneficio)}
                 >
@@ -224,7 +219,7 @@ export default function SecaoBeneficiosFrequencia({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
                   aria-label={`Excluir ${beneficio.nome}`}
                   onClick={() => setParaExcluir(beneficio)}
                 >
@@ -237,17 +232,28 @@ export default function SecaoBeneficiosFrequencia({
         </ul>
       )}
 
+      <details className="text-muted-foreground text-xs">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+          <HelpCircle size={16} aria-hidden="true" />
+          Como funcionam os alertas
+        </summary>
+        <p className="mt-1 leading-relaxed">
+          O mínimo de frequência vale para as aulas do mês. Quando as faltas ultrapassam o limite, a
+          Chamada mostra o nome do benefício. Regras inativas não geram alertas.
+        </p>
+      </details>
+
       <Dialog
         open={formulario !== null}
         onOpenChange={(valor) => {
           if (!valor) setFormulario(null);
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{formulario?.id ? "Editar benefício" : "Novo benefício"}</DialogTitle>
             <DialogDescription>
-              O alerta usa as aulas do mês e só conta as faltas que a regra manda contar.
+              Defina o mínimo de frequência e as faltas consideradas.
             </DialogDescription>
           </DialogHeader>
           {formulario && (
@@ -281,11 +287,9 @@ export default function SecaoBeneficiosFrequencia({
                   onChange={(evento) =>
                     setFormulario({ ...formulario, percentual: evento.target.value })
                   }
-                  className="numerais-tabulares"
+                  className="numerais-tabulares h-11"
                 />
-                <p className="text-muted-foreground text-xs">
-                  Percentual das aulas do mês em que o aluno precisa estar presente.
-                </p>
+                <p className="text-muted-foreground text-xs">Presença nas aulas do mês.</p>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex w-full flex-col gap-1.5">
@@ -303,19 +307,16 @@ export default function SecaoBeneficiosFrequencia({
                     onChange={(evento) =>
                       setFormulario({ ...formulario, aulasPorDia: evento.target.value })
                     }
-                    className="numerais-tabulares"
+                    className="numerais-tabulares h-11"
                   />
                   <p id="beneficio-aulas-dia-ajuda" className="text-muted-foreground text-xs">
-                    Vazio usa a grade da turma. Chamadas salvas mantêm as aulas registradas.
+                    Vazio usa a grade. Chamadas salvas mantêm as aulas registradas.
                   </p>
                 </div>
               </div>
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <Label htmlFor="beneficio-justificadas">Faltas justificadas contam</Label>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Desligado, só as faltas sem justificativa entram na conta do limite.
-                  </p>
                 </div>
                 <Switch
                   id="beneficio-justificadas"
@@ -328,9 +329,6 @@ export default function SecaoBeneficiosFrequencia({
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <Label htmlFor="beneficio-ativo">Benefício ativo</Label>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Inativo, o benefício deixa de gerar alerta na Chamada.
-                  </p>
                 </div>
                 <Switch
                   id="beneficio-ativo"
@@ -346,10 +344,19 @@ export default function SecaoBeneficiosFrequencia({
                 />
               )}
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setFormulario(null)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  onClick={() => setFormulario(null)}
+                >
+                  <X size={16} aria-hidden="true" />
                   Cancelar
                 </Button>
-                <Button type="submit">Aplicar ao rascunho</Button>
+                <Button type="submit" className="min-h-11">
+                  <Check size={16} aria-hidden="true" />
+                  Aplicar ao rascunho
+                </Button>
               </DialogFooter>
             </form>
           )}
@@ -366,9 +373,8 @@ export default function SecaoBeneficiosFrequencia({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir benefício?</AlertDialogTitle>
             <AlertDialogDescription>
-              {paraExcluir ? `${paraExcluir.nome}. ` : ""}A Chamada deixa de mostrar alertas desse
-              benefício. As frequências salvas não mudam. Para manter a regra e só pausar o alerta,
-              desative em vez de excluir.
+              {paraExcluir ? `${paraExcluir.nome}. ` : ""}Ao salvar as configurações, a regra e seus
+              alertas serão removidos. As frequências salvas permanecem.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

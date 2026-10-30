@@ -4,12 +4,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, registrarSaida, trocarVisao } from "../helpers/pagina";
 import {
+  selecionarAcaoConfiguracoes,
   descartarConfiguracoes,
   enviarRascunhoConfiguracoes,
   salvarConfiguracoes,
 } from "../helpers/configuracoes";
 
 async function abrirCatalogo(page: Page) {
+  await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
   const secao = page.locator('[data-secao="config-liberadores"]');
   const regiao = secao.getByRole("region", { name: "Quem libera as saídas" });
   if (!(await regiao.isVisible())) {
@@ -36,6 +38,7 @@ test.describe("quem libera as saídas", () => {
     await page.getByRole("tab", { name: "Configurações" }).click();
 
     const secao = await abrirCatalogo(page);
+    await secao.getByText("Adicionar responsável", { exact: true }).click();
     await page.locator("#liberador-codigo").fill("E2E1");
     await page.locator("#liberador-rotulo").fill("E2E Porteiro");
     await secao.getByRole("button", { name: "Adicionar" }).click();

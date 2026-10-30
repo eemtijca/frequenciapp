@@ -3,7 +3,7 @@
 import { expect, test } from "@playwright/test";
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 import { abrirNotificacoes, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.describe("configuração de notificações", () => {
   let anterior: ConfiguracaoNotificacoes;
@@ -35,6 +35,7 @@ test.describe("configuração de notificações", () => {
       .getByRole("button", { name: "Acesso e avisos", exact: true })
       .click();
     const secao = page.locator('[data-secao="notificacoes"]');
+    await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
     await secao.getByRole("button", { name: /Notificações/ }).click();
     const pendencias = secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" });
     await expect(pendencias).toHaveAttribute("aria-checked", "false");
@@ -59,6 +60,7 @@ test.describe("configuração de notificações", () => {
       .getByRole("navigation", { name: "Categorias de configurações" })
       .getByRole("button", { name: "Acesso e avisos", exact: true })
       .click();
+    await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
     await secao.getByRole("button", { name: /Notificações/ }).click();
     await expect(
       secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" }),
