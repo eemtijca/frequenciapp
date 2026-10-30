@@ -2,7 +2,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
+import {
+  descartarConfiguracoes,
+  selecionarAcaoConfiguracoes,
+  salvarConfiguracoes,
+} from "../helpers/configuracoes";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -102,6 +106,33 @@ async function abrirChamadaDoMesAnterior(page: Page, navegar: boolean) {
   };
 }
 
+for (const largura of [320, 390, 800, 1280]) {
+  test(`em ${largura} px, o aviso não impede salvar ou descartar o rascunho`, async ({ page }) => {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const secao = await abrirBeneficios(page);
+    await secao.getByRole("button", { name: "Novo benefício" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Novo benefício" });
+    await dialogo.getByLabel("Nome do benefício").fill(NOME_BENEFICIO);
+    await dialogo.getByLabel("Frequência mínima, em %").fill("99");
+    await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+    const aviso = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
+    await expect(aviso).toBeVisible();
+    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+      trial: true,
+      timeout: 2_000,
+    });
+    await page.getByRole("button", { name: "Descartar", exact: true }).click({
+      trial: true,
+      timeout: 2_000,
+    });
+    await expect(aviso).toBeVisible();
+    await descartarConfiguracoes(page);
+    await expect(secao.getByText(NOME_BENEFICIO, { exact: true })).toHaveCount(0);
+  });
+}
+
 test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", async ({
   page,
   isMobile,
@@ -139,6 +170,14 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await dialogo.screenshot({ path: test.info().outputPath("aulas-por-dia.png") });
   await dialogo.getByLabel("Aulas por dia", { exact: true }).fill("");
   await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+  const avisoRascunho = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
+  await expect(avisoRascunho).toBeVisible();
+  // O aviso não pode bloquear o salvamento enquanto permanece visível.
+  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+    trial: true,
+    timeout: 2_000,
+  });
+  await expect(avisoRascunho).toBeVisible();
   await salvarConfiguracoes(page);
   await expect(secao.getByText(NOME_BENEFICIO)).toBeVisible();
   await expect(secao.getByText(/Mínimo de 99% de frequência/)).toBeVisible();

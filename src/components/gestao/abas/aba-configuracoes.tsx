@@ -1459,6 +1459,7 @@ function ConteudoConfiguracoes({
         <div
           role="region"
           aria-label="Salvar configurações"
+          data-rodape-configuracoes=""
           className="superficie sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
           style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
