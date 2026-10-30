@@ -448,6 +448,7 @@ export default function VistaHorarios({
           <Label htmlFor={`${base}-turma`}>Turma</Label>
           <Selecionar
             id={`${base}-turma`}
+            buscavel={editavel}
             value={turma?.id ?? ""}
             onValueChange={setTurmaId}
             opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}

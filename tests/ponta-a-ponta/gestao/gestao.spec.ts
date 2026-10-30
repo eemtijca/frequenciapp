@@ -1,6 +1,7 @@
 // Navegação da Gestão e das configurações, com preservação de rascunhos e retorno do Google.
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
 test.describe("abas da Gestão", () => {
   const retornosGoogle = [
@@ -59,12 +60,15 @@ test.describe("abas da Gestão", () => {
       "aria-pressed",
       "true",
     );
+    await expect(justificativas).toBeHidden();
+    await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
     await expect(justificativas).toBeVisible();
     await expect(copia).toBeHidden();
     await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
     await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
 
     await justificativas.getByRole("button", { name: /^Justificativas/ }).click();
+    await justificativas.getByText("Adicionar justificativa", { exact: true }).click();
     await justificativas.getByLabel("Código", { exact: true }).fill("E2E");
     await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Rascunho preservado");
     await categorias.getByRole("button", { name: "Dados", exact: true }).click();
@@ -75,6 +79,7 @@ test.describe("abas da Gestão", () => {
 
     await categorias.getByRole("button", { name: "Escola", exact: true }).click();
     await expect(copia).toBeHidden();
+    await expect(justificativas).toBeVisible();
     await expect(justificativas.getByLabel("Código", { exact: true })).toHaveValue("E2E");
     await expect(justificativas.getByLabel("Rótulo", { exact: true })).toHaveValue(
       "E2E Rascunho preservado",

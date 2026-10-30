@@ -3,7 +3,7 @@
 // Calendário anual de feriados no rascunho das configurações, com
 // sincronização externa imediata e remoção confirmada.
 import { useState } from "react";
-import { CalendarDays, Trash2 } from "lucide-react";
+import { CalendarDays, HelpCircle, Plus, Trash2 } from "lucide-react";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido, rotuloData } from "@/domain/frequencia";
 import { avisarSucesso } from "@/lib/avisos";
@@ -102,7 +102,6 @@ export default function SecaoCalendarioLetivo({
   return (
     <SecaoRecolhivel
       titulo="Calendário letivo"
-      descricao="Feriados e recessos que suspendem a chamada."
       icone={CalendarDays}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -115,18 +114,20 @@ export default function SecaoCalendarioLetivo({
         </Selo>
       }
     >
-      <p className="text-muted-foreground text-sm">Feriados valem para todas as turmas.</p>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">Ano do calendário</span>
-        <SeletorAno
-          id="calendario-letivo-ano"
-          valor={ano}
-          min={1900}
-          max={2199}
-          disabled={bloqueado}
-          rotuloAcessivel="Ano do calendário"
-          onValor={mudarAno}
-        />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-48">
+          <span className="text-sm font-medium">Ano do calendário</span>
+          <SeletorAno
+            id="calendario-letivo-ano"
+            valor={ano}
+            min={1900}
+            max={2199}
+            disabled={bloqueado}
+            rotuloAcessivel="Ano do calendário"
+            onValor={mudarAno}
+          />
+        </div>
+        <Selo>Todas as turmas</Selo>
       </div>
       <ControleSincronizarFeriados
         ano={ano}
@@ -137,7 +138,8 @@ export default function SecaoCalendarioLetivo({
         onAtualizar={onSincronizar}
       />
       <form
-        className="flex flex-col gap-3"
+        aria-label="Adicionar feriado ao calendário"
+        className="grid min-w-0 gap-3 rounded-xl border p-3 sm:grid-cols-[12rem_minmax(0,1fr)]"
         onSubmit={(evento) => {
           evento.preventDefault();
           if (!bloqueado) adicionar();
@@ -164,6 +166,7 @@ export default function SecaoCalendarioLetivo({
             value={nome}
             maxLength={120}
             required
+            className="h-11"
             disabled={bloqueado}
             onChange={(evento) => setNome(evento.target.value)}
           />
@@ -171,8 +174,9 @@ export default function SecaoCalendarioLetivo({
         <Button
           type="submit"
           disabled={bloqueado || !anoValido || !nome.trim()}
-          className="self-start"
+          className="h-auto min-h-11 min-w-0 whitespace-normal sm:col-span-2 sm:justify-self-end"
         >
+          <Plus size={16} aria-hidden="true" />
           Adicionar feriado
         </Button>
       </form>
@@ -198,6 +202,7 @@ export default function SecaoCalendarioLetivo({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="text-falta-texto size-11"
                   aria-label={`Remover feriado ${feriado.nome}`}
                   disabled={bloqueado}
                   onClick={() => {
@@ -213,6 +218,16 @@ export default function SecaoCalendarioLetivo({
         ) : (
           <p className="text-muted-foreground text-sm">Nenhum feriado em {ano}.</p>
         ))}
+      <details className="text-muted-foreground text-xs">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+          <HelpCircle size={16} aria-hidden="true" />
+          Ajuda
+        </summary>
+        <p>Feriados e recessos suspendem a chamada em todas as turmas.</p>
+        <p className="mt-2">
+          Datas adicionadas ou removidas manualmente valem ao salvar as configurações.
+        </p>
+      </details>
       <AlertDialog
         open={paraRemover !== null}
         onOpenChange={(valor) => {

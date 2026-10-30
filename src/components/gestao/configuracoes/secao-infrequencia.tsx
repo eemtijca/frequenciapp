@@ -2,7 +2,7 @@
 
 // Limites percentuais do card de Infrequência do Painel, no rascunho da Gestão.
 import { useState } from "react";
-import { Percent } from "lucide-react";
+import { CheckCircle2, CircleAlert, HelpCircle, Percent, TriangleAlert } from "lucide-react";
 import type { Configuracoes } from "@/domain/frequencia";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,14 +68,13 @@ export default function SecaoInfrequencia({ configuracoes, onMudar }: Props) {
     <SecaoRecolhivel
       dataSecao="config-infrequencia"
       titulo="Infrequência do Painel"
-      descricao="Faixas do card de Infrequência nos dias de segunda a sábado."
       icone={Percent}
       aberto={aberto}
       onAbertoChange={setAberto}
       resumo={
         <>
-          <Selo>{configuracoes.infrequenciaAtencaoPercentual}% no verde</Selo>
-          <Selo>{configuracoes.infrequenciaCriticaPercentual}% no âmbar</Selo>
+          <Selo>Esperado até {configuracoes.infrequenciaAtencaoPercentual}%</Selo>
+          <Selo>Atenção até {configuracoes.infrequenciaCriticaPercentual}%</Selo>
         </>
       }
     >
@@ -132,21 +131,36 @@ export default function SecaoInfrequencia({ configuracoes, onMudar }: Props) {
       )}
       <div className="grid gap-2 text-xs sm:grid-cols-3">
         <div className="bg-primary/10 text-primary rounded-xl border px-3 py-2">
-          <p className="font-semibold">Dentro do esperado</p>
+          <p className="flex items-center gap-2 font-semibold">
+            <CheckCircle2 size={16} aria-hidden="true" /> Dentro do esperado
+          </p>
           <p>até {configuracoes.infrequenciaAtencaoPercentual}%</p>
         </div>
         <div className="bg-alerta-fraca text-alerta-texto rounded-xl border px-3 py-2">
-          <p className="font-semibold">Atenção</p>
+          <p className="flex items-center gap-2 font-semibold">
+            <TriangleAlert size={16} aria-hidden="true" /> Atenção
+          </p>
           <p>
             acima de {configuracoes.infrequenciaAtencaoPercentual}% até{" "}
             {configuracoes.infrequenciaCriticaPercentual}%
           </p>
         </div>
         <div className="bg-falta-fraca text-falta-texto rounded-xl border px-3 py-2">
-          <p className="font-semibold">Acima do limite</p>
+          <p className="flex items-center gap-2 font-semibold">
+            <CircleAlert size={16} aria-hidden="true" /> Acima do limite
+          </p>
           <p>acima de {configuracoes.infrequenciaCriticaPercentual}%</p>
         </div>
       </div>
+      <details className="text-muted-foreground text-xs">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+          <HelpCircle size={16} aria-hidden="true" /> Como ler as faixas
+        </summary>
+        <p className="mt-1 leading-relaxed">
+          Os percentuais representam faltas nos dias de segunda a sábado. O primeiro limite deve ser
+          menor que o segundo.
+        </p>
+      </details>
     </SecaoRecolhivel>
   );
 }

@@ -2,7 +2,7 @@
 
 // Botão que grava os feriados do ano e fica bloqueado até a senha do administrador.
 import { useEffect, useId, useRef, useState } from "react";
-import { Download, LoaderCircle, LockKeyhole } from "lucide-react";
+import { Download, LoaderCircle, LockKeyhole, RotateCcw } from "lucide-react";
 import type {
   AbrangenciaFeriados,
   EstadoSincronizacaoFeriados,
@@ -48,12 +48,12 @@ const ESTADO_VAZIO: EstadoSincronizacaoFeriados = {
 
 function textoDaBusca(abrangencia: AbrangenciaFeriados, ano: string): string {
   if (abrangencia === "municipais") {
-    return `Busca os feriados nacionais, estaduais e municipais de ${ano} e grava as datas no calendário.`;
+    return `Feriados nacionais, estaduais e municipais de ${ano}. Gravação imediata.`;
   }
   if (abrangencia === "estaduais") {
-    return `Busca os feriados nacionais e estaduais de ${ano} e grava as datas no calendário.`;
+    return `Feriados nacionais e estaduais de ${ano}. Gravação imediata.`;
   }
-  return `Busca os feriados nacionais de ${ano} e grava as datas no calendário.`;
+  return `Feriados nacionais de ${ano}. Gravação imediata.`;
 }
 
 export default function ControleSincronizarFeriados({
@@ -194,7 +194,7 @@ export default function ControleSincronizarFeriados({
     estado.configurado &&
     (!sincronizado || desbloqueado);
   const ajuda = !anoValido
-    ? "Selecione um ano entre 1900 e 2199 para sincronizar."
+    ? "Selecione um ano de 1900 a 2199."
     : carregando
       ? "Conferindo o calendário."
       : leituraAtual?.erro
@@ -202,9 +202,9 @@ export default function ControleSincronizarFeriados({
         : !estado.configurado
           ? "A consulta de feriados não está configurada."
           : sincronizado && !desbloqueado
-            ? "Os feriados já estão gravados. Desbloqueie a sincronização com a senha do administrador."
+            ? "Feriados sincronizados. Nova consulta exige a senha do administrador."
             : desbloqueado
-              ? `A sincronização de ${ano} está liberada. O botão volta a ficar bloqueado depois da gravação.`
+              ? `Sincronização de ${ano} liberada para uma gravação imediata.`
               : textoDaBusca(estado.abrangencia, ano);
 
   function fecharDialogo() {
@@ -215,14 +215,12 @@ export default function ControleSincronizarFeriados({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <p id={ajudaId} className="text-muted-foreground text-sm">
-        {ajuda}
-      </p>
+    <div className="bg-muted/30 flex min-w-0 flex-col gap-2 rounded-xl border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           ref={botaoRef}
           type="button"
+          className="h-auto min-h-11 min-w-0 whitespace-normal"
           disabled={!podeSincronizar}
           aria-describedby={ajudaId}
           onClick={() => void executar()}
@@ -246,6 +244,7 @@ export default function ControleSincronizarFeriados({
             <Button
               type="button"
               variant="outline"
+              className="h-auto min-h-11 min-w-0 whitespace-normal"
               disabled={ocupado || !anoValido}
               onClick={() => {
                 setErro("");
@@ -261,13 +260,18 @@ export default function ControleSincronizarFeriados({
           <Button
             type="button"
             variant="outline"
+            className="h-auto min-h-11 min-w-0 whitespace-normal"
             disabled={desabilitado || executando}
             onClick={() => setTentativa((atual) => atual + 1)}
           >
+            <RotateCcw size={16} aria-hidden="true" />
             Tentar de novo
           </Button>
         )}
       </div>
+      <p id={ajudaId} className="text-muted-foreground text-xs">
+        {ajuda}
+      </p>
       {erro && (
         <AvisoCompacto
           variante={varianteErro}
@@ -297,8 +301,7 @@ export default function ControleSincronizarFeriados({
           <DialogHeader>
             <DialogTitle>Desbloquear sincronização</DialogTitle>
             <DialogDescription>
-              Informe a senha do administrador para liberar uma nova sincronização de {ano}. A senha
-              evita um clique acidental.
+              A senha do administrador libera uma nova gravação dos feriados de {ano}.
             </DialogDescription>
           </DialogHeader>
           <form

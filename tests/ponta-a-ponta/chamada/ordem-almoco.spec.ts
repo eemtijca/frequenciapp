@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 const serie = "E2E Almoco";
@@ -66,7 +66,7 @@ test("a ordem definida na Gestão aparece na aba Horários do dia", async ({ pag
 
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-  await page.locator("#categoria-config-horarios").click();
+  await selecionarAcaoConfiguracoes(page, "Horários", "Almoço");
   const secao = page.locator('[data-secao="config-ordem-almoco"]');
   await secao.getByRole("button", { name: /Ordem do almoço/ }).click();
   const regiao = secao.getByRole("region", { name: "Ordem do almoço" });

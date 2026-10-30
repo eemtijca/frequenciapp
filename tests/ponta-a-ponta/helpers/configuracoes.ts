@@ -89,3 +89,33 @@ export async function descartarConfiguracoes(page: Page): Promise<void> {
   await dialogo.getByRole("button", { name: "Descartar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 }
+
+/** Seleciona a categoria e sua tarefa, preservando o rascunho dos demais painéis. */
+export async function selecionarAcaoConfiguracoes(
+  page: Page,
+  categoria: "Escola" | "Horários" | "Acesso e avisos",
+  acao:
+    | "Geral"
+    | "Frequência"
+    | "Calendário"
+    | "Cadastros"
+    | "Aulas"
+    | "Almoço"
+    | "Diretores"
+    | "Notificações"
+    | "FrequenciBI",
+): Promise<void> {
+  const navegacoes = {
+    Escola: "Ações da escola",
+    Horários: "Ações dos horários",
+    "Acesso e avisos": "Ações de acesso e avisos",
+  };
+  await page
+    .getByRole("navigation", { name: "Categorias de configurações", exact: true })
+    .getByRole("button", { name: categoria, exact: true })
+    .click();
+  await page
+    .getByRole("navigation", { name: navegacoes[categoria], exact: true })
+    .getByRole("button", { name: acao, exact: true })
+    .click();
+}
