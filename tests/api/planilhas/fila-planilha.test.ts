@@ -458,3 +458,36 @@ describe("agenda com segredo", () => {
     expect((await fila()).find((item) => item.id === id)?.estado).toBe("CONCLUIDO");
   });
 });
+
+describe("lista da fila", () => {
+  it("mostra só os envios pendentes e os que falharam, na ordem de processamento", async () => {
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+    const ids: Record<string, string> = {};
+    for (const [estado, dia] of [
+      ["CONCLUIDO", "2026-09-01"],
+      ["AGUARDANDO", "2026-09-02"],
+      ["DESCARTADO", "2026-09-03"],
+      ["FALHOU", "2026-09-04"],
+      ["EM_ANDAMENTO", "2026-09-05"],
+    ] as const) {
+      const id = await inserirItem(dia);
+      await sql().query("update fila_planilha set estado = $2 where id = $1", [id, estado]);
+      ids[estado] = id;
+    }
+    const resposta = await chamar("/api/planilha/fila", "GET");
+    expect(resposta.status).toBe(200);
+    const estado = await json<{
+      contagens: Record<string, number>;
+      itens: { id: string; estado: string }[];
+    }>(resposta);
+    const daSuite = estado.itens.filter((item) => Object.values(ids).includes(item.id));
+    // Enviados e descartados saem da lista, mas continuam nas contagens.
+    expect(daSuite.map((item) => item.estado)).toEqual(["AGUARDANDO", "FALHOU", "EM_ANDAMENTO"]);
+    expect(estado.itens.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(
+      true,
+    );
+    expect(estado.contagens.CONCLUIDO).toBeGreaterThanOrEqual(1);
+    expect(estado.contagens.DESCARTADO).toBeGreaterThanOrEqual(1);
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+  });
+});

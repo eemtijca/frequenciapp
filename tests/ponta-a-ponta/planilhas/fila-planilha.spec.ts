@@ -1,5 +1,5 @@
-// Painel da fila de envios automáticos na Gestão: contagens, itens e ações da administração,
-// com as respostas da API simuladas.
+// Painel da fila de envios automáticos na Gestão: contagens, itens pendentes e ações da
+// administração, com as respostas da API simuladas.
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -35,18 +35,6 @@ const ESTADO = {
       criadoEm: "2026-10-06T12:00:00.000Z",
       proximaTentativaEm: null,
     },
-    {
-      id: "33333333-3333-4333-8333-333333333333",
-      tipo: "ENTRADAS",
-      estado: "CONCLUIDO",
-      dia: "2026-10-05",
-      turmaRotulo: null,
-      tentativas: 1,
-      resultado: "enviado",
-      erro: null,
-      criadoEm: "2026-10-05T12:00:00.000Z",
-      proximaTentativaEm: null,
-    },
   ],
 };
 
@@ -64,7 +52,7 @@ async function abrirSecao(page: Page) {
   return secao;
 }
 
-test("mostra as contagens e os itens e permite processar, descartar e reenfileirar", async ({
+test("mostra as contagens e os pendentes e permite processar, descartar e reenfileirar", async ({
   page,
 }) => {
   const chamadas: string[] = [];
@@ -85,18 +73,18 @@ test("mostra as contagens e os itens e permite processar, descartar e reenfileir
   await expect(secao.getByText("Aguardando: 1", { exact: true })).toBeVisible();
   await expect(secao.getByText("Concluído: 2", { exact: true })).toBeVisible();
   await expect(secao.getByText("Falhou: 1", { exact: true })).toBeVisible();
+  // Os envios concluídos entram só na contagem: a lista traz o que ainda falta enviar.
   const itens = secao.getByRole("list", { name: "Itens da fila" }).getByRole("listitem");
-  await expect(itens).toHaveCount(3);
+  await expect(itens).toHaveCount(2);
+  await expect(secao.getByText("Concluído", { exact: true })).toHaveCount(0);
   await expect(itens.nth(0)).toContainText("Saída");
   await expect(itens.nth(0)).toContainText("1 tentativa");
   await expect(itens.nth(1)).toContainText("E2E Ano A");
   await expect(itens.nth(1)).toContainText("5 tentativas");
-  await expect(itens.nth(2)).toContainText("Enviado");
   // Cada ação só aparece no estado em que vale.
   await expect(itens.nth(0).getByRole("button", { name: "Descartar" })).toBeVisible();
   await expect(itens.nth(0).getByRole("button", { name: "Tentar novamente" })).toHaveCount(0);
   await expect(itens.nth(1).getByRole("button", { name: "Tentar novamente" })).toBeVisible();
-  await expect(itens.nth(2).getByRole("button")).toHaveCount(0);
 
   await secao.getByRole("button", { name: "Processar agora" }).click();
   await expect(page.getByText("Fila processada.", { exact: true })).toBeVisible();
@@ -125,5 +113,5 @@ test("com a fila vazia, o resumo e a lista dizem isso", async ({ page }) => {
   );
   const secao = await abrirSecao(page);
   await expect(secao.getByText("Fila vazia", { exact: true }).first()).toBeVisible();
-  await expect(secao.getByText("Nenhum envio automático registrado.")).toBeVisible();
+  await expect(secao.getByText("Nenhum envio pendente na fila.")).toBeVisible();
 });
