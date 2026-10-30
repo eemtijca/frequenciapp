@@ -10,7 +10,7 @@ import {
   restaurarParametrosAcessoE2E,
 } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.describe("diretores de turma na Gestão", () => {
   test.beforeAll(async () => {
@@ -134,6 +134,7 @@ test.describe("diretores de turma na Gestão", () => {
       .getByRole("navigation", { name: "Categorias de configurações" })
       .getByRole("button", { name: "Acesso e avisos", exact: true })
       .click();
+    await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Diretores");
     const secao = page.locator('[data-secao="config-acesso-diretores"]');
     await secao.getByRole("button", { name: /Acesso dos diretores/ }).click();
     const validade = secao.getByLabel("Validade da palavra-chave");

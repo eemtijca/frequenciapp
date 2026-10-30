@@ -5,6 +5,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Archive,
+  Bell,
+  CalendarDays,
+  ChartNoAxesCombined,
+  ClipboardList,
+  HelpCircle,
+  Utensils,
   Check,
   Clock,
   Download,
@@ -43,6 +49,7 @@ import type {
 } from "@/domain/configuracoes";
 import { DIAS_ORDEM_ALMOCO } from "@/domain/ordem-almoco";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { PainelAcoes } from "@/components/ui/painel-acoes";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Input } from "@/components/ui/input";
@@ -197,6 +204,9 @@ function ConteudoConfiguracoes({
     mutarChaves,
   } = useRascunhoConfiguracoes();
 
+  const [acaoEscola, setAcaoEscola] = useState("geral");
+  const [acaoHorarios, setAcaoHorarios] = useState("aulas");
+  const [acaoAcesso, setAcaoAcesso] = useState("diretores");
   const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
   // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
   const [horariosAbertos, setHorariosAbertos] = useState(false);
@@ -611,21 +621,20 @@ function ConteudoConfiguracoes({
     return "";
   }
 
-  const escola = (
+  const recursos = (
     <>
       <SecaoRecolhivel
         dataSecao="config-recursos"
         titulo="Recursos da escola"
-        descricao="Liga e desliga recursos da chamada e das saídas."
         icone={Settings2}
         aberto={abertoRecursos}
         onAbertoChange={setAbertoRecursos}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="superficie flex items-center justify-between gap-4 p-3">
           <div className="min-w-0">
             <Label htmlFor="config-frequencia-aula">Chamada por aula</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Ligada: faltas por aula. Desligada: chamada diária.
+              {atual.configuracoes.frequenciaPorAula ? "Por aula" : "Diária"}
             </p>
           </div>
           <Switch
@@ -636,11 +645,11 @@ function ConteudoConfiguracoes({
           />
         </div>
 
-        <div className="flex items-start justify-between gap-4">
+        <div className="superficie flex items-center justify-between gap-4 p-3">
           <div className="min-w-0">
             <Label htmlFor="config-saida-antecipada">Saídas e Entradas</Label>
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Desligar oculta a área e preserva os registros.
+              {atual.configuracoes.saidaAntecipada ? "Área disponível" : "Área oculta"}
             </p>
           </div>
           <Switch
@@ -656,12 +665,9 @@ function ConteudoConfiguracoes({
           role="group"
           aria-label="Turma de origem na Chamada"
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="superficie flex items-center justify-between gap-4 p-3">
             <div className="min-w-0">
               <Label htmlFor="config-origem-chamada">Turma de origem na Chamada</Label>
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Mostra a origem e o remanejamento nas séries e turmas selecionadas.
-              </p>
             </div>
             <Switch
               id="config-origem-chamada"
@@ -757,9 +763,19 @@ function ConteudoConfiguracoes({
           )}
         </div>
       </SecaoRecolhivel>
+    </>
+  );
 
+  const frequencia = (
+    <>
       <SecaoInfrequencia configuracoes={atual.configuracoes} onMudar={mutarConfiguracoes} />
 
+      <SecaoBeneficiosFrequencia beneficios={atual.beneficios} onMudar={mutarBeneficios} />
+    </>
+  );
+
+  const calendario = (
+    <>
       <SecaoCalendarioLetivo
         feriados={atual.feriados}
         diaCorrente={diaCorrente}
@@ -770,58 +786,64 @@ function ConteudoConfiguracoes({
           aplicarFeriadosExternos(dados);
         }}
       />
+    </>
+  );
 
-      <SecaoBeneficiosFrequencia beneficios={atual.beneficios} onMudar={mutarBeneficios} />
-
+  const cadastros = (
+    <>
       <SecaoRecolhivel
         dataSecao="config-justificativas"
         titulo="Justificativas"
-        descricao="Motivos disponíveis nas faltas justificadas."
         icone={ScrollText}
         aberto={abertoJustificativas}
         onAbertoChange={setAbertoJustificativas}
         resumo={
           <>
-            <Selo>{atual.justificativas.length} no catálogo</Selo>
             <Selo>{atual.justificativas.filter((item) => item.ativo).length} ativas</Selo>
           </>
         }
       >
-        <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
-          <div className="flex flex-col gap-1.5 sm:w-32">
-            <Label htmlFor="justificativa-codigo">Código</Label>
-            <Input
-              id="justificativa-codigo"
-              value={novaCodigo}
-              maxLength={10}
-              autoComplete="off"
-              onChange={(evento) => setNovaCodigo(evento.target.value)}
-              placeholder="Ex.: At"
-              className="h-11"
-            />
+        <details className="rounded-xl border p-3">
+          <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
+            <Plus size={18} aria-hidden="true" />
+            Adicionar justificativa
+          </summary>
+          <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-1.5 sm:w-32">
+              <Label htmlFor="justificativa-codigo">Código</Label>
+              <Input
+                id="justificativa-codigo"
+                value={novaCodigo}
+                maxLength={10}
+                autoComplete="off"
+                onChange={(evento) => setNovaCodigo(evento.target.value)}
+                placeholder="Ex.: At"
+                className="h-11"
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="justificativa-rotulo">Rótulo</Label>
+              <Input
+                id="justificativa-rotulo"
+                value={novaRotulo}
+                maxLength={60}
+                autoComplete="off"
+                onChange={(evento) => setNovaRotulo(evento.target.value)}
+                placeholder="Ex.: Atestado"
+                className="h-11"
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-11 sm:w-auto"
+              onClick={criarJustificativa}
+              disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
+            >
+              <Plus size={16} />
+              Adicionar
+            </Button>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Label htmlFor="justificativa-rotulo">Rótulo</Label>
-            <Input
-              id="justificativa-rotulo"
-              value={novaRotulo}
-              maxLength={60}
-              autoComplete="off"
-              onChange={(evento) => setNovaRotulo(evento.target.value)}
-              placeholder="Ex.: Atestado"
-              className="h-11"
-            />
-          </div>
-          <Button
-            type="button"
-            className="h-11 sm:w-auto"
-            onClick={criarJustificativa}
-            disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
-          >
-            <Plus size={16} />
-            Adicionar
-          </Button>
-        </div>
+        </details>
 
         {erroJustificativa && (
           <AvisoCompacto variante="dados_invalidos" descricao={erroJustificativa} tamanho="linha" />
@@ -831,28 +853,25 @@ function ConteudoConfiguracoes({
           {atual.justificativas.map((item) => (
             <li
               key={item.codigo}
-              className={`flex min-h-14 items-center gap-3 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
+              className={`grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
                 item.ativo ? "" : "opacity-60"
               }`}
             >
-              <span className="bg-secondary text-secondary-foreground numerais-tabulares w-12 shrink-0 rounded-md px-1.5 py-1 text-center text-xs font-semibold">
-                {item.codigo}
-              </span>
               {editando === item.codigo ? (
-                <>
+                <div className="col-span-full flex min-w-0 items-center gap-2">
                   <Input
                     value={rotuloEdicao}
                     maxLength={60}
                     autoComplete="off"
                     aria-label={`Rótulo de ${item.codigo}`}
                     onChange={(evento) => setRotuloEdicao(evento.target.value)}
-                    className="h-10 min-w-0 flex-1"
+                    className="h-11 min-w-0 flex-1"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-10 shrink-0"
+                    className="size-11 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
                     onClick={() => salvarRotulo(item.codigo)}
                     disabled={rotuloEdicao.trim().length < 2}
@@ -863,7 +882,7 @@ function ConteudoConfiguracoes({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-10 shrink-0"
+                    className="size-11 shrink-0"
                     aria-label={`Cancelar edição de ${item.codigo}`}
                     onClick={() => {
                       setEditando(null);
@@ -872,41 +891,46 @@ function ConteudoConfiguracoes({
                   >
                     <X size={16} />
                   </Button>
-                </>
+                </div>
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {item.rotulo}
-                    {item.ativo ? "" : " · desativada"}
-                  </span>
-                  <Switch
-                    checked={item.ativo}
-                    aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                    onCheckedChange={() => alternarAtivo(item)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-10 shrink-0"
-                    aria-label={`Editar rótulo de ${item.codigo}`}
-                    onClick={() => {
-                      setEditando(item.codigo);
-                      setRotuloEdicao(item.rotulo);
-                    }}
-                  >
-                    <Pencil size={16} />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-falta-texto size-10 shrink-0"
-                    aria-label={`Excluir ${item.codigo}`}
-                    onClick={() => setExcluirAlvo(item)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium wrap-anywhere">{item.rotulo}</p>
+                    <p className="text-muted-foreground text-xs wrap-anywhere">
+                      {item.codigo}
+                      {item.ativo ? "" : " · desativada"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Switch
+                      checked={item.ativo}
+                      aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
+                      onCheckedChange={() => alternarAtivo(item)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-11 shrink-0"
+                      aria-label={`Editar rótulo de ${item.codigo}`}
+                      onClick={() => {
+                        setEditando(item.codigo);
+                        setRotuloEdicao(item.rotulo);
+                      }}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-falta-texto size-11 shrink-0"
+                      aria-label={`Excluir ${item.codigo}`}
+                      onClick={() => setExcluirAlvo(item)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
                 </>
               )}
             </li>
@@ -944,52 +968,56 @@ function ConteudoConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-liberadores"
         titulo="Quem libera as saídas"
-        descricao="Nomes disponíveis ao registrar uma saída."
         icone={UserCheck}
         aberto={abertoLiberadores}
         onAbertoChange={setAbertoLiberadores}
         resumo={
           <>
-            <Selo>{atual.liberadores.length} no catálogo</Selo>
             <Selo>{atual.liberadores.filter((item) => item.ativo).length} ativos</Selo>
           </>
         }
       >
-        <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
-          <div className="flex flex-col gap-1.5 sm:w-32">
-            <Label htmlFor="liberador-codigo">Código</Label>
-            <Input
-              id="liberador-codigo"
-              value={novaCodigoLiberador}
-              maxLength={20}
-              autoComplete="off"
-              onChange={(evento) => setNovaCodigoLiberador(evento.target.value)}
-              placeholder="Ex.: maria"
-              className="h-11"
-            />
+        <details className="rounded-xl border p-3">
+          <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
+            <Plus size={18} aria-hidden="true" />
+            Adicionar responsável
+          </summary>
+          <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-1.5 sm:w-32">
+              <Label htmlFor="liberador-codigo">Código</Label>
+              <Input
+                id="liberador-codigo"
+                value={novaCodigoLiberador}
+                maxLength={20}
+                autoComplete="off"
+                onChange={(evento) => setNovaCodigoLiberador(evento.target.value)}
+                placeholder="Ex.: maria"
+                className="h-11"
+              />
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Label htmlFor="liberador-rotulo">Rótulo</Label>
+              <Input
+                id="liberador-rotulo"
+                value={novaRotuloLiberador}
+                maxLength={60}
+                autoComplete="off"
+                onChange={(evento) => setNovaRotuloLiberador(evento.target.value)}
+                placeholder="Ex.: Coordenadora Maria"
+                className="h-11"
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-11 sm:w-auto"
+              onClick={criarLiberador}
+              disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
+            >
+              <Plus size={16} />
+              Adicionar
+            </Button>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <Label htmlFor="liberador-rotulo">Rótulo</Label>
-            <Input
-              id="liberador-rotulo"
-              value={novaRotuloLiberador}
-              maxLength={60}
-              autoComplete="off"
-              onChange={(evento) => setNovaRotuloLiberador(evento.target.value)}
-              placeholder="Ex.: Coordenadora Maria"
-              className="h-11"
-            />
-          </div>
-          <Button
-            type="button"
-            className="h-11 sm:w-auto"
-            onClick={criarLiberador}
-            disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
-          >
-            <Plus size={16} />
-            Adicionar
-          </Button>
-        </div>
+        </details>
 
         {erroLiberador && (
           <AvisoCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
@@ -1003,28 +1031,25 @@ function ConteudoConfiguracoes({
           {atual.liberadores.map((item) => (
             <li
               key={item.codigo}
-              className={`flex min-h-14 items-center gap-3 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
+              className={`grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
                 item.ativo ? "" : "opacity-60"
               }`}
             >
-              <span className="bg-secondary text-secondary-foreground numerais-tabulares w-20 shrink-0 truncate rounded-md px-1.5 py-1 text-center text-xs font-semibold">
-                {item.codigo}
-              </span>
               {editandoLiberador === item.codigo ? (
-                <>
+                <div className="col-span-full flex min-w-0 items-center gap-2">
                   <Input
                     value={rotuloEdicaoLiberador}
                     maxLength={60}
                     autoComplete="off"
                     aria-label={`Rótulo de ${item.codigo}`}
                     onChange={(evento) => setRotuloEdicaoLiberador(evento.target.value)}
-                    className="h-10 min-w-0 flex-1"
+                    className="h-11 min-w-0 flex-1"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-10 shrink-0"
+                    className="size-11 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
                     onClick={() => salvarRotuloLiberador(item.codigo)}
                     disabled={rotuloEdicaoLiberador.trim().length < 2}
@@ -1035,7 +1060,7 @@ function ConteudoConfiguracoes({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-10 shrink-0"
+                    className="size-11 shrink-0"
                     aria-label={`Cancelar edição de ${item.codigo}`}
                     onClick={() => {
                       setEditandoLiberador(null);
@@ -1044,41 +1069,46 @@ function ConteudoConfiguracoes({
                   >
                     <X size={16} />
                   </Button>
-                </>
+                </div>
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {item.rotulo}
-                    {item.ativo ? "" : " · desativado"}
-                  </span>
-                  <Switch
-                    checked={item.ativo}
-                    aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                    onCheckedChange={() => alternarAtivoLiberador(item)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-10 shrink-0"
-                    aria-label={`Editar rótulo de ${item.codigo}`}
-                    onClick={() => {
-                      setEditandoLiberador(item.codigo);
-                      setRotuloEdicaoLiberador(item.rotulo);
-                    }}
-                  >
-                    <Pencil size={16} />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-falta-texto size-10 shrink-0"
-                    aria-label={`Excluir ${item.codigo}`}
-                    onClick={() => setExcluirAlvoLiberador(item)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium wrap-anywhere">{item.rotulo}</p>
+                    <p className="text-muted-foreground text-xs wrap-anywhere">
+                      {item.codigo}
+                      {item.ativo ? "" : " · desativado"}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Switch
+                      checked={item.ativo}
+                      aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
+                      onCheckedChange={() => alternarAtivoLiberador(item)}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-11 shrink-0"
+                      aria-label={`Editar rótulo de ${item.codigo}`}
+                      onClick={() => {
+                        setEditandoLiberador(item.codigo);
+                        setRotuloEdicaoLiberador(item.rotulo);
+                      }}
+                    >
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-falta-texto size-11 shrink-0"
+                      aria-label={`Excluir ${item.codigo}`}
+                      onClick={() => setExcluirAlvoLiberador(item)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
                 </>
               )}
             </li>
@@ -1119,17 +1149,16 @@ function ConteudoConfiguracoes({
       <SecaoRecolhivel
         dataSecao="config-copia"
         titulo="Cópia de segurança"
-        descricao="A importação adiciona dados ausentes, sem sobrescrever os existentes."
         icone={Archive}
         aberto={abertoCopia}
         onAbertoChange={setAbertoCopia}
         resumo={<Selo>Arquivo JSON</Selo>}
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant="outline"
-            className="h-11"
+            className="h-auto min-h-24 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
             onClick={() => setDownloadAberto(true)}
             disabled={importando}
           >
@@ -1138,7 +1167,12 @@ function ConteudoConfiguracoes({
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" className="h-11" disabled={importando}>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-auto min-h-24 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
+                disabled={importando}
+              >
                 {importando ? (
                   <LoaderCircle size={16} className="animate-spin" />
                 ) : (
@@ -1174,6 +1208,16 @@ function ConteudoConfiguracoes({
             }}
           />
         </div>
+        <details className="text-muted-foreground text-xs">
+          <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+            <HelpCircle size={16} aria-hidden="true" />
+            Ajuda
+          </summary>
+          <p>
+            A importação adiciona dados ausentes e preserva os existentes. Chaves do FrequenciBI
+            precisam ser geradas novamente.
+          </p>
+        </details>
         {erroCopia && (
           <AvisoCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
         )}
@@ -1243,7 +1287,7 @@ function ConteudoConfiguracoes({
               setCategoria(valor);
               if (valor === "horarios") setHorariosAbertos(true);
             }}
-            className={`h-12 min-w-0 justify-start px-3 text-xs sm:text-sm ${
+            className={`h-auto min-h-14 min-w-0 justify-start rounded-xl px-3 py-2 text-xs whitespace-normal sm:text-sm ${
               categoria === valor ? "selecionado" : "text-muted-foreground"
             }`}
           >
@@ -1260,7 +1304,32 @@ function ConteudoConfiguracoes({
           inert={categoria !== "escola"}
           className="flex min-w-0 flex-col gap-4"
         >
-          {escola}
+          <PainelAcoes
+            rotulo="Ações da escola"
+            valor={acaoEscola}
+            onValor={setAcaoEscola}
+            itens={[
+              { valor: "geral", rotulo: "Geral", icone: Settings2, conteudo: recursos },
+              {
+                valor: "frequencia",
+                rotulo: "Frequência",
+                icone: ChartNoAxesCombined,
+                conteudo: frequencia,
+              },
+              {
+                valor: "calendario",
+                rotulo: "Calendário",
+                icone: CalendarDays,
+                conteudo: calendario,
+              },
+              {
+                valor: "cadastros",
+                rotulo: "Cadastros",
+                icone: ClipboardList,
+                conteudo: cadastros,
+              },
+            ]}
+          />
         </section>
         <section
           id="config-grupo-horarios"
@@ -1270,23 +1339,42 @@ function ConteudoConfiguracoes({
           className="flex min-w-0 flex-col gap-4"
         >
           {horariosAbertos && (
-            <VistaHorarios
-              turmas={turmas}
-              diaCorrente={diaCorrente}
-              fuso={fuso}
-              editavel
-              onMudanca={onHorariosMudaram}
-              onPendencia={onPendenciaHorarios}
-            />
-          )}
-          {horariosAbertos && (
-            <SecaoOrdemAlmoco
-              turmas={turmas}
-              dias={atual.ordemAlmoco}
-              onMudar={mutarOrdem}
-              onCopiarParaTodos={(dia, itens) => {
-                for (const valor of DIAS_ORDEM_ALMOCO) mutarOrdem(valor, itens);
-              }}
+            <PainelAcoes
+              rotulo="Ações dos horários"
+              valor={acaoHorarios}
+              onValor={setAcaoHorarios}
+              itens={[
+                {
+                  valor: "aulas",
+                  rotulo: "Aulas",
+                  icone: Clock,
+                  conteudo: (
+                    <VistaHorarios
+                      turmas={turmas}
+                      diaCorrente={diaCorrente}
+                      fuso={fuso}
+                      editavel
+                      onMudanca={onHorariosMudaram}
+                      onPendencia={onPendenciaHorarios}
+                    />
+                  ),
+                },
+                {
+                  valor: "almoco",
+                  rotulo: "Almoço",
+                  icone: Utensils,
+                  conteudo: (
+                    <SecaoOrdemAlmoco
+                      turmas={turmas}
+                      dias={atual.ordemAlmoco}
+                      onMudar={mutarOrdem}
+                      onCopiarParaTodos={(dia, itens) => {
+                        for (const valor of DIAS_ORDEM_ALMOCO) mutarOrdem(valor, itens);
+                      }}
+                    />
+                  ),
+                },
+              ]}
             />
           )}
         </section>
@@ -1319,14 +1407,43 @@ function ConteudoConfiguracoes({
           inert={categoria !== "acesso"}
           className="flex min-w-0 flex-col gap-4"
         >
-          <SecaoChavesBi
-            series={series}
-            turmas={turmas}
-            chaves={atual.chavesBi}
-            onMudar={(lista: ChaveBiDesejada[]) => mutarChaves(lista)}
+          <PainelAcoes
+            rotulo="Ações de acesso e avisos"
+            valor={acaoAcesso}
+            onValor={setAcaoAcesso}
+            itens={[
+              {
+                valor: "diretores",
+                rotulo: "Diretores",
+                icone: ShieldCheck,
+                conteudo: <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />,
+              },
+              {
+                valor: "notificacoes",
+                rotulo: "Notificações",
+                icone: Bell,
+                conteudo: (
+                  <SecaoNotificacoes
+                    configuracao={atual.notificacoes}
+                    onMudar={mutarNotificacoes}
+                  />
+                ),
+              },
+              {
+                valor: "bi",
+                rotulo: "FrequenciBI",
+                icone: ChartNoAxesCombined,
+                conteudo: (
+                  <SecaoChavesBi
+                    series={series}
+                    turmas={turmas}
+                    chaves={atual.chavesBi}
+                    onMudar={(lista: ChaveBiDesejada[]) => mutarChaves(lista)}
+                  />
+                ),
+              },
+            ]}
           />
-          <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />
-          <SecaoNotificacoes configuracao={atual.notificacoes} onMudar={mutarNotificacoes} />
         </section>
         <section
           id="config-grupo-dados"

@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -68,6 +68,7 @@ test.afterAll(limpar);
 async function abrirBeneficios(page: Page) {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
+  await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
   const secao = page.locator('[data-secao="config-beneficios"]');
   const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima" });
   if (!(await regiao.isVisible())) {
@@ -175,6 +176,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   // Um feriado no fim do mês muda o percentual com a Chamada já montada,
   // sem trocar o mês ou salvar outra frequência. Remover a data restaura a base.
   await abrirBeneficios(page);
+  await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const calendarioLetivo = page.locator('[data-secao="config-calendario"]');
   await calendarioLetivo.getByRole("button", { name: /^Calendário letivo/ }).click();
   await calendarioLetivo.locator("#calendario-feriado-data").click();
@@ -201,6 +203,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(detalhe.getByText(/Mínimo 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await abrirBeneficios(page);
+  await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   await calendarioLetivo
     .getByRole("button", { name: `Remover feriado ${nomeFeriado}`, exact: true })
     .click();

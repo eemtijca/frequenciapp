@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Gestão estende a navegação por tarefa às categorias Escola, Horários e Acesso e avisos. Cadastros, calendário, frequência, almoço, notificações e FrequenciBI ganham controles compactos com ícones e ajuda recolhida; Dados apresenta ações de cópia em destaque. Alternar as tarefas preserva os formulários e o rascunho único.
+
 - A troca do mês na prévia de entradas e saídas cancela a leitura anterior e bloqueia o envio até concluir a nova conferência, evitando exibir ou aplicar dados de outro período.
 
 - Gestão organiza as Planilhas em ações com ícones: Enviar, Editar, Organizar e Configurar, conforme a finalidade. Conexão, histórico e fila ficam mais compactos; a liberação do modo completo fica junto da edição e as seleções são preservadas ao alternar as ações.

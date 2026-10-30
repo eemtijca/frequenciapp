@@ -6,7 +6,10 @@ import { useRef, useState } from "react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import {
   Ban,
+  Check,
   ChevronDown,
+  History,
+  ShieldCheck,
   KeyRound,
   ListFilter,
   Pencil,
@@ -219,35 +222,43 @@ export default function SecaoChavesBi({
   return (
     <SecaoRecolhivel
       titulo="FrequenciBI"
-      descricao="Chaves de leitura dos dados escolares."
       icone={KeyRound}
       aberto={aberto}
       onAbertoChange={setAberto}
       dataSecao="config-chaves-bi"
-      resumo={<Selo>{ativas} ativas</Selo>}
+      resumo={<Selo>{contar(ativas, "ativa", "ativas")}</Selo>}
     >
       <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => preparar("criar")}>
-            <Plus size={16} />
+        <div className="grid grid-cols-3 gap-2">
+          <Button
+            className="h-auto min-h-20 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 text-xs whitespace-normal sm:text-sm"
+            onClick={() => preparar("criar")}
+          >
+            <Plus size={20} aria-hidden="true" />
             Criar chave
           </Button>
           <Button
             variant="outline"
+            className="h-auto min-h-20 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 text-xs whitespace-normal sm:text-sm"
             onClick={() => preparar("revogar-todas")}
             disabled={!chaves.some((c) => c.estado === "ativa" && !estaRevogada(c))}
           >
-            <Ban size={16} />
+            <Ban size={20} aria-hidden="true" />
             Revogar todas
           </Button>
-          <Button variant="outline" onClick={() => preparar("limpar")} disabled={!naoAtivas}>
-            <Trash2 size={16} />
+          <Button
+            variant="outline"
+            className="h-auto min-h-20 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 text-xs whitespace-normal sm:text-sm"
+            onClick={() => preparar("limpar")}
+            disabled={!naoAtivas}
+          >
+            <Trash2 size={20} aria-hidden="true" />
             Limpar histórico
           </Button>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Uma chave permite consultar dados pessoais. Entregue apenas à equipe autorizada. As ações
-          só valem depois de salvar as configurações.
+        <p className="text-muted-foreground flex items-start gap-2 text-xs">
+          <ShieldCheck size={16} aria-hidden="true" className="shrink-0" />
+          Chaves acessam dados pessoais. Compartilhe apenas com a equipe autorizada.
         </p>
         <div className="flex flex-wrap gap-2">
           <Input
@@ -255,7 +266,7 @@ export default function SecaoChavesBi({
             placeholder="Buscar chave"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="min-w-0 flex-1"
+            className="h-11 min-w-0 flex-1 basis-44"
           />
           <Selecionar
             ariaLabel="Ordenar chaves"
@@ -266,7 +277,7 @@ export default function SecaoChavesBi({
               { valor: "nome", rotulo: "Nome" },
               { valor: "uso", rotulo: "Mais usadas" },
             ]}
-            className="w-44"
+            className="h-11 w-full sm:w-44"
           />
         </div>
         {erro && (
@@ -291,68 +302,97 @@ export default function SecaoChavesBi({
                   {c.rotacionar && <Selo variante="atencao">Substituir ao salvar</Selo>}
                 </div>
               </div>
-              <dl className="text-muted-foreground grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <dt>Criação</dt>
-                  <dd>{new Date(c.criadaEm).toLocaleDateString("pt-BR")}</dd>
-                </div>
-                <div>
-                  <dt>Validade</dt>
-                  <dd>{c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}</dd>
-                </div>
-                <div>
-                  <dt>Primeiro uso</dt>
-                  <dd>
-                    {c.primeiroUsoEm
-                      ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR")
-                      : "Sem uso"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Último uso</dt>
-                  <dd>
-                    {c.ultimoUsoEm ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR") : "Sem uso"}
-                  </dd>
-                </div>
-              </dl>
+              <p className="text-muted-foreground text-xs wrap-anywhere">
+                {resumoDoEscopo(c.escopo)}
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Selo>{c.usos} consultas</Selo>
                 <Selo>
-                  {c.escopo.recursos ? `${c.escopo.recursos.length} bases` : "Todas as bases"}
-                </Selo>
-                <Selo>
-                  {c.escopo.turmas ? `${c.escopo.turmas.length} turmas` : "Todas as turmas"}
+                  {c.expiraEm
+                    ? `Até ${new Date(c.expiraEm).toLocaleDateString("pt-BR")}`
+                    : "Sem prazo"}
                 </Selo>
                 {c.inativa && c.estado === "ativa" && <Selo>Revisar: sem uso há 90 dias</Selo>}
               </div>
+              <details className="text-muted-foreground text-xs">
+                <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+                  <History size={16} aria-hidden="true" /> Detalhes da chave
+                </summary>
+                <dl className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <dt>Criação</dt>
+                    <dd>{new Date(c.criadaEm).toLocaleDateString("pt-BR")}</dd>
+                  </div>
+                  <div>
+                    <dt>Validade</dt>
+                    <dd>
+                      {c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Primeiro uso</dt>
+                    <dd>
+                      {c.primeiroUsoEm
+                        ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR")
+                        : "Sem uso"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Último uso</dt>
+                    <dd>
+                      {c.ultimoUsoEm ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR") : "Sem uso"}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
               {acionavel && (
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" onClick={() => preparar("editar", c)}>
-                    <Pencil size={15} />
+                  <Button
+                    variant="outline"
+                    className="h-11 min-w-0"
+                    onClick={() => preparar("editar", c)}
+                  >
+                    <Pencil size={16} aria-hidden="true" />
                     Editar
                   </Button>
                   {!nova &&
                     (c.rotacionar ? (
-                      <Button variant="outline" size="sm" onClick={() => desfazerRotacao(c)}>
-                        <RotateCw size={15} />
+                      <Button
+                        variant="outline"
+                        className="h-auto min-h-11 whitespace-normal"
+                        onClick={() => desfazerRotacao(c)}
+                      >
+                        <RotateCw size={16} aria-hidden="true" />
                         Desfazer substituição
                       </Button>
                     ) : (
-                      <Button variant="outline" size="sm" onClick={() => preparar("rotacionar", c)}>
-                        <RotateCw size={15} />
+                      <Button
+                        variant="outline"
+                        className="h-11 min-w-0"
+                        onClick={() => preparar("rotacionar", c)}
+                      >
+                        <RotateCw size={16} aria-hidden="true" />
                         Substituir
                       </Button>
                     ))}
-                  <Button variant="outline" size="sm" onClick={() => preparar("revogar", c)}>
-                    <Ban size={15} />
+                  <Button
+                    variant="outline"
+                    className="text-falta-texto h-11 min-w-0"
+                    onClick={() => preparar("revogar", c)}
+                  >
+                    <Ban size={16} aria-hidden="true" />
                     Revogar
                   </Button>
                 </div>
               )}
               {c.revogada && (
                 <div>
-                  <Button variant="outline" size="sm" onClick={() => desfazerRevogacao(c)}>
-                    <Ban size={15} />
+                  <Button
+                    variant="outline"
+                    className="h-auto min-h-11 whitespace-normal"
+                    onClick={() => desfazerRevogacao(c)}
+                  >
+                    <Ban size={16} aria-hidden="true" />
                     Desfazer revogação
                   </Button>
                 </div>
@@ -371,6 +411,7 @@ export default function SecaoChavesBi({
         }}
       >
         <DialogContent
+          className="max-h-[90dvh] overflow-y-auto"
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             foco.current?.focus();
@@ -380,7 +421,7 @@ export default function SecaoChavesBi({
             <DialogTitle>{acao ? TITULOS[acao] : "Chave"}</DialogTitle>
             <DialogDescription>
               {cadastro
-                ? "Sem seleção, o escopo inclui todas as séries, turmas e bases. A chave só é criada ou alterada ao salvar as configurações."
+                ? "Sem seleção, o acesso inclui todas as séries, turmas e bases. Salve as configurações para aplicar."
                 : acao === "rotacionar"
                   ? "A chave anterior deixa de funcionar ao salvar. O novo segredo aparece uma única vez."
                   : acao === "limpar"
@@ -617,7 +658,9 @@ export default function SecaoChavesBi({
               >
                 Cancelar
               </Button>
-              <Button type="submit">Aplicar ao rascunho</Button>
+              <Button type="submit">
+                <Check size={16} aria-hidden="true" /> Aplicar ao rascunho
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
