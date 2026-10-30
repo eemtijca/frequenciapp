@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 import type { Configuracoes } from "@/domain/frequencia";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 
@@ -17,6 +18,7 @@ test("a Gestão grava os limites de infrequência e a API devolve os valores", a
     await page.getByRole("tab", { name: /Configurações/ }).click();
     await page.getByRole("button", { name: "Escola", exact: true }).click();
 
+    await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
     const secao = page.locator('[data-secao="config-infrequencia"]');
     await expect(secao).toBeVisible();
     await secao.locator("button").first().click();

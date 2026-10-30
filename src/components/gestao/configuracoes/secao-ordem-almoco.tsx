@@ -3,7 +3,17 @@
 // Ordem do almoço no rascunho: a administração ordena as turmas de cada dia
 // da semana, com horário opcional, e a aba Horários mostra.
 import { useId, useState } from "react";
-import { ChevronDown, ChevronUp, Copy, ListPlus, Plus, Trash2, Utensils, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  HelpCircle,
+  ListPlus,
+  Plus,
+  Trash2,
+  Utensils,
+  X,
+} from "lucide-react";
 import type { Turma } from "@/domain/frequencia";
 import { DIAS_DA_SEMANA } from "@/domain/horarios-semanais";
 import {
@@ -113,7 +123,6 @@ export default function SecaoOrdemAlmoco({
   return (
     <SecaoRecolhivel
       titulo="Ordem do almoço"
-      descricao="Ordem e horário das turmas no almoço de cada dia."
       icone={Utensils}
       aberto={aberto}
       onAbertoChange={setAberto}
@@ -124,21 +133,78 @@ export default function SecaoOrdemAlmoco({
         </Selo>
       }
     >
-      <p className="text-muted-foreground text-sm">
-        A aba Horários mostra a ordem do dia consultado. O horário de cada turma é opcional.
-      </p>
-      <div className="flex flex-col gap-1.5 sm:max-w-xs">
-        <Label htmlFor={`${base}-dia`}>Dia da semana</Label>
-        <Selecionar
-          id={`${base}-dia`}
-          value={String(dia)}
-          onValueChange={trocarDia}
-          opcoes={DIAS_ORDEM_ALMOCO.map((valor) => ({
-            valor: String(valor),
-            rotulo: rotuloDia(valor),
-          }))}
-        />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-xs">
+          <Label htmlFor={`${base}-dia`}>Dia da semana</Label>
+          <Selecionar
+            id={`${base}-dia`}
+            value={String(dia)}
+            onValueChange={trocarDia}
+            opcoes={DIAS_ORDEM_ALMOCO.map((valor) => ({
+              valor: String(valor),
+              rotulo: rotuloDia(valor),
+            }))}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 min-w-0 whitespace-normal"
+          aria-label="Copiar para os outros dias"
+          disabled={rascunho.length === 0}
+          onClick={() => setCopiando(true)}
+        >
+          <Copy size={16} aria-hidden="true" />
+          Copiar para os outros dias
+        </Button>
       </div>
+
+      {restantes.length > 0 ? (
+        <div className="superficie flex flex-col gap-3 p-3">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor={`${base}-adicionar`}>Turma</Label>
+            <Selecionar
+              id={`${base}-adicionar`}
+              buscavel
+              value={paraAdicionar}
+              onValueChange={setParaAdicionar}
+              placeholder="Selecione a turma"
+              opcoes={restantes.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              className="h-auto min-h-11 min-w-0 px-2 whitespace-normal"
+              aria-label="Adicionar à ordem"
+              disabled={!paraAdicionar}
+              onClick={() => {
+                aplicar([...rascunho, { turmaId: paraAdicionar, inicio: "" }]);
+                setParaAdicionar("");
+              }}
+            >
+              <Plus size={16} aria-hidden="true" />
+              Adicionar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-11 min-w-0 px-2 whitespace-normal"
+              aria-label="Incluir todas as turmas restantes"
+              onClick={() => {
+                aplicar([
+                  ...rascunho,
+                  ...restantes.map((turma) => ({ turmaId: turma.id, inicio: "" })),
+                ]);
+                setParaAdicionar("");
+              }}
+            >
+              <ListPlus size={16} aria-hidden="true" />
+              Incluir todas
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {rascunho.length === 0 ? (
         <p className="text-muted-foreground text-sm">Nenhuma turma na ordem de {rotuloDia(dia)}.</p>
@@ -181,6 +247,7 @@ export default function SecaoOrdemAlmoco({
                     type="button"
                     variant="ghost"
                     size="icon"
+                    className="text-falta-texto"
                     aria-label={`Tirar ${rotulo} da ordem`}
                     onClick={() => aplicar(rascunho.filter((_, i) => i !== indice))}
                   >
@@ -214,65 +281,18 @@ export default function SecaoOrdemAlmoco({
         </ol>
       )}
 
-      {restantes.length > 0 ? (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-xs">
-            <Label htmlFor={`${base}-adicionar`}>Turma</Label>
-            <Selecionar
-              id={`${base}-adicionar`}
-              value={paraAdicionar}
-              onValueChange={setParaAdicionar}
-              placeholder="Selecione a turma"
-              opcoes={restantes.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!paraAdicionar}
-              onClick={() => {
-                aplicar([...rascunho, { turmaId: paraAdicionar, inicio: "" }]);
-                setParaAdicionar("");
-              }}
-            >
-              <Plus size={16} aria-hidden="true" />
-              Adicionar à ordem
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                aplicar([
-                  ...rascunho,
-                  ...restantes.map((turma) => ({ turmaId: turma.id, inicio: "" })),
-                ]);
-                setParaAdicionar("");
-              }}
-            >
-              <ListPlus size={16} aria-hidden="true" />
-              Adicionar as demais turmas
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
       {erro ? <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" /> : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={rascunho.length === 0}
-          onClick={() => setCopiando(true)}
-        >
-          <Copy size={16} aria-hidden="true" />
-          Copiar para os outros dias
-        </Button>
-        <p className="text-muted-foreground text-xs">
-          As alterações entram no rascunho e valem ao salvar as configurações.
+      <details className="text-muted-foreground text-xs">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
+          <HelpCircle size={16} aria-hidden="true" />
+          Ajuda
+        </summary>
+        <p className="mt-1 leading-relaxed">
+          Use as setas para ordenar as turmas. Os horários são opcionais. A ordem aparece na
+          consulta de Horários depois de salvar as configurações.
         </p>
-      </div>
+      </details>
 
       <AlertDialog open={copiando} onOpenChange={setCopiando}>
         <AlertDialogContent>

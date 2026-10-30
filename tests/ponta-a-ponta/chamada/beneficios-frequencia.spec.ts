@@ -2,7 +2,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import {
+  descartarConfiguracoes,
+  selecionarAcaoConfiguracoes,
+  salvarConfiguracoes,
+} from "../helpers/configuracoes";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
 
@@ -68,6 +72,7 @@ test.afterAll(limpar);
 async function abrirBeneficios(page: Page) {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
+  await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
   const secao = page.locator('[data-secao="config-beneficios"]');
   const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima" });
   if (!(await regiao.isVisible())) {
@@ -99,6 +104,33 @@ async function abrirChamadaDoMesAnterior(page: Page, navegar: boolean) {
     muitas: lista.getByRole("listitem").filter({ hasText: `${prefixo} Muitas faltas` }),
     uma: lista.getByRole("listitem").filter({ hasText: `${prefixo} Uma falta` }),
   };
+}
+
+for (const largura of [320, 390, 800, 1280]) {
+  test(`em ${largura} px, o aviso não impede salvar ou descartar o rascunho`, async ({ page }) => {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const secao = await abrirBeneficios(page);
+    await secao.getByRole("button", { name: "Novo benefício" }).click();
+    const dialogo = page.getByRole("dialog", { name: "Novo benefício" });
+    await dialogo.getByLabel("Nome do benefício").fill(NOME_BENEFICIO);
+    await dialogo.getByLabel("Frequência mínima, em %").fill("99");
+    await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+    const aviso = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
+    await expect(aviso).toBeVisible();
+    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+      trial: true,
+      timeout: 2_000,
+    });
+    await page.getByRole("button", { name: "Descartar", exact: true }).click({
+      trial: true,
+      timeout: 2_000,
+    });
+    await expect(aviso).toBeVisible();
+    await descartarConfiguracoes(page);
+    await expect(secao.getByText(NOME_BENEFICIO, { exact: true })).toHaveCount(0);
+  });
 }
 
 test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", async ({
@@ -138,6 +170,14 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await dialogo.screenshot({ path: test.info().outputPath("aulas-por-dia.png") });
   await dialogo.getByLabel("Aulas por dia", { exact: true }).fill("");
   await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
+  const avisoRascunho = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
+  await expect(avisoRascunho).toBeVisible();
+  // O aviso não pode bloquear o salvamento enquanto permanece visível.
+  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+    trial: true,
+    timeout: 2_000,
+  });
+  await expect(avisoRascunho).toBeVisible();
   await salvarConfiguracoes(page);
   await expect(secao.getByText(NOME_BENEFICIO)).toBeVisible();
   await expect(secao.getByText(/Mínimo de 99% de frequência/)).toBeVisible();
@@ -175,6 +215,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   // Um feriado no fim do mês muda o percentual com a Chamada já montada,
   // sem trocar o mês ou salvar outra frequência. Remover a data restaura a base.
   await abrirBeneficios(page);
+  await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const calendarioLetivo = page.locator('[data-secao="config-calendario"]');
   await calendarioLetivo.getByRole("button", { name: /^Calendário letivo/ }).click();
   await calendarioLetivo.locator("#calendario-feriado-data").click();
@@ -201,6 +242,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(detalhe.getByText(/Mínimo 99%/)).toBeVisible();
   await page.keyboard.press("Escape");
   await abrirBeneficios(page);
+  await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   await calendarioLetivo
     .getByRole("button", { name: `Remover feriado ${nomeFeriado}`, exact: true })
     .click();

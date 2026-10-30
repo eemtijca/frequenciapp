@@ -3,7 +3,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, ADMIN_E2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { salvarConfiguracoes } from "../helpers/configuracoes";
+import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 test.describe.configure({ timeout: 90_000 });
@@ -18,6 +18,7 @@ async function abrir(page: Page) {
     .getByRole("navigation", { name: "Categorias de configurações" })
     .getByRole("button", { name: "Acesso e avisos", exact: true })
     .click();
+  await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "FrequenciBI");
   const secao = page.locator('[data-secao="config-chaves-bi"]');
   const gatilho = secao.getByRole("button", { name: /^FrequenciBI/ });
   if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();

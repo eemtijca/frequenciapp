@@ -10,7 +10,11 @@ import {
   salvarChamada,
   trocarVisao,
 } from "../helpers/pagina";
-import { enviarRascunhoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
+import {
+  selecionarAcaoConfiguracoes,
+  enviarRascunhoConfiguracoes,
+  salvarConfiguracoes,
+} from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
 
@@ -111,6 +115,7 @@ async function abrirCalendario(page: Page): Promise<Locator> {
     .getByRole("navigation", { name: "Categorias de configurações", exact: true })
     .getByRole("button", { name: "Escola", exact: true })
     .click();
+  await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const secao = page.locator('[data-secao="config-calendario"]');
   const abrir = secao.getByRole("button", { name: /^Calendário letivo/ });
   await expect(abrir).toBeVisible();

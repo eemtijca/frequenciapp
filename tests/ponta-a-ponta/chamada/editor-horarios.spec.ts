@@ -502,7 +502,14 @@ test.describe("recuperação de falha de transporte", () => {
     await page.unroute("**/api/horarios/*");
     confirmacao = await pedirConfirmacao(page, formulario);
     expect(gravacoes).toHaveLength(1);
+    const resposta = page.waitForResponse(
+      (resposta) =>
+        new URL(resposta.url()).pathname === `/api/horarios/${antes[0]?.id}` &&
+        resposta.request().method() === "PATCH",
+    );
     await confirmacao.getByRole("button", { name: "Confirmar alterações", exact: true }).click();
+    expect((await resposta).status()).toBe(200);
+    await expect(confirmacao).toHaveCount(0);
     await expect(formulario).toHaveCount(0);
     expect(gravacoes).toHaveLength(2);
     expect((await aulasDaTurma("A"))[0]).toEqual({
