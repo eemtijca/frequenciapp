@@ -57,7 +57,7 @@ export function SecaoRecolhivel({
           <span
             className={`mt-0.5 flex size-9 shrink-0 items-center justify-center ${
               perigo
-                ? "bg-falta-fraca text-falta-texto rounded-full"
+                ? "bg-falta-fraca text-falta-texto rounded-2xl"
                 : "controle text-secondary-foreground"
             }`}
           >

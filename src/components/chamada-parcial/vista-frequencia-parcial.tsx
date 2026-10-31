@@ -608,14 +608,15 @@ export default function VistaFrequenciaParcial({
         </div>
       )}
       {nav.mostrarVoltar && (
-        <button
+        <Button
           type="button"
+          variant="secondary"
           disabled={ocupado || editorAberto || sujo}
           onClick={() => nav.voltarParaHoje()}
-          className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
+          className="self-start"
         >
           Voltar para hoje
-        </button>
+        </Button>
       )}
       {nav.resumo && nav.semana ? (
         <VistaResumoParcial
@@ -691,16 +692,17 @@ export default function VistaFrequenciaParcial({
                   {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
                 </span>
                 {(filtro !== "todos" || busca !== "") && (
-                  <button
+                  <Button
                     type="button"
-                    className="text-primary pressionavel font-medium hover:underline"
+                    variant="ghost"
+                    className="text-primary"
                     onClick={() => {
                       setFiltro("todos");
                       setBusca("");
                     }}
                   >
                     Ver todos
-                  </button>
+                  </Button>
                 )}
               </div>
               {alunosFiltrados.length === 0 ? (
@@ -717,8 +719,8 @@ export default function VistaFrequenciaParcial({
                     <span>Registro na Seduc</span>
                     <span className="text-right">Ações</span>
                   </div>
-                  <ul>
-                    {alunosFiltrados.map((aluno, indice) => {
+                  <ul className="divide-y">
+                    {alunosFiltrados.map((aluno) => {
                       const registro = aluno.registro;
                       // Desistente mostra D, como na Chamada, com ou sem chamada salva.
                       const resumo = aluno.desistente
@@ -727,11 +729,7 @@ export default function VistaFrequenciaParcial({
                       return (
                         <li
                           key={aluno.id}
-                          // Linhas alternadas, como na Chamada, para separar os nomes.
-                          className={cn(
-                            "px-4 py-2",
-                            indice % 2 === 0 ? "bg-card" : "bg-secondary/60",
-                          )}
+                          className="bg-card px-4 py-3"
                           data-testid={`parcial-aluno-${aluno.id}`}
                         >
                           {/* No celular: nome e situação à esquerda, ações à direita e a
@@ -747,20 +745,20 @@ export default function VistaFrequenciaParcial({
                               <span
                                 title={aluno.desistente ? "Desistente" : resumo}
                                 className={cn(
-                                  "line-clamp-2 inline-block max-w-full rounded-lg border px-2 py-0.5 text-xs font-medium wrap-anywhere",
+                                  "line-clamp-2 inline-block max-w-full rounded-xl border border-transparent px-2.5 py-1 text-xs font-medium wrap-anywhere",
                                   !registro || aluno.desistente
                                     ? "bg-muted/30 text-muted-foreground"
                                     : registro.tipo === "SAIDA" && !registro.aulasConferiveis
                                       ? "bg-muted/30 text-muted-foreground"
                                       : registro.tipo === "SAIDA" && registro.aulas.length === 0
-                                        ? "border-falta/25 bg-falta-fraca text-falta-texto"
+                                        ? "bg-falta-fraca text-falta-texto"
                                         : registro.tipo === "JUSTIFICADA"
-                                          ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
+                                          ? "bg-justificada-fraca text-justificada-texto"
                                           : registro.tipo !== "CHAMADA" || registro.marca === "P"
-                                            ? "border-primary/25 bg-primary/10 text-primary"
+                                            ? "bg-primary/10 text-primary"
                                             : registro.marca === "FJ"
-                                              ? "border-justificada/30 bg-justificada-fraca text-justificada-texto"
-                                              : "border-falta/25 bg-falta-fraca text-falta-texto",
+                                              ? "bg-justificada-fraca text-justificada-texto"
+                                              : "bg-falta-fraca text-falta-texto",
                                 )}
                               >
                                 {resumo}
@@ -792,14 +790,14 @@ export default function VistaFrequenciaParcial({
                             <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1 md:col-start-4 md:row-span-1">
                               <Button
                                 type="button"
-                                variant={registro ? "ghost" : "outline"}
+                                variant="secondary"
                                 size="sm"
                                 onClick={() => abrirEditor(registro ?? null, aluno.id)}
                                 aria-label={`${registro ? "Editar" : "Registrar"} frequência parcial de ${aluno.nome}`}
                                 disabled={
                                   ocupado || editorAberto || Boolean(feriado) || aluno.desistente
                                 }
-                                className="h-10"
+                                className="h-11"
                               >
                                 {registro ? <Pencil size={15} /> : <Plus size={15} />}
                                 {registro ? "Editar" : "Registrar"}
@@ -809,12 +807,12 @@ export default function VistaFrequenciaParcial({
                                 registro.tipo !== "SAIDA" && (
                                   <Button
                                     type="button"
-                                    variant="ghost"
+                                    variant="secondary"
                                     size="sm"
                                     onClick={() => setRegistroRemover(registro)}
                                     aria-label={`Remover frequência parcial de ${aluno.nome}`}
                                     disabled={ocupado || editorAberto}
-                                    className="text-falta-texto h-10"
+                                    className="text-falta-texto h-11"
                                   >
                                     <Trash2 size={15} />
                                     Remover

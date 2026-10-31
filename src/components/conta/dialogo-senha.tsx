@@ -128,7 +128,7 @@ export default function DialogoSenha({
               required
               autoComplete="current-password"
               onChange={(evento) => setSenhaAtual(evento.target.value)}
-              className="h-11 rounded-lg"
+              className="h-11"
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -140,7 +140,7 @@ export default function DialogoSenha({
               minLength={8}
               autoComplete="new-password"
               onChange={(evento) => setSenhaNova(evento.target.value)}
-              className="h-11 rounded-lg"
+              className="h-11"
             />
             <p className="text-muted-foreground text-xs">
               Mínimo de 8 caracteres, com pelo menos uma letra e um número.
@@ -155,7 +155,7 @@ export default function DialogoSenha({
               minLength={8}
               autoComplete="new-password"
               onChange={(evento) => setConfirmacao(evento.target.value)}
-              className="h-11 rounded-lg"
+              className="h-11"
             />
           </div>
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}

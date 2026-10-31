@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O estilo Blocos suaves passa a orientar navegação, conta e demais telas, incluindo Painel, Relatórios, Alunos, Gestão, Chamada Parcial, Saídas e Entradas, Horários, Minhas turmas e FrequenciBI. Botões, filtros e abas ganham cantos arredondados e fundos discretos, com seleções suaves e ações principais em destaque.
+
 - Chamada adota blocos suaves nos controles de turma, data, resumo e edição, com cantos arredondados e Salvar em destaque. As linhas ficam neutras e as marcações P, F e FJ combinam ícones e cores suaves; a justificativa salva aparece uma única vez abaixo do nome do aluno.
 
 - Gestão estende a navegação por tarefa às categorias Escola, Horários e Acesso e avisos. Cadastros, calendário, frequência, almoço, notificações e FrequenciBI ganham controles compactos com ícones e ajuda recolhida; Dados apresenta ações de cópia em destaque. Alternar as tarefas preserva os formulários e o rascunho único. Os avisos não encobrem as ações de salvar e descartar o rascunho.

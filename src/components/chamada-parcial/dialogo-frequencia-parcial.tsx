@@ -408,7 +408,7 @@ export function DialogoFrequenciaParcial({
                 {aulasVisiveis.length < LIMITE_AULAS_PARCIAL && (
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     onClick={() => setLimiteAulas(LIMITE_AULAS_PARCIAL)}
                     className="h-11"
                   >

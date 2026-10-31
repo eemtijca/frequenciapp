@@ -200,7 +200,7 @@ export default function SecaoCalendarioLetivo({
                 </div>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
                   className="text-falta-texto size-11"
                   aria-label={`Remover feriado ${feriado.nome}`}

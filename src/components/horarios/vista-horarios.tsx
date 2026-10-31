@@ -200,7 +200,7 @@ function AulasDoDia({
               {editavel ? (
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
                   aria-label={`Editar ${aula.ordem}ª aula de ${rotuloDia(dia)}`}
                   aria-expanded={aulaEmEdicao === aula.id}
@@ -559,7 +559,7 @@ export default function VistaHorarios({
                             {editavel ? (
                               <Button
                                 type="button"
-                                variant="ghost"
+                                variant="secondary"
                                 size="icon"
                                 className="mt-1"
                                 aria-label={`Editar horário da ${aula.ordem}ª aula`}
@@ -586,7 +586,7 @@ export default function VistaHorarios({
                                   {editavel ? (
                                     <Button
                                       type="button"
-                                      variant="ghost"
+                                      variant="secondary"
                                       size="icon"
                                       aria-label={`Editar disciplina da ${aula.ordem}ª aula de ${rotuloDia(item.valor)}`}
                                       disabled={navegacaoBloqueada}

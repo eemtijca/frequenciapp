@@ -5,7 +5,15 @@
 // acumulada (F + FJ) de todo o histórico.
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ChevronLeft, ChevronRight, Download, LoaderCircle, Send, Table2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  Download,
+  LoaderCircle,
+  Send,
+  Table2,
+} from "lucide-react";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -317,7 +325,7 @@ export default function VistaGrade({
           {estadoPlanilha?.podeEnviar && (
             <Button
               variant="outline"
-              className="h-10"
+              className="h-11"
               aria-label="Enviar para a planilha"
               onClick={() => setEnvioAberto(true)}
               disabled={grade.linhas.length === 0 || carregandoPeriodo}
@@ -327,9 +335,9 @@ export default function VistaGrade({
             </Button>
           )}
           <Button
-            variant="ghost"
+            variant="secondary"
             size="icon"
-            className="size-10"
+            className="size-11"
             aria-label="Baixar planilha (CSV)"
             title="Baixar planilha (CSV) da turma de origem"
             onClick={() => setDownloadAberto(true)}
@@ -458,13 +466,15 @@ export default function VistaGrade({
         )}
 
         {modo === "mes" && mes !== mesCorrente && (
-          <button
+          <Button
             type="button"
             onClick={() => onMes(mesCorrente)}
-            className="text-primary pressionavel self-start text-sm font-medium hover:underline"
+            variant="secondary"
+            className="self-start"
           >
+            <RotateCcw size={16} aria-hidden="true" />
             Voltar para este mês
-          </button>
+          </Button>
         )}
       </div>
 

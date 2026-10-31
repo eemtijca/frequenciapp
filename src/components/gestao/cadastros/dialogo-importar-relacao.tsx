@@ -236,7 +236,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
             spellCheck={false}
             aria-invalid={foraDoPadrao || undefined}
             aria-describedby="situacao-relacao"
-            className="controle focus-visible:ring-ring/50 focus-visible:border-ring aria-[invalid=true]:border-falta min-h-36 w-full px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
+            className="controle border-input focus-visible:ring-ring/50 focus-visible:border-ring aria-[invalid=true]:border-falta min-h-36 w-full px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px]"
             placeholder={`${CABECALHO_RELACAO}\n3º ano A;1;Nome do aluno;3º ano B`}
           />
           <div id="situacao-relacao">

@@ -50,7 +50,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="superficie sticky top-0 z-20 rounded-none border-0 border-b">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
           <div className="min-w-0">
             <p className="truncate font-semibold tracking-tight">FrequenciApp</p>
             <p className="text-muted-foreground truncate text-xs">
@@ -58,7 +58,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
             </p>
             <AtualizadoEm instante={atualizadoEm} fuso={fuso} className="mt-0.5" />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <BotaoAtualizar
               onAtualizar={() => {
                 setAtualizacao((valor) => valor + 1);
@@ -67,9 +67,9 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
             <SeletorTema />
             {!contexto.trocaObrigatoria ? (
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
-                className="size-11 rounded-full"
+                className="size-11"
                 aria-label="Configurar notificações"
                 title="Configurar notificações"
                 onClick={() => setNotificacoesAbertas(true)}
@@ -78,9 +78,9 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               </Button>
             ) : null}
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
-              className="size-11 rounded-full"
+              className="size-11"
               aria-label="Sobre"
               title="Sobre"
               onClick={() => setSobreAberto(true)}
@@ -88,9 +88,9 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               <Info size={18} />
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
-              className="size-11 rounded-full"
+              className="size-11"
               aria-label="Trocar minha palavra-chave"
               title="Trocar minha palavra-chave"
               onClick={() => setTrocaAberta(true)}
@@ -98,9 +98,9 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               <KeyRound size={18} />
             </Button>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="icon"
-              className="size-11 rounded-full"
+              className="size-11"
               aria-label="Sair da conta"
               title="Sair da conta"
               disabled={saindo}

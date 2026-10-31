@@ -169,7 +169,7 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
               type="button"
               aria-pressed={ativo}
               onClick={() => setAgrupamento(opcao.valor)}
-              className="controle discreto pressionavel relative flex min-h-10 items-center justify-center px-2 text-xs font-medium transition-colors"
+              className="controle pressionavel relative flex min-h-11 items-center justify-center px-2 text-xs font-medium transition-colors"
             >
               {opcao.rotulo}
             </button>

@@ -33,7 +33,7 @@ const SALVAGUARDAS = [
 const REPOSITORIO = "https://github.com/eemtijca/frequenciapp";
 const TITULO_CARTAO = "flex items-center gap-2 text-base font-semibold";
 const ACAO =
-  "flex min-h-11 w-full items-center justify-between gap-3 border-t pt-3 text-sm font-medium underline-offset-4 hover:underline";
+  "controle pressionavel flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-sm font-medium underline-offset-4 hover:underline";
 const CHIP =
   "controle pressionavel inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium";
 

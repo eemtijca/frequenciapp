@@ -233,7 +233,7 @@ export function EditorGraficoBi({
         <summary className="cursor-pointer py-2 text-sm">Anotação local</summary>
         <textarea
           aria-label="Anotação do gráfico"
-          className="controle mt-2 min-h-20 w-full p-3 text-sm"
+          className="controle border-input mt-2 min-h-20 w-full p-3 text-sm"
           maxLength={1000}
           value={config.anotacao}
           onChange={(e) => onAlterar({ ...config, anotacao: e.target.value })}

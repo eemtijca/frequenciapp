@@ -2,7 +2,7 @@
 
 // Histórico: frequências salvas de um mês, abertas em um toque.
 import { useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight, History } from "lucide-react";
+import { ArrowUpRight, ChevronLeft, ChevronRight, RotateCcw, History } from "lucide-react";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
   dataNoFuso,
@@ -116,13 +116,15 @@ export default function VistaHistorico({
         </Button>
       </div>
       {mes !== mesCorrente && (
-        <button
+        <Button
           type="button"
           onClick={() => onMes(mesCorrente)}
-          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
+          variant="secondary"
+          className="self-start"
         >
+          <RotateCcw size={16} aria-hidden="true" />
           Voltar para este mês
-        </button>
+        </Button>
       )}
 
       {series.length > 0 && (

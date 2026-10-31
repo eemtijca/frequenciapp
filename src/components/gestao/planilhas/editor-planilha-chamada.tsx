@@ -95,12 +95,12 @@ export function EditorPlanilhaChamada({
               key={acao}
               type="button"
               variant="outline"
-              className="relative h-auto min-h-28 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
+              className="relative h-auto min-h-28 min-w-0 flex-col gap-2 rounded-2xl px-2 py-3 whitespace-normal"
               disabled={!habilitado || protegida}
               onClick={() => setObjetivo(acao)}
             >
               <span
-                className={`flex size-10 items-center justify-center rounded-full ${acao === "remover" ? "bg-falta-fraca text-falta-texto" : "bg-primary/10 text-primary"}`}
+                className={`flex size-10 items-center justify-center rounded-2xl ${acao === "remover" ? "bg-falta-fraca text-falta-texto" : "bg-primary/10 text-primary"}`}
               >
                 <Icone aria-hidden="true" className="size-5" />
               </span>

@@ -260,7 +260,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="icon"
                           className="size-11"
                           aria-label={`Editar conta de ${usuario.nome}`}
@@ -270,7 +270,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                         </Button>
                         {!propria && (
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="icon"
                             className="size-11"
                             aria-label={
@@ -293,7 +293,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
-                                variant="ghost"
+                                variant="secondary"
                                 size="icon"
                                 className="text-falta-texto size-11"
                                 aria-label={`Excluir conta de ${usuario.nome}`}

@@ -33,7 +33,7 @@ export function SeletorTema({ className }: { className?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           className={cn("size-11", className)}
           aria-label={montado ? `Tema: ${atual.rotulo}. Alterar tema` : "Alterar tema"}

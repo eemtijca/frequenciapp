@@ -71,7 +71,7 @@ export default function SecaoNotificacoes({
         {CAMPOS.map(({ tipo, titulo, rotulo, destinatarios, icone: Icone }) => (
           <div key={tipo} className="flex min-w-0 flex-col gap-3 rounded-xl border p-3">
             <div className="flex items-center gap-3">
-              <span className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-full">
+              <span className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-2xl">
                 <Icone size={18} aria-hidden="true" />
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-1">

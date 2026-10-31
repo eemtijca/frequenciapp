@@ -390,8 +390,9 @@ export default function VistaEntradas({
                     <CaixasDeInfo partes={partesDoMotivo(entrada.motivo)} className="mt-2" />
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
+                    className="text-falta-texto"
                     aria-label={`Remover entrada de ${entrada.nome}`}
                     disabled={executando}
                     onClick={() => setRemover(entrada)}
@@ -610,8 +611,9 @@ export default function VistaEntradas({
                     </p>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
+                    className="text-falta-texto"
                     aria-label={`Remover entrada de ${entrada.nome}`}
                     disabled={executando}
                     onClick={() => setRemover(entrada)}

@@ -25,7 +25,7 @@ export function BarraBusca({
   return (
     <div
       className={cn(
-        "controle focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
+        "controle border-input focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
         className,
       )}
     >

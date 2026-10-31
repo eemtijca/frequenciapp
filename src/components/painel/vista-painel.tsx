@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleAlert,
   LoaderCircle,
+  RotateCcw,
   TriangleAlert,
 } from "lucide-react";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
@@ -421,16 +422,18 @@ export default function VistaPainel({
         </div>
       )}
       {nav.mostrarVoltar && (
-        <button
+        <Button
           type="button"
           onClick={() => {
             setCarregando(false);
             nav.voltarParaHoje();
           }}
-          className="text-primary pressionavel self-start text-sm font-medium hover:underline"
+          variant="secondary"
+          className="self-start"
         >
+          <RotateCcw size={16} aria-hidden="true" />
           Voltar para hoje
-        </button>
+        </Button>
       )}
 
       {nav.resumo && nav.semana ? (
