@@ -354,6 +354,8 @@ test("confirma presença por turno na Seduc e preserva a chamada justificada da 
   await abrirChamada(page);
   await expect(chamada.getByRole("switch")).toHaveCount(0);
   await expect(
-    chamada.getByRole("button", { name: new RegExp(`${prefixo} Um: falta em`) }),
+    chamada.getByRole("button", {
+      name: new RegExp(`${prefixo} Um: falta justificada, Outros em`),
+    }),
   ).toBeVisible();
 });
