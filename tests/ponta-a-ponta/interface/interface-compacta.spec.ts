@@ -33,7 +33,12 @@ for (const [nome, largura, altura] of [
     const secao = await chamada.boundingBox();
     expect(inicial).not.toBeNull();
     expect(secao).not.toBeNull();
-    expect((inicial?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.75);
+    if (largura >= 1024) {
+      expect((inicial?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.75);
+    } else {
+      expect(inicial?.width ?? 0).toBeLessThan(largura);
+      expect(inicial?.height ?? altura).toBeLessThan(100);
+    }
 
     const aluno = chamada.getByRole("button", { name: /^E2E Aluno Um:/ });
     await expect(aluno).toBeEnabled();
@@ -42,8 +47,8 @@ for (const [nome, largura, altura] of [
 
     const depois = await barra.boundingBox();
     expect(depois).not.toBeNull();
-    expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.85);
     if (largura >= 1024) {
+      expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.85);
       // No desktop, a barra fica à direita do conteúdo, sem ocupar a largura da lista.
       expect((depois?.x ?? 0) + (depois?.width ?? 0)).toBeGreaterThan(
         (secao?.x ?? 0) + (secao?.width ?? 0) / 2,

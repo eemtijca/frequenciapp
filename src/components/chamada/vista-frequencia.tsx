@@ -17,6 +17,11 @@ import {
   CloudCheck,
   CalendarOff,
   CheckCircle2,
+  Check,
+  ChartNoAxesCombined,
+  FileText,
+  Minus,
+  Pencil,
   LockKeyhole,
   LockKeyholeOpen,
   LoaderCircle,
@@ -69,6 +74,7 @@ import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/chamada/aviso-beneficio-frequencia";
+import estilos from "./vista-frequencia.module.css";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import {
   AlertDialog,
@@ -872,14 +878,14 @@ export default function VistaFrequencia({
             <Button
               variant="outline"
               size="icon"
-              className="size-11 shrink-0"
+              className={`${estilos.acao} size-11 shrink-0`}
               aria-label="Dia anterior"
               disabled={travado || !dia}
               onClick={() => nav.anterior()}
             >
               <ChevronLeft size={18} />
             </Button>
-            <div className="min-w-0 flex-1">
+            <div className={`${estilos.data} min-w-0 flex-1`}>
               <SeletorPeriodo
                 id="dia-frequencia"
                 modo="dia"
@@ -903,7 +909,7 @@ export default function VistaFrequencia({
             <Button
               variant="outline"
               size="icon"
-              className="size-11 shrink-0"
+              className={`${estilos.acao} size-11 shrink-0`}
               aria-label="Dia seguinte"
               disabled={travado || !dia || nav.seguinteDesabilitado}
               onClick={() => nav.seguinte()}
@@ -967,18 +973,20 @@ export default function VistaFrequencia({
                 </p>
               )}
 
-              <div className={`flex flex-col gap-2 ${ehSabado ? "" : "sm:flex-row"}`}>
+              <div className={ehSabado ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"}>
                 <Button
                   type="button"
                   variant="outline"
+                  aria-label={tituloResumo}
                   aria-expanded={resumoAberto}
                   aria-controls={idResumo}
                   onClick={() => setResumoAberto((atual) => !atual)}
-                  className={`selecionado h-11 w-full justify-center rounded-full px-4 ${
-                    ehSabado ? "" : "sm:w-auto sm:min-w-0 sm:flex-1 sm:shrink"
+                  className={`${estilos.acao} h-11 min-w-0 justify-center px-3 ${
+                    revisaoSalva > 0 ? "" : "col-span-2"
                   }`}
                 >
-                  <span>{tituloResumo}</span>
+                  <ChartNoAxesCombined size={16} aria-hidden="true" />
+                  <span>Resumo</span>
                   <ChevronDown
                     aria-hidden="true"
                     className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
@@ -997,7 +1005,7 @@ export default function VistaFrequencia({
                           ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
                           : "Libera a chamada somente para esta turma e este sábado."
                     }
-                    className={`h-11 w-full justify-center rounded-full px-4 ${sabadoLiberado ? "selecionado" : ""}`}
+                    className={`${estilos.acao} h-auto min-h-11 w-full justify-center px-4 py-2 whitespace-normal`}
                     onClick={() => {
                       if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas)
                         return;
@@ -1016,10 +1024,8 @@ export default function VistaFrequencia({
                   <Button
                     type="button"
                     variant="outline"
-                    className={`h-11 w-full justify-center rounded-full px-4 ${
-                      ehSabado ? "" : "sm:w-auto sm:min-w-0 sm:flex-1 sm:shrink"
-                    }`}
-                    aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}`}
+                    className={`${estilos.acao} h-11 min-w-0 justify-center px-3`}
+                    aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}${chamadaBloqueada ? ", editar chamada" : ""}`}
                     disabled={ocupado || (edicaoLiberada && sujo)}
                     onClick={() => {
                       if (ocupado || (edicaoLiberada && sujo)) return;
@@ -1031,8 +1037,8 @@ export default function VistaFrequencia({
                       }
                     }}
                   >
-                    {chamadaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
-                    {chamadaBloqueada ? "Desbloquear" : "Bloquear"}
+                    {chamadaBloqueada ? <Pencil size={16} /> : <LockKeyhole size={16} />}
+                    {chamadaBloqueada ? "Editar" : "Bloquear"}
                   </Button>
                 )}
               </div>
@@ -1063,12 +1069,12 @@ export default function VistaFrequencia({
                 ))}
               <div
                 aria-label="Barra de salvamento"
-                className="superficie fixed left-1/2 z-30 flex w-fit max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-2xl p-2 xl:static xl:left-auto xl:z-auto xl:w-full xl:translate-x-0"
+                className="superficie fixed left-1/2 z-30 flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-2xl p-2 xl:static xl:left-auto xl:z-auto xl:w-full xl:max-w-none xl:translate-x-0"
                 style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
               >
                 <p
                   aria-live="polite"
-                  className="text-muted-foreground min-w-0 px-2 text-xs font-medium xl:flex-1"
+                  className="text-muted-foreground min-w-0 flex-1 px-2 text-xs font-medium"
                   title={feriado?.nome}
                 >
                   {feriado ? "Feriado" : tituloEstado}
@@ -1082,7 +1088,7 @@ export default function VistaFrequencia({
                         aria-label="Descartar"
                         title="Descartar alterações"
                         disabled={salvando}
-                        className="size-11 shrink-0"
+                        className={`${estilos.acao} size-11 shrink-0`}
                       >
                         <RotateCcw size={16} aria-hidden="true" />
                       </Button>
@@ -1103,7 +1109,7 @@ export default function VistaFrequencia({
                   </AlertDialog>
                 )}
                 <Button
-                  className="h-11 shrink-0 px-4"
+                  className={`${estilos.salvar} shrink-0`}
                   onClick={() => setConfirmarSalvamento(true)}
                   disabled={!podeSalvar}
                 >
@@ -1316,7 +1322,7 @@ export default function VistaFrequencia({
                   </div>
                 ) : (
                   <ul aria-label="Alunos da chamada" className="divide-y">
-                    {visiveis.map((aluno, indice) => {
+                    {visiveis.map((aluno) => {
                       const nomeExibido = nomeNaChamada(
                         aluno.nome,
                         mostrarOrigem,
@@ -1327,8 +1333,8 @@ export default function VistaFrequencia({
                       const marcadas = ausencias.get(aluno.id)?.size ?? 0;
                       const parcial = faltando && totalAulasDoDia > 0 && marcadas < totalAulasDoDia;
                       const codigo = justificativas.get(aluno.id) ?? "";
-                      const mostrarJustificativa =
-                        faltando && (!chamadaBloqueada || Boolean(codigo));
+                      const mostrarJustificativa = faltando && !chamadaBloqueada;
+                      const justificativaSalva = faltando && chamadaBloqueada && Boolean(codigo);
                       const mostrarAulas =
                         faltando &&
                         configuracoes.frequenciaPorAula &&
@@ -1339,25 +1345,17 @@ export default function VistaFrequencia({
                         acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
                       );
                       const alertasBeneficios = alertasDoAluno(aluno.id);
-                      const esmaecida = bloqueado || desistente;
+                      const esmaecida = desistente || (bloqueado && !chamadaBloqueada);
                       return (
                         <li
                           key={aluno.id}
-                          className={`last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${indice % 2 === 0 ? "bg-card" : "bg-secondary/60"}`}
+                          className="bg-card last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
                         >
-                          <div
-                            className={
-                              faltando
-                                ? indice % 2 === 0
-                                  ? "bg-falta-fraca/65"
-                                  : "bg-falta-fraca"
-                                : ""
-                            }
-                          >
+                          <div>
                             <div className="flex items-stretch">
                               <div
-                                className={`faixa-toque relative flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 transition-colors ${
-                                  faltando ? "" : "hover:bg-secondary/60"
+                                className={`faixa-toque relative flex min-h-18 min-w-0 flex-1 items-center gap-3 px-4 py-3 transition-colors ${
+                                  bloqueado || desistente ? "" : "hover:bg-secondary/40"
                                 }`}
                               >
                                 <span className="min-w-0 flex-1">
@@ -1376,7 +1374,7 @@ export default function VistaFrequencia({
                                         desistente
                                           ? "desistente. Marcação bloqueada."
                                           : faltando
-                                            ? `falta em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
+                                            ? `${codigo ? `falta justificada, ${rotuloJustificativa(codigo, catalogoJustificativas)}` : "falta"} em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
                                             : "presente. Toque para marcar falta."
                                       }${
                                         temAcumulado && acumulado
@@ -1400,6 +1398,11 @@ export default function VistaFrequencia({
                                       )}
                                     </button>
                                   </span>
+                                  {justificativaSalva && (
+                                    <span className="text-justificada-texto mt-1 block text-xs font-medium">
+                                      {rotuloJustificativa(codigo, catalogoJustificativas)}
+                                    </span>
+                                  )}
                                   {parcial ||
                                   (temAcumulado && acumulado) ||
                                   alertasBeneficios.length > 0 ? (
@@ -1441,16 +1444,21 @@ export default function VistaFrequencia({
                                       ? { duration: 0 }
                                       : { type: "spring", stiffness: 500, damping: 28 }
                                   }
-                                  className={`${
-                                    desistente
-                                      ? "bg-secondary text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                                      : faltando
-                                        ? codigo
-                                          ? "bg-justificada text-justificada-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold"
-                                          : "bg-falta text-falta-foreground flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold"
-                                        : "border-primary/25 bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold"
-                                  } ${esmaecida ? "opacity-60" : ""}`}
+                                  aria-hidden="true"
+                                  data-estado={
+                                    desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"
+                                  }
+                                  className={`${estilos.marca} ${esmaecida ? "opacity-60" : ""}`}
                                 >
+                                  {desistente ? null : faltando ? (
+                                    codigo ? (
+                                      <FileText size={16} />
+                                    ) : (
+                                      <Minus size={16} />
+                                    )
+                                  ) : (
+                                    <Check size={16} />
+                                  )}
                                   {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                                 </motion.span>
                               </div>
@@ -1467,7 +1475,7 @@ export default function VistaFrequencia({
                                         atual === aluno.id ? null : aluno.id,
                                       )
                                     }
-                                    className="controle text-muted-foreground pressionavel my-2 mr-2 h-9 shrink-0 px-2.5 text-xs font-medium disabled:opacity-50"
+                                    className={`${estilos.acao} pressionavel my-3 mr-2 h-11 shrink-0 px-3 text-xs font-medium disabled:opacity-50`}
                                   >
                                     Aulas
                                   </button>
@@ -1478,37 +1486,27 @@ export default function VistaFrequencia({
                             <div className="border-t px-4 py-2.5">
                               {mostrarJustificativa && (
                                 <div className="flex flex-wrap items-center gap-2">
-                                  {chamadaBloqueada ? (
-                                    <span className="text-primary text-xs font-medium">
-                                      {rotuloJustificativa(codigo, catalogoJustificativas)}
-                                    </span>
-                                  ) : (
-                                    <>
-                                      <Selecionar
-                                        id={`justificativa-${aluno.id}`}
-                                        value={codigo}
-                                        onValueChange={(valor) =>
-                                          definirJustificativa(aluno.id, valor)
-                                        }
-                                        disabled={bloqueado}
-                                        ariaLabel={`Justificativa da falta de ${nomeExibido}`}
-                                        opcoes={opcoesJustificativa}
-                                        className="h-9 max-w-64"
-                                      />
-                                      {codigo === JUSTIFICATIVA_OUTROS && (
-                                        <Input
-                                          value={observacoes.get(aluno.id) ?? ""}
-                                          maxLength={200}
-                                          disabled={bloqueado}
-                                          onChange={(evento) =>
-                                            definirObservacao(aluno.id, evento.target.value)
-                                          }
-                                          placeholder="Observação"
-                                          aria-label={`Observação da falta de ${nomeExibido}`}
-                                          className="h-9 max-w-64"
-                                        />
-                                      )}
-                                    </>
+                                  <Selecionar
+                                    id={`justificativa-${aluno.id}`}
+                                    value={codigo}
+                                    onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
+                                    disabled={bloqueado}
+                                    ariaLabel={`Justificativa da falta de ${nomeExibido}`}
+                                    opcoes={opcoesJustificativa}
+                                    className="h-11 max-w-64 rounded-2xl"
+                                  />
+                                  {codigo === JUSTIFICATIVA_OUTROS && (
+                                    <Input
+                                      value={observacoes.get(aluno.id) ?? ""}
+                                      maxLength={200}
+                                      disabled={bloqueado}
+                                      onChange={(evento) =>
+                                        definirObservacao(aluno.id, evento.target.value)
+                                      }
+                                      placeholder="Observação"
+                                      aria-label={`Observação da falta de ${nomeExibido}`}
+                                      className="h-11 max-w-64 rounded-2xl"
+                                    />
                                   )}
                                 </div>
                               )}
@@ -1525,10 +1523,10 @@ export default function VistaFrequencia({
                                           aria-pressed={marcada}
                                           disabled={bloqueado}
                                           onClick={() => alternarAula(aluno.id, aula.id)}
-                                          className={`numerais-tabulares pressionavel h-9 rounded-lg border px-2.5 text-xs font-medium transition-colors disabled:opacity-50 ${
+                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl border border-transparent px-3 text-xs font-medium transition-colors disabled:opacity-50 ${
                                             marcada
-                                              ? "border-falta bg-falta text-falta-foreground"
-                                              : "text-muted-foreground hover:border-foreground/30"
+                                              ? "bg-falta-fraca text-falta-texto"
+                                              : "bg-secondary text-secondary-foreground"
                                           }`}
                                         >
                                           {aula.ordem}ª {aula.inicio}
