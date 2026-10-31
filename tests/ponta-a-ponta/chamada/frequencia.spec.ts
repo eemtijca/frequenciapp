@@ -123,15 +123,18 @@ test.describe("chamada com saída por aula", () => {
       timeout: 15_000,
     });
 
-    // Do sábado, a seta seguinte abre o resumo; ali ela fica bloqueada no domingo corrente.
-    // Em outro dia da semana, a seta apenas avança para o dia seguinte.
+    // O sábado só avança ao resumo quando o domingo já chegou.
+    // No sábado corrente, a seta continua bloqueando datas futuras.
     if (diaDaSemanaIso(diaDeChamada()) === 6) {
-      await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeEnabled();
-      await painel.getByRole("button", { name: "Dia seguinte" }).click();
-      await expect(
-        page.getByRole("region", { name: "Resumo da semana", exact: true }),
-      ).toBeVisible();
-      await expect(painel.getByRole("button", { name: "Dia seguinte" })).toBeDisabled();
+      const seguinte = painel.getByRole("button", { name: "Dia seguinte" });
+      if (diaDaSemanaIso(diaCorrente()) === 7) {
+        await expect(seguinte).toBeEnabled();
+        await seguinte.click();
+        await expect(
+          page.getByRole("region", { name: "Resumo da semana", exact: true }),
+        ).toBeVisible();
+      }
+      await expect(seguinte).toBeDisabled();
     }
 
     // A marcação sobrevive à recarga.
@@ -245,9 +248,15 @@ test.describe("chamada com saída por aula", () => {
     }
     const linha = painel.locator("ul li").filter({ hasText: "E2E Aluno Dois" }).first();
     const desbloquear = painel.getByRole("button", { name: /Desbloquear chamada de E2E Ano A/ });
-    // Espera a leitura decidir entre a chamada bloqueada e a lista editável.
+    const liberarSabado = painel
+      .getByRole("button", { name: "Desbloquear sábado letivo", exact: true })
+      .and(painel.locator("button:not(:disabled)"));
+    // Espera a leitura ou a liberação do sábado antes de exigir a lista editável.
     await expect(
-      desbloquear.or(painel.locator("ul li button[aria-pressed]:not([disabled])").first()),
+      desbloquear
+        .or(liberarSabado)
+        .or(painel.locator("ul li button[aria-pressed]:not([disabled])").first())
+        .first(),
     ).toBeVisible({ timeout: 15_000 });
     if (await desbloquear.isVisible().catch(() => false)) await desbloquearChamada(painel);
     await liberarSabadoSeNecessario(painel);

@@ -1,4 +1,4 @@
-// Lista da Chamada: justificativas bloqueadas, linhas alternadas e acumulado mensal.
+// Lista da Chamada: justificativas bloqueadas, estados suaves e acumulado mensal.
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import {
@@ -111,7 +111,7 @@ async function mesPassado(page: Page) {
   await calendario.getByRole("button", { name: new RegExp(`^${nome}(,|$)`) }).click();
 }
 
-test("simplifica a chamada bloqueada, alterna as linhas e atualiza o mês após corrigir", async ({
+test("simplifica a chamada bloqueada, destaca os estados e atualiza o mês após corrigir", async ({
   page,
 }, info) => {
   await page.setViewportSize({ width: info.project.name === "chromium" ? 1280 : 320, height: 900 });
@@ -131,7 +131,18 @@ test("simplifica a chamada bloqueada, alterna as linhas e atualiza o mês após 
   ).toBeVisible();
   const corF = await falta.evaluate((e) => getComputedStyle(e).backgroundColor);
   const corFj = await justificada.evaluate((e) => getComputedStyle(e).backgroundColor);
-  expect(corF).not.toBe(corFj);
+  expect(corF).toBe(corFj);
+  const marcaF = falta.locator('[data-estado="F"]');
+  const marcaFj = justificada.locator('[data-estado="FJ"]');
+  expect(await marcaF.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe(
+    await marcaFj.evaluate((e) => getComputedStyle(e).backgroundColor),
+  );
+  await expect
+    .poll(async () => (await marcaF.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
+  await expect
+    .poll(async () => (await marcaFj.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   for (const tema of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: tema });

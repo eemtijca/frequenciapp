@@ -1,6 +1,7 @@
 // Painel Turmas com séries recolhíveis, progresso e bloqueios de edição.
 // Gestão mantém a seleção de origem recolhível. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { diaDaSemanaIso } from "@/domain/frequencia";
 import { diaDeChamada } from "../helpers/dia";
 import { comBanco } from "../helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
@@ -42,8 +43,15 @@ async function abrirPrimeiraSerie(secao: Locator): Promise<Locator> {
 }
 
 async function salvarPelaApi(page: Page, turma: string, revisao = 0): Promise<void> {
+  const dia = diaAtual();
   const resposta = await page.request.post("/api/frequencias", {
-    data: { dia: diaAtual(), turmaId: turmasDoProgresso.get(turma), revisao, faltas: [] },
+    data: {
+      dia,
+      turmaId: turmasDoProgresso.get(turma),
+      revisao,
+      faltas: [],
+      ...(diaDaSemanaIso(dia) === 6 ? { sabadoLetivo: true } : {}),
+    },
   });
   expect(resposta.ok()).toBe(true);
 }

@@ -1,0 +1,76 @@
+/* Blocos suaves da Chamada, com cores restritas aos controles e às marcações. */
+.acao,
+.data > button {
+  border-color: transparent;
+  border-radius: 1rem;
+  background-color: var(--secondary);
+  color: var(--foreground);
+}
+
+.acao:where([aria-expanded="true"], [aria-pressed="true"]) {
+  background-color: color-mix(in oklab, var(--primary) 12%, var(--card));
+  color: var(--primary);
+}
+
+@media (hover: hover) {
+  .acao:not(:disabled):hover,
+  .data > button:not(:disabled):hover {
+    border-color: transparent;
+    background-color: color-mix(in oklab, var(--primary) 8%, var(--secondary));
+  }
+}
+
+.marca {
+  display: flex;
+  height: 44px;
+  min-width: 64px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 1rem;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.marca[data-estado="P"] {
+  background-color: color-mix(in oklab, var(--primary) 12%, var(--card));
+  color: var(--primary);
+}
+
+.marca[data-estado="F"] {
+  background-color: var(--falta-fraca);
+  color: var(--falta-texto);
+}
+
+.marca[data-estado="FJ"] {
+  background-color: var(--justificada-fraca);
+  color: var(--justificada-texto);
+}
+
+.marca[data-estado="D"] {
+  background-color: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+.salvar {
+  height: 48px;
+  border-radius: 1rem;
+  padding-inline: 20px;
+}
+
+@media (forced-colors: active) {
+  .acao,
+  .data > button,
+  .marca {
+    border-color: ButtonText;
+  }
+
+  .acao:where([aria-expanded="true"], [aria-pressed="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

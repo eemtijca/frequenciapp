@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Chamada adota blocos suaves nos controles de turma, data, resumo e edição, com cantos arredondados e Salvar em destaque. As linhas ficam neutras e as marcações P, F e FJ combinam ícones e cores suaves; a justificativa salva aparece uma única vez abaixo do nome do aluno.
+
 - Gestão estende a navegação por tarefa às categorias Escola, Horários e Acesso e avisos. Cadastros, calendário, frequência, almoço, notificações e FrequenciBI ganham controles compactos com ícones e ajuda recolhida; Dados apresenta ações de cópia em destaque. Alternar as tarefas preserva os formulários e o rascunho único. Os avisos não encobrem as ações de salvar e descartar o rascunho.
 
 - A Fila de envios automáticos, em Gestão, Configurações, Planilhas, lista só os envios que ainda não foram feitos: aguardando, em andamento ou com falha, na ordem de processamento. Os já enviados e os descartados deixam a lista e continuam nas contagens. `GET /api/planilha/fila` passa a devolver só esses itens.

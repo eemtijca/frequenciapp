@@ -1,4 +1,4 @@
-/* Painel compacto com turmas contidas em cada série e progresso em barra sólida. */
+/* Blocos suaves para séries e turmas, com seleção e progresso independentes. */
 .faixa {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -17,12 +17,13 @@
   min-height: 72px;
   flex-direction: column;
   gap: 5px;
-  border-radius: var(--radius);
-  border-color: var(--border);
+  border-radius: 1rem;
+  border-color: transparent;
   padding: 10px;
   white-space: normal;
   color: var(--foreground);
-  background-color: var(--card);
+  background-color: var(--secondary);
+  box-shadow: none;
   text-align: center;
   transition:
     background-color 180ms ease,
@@ -32,21 +33,14 @@
 .gatilho:where([data-situacao="concluida"]),
 .serie:where([data-situacao="concluida"]),
 .turma:where([data-situacao="concluida"]) {
-  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
-  background-color: color-mix(in oklab, var(--primary) 10%, var(--card));
-}
-
-.gatilho:where([data-situacao="pendente"]),
-.serie:where([data-situacao="pendente"]),
-.turma:where([data-situacao="pendente"]) {
-  border-color: color-mix(in oklab, var(--falta) 45%, var(--border));
-  background-color: color-mix(in oklab, var(--falta) 6%, var(--card));
+  background-color: color-mix(in oklab, var(--primary) 8%, var(--card));
 }
 
 .serie:where([aria-pressed="true"]),
 .turma:where([aria-pressed="true"]) {
   outline: 2px solid var(--justificada);
   outline-offset: 2px;
+  background-color: color-mix(in oklab, var(--justificada) 10%, var(--card));
 }
 
 .gatilho:focus-visible,
@@ -82,19 +76,13 @@
   color: var(--primary);
 }
 
-.gatilho:where([data-situacao="pendente"]) .percentual,
-.serie:where([data-situacao="pendente"]) .percentual,
-.turma:where([data-situacao="pendente"]) .percentual {
-  color: var(--falta-texto);
-}
-
 .barra {
   display: block;
   width: 100%;
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background-color: color-mix(in oklab, var(--falta-texto) 38%, var(--card));
+  background-color: color-mix(in oklab, var(--muted-foreground) 22%, var(--card));
 }
 
 .barra:where([data-disponivel="false"]) {
@@ -107,6 +95,14 @@
   border-radius: inherit;
   background: var(--primary);
   transition: width 180ms ease;
+}
+
+@media (hover: hover) {
+  .gatilho:where(:not(:disabled):hover),
+  .serie:where(:not(:disabled, [aria-pressed="true"]):hover),
+  .turma:where(:not(:disabled, [aria-pressed="true"]):hover) {
+    background-color: color-mix(in oklab, var(--primary) 8%, var(--secondary));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -135,7 +131,9 @@
     outline-color: Highlight;
   }
 
-  .percentual {
+  .gatilho .percentual,
+  .serie .percentual,
+  .turma .percentual {
     color: CanvasText;
   }
 
@@ -191,10 +189,10 @@
 }
 .gatilho,
 .serie {
-  min-height: 44px;
+  min-height: 48px;
   flex-direction: row;
   gap: 12px;
-  border-radius: 999px;
+  border-radius: 1rem;
   padding: 8px 14px;
   text-align: left;
 }
@@ -209,7 +207,7 @@
   flex-shrink: 0;
 }
 .gatilho {
-  border-color: var(--justificada);
+  border-color: transparent;
 }
 .gatilho .percentual {
   border-radius: 999px;
@@ -263,12 +261,12 @@
 }
 .blocoSerie {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid transparent;
+  border-radius: 1rem;
   background: var(--card);
 }
 .blocoSerie[data-selecionada="true"] {
-  border-color: var(--justificada);
+  border-color: color-mix(in oklab, var(--justificada) 40%, var(--border));
 }
 .serie {
   border: 0;
@@ -300,8 +298,8 @@
   aspect-ratio: 1;
   align-self: start;
   justify-self: center;
-  border-color: var(--border);
-  border-radius: 50%;
+  border-color: transparent;
+  border-radius: 1rem;
   padding: 10px;
 }
 .turma .nome {
@@ -310,8 +308,8 @@
 .anel {
   position: absolute;
   inset: 3px;
-  border-radius: 50%;
-  color: var(--border);
+  border-radius: 13px;
+  color: color-mix(in oklab, var(--muted-foreground) 24%, var(--card));
   pointer-events: none;
   transition: color 180ms ease;
 }
@@ -319,10 +317,6 @@
   display: block;
   width: 100%;
   height: 100%;
-  transform: rotate(-90deg);
-}
-.turma:where([data-situacao="pendente"]) .anel {
-  color: color-mix(in oklab, var(--falta-texto) 60%, var(--border));
 }
 .turma:where([data-situacao="concluida"]) .anel {
   color: var(--primary);

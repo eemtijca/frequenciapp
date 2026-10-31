@@ -285,16 +285,15 @@ export function SeletorTurmaChamada({
                             data-progresso={progresso ?? undefined}
                           >
                             <svg viewBox="0 0 64 64" focusable="false" className="size-full">
-                              <circle
-                                cx="32"
-                                cy="32"
-                                r="27"
+                              <rect
+                                x="5"
+                                y="5"
+                                width="54"
+                                height="54"
+                                rx="12"
                                 fill="none"
                                 stroke="currentColor"
-                                strokeWidth="5"
-                                strokeLinecap="round"
-                                pathLength="100"
-                                strokeDasharray="8.5 4"
+                                strokeWidth="2"
                               />
                             </svg>
                           </span>
