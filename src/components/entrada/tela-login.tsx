@@ -236,15 +236,12 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
             </Button>
           </form>
 
-          <nav
-            aria-label="Projeto e ferramentas"
-            className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs"
-          >
+          <nav aria-label="Projeto e ferramentas" className="grid grid-cols-2 gap-2 text-xs">
             <a
               href="/bi"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
             >
               FrequenciBI
             </a>
@@ -252,7 +249,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               href="https://github.com/eemtijca/frequenciapp"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
             >
               GitHub
             </a>
@@ -260,14 +257,14 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               href="/api/docs"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
             >
               API
             </a>
             <button
               type="button"
               onClick={() => setSobreAberto(true)}
-              className="text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
             >
               Sobre
             </button>

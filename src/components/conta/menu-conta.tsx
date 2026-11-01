@@ -34,7 +34,7 @@ function Item({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="pressionavel focus-visible:ring-ring/50 hover:bg-secondary flex min-h-11 w-full items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="controle pressionavel focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-2.5 px-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Icone size={17} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <span className="min-w-0 truncate">{rotulo}</span>
@@ -60,7 +60,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           type="button"
           aria-haspopup="menu"
           aria-label={`Conta de ${usuario.nome}`}
-          className="pressionavel focus-visible:ring-ring/50 hover:bg-secondary flex min-h-12 w-full items-center gap-2.5 rounded-2xl px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="controle pressionavel focus-visible:ring-ring/50 flex min-h-12 w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <span className="selecionado flex size-10 shrink-0 items-center justify-center rounded-full">
             <span className="text-sm font-semibold" aria-hidden="true">
@@ -90,7 +90,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           ref={conteudoRef}
           role="menu"
           aria-label="Conta"
-          className="flex flex-col gap-0.5"
+          className="flex flex-col gap-1.5"
           onKeyDown={(evento) => {
             if (evento.key !== "ArrowDown" && evento.key !== "ArrowUp") return;
             const itens = [
@@ -116,7 +116,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           <Item icone={Bell} rotulo="Notificações" onClick={() => acionar("notificacoes")} />
           <Item icone={KeyRound} rotulo="Trocar senha" onClick={() => acionar("senha")} />
           <Item icone={Info} rotulo="Sobre" onClick={() => acionar("sobre")} />
-          <div className="border-t pt-0.5">
+          <div className="border-t pt-1.5">
             <Item
               icone={LogOut}
               rotulo={saindo ? "Saindo..." : "Sair da conta"}

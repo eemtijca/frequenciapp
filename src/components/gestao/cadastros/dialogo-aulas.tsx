@@ -251,7 +251,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                     </p>
                   </div>
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="size-11"
                     aria-label={`Editar aula ${aula.ordem}`}
@@ -263,7 +263,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="icon"
                         className="size-11"
                         aria-label={
@@ -296,7 +296,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="icon"
                         className="text-falta-texto size-11"
                         aria-label={`Excluir aula ${aula.ordem}`}

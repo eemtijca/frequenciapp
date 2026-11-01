@@ -54,6 +54,7 @@ export function TabelaApoioBi({
         <Button
           variant="outline"
           size="sm"
+          className="h-11"
           onClick={() =>
             confirmar(() =>
               baixarBi(
@@ -120,7 +121,13 @@ export function TabelaApoioBi({
         {filtradas.length > 50 && " O CSV inclui todos os registros filtrados."}
       </p>
       <div className="mt-2 flex items-center justify-between gap-2 print:hidden">
-        <Button size="sm" variant="ghost" disabled={!atual} onClick={() => setPagina(atual - 1)}>
+        <Button
+          size="sm"
+          className="h-11"
+          variant="secondary"
+          disabled={!atual}
+          onClick={() => setPagina(atual - 1)}
+        >
           Anterior
         </Button>
         <p className="text-muted-foreground text-xs">
@@ -128,7 +135,8 @@ export function TabelaApoioBi({
         </p>
         <Button
           size="sm"
-          variant="ghost"
+          className="h-11"
+          variant="secondary"
           disabled={(atual + 1) * 50 >= filtradas.length}
           onClick={() => setPagina(atual + 1)}
         >

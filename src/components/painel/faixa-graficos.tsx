@@ -67,7 +67,7 @@ export default function FaixaGraficos({
             aria-label="Gráfico anterior"
             disabled={atual <= 0}
             onClick={() => irPara(atual - 1)}
-            className="size-11 shrink-0 rounded-full"
+            className="size-11 shrink-0"
           >
             <ChevronLeft aria-hidden="true" />
           </Button>
@@ -78,7 +78,7 @@ export default function FaixaGraficos({
             aria-label="Próximo gráfico"
             disabled={atual >= cartoes.length - 1}
             onClick={() => irPara(atual + 1)}
-            className="size-11 shrink-0 rounded-full"
+            className="size-11 shrink-0"
           >
             <ChevronRight aria-hidden="true" />
           </Button>

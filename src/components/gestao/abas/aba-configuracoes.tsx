@@ -869,7 +869,7 @@ function ConteudoConfiguracoes({
                   />
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="size-11 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
@@ -880,7 +880,7 @@ function ConteudoConfiguracoes({
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="size-11 shrink-0"
                     aria-label={`Cancelar edição de ${item.codigo}`}
@@ -909,7 +909,7 @@ function ConteudoConfiguracoes({
                     />
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
                       className="size-11 shrink-0"
                       aria-label={`Editar rótulo de ${item.codigo}`}
@@ -922,7 +922,7 @@ function ConteudoConfiguracoes({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
                       className="text-falta-texto size-11 shrink-0"
                       aria-label={`Excluir ${item.codigo}`}
@@ -1047,7 +1047,7 @@ function ConteudoConfiguracoes({
                   />
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="size-11 shrink-0"
                     aria-label={`Salvar rótulo de ${item.codigo}`}
@@ -1058,7 +1058,7 @@ function ConteudoConfiguracoes({
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="size-11 shrink-0"
                     aria-label={`Cancelar edição de ${item.codigo}`}
@@ -1087,7 +1087,7 @@ function ConteudoConfiguracoes({
                     />
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
                       className="size-11 shrink-0"
                       aria-label={`Editar rótulo de ${item.codigo}`}
@@ -1100,7 +1100,7 @@ function ConteudoConfiguracoes({
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
                       className="text-falta-texto size-11 shrink-0"
                       aria-label={`Excluir ${item.codigo}`}

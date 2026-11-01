@@ -152,7 +152,7 @@ export function GradePaineisBi({
               <div className="flex flex-wrap gap-1 print:hidden">
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   className={estilos.puxador}
                   aria-label={`Mover ${g.titulo}`}
                   title="Arrastar ou usar as setas do teclado"
@@ -175,7 +175,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   aria-label={`Subir ${g.titulo}`}
                   disabled={!i}
                   onClick={() => mover(g.id, i - 1)}
@@ -184,7 +184,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   aria-label={`Descer ${g.titulo}`}
                   disabled={i === painel.graficos.length - 1}
                   onClick={() => mover(g.id, i + 1)}
@@ -193,7 +193,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   className={estilos.redimensionar}
                   aria-label={`Redimensionar ${g.titulo}`}
                   title="Arrastar; setas alteram largura e altura"
@@ -216,12 +216,12 @@ export function GradePaineisBi({
                 >
                   <Expand size={15} />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => onEditar(g)}>
+                <Button size="sm" className="h-11" variant="secondary" onClick={() => onEditar(g)}>
                   Editar
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   aria-label={`Duplicar ${g.titulo}`}
                   disabled={painel.graficos.length >= 40}
                   onClick={() =>
@@ -242,7 +242,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="ghost"
+                  variant="secondary"
                   aria-label={`Excluir ${g.titulo}`}
                   onClick={() =>
                     onAlterar({

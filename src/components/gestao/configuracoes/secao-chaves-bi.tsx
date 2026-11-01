@@ -500,7 +500,7 @@ export default function SecaoChavesBi({
                       type="button"
                       className="pressionavel focus-visible:ring-ring/50 flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left outline-none focus-visible:ring-[3px]"
                     >
-                      <span className="bg-secondary/60 text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
+                      <span className="bg-secondary/60 text-secondary-foreground flex size-9 shrink-0 items-center justify-center rounded-2xl">
                         <ListFilter size={16} aria-hidden="true" />
                       </span>
                       <span className="min-w-0 flex-1">

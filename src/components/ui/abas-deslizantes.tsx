@@ -1,6 +1,6 @@
 "use client";
 
-// Abas com pílula indicadora: troca instantânea por toque, teclado e botões,
+// Abas com bloco indicador: troca instantânea por toque, teclado e botões,
 // com deslize curto do conteúdo no desktop.
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -74,7 +74,7 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`superficie relative grid gap-0.5 p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          className={`bg-secondary/60 relative grid gap-0.5 rounded-[1.25rem] p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
           style={
             {
               gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))`,
@@ -107,7 +107,7 @@ export default function AbasDeslizantes<T extends string>({
                 tabIndex={ativo ? 0 : -1}
                 disabled={bloqueada}
                 onClick={() => trocarAba(item.valor)}
-                className={`${ativo ? "" : "discreto"} focus-visible:ring-ring/50 pressionavel relative z-10 flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs`}
+                className={`${ativo ? "rounded-2xl" : "discreto"} focus-visible:ring-ring/50 pressionavel relative z-10 flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs`}
               >
                 <Icone
                   size={15}

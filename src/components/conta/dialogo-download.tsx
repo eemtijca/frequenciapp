@@ -9,6 +9,7 @@ import { baixarArquivo, protegerArquivo, type ArquivoDownload } from "@/lib/down
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/ui/campo-senha";
 import { Label } from "@/components/ui/label";
@@ -144,7 +145,12 @@ function ConteudoDownload({
         )}
         <fieldset disabled={executando} className="flex flex-col gap-3">
           <legend className="mb-2 text-sm font-medium">Formato do download</legend>
-          <Label className="flex min-h-11 items-center gap-3 rounded-lg border p-3">
+          <Label
+            className={cn(
+              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
+              protegido && "selecionado",
+            )}
+          >
             <input
               type="radio"
               name={`${id}-formato`}
@@ -156,7 +162,12 @@ function ConteudoDownload({
             />
             ZIP protegido por senha
           </Label>
-          <Label className="flex min-h-11 items-center gap-3 rounded-lg border p-3">
+          <Label
+            className={cn(
+              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
+              !protegido && "selecionado",
+            )}
+          >
             <input
               type="radio"
               name={`${id}-formato`}

@@ -348,7 +348,7 @@ export default function ResumoRelatorios({
                         setCriterioRanking(criterio);
                         setMostrarTodos(false);
                       }}
-                      className={`rounded-full px-4 ${criterioRanking === criterio ? "selecionado" : ""}`}
+                      className={`px-4 ${criterioRanking === criterio ? "selecionado" : ""}`}
                     >
                       {RANKINGS[criterio].botao}
                     </Button>

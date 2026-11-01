@@ -236,7 +236,7 @@ export default function VistaMovimentacoes({
           <Button
             key={item.valor}
             type="button"
-            variant={modo === item.valor ? "default" : "outline"}
+            variant="secondary"
             aria-pressed={modo === item.valor}
             onClick={() => setModo(item.valor)}
             className="min-h-11"
@@ -250,7 +250,7 @@ export default function VistaMovimentacoes({
           <Button
             key={item.valor}
             type="button"
-            variant={agrupamento === item.valor ? "default" : "outline"}
+            variant="secondary"
             aria-pressed={agrupamento === item.valor}
             onClick={() => setAgrupamento(item.valor)}
             className="min-h-11"

@@ -27,7 +27,7 @@ export function BotaoAtualizar({
   disponivel,
   className,
   rotulo = "Atualizar tela",
-  variante = "ghost",
+  variante = "secondary",
   tamanho = "icon",
   comRotulo = false,
 }: BotaoAtualizarProps) {
@@ -41,7 +41,7 @@ export function BotaoAtualizar({
       type="button"
       variant={variante}
       size={tamanho}
-      className={cn("shrink-0 rounded-full", comRotulo ? "w-auto px-3" : "size-11", className)}
+      className={cn("shrink-0", comRotulo ? "w-auto px-3" : "size-11", className)}
       aria-label={rotulo}
       title={ativo ? rotulo : "Atualização indisponível nesta tela"}
       disabled={!ativo || carregando}

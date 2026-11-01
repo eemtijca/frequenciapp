@@ -466,7 +466,7 @@ export default function VistaSaidas({
               <Button
                 type="button"
                 variant="outline"
-                className="min-h-11 rounded-full px-4"
+                className="min-h-11 px-4"
                 aria-label={`${domingoBloqueado ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloData(nav.domingo)}`}
                 disabled={removendoId !== null}
                 onClick={() => setDiaLiberado(domingoBloqueado ? nav.domingo : null)}
@@ -506,8 +506,9 @@ export default function VistaSaidas({
                     </div>
                     {!domingoBloqueado && (
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="icon"
+                        className="text-falta-texto"
                         aria-label={`Remover saída de ${aluno?.nome ?? "aluno"}`}
                         disabled={removendoId === saida.id}
                         onClick={() => setSaidaRemover(saida)}
@@ -718,7 +719,7 @@ export default function VistaSaidas({
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-full px-4"
+                    className="px-4"
                     aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
                     disabled={removendoId !== null}
                     onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
@@ -751,8 +752,9 @@ export default function VistaSaidas({
                           </div>
                           {!listaBloqueada && (
                             <Button
-                              variant="ghost"
+                              variant="secondary"
                               size="icon"
+                              className="text-falta-texto"
                               aria-label={`Remover saída de ${nome}`}
                               disabled={removendoId === saida.id}
                               onClick={() => remover(saida)}

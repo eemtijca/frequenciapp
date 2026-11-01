@@ -179,7 +179,7 @@ function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) 
       onClick={() => onTrocar(item.visao)}
       className={cn(
         "pressionavel focus-visible:ring-ring relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-2xl px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-        ativo ? "selecionado" : "discreto text-muted-foreground",
+        ativo ? "selecionado" : "controle text-secondary-foreground",
       )}
     >
       <Icone size={20} strokeWidth={ativo ? 2 : 1.7} aria-hidden="true" className="shrink-0" />
@@ -255,9 +255,9 @@ function MenuMovel({
       <DialogTrigger asChild>
         <Button
           ref={gatilhoRef}
-          variant="ghost"
+          variant="secondary"
           size="icon"
-          className="relative size-11 shrink-0 rounded-full"
+          className="relative size-11 shrink-0"
           aria-label="Abrir menu"
           title="Menu"
         >
@@ -848,12 +848,7 @@ export default function Aplicacao({
           {!movel && <BotaoAtualizar />}
           {movel && (
             <DialogClose asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-11 rounded-full"
-                aria-label="Fechar menu"
-              >
+              <Button variant="secondary" size="icon" className="size-11" aria-label="Fechar menu">
                 <X size={20} aria-hidden="true" />
               </Button>
             </DialogClose>
@@ -880,7 +875,7 @@ export default function Aplicacao({
               />
             ))}
             {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
-              <Button asChild variant="ghost" className="h-11 justify-start gap-2 px-4">
+              <Button asChild variant="secondary" className="h-11 justify-start gap-2.5 px-3">
                 <a href="/bi" target="_blank" rel="noopener" aria-label="FrequenciBI, nova aba">
                   <ChartNoAxesCombined size={18} aria-hidden="true" />
                   FrequenciBI
@@ -941,11 +936,11 @@ export default function Aplicacao({
                   FrequenciApp
                 </span>
                 <BotaoAtualizar />
-                <SeletorTema className="shrink-0 rounded-full" />
+                <SeletorTema className="shrink-0" />
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="icon"
-                  className="size-11 shrink-0 rounded-full"
+                  className="size-11 shrink-0"
                   aria-label="Configurar notificações"
                   title="Configurar notificações"
                   onClick={(evento) => {

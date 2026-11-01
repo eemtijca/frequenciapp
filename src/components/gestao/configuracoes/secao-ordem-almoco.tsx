@@ -225,7 +225,7 @@ export default function SecaoOrdemAlmoco({
                   <span className="min-w-0 flex-1 text-sm font-medium break-words">{rotulo}</span>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     aria-label={`Subir ${rotulo}`}
                     disabled={indice === 0}
@@ -235,7 +235,7 @@ export default function SecaoOrdemAlmoco({
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     aria-label={`Descer ${rotulo}`}
                     disabled={indice === rascunho.length - 1}
@@ -245,7 +245,7 @@ export default function SecaoOrdemAlmoco({
                   </Button>
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                     size="icon"
                     className="text-falta-texto"
                     aria-label={`Tirar ${rotulo} da ordem`}
@@ -266,7 +266,7 @@ export default function SecaoOrdemAlmoco({
                   {item.inicio ? (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       size="icon"
                       aria-label={`Limpar horário de ${rotulo}`}
                       onClick={() => atualizarInicio(indice, "")}

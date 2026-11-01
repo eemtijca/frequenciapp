@@ -29,11 +29,11 @@ export default function ErroGlobal({
           body { background: ${FUNDO_CLARO}; color: ${TINTA_CLARA}; }
           .texto { color: #6f6a60; }
           .acao:focus-visible { outline: 2px solid ${COR_PRIMARIA}; outline-offset: 2px; }
-          .secundaria { border-color: #3d3a3433; }
+          .secundaria { background: #efede8; color: ${TINTA_CLARA}; }
           @media (prefers-color-scheme: dark) {
             body { background: ${FUNDO_ESCURO}; color: ${TINTA_ESCURA}; }
             .texto { color: #b6b2a9; }
-            .secundaria { border-color: #ffffff2e; color: ${TINTA_ESCURA}; }
+            .secundaria { background: #2b2925; color: ${TINTA_ESCURA}; }
           }
         `}</style>
       </head>
@@ -59,7 +59,7 @@ export default function ErroGlobal({
             height: 56,
             alignItems: "center",
             justifyContent: "center",
-            borderRadius: 14,
+            borderRadius: 16,
             background: `${COR_PRIMARIA}1a`,
             color: COR_PRIMARIA,
           }}
@@ -97,7 +97,7 @@ export default function ErroGlobal({
               marginTop: 8,
               padding: "10px 18px",
               minHeight: 44,
-              borderRadius: 12,
+              borderRadius: 16,
               border: "none",
               background: COR_PRIMARIA,
               color: "#faf9f6",
@@ -117,8 +117,8 @@ export default function ErroGlobal({
               alignItems: "center",
               padding: "10px 18px",
               minHeight: 44,
-              borderRadius: 12,
-              border: "1px solid #3d3a3433",
+              borderRadius: 16,
+              border: "1px solid transparent",
               fontSize: 15,
               fontWeight: 600,
               textDecoration: "none",

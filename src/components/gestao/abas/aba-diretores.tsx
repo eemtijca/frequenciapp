@@ -377,7 +377,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                         {diretor.estado === "sem_palavra" ? "Gerar palavra-chave" : "Gerar nova"}
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="icon"
                         className="size-11"
                         aria-label={`Editar ${diretor.nome}`}
@@ -386,7 +386,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                         <Pencil size={16} />
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="icon"
                         className="size-11"
                         aria-label={
@@ -399,7 +399,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                       </Button>
                       {podeRevogar(diretor) && (
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="icon"
                           className="text-falta-texto size-11"
                           aria-label={`Revogar a palavra-chave de ${diretor.nome}`}

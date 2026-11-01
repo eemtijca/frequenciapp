@@ -1,4 +1,4 @@
-// Botões compartilhados com hierarquia de ações e superfícies planas.
+// Botões em blocos suaves com hierarquia de ações compartilhada.
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -14,9 +14,9 @@ const buttonVariants = cva(
         destructive:
           "destrutivo focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline: "controle",
-        secondary: "controle text-secondary-foreground",
+        secondary: "controle",
         ghost: "discreto",
-        link: "text-primary rounded-full underline-offset-4 hover:underline",
+        link: "text-primary rounded-2xl underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-4 py-2 has-[>svg]:px-3",

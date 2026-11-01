@@ -224,7 +224,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="icon"
                             className="size-11"
                             aria-label={`Horários de ${turma.rotulo}`}
@@ -236,7 +236,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                             <Clock size={16} />
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="icon"
                             className="size-11"
                             aria-label={`Editar turma ${turma.rotulo}`}
@@ -247,7 +247,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button
-                                variant="ghost"
+                                variant="secondary"
                                 size="icon"
                                 className="text-falta-texto size-11"
                                 aria-label={`Excluir turma ${turma.rotulo}`}

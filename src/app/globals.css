@@ -67,7 +67,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
  * semântico: só aparece onde há ausência a comunicar.
  */
 :root {
-  --radius: 0.875rem;
+  --radius: 1rem;
   --background: oklch(0.975 0.004 90);
   --foreground: oklch(0.245 0.006 90);
   --card: oklch(1 0 0);

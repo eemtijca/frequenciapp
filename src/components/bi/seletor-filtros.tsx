@@ -113,6 +113,7 @@ export function SeletorFiltrosBi({
           <Button
             key={periodo}
             size="sm"
+            className="h-11"
             variant="outline"
             type="button"
             onClick={() => {
@@ -194,13 +195,19 @@ export function SeletorFiltrosBi({
           )}
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="submit" size="sm" disabled={!inicio || !fim || inicio > fim}>
+          <Button
+            type="submit"
+            size="sm"
+            className="h-11"
+            disabled={!inicio || !fim || inicio > fim}
+          >
             Aplicar período
           </Button>
           <Button
             type="button"
             size="sm"
-            variant="ghost"
+            className="h-11"
+            variant="secondary"
             disabled={!temRecorte}
             onClick={() =>
               onAlterar({

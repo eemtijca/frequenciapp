@@ -813,8 +813,8 @@ export default function IntegracaoPlanilha({
                                 <span className="min-w-0 truncate">{turma.rotulo}</span>
                                 <Button
                                   type="button"
-                                  variant="ghost"
-                                  className="h-8"
+                                  variant="secondary"
+                                  className="h-11"
                                   onClick={() => void criarAba(turma.rotulo)}
                                   disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
                                 >

@@ -247,7 +247,8 @@ export function CartaoGrafico({
           <div className="flex flex-wrap gap-1 print:hidden">
             <Button
               size="sm"
-              variant="ghost"
+              className="h-11"
+              variant="secondary"
               onClick={() => setDetalhes(!detalhes)}
               aria-expanded={detalhes || config.tipo === "tabela"}
             >
@@ -255,13 +256,19 @@ export function CartaoGrafico({
               Tabela
             </Button>
             {onAprofundar && ["serie", "turma"].includes(config.dimensao) && (
-              <Button size="sm" variant="ghost" onClick={() => onAprofundar(config)}>
+              <Button
+                size="sm"
+                className="h-11"
+                variant="secondary"
+                onClick={() => onAprofundar(config)}
+              >
                 Aprofundar
               </Button>
             )}
             <Button
               size="sm"
-              variant="ghost"
+              className="h-11"
+              variant="secondary"
               aria-label={`Exportar CSV de ${config.titulo}`}
               onClick={() =>
                 confirmar(() =>
@@ -277,7 +284,8 @@ export function CartaoGrafico({
             </Button>
             <Button
               size="sm"
-              variant="ghost"
+              className="h-11"
+              variant="secondary"
               aria-label={`Exportar PNG de ${config.titulo}`}
               onClick={() =>
                 confirmar(async () => {
@@ -331,6 +339,7 @@ export function CartaoGrafico({
                 />
                 <Button
                   size="sm"
+                  className="h-11"
                   variant="outline"
                   onClick={() => {
                     setCompletos(!completos);
@@ -425,7 +434,8 @@ export function CartaoGrafico({
               <div className="mt-2 flex items-center justify-between gap-2 print:hidden">
                 <Button
                   size="sm"
-                  variant="ghost"
+                  className="h-11"
+                  variant="secondary"
                   disabled={!atual}
                   onClick={() => setPagina(atual - 1)}
                 >
@@ -437,7 +447,8 @@ export function CartaoGrafico({
                 </span>
                 <Button
                   size="sm"
-                  variant="ghost"
+                  className="h-11"
+                  variant="secondary"
                   disabled={(atual + 1) * 50 >= linhasTabela.length}
                   onClick={() => setPagina(atual + 1)}
                 >

@@ -122,7 +122,7 @@ const LinhaAluno = memo(function LinhaAluno({
       {!modoSelecao && (
         <div className="flex shrink-0 items-center gap-1">
           <Button
-            variant="ghost"
+            variant="secondary"
             size="icon"
             className="size-11"
             aria-label={`Editar ${aluno.nome}`}
@@ -133,7 +133,7 @@ const LinhaAluno = memo(function LinhaAluno({
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
                 className="size-11"
                 aria-label={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
@@ -164,7 +164,7 @@ const LinhaAluno = memo(function LinhaAluno({
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="icon"
                 className="text-falta-texto size-11"
                 aria-label={`Excluir ${aluno.nome}`}
