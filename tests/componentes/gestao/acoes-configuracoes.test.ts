@@ -115,11 +115,18 @@ async function abrirAlmoco(page: Page) {
     .click();
 }
 async function conferirPerigo(botao: Locator) {
-  const cores = await botao.evaluate((el) => ({
-    cor: getComputedStyle(el).color,
-    perigo: getComputedStyle(el).getPropertyValue("--falta-texto").trim(),
-  }));
-  expect(cores.cor).toBe(cores.perigo);
+  await expect
+    .poll(() =>
+      botao.evaluate((el) => {
+        const amostra = document.createElement("span");
+        amostra.style.color = "var(--falta-texto)";
+        el.appendChild(amostra);
+        const resultado = getComputedStyle(el).color === getComputedStyle(amostra).color;
+        amostra.remove();
+        return resultado;
+      }),
+    )
+    .toBe(true);
 }
 async function conferirFoco(botao: Locator) {
   await botao.page().keyboard.press("Tab");

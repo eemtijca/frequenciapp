@@ -60,16 +60,29 @@ test.describe("chamada com saída por aula", () => {
     if (diaDeChamada() === diaCorrente()) {
       await expect(painel.getByText("Hoje", { exact: true })).toBeVisible();
     }
-    // A coluna lateral do desktop preserva a data e, quando há selo "Hoje",
-    // os dois ficam sem sobreposição.
+    // A coluna lateral preserva a data e, quando há selo "Hoje", os dois ficam
+    // dentro do gatilho e sem sobreposição. Em telas estreitas o selo pode
+    // ocupar uma segunda linha, por isso a checagem é bidimensional.
     expect(
       await gatilhoDia.evaluate((botao) => {
         const data = botao.querySelector(".numerais-tabulares")?.getBoundingClientRect();
         const selo = botao.querySelector(".rounded-full")?.getBoundingClientRect();
         const caixa = botao.getBoundingClientRect();
-        if (!data || data.left < caixa.left || data.right > caixa.right) return false;
+        if (
+          !data ||
+          data.left < caixa.left ||
+          data.right > caixa.right ||
+          data.top < caixa.top ||
+          data.bottom > caixa.bottom
+        )
+          return false;
         if (!selo) return true;
-        return data.right <= selo.left && selo.right <= caixa.right;
+        const sobrepoe =
+          data.left < selo.right &&
+          selo.left < data.right &&
+          data.top < selo.bottom &&
+          selo.top < data.bottom;
+        return !sobrepoe && selo.right <= caixa.right && selo.bottom <= caixa.bottom;
       }),
     ).toBe(true);
     await expect(gatilhoDia).toHaveAttribute("aria-haspopup", "dialog");

@@ -46,6 +46,12 @@ it("registra estilos escuros de referência", async () => {
     await page.evaluate(() => {
       document.documentElement.className = "dark";
     });
+    await page.waitForFunction(
+      () =>
+        document.documentElement.classList.contains("dark") &&
+        getComputedStyle(document.documentElement).getPropertyValue("--background").trim() ===
+          "oklch(0.19 0.004 90)",
+    );
     const ano = page.getByRole("button", { name: "Ano letivo", exact: true });
     await ano.waitFor();
     const style = (el: Element) => {
@@ -163,6 +169,12 @@ for (const largura of [320, 390, 1280]) {
         await page.goto(url);
         await page.evaluate((t) => {
           document.documentElement.className = t;
+        }, tema);
+        await page.waitForFunction((classe) => {
+          const html = document.documentElement;
+          if (!html.classList.contains(classe)) return false;
+          const fundo = getComputedStyle(html).getPropertyValue("--background").trim();
+          return classe === "dark" ? fundo === "oklch(0.19 0.004 90)" : fundo === "#f6f6f6";
         }, tema);
         const ano = page.getByRole("button", { name: "Ano letivo", exact: true });
         const hora = page.getByRole("button", { name: "Horário de entrada: 08:30" });

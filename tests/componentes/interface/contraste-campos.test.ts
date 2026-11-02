@@ -205,7 +205,9 @@ it("todos os campos indicam foco e preservam a seleção em cores forçadas", as
     await page.getByLabel("Buscável pagina").click();
     await page.getByRole("option", { name: "Dois" }).click();
     await page.getByLabel("Texto pagina").focus();
-    expect(await page.getByLabel("Buscável pagina").innerText()).toContain("Dois");
+    expect(await page.getByRole("combobox", { name: "Buscável pagina" }).innerText()).toContain(
+      "Dois",
+    );
   } finally {
     await page.close();
   }

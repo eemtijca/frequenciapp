@@ -590,7 +590,8 @@ async function medirVariante(variante: Locator): Promise<MedidaTexto[]> {
       let alfaTexto: number | null = null;
       if (ctx && no.parentElement) {
         const cor = getComputedStyle(no.parentElement).color;
-        ctx.fillStyle = "#000000";
+        // O sentinela branco detecta cor não suportada: nesse caso o Canvas
+        // mantém o valor anterior e a comparação abaixo falha fechada.
         ctx.fillStyle = cor;
         const primeira = ctx.fillStyle;
         ctx.fillStyle = "#ffffff";
@@ -659,6 +660,18 @@ async function conferirData(gatilho: Locator, dia: string, hoje: string) {
   const data = gatilho.locator(":scope > span").first();
   await expect(data).toHaveText(esperado.rotulo);
   await expect(data).toBeVisible();
+  // Durante a leitura inicial o gatilho pode ficar desabilitado; a medição de
+  // legibilidade só vale depois que ele e seus ancestrais voltam à opacidade plena.
+  await expect
+    .poll(() =>
+      gatilho.evaluate((el) => {
+        for (let pai: Element | null = el; pai; pai = pai.parentElement) {
+          if (Number(getComputedStyle(pai).opacity) !== 1) return false;
+        }
+        return el.isConnected;
+      }),
+    )
+    .toBe(true);
   const medida = await data.evaluate((el) => {
     const range = document.createRange();
     range.selectNodeContents(el);

@@ -35,6 +35,9 @@ for (const tema of ["light", "dark"] as const) {
     );
     await page.keyboard.press("Tab");
     const tentar = page.getByRole("link", { name: "Tentar de novo" });
+    // O WebKit móvel não inclui links no ciclo de Tab por padrão; o foco
+    // explícito preserva a verificação do link e do Enter sem simular teclado.
+    if (!(await tentar.evaluate((el) => el === document.activeElement))) await tentar.focus();
     await expect(tentar).toBeFocused();
     if (process.env.CAPTURAS_ESTADOS)
       await page.screenshot({

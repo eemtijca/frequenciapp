@@ -54,6 +54,25 @@ afterAll(async () => {
   rmSync(cache, { recursive: true, force: true });
 });
 
+/** Espera a classe e a pintura real do body antes de medir contrastes. */
+async function aguardarTema(page: Page, tema: "light" | "dark") {
+  await page.waitForFunction((valor) => {
+    const raiz = document.documentElement;
+    if (!raiz.classList.contains(valor)) return false;
+    const token = getComputedStyle(raiz).getPropertyValue("--background").trim();
+    if (valor === "dark" ? token !== "oklch(0.19 0.004 90)" : token !== "#f6f6f6") return false;
+    const corpo = getComputedStyle(document.body).backgroundColor;
+    if (corpo === "rgba(0, 0, 0, 0)") return false;
+    const contexto = document.createElement("canvas").getContext("2d");
+    if (!contexto) return false;
+    contexto.clearRect(0, 0, 1, 1);
+    contexto.fillStyle = corpo;
+    contexto.fillRect(0, 0, 1, 1);
+    const r = contexto.getImageData(0, 0, 1, 1).data[0] ?? 0;
+    return valor === "dark" ? r < 80 : r > 180;
+  }, tema);
+}
+
 it("no painel claro o resumo usa fundo transparente e borda discreta", async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
@@ -203,6 +222,7 @@ for (const largura of [320, 390, 1280]) {
           await page.evaluate((valor) => {
             document.documentElement.className = valor;
           }, tema);
+          await aguardarTema(page, tema);
           const anterior = page.getByRole("button", { name: /^Dia anterior/ }).first();
           const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
           const seguinte = page.getByRole("button", { name: /^Dia seguinte/ }).first();
@@ -250,10 +270,17 @@ for (const largura of [320, 390, 1280]) {
                 .map((v) => v / 255)
                 .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
                 .reduce((s, v, i) => s + v * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
-            const fundo =
-              getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)"
-                ? getComputedStyle(document.body).backgroundColor
-                : getComputedStyle(el).backgroundColor;
+            let fundo = getComputedStyle(el).backgroundColor;
+            for (let no: Element | null = el; no; no = no.parentElement) {
+              if (fundo !== "rgba(0, 0, 0, 0)") break;
+              fundo = getComputedStyle(no).backgroundColor;
+            }
+            if (fundo === "rgba(0, 0, 0, 0)")
+              fundo =
+                getComputedStyle(document.documentElement)
+                  .getPropertyValue("--background")
+                  .trim() ||
+                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6");
             const l = lum(rgb(fundo));
             return Array.from(el.querySelectorAll("span, svg"))
               .filter((n) => getComputedStyle(n).display !== "none")
@@ -390,7 +417,7 @@ it.each(["relatorio", "grade"])(
   "navegação de período da tela %s preserva responsividade e interação",
   async (tela) => {
     for (const largura of [320, 390, 1280])
-      for (const tema of ["light", "dark"]) {
+      for (const tema of ["light", "dark"] as const) {
         const page = await browser.newPage({
           viewport: { width: largura, height: 844 },
           reducedMotion: "reduce",
@@ -400,6 +427,7 @@ it.each(["relatorio", "grade"])(
           await page.evaluate((valor) => {
             document.documentElement.className = valor;
           }, tema);
+          await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
             name: tela === "grade" ? "Mês anterior" : "Dia anterior do relatório",
             exact: true,
@@ -559,7 +587,7 @@ it.each(["por-aluno", "resumo", "historico", "diretor"])(
 for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
   it(`trio mensal de ${tela}: tamanhos, temas, teclado e retorno`, async () => {
     for (const largura of [320, 390, 1280]) {
-      for (const tema of ["light", "dark"]) {
+      for (const tema of ["light", "dark"] as const) {
         const page = await browser.newPage({
           viewport: { width: largura, height: 844 },
           reducedMotion: "reduce",
@@ -570,6 +598,7 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           await page.evaluate((tema) => {
             document.documentElement.className = tema;
           }, tema);
+          await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
             name: tela === "resumo" ? "Mês anterior do resumo" : "Mês anterior",
             exact: true,
@@ -604,7 +633,7 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           expect(a.x + a.width).toBeLessThanOrEqual(b.x);
           expect(b.x + b.width).toBeLessThanOrEqual(c.x);
           expect(await seguinte.isDisabled()).toBe(true);
-          const contraste = await periodo.evaluate((el) => {
+          const medida = await periodo.evaluate((el) => {
             const contexto = document.createElement("canvas").getContext("2d");
             if (!contexto) throw new Error("Canvas indisponível");
             const luminancia = (cor: string) => {
@@ -618,15 +647,37 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
                 .reduce((s, v, i) => s + v * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
             };
             const estilo = getComputedStyle(el);
-            const fundo =
-              estilo.backgroundColor === "rgba(0, 0, 0, 0)"
-                ? getComputedStyle(document.body).backgroundColor
-                : estilo.backgroundColor;
+            let fundo = estilo.backgroundColor;
+            for (let no: Element | null = el; no; no = no.parentElement) {
+              if (fundo !== "rgba(0, 0, 0, 0)") break;
+              fundo = getComputedStyle(no).backgroundColor;
+            }
+            if (fundo === "rgba(0, 0, 0, 0)")
+              fundo =
+                getComputedStyle(document.documentElement)
+                  .getPropertyValue("--background")
+                  .trim() ||
+                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6");
             const a = luminancia(estilo.color);
             const b = luminancia(fundo);
-            return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+            return {
+              contraste: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+              cor: estilo.color,
+              fundo,
+              classe: document.documentElement.className,
+              htmlVar: getComputedStyle(document.documentElement)
+                .getPropertyValue("--background")
+                .trim(),
+              bodyVar: getComputedStyle(document.body).getPropertyValue("--background").trim(),
+              body: getComputedStyle(document.body).backgroundColor,
+              bodyClasse: document.body.className,
+              bodyEstilo: document.body.getAttribute("style"),
+            };
           });
-          expect(contraste).toBeGreaterThanOrEqual(4.5);
+          expect(
+            medida.contraste,
+            JSON.stringify({ tela, tema, largura, medida }),
+          ).toBeGreaterThanOrEqual(4.5);
           for (const botao of botoes) {
             const estilo = await botao.evaluate((el) => ({
               fundo: getComputedStyle(el).backgroundColor,

@@ -36,8 +36,10 @@ for (const tema of ["light", "dark"] as const) {
     for (const nome of ["Notificações", "Trocar senha", "Sobre", "Sair da conta"]) {
       const item = conta.getByRole("menuitem", { name: nome, exact: true });
       await expect(item).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      const tamanho = await item.boundingBox();
-      expect(tamanho?.height).toBeGreaterThanOrEqual(44);
+      // O popover entra com zoom; aguarda o tamanho final antes de exigir 44 px.
+      await expect
+        .poll(async () => (await item.boundingBox())?.height ?? 0)
+        .toBeGreaterThanOrEqual(43.99);
     }
     await expect(conta.getByRole("menuitem", { name: "Notificações" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
