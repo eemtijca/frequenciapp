@@ -116,7 +116,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --chart-1: var(--primary);
   --chart-2: var(--falta);
   --chart-3: color-mix(in oklab, var(--foreground) 55%, var(--card));
-  --chart-4: color-mix(in oklab, var(--primary) 55%, var(--card));
+  --chart-4: color-mix(in oklab, var(--primary) 65%, var(--card));
   --chart-5: color-mix(in oklab, var(--foreground) 25%, var(--card));
   --sidebar: oklch(0.985 0.003 90);
   --sidebar-foreground: oklch(0.245 0.006 90);

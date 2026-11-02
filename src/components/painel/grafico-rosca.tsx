@@ -57,7 +57,12 @@ export default function GraficoRosca({
 
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-      <div className="relative size-44 shrink-0" role="img" aria-label={titulo}>
+      <div
+        className="relative size-44 shrink-0"
+        role="img"
+        aria-label={titulo}
+        data-grafico={titulo}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

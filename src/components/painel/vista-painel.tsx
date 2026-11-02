@@ -240,7 +240,9 @@ export default function VistaPainel({
 
   const rotuloDia = dia.split("-").reverse().join("/");
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
-  const carregandoPainel = carregando && !compartilhado;
+  const temDadosDoDia = compartilhado || doDia?.dia === dia;
+  const carregandoPainel = carregando && !temDadosDoDia;
+  const atualizando = carregando && temDadosDoDia;
 
   // O painel se atualiza sozinho: a cada minuto e ao voltar para a aba do
   // navegador, sem botão. Sem rede não tenta, e sessão expirada segue o
@@ -521,19 +523,24 @@ export default function VistaPainel({
           </div>
 
           <FaixaGraficos
-            ativo={ativo}
-            onCartaoAtivo={setCartaoAtivo}
-            cartoes={[
-              { id: "escola", nome: "Toda a escola", conteudo: graficoDoDia(null) },
+            valor={cartaoAtivo}
+            onValor={setCartaoAtivo}
+            ocupado={atualizando}
+            itens={[
+              {
+                id: "escola",
+                rotulo: "Toda a escola",
+                render: () => graficoDoDia(null),
+              },
               ...series.map((serie) => ({
                 id: serie.id,
-                nome: serie.nome,
-                conteudo: graficoDoDia(serie),
+                rotulo: serie.nome,
+                render: () => graficoDoDia(serie),
               })),
               {
                 id: "personalizado",
-                nome: "Personalizado",
-                conteudo: (
+                rotulo: "Personalizado",
+                render: () => (
                   <VistaPeriodo
                     diaCorrente={diaCorrente}
                     series={series}
@@ -544,8 +551,8 @@ export default function VistaPainel({
               },
               {
                 id: "desistentes",
-                nome: "Desistentes",
-                conteudo: (
+                rotulo: "Desistentes",
+                render: () => (
                   <div className="superficie flex flex-col gap-4 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <h2 className="sr-only">Desistentes até este dia</h2>
