@@ -454,7 +454,8 @@ export default function VistaEntradas({
               onTexto={setMotivo}
               onJustificativa={setJustificativa}
               onObservacao={setObservacao}
-            />            <div className="flex justify-end">
+            />{" "}
+            <div className="flex justify-end">
               <Button
                 className="h-11 w-full px-6 sm:w-auto"
                 size="lg"

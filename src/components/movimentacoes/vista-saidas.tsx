@@ -577,7 +577,8 @@ export default function VistaSaidas({
               onTexto={setTexto}
               onJustificativa={setJustificativa}
               onObservacao={setObservacao}
-            />            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+            />{" "}
+            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <div className="flex justify-end">
               <Button
                 type="submit"
