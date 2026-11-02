@@ -9,8 +9,7 @@ export default defineConfig({
   reporter: "list",
   use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3195" },
   webServer: {
-    command:
-      "node $(node -p \"require.resolve('vitest/package.json').replace('/vitest/package.json','/vite/bin/vite.js')\") --config tests/fixtures/graficos-visibilidade/vite.config.ts",
+    command: "pnpm exec vite --config tests/fixtures/graficos-visibilidade/vite.config.ts",
     url: "http://localhost:3195/tests/fixtures/graficos-visibilidade/",
     reuseExistingServer: false,
     timeout: 120_000,

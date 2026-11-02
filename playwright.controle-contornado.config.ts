@@ -8,8 +8,7 @@ export default defineConfig({
   reporter: "list",
   use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3198" },
   webServer: {
-    command:
-      "node $(node -p \"require.resolve('vitest/package.json').replace('/vitest/package.json','/vite/bin/vite.js')\") --config tests/fixtures/controle-contornado/vite.config.ts",
+    command: "pnpm exec vite --config tests/fixtures/controle-contornado/vite.config.ts",
     url: "http://localhost:3198/tests/fixtures/controle-contornado/",
     reuseExistingServer: false,
     timeout: 120_000,

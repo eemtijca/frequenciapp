@@ -10,8 +10,7 @@ export default defineConfig({
   reporter: "list",
   use: { ...devices["Desktop Chrome"], baseURL: "http://127.0.0.1:3197" },
   webServer: {
-    command:
-      "node $(node -p \"require.resolve('vitest/package.json').replace('/vitest/package.json','/vite/bin/vite.js')\") --config tests/fixtures/foco-forcado/vite.config.ts",
+    command: "pnpm exec vite --config tests/fixtures/foco-forcado/vite.config.ts",
     url: "http://127.0.0.1:3197/tests/fixtures/foco-forcado/",
     reuseExistingServer: false,
     timeout: 120_000,

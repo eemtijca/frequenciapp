@@ -13,8 +13,7 @@ export default defineConfig({
     serviceWorkers: "block",
   },
   webServer: {
-    command:
-      "node $(node -p \"require.resolve('vitest/package.json').replace('/vitest/package.json','/vite/bin/vite.js')\") --config tests/fixtures/atualizacao-offline/vite.config.ts",
+    command: "pnpm exec vite --config tests/fixtures/atualizacao-offline/vite.config.ts",
     url: "http://127.0.0.1:3196/tests/fixtures/atualizacao-offline/",
     reuseExistingServer: false,
     timeout: 120_000,

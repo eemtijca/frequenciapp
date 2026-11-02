@@ -10,7 +10,7 @@ Suítes do FrequenciApp com Vitest e Playwright.
 | ------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
 | Unidade                   | `pnpm run test:unit`                  | Nenhum.                                                                 |
 | Componentes               | `pnpm run test:componentes`           | Chromium instalado pelo Playwright; sem aplicativo ou banco.            |
-| Visibilidade dos gráficos | `pnpm run test:graficos-visibilidade` | Chromium; fixture Vite isolada, também executada no workflow de testes. |
+| Visibilidade dos gráficos | `pnpm run test:graficos-visibilidade` | Chromium; fixture Vite isolada. Não há passo próprio no workflow atual. |
 | Contratos de API          | `pnpm run test:api`                   | Aplicativo no ar, banco migrado, contas de teste.                       |
 | Ponta a ponta             | `pnpm run test:e2e`                   | Aplicativo no ar e navegadores instalados.                              |
 | PWA                       | `pnpm run test:pwa`                   | Build de produção no ar (`pnpm run build` e `pnpm start`).              |
@@ -73,7 +73,10 @@ export GOOGLE_PROJECT_NUMBER=123456789
 NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" pnpm run dev
 
 # 4. suíte
-DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia pnpm run test:api
+# As fixtures de banco exigem DATABASE_URL e DIRECT_URL iguais e explícitas.
+DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+pnpm run test:api
 ```
 
 Variáveis aceitas:
@@ -82,7 +85,7 @@ Variáveis aceitas:
 - `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais da administração de teste.
 - `TESTE_EMAIL` e `TESTE_SENHA`: credenciais da coordenação de teste.
 - `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
-- `DIRECT_URL`: conexão preferida pelos comandos administrativos, quando disponível.
+- `DIRECT_URL`: conexão preferida pelos comandos administrativos e exigida igual a `DATABASE_URL` pelas fixtures que recusam banco ambíguo.
 
 O contrato `entradas.test.ts` cobre duplicidade, validação, momento, responsável ativo e nome histórico, turma histórica, separação da chamada, cópia JSON, desistência e permissões.
 
@@ -127,8 +130,9 @@ O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL
 
 `tests/componentes/entrada/legibilidade.test.ts` é uma regressão de componentes
 com fonte fallback e invólucro sintético: não monta `layout.tsx`, não usa a
-Plus Jakarta Sans do build e não representa o layout do aplicativo. O passo da
-fixture no CI permanece, mas não comprova legibilidade de produção.
+Plus Jakarta Sans do build e não representa o layout do aplicativo. A fixture é
+executada por `test:componentes`; não há passo próprio no CI atual e ela não
+comprova legibilidade de produção.
 
 `tests/ponta-a-ponta/interface/legibilidade-real.spec.ts` exercita o Next real:
 espera `document.fonts.ready`, exige uma face Jakarta carregada e consulta a fonte

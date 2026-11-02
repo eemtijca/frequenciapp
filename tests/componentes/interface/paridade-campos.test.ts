@@ -23,14 +23,24 @@ const urls: string[] = [];
 beforeAll(async () => {
   diretorio = await mkdtemp(path.join(tmpdir(), "campos-baseline-"));
   const arquivo = path.join(diretorio, "baseline.tar");
-  execFileSync("git", ["archive", "--format=tar", `--output=${arquivo}`, "a771356"], {
+  const referencia = process.env.BASELINE_REF ?? "origin/main";
+  let ref = referencia;
+  try {
+    execFileSync("git", ["rev-parse", "--verify", `${referencia}^{commit}`], {
+      cwd: repositorio,
+      stdio: "ignore",
+    });
+  } catch {
+    ref = "HEAD^";
+  }
+  execFileSync("git", ["archive", "--format=tar", `--output=${arquivo}`, ref], {
     cwd: repositorio,
   });
   execFileSync("tar", ["-xf", arquivo, "-C", diretorio]);
   await symlink(
     path.join(repositorio, "node_modules"),
     path.join(diretorio, "node_modules"),
-    "dir",
+    process.platform === "win32" ? "junction" : "dir",
   );
   for (const nome of ["paridade-campos.html", "paridade-campos.tsx"]) {
     await cp(
@@ -138,7 +148,7 @@ async function abrirPaginas() {
   }
 }
 
-it("preserva no escuro os estilos computados do baseline a771356", async () => {
+it("preserva no escuro os estilos computados da referência de base", async () => {
   const paginas = await abrirPaginas();
   try {
     const [baseline, atual] = await Promise.all(paginas.map((p) => coletar(p, "escuro")));

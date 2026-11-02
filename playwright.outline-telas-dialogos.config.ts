@@ -11,8 +11,7 @@ export default defineConfig({
   outputDir: "test-results/outline-telas-dialogos-verificacao",
   use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:3196" },
   webServer: {
-    command:
-      "node $(node -p \"require.resolve('vitest/package.json').replace('/vitest/package.json','/vite/bin/vite.js')\") --config tests/fixtures/outline-telas-dialogos/vite.config.ts",
+    command: "pnpm exec vite --config tests/fixtures/outline-telas-dialogos/vite.config.ts",
     url: "http://localhost:3196/tests/fixtures/outline-telas-dialogos/",
     reuseExistingServer: false,
     timeout: 120_000,
