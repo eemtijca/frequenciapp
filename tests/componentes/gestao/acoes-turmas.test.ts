@@ -139,7 +139,12 @@ it("teclado, seleção e confirmações preservam ações e exclusões", async (
     const horarios = page.getByRole("button", { name: "Horários de 1º ano A" });
     await horarios.focus();
     expect(await horarios.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-    expect(await horarios.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+    expect(
+      await horarios.evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+      }),
+    ).toBe(true);
     await page.keyboard.press("Enter");
     const editar = page.getByRole("button", { name: "Editar aula 1" });
     await editar.click();

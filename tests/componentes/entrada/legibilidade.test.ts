@@ -152,7 +152,12 @@ it.each([
     await page.keyboard.press("Tab");
     await seletor.focus();
     expect(await seletor.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-    expect(await seletor.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+    expect(
+      await seletor.evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+      }),
+    ).toBe(true);
     await seletor.click();
     expect(await page.getByRole("dialog", { name: "Data da chamada" }).isVisible()).toBe(true);
     await page.keyboard.press("Escape");

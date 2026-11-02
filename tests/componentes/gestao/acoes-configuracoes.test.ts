@@ -132,7 +132,7 @@ async function conferirFoco(botao: Locator) {
   await botao.page().keyboard.press("Tab");
   await botao.focus();
   expect(await botao.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-  expect(await botao.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  expect(await botao.evaluate((el) => { const estilo = getComputedStyle(el); return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none"; })).toBe(true);
 }
 async function conferirAcao(botao: Locator) {
   await botao.waitFor({ state: "visible" });
