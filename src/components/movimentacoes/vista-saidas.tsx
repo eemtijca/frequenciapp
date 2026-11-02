@@ -380,7 +380,7 @@ export default function VistaSaidas({
     <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
       <h1 className="sr-only">Saiu mais cedo</h1>
 
-      <div className="flex items-center gap-2">
+      <div className="navegacao-dia flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -612,7 +612,7 @@ export default function VistaSaidas({
                       setJustificativa("");
                       setObservacao("");
                     }}
-                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : ""}`}
+                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : "controle-contornado"}`}
                   >
                     Escrever
                   </button>
@@ -624,7 +624,7 @@ export default function VistaSaidas({
                       setFormaJustificativa("catalogo");
                       setTexto("");
                     }}
-                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : ""}`}
+                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : "controle-contornado"}`}
                   >
                     Selecionar tipo
                   </button>

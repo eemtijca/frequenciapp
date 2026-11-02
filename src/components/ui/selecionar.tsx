@@ -5,6 +5,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { SelecionarBuscavel } from "@/components/ui/selecionar-buscavel";
 import { cn } from "@/lib/utils";
+import estilos from "./campos.module.css";
 
 interface Opcao {
   valor: string;
@@ -54,6 +55,7 @@ export function Selecionar({
         id={id}
         aria-label={ariaLabel}
         className={cn(
+          estilos.campo,
           "controle border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
           className,
         )}

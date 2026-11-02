@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PropsSelecionar } from "@/components/ui/selecionar";
 import { cn } from "@/lib/utils";
+import estilos from "./campos.module.css";
 
 export function SelecionarBuscavel({
   id,
@@ -128,6 +129,7 @@ export function SelecionarBuscavel({
             }
           }}
           className={cn(
+            estilos.campo,
             "controle border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
             className,
           )}

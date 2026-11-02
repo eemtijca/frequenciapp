@@ -1,11 +1,17 @@
 // Painel: rolagem lateral entre escola, séries, período personalizado e desistentes.
 // Confere os recortes, teclado, gesto no celular e preservação do formulário.
 import { expect, test, type Page } from "@playwright/test";
-import { diaLocal, mesSeguinte, nomeDoMes, type Aluno, type Frequencia } from "@/domain/frequencia";
+import { type Aluno, type Frequencia } from "@/domain/frequencia";
+import { datasDoPainel } from "./datas-painel";
 import { comBanco } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
-import { aguardarHidratacao, rolarAteGrafico, trocarVisao } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  escolherDataNoPeriodo,
+  rolarAteGrafico,
+  trocarVisao,
+} from "../helpers/pagina";
 
 async function limparMassa(): Promise<void> {
   await comBanco(async (cliente) => {
@@ -429,26 +435,28 @@ test.describe("infrequência do dia", () => {
         json:
           estado === "feriado"
             ? { frequencias, feriado: { dia, nome: nomeFeriado } }
-            : { frequencias },
+            : { frequencias, feriado: null },
       });
     });
+    // O cenário histórico usa apenas saídas e feriados sintéticos, mesmo que
+    // a instalação contenha registros no mesmo dia civil.
+    await page.route("**/api/saidas?dia=**", (rota) => rota.fulfill({ json: { saidas: [] } }));
     await page.setViewportSize({ width: 320, height: 780 });
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Painel", "painel");
-    const anterior = mesSeguinte(
-      diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza").slice(0, 7),
-      -1,
-    );
-    await page.locator("#dia-painel").click();
-    const calendario = page.getByRole("dialog", { name: "Dia do painel", exact: true });
-    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
-    await calendario
-      .getByRole("button", {
-        name: `1 de ${nomeDoMes(anterior).toLowerCase()} de ${anterior.slice(0, 4)}`,
-        exact: true,
-      })
-      .click();
+    // O estado pode ser semanal se o relógio do servidor estiver em outro dia.
+    if (
+      (await page.locator("#dia-painel").getAttribute("aria-label"))?.startsWith("Resumo da semana")
+    ) {
+      await page.getByRole("button", { name: "Dia anterior", exact: true }).click();
+    }
+    // A referência vem do servidor: não depende do relógio/fuso do runner.
+    const rotulo = await page.locator("#dia-painel").getAttribute("aria-label");
+    const dataExibida = rotulo?.match(/\d{2}\/\d{2}\/\d{4}/)?.[0];
+    if (!dataExibida) throw new Error(`Data do Painel não encontrada: ${rotulo}`);
+    const dias = datasDoPainel(dataExibida.split("/").reverse().join("-"));
+    await escolherDataNoPeriodo(page, "Dia do painel", dias[0]);
     const resumo = page.getByRole("group", { name: "Resumo do dia" });
     const barra = resumo.getByRole("progressbar", { name: "Infrequência do dia" });
     await expect(resumo).toHaveAttribute("aria-busy", "false");
@@ -459,6 +467,7 @@ test.describe("infrequência do dia", () => {
 
     estado = "falta";
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(page.locator("#dia-painel")).toContainText(dias[1].split("-").reverse().join("/"));
     await expect(resumo.getByText("33,3%", { exact: true })).toBeVisible();
     await expect(barra).toHaveAttribute("aria-valuenow", "33");
     await expect(barra).toHaveAttribute("aria-valuetext", /33,3% de infrequência, acima do limite/);
@@ -491,6 +500,7 @@ test.describe("infrequência do dia", () => {
 
     estado = "presenca";
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(page.locator("#dia-painel")).toContainText(dias[2].split("-").reverse().join("/"));
     await expect(resumo.getByText("0%", { exact: true })).toBeVisible();
     await expect(resumo.getByText("Sem dados", { exact: true })).toHaveCount(0);
     await expect(barra).toHaveAttribute("aria-valuenow", "0");
@@ -500,6 +510,7 @@ test.describe("infrequência do dia", () => {
 
     estado = "feriado";
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
+    await expect(page.locator("#dia-painel")).toContainText(dias[3].split("-").reverse().join("/"));
     await expect(resumo.getByText(nomeFeriado, { exact: true })).toBeVisible();
     const cobertura = page.getByRole("group", { name: "Cobertura do dia" });
     await expect(cobertura.getByText(nomeFeriado, { exact: true })).toBeVisible();
@@ -541,23 +552,6 @@ test.describe("gráfico personalizado por período", () => {
     await trocarVisao(page, "Painel", "painel");
     await rolarAteGrafico(page, "Personalizado");
     return page.getByRole("region", { name: "Infrequência personalizada" });
-  }
-
-  async function escolherDia(page: Page, id: string, mes: string, dia: string) {
-    await page.locator(id).click();
-    const calendario = page.getByRole("dialog", {
-      name: id === "#periodo-painel-de" ? "Data inicial do gráfico" : "Data final do gráfico",
-      exact: true,
-    });
-    for (let indice = 0; indice < 36; indice += 1) {
-      if (await calendario.getByRole("group", { name: `Dias de ${mes}` }).count()) break;
-      const grade = calendario.getByRole("group", { name: /^Dias de / });
-      const anterior = await grade.getAttribute("aria-label");
-      await calendario.getByRole("button", { name: "Mês anterior" }).click();
-      await expect(grade).not.toHaveAttribute("aria-label", anterior ?? "");
-    }
-    await calendario.getByRole("button", { name: dia, exact: true }).click();
-    await expect(calendario).toHaveCount(0);
   }
 
   async function chamadasSinteticas(page: Page): Promise<Frequencia[]> {
@@ -609,8 +603,8 @@ test.describe("gráfico personalizado por período", () => {
     expect(nomes.at(-2)).toMatch(/: Personalizado$/);
     expect(nomes.at(-1)).toMatch(/: Desistentes$/);
     await expect(page.getByRole("group", { name: "Resumo do dia" })).toBeVisible();
-    await escolherDia(page, "#periodo-painel-de", "Agosto de 2026", "31 de agosto de 2026");
-    await escolherDia(page, "#periodo-painel-ate", "Setembro de 2026", "1 de setembro de 2026");
+    await escolherDataNoPeriodo(page, "Data inicial do gráfico", "2026-08-31");
+    await escolherDataNoPeriodo(page, "Data final do gráfico", "2026-09-01");
     await expect(painel.getByRole("combobox", { name: "Turma", exact: true })).toBeDisabled();
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
     await painel.locator("[data-grafico-sob-demanda]").scrollIntoViewIfNeeded();
@@ -702,12 +696,14 @@ test.describe("gráfico personalizado por período", () => {
       consultas += 1;
       await rota.fulfill({ json: { frequencias: [] } });
     });
-    await escolherDia(page, "#periodo-painel-ate", "Agosto de 2026", "31 de agosto de 2026");
+    // Defina ambos os extremos: o início padrão depende da data de execução.
+    await escolherDataNoPeriodo(page, "Data inicial do gráfico", "2026-09-01");
+    await escolherDataNoPeriodo(page, "Data final do gráfico", "2026-08-31");
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
     await expect(painel.getByRole("alert")).toHaveText(
       "A data final deve ser igual ou posterior à inicial.",
     );
-    await escolherDia(page, "#periodo-painel-de", "Agosto de 2025", "1 de agosto de 2025");
+    await escolherDataNoPeriodo(page, "Data inicial do gráfico", "2025-08-01");
     await painel.getByRole("button", { name: "Gerar gráfico", exact: true }).click();
     await expect(painel.getByRole("alert")).toHaveText(
       "O período é grande demais. Escolha até 366 dias.",

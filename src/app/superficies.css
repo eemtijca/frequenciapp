@@ -161,6 +161,11 @@
   }
 
   @media (forced-colors: active) {
+    .indicador-abas {
+      outline: 2px solid Highlight;
+      outline-offset: -3px;
+    }
+
     .superficie,
     .controle,
     .discreto,
@@ -209,8 +214,89 @@
   }
 }
 
+/* Variante contextual para controles diretos, não para Button ou ações semânticas.
+   Conserva os estados selecionados e desabilitados da superfície original. */
+@media (forced-colors: none) {
+  html:not(.dark)
+    .controle.controle-contornado:where(
+      :not(
+        .selecionado,
+        .primario,
+        .destrutivo,
+        :disabled,
+        [aria-disabled="true"],
+        [aria-pressed="true"],
+        [aria-selected="true"],
+        [aria-checked="true"],
+        [data-state="active"]
+      )
+    ) {
+    border-color: #d9ddda;
+    background-color: transparent;
+    color: inherit;
+  }
+
+  html:not(.dark)
+    .controle.controle-contornado:where(:not(:disabled, [aria-disabled="true"])):focus-visible {
+    outline: 2px solid #086440;
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) {
+    html:not(.dark)
+      .controle.controle-contornado:where(
+        :not(
+          .selecionado,
+          .primario,
+          .destrutivo,
+          :disabled,
+          [aria-disabled="true"],
+          [aria-pressed="true"],
+          [aria-selected="true"],
+          [aria-checked="true"],
+          [data-state="active"]
+        ):hover
+      ) {
+      background-color: #ebebeb;
+    }
+  }
+}
+
+/* Somente a navegação diária no tema claro, sem afetar outros seletores. */
+html:not(.dark) .navegacao-dia > button,
+html:not(.dark) .navegacao-dia > div > button {
+  border-color: #d9ddda;
+  border-radius: 12px;
+  background-color: transparent;
+  color: var(--foreground);
+}
+
+html:not(.dark) .navegacao-dia > button:focus-visible,
+html:not(.dark) .navegacao-dia > div > button:focus-visible {
+  outline: 2px solid #086440;
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  html:not(.dark) .navegacao-dia > button:not(:disabled):hover,
+  html:not(.dark) .navegacao-dia > div > button:not(:disabled):hover {
+    background-color: color-mix(in oklab, var(--primary) 8%, var(--secondary));
+  }
+}
+
 /* Foco visível também nas cores forçadas, acima das utilidades de outline. */
 @media (forced-colors: active) {
+  html:not(.dark) .navegacao-dia > button,
+  html:not(.dark) .navegacao-dia > div > button {
+    border-color: ButtonText;
+    color: ButtonText;
+  }
+
+  html:not(.dark) .navegacao-dia > button:focus-visible,
+  html:not(.dark) .navegacao-dia > div > button:focus-visible {
+    outline-color: Highlight;
+  }
+
   :where(
     button,
     a,

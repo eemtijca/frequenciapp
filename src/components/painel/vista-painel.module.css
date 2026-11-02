@@ -1,0 +1,4 @@
+/* Reforça os blocos das setas do painel apenas no tema claro. */
+:global(html.light) .seta {
+  --secondary: oklch(0.89 0.005 90);
+}

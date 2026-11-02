@@ -156,7 +156,7 @@ export function CartaoDia({
           onClick={onAbrir}
           aria-label={ariaLabel}
           data-dia={dia}
-          className="controle pressionavel focus-visible:ring-ring/50 flex min-h-32 w-full flex-col gap-2 rounded-[14px] p-3 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+          className="controle controle-contornado pressionavel focus-visible:ring-ring/50 flex min-h-32 w-full flex-col gap-2 rounded-[14px] p-3 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
         >
           {conteudo}
         </button>

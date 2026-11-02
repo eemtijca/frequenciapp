@@ -60,14 +60,15 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <BotaoAtualizar
+              variante="ghost"
               onAtualizar={() => {
                 setAtualizacao((valor) => valor + 1);
               }}
             />
-            <SeletorTema />
+            <SeletorTema variante="ghost" />
             {!contexto.trocaObrigatoria ? (
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="icon"
                 className="size-11"
                 aria-label="Configurar notificações"
@@ -78,7 +79,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               </Button>
             ) : null}
             <Button
-              variant="secondary"
+              variant="ghost"
               size="icon"
               className="size-11"
               aria-label="Sobre"
@@ -88,7 +89,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               <Info size={18} />
             </Button>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="icon"
               className="size-11"
               aria-label="Trocar minha palavra-chave"
@@ -98,7 +99,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               <KeyRound size={18} />
             </Button>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="icon"
               className="size-11"
               aria-label="Sair da conta"

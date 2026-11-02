@@ -1,5 +1,8 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
+import { nomeDoMes } from "@/domain/frequencia";
+import { navegarCalendario } from "./calendario-historico";
+import { validarDiaCivil } from "./navegacao-periodo";
 import { hojeEDomingo } from "./dia";
 
 /**
@@ -263,6 +266,8 @@ export async function escolherDataNoPeriodo(
   rotuloAcessivel: string,
   diaIso: string,
 ): Promise<void> {
+  validarDiaCivil(diaIso);
+  const mes = diaIso.slice(0, 7);
   const gatilho = page.getByRole("button", {
     name: new RegExp(`^${rotuloAcessivel}:`),
   });
@@ -270,43 +275,24 @@ export async function escolherDataNoPeriodo(
   if ((await gatilho.getAttribute("aria-label"))?.includes(diaFormatado)) return;
   await gatilho.click();
   const painel = page.getByRole("dialog", { name: rotuloAcessivel, exact: true });
-  const data = new Date(`${diaIso}T12:00:00Z`);
-  const mes = new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(data);
-  const mesCompleto = `${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
-  const nomesDosMeses = Array.from({ length: 12 }, (_, indice) =>
-    new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" }).format(
-      new Date(Date.UTC(2000, indice, 1)),
-    ),
-  );
-  for (let tentativa = 0; tentativa < 36; tentativa += 1) {
-    if (await painel.getByRole("group", { name: `Dias de ${mesCompleto}`, exact: true }).count())
-      break;
-    const grade = painel.getByRole("group", { name: /^Dias de / });
-    const rotuloAtual = (await grade.getAttribute("aria-label")) ?? "";
-    const partes = /^Dias de (\S+) de (\d{4})$/.exec(rotuloAtual);
-    const numeroDoMes = nomesDosMeses.indexOf((partes?.[1] ?? "").toLowerCase()) + 1;
-    if (!partes?.[2] || numeroDoMes < 1)
-      throw new Error("Mês visível do calendário não encontrado.");
-    const mesVisivel = `${partes[2]}-${String(numeroDoMes).padStart(2, "0")}`;
-    await painel
-      .getByRole("button", {
-        name: mesVisivel > diaIso.slice(0, 7) ? "Mês anterior" : "Mês seguinte",
-        exact: true,
-      })
-      .click();
-    await expect(grade).not.toHaveAttribute("aria-label", rotuloAtual);
+  await navegarCalendario(painel, mes);
+  await expect(
+    painel.getByRole("group", {
+      name: `Dias de ${nomeDoMes(mes)} de ${diaIso.slice(0, 4)}`,
+      exact: true,
+    }),
+  ).toBeVisible();
+  const nomeDoDia = `${Number(diaIso.slice(8))} de ${nomeDoMes(mes).toLowerCase()} de ${diaIso.slice(0, 4)}`;
+  const dia = painel.getByRole("group", { name: /^Dias de / }).getByRole("button", {
+    name: new RegExp(`^${nomeDoDia}(,|$)`),
+  });
+  await expect(dia).toBeVisible();
+  if (!(await dia.isEnabled())) {
+    throw new Error(
+      `Dia ${diaIso} está desabilitado pelo intervalo do seletor ${rotuloAcessivel}.`,
+    );
   }
-  const nomeDoDia = new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(data);
-  await painel.getByRole("button", { name: new RegExp(`^${nomeDoDia}(,|$)`) }).click();
+  await dia.click();
   await expect(painel).toHaveCount(0);
 }
 

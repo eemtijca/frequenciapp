@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useTheme } from "next-themes";
 
-const CORES = { light: "#f9f7f2", dark: "#1c1b19" } as const;
+const CORES = { light: "#f6f6f6", dark: "#1c1b19" } as const;
 
 export default function CorDoTema() {
   const { resolvedTheme } = useTheme();

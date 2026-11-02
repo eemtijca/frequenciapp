@@ -62,11 +62,28 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await expect(edicao.getByText("Escolha outra turma para mover o aluno.")).toBeVisible();
   await edicao.locator("#turma-aluno-gestao").click();
   await page.getByRole("option", { name: "E2E Desistencia B" }).click();
-  await edicao.getByRole("button", { name: "Salvar" }).click();
-  await expect(page.getByText("Aluno movido de turma.")).toBeVisible();
+  const toque = Boolean(test.info().project.use.hasTouch);
+  const salvar = edicao.getByRole("button", { name: "Salvar" });
+  if (toque) {
+    await salvar.tap();
+    // Cliques anteriores deixam o cursor virtual sobre a área do aviso e podem
+    // pausar sua saída; o toque real não precisa manter esse hover artificial.
+    await page.mouse.move(0, 0);
+  } else {
+    await salvar.click();
+  }
+  const aviso = page.getByText("Aluno movido de turma.");
+  await expect(aviso).toBeVisible();
   await expect(page.locator("#painel-alunos").getByText("Origem E2E Desistencia A")).toBeVisible();
 
-  await page.getByRole("button", { name: "Editar E2E Desistente Um" }).click();
+  const editar = page.getByRole("button", { name: "Editar E2E Desistente Um" });
+  if (toque) {
+    // O aviso cobre temporariamente o botão: esta espera não valida toque sob ele.
+    await expect(aviso).toBeHidden();
+    await editar.tap();
+  } else {
+    await editar.click();
+  }
   await page
     .getByRole("dialog", { name: "Editar E2E Desistente Um" })
     .getByRole("button", { name: "Marcar como desistente" })

@@ -1,5 +1,5 @@
 // Reorganização global de alunos: confirmação, toque duplo e atualização da chamada.
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Response } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
 
@@ -120,28 +120,67 @@ test("um único botão reorganiza todas as turmas e atualiza a chamada sem dupli
   await expect(nomes.nth(0)).toContainText(`${prefixo} A Álvaro`);
 });
 
-test("uma falha mantém a confirmação aberta e permite nova tentativa", async ({ page }) => {
-  await abrir(page);
-  const antes = await ordens();
-  await page.route("**/api/turmas/ordenar", (rota) =>
-    rota.fulfill({
-      status: 500,
-      contentType: "application/json",
-      body: JSON.stringify({ error: "Não foi possível reorganizar as turmas." }),
-    }),
-  );
-  await page.getByRole("button", { name: "Reorganizar turmas", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog");
-  const confirmar = dialogo.getByRole("button", { name: "Reorganizar todas", exact: true });
-  await confirmar.click();
-  await expect(
-    page.getByText("Não foi possível reorganizar as turmas.", { exact: true }),
-  ).toBeVisible();
-  await expect(dialogo).toBeVisible();
-  await expect(confirmar).toBeEnabled();
-  expect(await ordens()).toEqual(antes);
-  await page.unroute("**/api/turmas/ordenar");
-  await confirmar.click();
-  await expect(page.getByText("Turmas reorganizadas.", { exact: true })).toBeVisible();
-  await expect(dialogo).toHaveCount(0);
+test.describe("falha simulada na ordenação", () => {
+  // A suíte PWA exercita o worker real, mas não esta falha de ordenação.
+  test.use({ serviceWorkers: "block" });
+
+  test("uma falha mantém a confirmação aberta e permite nova tentativa", async ({ page }) => {
+    const url = "**/api/turmas/ordenar";
+    const mensagem = "Falha simulada ao reorganizar as turmas.";
+    let interceptacoes = 0;
+    let envios = 0;
+    await page.route(url, async (rota) => {
+      if (rota.request().method() !== "POST") return rota.fallback();
+      interceptacoes++;
+      await rota.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: mensagem }),
+      });
+    });
+    page.on("request", (requisicao) => {
+      if (
+        requisicao.method() === "POST" &&
+        new URL(requisicao.url()).pathname === "/api/turmas/ordenar"
+      )
+        envios++;
+    });
+
+    await abrir(page);
+    const antes = await ordens();
+    expect(antes).toEqual([
+      { nome: `${prefixo} A Zoé`, ordem: 1 },
+      { nome: `${prefixo} A Álvaro`, ordem: 2 },
+      { nome: `${prefixo} B Zoé`, ordem: 1 },
+      { nome: `${prefixo} B Álvaro`, ordem: 2 },
+    ]);
+    await page.getByRole("button", { name: "Reorganizar turmas", exact: true }).click();
+    const dialogo = page.getByRole("alertdialog");
+    const confirmar = dialogo.getByRole("button", { name: "Reorganizar todas", exact: true });
+    const ehOrdenacao = (resposta: Response) =>
+      resposta.request().method() === "POST" &&
+      new URL(resposta.url()).pathname === "/api/turmas/ordenar";
+    const [falha] = await Promise.all([page.waitForResponse(ehOrdenacao), confirmar.click()]);
+    expect(falha.status()).toBe(500);
+    expect(interceptacoes).toBe(1);
+    expect(envios).toBe(1);
+    await expect(page.getByText(mensagem, { exact: true })).toBeVisible();
+    await expect(dialogo).toBeVisible();
+    await expect(confirmar).toBeEnabled();
+    expect(await ordens()).toEqual(antes);
+
+    await page.unroute(url);
+    const [sucesso] = await Promise.all([page.waitForResponse(ehOrdenacao), confirmar.click()]);
+    expect(sucesso.status()).toBe(200);
+    expect(interceptacoes).toBe(1);
+    expect(envios).toBe(2);
+    await expect(page.getByText("Turmas reorganizadas.", { exact: true })).toBeVisible();
+    await expect(dialogo).toHaveCount(0);
+    expect(await ordens()).toEqual([
+      { nome: `${prefixo} A Álvaro`, ordem: 1 },
+      { nome: `${prefixo} A Zoé`, ordem: 2 },
+      { nome: `${prefixo} B Álvaro`, ordem: 1 },
+      { nome: `${prefixo} B Zoé`, ordem: 2 },
+    ]);
+  });
 });

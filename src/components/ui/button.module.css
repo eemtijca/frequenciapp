@@ -1,0 +1,76 @@
+/* Apenas ações não selecionadas no tema claro; .controle continua responsável
+   pelos estados, tema escuro e cores forçadas compartilhados. */
+@layer theme, base, components, utilities;
+
+@layer components {
+  :where(html:not(:global(.dark)))
+    .acao:global(.controle):where(
+      :not(
+        :global(.selecionado),
+        [aria-pressed="true"],
+        [aria-selected="true"],
+        [aria-checked="true"],
+        [data-state="active"]
+      )
+    ) {
+    border-color: #d9ddda;
+    background-color: transparent;
+  }
+
+  @media (hover: hover) {
+    :where(html:not(:global(.dark)))
+      .acao:global(.controle):where(
+        :not(
+          :global(.selecionado),
+          [aria-pressed="true"],
+          [aria-selected="true"],
+          [aria-checked="true"],
+          [data-state="active"],
+          :disabled,
+          [aria-disabled="true"]
+        ):hover
+      ) {
+      background-color: #ebebeb;
+    }
+  }
+
+  @media (forced-colors: active) {
+    :where(html:not(:global(.dark)))
+      .acao:global(.controle):where(
+        :not(
+          :global(.selecionado),
+          [aria-pressed="true"],
+          [aria-selected="true"],
+          [aria-checked="true"],
+          [data-state="active"]
+        )
+      ) {
+      border-color: ButtonText;
+      background-color: Canvas;
+    }
+  }
+}
+
+/* Acima de outline-none, sem afetar o anel ou as variantes no escuro. */
+:where(html:not(:global(.dark))) .acao:focus-visible {
+  outline: 2px solid #086440;
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  /* A seleção deve continuar visível mesmo depois que o foco sair do botão. */
+  .acao:where(
+      :global(.selecionado),
+      [aria-pressed="true"],
+      [aria-selected="true"],
+      [aria-checked="true"],
+      [data-state="active"]
+    ):not(:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+
+  :where(html:not(:global(.dark))) .acao:focus-visible {
+    outline-color: Highlight;
+  }
+}

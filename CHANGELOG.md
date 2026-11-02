@@ -10,6 +10,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O filtro dos seletores pesquisáveis mantém um indicador de foco visível em cores forçadas. O seletor de período recupera o foco ao fechar o calendário e permite a quebra de linha para preservar a leitura da data e do dia em telas estreitas.
+
+- A navegação, a conta, os comandos do cabeçalho, os atalhos da entrada, as ações por ícone nas listas da Gestão e as ações auxiliares e de organização dos gráficos do FrequenciBI deixam de ter fundos individuais em repouso, mantendo a seleção e as ações principais em destaque. No tema claro, as setas de data do Painel e as ações Registrar e Editar da Chamada Parcial ganham fundos mais visíveis. Em cores forçadas, a aba selecionada mantém um contorno mesmo depois que o foco muda.
+
+- A ação Tentar de novo da página offline volta a abrir a página solicitada quando a conexão retorna, sem depender de script inline bloqueado pela política de segurança.
+
+- A rosca do resumo semanal identifica o total de faltas, justificadas e presenças como F + FJ + P e nomeia cada categoria corretamente na legenda acessível. As presenças parciais continuam separadas.
+
 - O estilo Blocos suaves passa a orientar navegação, conta e demais telas, incluindo Painel, Relatórios, Alunos, Gestão, Chamada Parcial, Saídas e Entradas, Horários, Minhas turmas e FrequenciBI. Botões, filtros e abas ganham cantos arredondados e fundos discretos, com seleções suaves e ações principais em destaque.
 
 - Chamada adota blocos suaves nos controles de turma, data, resumo e edição, com cantos arredondados e Salvar em destaque. As linhas ficam neutras e as marcações P, F e FJ combinam ícones e cores suaves; a justificativa salva aparece uma única vez abaixo do nome do aluno.

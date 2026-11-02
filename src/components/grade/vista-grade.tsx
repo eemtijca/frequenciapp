@@ -371,7 +371,7 @@ export default function VistaGrade({
               type="button"
               aria-pressed={ativo}
               onClick={() => setTurmaId(turma.id)}
-              className="controle pressionavel flex h-11 items-center gap-2 px-4 text-sm font-medium transition-colors"
+              className="controle controle-contornado pressionavel flex h-11 items-center gap-2 px-4 text-sm font-medium transition-colors"
             >
               <span>{turma.rotulo}</span>
               <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
@@ -395,7 +395,7 @@ export default function VistaGrade({
         </div>
 
         {modo === "mes" ? (
-          <div className="flex items-center gap-2">
+          <div className="navegacao-dia flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"

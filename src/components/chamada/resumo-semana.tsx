@@ -458,6 +458,7 @@ export function VistaResumoSemana({
 
         {resumos.map((item) => {
           const totalPendencias = item.pendencias.length;
+          const totalMarcas = item.totais.faltas + item.totais.justificadas + item.totais.presentes;
           const evolucao = item.dias.map((dia) => {
             const registrados = dia.faltas + dia.justificadas + dia.presentes + dia.parciais;
             return {
@@ -560,16 +561,31 @@ export function VistaResumoSemana({
                     </div>
                   );
                 })()}
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,24rem),1fr))] gap-4">
                   <GraficoRosca
                     tomValores="falta"
-                    titulo={`Faltas, justificadas e presentes de ${item.rotulo}`}
+                    titulo={`Faltas, justificadas e presentes de ${item.rotulo}: ${totalMarcas} ${totalMarcas === 1 ? "registro" : "registros"} (F + FJ + P)`}
+                    rotuloTotal="F + FJ + P"
                     fatias={[
                       { nome: "Faltas", valor: item.totais.faltas },
-                      { nome: "Justificadas", valor: item.totais.justificadas },
-                      { nome: "Presentes", valor: item.totais.presentes },
+                      {
+                        nome: "Justificadas",
+                        valor: item.totais.justificadas,
+                        unidadeSingular: "falta justificada",
+                        unidadePlural: "faltas justificadas",
+                      },
+                      {
+                        nome: "Presentes",
+                        valor: item.totais.presentes,
+                        unidadeSingular: "presença",
+                        unidadePlural: "presenças",
+                      },
                     ]}
-                    vazio="Nenhuma chamada salva nesta semana"
+                    vazio={
+                      item.chamadasSalvas.length > 0
+                        ? "Nenhum registro F, FJ ou P nesta semana"
+                        : "Nenhuma chamada salva nesta semana"
+                    }
                   />
                   <GraficoEvolucao
                     evolucao={evolucao}
@@ -577,7 +593,7 @@ export function VistaResumoSemana({
                     rotuloAcessivel={`Infrequência diária de ${item.rotulo}. Os valores também aparecem nos cartões de dia.`}
                   />
                 </div>
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2">
                   {item.dias.map((dia) => {
                     const situacao = horarioDoDia(dia);
                     const abre = Boolean(dia.salva || dia.previsto);

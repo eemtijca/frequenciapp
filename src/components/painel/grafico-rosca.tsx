@@ -10,6 +10,8 @@ export interface FatiaGrafico {
   valor: number;
   detalhe?: string;
   alunos?: number;
+  unidadeSingular?: string;
+  unidadePlural?: string;
 }
 
 // Tons do próprio tema: verde institucional, verde claro e grafite. O
@@ -41,6 +43,8 @@ export default function GraficoRosca({
 }: Props) {
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
+  const rotuloFatia = (fatia: FatiaGrafico) =>
+    `${fatia.valor} ${fatia.valor === 1 ? (fatia.unidadeSingular ?? unidadeSingular) : (fatia.unidadePlural ?? unidadePlural)}`;
 
   if (total === 0) {
     return (
@@ -81,8 +85,7 @@ export default function GraficoRosca({
                   <div className="superficie text-foreground max-w-44 px-3 py-2 text-xs break-words whitespace-normal">
                     {payload.map((item) => (
                       <p key={String(item.name)} className="numerais-tabulares">
-                        {String(item.name)}: {Number(item.value) || 0}{" "}
-                        {Number(item.value) === 1 ? unidadeSingular : unidadePlural}
+                        {String(item.name)}: {rotuloFatia(item.payload as FatiaGrafico)}
                       </p>
                     ))}
                   </div>
@@ -135,7 +138,7 @@ export default function GraficoRosca({
             <span className="ml-auto flex shrink-0 items-center gap-1">
               <CirculoValor
                 texto={String(fatia.valor)}
-                rotulo={`${fatia.valor} ${fatia.valor === 1 ? unidadeSingular : unidadePlural}`}
+                rotulo={rotuloFatia(fatia)}
                 tom={tomValores}
               />
               <CirculoValor

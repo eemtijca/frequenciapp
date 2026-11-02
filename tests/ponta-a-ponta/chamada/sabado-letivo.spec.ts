@@ -1,7 +1,9 @@
 // Sábado letivo excepcional na Chamada: liberação por turma e dia, rascunho,
 // bloqueio após salvar e controles lado a lado no celular. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { diaDaSemanaIso, diaLocal, diaSeguinte } from "@/domain/frequencia";
+import { diaLocal, diaSeguinte } from "@/domain/frequencia";
+import { procurarDia } from "../../helpers/calendario-fixture";
+import { lerFeriados } from "../../helpers/feriados-banco";
 import { comBanco } from "../helpers/banco";
 import {
   aguardarHidratacao,
@@ -28,11 +30,7 @@ interface GradeDoTeste {
 const turmas = new Map<string, TurmaDoTeste>();
 let gradeOriginal: GradeDoTeste[] = [];
 
-function ultimoSabado(): string {
-  let dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
-  while (diaDaSemanaIso(dia) !== 6) dia = diaSeguinte(dia, -1);
-  return dia;
-}
+let sabadoDisponivel = "";
 
 async function limparChamadas(): Promise<void> {
   await comBanco((cliente) =>
@@ -75,7 +73,7 @@ async function escolherDia(page: Page, secao: Locator, dia: string): Promise<voi
     timeZone: "UTC",
   }).format(data);
   const mesCompleto = `${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
-  for (let indice = 0; indice < 3; indice += 1) {
+  for (let indice = 0; indice < 15; indice += 1) {
     if (await calendario.getByRole("group", { name: `Dias de ${mesCompleto}` }).count()) break;
     const grade = calendario.getByRole("group", { name: /^Dias de / });
     const anterior = await grade.getAttribute("aria-label");
@@ -132,6 +130,8 @@ async function salvar(page: Page, secao: Locator) {
 test.beforeAll(async () => {
   await limparMassa();
   await comBanco(async (cliente) => {
+    const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+    sabadoDisponivel = procurarDia(hoje, -1, [6], await lerFeriados(cliente), 365, [0, -1, -5, -7]);
     const serie = await cliente.query<{ id: string }>(
       "insert into series (nome, ordem) values ($1, 94) returning id",
       [SERIE],
@@ -170,7 +170,7 @@ test.afterAll(limparMassa);
 test("libera apenas o sábado selecionado, salva e exige o desbloqueio comum para corrigir", async ({
   page,
 }) => {
-  const dia = ultimoSabado();
+  const dia = sabadoDisponivel;
   let secao = await abrirTurma(page, "A", dia);
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   await expect(liberar).toBeEnabled();
@@ -222,7 +222,7 @@ test("libera apenas o sábado selecionado, salva e exige o desbloqueio comum par
 test("a liberação não alcança outra turma ou data e o rascunho recupera o sábado letivo", async ({
   page,
 }, info) => {
-  const dia = ultimoSabado();
+  const dia = sabadoDisponivel;
   const anterior = diaSeguinte(dia, -7);
   let secao = await abrirTurma(page, "A", dia);
   const resumo = secao.getByRole("button", { name: /^Resumo d/ });
@@ -303,7 +303,7 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
 test("sábado com grade também começa bloqueado e não mostra a ação nos dias úteis", async ({
   page,
 }) => {
-  const sabado = ultimoSabado();
+  const sabado = sabadoDisponivel;
   const secao = await abrirTurma(page, "C", sabado);
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   await expect(liberar).toBeVisible();
@@ -337,7 +337,7 @@ test("sábado com grade também começa bloqueado e não mostra a ação nos dia
 test("falha de leitura bloqueia a liberação e preserva o rascunho até tentar novamente", async ({
   page,
 }) => {
-  const dia = ultimoSabado();
+  const dia = sabadoDisponivel;
   let secao = await abrirTurma(page, "A", dia);
   await liberarSabadoSeNecessario(secao);
   await aluno(secao, "A").click();

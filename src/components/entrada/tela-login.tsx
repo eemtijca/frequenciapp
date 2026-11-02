@@ -160,7 +160,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                 </p>
               </div>
             </div>
-            <SeletorTema className="absolute top-0 right-0 shrink-0 lg:static" />
+            <SeletorTema variante="ghost" className="absolute top-0 right-0 shrink-0 lg:static" />
           </div>
 
           {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}
@@ -183,7 +183,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                   setEmail(evento.target.value);
                   if (erro) setErro("");
                 }}
-                placeholder="pessoa@escola.br ou 3a-maria"
+                placeholder="ana@escola.br ou 3a-maria"
                 className="h-12"
               />
             </div>
@@ -236,12 +236,15 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
             </Button>
           </form>
 
-          <nav aria-label="Projeto e ferramentas" className="grid grid-cols-2 gap-2 text-xs">
+          <nav
+            aria-label="Projeto e ferramentas"
+            className="flex items-center justify-center gap-1 text-xs"
+          >
             <a
               href="/bi"
               target="_blank"
               rel="noopener noreferrer"
-              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
+              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
             >
               FrequenciBI
             </a>
@@ -249,7 +252,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               href="https://github.com/eemtijca/frequenciapp"
               target="_blank"
               rel="noopener noreferrer"
-              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
+              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
             >
               GitHub
             </a>
@@ -257,14 +260,14 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               href="/api/docs"
               target="_blank"
               rel="noopener noreferrer"
-              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
+              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
             >
               API
             </a>
             <button
               type="button"
               onClick={() => setSobreAberto(true)}
-              className="controle text-secondary-foreground inline-flex min-h-11 items-center justify-center px-3 underline-offset-4 hover:underline"
+              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
             >
               Sobre
             </button>

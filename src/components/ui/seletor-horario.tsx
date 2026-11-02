@@ -7,6 +7,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Clock } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import estilos from "./seletores-contorno.module.css";
 
 interface Props {
   id: string;
@@ -206,7 +207,10 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${valor || "sem horário"}`}
       onClick={() => aoAbrir(!aberto)}
-      className="controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className={cn(
+        "controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        estilos.contorno,
+      )}
     >
       <Clock size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <span className="numerais-tabulares truncate font-semibold">{valor || "--:--"}</span>

@@ -874,7 +874,7 @@ export default function VistaFrequencia({
             />
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="navegacao-dia flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
@@ -1169,7 +1169,7 @@ export default function VistaFrequencia({
                           onClick={() =>
                             setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
                           }
-                          className="controle aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                          className="controle controle-contornado aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                         >
                           <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                             {carregando ? "" : contagemFaltas}
@@ -1184,7 +1184,7 @@ export default function VistaFrequencia({
                               atual === "justificadas" ? "todos" : "justificadas",
                             )
                           }
-                          className="controle aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                          className="controle controle-contornado aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                         >
                           <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
                             {carregando ? "" : contagemJustificadas}
@@ -1199,7 +1199,7 @@ export default function VistaFrequencia({
                           onClick={() =>
                             setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))
                           }
-                          className="controle pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                          className="controle controle-contornado pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                         >
                           <span className="numerais-tabulares text-primary text-2xl font-semibold">
                             {carregando ? "" : contagemPresencas}

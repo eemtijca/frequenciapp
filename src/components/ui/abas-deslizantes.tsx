@@ -4,6 +4,7 @@
 // com deslize curto do conteúdo no desktop.
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
+import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
 
 export interface AbaItem<T extends string> {
   valor: T;
@@ -149,7 +150,9 @@ export default function AbasDeslizantes<T extends string>({
                 hidden={!ativo}
                 className="pagina-painel aba-painel min-w-0"
               >
-                {children(item.valor, ativo)}
+                <ProvedorVisibilidadeGraficos visivel={ativo}>
+                  {children(item.valor, ativo)}
+                </ProvedorVisibilidadeGraficos>
               </div>
             );
           })}

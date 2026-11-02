@@ -2,6 +2,9 @@
 // o resumo da semana; quem segue até a chamada usa o sábado anterior.
 import { diaLocal, ehDomingo, ultimoDiaDeChamada } from "@/domain/frequencia";
 
+// Mantém a API dos testes de data usando a mesma validação civil da navegação.
+export { deslocamentoMes as diferencaEmMeses } from "./navegacao-periodo";
+
 /** Dia civil corrente no fuso da escola. */
 export function diaCorrente(): string {
   return diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");

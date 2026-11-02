@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
+import { navegarAno } from "../helpers/calendario-historico";
 import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "../helpers/pagina";
 
 const nomes = {
@@ -97,10 +98,16 @@ test("restaura os pontos verdes sem salvar novamente nem apagar faltas", async (
   const grade = page.getByRole("region", { name: "Grade de frequência" });
   await escolherTurmaNaGrade(page, new RegExp(`${nomes.serie} A`));
   await grade.locator("#mes-grade").click();
-  await page
-    .getByRole("dialog", { name: "Mês da consulta" })
-    .getByRole("button", { name: "Setembro", exact: true })
-    .click();
+  const seletor = page.getByRole("dialog", { name: "Mês da consulta", exact: true });
+  await navegarAno(seletor, "2026-09");
+  const setembro = seletor
+    .getByRole("group", { name: "Meses de 2026", exact: true })
+    .getByRole("button", { name: "Setembro", exact: true });
+  if (!(await setembro.isEnabled())) {
+    throw new Error("Setembro de 2026 está fora do intervalo selecionável da Grade.");
+  }
+  await setembro.click();
+  await expect(seletor).toHaveCount(0);
   await expect(
     grade.getByRole("img", { name: `${nomes.presente} sem frequência em 2026-09-15`, exact: true }),
   ).toBeAttached();

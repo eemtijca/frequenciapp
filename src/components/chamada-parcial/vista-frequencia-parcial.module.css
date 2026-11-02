@@ -1,0 +1,12 @@
+/* Ação secundária leve sobre a linha, sem alterar o tema escuro. */
+@media (forced-colors: none) {
+  :global(html:not(.dark)) .acaoRegistro {
+    background-color: transparent;
+    border-color: #d9ddda;
+  }
+  @media (hover: hover) {
+    :global(html:not(.dark)) .acaoRegistro:not(:disabled):hover {
+      background-color: color-mix(in oklab, var(--foreground) 5%, transparent);
+    }
+  }
+}

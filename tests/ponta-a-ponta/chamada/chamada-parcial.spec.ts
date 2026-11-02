@@ -301,6 +301,7 @@ test("preserva a linha histórica após transferência e desativação do aluno"
 
 test("confirma presença por turno e por aulas, filtra a pendência e invalida após corrigir", async ({
   page,
+  isMobile,
 }) => {
   const { secao, dialogo } = await abrirRegistro(page);
   await dialogo.locator("#parcial-turno").click();
@@ -327,12 +328,23 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
     name: "Registro na Seduc: E2E Parcial Um",
     exact: true,
   });
+  const alternarRegistro = async () => {
+    if (isMobile) {
+      // Emula um aparelho sem cursor sobre a pilha, preservando a saída natural dos avisos.
+      await page.mouse.move(0, 0);
+      // Testa o fluxo após os avisos sumirem naturalmente, não o acesso enquanto visíveis.
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+      await controle.tap();
+    } else {
+      await controle.click();
+    }
+  };
   await expect(controle).toBeVisible();
   await expect(controle).not.toBeChecked();
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Pendentes na Seduc", exact: true }).click();
   await expect(linha).toBeVisible();
-  await controle.click();
+  await alternarRegistro();
   await expect(linha).toBeHidden();
   await secao.locator("#parcial-filtro").click();
   await page.getByRole("option", { name: "Registrados na Seduc", exact: true }).click();
@@ -355,9 +367,9 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
   await expect(controle).toBeVisible();
   await expect(controle).not.toBeChecked();
   await expect(linha.getByText("Presente · Aulas 3, 4, 6", { exact: true })).toBeVisible();
-  await controle.click();
+  await alternarRegistro();
   await expect(controle).toBeChecked();
-  await controle.click();
+  await alternarRegistro();
   await expect(controle).not.toBeChecked();
   const corrigido = (await registrosDoDia(page)).registros[0];
   expect(corrigido?.aulas).toEqual([3, 4, 6]);
@@ -661,9 +673,10 @@ async function escolherData(page: Page, id: string, rotulo: string, de: string, 
 
 test("agenda uma justificativa futura por início e fim, sem criar presenças e com calendário responsivo", async ({
   page,
+  isMobile,
 }, info) => {
   await page.setViewportSize({
-    width: info.project.name === "mobile-chrome" ? 320 : 1280,
+    width: isMobile ? 320 : 1280,
     height: 850,
   });
   const secao = await abrirParcial(page);
@@ -765,12 +778,22 @@ test("preenche a primeira Chamada com o motivo agendado e mantém datas futuras 
   await chamada.locator("#dia-frequencia").click();
   const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
   const futuro = diaDeChamadaVizinho(dia, 1);
-  if (futuro.slice(0, 7) === dia.slice(0, 7)) {
+  if (futuro.slice(0, 7) !== dia.slice(0, 7)) {
+    const seguinte = calendario.getByRole("button", { name: "Mês seguinte", exact: true });
+    // Se o mês futuro ainda não chegou, a navegação já é o bloqueio.
+    if (futuro.slice(0, 7) > diaCorrente().slice(0, 7)) {
+      await expect(seguinte).toBeDisabled();
+    } else {
+      await expect(seguinte).toBeEnabled();
+      await seguinte.click();
+      await expect(
+        calendario.getByRole("group", { name: `Dias de ${rotuloMes(futuro.slice(0, 7))}` }),
+      ).toBeVisible();
+      await expect(calendario.locator(`[data-dia="${futuro}"]`)).toBeDisabled();
+    }
+  } else {
     await expect(calendario.locator(`[data-dia="${futuro}"]`)).toBeDisabled();
-  } else
-    await expect(
-      calendario.getByRole("button", { name: "Mês seguinte", exact: true }),
-    ).toBeDisabled();
+  }
   await calendario.getByRole("button", { name: "Fechar", exact: true }).click();
   await salvarChamada(chamada);
   await expect(chamada.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();

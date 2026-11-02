@@ -83,7 +83,7 @@ export default function VistaHistorico({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="navegacao-dia flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -133,7 +133,7 @@ export default function VistaHistorico({
             type="button"
             aria-pressed={serieFiltro === ""}
             onClick={() => setSerieFiltro("")}
-            className="controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
+            className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === "" ? "" : "controle-contornado"}`}
           >
             Todas
           </button>
@@ -143,7 +143,7 @@ export default function VistaHistorico({
               type="button"
               aria-pressed={serieFiltro === serie.id}
               onClick={() => setSerieFiltro(serie.id)}
-              className="controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors"
+              className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === serie.id ? "" : "controle-contornado"}`}
             >
               {serie.nome}
             </button>

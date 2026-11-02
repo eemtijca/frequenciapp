@@ -6,18 +6,29 @@ Suítes do FrequenciApp com Vitest e Playwright.
 
 `tests/api/notificacoes/notificacoes-agenda.test.ts` exercita a agenda com PostgreSQL real e transporte simulado, incluindo horários, preferências, pendências e reserva concorrente. A suíte não faz envios externos. `tests/ponta-a-ponta/notificacoes/notificacoes.spec.ts` valida a Gestão e a coordenação; `tests/ponta-a-ponta/pwa/pwa-notificacoes.spec.ts` confere consentimento e tipos da conta. Contra servidor de produção em HTTP local, usar `PERMITIR_HTTP=true`. Essa opção não é necessária em desenvolvimento e não devem ser aplicadas a uma implantação HTTPS comum.
 
-| Suíte            | Comando                     | Pré-requisitos                                               |
-| ---------------- | --------------------------- | ------------------------------------------------------------ |
-| Unidade          | `pnpm run test:unit`        | Nenhum.                                                      |
-| Componentes      | `pnpm run test:componentes` | Chromium instalado pelo Playwright; sem aplicativo ou banco. |
-| Contratos de API | `pnpm run test:api`         | Aplicativo no ar, banco migrado, contas de teste.            |
-| Ponta a ponta    | `pnpm run test:e2e`         | Aplicativo no ar e navegadores instalados.                   |
-| PWA              | `pnpm run test:pwa`         | Build de produção no ar (`pnpm run build` e `pnpm start`).   |
-| API e unidade    | `pnpm test`                 | Idem, na ordem.                                              |
+| Suíte                     | Comando                               | Pré-requisitos                                                          |
+| ------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| Unidade                   | `pnpm run test:unit`                  | Nenhum.                                                                 |
+| Componentes               | `pnpm run test:componentes`           | Chromium instalado pelo Playwright; sem aplicativo ou banco.            |
+| Visibilidade dos gráficos | `pnpm run test:graficos-visibilidade` | Chromium; fixture Vite isolada. Não há passo próprio no workflow atual. |
+| Contratos de API          | `pnpm run test:api`                   | Aplicativo no ar, banco migrado, contas de teste.                       |
+| Ponta a ponta             | `pnpm run test:e2e`                   | Aplicativo no ar e navegadores instalados.                              |
+| PWA                       | `pnpm run test:pwa`                   | Build de produção no ar (`pnpm run build` e `pnpm start`).              |
+| API e unidade             | `pnpm test`                           | Idem, na ordem.                                                         |
 
 ## Unidade
 
 Roda em qualquer ambiente, sem banco e sem rede:
+
+Os helpers E2E que navegam o seletor de período aceitam meses de `1000-01` a
+`9999-11` nas duas extremidades e validam o destino antes de abrir o painel.
+O limite é conservador e não altera o produto: o seletor anual não preenche
+anos menores que 1000 com zeros e `Date.UTC` interpreta anos de 0 a 99 como
+1900 a 1999. Além disso, o calendário semanal de dezembro de 9999
+avança para um ano ISO de seis dígitos, incompatível com as datas de quatro
+dígitos usadas na grade. A conta `deslocamentoMes` continua independente e
+aceita `0001-01` a `9999-12`. Os controles e limites efetivos da tela ainda
+podem impedir uma escolha; a contagem de passos não tem teto arbitrário.
 
 - `entradas.test.ts` e `planilha-entradas.test.ts`: horário, código por aluno e data, preservação de linhas e fórmulas, releitura, mudança de arquivo e falha sem confirmação com dublê de Sheets API.
 - `frequencia.test.ts`: domínio da frequência (calendário, horários, aulas, marca, grade, normalização).
@@ -62,7 +73,10 @@ export GOOGLE_PROJECT_NUMBER=123456789
 NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" pnpm run dev
 
 # 4. suíte
-DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia pnpm run test:api
+# As fixtures de banco exigem DATABASE_URL e DIRECT_URL iguais e explícitas.
+DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+pnpm run test:api
 ```
 
 Variáveis aceitas:
@@ -71,7 +85,7 @@ Variáveis aceitas:
 - `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais da administração de teste.
 - `TESTE_EMAIL` e `TESTE_SENHA`: credenciais da coordenação de teste.
 - `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
-- `DIRECT_URL`: conexão preferida pelos comandos administrativos, quando disponível.
+- `DIRECT_URL`: conexão preferida pelos comandos administrativos e exigida igual a `DATABASE_URL` pelas fixtures que recusam banco ambíguo.
 
 O contrato `entradas.test.ts` cobre duplicidade, validação, momento, responsável ativo e nome histórico, turma histórica, separação da chamada, cópia JSON, desistência e permissões.
 
@@ -111,6 +125,52 @@ pnpm exec playwright test    # headless, execução serial
 - Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
 
 O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `pnpm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e carrega o transporte de testes por `NODE_OPTIONS` (ver `compose.ci.yml`), para OAuth e Sheets API simulados responderem no loopback do runner.
+
+## Legibilidade: fixture e aplicativo real
+
+`tests/componentes/entrada/legibilidade.test.ts` é uma regressão de componentes
+com fonte fallback e invólucro sintético: não monta `layout.tsx`, não usa a
+Plus Jakarta Sans do build e não representa o layout do aplicativo. A fixture é
+executada por `test:componentes`; não há passo próprio no CI atual e ela não
+comprova legibilidade de produção.
+
+`tests/ponta-a-ponta/interface/legibilidade-real.spec.ts` exercita o Next real:
+espera `document.fonts.ready`, exige uma face Jakarta carregada e consulta a fonte
+computada no próprio texto da data (ou no placeholder), inclusive seu peso.
+Essa consulta não comprova que cada glifo foi renderizado sem fallback. O teste
+mede o placeholder com padding e bordas fracionários. Os textos descendentes são
+medidos com `Range` e checados contra os recortes dos ancestrais; a data exata
+também deve estar visível e ter área positiva sem recorte. Oito autochecagens com
+HTML sintético verificam recorte, visibilidade, transparência, geometria e fonte
+fallback; não substituem o teste real.
+Registra capturas e verifica chamada, navegação, foco e contêineres também perto de 14rem.
+O teste de alargamento modifica somente o invólucro do controle e seu tamanho
+de fonte no navegador: é um estresse controlado, não prova de zoom do navegador
+ou de acessibilidade em dispositivo físico. Aos domingos a chamada inicia no
+resumo e o selo Hoje da chamada não está disponível; a presença do selo é
+verificada quando a data selecionada é hoje, não é simulada por relógio local.
+
+O spec autenticado usa a massa E2E padrão e a remove. Tanto seu helper quanto o
+`globalSetup` do Playwright **escrevem no banco**, apagam dados por prefixo E2E
+e podem redefinir contas fixas, mesmo que o teste aborte escritas da página.
+Use exclusivamente banco e servidor descartáveis, isolados e sem outras suítes
+concorrentes; nunca aponte para uma base real. O runner padrão descobre esse spec
+junto com os demais. Para executar apenas os seis casos de login e as oito
+autochecagens sem globalSetup,
+sem ler estado de sessão e sem iniciar servidor automaticamente, com o servidor
+descartável já no ar:
+
+```bash
+TEST_BASE_URL=http://localhost:3000 pnpm exec playwright test --config=playwright.legibilidade-anon.config.ts
+```
+
+Para a comparação RED/GREEN, execute o mesmo spec de login sobre o build da base
+`537b826` e da branch, em ambientes descartáveis separados com a mesma versão de
+navegador, e preserve resultados e capturas. Para comparar o seletor, coloque o
+mesmo spec e helpers necessários em cada checkout e execute o runner padrão em
+bancos isolados próprios; confira a limpeza e o relatório. Uma falha de fonte,
+servidor ou seed é infraestrutura, não RED do defeito. A antiga falha na fixture
+fallback não comprova RED do E2E real.
 
 ## Verificação visual e de ponta a ponta
 

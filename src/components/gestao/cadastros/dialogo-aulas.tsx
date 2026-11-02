@@ -251,7 +251,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                     </p>
                   </div>
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="icon"
                     className="size-11"
                     aria-label={`Editar aula ${aula.ordem}`}
@@ -263,7 +263,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="icon"
                         className="size-11"
                         aria-label={
@@ -296,7 +296,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="icon"
                         className="text-falta-texto size-11"
                         aria-label={`Excluir aula ${aula.ordem}`}
@@ -420,7 +420,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                         aria-pressed={marcado}
                         aria-label={dia.rotulo}
                         onClick={() => alternarDia(dia.valor)}
-                        className="controle pressionavel h-11 px-3 text-xs font-medium transition-colors"
+                        className="controle controle-contornado pressionavel h-11 px-3 text-xs font-medium transition-colors"
                       >
                         {dia.abreviacao}
                       </button>

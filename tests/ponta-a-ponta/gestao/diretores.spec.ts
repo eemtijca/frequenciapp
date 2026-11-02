@@ -2,7 +2,7 @@
 // uma única vez, revogação com motivo, parâmetros de acesso e a visão só de
 // leitura do diretor, que entra pelo identificador e troca a palavra.
 import { expect, test } from "@playwright/test";
-import { diaDeChamada } from "../helpers/dia";
+import { diaCorrente, diaDeChamada } from "../helpers/dia";
 import {
   comBanco,
   criarMassaE2E,
@@ -214,8 +214,37 @@ test.describe("diretores de turma na Gestão", () => {
     await troca.getByRole("button", { name: "Salvar e continuar" }).click();
 
     await expect(diretor.getByRole("heading", { name: "Minhas turmas" })).toBeVisible();
+    // Os comandos do diretor também dispensam fundos repetidos em ambos os temas.
+    for (const tema of ["Claro", "Escuro"]) {
+      await diretor.getByRole("button", { name: /^Tema: .* Alterar tema$/ }).click();
+      await diretor.getByRole("radio", { name: tema, exact: true }).click();
+      await diretor.keyboard.press("Escape");
+      for (const largura of [390, 1280]) {
+        await diretor.setViewportSize({ width: largura, height: 844 });
+        await diretor.mouse.move(largura - 1, 843);
+        for (const nome of [
+          /^Atualizar tela$/,
+          /^Tema: .* Alterar tema$/,
+          /^Configurar notificações$/,
+          /^Sobre$/,
+          /^Trocar minha palavra-chave$/,
+          /^Sair da conta$/,
+        ]) {
+          const botao = diretor.getByRole("banner").getByRole("button", { name: nome });
+          await expect(botao).toBeVisible();
+          await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+          const caixa = await botao.boundingBox();
+          expect(caixa?.width).toBeGreaterThanOrEqual(44);
+          expect(caixa?.height).toBeGreaterThanOrEqual(44);
+        }
+      }
+    }
     await expect(diretor.locator("main")).toHaveAttribute("data-visao", "diretor");
     await expect(diretor.getByText("E2E Ano A").first()).toBeVisible();
+    // No primeiro dia do mês, um domingo consulta a chamada do mês anterior.
+    if (dia.slice(0, 7) !== diaCorrente().slice(0, 7)) {
+      await diretor.getByRole("button", { name: "Mês anterior", exact: true }).click();
+    }
     await expect(diretor.getByRole("heading", { name: "Ausência por aluno" })).toBeVisible();
     await expect(diretor.getByRole("img", { name: /1 de 2 alcançam o limite/ })).toBeVisible();
 

@@ -1,14 +1,8 @@
 // Acesso direto ao banco da suíte de ponta a ponta: contas fixas, contagens e
 // limpeza da massa com prefixo E2E. Nunca usa dados reais.
-import { randomBytes, scrypt } from "node:crypto";
-import { promisify } from "node:util";
 import pg from "pg";
-
-const scryptAssincrono = promisify(scrypt);
-const CUSTO = 16384;
-const BLOCO = 8;
-const PARALELISMO = 1;
-const TAMANHO = 64;
+import { hashearSenha } from "../../../src/infra/auth/hash";
+import { selecionarSchema } from "../../../src/infra/schema-postgres.mjs";
 
 /** Papel de quem faz a frequência; acompanha o enum do schema. */
 const PAPEL_COORDENACAO = "COORDENACAO";
@@ -36,22 +30,28 @@ function urlDoBanco(): string {
 /** Abre uma conexão, executa a operação e fecha, mesmo em falha. */
 export async function comBanco<T>(operacao: (cliente: pg.Client) => Promise<T>): Promise<T> {
   const cliente = new pg.Client({ connectionString: urlDoBanco() });
-  await cliente.connect();
+  let erroOperacao: unknown;
+  let falhou = false;
   try {
+    await cliente.connect();
+    await selecionarSchema(cliente, process.env.DATABASE_URL ?? urlDoBanco());
     return await operacao(cliente);
+  } catch (erro) {
+    erroOperacao = erro;
+    falhou = true;
+    throw erro;
   } finally {
-    await cliente.end();
+    try {
+      await cliente.end();
+    } catch (erroFechamento) {
+      if (falhou)
+        throw new AggregateError(
+          [erroOperacao, erroFechamento],
+          "Falha na operação e no fechamento do banco.",
+        );
+      throw erroFechamento;
+    }
   }
-}
-
-async function hashear(senha: string): Promise<string> {
-  const sal = randomBytes(16);
-  const chave = await scryptAssincrono(senha, sal, TAMANHO, {
-    N: CUSTO,
-    r: BLOCO,
-    p: PARALELISMO,
-  });
-  return `scrypt$${CUSTO}$${BLOCO}$${PARALELISMO}$${sal.toString("hex")}$${chave.toString("hex")}`;
 }
 
 async function garantirConta(
@@ -59,7 +59,7 @@ async function garantirConta(
   conta: { email: string; senha: string; nome: string },
   papel: string,
 ): Promise<void> {
-  const senhaHash = await hashear(conta.senha);
+  const senhaHash = await hashearSenha(conta.senha);
   await cliente.query(
     `insert into usuarios (email, senha_hash, nome, papel, ativo, criado_em, atualizado_em)
      values ($1, $2, $3, $4, true, now(), now())
