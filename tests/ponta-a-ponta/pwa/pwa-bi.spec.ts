@@ -3,7 +3,43 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao } from "../helpers/pagina";
 import { comBanco } from "../helpers/banco";
+import { diasEscolaresDaFixture } from "../helpers/dias-escolares-fixture";
+import { fixtureBi } from "../helpers/fixture-bi";
 const rotulo = "E2E BI Offline";
+
+async function contarRetratosDaChave(page: Page, hash: string): Promise<number> {
+  return page.evaluate(
+    (prefixo) =>
+      new Promise<number>((resolve, reject) => {
+        const abertura = indexedDB.open("frequencibi-dados-v1", 1);
+        abertura.onerror = () => reject(abertura.error);
+        abertura.onblocked = () => reject(new Error("IndexedDB bloqueado"));
+        abertura.onsuccess = () => {
+          const db = abertura.result;
+          if (!db.objectStoreNames.contains("retratos")) {
+            db.close();
+            reject(new Error("Armazenamento de retratos ausente"));
+            return;
+          }
+          const tx = db.transaction("retratos", "readonly");
+          const pedido = tx.objectStore("retratos").getAllKeys();
+          let total = 0;
+          pedido.onsuccess = () => {
+            total = pedido.result.filter((chave) => String(chave).startsWith(`${prefixo}:`)).length;
+          };
+          tx.oncomplete = () => {
+            db.close();
+            resolve(total);
+          };
+          tx.onabort = tx.onerror = () => {
+            db.close();
+            reject(tx.error);
+          };
+        };
+      }),
+    hash,
+  );
+}
 
 async function aba(page: Page, nome: string) {
   const navegacao = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
@@ -27,8 +63,10 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
   const alunoId = randomUUID();
   const frequenciaId = randomUUID();
   const aluno = `E2E BI Aluno ${alunoId.slice(0, 8)}`;
-  const dia = new Date().toISOString().slice(0, 10);
+  const [diaEscolar] = await diasEscolaresDaFixture(1);
+  const { dia, personalizacao } = fixtureBi(diaEscolar);
   const chave = `fbi_${randomBytes(32).toString("base64url")}`;
+  const hash = createHash("sha256").update(chave).digest("hex");
   try {
     await comBanco(async (db) => {
       await db.query("insert into series (id,nome,ordem) values ($1,$2,99)", [
@@ -66,6 +104,12 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
     });
     // Mantém gráficos abaixo da dobra para testar a abertura offline antes do módulo visual.
     await page.setViewportSize({ width: 393, height: 400 });
+    await page.addInitScript((valor) => {
+      if (location.pathname === "/bi" && !sessionStorage.getItem("e2e:periodo-definido")) {
+        localStorage.setItem("frequencibi:personalizacao", JSON.stringify(valor));
+        sessionStorage.setItem("e2e:periodo-definido", "1");
+      }
+    }, personalizacao);
     await page.goto("/bi");
     await aguardarHidratacao(page, "#chave-bi");
     await page.getByLabel("Chave de acesso", { exact: true }).fill(chave);
@@ -96,12 +140,17 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
         }),
       )
       .toBe(true);
+    // A entrada de acesso é uma das chaves; exige pelo menos um retrato além dela.
+    await expect.poll(() => contarRetratosDaChave(page, hash)).toBeGreaterThan(1);
     await context.setOffline(true);
     await page.reload();
     await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Consulta offline" })).toBeVisible();
     await expect(indicadores.locator("article").filter({ hasText: "Alunos ativos" })).toHaveText(
       "Alunos ativos1",
+    );
+    await expect(indicadores.locator("article").filter({ hasText: "Dias com chamada" })).toHaveText(
+      "Dias com chamada1",
     );
     await aba(page, "Ajuda");
     await page.getByRole("button", { name: "Alunos: 1", exact: true }).click();
@@ -125,6 +174,7 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
     await context.setOffline(false);
     await expect(page.getByRole("button", { name: "Testar e entrar", exact: true })).toBeVisible();
     expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+    await expect.poll(() => contarRetratosDaChave(page, hash)).toBe(0);
   } finally {
     await context.setOffline(false);
     await comBanco(async (db) => {

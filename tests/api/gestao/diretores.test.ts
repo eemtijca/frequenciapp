@@ -6,7 +6,16 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { diaDaSemanaIso, diaLocal, diaSeguinte } from "@/domain/frequencia";
+import { diaLocal, diaSeguinte } from "@/domain/frequencia";
+
+import { procurarDia } from "../../helpers/calendario-fixture";
+import { lerFeriados } from "../../helpers/feriados-banco";
+import {
+  conectarDiretores,
+  finalizarDiretores,
+  limparDiretores,
+} from "../../helpers/teardown-fixtures";
+import { selecionarSchema } from "@/infra/schema-postgres.mjs";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
@@ -42,30 +51,15 @@ interface Parametros {
 
 async function conectarBanco(): Promise<pg.Client | null> {
   const conexao = process.env.DATABASE_URL;
-  if (!conexao || !conexao.startsWith("postgresql://")) return null;
+  if (!conexao) throw new Error("DATABASE_URL é obrigatória para os testes de diretores.");
   const cliente = new pg.Client({ connectionString: conexao });
-  await cliente.connect();
+  await conectarDiretores(cliente, () => selecionarSchema(cliente, conexao));
   return cliente;
 }
 
 async function limparMassa() {
   if (!banco) return;
-  await banco.query("delete from usuarios where email like 'qd-%'");
-  await banco.query("delete from tentativas_entrada where chave like '%qd-%'");
-  const daSerie =
-    "select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'QD Ano'";
-  await banco.query(`delete from frequencias where turma_id in (${daSerie})`);
-  await banco.query(`delete from alunos where turma_id in (${daSerie})`);
-  await banco.query(
-    "delete from turmas where serie_id in (select id from series where nome = 'QD Ano')",
-  );
-  await banco.query("delete from series where nome = 'QD Ano'");
-  await banco.query(
-    `update parametros_acesso set validade_palavra_dias = 90, sessao_diretor_horas = 12,
-       tentativas_por_origem = 10, tentativas_por_login = 30, janela_minutos = 15,
-       categorias_diretor = '{faltas}', limite_risco_percentual = 25
-     where id = 'principal'`,
-  );
+  await limparDiretores(banco);
 }
 
 function chamar(caminho: string, opcoes: RequestInit = {}, cookie = ""): Promise<Response> {
@@ -82,13 +76,6 @@ async function json<T>(resposta: Response): Promise<T> {
 
 async function entrar(corpo: Record<string, unknown>): Promise<Response> {
   return chamar("/api/auth/entrar", { method: "POST", body: JSON.stringify(corpo) });
-}
-
-/** Dia letivo mais recente até hoje, no fuso da escola. */
-function diaUtilRecente(): string {
-  let dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
-  while (diaDaSemanaIso(dia) > 5) dia = diaSeguinte(dia, -1);
-  return dia;
 }
 
 function hojeNaEscola(): string {
@@ -148,8 +135,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await limparMassa();
-  if (banco) await banco.end();
+  await finalizarDiretores(banco);
 });
 
 describe("cadastro de diretores pela administração", () => {
@@ -343,9 +329,10 @@ describe("palavra-chave e entrada do diretor", () => {
   });
 
   it("recorta o período ao vínculo e mostra só as categorias liberadas", async () => {
-    if (!banco) return;
+    if (!banco) throw new Error("Banco de diretores não inicializado.");
     const hoje = hojeNaEscola();
-    const inicio = diaSeguinte(hoje, -10);
+    const diaLetivo = procurarDia(hoje, -1, [1, 2, 3, 4, 5], await lerFeriados(banco), 320);
+    const inicio = diaSeguinte(diaLetivo, -10);
     await banco.query(
       "update vinculos_diretor set inicio = $2::date where usuario_id = $1 and fim is null",
       [diretorId, inicio],
@@ -367,7 +354,7 @@ describe("palavra-chave e entrada do diretor", () => {
       {
         method: "POST",
         body: JSON.stringify({
-          dia: diaUtilRecente(),
+          dia: diaLetivo,
           turmaId,
           faltas: [alunoRiscoId],
           revisao: 0,
@@ -377,7 +364,7 @@ describe("palavra-chave e entrada do diretor", () => {
     );
     expect(salvar.status).toBe(200);
 
-    const consulta = `/api/diretor/estatisticas?turmaId=${turmaId}&de=${diaSeguinte(hoje, -40)}&ate=${hoje}`;
+    const consulta = `/api/diretor/estatisticas?turmaId=${turmaId}&de=${diaSeguinte(inicio, -30)}&ate=${hoje}`;
     interface Resposta {
       periodo: { de: string; ate: string } | null;
       estatisticas: {
@@ -455,7 +442,7 @@ describe("palavra-chave e entrada do diretor", () => {
   });
 
   it("encerra o vínculo antigo ontem, sem apagar", async () => {
-    if (!banco) return;
+    if (!banco) throw new Error("Banco de diretores não inicializado.");
     await banco.query(
       "update vinculos_diretor set inicio = current_date - 10 where usuario_id = $1 and fim is null",
       [diretorId],
@@ -481,7 +468,7 @@ describe("palavra-chave e entrada do diretor", () => {
   });
 
   it("recusa a entrada com palavra-chave vencida", async () => {
-    if (!banco) return;
+    if (!banco) throw new Error("Banco de diretores não inicializado.");
     await banco.query(
       "update credenciais_diretor set expira_em = now() - interval '1 minute', emitida_em = now() - interval '1 day' where usuario_id = $1",
       [diretorId],
@@ -561,7 +548,8 @@ describe("parâmetros de acesso", () => {
       statuses.push((await entrar({ login: "qd-inexistente", senha: "errada-123" })).status);
     }
     expect(statuses).toEqual([401, 401, 429]);
-    if (banco) {
+    {
+      if (!banco) throw new Error("Banco de diretores não inicializado.");
       const linhas = await banco.query(
         "select contagem from tentativas_entrada where chave like '%qd-inexistente'",
       );

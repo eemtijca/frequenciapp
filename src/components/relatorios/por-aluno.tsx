@@ -395,7 +395,7 @@ export default function PorAluno({
     <section aria-label="Relatório por aluno" className="flex flex-col gap-4 pb-6">
       <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
 
-      <div className="flex items-center gap-2">
+      <div className="navegacao-dia flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"

@@ -12,29 +12,63 @@ import {
   rotuloMes,
 } from "../../../src/domain/frequencia";
 import { diasDaPlanilhaMensal, nomeAbaMensal } from "../../../src/domain/planilha-mensal";
+import { diaHistoricoDaFixture, diasUteisDaFixture } from "../../helpers/calendario-fixture";
+import { cabecalhoDaFixture } from "../../helpers/cabecalho-planilha-fixture";
+import {
+  conferirConexaoFixture,
+  criarFeriadoDaFixture,
+  lerDiasComFrequencia,
+  lerFeriados,
+  removerFeriadoDaFixture,
+} from "../../helpers/feriados-banco";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
+import { limparIndependentemente } from "../../helpers/limpeza-independente";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 test.use({ serviceWorkers: "block" });
+// EXIGE harness com servidor e banco sintéticos exclusivos: esta suíte altera
+// integração e apaga sincronizações globais; verificações locais não provam
+// isolamento nem protegem o globalSetup ou outros processos.
 
 let google: GoogleFalso;
+let conexaoVerificada = false;
+let googleCriado = false;
+let massaIniciada = false;
 const mes = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza").slice(0, 7);
 const turmas = ["E2E Ano A", "E2E Ano B"];
 const abasMensais = turmas.map((turma) => `${turma} · ${nomeDoMes(mes)}`);
-const diasUteis = diasDoMes(mes)
-  .filter((dia) => diaDaSemanaIso(dia) <= 5)
-  .map(rotuloData);
+let diasUteis: string[] = [];
+let feriadoDaFixture = "";
+let diaHistorico = "";
+const nomeFeriado = `E2E planilha ${randomUUID()}`;
 
 test.beforeEach(async () => {
+  conexaoVerificada = false;
+  googleCriado = false;
+  massaIniciada = false;
+  await comBanco(async (cliente) => conferirConexaoFixture(cliente));
+  conexaoVerificada = true;
   google = await criarGoogleFalso();
-  google.definirAba("E2E Ano A", [
-    ["Aluno", "29/09/2026"],
-    ["E2E Aluno Um", "F"],
-  ]);
+  googleCriado = true;
+  massaIniciada = true;
   await criarMassaE2E();
   await comBanco(async (cliente) => {
+    const feriados = await lerFeriados(cliente);
+    const bloqueados = new Set([...feriados, ...(await lerDiasComFrequencia(cliente))]);
+    const feriado = diasDoMes(mes).find((dia) => diaDaSemanaIso(dia) <= 5 && !bloqueados.has(dia));
+    if (!feriado) throw new Error(`Nenhum dia útil livre para feriado sintético em ${mes}.`);
+    diasUteis = diasUteisDaFixture(mes, [...feriados, feriado]).map(rotuloData);
+    if (!diasUteis.length) throw new Error(`Nenhum dia útil restante em ${mes}.`);
+    // Guarda o identificador antes do commit para permitir limpeza de resultado incerto.
+    feriadoDaFixture = feriado;
+    await criarFeriadoDaFixture(cliente, feriado, nomeFeriado);
+    diaHistorico = diaHistoricoDaFixture(mes, [...feriados, feriado]);
+    google.definirAba("E2E Ano A", [
+      ["Aluno", rotuloData(diaHistorico)],
+      ["E2E Aluno Um", "F"],
+    ]);
     await cliente.query(
       "insert into turmas (serie_id, nome) select id, 'B' from series where nome = 'E2E Ano'",
     );
@@ -58,17 +92,39 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  await comBanco(async (cliente) => {
-    await cliente.query("delete from sincronizacoes_planilha");
-    await cliente.query(
-      `update integracoes_planilha set ativa = false, envio_automatico = false,
-         google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
-         esquema = null, assinatura_esquema = null, esquema_em = null
-       where id = 'principal'`,
-    );
-  });
-  await limparMassaE2E();
-  await google.fechar();
+  await limparIndependentemente([
+    async () => {
+      if (!conexaoVerificada || !feriadoDaFixture) return;
+      await comBanco((cliente) => removerFeriadoDaFixture(cliente, feriadoDaFixture, nomeFeriado));
+      feriadoDaFixture = "";
+    },
+    async () => {
+      if (!conexaoVerificada || !massaIniciada) return;
+      await comBanco(async (cliente) => {
+        await cliente.query(
+          `delete from sincronizacoes_planilha where turma_original_id in
+            (select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'E2E Ano')`,
+        );
+      });
+    },
+    async () => {
+      if (!conexaoVerificada || !googleCriado) return;
+      await comBanco(async (cliente) => {
+        await cliente.query(
+          `update integracoes_planilha set ativa = false, envio_automatico = false,
+             google_refresh_token = null, google_planilha_id = null, google_planilha_nome = null,
+             esquema = null, assinatura_esquema = null, esquema_em = null
+           where id = 'principal' and google_planilha_id = 'planilha-sintetica'`,
+        );
+      });
+    },
+    async () => {
+      if (conexaoVerificada && massaIniciada) await limparMassaE2E();
+    },
+    async () => {
+      if (googleCriado) await google.fechar();
+    },
+  ]);
 });
 
 async function abrirPlanilha(page: Page, acao: "Organizar" | "Configurar" = "Organizar") {
@@ -133,9 +189,10 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   for (const aba of abasMensais) {
     await expect(resultado.getByRole("listitem").filter({ hasText: aba })).toContainText("Criada");
     expect(google.valor(aba, 1, 1)).toBe("Aluno");
-    expect(
-      Array.from({ length: diasUteis.length + 1 }, (_, indice) => google.valor(aba, 1, indice + 1)),
-    ).toEqual(["Aluno", ...diasUteis]);
+    expect(diasUteis).not.toContain(rotuloData(feriadoDaFixture));
+    const cabecalho = cabecalhoDaFixture(google, aba);
+    expect(cabecalho).not.toContain(rotuloData(feriadoDaFixture));
+    expect(cabecalho).toEqual(["Aluno", ...diasUteis]);
   }
   expect(google.abasVisiveis().sort()).toEqual(["E2E Ano A", ...abasMensais].sort());
   expect(preparos).toHaveLength(2);
@@ -524,13 +581,13 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
   const headers = { Origin: new URL(page.url()).origin };
   const criada = await page.request.post("/api/planilha/criar-aba", {
     headers,
-    data: { nome: "E2E Ano A", cabecalho: ["Aluno", "29/09/2026"] },
+    data: { nome: "E2E Ano A", cabecalho: ["Aluno", rotuloData(diaHistorico)] },
   });
   expect(criada.status()).toBe(200);
   google.definirAba(
     "E2E Ano A",
     [
-      ["Aluno", "29/09/2026", "Total"],
+      ["Aluno", rotuloData(diaHistorico), "Total"],
       ["E2E Aluno Um", "FJ", "1"],
     ],
     {
@@ -544,7 +601,7 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
     );
     const preparada = await page.request.post("/api/planilha/mensal", {
       headers,
-      data: { turmaOriginalId: rows[0]?.id, mes: "2026-09" },
+      data: { turmaOriginalId: rows[0]?.id, mes: diaHistorico.slice(0, 7) },
     });
     expect(preparada.status()).toBe(200);
   });
@@ -599,11 +656,15 @@ test("confere e transfere uma aba antiga sem perder as frequências", async ({ p
   await expect(dialogo.getByText("Transferida e retirada", { exact: true })).toBeVisible();
   expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
   expect(google.abas()).not.toContain("E2E Ano A");
-  const mensal = "E2E Ano A · Setembro";
+  const mensal = nomeAbaMensal("E2E Ano A", diaHistorico.slice(0, 7));
   const cabecalho = Array.from({ length: 31 }, (_, indice) => google.valor(mensal, 1, indice + 1));
   const nomes = Array.from({ length: 4 }, (_, indice) => google.valor(mensal, indice + 1, 1));
   expect(
-    google.valor(mensal, nomes.indexOf("E2E Aluno Um") + 1, cabecalho.indexOf("29/09/2026") + 1),
+    google.valor(
+      mensal,
+      nomes.indexOf("E2E Aluno Um") + 1,
+      cabecalho.indexOf(rotuloData(diaHistorico)) + 1,
+    ),
   ).toBe("FJ");
 });
 
@@ -618,12 +679,12 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
     (
       await page.request.post("/api/planilha/criar-aba", {
         headers,
-        data: { nome: "E2E Ano A", cabecalho: ["Aluno", "29/09/2026"] },
+        data: { nome: "E2E Ano A", cabecalho: ["Aluno", rotuloData(diaHistorico)] },
       })
     ).status(),
   ).toBe(200);
   google.definirAba("E2E Ano A", [
-    ["Aluno", "29/09/2026"],
+    ["Aluno", rotuloData(diaHistorico)],
     ["E2E Aluno Um", "FJ"],
     ["E2E Aluno Histórico", "P"],
   ]);
@@ -635,16 +696,16 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
       (
         await page.request.post("/api/planilha/mensal", {
           headers,
-          data: { turmaOriginalId: rows[0]?.id, mes: "2026-09" },
+          data: { turmaOriginalId: rows[0]?.id, mes: diaHistorico.slice(0, 7) },
         })
       ).status(),
     ).toBe(200);
   });
-  const mensal = "E2E Ano A · Setembro";
+  const mensal = nomeAbaMensal("E2E Ano A", diaHistorico.slice(0, 7));
   const nomes = Array.from({ length: 4 }, (_, i) => google.valor(mensal, i + 1, 1));
   const linhaAluno = nomes.indexOf("E2E Aluno Um") + 1;
   const cabecalho = Array.from({ length: 31 }, (_, i) => google.valor(mensal, 1, i + 1));
-  const coluna = cabecalho.indexOf("29/09/2026") + 1;
+  const coluna = cabecalho.indexOf(rotuloData(diaHistorico)) + 1;
   expect(linhaAluno).toBeGreaterThan(1);
   expect(coluna).toBeGreaterThan(1);
   const alunoId = google.vinculos(mensal).find((item) => item.linha === linhaAluno)?.alunoId;
@@ -670,14 +731,17 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
     /&range=A2$/,
   );
   await dialogo
-    .getByRole("combobox", { name: "Destino de E2E Aluno Um, linha 2, 2026-09", exact: true })
+    .getByRole("combobox", {
+      name: `Destino de E2E Aluno Um, linha 2, ${diaHistorico.slice(0, 7)}`,
+      exact: true,
+    })
     .click();
   await page
     .getByRole("option", { name: `Linha ${linhaAluno}: E2E Aluno Um`, exact: true })
     .click();
   await dialogo
     .getByRole("combobox", {
-      name: "Inclusão de E2E Aluno Histórico, linha 3, 2026-09",
+      name: `Inclusão de E2E Aluno Histórico, linha 3, ${diaHistorico.slice(0, 7)}`,
       exact: true,
     })
     .click();
@@ -688,7 +752,10 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
   await expect(resolver).toBeVisible();
   if (
     !(await dialogo
-      .getByRole("combobox", { name: "Marca para E2E Aluno Um, B2, 2026-09", exact: true })
+      .getByRole("combobox", {
+        name: `Marca para E2E Aluno Um, B2, ${diaHistorico.slice(0, 7)}`,
+        exact: true,
+      })
       .isVisible())
   )
     await resolver.click();
@@ -701,7 +768,10 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
     contentType: "image/png",
   });
   await dialogo
-    .getByRole("combobox", { name: "Marca para E2E Aluno Um, B2, 2026-09", exact: true })
+    .getByRole("combobox", {
+      name: `Marca para E2E Aluno Um, B2, ${diaHistorico.slice(0, 7)}`,
+      exact: true,
+    })
     .click();
   await page.getByRole("option", { name: "Usar antiga: FJ", exact: true }).click();
   await dialogo.getByRole("button", { name: "Conferir escolhas", exact: true }).click();

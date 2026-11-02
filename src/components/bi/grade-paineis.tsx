@@ -152,7 +152,7 @@ export function GradePaineisBi({
               <div className="flex flex-wrap gap-1 print:hidden">
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   className={estilos.puxador}
                   aria-label={`Mover ${g.titulo}`}
                   title="Arrastar ou usar as setas do teclado"
@@ -175,7 +175,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   aria-label={`Subir ${g.titulo}`}
                   disabled={!i}
                   onClick={() => mover(g.id, i - 1)}
@@ -184,7 +184,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   aria-label={`Descer ${g.titulo}`}
                   disabled={i === painel.graficos.length - 1}
                   onClick={() => mover(g.id, i + 1)}
@@ -193,7 +193,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   className={estilos.redimensionar}
                   aria-label={`Redimensionar ${g.titulo}`}
                   title="Arrastar; setas alteram largura e altura"
@@ -221,7 +221,7 @@ export function GradePaineisBi({
                 </Button>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   aria-label={`Duplicar ${g.titulo}`}
                   disabled={painel.graficos.length >= 40}
                   onClick={() =>

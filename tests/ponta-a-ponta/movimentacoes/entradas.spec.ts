@@ -1,11 +1,13 @@
 // Entradas atrasadas na interface, persistência e prévia com Sheets API falsa.
 import { test, expect, type Page } from "@playwright/test";
+import { rotuloMes } from "@/domain/frequencia";
 import { criarMassaE2E, criarLiberadoresE2E, limparMassaE2E } from "../helpers/banco";
-import { diaCorrente } from "../helpers/dia";
+import { periodoHistoricoDistinto } from "./periodo-envio-entradas";
 import {
   abrirAbaMovimentacao,
   abrirNavegacao,
   aguardarHidratacao,
+  escolherDataNoPeriodo,
   escolherHorario,
   registrarEntrada,
   trocarVisao,
@@ -18,16 +20,14 @@ test.beforeAll(async () => {
 });
 test.afterAll(limparMassaE2E);
 
+const diaFixtureEntradas = "2026-06-15";
+
 async function escolherDiaDeTeste(page: Page) {
-  await page.locator("#entrada-dia").click();
-  const calendario = page.getByRole("dialog", { name: "Data da entrada", exact: true });
-  // Junho de 2026 é a massa fixa; a seleção usa o calendário real, sem campo nativo.
-  for (let tentativa = 0; tentativa < 48; tentativa++) {
-    if (await calendario.getByRole("button", { name: /^15 de junho de 2026/ }).isVisible()) break;
-    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
-  }
-  await calendario.getByRole("button", { name: /^15 de junho de 2026/ }).click();
-  await expect(page.locator("#entrada-dia")).toContainText("15/06/2026");
+  // Junho de 2026 é a massa fixa; o calendário pode abrir em qualquer mês.
+  await escolherDataNoPeriodo(page, "Data da entrada", diaFixtureEntradas);
+  await expect(page.locator("#entrada-dia")).toContainText(
+    diaFixtureEntradas.split("-").reverse().join("/"),
+  );
 }
 
 /** Simula a planilha de saídas indisponível para isolar a prévia das entradas. */
@@ -240,14 +240,20 @@ for (const bloqueado of [false, true]) {
 
 test("revê o envio em confirmação própria", async ({ page }) => {
   let enviou = 0;
-  const mes = diaCorrente().slice(0, 7);
+  let simulou = 0;
+  const planoHashPrevia = "previa-qa";
+  const esperado: { periodo?: { de: string; ate: string } } = {};
   await page.route("**/api/planilha-entradas/**", async (route) => {
     const acao = new URL(route.request().url()).pathname.split("/").at(-1);
+    if (acao === "simular" || acao === "enviar") {
+      if (!esperado.periodo) throw new Error("Período esperado ainda não foi calculado.");
+      expect(route.request().postDataJSON()).toMatchObject(esperado.periodo);
+    }
+    if (acao === "simular") simulou++;
     if (acao === "enviar") {
       enviou++;
       expect(route.request().postDataJSON()).toMatchObject({
-        planoHash: "previa-qa",
-        de: `${mes}-01`,
+        planoHash: planoHashPrevia,
       });
     }
     await route.fulfill({
@@ -256,7 +262,7 @@ test("revê o envio em confirmação própria", async ({ page }) => {
           ? { podeEnviar: true, planilhaNome: "QA Planilha" }
           : acao === "simular"
             ? {
-                planoHash: "previa-qa",
+                planoHash: planoHashPrevia,
                 novas: 1,
                 existentes: 0,
                 bloqueado: false,
@@ -286,15 +292,48 @@ test("revê o envio em confirmação própria", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Saídas e Entradas", "saidas");
+  const seletorSaidas = page.locator("#dia-saidas");
+  await expect(seletorSaidas).toHaveAttribute("aria-label", /^Data da saída: \d{2}\/\d{2}\/\d{4}/);
+  const dataExibida = (await seletorSaidas.getAttribute("aria-label"))?.match(
+    /\d{2}\/\d{2}\/\d{4}/,
+  )?.[0];
+  if (!dataExibida) throw new Error("Data de Saídas não está disponível na interface.");
+  const referencia = dataExibida.split("/").reverse().join("-");
+  const periodo = periodoHistoricoDistinto(referencia, diaFixtureEntradas.slice(0, 7));
+  esperado.periodo = periodo;
+  expect(periodo.de.slice(0, 7)).not.toBe(diaFixtureEntradas.slice(0, 7));
+  expect(periodo.de < referencia).toBe(true);
+  await escolherDataNoPeriodo(page, "Data da saída", periodo.de);
+  // Se o dia 1 cair em domingo, a saída passa ao resumo; confira a seleção no calendário.
+  const rotuloSaidas = (await seletorSaidas.getAttribute("aria-label")) ?? "";
+  const nomeCalendario = rotuloSaidas.startsWith("Resumo da semana:")
+    ? "Resumo da semana"
+    : "Data da saída";
+  await seletorSaidas.click();
+  const calendarioSaidas = page.getByRole("dialog", { name: nomeCalendario, exact: true });
+  await expect(calendarioSaidas.locator(`[data-dia="${periodo.de}"]`)).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await calendarioSaidas.getByRole("button", { name: "Fechar", exact: true }).click();
   await abrirAbaMovimentacao(page, "Entradas");
   await escolherDiaDeTeste(page);
+  // Testa a regra atual (mês de Saídas); não confirma a intenção do produto.
+  // As respostas da planilha são simuladas, não comprovam um envio real.
   // O preparo e a organização da aba Entradas ficam em Gestão, Configurações, Planilhas.
   await expect(page.getByRole("button", { name: "Preparar aba Entradas" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Organizar apresentação/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" }).click();
   const dialogo = page.getByRole("dialog", { name: /Enviar saídas e entradas/ });
+  await expect(
+    dialogo.getByRole("button", { name: /Mês do envio das saídas e entradas/ }),
+  ).toHaveAttribute(
+    "aria-label",
+    `Mês do envio das saídas e entradas: ${rotuloMes(periodo.de.slice(0, 7))}, Este mês`,
+  );
   await expect(dialogo.getByText("Aba Entradas", { exact: true })).toBeVisible();
   await expect(dialogo).toContainText("1 linha nova");
+  expect(simulou).toBeGreaterThan(0);
   expect(enviou).toBe(0);
   await dialogo.getByRole("button", { name: "Enviar", exact: true }).click();
   await expect(page.getByText("Entradas: 1 linha criada.", { exact: true })).toBeVisible();

@@ -1,9 +1,10 @@
 "use client";
 
-// Monta uma visualização uma vez, quando próxima da tela ou quando o carrossel pede o aquecimento;
-// mantém o estado depois da visita.
+// Prepara uma visualização quando próxima da tela ou quando o carrossel pede aquecimento;
+// conserva o estado de preparação mesmo quando a visualização é ocultada.
 import LimiteErroGrafico from "./limite-erro-grafico";
 import { AquecimentoGraficos } from "./aquecimento-graficos";
+import { useGraficosVisiveis } from "./visibilidade-graficos";
 import { Suspense, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 
 export default function GraficoSobDemanda({
@@ -16,6 +17,7 @@ export default function GraficoSobDemanda({
   const elemento = useRef<HTMLDivElement>(null);
   const [pronto, setPronto] = useState(false);
   const aquecer = useContext(AquecimentoGraficos);
+  const visivel = useGraficosVisiveis();
   useEffect(() => {
     if (!aquecer || pronto) return;
     // Em tempo ocioso, para a montagem não competir com o gesto de rolagem; o limite de
@@ -71,13 +73,10 @@ export default function GraficoSobDemanda({
           evento.preventDefault();
       }}
     >
-      {pronto ? (
-        <LimiteErroGrafico>
-          <Suspense fallback={espera}>{children}</Suspense>
-        </LimiteErroGrafico>
-      ) : (
-        espera
-      )}
+      {/* Mantém a falha; o gráfico oculto desmonta para não medir um ancestral sem dimensões. */}
+      <LimiteErroGrafico>
+        {!visivel ? null : pronto ? <Suspense fallback={espera}>{children}</Suspense> : espera}
+      </LimiteErroGrafico>
     </div>
   );
 }

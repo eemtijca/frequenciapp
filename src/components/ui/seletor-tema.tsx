@@ -18,7 +18,13 @@ const OPCOES = [
  * Configuração da grade de aulas (aulas por turma) chega na Fase 5; este
  * componente cuida apenas da preferência de tema do dispositivo.
  */
-export function SeletorTema({ className }: { className?: string }) {
+export function SeletorTema({
+  className,
+  variante = "secondary",
+}: {
+  className?: string;
+  variante?: "ghost" | "secondary";
+}) {
   const { theme, setTheme } = useTheme();
   // O tema só é conhecido depois da montagem: evita divergência de hidratação.
   const montado = useSyncExternalStore(
@@ -33,7 +39,7 @@ export function SeletorTema({ className }: { className?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          variant="secondary"
+          variant={variante}
           size="icon"
           className={cn("size-11", className)}
           aria-label={montado ? `Tema: ${atual.rotulo}. Alterar tema` : "Alterar tema"}

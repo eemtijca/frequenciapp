@@ -636,7 +636,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
           href="/"
           prefetch={false}
           aria-label="Voltar ao FrequenciApp"
-          className="controle focus-visible:ring-ring flex min-h-11 min-w-11 items-center justify-center gap-2 justify-self-start px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
+          className="discreto focus-visible:ring-ring flex min-h-11 min-w-11 items-center justify-center gap-2 justify-self-start px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
         >
           <ArrowLeft size={18} />
           <span className="hidden sm:inline">FrequenciApp</span>
@@ -647,7 +647,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
         </h1>
         <div className="flex items-center justify-self-end">
           <div className="hidden items-center gap-1 sm:flex">
-            <SeletorTema />
+            <SeletorTema variante="ghost" />
             {acesso && (
               <Button
                 size="sm"
@@ -666,7 +666,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
               <PopoverTrigger asChild>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="ghost"
                   className="size-11"
                   aria-label="Mais ações do FrequenciBI"
                 >
@@ -767,7 +767,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   {ABAS.map((a) => (
                     <Button
                       key={a.id}
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       aria-current={aba === a.id ? "page" : undefined}
                       onClick={() => trocarAba(a.id)}
@@ -796,7 +796,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   <AtualizadoEm instante={ultimaData} fuso={fuso} className="self-center px-1" />
                   <div className="hidden flex-wrap gap-1 sm:flex">
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       className="h-11"
                       onClick={() => void compartilhar()}
@@ -805,7 +805,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                       Compartilhar filtros
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       className="h-11"
                       onClick={() => setApresentacao(!apresentacao)}
@@ -814,7 +814,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                       {apresentacao ? "Sair da apresentação" : "Apresentar"}
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
                       className="h-11"
                       disabled={carregando || imprimindo}
@@ -827,7 +827,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
-                        variant="secondary"
+                        variant="ghost"
                         size="icon"
                         className="size-11 sm:hidden"
                         aria-label="Mais ações da análise"

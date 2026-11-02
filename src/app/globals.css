@@ -62,13 +62,13 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
 }
 
 /*
- * Paleta do FrequenciApp: papel neutro quente, tinta grafite e um único
+ * Paleta do FrequenciApp: fundo neutro no tema claro, tinta grafite e um único
  * acento verde institucional. O vermelho (falta) é estritamente
  * semântico: só aparece onde há ausência a comunicar.
  */
 :root {
   --radius: 1rem;
-  --background: oklch(0.975 0.004 90);
+  --background: #f6f6f6;
   --foreground: oklch(0.245 0.006 90);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.245 0.006 90);
@@ -98,7 +98,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --alerta-fraca: oklch(0.965 0.045 90);
   --alerta-texto: oklch(0.45 0.1 65);
   --border: oklch(0.905 0.006 90);
-  --input: oklch(0.65 0.008 90);
+  --input: oklch(0.645 0.008 90);
   --ring: oklch(0.55 0.1 160);
   --chart-1: oklch(0.5 0.11 160);
   --chart-2: oklch(0.5 0.16 27);

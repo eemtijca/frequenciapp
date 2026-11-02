@@ -1,8 +1,17 @@
 // Chamada com saída por aula: marcação parcial, persistência, histórico,
 // grade e falta justificada. O modo por aula é ligado pela configuração.
 import { expect, test } from "@playwright/test";
-import { diaDaSemanaIso, rotuloData } from "@/domain/frequencia";
+import {
+  diaDaSemanaIso,
+  diaDeChamadaVizinho,
+  diaSeguinte,
+  mesSeguinte,
+  nomeDoMes,
+  rotuloData,
+  rotuloMes,
+} from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
+import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { diaCorrente, diaDeChamada, tituloResumoDoDia } from "../helpers/dia";
 import {
   abrirDiaSeResumo,
@@ -78,10 +87,25 @@ test.describe("chamada com saída por aula", () => {
       const centroAlvo = (alvo?.x ?? 0) + (alvo?.width ?? 0) / 2;
       expect(Math.abs(centro - centroAlvo)).toBeLessThan(120);
     }
-    // O teclado anda pela grade e Enter escolhe o dia anterior.
+    // O calendário semanal inclui o domingo, que abre o resumo da semana.
+    // Escolha o dia de chamada anterior, inclusive na virada de mês ou ano.
+    const diaAtual = diaDeChamada();
+    const diaAnterior = diaDeChamadaVizinho(diaAtual, -1);
+    const celulaAnterior = painelDia.locator(`button[data-dia="${diaAnterior}"]`);
+    await expect(painelDia.locator(`button[data-dia="${diaAtual}"]`)).toBeFocused();
     await page.keyboard.press("ArrowLeft");
+    if (diaDaSemanaIso(diaAtual) === 1) {
+      const domingo = diaSeguinte(diaAtual, -1);
+      await expect(painelDia.locator(`button[data-dia="${domingo}"]`)).toBeFocused();
+      await page.keyboard.press("ArrowLeft");
+    }
+    await expect(celulaAnterior).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(painelDia).toBeHidden();
+    await expect(gatilhoDia).toHaveAttribute(
+      "aria-label",
+      new RegExp(`^Data da chamada: ${rotuloData(diaAnterior)}`),
+    );
     await expect(painel.getByRole("button", { name: "Resumo do dia" })).toBeVisible();
     await expect(painel.getByRole("button", { name: "Voltar para hoje" })).toBeVisible();
     await painel.getByRole("button", { name: "Voltar para hoje" }).click();
@@ -177,6 +201,8 @@ test.describe("chamada com saída por aula", () => {
 
     await trocarVisao(page, "Relatórios", "relatorios");
     await page.getByRole("tab", { name: "Histórico" }).click();
+    const historico = page.locator('section[aria-label="Histórico de frequências"]');
+    await escolherMesNoPeriodo(page, historico, "Mês do histórico", diaDeChamada().slice(0, 7));
     await expect(
       page
         .locator('[data-pager="principal"] > section:not([hidden])')
@@ -185,14 +211,44 @@ test.describe("chamada com saída por aula", () => {
     ).toBeVisible();
 
     // O seletor de mês abre em painel, aceita teclado e volta para este mês.
-    const historico = page.locator('section[aria-label="Histórico de frequências"]');
+    await escolherMesNoPeriodo(page, historico, "Mês do histórico", diaCorrente().slice(0, 7));
     await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
     await historico.locator("#mes-historico").click();
     const painelMes = page.getByRole("dialog", { name: "Mês do histórico" });
     await expect(painelMes).toBeVisible();
-    await page.keyboard.press("ArrowLeft");
+    const gradeMes = painelMes.getByRole("group", { name: /^Meses de \d{4}$/ });
+    const anoVisivel = (await gradeMes.getAttribute("aria-label"))?.match(/\d{4}/)?.[0];
+    if (!anoVisivel) throw new Error("Ano visível do seletor de mês não encontrado.");
+    const selecionado = gradeMes.locator('button[aria-pressed="true"]');
+    await expect(selecionado).toBeFocused();
+    const nomeSelecionado = (await selecionado.textContent())?.trim();
+    const meses = Array.from(
+      { length: 12 },
+      (_, indice) => `${anoVisivel}-${String(indice + 1).padStart(2, "0")}`,
+    );
+    const mesSelecionado = meses.find((mes) => nomeDoMes(mes) === nomeSelecionado);
+    if (!mesSelecionado) throw new Error("Mês selecionado não encontrado na grade.");
+    const mesAnterior = mesSeguinte(mesSelecionado, -1);
+    if (mesAnterior.slice(0, 4) !== anoVisivel) {
+      await painelMes.getByRole("button", { name: "Ano anterior", exact: true }).click();
+      const dezembro = painelMes
+        .getByRole("group", { name: `Meses de ${mesAnterior.slice(0, 4)}`, exact: true })
+        .getByRole("button", { name: nomeDoMes(mesAnterior), exact: true });
+      await expect(dezembro).toBeEnabled();
+      await dezembro.focus();
+      await expect(dezembro).toBeFocused();
+    } else {
+      await page.keyboard.press("ArrowLeft");
+      await expect(
+        gradeMes.getByRole("button", { name: nomeDoMes(mesAnterior), exact: true }),
+      ).toBeFocused();
+    }
     await page.keyboard.press("Enter");
     await expect(painelMes).toBeHidden();
+    await expect(historico.locator("#mes-historico")).toHaveAttribute(
+      "aria-label",
+      `Mês do histórico: ${rotuloMes(mesAnterior)}`,
+    );
     await expect(historico.getByRole("button", { name: "Voltar para este mês" })).toBeVisible();
     await historico.getByRole("button", { name: "Voltar para este mês" }).click();
     await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
@@ -204,11 +260,13 @@ test.describe("chamada com saída por aula", () => {
     if (await pilulaGrade.isVisible().catch(() => false)) {
       await pilulaGrade.click();
     }
+    await escolherMesNoPeriodo(page, grade, "Mês da consulta", diaDeChamada().slice(0, 7));
     await expect(
       grade.getByRole("img", { name: /presente em parte das aulas/ }).first(),
     ).toBeVisible();
 
     // O seletor de mês da Grade abre, fecha com Esc e mantém este mês.
+    await escolherMesNoPeriodo(page, grade, "Mês da consulta", diaCorrente().slice(0, 7));
     await expect(grade.getByText("Este mês", { exact: true })).toBeVisible();
     await grade.locator("#mes-grade").click();
     const painelGrade = page.getByRole("dialog", { name: "Mês da consulta" });

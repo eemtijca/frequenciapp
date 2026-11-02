@@ -50,6 +50,7 @@ import {
   useContextoAtualizacao,
   useAtualizacaoTela,
 } from "@/components/atualizacao/contexto-atualizacao";
+import estilos from "./vista-painel.module.css";
 
 interface Props {
   ativo: boolean;
@@ -375,11 +376,11 @@ export default function VistaPainel({
     <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">
       <h1 className="sr-only">Painel</h1>
 
-      <div className="flex items-center gap-2">
+      <div className="navegacao-dia flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0"
+          className={`size-11 shrink-0 ${estilos.seta}`}
           aria-label="Dia anterior"
           onClick={() => nav.anterior()}
         >
@@ -408,7 +409,7 @@ export default function VistaPainel({
         <Button
           variant="outline"
           size="icon"
-          className="size-11 shrink-0"
+          className={`size-11 shrink-0 ${estilos.seta}`}
           aria-label="Dia seguinte"
           disabled={nav.seguinteDesabilitado}
           onClick={() => nav.seguinte()}

@@ -1,12 +1,39 @@
 // Justificativas antecipadas com calendário civil, lote atômico e integração sem presenças inventadas.
+import { randomUUID } from "node:crypto";
+import { procurarDia } from "../../helpers/calendario-fixture";
+import {
+  conferirConexaoFixture,
+  criarFeriadoDaFixture,
+  lerDiasComFrequencia,
+  lerFeriados,
+  removerFeriadoDaFixture,
+} from "../../helpers/feriados-banco";
+import { executarLimpezas } from "../../helpers/limpeza-fixture";
+import {
+  guardaDependentesFixture,
+  inserirJustificativaFixture,
+  novasJustificativasFixture,
+  removerJustificativaFixture,
+} from "../../helpers/justificativas-fixture";
+import { removerFeriadoEmConexaoNova } from "../../helpers/teardown-fixtures";
 import { beforeAll, beforeEach, afterAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { diaLocal, diasEntre, ehDomingo } from "@/domain/frequencia";
+import { selecionarSchema } from "@/infra/schema-postgres.mjs";
 
 const origem = process.env.APP_URL ?? "http://localhost:3000";
 const cliente = new pg.Client({ connectionString: process.env.DATABASE_URL });
 const prefixo = "QA Antecipadas";
-const historico = "2026-06-22";
+const justificativasFixture = novasJustificativasFixture();
+const [primeiraJustificativa, segundaJustificativa] = justificativasFixture;
+const consultarFixture = (sql: string, parametros: unknown[]) => cliente.query(sql, parametros);
+let historico = "2026-06-22";
+const nomeFeriado = `${prefixo} ${randomUUID()}`;
+let feriadoCriado = "";
+let conexaoVerificada = false;
+let urlVerificada = "";
+let schemaVerificado: string | undefined;
+let conexaoEncerrada = false;
 let serie = "";
 let turma = "";
 let outraTurma = "";
@@ -21,7 +48,7 @@ function deslocar(dia: string, n: number) {
   return d.toISOString().slice(0, 10);
 }
 let futuro = deslocar(hoje, 8);
-while (ehDomingo(futuro)) futuro = deslocar(futuro, 1);
+
 async function chamar(caminho: string, metodo = "GET", dados?: unknown, sessao = cookie) {
   return fetch(`${origem}${caminho}`, {
     method: metodo,
@@ -39,7 +66,7 @@ const dados = (dia = historico, mais: Record<string, unknown> = {}) => ({
   turmaId: turma,
   dia,
   tipo: "JUSTIFICADA",
-  justificativa: "QAAg",
+  justificativa: primeiraJustificativa.codigo,
   turno: null,
   aulas: [],
   revisao: 0,
@@ -55,17 +82,47 @@ async function lerChamada(dia = historico, id = turma) {
   expect(r.status).toBe(200);
   return r.json();
 }
-async function limparRegistros() {
-  await cliente.query("delete from frequencias where turma_id=any($1::uuid[])", [
-    [turma, outraTurma].filter(Boolean),
+async function limparRegistros(limparFeriado = true) {
+  await executarLimpezas([
+    () =>
+      cliente.query("delete from frequencias where turma_id=any($1::uuid[])", [
+        [turma, outraTurma].filter(Boolean),
+      ]),
+    () =>
+      cliente.query("delete from frequencias_parciais where turma_id=any($1::uuid[])", [
+        [turma, outraTurma].filter(Boolean),
+      ]),
+    async () => {
+      if (limparFeriado && conexaoVerificada && feriadoCriado) {
+        await removerFeriadoDaFixture(cliente, feriadoCriado, nomeFeriado);
+        feriadoCriado = "";
+      }
+    },
   ]);
-  await cliente.query("delete from frequencias_parciais where turma_id=any($1::uuid[])", [
-    [turma, outraTurma].filter(Boolean),
-  ]);
-  await cliente.query("delete from feriados where nome like $1", [`${prefixo}%`]);
 }
 beforeAll(async () => {
-  await cliente.connect();
+  try {
+    await cliente.connect();
+    conferirConexaoFixture(cliente);
+    const conexao = process.env.DATABASE_URL;
+    if (!conexao) throw new Error("DATABASE_URL é obrigatória para a fixture.");
+    await selecionarSchema(cliente, conexao);
+    urlVerificada = conexao;
+    schemaVerificado = process.env.DATABASE_SCHEMA;
+    conexaoVerificada = true;
+  } catch (erro) {
+    conexaoEncerrada = true;
+    await cliente.end().catch(() => undefined);
+    throw erro;
+  }
+  historico = procurarDia(
+    historico < hoje ? historico : hoje,
+    -1,
+    [1],
+    await lerFeriados(cliente),
+    365,
+    [0, 1, 2],
+  );
   cookie = await entrar("demo@escola.exemplo", "DemoFrequencia2026");
   admin = await entrar("direcao@escola.exemplo", "DirecaoFrequencia2026");
   serie =
@@ -102,14 +159,19 @@ beforeAll(async () => {
     if (i === 0) aluno = id;
     else colega = id;
   }
-  for (const codigo of ["QAAg", "QAAg2"])
-    await cliente.query("insert into justificativas(codigo,rotulo,ativo) values ($1,$2,true)", [
-      codigo,
-      `${prefixo} ${codigo}`,
-    ]);
+  for (const item of justificativasFixture)
+    await inserirJustificativaFixture(consultarFixture, item);
 });
 beforeEach(async () => {
   await limparRegistros();
+  futuro = procurarDia(
+    deslocar(hoje, 8),
+    1,
+    [1],
+    [...(await lerFeriados(cliente)), ...(await lerDiasComFrequencia(cliente))],
+    325,
+    [0, 2],
+  );
   await cliente.query("update horarios set ativo=true where turma_id=any($1::uuid[])", [
     [turma, outraTurma],
   ]);
@@ -119,13 +181,69 @@ beforeEach(async () => {
   ]);
 });
 afterAll(async () => {
-  await limparRegistros();
-  await cliente.query("delete from alunos where id=any($1::uuid[])", [[aluno, colega]]);
-  await cliente.query("delete from horarios where turma_id=any($1::uuid[])", [[turma, outraTurma]]);
-  await cliente.query("delete from turmas where serie_id=$1", [serie]);
-  await cliente.query("delete from series where id=$1", [serie]);
-  await cliente.query("delete from justificativas where codigo in ('QAAg','QAAg2')");
-  await cliente.end();
+  const guarda = guardaDependentesFixture();
+  await executarLimpezas(
+    conexaoVerificada
+      ? [
+          () => guarda.limpar(() => limparRegistros(false)),
+          async () => {
+            if (!feriadoCriado) return;
+            try {
+              if (
+                process.env.DATABASE_URL !== urlVerificada ||
+                process.env.DATABASE_SCHEMA !== schemaVerificado
+              )
+                throw new Error("Configuração da conexão ou schema mudou desde a preparação.");
+              const novo = new pg.Client({
+                connectionString: urlVerificada,
+                connectionTimeoutMillis: 5_000,
+                query_timeout: 10_000,
+                keepAlive: true,
+              });
+              await removerFeriadoEmConexaoNova(
+                novo,
+                conferirConexaoFixture,
+                (conexao) => selecionarSchema(conexao, urlVerificada, schemaVerificado),
+                removerFeriadoDaFixture,
+                feriadoCriado,
+                nomeFeriado,
+              );
+              feriadoCriado = "";
+            } catch (erro) {
+              console.error(
+                `Falha ao limpar feriado da fixture (${feriadoCriado}, ${nomeFeriado}); remoção não confirmada.`,
+                erro,
+              );
+              throw erro;
+            }
+          },
+          guarda.somenteSeLimpos(() =>
+            cliente.query("delete from alunos where id=any($1::uuid[])", [
+              [aluno, colega].filter(Boolean),
+            ]),
+          ),
+          guarda.somenteSeLimpos(() =>
+            cliente.query("delete from horarios where turma_id=any($1::uuid[])", [
+              [turma, outraTurma].filter(Boolean),
+            ]),
+          ),
+          guarda.somenteSeLimpos(async () => {
+            if (serie)
+              await cliente.query("delete from turmas where id=any($1::uuid[]) and serie_id=$2", [
+                [turma, outraTurma].filter(Boolean),
+                serie,
+              ]);
+          }),
+          guarda.somenteSeLimpos(async () => {
+            if (serie) await cliente.query("delete from series where id=$1", [serie]);
+          }),
+          ...justificativasFixture.map(
+            (item) => () => removerJustificativaFixture(consultarFixture, item),
+          ),
+        ]
+      : [],
+    conexaoEncerrada ? undefined : () => cliente.end(),
+  );
 });
 describe("Justificativas antecipadas", () => {
   it("permite somente justificativa no futuro e mantém a Chamada normal bloqueada", async () => {
@@ -160,7 +278,7 @@ describe("Justificativas antecipadas", () => {
     const salva = await gravar(dados(futuro));
     expect(salva.registro).toMatchObject({
       tipo: "JUSTIFICADA",
-      justificativa: "QAAg",
+      justificativa: primeiraJustificativa.codigo,
       dia: futuro,
     });
     expect((await lerChamada(futuro)).justificativasAntecipadas).toEqual([]);
@@ -169,14 +287,14 @@ describe("Justificativas antecipadas", () => {
     ).toBe(0);
   });
   it.each([
-    ["inversão", { ate: deslocar(futuro, -1) }],
-    ["mais de 31 dias", { ate: deslocar(futuro, 31) }],
-    ["motivo ausente", { justificativa: null }],
-    ["combinação com presença", { turno: "MANHA" }],
-    ["observação extensa", { justificativa: "O", observacao: "x".repeat(201) }],
-    ["limite anual", { dia: deslocar(hoje, 370) }],
+    ["inversão", () => ({ ate: deslocar(futuro, -1) })],
+    ["mais de 31 dias", () => ({ ate: deslocar(futuro, 31) })],
+    ["motivo ausente", () => ({ justificativa: null })],
+    ["combinação com presença", () => ({ turno: "MANHA" })],
+    ["observação extensa", () => ({ justificativa: "O", observacao: "x".repeat(201) })],
+    ["limite anual", () => ({ dia: deslocar(hoje, 370) })],
   ])("recusa %s sem gravar um registro", async (_nome, mudanca) => {
-    const resposta = await chamar("/api/frequencias-parciais", "POST", dados(futuro, mudanca));
+    const resposta = await chamar("/api/frequencias-parciais", "POST", dados(futuro, mudanca()));
     expect(resposta.status).toBe(400);
     expect(
       (await cliente.query("select id from frequencias_parciais where aluno_id=$1", [aluno]))
@@ -217,11 +335,10 @@ describe("Justificativas antecipadas", () => {
   it("grava o período sem domingos ou feriados e recusa sobreposição sem gravar parte do lote", async () => {
     const ate = deslocar(futuro, 6);
     const feriado = deslocar(futuro, 2);
-    await cliente.query("insert into feriados(dia,nome,atualizado_em) values ($1,$2,now())", [
-      feriado,
-      `${prefixo} Feriado`,
-    ]);
-    const esperados = diasEntre(futuro, ate).filter((d) => !ehDomingo(d) && d !== feriado);
+    feriadoCriado = feriado;
+    await criarFeriadoDaFixture(cliente, feriado, nomeFeriado);
+    const feriados = new Set(await lerFeriados(cliente));
+    const esperados = diasEntre(futuro, ate).filter((d) => !ehDomingo(d) && !feriados.has(d));
     const salva = await gravar(dados(futuro, { ate }));
     expect(salva.registros.map((r: { dia: string }) => r.dia)).toEqual(esperados);
     expect(
@@ -238,7 +355,7 @@ describe("Justificativas antecipadas", () => {
     const leitura = await lerChamada();
     expect(leitura.frequencia).toBeNull();
     expect(leitura.justificativasAntecipadas).toMatchObject([
-      { id: salva.registro.id, justificativa: "QAAg", alunoId: aluno },
+      { id: salva.registro.id, justificativa: primeiraJustificativa.codigo, alunoId: aluno },
     ]);
     const r = await chamar("/api/frequencias", "POST", {
       dia: historico,
@@ -249,7 +366,7 @@ describe("Justificativas antecipadas", () => {
     expect(r.status).toBe(200);
     const chamada = (await r.json()).frequencia;
     expect(chamada.faltas).toEqual([
-      expect.objectContaining({ alunoId: aluno, justificativa: "QAAg" }),
+      expect.objectContaining({ alunoId: aluno, justificativa: primeiraJustificativa.codigo }),
     ]);
     expect(chamada.alunos).toContain(colega);
   });
@@ -258,7 +375,12 @@ describe("Justificativas antecipadas", () => {
     const anterior = (await lerChamada()).justificativasAntecipadas.map(
       (j: { id: string; revisao: number }) => ({ id: j.id, revisao: j.revisao }),
     );
-    await gravar(dados(historico, { revisao: salva.registro.revisao, justificativa: "QAAg2" }));
+    await gravar(
+      dados(historico, {
+        revisao: salva.registro.revisao,
+        justificativa: segundaJustificativa.codigo,
+      }),
+    );
     const requisicao = {
       dia: historico,
       turmaId: turma,
@@ -308,7 +430,7 @@ describe("Justificativas antecipadas", () => {
     expect(chamada.revisao).toBe(2);
     expect(
       chamada.faltas.find((f: { alunoId: string }) => f.alunoId === aluno)?.justificativa,
-    ).toBe("QAAg");
+    ).toBe(primeiraJustificativa.codigo);
     expect(
       chamada.faltas.find((f: { alunoId: string }) => f.alunoId === colega)?.justificativa,
     ).toBeUndefined();
@@ -348,12 +470,21 @@ describe("Justificativas antecipadas", () => {
       ).status,
     ).toBe(200);
     expect((await lerChamada(historico, outraTurma)).frequencia.faltas).toMatchObject([
-      { alunoId: aluno, justificativa: "QAAg" },
+      { alunoId: aluno, justificativa: primeiraJustificativa.codigo },
     ]);
   });
   it("protege o catálogo em uso e não apaga a frequência consolidada ao remover a agenda", async () => {
     const salva = await gravar(dados());
-    expect((await chamar("/api/justificativas/QAAg", "DELETE", undefined, admin)).status).toBe(409);
+    expect(
+      (
+        await chamar(
+          `/api/justificativas/${primeiraJustificativa.codigo}`,
+          "DELETE",
+          undefined,
+          admin,
+        )
+      ).status,
+    ).toBe(409);
     expect(
       (
         await chamar("/api/frequencias", "POST", {
@@ -372,7 +503,7 @@ describe("Justificativas antecipadas", () => {
       ).status,
     ).toBe(200);
     expect((await lerChamada()).frequencia.faltas).toMatchObject([
-      { alunoId: aluno, justificativa: "QAAg" },
+      { alunoId: aluno, justificativa: primeiraJustificativa.codigo },
     ]);
   });
   it("preserva o motivo e o agendamento na cópia de segurança e na restauração", async () => {
@@ -387,7 +518,11 @@ describe("Justificativas antecipadas", () => {
     const copia = await exportacao.json();
     expect(
       copia.frequenciasParciais.find((r: { id: string }) => r.id === salva.registro.id),
-    ).toMatchObject({ tipo: "JUSTIFICADA", justificativa: "QAAg", dia: futuro });
+    ).toMatchObject({
+      tipo: "JUSTIFICADA",
+      justificativa: primeiraJustificativa.codigo,
+      dia: futuro,
+    });
     const recorte = {
       formato: copia.formato,
       versao: copia.versao,
@@ -397,7 +532,9 @@ describe("Justificativas antecipadas", () => {
       alunos: copia.alunos.filter((r: { id: string }) => r.id === aluno),
       frequencias: [],
       saidas: [],
-      justificativas: copia.justificativas.filter((r: { codigo: string }) => r.codigo === "QAAg"),
+      justificativas: copia.justificativas.filter(
+        (r: { codigo: string }) => r.codigo === primeiraJustificativa.codigo,
+      ),
       frequenciasParciais: copia.frequenciasParciais.filter(
         (r: { id: string }) => r.id === salva.registro.id,
       ),
@@ -411,6 +548,6 @@ describe("Justificativas antecipadas", () => {
           salva.registro.id,
         ])
       ).rows[0],
-    ).toMatchObject({ tipo: "JUSTIFICADA", justificativa: "QAAg" });
+    ).toMatchObject({ tipo: "JUSTIFICADA", justificativa: primeiraJustificativa.codigo });
   });
 });

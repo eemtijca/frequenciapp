@@ -57,6 +57,7 @@ export interface GoogleFalso {
   renomearAba(nome: string, novo: string): void;
   removerAba(nome: string): void;
   valor(nome: string, linha: number, coluna: number): string;
+  linha(nome: string, linha: number): string[];
   definirValor(nome: string, linha: number, coluna: number, valor: string): void;
   definirNota(nome: string, linha: number, coluna: number, nota: string): void;
   formulaDe(nome: string, linha: number, coluna: number): string;
@@ -72,7 +73,9 @@ export interface GoogleFalso {
   fechar(): Promise<void>;
 }
 
-export async function criarGoogleFalso(): Promise<GoogleFalso> {
+export async function criarGoogleFalso(
+  opcoes: { semServidor?: boolean } = {},
+): Promise<GoogleFalso> {
   const abas: Aba[] = [];
   const chamadas: string[] = [];
   let proximoId = 1;
@@ -519,13 +522,17 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       }
     });
   });
-  await new Promise<void>((resolver) => servidor.listen(0, "127.0.0.1", resolver));
-  const endereco = servidor.address();
-  if (!endereco || typeof endereco === "string") throw new Error("Servidor sintético sem porta.");
-  credencial = `frequenciapp-teste:${Buffer.from(`http://127.0.0.1:${endereco.port}`).toString("base64url")}`;
+  if (!opcoes.semServidor) {
+    await new Promise<void>((resolver) => servidor.listen(0, "127.0.0.1", resolver));
+    const endereco = servidor.address();
+    if (!endereco || typeof endereco === "string") throw new Error("Servidor sintético sem porta.");
+    credencial = `frequenciapp-teste:${Buffer.from(`http://127.0.0.1:${endereco.port}`).toString("base64url")}`;
+  }
   return {
     codigoAutorizacao: () => credencial,
     conectar: async (banco, finalidade = "FREQUENCIA") => {
+      if (opcoes.semServidor)
+        throw new Error("Google falso sem servidor não pode conectar ao banco.");
       const id =
         finalidade === "PARCIAL" ? "parcial" : finalidade === "SAIDAS" ? "saidas" : "principal";
       await banco.query(
@@ -625,6 +632,7 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
       if (item) abas.splice(abas.indexOf(item), 1);
     },
     valor: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.valor ?? "",
+    linha: (nome, linha) => aba(nome)?.celulas[linha - 1]?.map((celula) => celula.valor) ?? [],
     definirValor: (nome, linha, indice, valor) => {
       const item = aba(nome);
       if (item) garantir(item, linha, indice).valor = valor;
@@ -688,6 +696,9 @@ export async function criarGoogleFalso(): Promise<GoogleFalso> {
     abas: () => abas.map((item) => item.nome),
     abasVisiveis: () => abas.filter((item) => !item.oculta).map((item) => item.nome),
     chamadas: () => chamadas.slice(),
-    fechar: () => new Promise<void>((resolver) => servidor.close(() => resolver())),
+    fechar: () =>
+      opcoes.semServidor
+        ? Promise.resolve()
+        : new Promise<void>((resolver) => servidor.close(() => resolver())),
   };
 }

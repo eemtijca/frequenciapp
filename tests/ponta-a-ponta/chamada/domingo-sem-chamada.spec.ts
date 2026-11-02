@@ -9,6 +9,7 @@ import {
   ehDomingo,
   rotuloData,
   rotuloDataCurta,
+  rotuloMes,
   ultimoDiaDeChamada,
 } from "@/domain/frequencia";
 import { semanaEncerrada } from "@/domain/resumo-semana";
@@ -85,10 +86,25 @@ function rotuloAcessivelDe(prefixo: string, dia: string): RegExp {
 
 test("o calendário da Chamada vai de segunda a domingo e destaca o resumo", async ({ page }) => {
   const secao = await abrirChamada(page);
+  // abrirChamada sai do resumo dominical para o sábado; nos demais dias usa hoje.
+  const diaSelecionado = ultimoDiaDeChamada(hoje);
+  await expect(secao.locator("#dia-frequencia")).toHaveAttribute(
+    "aria-label",
+    rotuloAcessivelDe("Data da chamada", diaSelecionado),
+  );
   await secao.locator("#dia-frequencia").click();
   const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
   const grade = calendario.getByRole("group", { name: /^Dias de / });
-  const mes = hoje.slice(0, 7);
+  // A primeira célula do próprio mês identifica a grade realmente exibida;
+  // nos domingos de virada ela pode abrir no mês anterior ao de hoje.
+  const primeiraData = await grade
+    .locator("button[data-dia]:not([data-fora-do-mes])")
+    .first()
+    .getAttribute("data-dia");
+  expect(primeiraData).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  const mes = (primeiraData ?? "").slice(0, 7);
+  expect(mes).toBe(diaSelecionado.slice(0, 7));
+  await expect(grade).toHaveAttribute("aria-label", `Dias de ${rotuloMes(mes)}`);
 
   await expect(grade.getByRole("button")).toHaveCount(celulasDoMesSegundaDomingo(mes).length);
   // Os rótulos das colunas ficam num bloco escondido dos leitores de tela: sete, de segunda a domingo.

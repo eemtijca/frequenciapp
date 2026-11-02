@@ -11,7 +11,8 @@ const resolverLocalhost = process.env.PLAYWRIGHT_RESOLVER_LOCALHOST === "1";
 export default defineConfig({
   testDir: "./tests/ponta-a-ponta",
   // O PWA roda em configuração própria contra o build de produção.
-  testIgnore: /pwa.*\.spec\.ts/,
+  // Confira apenas o nome do arquivo, não os diretórios do caminho.
+  testIgnore: /(?:^|[\\/])pwa[^\\/]*\.spec\.ts$/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,

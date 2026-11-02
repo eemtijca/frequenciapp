@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 
 const COR_PRIMARIA = "#17784d";
-const FUNDO_CLARO = "#f9f7f2";
+const FUNDO_CLARO = "#f6f6f6";
 const TINTA_CLARA = "#3d3a34";
 const FUNDO_ESCURO = "#1c1b19";
 const TINTA_ESCURA = "#eceae6";
@@ -29,11 +29,11 @@ export default function ErroGlobal({
           body { background: ${FUNDO_CLARO}; color: ${TINTA_CLARA}; }
           .texto { color: #6f6a60; }
           .acao:focus-visible { outline: 2px solid ${COR_PRIMARIA}; outline-offset: 2px; }
-          .secundaria { background: #efede8; color: ${TINTA_CLARA}; }
+          .secundaria { background: transparent; color: ${TINTA_CLARA}; border: 1px solid #d9ddda; }
           @media (prefers-color-scheme: dark) {
             body { background: ${FUNDO_ESCURO}; color: ${TINTA_ESCURA}; }
             .texto { color: #b6b2a9; }
-            .secundaria { background: #2b2925; color: ${TINTA_ESCURA}; }
+            .secundaria { background: #2b2925; color: ${TINTA_ESCURA}; border-color: transparent; }
           }
         `}</style>
       </head>
@@ -118,7 +118,6 @@ export default function ErroGlobal({
               padding: "10px 18px",
               minHeight: 44,
               borderRadius: 16,
-              border: "1px solid transparent",
               fontSize: 15,
               fontWeight: 600,
               textDecoration: "none",

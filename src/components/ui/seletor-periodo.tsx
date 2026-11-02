@@ -4,7 +4,6 @@
 // grade do mês (dia) ou a grade de meses, sem campo nativo. Abre em popover
 // ancorado em qualquer largura.
 import { useEffect, useRef, useState } from "react";
-import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   celulasDoMes,
@@ -20,8 +19,9 @@ import {
   rotuloMes,
   ultimoDiaDeChamada,
 } from "@/domain/frequencia";
-import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import estilos from "./seletores-contorno.module.css";
 
 interface Props {
   id: string;
@@ -55,6 +55,15 @@ const SEMANAS = ["D", "S", "T", "Q", "Q", "S", "S"];
 const SEMANAS_SEGUNDA_DOMINGO = ["S", "T", "Q", "Q", "S", "S", "D"];
 const SEMANAS_SEM_DOMINGO = SEMANAS.slice(1);
 const MESES = Array.from({ length: 12 }, (_, indice) => indice + 1);
+const DIAS = [
+  ["domingo", "dom."],
+  ["segunda-feira", "seg."],
+  ["terça-feira", "ter."],
+  ["quarta-feira", "qua."],
+  ["quinta-feira", "qui."],
+  ["sexta-feira", "sex."],
+  ["sábado", "sáb."],
+] as const;
 
 /** Mesmo dia em outro mês, limitado ao último dia do mês de destino. */
 function mesmoDiaNoMes(dia: string, deslocamento: number): string {
@@ -106,6 +115,9 @@ export function SeletorPeriodo({
   const piso = min ? aprumar(min) : null;
   const referencia = aprumar((valor || corrente) > max ? max : valor || corrente);
   const selo = mostrarSelo && valor === corrente ? (modo === "dia" ? "Hoje" : "Este mês") : "";
+  const diaDaSemana = DIAS.find(
+    ([nome]) => detalhe === nome || detalhe === nome.replace("-feira", ""),
+  );
 
   // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
   function aoAbrir(abertoNovo: boolean) {
@@ -244,7 +256,10 @@ export function SeletorPeriodo({
           type="button"
           aria-label={modo === "dia" ? "Mês anterior" : "Ano anterior"}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
-          className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className={cn(
+            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none",
+            estilos.contorno,
+          )}
         >
           <ChevronLeft size={18} />
         </button>
@@ -256,7 +271,10 @@ export function SeletorPeriodo({
           aria-label={modo === "dia" ? "Mês seguinte" : "Ano seguinte"}
           disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
-          className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          className={cn(
+            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
+            estilos.contorno,
+          )}
         >
           <ChevronRight size={18} />
         </button>
@@ -422,29 +440,34 @@ export function SeletorPeriodo({
       disabled={disabled}
       aria-haspopup="dialog"
       aria-expanded={aberto}
-      aria-label={`${rotuloAcessivel}: ${rotulo}${selo ? `, ${selo}` : ""}`}
-      onClick={() => aoAbrir(!aberto)}
-      className="controle focus-visible:ring-ring pressionavel @container flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label={`${rotuloAcessivel}: ${rotulo}${diaDaSemana ? `, ${diaDaSemana[0]}` : ""}${selo ? `, ${selo}` : ""}`}
+      className={cn(
+        "controle focus-visible:ring-ring pressionavel @container flex min-h-11 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0 px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        estilos.contorno,
+      )}
     >
       <CalendarDays
         size={16}
         className="text-muted-foreground hidden shrink-0 @min-[11rem]:block"
         aria-hidden="true"
       />
-      <span
-        className={cn(
-          "numerais-tabulares font-semibold",
-          modo === "dia" ? "shrink-0 whitespace-nowrap" : "min-w-0 truncate",
-        )}
-      >
+      <span className="numerais-tabulares max-w-full min-w-0 shrink-0 font-semibold break-words">
         {rotulo}
       </span>
       {detalhe && (
-        // No painel estreito do desktop o dia da semana já aparece no cabeçalho.
-        <span className="text-muted-foreground min-w-0 truncate xl:hidden">{detalhe}</span>
+        <span className="text-muted-foreground max-w-full min-w-0 shrink-0 break-words">
+          {diaDaSemana ? (
+            <>
+              <span className="@min-[14rem]:hidden">{diaDaSemana[1]}</span>
+              <span className="hidden @min-[14rem]:inline">{detalhe}</span>
+            </>
+          ) : (
+            detalhe
+          )}
+        </span>
       )}
       {selo && (
-        <span className="bg-primary/15 text-primary hidden shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold @min-[9rem]:inline">
+        <span className="bg-primary/15 text-primary max-w-full shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
           {selo}
         </span>
       )}
@@ -453,7 +476,7 @@ export function SeletorPeriodo({
 
   return (
     <Popover open={aberto} onOpenChange={aoAbrir}>
-      <PopoverPrimitive.Anchor asChild>{gatilho}</PopoverPrimitive.Anchor>
+      <PopoverTrigger asChild>{gatilho}</PopoverTrigger>
       <PopoverContent
         role="dialog"
         aria-label={rotuloAcessivel}

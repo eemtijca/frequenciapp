@@ -34,7 +34,7 @@ function Item({
       role="menuitem"
       disabled={disabled}
       onClick={onClick}
-      className="controle pressionavel focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-2.5 px-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      className="discreto pressionavel focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-2.5 px-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Icone size={17} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <span className="min-w-0 truncate">{rotulo}</span>
@@ -60,7 +60,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           type="button"
           aria-haspopup="menu"
           aria-label={`Conta de ${usuario.nome}`}
-          className="controle pressionavel focus-visible:ring-ring/50 flex min-h-12 w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          className="discreto pressionavel focus-visible:ring-ring/50 flex min-h-12 w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           <span className="selecionado flex size-10 shrink-0 items-center justify-center rounded-full">
             <span className="text-sm font-semibold" aria-hidden="true">

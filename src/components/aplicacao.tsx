@@ -1,5 +1,7 @@
 "use client";
 
+import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
+
 // Navegação lateral compartilhada entre desktop e menu móvel, com estado preservado.
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -179,7 +181,7 @@ function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) 
       onClick={() => onTrocar(item.visao)}
       className={cn(
         "pressionavel focus-visible:ring-ring relative flex min-h-11 w-full min-w-0 items-center gap-2.5 rounded-2xl px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none",
-        ativo ? "selecionado" : "controle text-secondary-foreground",
+        ativo ? "selecionado" : "discreto text-muted-foreground",
       )}
     >
       <Icone size={20} strokeWidth={ativo ? 2 : 1.7} aria-hidden="true" className="shrink-0" />
@@ -255,7 +257,7 @@ function MenuMovel({
       <DialogTrigger asChild>
         <Button
           ref={gatilhoRef}
-          variant="secondary"
+          variant="ghost"
           size="icon"
           className="relative size-11 shrink-0"
           aria-label="Abrir menu"
@@ -845,10 +847,10 @@ export default function Aplicacao({
             <Logotipo tamanho={26} />
             <p className="truncate text-base font-semibold tracking-tight">FrequenciApp</p>
           </div>
-          {!movel && <BotaoAtualizar />}
+          {!movel && <BotaoAtualizar variante="ghost" />}
           {movel && (
             <DialogClose asChild>
-              <Button variant="secondary" size="icon" className="size-11" aria-label="Fechar menu">
+              <Button variant="ghost" size="icon" className="size-11" aria-label="Fechar menu">
                 <X size={20} aria-hidden="true" />
               </Button>
             </DialogClose>
@@ -875,7 +877,7 @@ export default function Aplicacao({
               />
             ))}
             {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
-              <Button asChild variant="secondary" className="h-11 justify-start gap-2.5 px-3">
+              <Button asChild variant="ghost" className="h-11 justify-start gap-2.5 px-3">
                 <a href="/bi" target="_blank" rel="noopener" aria-label="FrequenciBI, nova aba">
                   <ChartNoAxesCombined size={18} aria-hidden="true" />
                   FrequenciBI
@@ -935,10 +937,10 @@ export default function Aplicacao({
                 <span className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
                   FrequenciApp
                 </span>
-                <BotaoAtualizar />
-                <SeletorTema className="shrink-0" />
+                <BotaoAtualizar variante="ghost" />
+                <SeletorTema variante="ghost" className="shrink-0" />
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="icon"
                   className="size-11 shrink-0"
                   aria-label="Configurar notificações"
@@ -986,7 +988,9 @@ export default function Aplicacao({
                       hidden={!ativo}
                       className="pagina-painel h-full w-full overflow-y-auto px-4 pt-4 pb-0 sm:px-6 lg:px-8"
                     >
-                      {renderizarVisao(item.visao, ativo)}
+                      <ProvedorVisibilidadeGraficos visivel={ativo}>
+                        {renderizarVisao(item.visao, ativo)}
+                      </ProvedorVisibilidadeGraficos>
                     </section>
                   );
                 })}

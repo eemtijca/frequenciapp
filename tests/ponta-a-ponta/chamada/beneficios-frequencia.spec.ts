@@ -1,7 +1,7 @@
 // Benefícios e frequência mínima: a regra criada e editada na Gestão muda o alerta que a Chamada mostra.
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, escolherDataNoPeriodo, trocarVisao } from "../helpers/pagina";
 import {
   descartarConfiguracoes,
   selecionarAcaoConfiguracoes,
@@ -9,6 +9,7 @@ import {
 } from "../helpers/configuracoes";
 import { diaDeChamada } from "../helpers/dia";
 import { diaDaSemanaIso, diasDoMes } from "@/domain/frequencia";
+import { contidoNosLimites } from "../helpers/geometria";
 
 test.use({ serviceWorkers: "block" });
 const prefixo = "E2E Beneficio";
@@ -86,17 +87,8 @@ async function abrirBeneficios(page: Page) {
 async function abrirChamadaDoMesAnterior(page: Page, navegar: boolean) {
   await trocarVisao(page, "Chamada", "chamada");
   if (navegar) {
-    await page.locator("#dia-frequencia").click();
-    const calendario = page.getByRole("dialog", { name: "Data da chamada", exact: true });
-    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
     const primeiro = diasUteis[0] ?? `${mesAnterior}-01`;
-    const nome = new Intl.DateTimeFormat("pt-BR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      timeZone: "UTC",
-    }).format(new Date(`${primeiro}T12:00:00Z`));
-    await calendario.getByRole("button", { name: new RegExp(`^${nome}(,|$)`) }).click();
+    await escolherDataNoPeriodo(page, "Data da chamada", primeiro);
   }
   const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
   const lista = secao.getByRole("list", { name: "Alunos da chamada", exact: true });
@@ -204,7 +196,57 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(
     painel.getByText("Estimativa mensal. Não determina o pagamento do benefício.", { exact: true }),
   ).toBeVisible();
-  await expect(painel).toBeInViewport({ ratio: 1 });
+  // Razões de interseção podem arredondar para menos de 1 mesmo sem recorte perceptível.
+  // Confira os quatro lados do próprio popover em CSS px, com tolerância máxima de 0,5 px.
+  await expect
+    .poll(async () => {
+      const { caixa, tela } = await painel.evaluate((elemento) => {
+        const r = elemento.getBoundingClientRect();
+        return {
+          caixa: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+          tela: { left: 0, top: 0, right: innerWidth, bottom: innerHeight },
+        };
+      });
+      return contidoNosLimites(caixa, tela);
+    })
+    .toBe(true);
+
+  // Se o painel rolar, cada informação continua alcançável dentro de sua área visível.
+  const posicaoInicial = await painel.evaluate((elemento) => elemento.scrollTop);
+  for (const texto of [
+    detalhe.getByText(/^5 de \d+ aulas$/),
+    detalhe.getByText("Frequência estimada"),
+    detalhe.getByText("5 aulas acima do limite.", { exact: true }),
+    detalhe.getByText("1 aula justificada desconsiderada.", { exact: true }),
+    painel.getByText("Estimativa mensal. Não determina o pagamento do benefício.", { exact: true }),
+  ]) {
+    await texto.scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => {
+        const { caixa, area } = await texto.evaluate((elemento) => {
+          const painel = elemento.closest<HTMLElement>('[data-slot="popover-content"]');
+          if (!painel) throw new Error("Conteúdo fora do popover");
+          const r = elemento.getBoundingClientRect();
+          const p = painel.getBoundingClientRect();
+          const left = p.left + painel.clientLeft;
+          const top = p.top + painel.clientTop;
+          return {
+            caixa: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+            area: {
+              left: Math.max(0, left),
+              top: Math.max(0, top),
+              right: Math.min(innerWidth, left + painel.clientWidth),
+              bottom: Math.min(innerHeight, top + painel.clientHeight),
+            },
+          };
+        });
+        return contidoNosLimites(caixa, area);
+      })
+      .toBe(true);
+  }
+  await painel.evaluate((elemento, posicao) => {
+    elemento.scrollTop = posicao;
+  }, posicaoInicial);
   await painel.screenshot({ path: test.info().outputPath("aviso-frequencia-resumido.png") });
   await page.keyboard.press("Escape");
   await botaoUma.click();
@@ -218,19 +260,8 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const calendarioLetivo = page.locator('[data-secao="config-calendario"]');
   await calendarioLetivo.getByRole("button", { name: /^Calendário letivo/ }).click();
-  await calendarioLetivo.locator("#calendario-feriado-data").click();
-  const calendarioFeriado = page.getByRole("dialog", { name: "Data do feriado", exact: true });
-  await calendarioFeriado.getByRole("button", { name: "Mês anterior", exact: true }).click();
   const dataFeriado = diasUteis[diasUteis.length - 1] ?? "";
-  const nomeDoDiaFeriado = new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${dataFeriado}T12:00:00Z`));
-  await calendarioFeriado
-    .getByRole("button", { name: new RegExp(`^${nomeDoDiaFeriado}(,|$)`) })
-    .click();
+  await escolherDataNoPeriodo(page, "Data do feriado", dataFeriado);
   const nomeFeriado = `${prefixo} calendário mensal`;
   await calendarioLetivo.getByLabel("Nome do feriado", { exact: true }).fill(nomeFeriado);
   await calendarioLetivo.getByRole("button", { name: "Adicionar feriado", exact: true }).click();

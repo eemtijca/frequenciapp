@@ -2,6 +2,10 @@
 import { afterAll, beforeAll, beforeEach, expect, it } from "vitest";
 import pg from "pg";
 import { diaDaSemanaIso, diaLocal, type Frequencia } from "@/domain/frequencia";
+import { procurarDia } from "../../helpers/calendario-fixture";
+import { lerFeriados } from "../../helpers/feriados-banco";
+import { finalizarSabado, limparSabado } from "../../helpers/teardown-fixtures";
+import { selecionarSchema } from "@/infra/schema-postgres.mjs";
 import type { RegistroPersonalizado } from "@/domain/frequencia-personalizada";
 
 const url = process.env.APP_URL ?? "http://localhost:3000";
@@ -12,13 +16,15 @@ const alunos: string[] = [];
 const horarios: string[] = [];
 const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
 const distanciaDoSabado = (diaDaSemanaIso(hoje) - 6 + 7) % 7;
-const sabado = deslocarDia(hoje, -distanciaDoSabado - 7);
+let sabado = deslocarDia(hoje, -distanciaDoSabado - 7);
 const sabadoFuturo = deslocarDia(hoje, 7 - distanciaDoSabado);
 let turmaId = "";
 let outraTurmaId = "";
 let aulaInativa = "";
 let aulaDeOutraTurma = "";
 let cookie = "";
+let schemaSelecionado = false;
+let conexaoEncerrada = false;
 
 function deslocarDia(dia: string, quantidade: number): string {
   const data = new Date(`${dia}T12:00:00Z`);
@@ -76,18 +82,22 @@ async function limparChamadas() {
 }
 
 async function limpar() {
-  await limparChamadas();
-  await banco.query("delete from alunos where nome like $1", [`${prefixo}%`]);
-  await banco.query(
-    "delete from turmas where serie_id in (select id from series where nome = $1)",
-    [prefixo],
-  );
-  await banco.query("delete from series where nome = $1", [prefixo]);
-  await banco.query("delete from justificativas where codigo = $1", [justificativa]);
+  await limparSabado(banco, prefixo, justificativa);
 }
 
 beforeAll(async () => {
-  await banco.connect();
+  const conexao = process.env.DATABASE_URL;
+  if (!conexao) throw new Error("DATABASE_URL é obrigatória para os testes de sábado letivo.");
+  try {
+    await banco.connect();
+    await selecionarSchema(banco, conexao);
+    schemaSelecionado = true;
+  } catch (erro) {
+    conexaoEncerrada = true;
+    await banco.end().catch(() => undefined);
+    throw erro;
+  }
+  sabado = procurarDia(sabado, -1, [6], await lerFeriados(banco), 365);
   await limpar();
   const entrada = await chamar(
     "/api/auth/entrar",
@@ -149,8 +159,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await limpar();
-  await banco.end();
+  await finalizarSabado(banco, schemaSelecionado, conexaoEncerrada, prefixo, justificativa);
 });
 
 it("exige sessão e desbloqueio explícito quando o sábado não tem grade", async () => {

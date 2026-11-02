@@ -165,7 +165,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="icon"
                   className="size-11"
                   aria-label={`Editar série ${serie.nome}`}
@@ -176,7 +176,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="icon"
                       className="text-falta-texto size-11"
                       aria-label={`Excluir série ${serie.nome}`}

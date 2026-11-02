@@ -1,6 +1,9 @@
 // Regressões de fluidez no celular: busca, relatórios, foco e rolagem dos controles.
+import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { nomeDoMes, rotuloMes } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
+import { diasEscolaresDaFixture } from "../helpers/dias-escolares-fixture";
 import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 const serie = "E2E Fluidez";
@@ -8,38 +11,46 @@ const turmaA = `${serie} A`;
 const alvaro = "E2E Fluidez Álvaro";
 const bruna = "E2E Fluidez Bruna";
 const caio = "E2E Fluidez Caio";
+let mesFixture: string;
+let diasFixture: string[];
+let serieId: string | undefined;
 
 test.use({ viewport: { width: 360, height: 740 }, serviceWorkers: "block" });
 
 async function limpar(): Promise<void> {
+  if (!serieId) return;
   await comBanco(async (banco) => {
     await banco.query(
-      "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = $1))",
-      [serie],
+      "delete from frequencias where turma_id in (select id from turmas where serie_id = $1)",
+      [serieId],
     );
     await banco.query(
-      "delete from alunos where turma_id in (select id from turmas where serie_id in (select id from series where nome = $1))",
-      [serie],
+      "delete from alunos where turma_id in (select id from turmas where serie_id = $1)",
+      [serieId],
     );
     await banco.query(
-      "delete from horarios where turma_id in (select id from turmas where serie_id in (select id from series where nome = $1))",
-      [serie],
+      "delete from horarios where turma_id in (select id from turmas where serie_id = $1)",
+      [serieId],
     );
-    await banco.query(
-      "delete from turmas where serie_id in (select id from series where nome = $1)",
-      [serie],
-    );
-    await banco.query("delete from series where nome = $1", [serie]);
+    await banco.query("delete from turmas where serie_id = $1", [serieId]);
+    await banco.query("delete from series where id = $1", [serieId]);
   });
 }
 
 test.beforeEach(async () => {
-  await limpar();
+  serieId = undefined;
+  diasFixture = await diasEscolaresDaFixture(2);
+  mesFixture = diasFixture[0].slice(0, 7);
   await comBanco(async (banco) => {
+    const existente = await banco.query("select 1 from series where nome = $1", [serie]);
+    if (existente.rowCount)
+      throw new Error("Série da fixture já existe; nenhum dado foi removido.");
+    const novoId = randomUUID();
     const criada = await banco.query<{ id: string }>(
-      "insert into series (nome, ordem) values ($1, 98) returning id",
-      [serie],
+      "insert into series (id, nome, ordem) values ($1, $2, 98) returning id",
+      [novoId, serie],
     );
+    serieId = novoId;
     const turmas = await banco.query<{ id: string; nome: string }>(
       "insert into turmas (nome, serie_id) values ('A', $1), ('B', $1) returning id, nome",
       [criada.rows[0]?.id],
@@ -48,7 +59,7 @@ test.beforeEach(async () => {
     const idB = turmas.rows.find((turma) => turma.nome === "B")?.id;
     if (!idA || !idB) throw new Error("Turmas sintéticas não encontradas.");
     const aula = await banco.query<{ id: string }>(
-      "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '00:00', '23:59', '{1,2,3,4,5,6,7}', true) returning id",
+      "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '00:00', '23:59', '{1,2,3,4,5,6}', true) returning id",
       [idA],
     );
     await banco.query(
@@ -59,19 +70,13 @@ test.beforeEach(async () => {
       "insert into alunos (nome, turma_id, turma_original_id, ordem) select 'E2E Fluidez Lista ' || lpad(n::text, 2, '0'), $1, $1, n from generate_series(1, 32) n",
       [idB],
     );
-    const partes = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Fortaleza",
-      year: "numeric",
-      month: "2-digit",
-    }).formatToParts(new Date());
-    const mes = `${partes.find((parte) => parte.type === "year")?.value}-${partes.find((parte) => parte.type === "month")?.value}`;
-    for (const [numero, justificativa] of [
-      ["01", null],
-      ["02", "D"],
+    for (const [dia, justificativa] of [
+      [diasFixture[0], null],
+      [diasFixture[1], "D"],
     ] as const) {
       const frequencia = await banco.query<{ id: string }>(
         "insert into frequencias (turma_id, dia, atualizado_em) values ($1, $2::date, now()) returning id",
-        [idA, `${mes}-${numero}`],
+        [idA, dia],
       );
       await banco.query(
         "insert into alunos_chamada (frequencia_id, aluno_id) select $1, id from alunos where turma_id = $2",
@@ -241,6 +246,29 @@ test("a busca e o grupo da turma preservam os totais e o detalhe do aluno", asyn
     name: "Relatório por aluno",
     exact: true,
   });
+  const seletorMes = relatorio.getByRole("button", { name: /^Mês do relatório:/ });
+  await seletorMes.click();
+  const calendario = page.getByRole("dialog", { name: "Mês do relatório", exact: true });
+  const meses = calendario.getByRole("group", { name: /^Meses de \d{4}$/ });
+  const anoAlvo = Number(mesFixture.slice(0, 4));
+  const nome = (await meses.getAttribute("aria-label")) ?? "";
+  const anoAtual = Number(/^Meses de (\d{4})$/.exec(nome)?.[1]);
+  if (!anoAtual) throw new Error("Ano do seletor de mês não encontrado.");
+  const direcao = Math.sign(anoAlvo - anoAtual);
+  for (let passo = 1; passo <= Math.abs(anoAlvo - anoAtual); passo++) {
+    await calendario
+      .getByRole("button", {
+        name: direcao < 0 ? "Ano anterior" : "Ano seguinte",
+        exact: true,
+      })
+      .click();
+    await expect(meses).toHaveAttribute("aria-label", `Meses de ${anoAtual + direcao * passo}`);
+  }
+  await meses.getByRole("button", { name: nomeDoMes(mesFixture), exact: true }).click();
+  await expect(seletorMes).toHaveAttribute(
+    "aria-label",
+    `Mês do relatório: ${rotuloMes(mesFixture)}`,
+  );
   const grupo = relatorio.getByRole("region", { name: turmaA, exact: true });
   const linhas = grupo.getByRole("listitem");
   await expect(linhas).toHaveCount(3);
@@ -257,8 +285,13 @@ test("a busca e o grupo da turma preservam os totais e o detalhe do aluno", asyn
   await expect(aluno.getByRole("img", { name: "1 falta justificada", exact: true })).toBeVisible();
   await aluno.click();
   await expect(aluno).toHaveAttribute("aria-expanded", "true");
-  await expect(linhas.first().getByText(/^01\/\d{2}F$/)).toBeVisible();
-  await expect(linhas.first().getByText(/^02\/\d{2}FJ$/)).toBeVisible();
+  const rotuloDia = (dia: string) => `${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+  await expect(
+    linhas.first().getByText(`${rotuloDia(diasFixture[0])}F`, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    linhas.first().getByText(`${rotuloDia(diasFixture[1])}FJ`, { exact: true }),
+  ).toBeVisible();
   await relatorio.getByRole("button", { name: "Limpar busca", exact: true }).click();
   await expect(linhas).toHaveCount(3);
   await expect(linhas.first()).toContainText(alvaro);
@@ -467,8 +500,8 @@ test("a confirmação de exclusão permite alcançar as ações na tela baixa e 
     "E2E Fluidez Álvaro de Almeida Fernandes Rodrigues Monteiro Cavalcante Albuquerque Nascimento Silva";
   await comBanco((banco) =>
     banco.query(
-      "update alunos set nome = $1 where nome = $2 and turma_id in (select id from turmas where serie_id in (select id from series where nome = $3))",
-      [nomeCompleto, alvaro, serie],
+      "update alunos set nome = $1 where nome = $2 and turma_id in (select id from turmas where serie_id = $3)",
+      [nomeCompleto, alvaro, serieId],
     ),
   );
   const painel = await abrirGestaoAlunos(page);

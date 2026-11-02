@@ -25,7 +25,7 @@ jobs:
   testes:
     name: Compose, migrações e contratos
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -112,6 +112,18 @@ jobs:
       - name: Instalar navegadores do Playwright
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Testes de legibilidade mobile (componentes reais)
+        run: pnpm exec vitest run --config tests/componentes/vitest.config.ts tests/componentes/entrada/legibilidade.test.ts
+
+      - name: Teste isolado de atualização offline (Playwright)
+        run: pnpm exec playwright test --config=playwright.atualizacao-offline.config.ts
+
+      - name: Teste de foco em cores forçadas (Playwright)
+        run: pnpm exec playwright test --config=playwright.foco-forcado.config.ts
+
+      - name: Testes de visibilidade dos gráficos (Playwright)
+        run: pnpm run test:graficos-visibilidade
+
       - name: Testes de ponta a ponta (Playwright)
         env:
           # localhost: o storageState do Playwright envia o cookie Secure do
@@ -127,6 +139,18 @@ jobs:
           PLAYWRIGHT_SKIP_WEBSERVER: "1"
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
         run: pnpm run test:pwa --project=chromium
+
+      - name: Instalar WebKit do Playwright
+        run: pnpm exec playwright install --with-deps webkit
+
+      - name: Testes de foco do período (Chromium e WebKit)
+        run: pnpm exec vitest run --config tests/componentes/vitest.config.ts tests/componentes/interface/foco-periodo.test.ts
+
+      - name: Testes de PWA no WebKit móvel (Playwright)
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_SKIP_WEBSERVER: "1"
+        run: pnpm run test:pwa --project=mobile-webkit
 
       - name: Validar a semente de demonstração
         # Depois do e2e: o cenário de banco vazio depende da base limpa.

@@ -144,10 +144,14 @@ test.describe("responsividade", () => {
       for (const nome of ["Trocar senha", "Sair da conta"]) {
         const acao = conta.getByRole("menuitem", { name: nome, exact: true });
         await expect(acao).toBeInViewport();
-        // O popover abre com zoom; aguarda o tamanho final do alvo de toque.
+        // O popover abre com zoom; tolera arredondamento subpixel do navegador,
+        // mas exige que a altura mínima configurada continue em 44 pixels.
         await expect
           .poll(async () => (await acao.boundingBox())?.height ?? 0)
-          .toBeGreaterThanOrEqual(44);
+          .toBeGreaterThanOrEqual(43.99);
+        expect(
+          await acao.evaluate((elemento) => parseFloat(getComputedStyle(elemento).minHeight)),
+        ).toBeGreaterThanOrEqual(44);
       }
       await page.keyboard.press("Escape");
       await expect(conta).toBeHidden();

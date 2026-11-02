@@ -62,13 +62,14 @@ Enquanto uma ação de rede está em andamento, o controle fica ocupado e ignora
 
 ## Tema e paleta
 
-O estilo Blocos suaves se estende à navegação, conta, Painel, Relatórios, Alunos, Gestão, Chamada Parcial, Saídas e Entradas, Horários, Minhas turmas e FrequenciBI. Botões e filtros compartilham cantos arredondados, ícones e rótulos curtos. Ações secundárias usam fundos neutros e seleções usam tons suaves; cores de ausência, justificativa e perigo continuam semânticas. Gráficos e tabelas preservam suas legendas e os formulários mantêm confirmações e permissões.
+O estilo Blocos suaves se estende à navegação, conta, Painel, Relatórios, Alunos, Gestão, Chamada Parcial, Saídas e Entradas, Horários, Minhas turmas e FrequenciBI. Botões e filtros compartilham cantos arredondados, ícones e rótulos curtos. Na navegação, na conta, nos comandos do cabeçalho e nos atalhos da entrada, as ações não selecionadas ficam sem fundo em repouso; a seção selecionada mantém o destaque verde. As ações por ícone repetidas nas listas da Gestão e as ações auxiliares e de organização dos gráficos do FrequenciBI também ficam sem fundo em repouso. Os demais fundos neutros são mantidos conforme a função; no tema claro, as setas de data do Painel e as ações Registrar e Editar da Chamada Parcial têm fundo mais perceptível. Em cores forçadas, a aba selecionada mantém um contorno depois da saída do foco. Cores de ausência, justificativa e perigo continuam semânticas. No resumo semanal, a rosca indica o total de faltas, justificadas e presenças como F + FJ + P, com presenças parciais separadas. Gráficos e tabelas preservam suas legendas e os formulários mantêm confirmações e permissões.
 
-- Papel neutro quente de fundo, tinta grafite e um único acento verde institucional para presença e ações primárias.
+- Fundo neutro `#f6f6f6` no tema claro, cartões brancos, tinta grafite e um único acento verde institucional para presença e ações primárias.
+- Campos `Input` e `Selecionar` com borda necessária à identificação são testados no claro sobre a página e o cartão branco. No campo integrado da barra de busca, a borda é do contêiner, não do input interno. O token `--input` também colore o interruptor desligado. `--secondary` também serve a preenchimentos decorativos, para os quais não se exige 3:1 com o fundo; a auditoria dos controles compartilhados (filtros, seleção, desabilitados, foco e demais variantes, nos dois temas) permanece pendente.
 - O vermelho é estritamente semântico: aparece somente onde comunica falta ou erro.
 - A falta justificada (FJ) usa um azul próprio, os tokens `--justificada`, e não o verde institucional. Vermelho e verde na mesma luminosidade se confundem para quem tem daltonismo vermelho-verde; o par falta e falta justificada é conferido em `tests/unidade/interface/paleta.test.ts` nos dois temas, com separação sob daltonismo simulado e contraste AA do texto.
 - Tema claro e escuro com preferência do sistema e troca manual persistida; as duas variações mantêm contraste AA.
-- Cantos de 16 px em cartões, botões e campos, seguindo o estilo Blocos suaves. Controles neutros usam fundo suave, campos mantêm contorno e seleções recebem verde suave; Salvar e as confirmações principais mantêm verde sólido.
+- Cantos de 16 px em cartões, botões e campos, seguindo o estilo Blocos suaves. Controles neutros podem usar fundo suave ou ficar transparentes conforme a função, campos mantêm contorno e seleções recebem verde suave; Salvar e as confirmações principais mantêm verde sólido.
 - Tipografia Plus Jakarta Sans para interface e JetBrains Mono com numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
 
 ## Estados e retorno
@@ -86,7 +87,7 @@ O estilo Blocos suaves se estende à navegação, conta, Painel, Relatórios, Al
 - Operações longas da planilha e da cópia de segurança mostram um aviso de andamento com o mesmo identificador até virarem sucesso ou erro, com contagens no resultado.
 - Telas de estado padronizadas em um único componente, com variantes para cada situação: página não encontrada, erro interno, serviço indisponível, dados inválidos, sessão expirada, acesso restrito, conta desativada, muitas tentativas, conflito de chamada e sem conexão. Cada variante tem ícone, tom (neutro, aviso ou perigo) e ações próprias, com o código HTTP discreto e, no erro interno, uma referência para o suporte localizar o log.
 - Nas rotas de página: o 404 oferece a volta ao início, a fronteira de erro de runtime oferece tentar novamente e ir para o início, e o fallback do layout raiz usa estilos próprios para aparecer mesmo sem o CSS. Os códigos 401 e 403 não usam arquivos especiais: a sessão expirada aparece como aviso na tela de entrada e a conta desativada ou o limite de tentativas aparecem no próprio formulário; os demais estados viram aviso compacto na tela em que aconteceram.
-- A página offline do PWA segue as mesmas cores, o mesmo tom e as mesmas ações do aplicativo, sem depender de fontes ou scripts externos.
+- A página offline do PWA segue as mesmas cores, o mesmo tom e as mesmas ações do aplicativo, sem depender de fontes ou scripts externos. Tentar de novo abre a página solicitada quando a conexão retorna.
 
 ## Acessibilidade
 

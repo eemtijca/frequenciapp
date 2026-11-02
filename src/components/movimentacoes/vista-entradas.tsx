@@ -274,7 +274,7 @@ export default function VistaEntradas({
   return (
     <div className="space-y-5 pb-6">
       <h1 className="sr-only">Entradas atrasadas</h1>
-      <div className="flex items-center gap-2">
+      <div className="navegacao-dia flex items-center gap-2">
         <Button
           variant="outline"
           size="icon"
@@ -487,7 +487,7 @@ export default function VistaEntradas({
                         setJustificativa("");
                         setObservacao("");
                       }}
-                      className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : ""}`}
+                      className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : "controle-contornado"}`}
                     >
                       {item.rotulo}
                     </button>

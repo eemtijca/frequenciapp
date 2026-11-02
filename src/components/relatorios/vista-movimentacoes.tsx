@@ -292,7 +292,7 @@ export default function VistaMovimentacoes({
             <Label htmlFor="movimentacoes-dia">
               {modo === "semana" ? "Semana da data" : "Data"}
             </Label>
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="navegacao-dia flex min-w-0 items-center gap-2">
               <Button
                 type="button"
                 variant="outline"

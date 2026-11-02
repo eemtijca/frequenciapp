@@ -6,6 +6,7 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import estilos from "./seletores-contorno.module.css";
 
 interface Props {
   id: string;
@@ -118,7 +119,10 @@ export function SeletorAno({
           aria-expanded={aberto}
           aria-label={rotuloAcessivel}
           onClick={() => aoAbrir(!aberto)}
-          className="controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className={cn(
+            "controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+            estilos.contorno,
+          )}
         >
           <CalendarDays
             size={16}
@@ -146,7 +150,10 @@ export function SeletorAno({
                 setBloco((atual) => Math.max(inicioDoBloco(min), atual - ANOS_POR_BLOCO));
                 setFoco((atual) => Math.max(min, atual - ANOS_POR_BLOCO));
               }}
-              className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className={cn(
+                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
+                estilos.contorno,
+              )}
             >
               <ChevronLeft size={18} />
             </button>
@@ -161,7 +168,10 @@ export function SeletorAno({
                 setBloco((atual) => Math.min(inicioDoBloco(max), atual + ANOS_POR_BLOCO));
                 setFoco((atual) => Math.min(max, atual + ANOS_POR_BLOCO));
               }}
-              className="controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+              className={cn(
+                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
+                estilos.contorno,
+              )}
             >
               <ChevronRight size={18} />
             </button>

@@ -145,7 +145,7 @@ export default function ResumoRelatorios({
     <section aria-label="Resumo dos relatórios" aria-busy={ocupado} className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Resumo do mês</h2>
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:max-w-md sm:flex-1">
+        <div className="navegacao-dia flex w-full min-w-0 items-center gap-2 sm:w-auto sm:max-w-md sm:flex-1">
           <Button
             variant="outline"
             size="icon"

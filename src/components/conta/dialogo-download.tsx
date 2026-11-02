@@ -147,7 +147,7 @@ function ConteudoDownload({
           <legend className="mb-2 text-sm font-medium">Formato do download</legend>
           <Label
             className={cn(
-              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
+              "controle controle-contornado flex min-h-11 cursor-pointer items-center gap-3 p-3",
               protegido && "selecionado",
             )}
           >
@@ -164,7 +164,7 @@ function ConteudoDownload({
           </Label>
           <Label
             className={cn(
-              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
+              "controle controle-contornado flex min-h-11 cursor-pointer items-center gap-3 p-3",
               !protegido && "selecionado",
             )}
           >

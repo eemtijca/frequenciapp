@@ -2,6 +2,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
+import { escolherMesNoPeriodo } from "../helpers/calendario";
+import { nomeDoMes } from "@/domain/frequencia";
 import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
@@ -100,11 +102,42 @@ test("mantém faltas e retrato quando a grade ganha aulas", async ({ page }) => 
   await page.getByRole("tab", { name: "Resumo", exact: true }).click();
   const painel = page.getByRole("region", { name: "Resumo dos relatórios", exact: true });
   await expect(painel).toHaveAttribute("aria-busy", "false");
+  const mesDaMassa = massa.dia.slice(0, 7);
+  const [respostaDoMes] = await Promise.all([
+    page.waitForResponse((resposta) => {
+      const url = new URL(resposta.url());
+      return (
+        resposta.request().method() === "GET" &&
+        url.pathname === "/api/frequencias" &&
+        url.searchParams.get("mes") === mesDaMassa
+      );
+    }),
+    escolherMesNoPeriodo(page, painel, "Mês do resumo", mesDaMassa),
+  ]);
+  expect(respostaDoMes.status()).toBe(200);
+  await expect(painel.getByRole("button", { name: /^Mês do resumo:/ })).toHaveAttribute(
+    "aria-label",
+    new RegExp(
+      `^Mês do resumo: ${nomeDoMes(mesDaMassa).slice(0, 3)}/${mesDaMassa.slice(0, 4)}(,|$)`,
+    ),
+  );
+  await expect(painel).toHaveAttribute("aria-busy", "false");
   await painel.getByRole("combobox", { name: "Série do resumo" }).click();
   await page.getByRole("option", { name: "E2E Ano", exact: true }).click();
   await painel.getByRole("combobox", { name: "Turma do resumo" }).click();
   await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
-  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
+  const [respostaAtualizada] = await Promise.all([
+    page.waitForResponse((resposta) => {
+      const url = new URL(resposta.url());
+      return (
+        resposta.request().method() === "GET" &&
+        url.pathname === "/api/frequencias" &&
+        url.searchParams.get("mes") === mesDaMassa
+      );
+    }),
+    page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click(),
+  ]);
+  expect(respostaAtualizada.status()).toBe(200);
   await expect(painel).toHaveAttribute("aria-busy", "false");
   await expect(painel.locator("dd")).toHaveText(["1", "0", "1", "50%"]);
   await painel.getByText("Ver dados diários", { exact: true }).click();

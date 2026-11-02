@@ -1,7 +1,7 @@
 // Painel Turmas com séries recolhíveis, progresso e bloqueios de edição.
 // Gestão mantém a seleção de origem recolhível. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { diaDaSemanaIso } from "@/domain/frequencia";
+import { diaDaSemanaIso, diaSeguinte, rotuloData, rotuloDataCurta } from "@/domain/frequencia";
 import { diaDeChamada } from "../helpers/dia";
 import { comBanco } from "../helpers/banco";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
@@ -273,7 +273,60 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
     contentType: "image/png",
   });
 
-  await secao.getByRole("button", { name: "Dia anterior", exact: true }).click();
+  // O domingo é uma parada de resumo, não uma chamada pendente. Feriados
+  // também não têm chamada: confira seu estado e procure um dia anterior livre.
+  let dia = diaDeChamada();
+  const seletorDia = secao.locator("#dia-frequencia");
+  const anterior = secao.getByRole("button", { name: "Dia anterior", exact: true });
+  await expect(seletorDia).toHaveAttribute(
+    "aria-label",
+    new RegExp(`^Data da chamada: ${rotuloData(dia)}(,|$)`),
+  );
+  let encontrouDiaSemFeriado = false;
+  for (let passos = 0; passos < 31; passos += 1) {
+    dia = diaSeguinte(dia, -1);
+    await anterior.click();
+    if (diaDaSemanaIso(dia) === 7) {
+      await expect(seletorDia).toHaveAttribute(
+        "aria-label",
+        `Resumo da semana: ${rotuloDataCurta(diaSeguinte(dia, -6))} a ${rotuloDataCurta(diaSeguinte(dia, -1))}`,
+      );
+      await expect(
+        secao.getByRole("region", { name: "Resumo da semana", exact: true }),
+      ).toBeVisible();
+      for (const botao of [serie, turmaA, turmaB]) {
+        await expect(botao).toHaveAttribute("data-situacao", "semana");
+        await expect(botao.locator("[data-progresso]")).toHaveCount(0);
+      }
+      await expect(percentual).toHaveText("-");
+      await expect(serie.getByText(/%/)).toHaveCount(0);
+      await seletorDia.click();
+      const calendario = page.getByRole("dialog", { name: "Resumo da semana", exact: true });
+      await expect(calendario.locator(`button[data-dia="${dia}"]`)).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      await calendario.getByRole("button", { name: "Fechar", exact: true }).click();
+      continue;
+    }
+    await expect(seletorDia).toHaveAttribute(
+      "aria-label",
+      new RegExp(`^Data da chamada: ${rotuloData(dia)}(,|$)`),
+    );
+    await expect.poll(() => serie.getAttribute("data-situacao")).toMatch(/^(pendente|feriado)$/);
+    if ((await serie.getAttribute("data-situacao")) === "feriado") {
+      await expect(turmaA).toHaveAttribute("data-situacao", "feriado");
+      await expect(turmaB).toHaveAttribute("data-situacao", "feriado");
+      await expect(percentual).toHaveText("-");
+      await expect(serie.getByText(/%/)).toHaveCount(0);
+      continue;
+    }
+    encontrouDiaSemFeriado = true;
+    break;
+  }
+  expect(encontrouDiaSemFeriado, "Nenhum dia anterior sem feriado encontrado em 31 dias").toBe(
+    true,
+  );
   await expect(turmaA).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB).toHaveAttribute("data-situacao", "pendente");
   await expect(percentual).toHaveText("0%");

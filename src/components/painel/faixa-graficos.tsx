@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Selecionar } from "@/components/ui/selecionar";
 import { AquecimentoGraficos } from "@/components/graficos/aquecimento-graficos";
+import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
 
 interface Cartao {
   id: string;
@@ -114,7 +115,9 @@ export default function FaixaGraficos({
               className="min-w-0"
             >
               <AquecimentoGraficos.Provider value={visivel && ativo}>
-                {cartao.conteudo}
+                <ProvedorVisibilidadeGraficos visivel={visivel}>
+                  {cartao.conteudo}
+                </ProvedorVisibilidadeGraficos>
               </AquecimentoGraficos.Provider>
             </div>
           );

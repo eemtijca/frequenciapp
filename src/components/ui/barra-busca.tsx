@@ -4,6 +4,7 @@
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import estilos from "./campos.module.css";
 
 interface Props {
   id: string;
@@ -25,6 +26,7 @@ export function BarraBusca({
   return (
     <div
       className={cn(
+        estilos.campo,
         "controle border-input focus-within:border-ring focus-within:ring-ring/50 flex items-center gap-2 px-3 py-1 focus-within:ring-[3px]",
         className,
       )}

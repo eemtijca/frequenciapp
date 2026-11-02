@@ -21,7 +21,7 @@
           "Segoe UI",
           Roboto,
           sans-serif;
-        background: #f9f7f2;
+        background: #f6f6f6;
         color: #3d3a34;
         min-height: 100dvh;
         display: flex;
@@ -76,7 +76,11 @@
         color: #6f6a60;
         margin-top: 8px;
       }
-      button {
+      a.tentar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
         margin-top: 20px;
         width: 100%;
         min-height: 44px;
@@ -88,11 +92,11 @@
         font-weight: 600;
         cursor: pointer;
       }
-      button:active {
+      a.tentar:active {
         transform: scale(0.98);
       }
       @media (prefers-reduced-motion: reduce) {
-        button:active {
+        a.tentar:active {
           transform: none;
         }
       }
@@ -126,7 +130,7 @@
         perdem: reconecte e toque em Salvar.
       </p>
       <p class="letra">Verifique o sinal ou os dados móveis e tente de novo.</p>
-      <button type="button" onclick="window.location.reload()">Tentar de novo</button>
+      <a class="tentar" href="">Tentar de novo</a>
     </main>
   </body>
 </html>

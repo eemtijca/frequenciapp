@@ -6,7 +6,8 @@ const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./tests/ponta-a-ponta",
-  testMatch: /pwa.*\.spec\.ts/,
+  // Restrinja ao nome do arquivo: o caminho do worktree pode conter "pwa".
+  testMatch: /(?:^|[\\/])pwa[^\\/]*\.spec\.ts$/,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -23,6 +24,7 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "mobile-webkit", use: { ...devices["iPhone 13"] } },
   ],
   webServer:
     process.env.PLAYWRIGHT_SKIP_WEBSERVER === "1"
