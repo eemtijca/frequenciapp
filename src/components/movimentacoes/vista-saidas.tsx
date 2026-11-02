@@ -30,7 +30,6 @@ import {
   dataNoFuso,
   horaNoFuso,
   JUSTIFICATIVA_OUTROS,
-  LIMITE_TEXTO_SAIDA,
   MOMENTOS_SAIDA,
   partesJustificativaSaida,
   rotuloData,
@@ -52,12 +51,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Campo } from "@/components/ui/campo";
-import { GrupoOpcoes } from "@/components/ui/grupo-opcoes";
-import { Input } from "@/components/ui/input";
-import { Selecionar } from "@/components/ui/selecionar";
+import { CamposMovimentacao } from "@/components/movimentacoes/campos-movimentacao";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
@@ -533,145 +528,56 @@ export default function VistaSaidas({
             noValidate
           >
             <h2 className="font-medium">Registrar saída</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <Campo id="saida-turma" rotulo="Turma">
-                <Selecionar
-                  id="saida-turma"
-                  value={turmaFiltro || "todas"}
-                  onValueChange={(valor) => {
-                    setTurmaFiltro(valor === "todas" ? "" : valor);
-                    setAlunoId("");
-                  }}
-                  placeholder="Todas as turmas"
-                  opcoes={opcoesTurma}
-                />
-              </Campo>
-              <Campo id="saida-aluno" rotulo="Aluno" className="md:col-span-1 xl:col-span-2">
-                <Selecionar
-                  id="saida-aluno"
-                  value={alunoId}
-                  onValueChange={setAlunoId}
-                  buscavel
-                  placeholder="Selecione o aluno"
-                  opcoes={opcoesAluno}
-                />
-              </Campo>
-              <Campo id="saida-momento" rotulo="Momento da saída">
-                <Selecionar
-                  id="saida-momento"
-                  value={momento}
-                  onValueChange={setMomento}
-                  placeholder="Selecione a aula ou pausa"
-                  opcoes={MOMENTOS_SAIDA.map((item) => ({
-                    valor: item.codigo,
-                    rotulo: item.rotulo,
-                  }))}
-                />
-              </Campo>
-              <Campo id="saida-horario" rotulo="Horário da saída">
-                <SeletorHorario
-                  id="saida-horario"
-                  valor={horario}
-                  onValor={setHorario}
-                  rotuloAcessivel="Horário da saída"
-                  agora={horaNoFuso(new Date().toISOString(), fuso)}
-                  disabled={enviando}
-                />
-              </Campo>
-              <Campo
-                id="saida-responsavel"
-                rotulo="Responsável pela liberação"
-                descricao={
-                  opcoesLiberador.length === 0
-                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
-                    : undefined
+            <CamposMovimentacao
+              tipo="saida"
+              turma={turmaFiltro}
+              alunoId={alunoId}
+              momento={momento}
+              horario={horario}
+              responsavel={responsavelCodigo}
+              forma={formaJustificativa}
+              texto={texto}
+              justificativa={justificativa}
+              observacao={observacao}
+              opcoesTurma={opcoesTurma}
+              opcoesAluno={opcoesAluno}
+              opcoesMomento={MOMENTOS_SAIDA.map((item) => ({
+                valor: item.codigo,
+                rotulo: item.rotulo,
+              }))}
+              opcoesJustificativa={opcoesJustificativa}
+              opcoesResponsavel={opcoesLiberador}
+              fuso={fuso}
+              enviando={enviando}
+              mostrarTextoCatalogo={duranteAula}
+              mostrarObservacao={!duranteAula && justificativa === JUSTIFICATIVA_OUTROS}
+              catalogoEmDuasColunas
+              descricaoResponsavel={
+                opcoesLiberador.length === 0
+                  ? "Nenhum respons�vel cadastrado. Cadastre em Gest�o, Configura��es."
+                  : undefined
+              }
+              onTurma={(valor) => {
+                setTurmaFiltro(valor);
+                setAlunoId("");
+              }}
+              onAluno={setAlunoId}
+              onMomento={setMomento}
+              onHorario={setHorario}
+              onResponsavel={setResponsavelCodigo}
+              onForma={(valor) => {
+                setFormaJustificativa(valor);
+                if (valor === "texto") {
+                  setJustificativa("");
+                  setObservacao("");
+                  return;
                 }
-              >
-                <Selecionar
-                  id="saida-responsavel"
-                  value={responsavelCodigo}
-                  onValueChange={setResponsavelCodigo}
-                  placeholder="Selecione quem liberou"
-                  opcoes={opcoesLiberador}
-                />
-              </Campo>
-              <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
-                <legend className="text-sm font-medium">Justificativa</legend>
-                <GrupoOpcoes
-                  rotulo="Forma da justificativa"
-                  valor={formaJustificativa}
-                  onValor={(valor) => {
-                    setFormaJustificativa(valor);
-                    if (valor === "texto") {
-                      setJustificativa("");
-                      setObservacao("");
-                      return;
-                    }
-                    setTexto("");
-                  }}
-                  opcoes={[
-                    { valor: "texto", rotulo: "Escrever" },
-                    { valor: "catalogo", rotulo: "Selecionar tipo" },
-                  ]}
-                />
-                {formaJustificativa === "texto" ? (
-                  <Campo
-                    id="saida-texto"
-                    rotulo="Texto da justificativa"
-                    contador={`${texto.length}/${LIMITE_TEXTO_SAIDA}`}
-                  >
-                    <Input
-                      id="saida-texto"
-                      value={texto}
-                      maxLength={LIMITE_TEXTO_SAIDA}
-                      onChange={(evento) => setTexto(evento.target.value)}
-                      placeholder="Descreva o motivo"
-                      className="h-11"
-                    />
-                  </Campo>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Campo id="saida-justificativa" rotulo="Tipo">
-                      <Selecionar
-                        id="saida-justificativa"
-                        value={justificativa}
-                        onValueChange={setJustificativa}
-                        placeholder="Selecione a justificativa"
-                        opcoes={opcoesJustificativa}
-                      />
-                    </Campo>
-                    {duranteAula ? (
-                      <Campo
-                        id="saida-texto"
-                        rotulo="Texto da justificativa"
-                        contador={`${texto.length}/${LIMITE_TEXTO_SAIDA}`}
-                      >
-                        <Input
-                          id="saida-texto"
-                          value={texto}
-                          maxLength={LIMITE_TEXTO_SAIDA}
-                          onChange={(evento) => setTexto(evento.target.value)}
-                          placeholder="Opcional"
-                          className="h-11"
-                        />
-                      </Campo>
-                    ) : justificativa === JUSTIFICATIVA_OUTROS ? (
-                      <Campo id="saida-observacao" rotulo="Observação">
-                        <Input
-                          id="saida-observacao"
-                          value={observacao}
-                          maxLength={200}
-                          onChange={(evento) => setObservacao(evento.target.value)}
-                          placeholder="Descreva brevemente o motivo"
-                          className="h-11"
-                        />
-                      </Campo>
-                    ) : null}
-                  </div>
-                )}
-              </fieldset>
-            </div>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+                setTexto("");
+              }}
+              onTexto={setTexto}
+              onJustificativa={setJustificativa}
+              onObservacao={setObservacao}
+            />            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
             <div className="flex justify-end">
               <Button
                 type="submit"
