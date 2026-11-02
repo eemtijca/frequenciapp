@@ -1,6 +1,7 @@
 "use client";
 
 // Gráficos do painel: carrossel controlado, um cartão por vez e estado preservado.
+import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CarrosselCartoes, type ItemCarrossel } from "@/components/ui/carrossel-cartoes";
@@ -19,11 +20,17 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
     itens.findIndex((item) => item.id === valor),
   );
   const atual = itens[indice];
+  const [visitados, setVisitados] = useState<string[]>(() => [valor]);
   if (!atual) return null;
+
+  function selecionar(id: string) {
+    setVisitados((atuais) => (atuais.includes(id) ? atuais : [...atuais, id]));
+    onValor(id);
+  }
 
   function irPara(destino: number) {
     const proximo = itens[Math.min(Math.max(destino, 0), itens.length - 1)];
-    if (proximo) onValor(proximo.id);
+    if (proximo) selecionar(proximo.id);
   }
 
   return (
@@ -38,7 +45,7 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
           <Selecionar
             ariaLabel="Gráfico em exibição"
             value={atual.id}
-            onValueChange={(id) => onValor(id)}
+            onValueChange={selecionar}
             opcoes={itens.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
             className="min-w-0 flex-1 sm:w-56 sm:flex-none"
           />
@@ -70,7 +77,8 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
       <CarrosselCartoes
         itens={itens}
         valor={atual.id}
-        onValor={onValor}
+        visitados={visitados}
+        onValor={selecionar}
         rotuloAcessivel="Cartões de gráficos"
         ocupado={ocupado}
       />

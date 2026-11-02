@@ -1,7 +1,8 @@
 "use client";
 
 // Carrossel controlado que monta o cartão ativo e conserva os cartões já visitados.
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useRef, type ReactNode } from "react";
+import { AquecimentoGraficos } from "@/components/graficos/aquecimento-graficos";
 import { cn } from "@/lib/utils";
 
 export interface ItemCarrossel {
@@ -13,6 +14,7 @@ export interface ItemCarrossel {
 interface Props {
   itens: ItemCarrossel[];
   valor: string;
+  visitados: string[];
   onValor: (id: string) => void;
   rotuloAcessivel: string;
   ocupado?: boolean;
@@ -23,6 +25,7 @@ interface Props {
 function CarrosselCartoes({
   itens,
   valor,
+  visitados,
   onValor,
   rotuloAcessivel,
   ocupado = false,
@@ -30,7 +33,6 @@ function CarrosselCartoes({
   children,
 }: Props) {
   const statusId = useId();
-  const [visitados, setVisitados] = useState<Set<string>>(() => new Set([valor]));
   const area = useRef<HTMLDivElement>(null);
   const indice = Math.max(
     0,
@@ -38,14 +40,10 @@ function CarrosselCartoes({
   );
   const ativo = itens[indice];
 
-  useEffect(() => {
-    setVisitados((atuais) => (atuais.has(valor) ? atuais : new Set(atuais).add(valor)));
-  }, [valor]);
-
   const ids = useMemo(() => new Set(itens.map((item) => item.id)), [itens]);
   const visitadosValidos = useMemo(
-    () => [...visitados].filter((id) => ids.has(id)),
-    [ids, visitados],
+    () => [...new Set([...visitados, valor])].filter((id) => ids.has(id)),
+    [ids, valor, visitados],
   );
 
   function irPara(destino: number) {
@@ -96,7 +94,9 @@ function CarrosselCartoes({
               !visivel && "pointer-events-none invisible absolute inset-x-0 top-0 w-full",
             )}
           >
-            {item.render(visivel)}
+            <AquecimentoGraficos.Provider value={visivel}>
+              {item.render(visivel)}
+            </AquecimentoGraficos.Provider>
           </div>
         );
       })}
