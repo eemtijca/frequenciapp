@@ -57,7 +57,11 @@ export function conferirConexaoFixture(cliente: pg.Client): void {
 }
 
 /** A trava advisory usa outra conexão para não fixar o snapshot serializable. */
-async function comTravas(cliente: pg.Client, tarefa: () => Promise<void>): Promise<void> {
+async function comTravas(
+  cliente: pg.Client,
+  tarefa: () => Promise<void>,
+  esperaMaximaMs = 0,
+): Promise<void> {
   conferirConexaoFixture(cliente);
   const advisory = new pg.Client({
     connectionString: process.env.DATABASE_URL,
@@ -83,12 +87,17 @@ async function comTravas(cliente: pg.Client, tarefa: () => Promise<void>): Promi
     conectada = true;
     await advisory.query("begin");
     transacaoAdvisory = true;
-    const { rows } = await advisory.query<{ obtida: boolean }>(
-      "SELECT pg_try_advisory_xact_lock($1::integer, $2::integer) AS obtida",
-      [0x46524551, 1],
-    );
-    if (rows[0]?.obtida !== true || perdeuConexao)
-      throw new Error("Trava da planilha de frequência indisponível.");
+    const limite = Date.now() + esperaMaximaMs;
+    for (;;) {
+      const { rows } = await advisory.query<{ obtida: boolean }>(
+        "SELECT pg_try_advisory_xact_lock($1::integer, $2::integer) AS obtida",
+        [0x46524551, 1],
+      );
+      if (rows[0]?.obtida === true && !perdeuConexao) break;
+      if (perdeuConexao || Date.now() >= limite)
+        throw new Error("Trava da planilha de frequência indisponível.");
+      await new Promise((resolver) => setTimeout(resolver, 100));
+    }
     // SHOW e SET são anteriores ao BEGIN, logo não fixam o snapshot dos dados.
     const timeout = await cliente.query<{ lock_timeout: string }>("show lock_timeout");
     timeoutAnterior = timeout.rows[0]?.lock_timeout;
@@ -144,39 +153,52 @@ async function comTravas(cliente: pg.Client, tarefa: () => Promise<void>): Promi
 }
 
 /** Exige harness sintético exclusivo; SQL externo pode ignorar o protocolo.
- * Um commit de resultado incerto pode deixar o UUID para revisão e limpeza. */
+ * Um commit de resultado incerto pode deixar o UUID para revisão e limpeza.
+ * `esperaMaximaMs` permite aguardar uma requisição concorrente liberar a trava. */
 export async function criarFeriadoDaFixture(
   cliente: pg.Client,
   dia: string,
   nome: string,
+  esperaMaximaMs = 0,
 ): Promise<void> {
-  await comTravas(cliente, async () => {
-    const { rows } = await cliente.query<{ ocupado: boolean }>(
-      `select exists(select 1 from ${objeto("feriados")} where dia=$1::date)
+  await comTravas(
+    cliente,
+    async () => {
+      const { rows } = await cliente.query<{ ocupado: boolean }>(
+        `select exists(select 1 from ${objeto("feriados")} where dia=$1::date)
          or exists(select 1 from ${objeto("frequencias")} where dia=$1::date)
          or exists(select 1 from ${objeto("frequencias_parciais")} where dia=$1::date) as ocupado`,
-      [dia],
-    );
-    if (rows[0]?.ocupado !== false) throw new Error(`Data ocupada para feriado sintético: ${dia}`);
-    await cliente.query(
-      `insert into ${objeto("feriados")}(dia,nome,atualizado_em) values ($1,$2,now())`,
-      [dia, nome],
-    );
-  });
+        [dia],
+      );
+      if (rows[0]?.ocupado !== false)
+        throw new Error(`Data ocupada para feriado sintético: ${dia}`);
+      await cliente.query(
+        `insert into ${objeto("feriados")}(dia,nome,atualizado_em) values ($1,$2,now())`,
+        [dia, nome],
+      );
+    },
+    esperaMaximaMs,
+  );
 }
 
-/** Nunca remove feriado alheio; usa a mesma ordem de trava para a remoção. */
+/** Nunca remove feriado alheio; usa a mesma ordem de trava para a remoção.
+ * `esperaMaximaMs` evita perder a limpeza quando o aplicativo ainda segura a trava. */
 export async function removerFeriadoDaFixture(
   cliente: pg.Client,
   dia: string,
   nome: string,
+  esperaMaximaMs = 0,
 ): Promise<void> {
-  await comTravas(cliente, async () => {
-    await cliente.query(`delete from ${objeto("feriados")} where dia=$1::date and nome=$2`, [
-      dia,
-      nome,
-    ]);
-  });
+  await comTravas(
+    cliente,
+    async () => {
+      await cliente.query(`delete from ${objeto("feriados")} where dia=$1::date and nome=$2`, [
+        dia,
+        nome,
+      ]);
+    },
+    esperaMaximaMs,
+  );
 }
 
 /** Datas civis presentes; leitura sem alterar o calendário compartilhado. */

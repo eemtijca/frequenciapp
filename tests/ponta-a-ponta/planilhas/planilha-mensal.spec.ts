@@ -24,6 +24,7 @@ import {
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { limparIndependentemente } from "../../helpers/limpeza-independente";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
+import { diaDeChamada } from "../helpers/dia";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
@@ -57,13 +58,17 @@ test.beforeEach(async () => {
   await comBanco(async (cliente) => {
     const feriados = await lerFeriados(cliente);
     const bloqueados = new Set([...feriados, ...(await lerDiasComFrequencia(cliente))]);
-    const feriado = diasDoMes(mes).find((dia) => diaDaSemanaIso(dia) <= 5 && !bloqueados.has(dia));
+    // Não usa o dia da Chamada: uma limpeza interrompida não deve contaminar o Painel.
+    const hoje = diaDeChamada();
+    const feriado = diasDoMes(mes).find(
+      (dia) => dia !== hoje && diaDaSemanaIso(dia) <= 5 && !bloqueados.has(dia),
+    );
     if (!feriado) throw new Error(`Nenhum dia útil livre para feriado sintético em ${mes}.`);
     diasUteis = diasUteisDaFixture(mes, [...feriados, feriado]).map(rotuloData);
     if (!diasUteis.length) throw new Error(`Nenhum dia útil restante em ${mes}.`);
     // Guarda o identificador antes do commit para permitir limpeza de resultado incerto.
     feriadoDaFixture = feriado;
-    await criarFeriadoDaFixture(cliente, feriado, nomeFeriado);
+    await criarFeriadoDaFixture(cliente, feriado, nomeFeriado, 15_000);
     diaHistorico = diaHistoricoDaFixture(mes, [...feriados, feriado]);
     google.definirAba("E2E Ano A", [
       ["Aluno", rotuloData(diaHistorico)],
@@ -95,7 +100,9 @@ test.afterEach(async () => {
   await limparIndependentemente([
     async () => {
       if (!conexaoVerificada || !feriadoDaFixture) return;
-      await comBanco((cliente) => removerFeriadoDaFixture(cliente, feriadoDaFixture, nomeFeriado));
+      await comBanco((cliente) =>
+        removerFeriadoDaFixture(cliente, feriadoDaFixture, nomeFeriado, 15_000),
+      );
       feriadoDaFixture = "";
     },
     async () => {

@@ -14,16 +14,25 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function preparar(falhas: string[] = []) {
+function preparar(
+  falhas: string[] = [],
+  ocupadas = falhas.includes("ocupada") ? Number.POSITIVE_INFINITY : 0,
+) {
   const eventos: string[] = [];
   const dados = new ClientOriginal({ connectionString: url });
   const advisory = new ClientOriginal({ connectionString: url });
+  let tentativasOcupadas = ocupadas;
   const query = (origem: string) =>
     vi.fn(async (sql: string) => {
       eventos.push(`${origem}:${sql}`);
       if (falhas.includes(`${origem}:${sql}`)) throw new Error(`falhou ${origem}:${sql}`);
-      if (sql.includes("pg_try_advisory"))
+      if (sql.includes("pg_try_advisory")) {
+        if (tentativasOcupadas > 0) {
+          tentativasOcupadas -= 1;
+          return { rows: [{ obtida: false }] };
+        }
         return { rows: [{ obtida: !falhas.includes("ocupada") }] };
+      }
       if (sql === "show lock_timeout") return { rows: [{ lock_timeout: "0" }] };
       if (sql.includes("exists")) return { rows: [{ ocupado: false }] };
       return { rows: [] };
@@ -72,6 +81,13 @@ it("não abre transação de dados quando advisory está ocupada", async () => {
   await expect(criarFeriadoDaFixture(dados, "2026-06-03", "QA")).rejects.toThrow(/trava/i);
   expect(eventos.some((evento) => evento.startsWith("dados:"))).toBe(false);
   expect(eventos.at(-1)).toBe("advisory:end");
+});
+
+it("aguarda a trava temporariamente ocupada antes de seguir", async () => {
+  const { dados, eventos } = preparar([], 2);
+  await removerFeriadoDaFixture(dados, "2026-06-03", "QA", 1_000);
+  expect(eventos.filter((evento) => evento.includes("pg_try_advisory"))).toHaveLength(3);
+  expect(eventos).toContain("dados:begin isolation level serializable");
 });
 
 it("preserva erro original ao falhar rollback e ainda libera advisory", async () => {
