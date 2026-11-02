@@ -1,9 +1,9 @@
 /* Blocos suaves da Chamada, com cores restritas aos controles e às marcações. */
 .acao,
 .data > button {
-  border-color: transparent;
+  border-color: var(--borda-controle);
   border-radius: 1rem;
-  background-color: var(--secondary);
+  background-color: var(--superficie-controle);
   color: var(--foreground);
 }
 
@@ -15,8 +15,7 @@
 @media (hover: hover) {
   .acao:not(:disabled):hover,
   .data > button:not(:disabled):hover {
-    border-color: transparent;
-    background-color: color-mix(in oklab, var(--primary) 8%, var(--secondary));
+    background-color: color-mix(in oklab, var(--primary) 8%, var(--superficie-controle));
   }
 }
 
