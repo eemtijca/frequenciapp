@@ -4,6 +4,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { CSSProperties } from "react";
 import { CirculoValor } from "@/components/ui/circulo-contagem";
+import { ItemLegendaGrafico } from "@/components/ui/item-legenda-grafico";
 
 export interface FatiaGrafico {
   nome: string;
@@ -108,46 +109,36 @@ export default function GraficoRosca({
       </div>
       <ul className="w-full min-w-0 flex-1 space-y-1.5">
         {visiveis.map((fatia, indice) => (
-          <li
+          <ItemLegendaGrafico
             key={fatia.nome}
-            className="superficie flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[var(--border)] p-2.5 text-sm"
+            cor={CORES[indice % CORES.length] ?? "var(--primary)"}
+            nome={fatia.nome}
+            detalhe={
+              fatia.alunos !== undefined ? (
+                <span
+                  role="img"
+                  aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
+                  title={fatia.detalhe ?? `${fatia.alunos} alunos`}
+                  className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none whitespace-nowrap"
+                >
+                  <span aria-hidden="true">{fatia.alunos} alunos</span>
+                </span>
+              ) : fatia.detalhe ? (
+                <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>
+              ) : null
+            }
           >
-            {/* Sem espaço para o nome, os círculos descem para a linha de baixo. */}
-            <span className="flex min-w-24 flex-1 items-center gap-2">
-              <span
-                aria-hidden="true"
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ background: CORES[indice % CORES.length] }}
-              />
-              <span className="min-w-0 flex-1 break-words">
-                {fatia.nome}
-                {fatia.alunos !== undefined ? (
-                  <span
-                    role="img"
-                    aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                    title={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                    className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none whitespace-nowrap"
-                  >
-                    <span aria-hidden="true">{fatia.alunos} alunos</span>
-                  </span>
-                ) : fatia.detalhe ? (
-                  <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>
-                ) : null}
-              </span>
-            </span>
-            <span className="ml-auto flex shrink-0 items-center gap-1">
-              <CirculoValor
-                texto={String(fatia.valor)}
-                rotulo={rotuloFatia(fatia)}
-                tom={tomValores}
-              />
-              <CirculoValor
-                texto={percentual.format(fatia.valor / total)}
-                rotulo={`${percentual.format(fatia.valor / total)} do total`}
-                tom={tomValores}
-              />
-            </span>
-          </li>
+            <CirculoValor
+              texto={String(fatia.valor)}
+              rotulo={rotuloFatia(fatia)}
+              tom={tomValores}
+            />
+            <CirculoValor
+              texto={percentual.format(fatia.valor / total)}
+              rotulo={`${percentual.format(fatia.valor / total)} do total`}
+              tom={tomValores}
+            />
+          </ItemLegendaGrafico>
         ))}
       </ul>
     </div>

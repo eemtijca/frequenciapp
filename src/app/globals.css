@@ -68,6 +68,8 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
  */
 :root {
   --radius: 1rem;
+  --raio-interno: 0.75rem;
+  --raio-pilula: 999px;
   --background: #f6f6f6;
   --foreground: oklch(0.245 0.006 90);
   --card: oklch(1 0 0);
@@ -76,7 +78,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --popover-foreground: oklch(0.245 0.006 90);
   --primary: oklch(0.5 0.11 160);
   --primary-foreground: oklch(0.985 0.002 90);
-  --secondary: oklch(0.955 0.005 90);
+  --secondary: oklch(0.965 0.004 90);
   --secondary-foreground: oklch(0.32 0.008 90);
   --muted: oklch(0.955 0.004 90);
   --muted-foreground: oklch(0.45 0.011 90);
@@ -97,21 +99,32 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --alerta: oklch(0.7 0.15 75);
   --alerta-fraca: oklch(0.965 0.045 90);
   --alerta-texto: oklch(0.45 0.1 65);
-  --border: oklch(0.905 0.006 90);
-  --input: oklch(0.645 0.008 90);
+  --border: oklch(0.9 0.006 90);
+  --input: oklch(0.62 0.008 90);
   --ring: oklch(0.55 0.1 160);
-  --chart-1: oklch(0.5 0.11 160);
-  --chart-2: oklch(0.5 0.16 27);
-  --chart-3: oklch(0.475 0.011 90);
-  --chart-4: oklch(0.8 0.09 160);
-  --chart-5: oklch(0.955 0.005 90);
+  /* Contrato de superfícies e controles compartilhados. */
+  --borda-controle: var(--input);
+  --superficie-controle: var(--secondary);
+  --superficie-interna: oklch(0.975 0.003 90);
+  --trilho: oklch(0.9 0.005 90);
+  --texto-desabilitado: oklch(0.52 0.008 90);
+  --interruptor-fundo: oklch(0.9 0.005 90);
+  --selecionado-fundo: color-mix(in oklab, var(--primary) 12%, var(--card));
+  --selecionado-borda: color-mix(in oklab, var(--primary) 28%, var(--border));
+  --selecionado-texto: var(--primary);
+  /* Gráficos: mesma relação perceptual nos dois temas. */
+  --chart-1: var(--primary);
+  --chart-2: var(--falta);
+  --chart-3: color-mix(in oklab, var(--foreground) 55%, var(--card));
+  --chart-4: color-mix(in oklab, var(--primary) 55%, var(--card));
+  --chart-5: color-mix(in oklab, var(--foreground) 25%, var(--card));
   --sidebar: oklch(0.985 0.003 90);
   --sidebar-foreground: oklch(0.245 0.006 90);
   --sidebar-primary: oklch(0.5 0.11 160);
   --sidebar-primary-foreground: oklch(0.985 0.002 90);
   --sidebar-accent: oklch(0.945 0.016 160);
   --sidebar-accent-foreground: oklch(0.36 0.07 160);
-  --sidebar-border: oklch(0.905 0.006 90);
+  --sidebar-border: oklch(0.9 0.006 90);
   --sidebar-ring: oklch(0.55 0.1 160);
 }
 
@@ -124,10 +137,10 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --popover-foreground: oklch(0.945 0.003 90);
   --primary: oklch(0.7 0.13 160);
   --primary-foreground: oklch(0.21 0.04 160);
-  --secondary: oklch(0.282 0.006 90);
+  --secondary: oklch(0.3 0.006 90);
   --secondary-foreground: oklch(0.945 0.003 90);
   --muted: oklch(0.282 0.006 90);
-  --muted-foreground: oklch(0.7 0.008 90);
+  --muted-foreground: oklch(0.72 0.008 90);
   --accent: oklch(0.3 0.02 160);
   --accent-foreground: oklch(0.87 0.06 160);
   --destructive: oklch(0.55 0.17 27);
@@ -142,14 +155,18 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --alerta: oklch(0.75 0.15 80);
   --alerta-fraca: oklch(0.32 0.06 80);
   --alerta-texto: oklch(0.85 0.14 85);
-  --border: oklch(1 0 0 / 16%);
-  --input: oklch(1 0 0 / 20%);
-  --ring: oklch(0.6 0.1 160);
-  --chart-1: oklch(0.7 0.13 160);
-  --chart-2: oklch(0.55 0.17 27);
-  --chart-3: oklch(0.7 0.008 90);
-  --chart-4: oklch(0.55 0.11 160);
-  --chart-5: oklch(0.282 0.006 90);
+  --border: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 38%);
+  --ring: oklch(0.66 0.1 160);
+  --borda-controle: var(--input);
+  --superficie-controle: var(--secondary);
+  --superficie-interna: oklch(0.26 0.005 90);
+  --trilho: oklch(1 0 0 / 14%);
+  --texto-desabilitado: oklch(0.62 0.008 90);
+  --interruptor-fundo: oklch(1 0 0 / 24%);
+  --selecionado-fundo: color-mix(in oklab, var(--primary) 18%, var(--card));
+  --selecionado-borda: color-mix(in oklab, var(--primary) 38%, var(--border));
+  --selecionado-texto: var(--primary);
   --sidebar: oklch(0.232 0.005 90);
   --sidebar-foreground: oklch(0.945 0.003 90);
   --sidebar-primary: oklch(0.7 0.13 160);
@@ -157,7 +174,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --sidebar-accent: oklch(0.3 0.02 160);
   --sidebar-accent-foreground: oklch(0.87 0.06 160);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.6 0.1 160);
+  --sidebar-ring: oklch(0.66 0.1 160);
 }
 
 @layer base {

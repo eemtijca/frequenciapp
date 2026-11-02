@@ -133,7 +133,7 @@ export default function VistaHistorico({
             type="button"
             aria-pressed={serieFiltro === ""}
             onClick={() => setSerieFiltro("")}
-            className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === "" ? "" : "controle-contornado"}`}
+            className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === "" ? "" : "controle"}`}
           >
             Todas
           </button>
@@ -143,7 +143,7 @@ export default function VistaHistorico({
               type="button"
               aria-pressed={serieFiltro === serie.id}
               onClick={() => setSerieFiltro(serie.id)}
-              className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === serie.id ? "" : "controle-contornado"}`}
+              className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === serie.id ? "" : "controle"}`}
             >
               {serie.nome}
             </button>

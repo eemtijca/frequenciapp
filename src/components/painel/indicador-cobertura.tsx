@@ -2,6 +2,8 @@
 import { CheckCircle2, ChevronDown, Clock3 } from "lucide-react";
 import { useId } from "react";
 import type { CoberturaTurmaDia } from "@/domain/relatorios";
+import { BarraProgresso } from "@/components/ui/barra-progresso";
+import { CartaoIndicador } from "@/components/ui/cartao-indicador";
 import { IndicadorFeriado } from "@/components/painel/indicador-feriado";
 
 interface Props {
@@ -13,15 +15,10 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
   const descricaoId = useId();
   if (feriado) {
     return (
-      <div
-        role="group"
-        aria-label="Cobertura do dia"
-        className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
-      >
-        <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
+      <CartaoIndicador titulo="Cobertura do dia" rotuloAcessivel="Cobertura do dia">
         <IndicadorFeriado nome={feriado} />
         <span className="sr-only">Não há chamadas pendentes nesta data.</span>
-      </div>
+      </CartaoIndicador>
     );
   }
   const esperados = turmas.reduce((total, item) => total + item.esperados, 0);
@@ -35,12 +32,7 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
   const contagem = `${registrados} de ${esperados} alunos com chamada salva`;
 
   return (
-    <div
-      role="group"
-      aria-label="Cobertura do dia"
-      className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
-    >
-      <h2 className="text-sm font-medium sm:text-base">Cobertura do dia</h2>
+    <CartaoIndicador titulo="Cobertura do dia" rotuloAcessivel="Cobertura do dia">
       <div className="flex flex-col gap-2">
         <span
           aria-hidden="true"
@@ -48,23 +40,13 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
         >
           {progresso}%
         </span>
-        <div
-          role="progressbar"
-          aria-label="Alunos com chamada salva"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={progresso}
-          aria-valuetext={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
-          aria-describedby={esperados > 0 ? descricaoId : undefined}
-          className={`ring-border h-3 w-full overflow-hidden rounded-full ring-1 ring-inset ${esperados > 0 ? "bg-falta-fraca" : "bg-muted"}`}
-        >
-          <div
-            data-testid="cobertura-preenchida"
-            aria-hidden="true"
-            className="bg-primary h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none"
-            style={{ width: `${progresso}%` }}
-          />
-        </div>
+        <BarraProgresso
+          valor={progresso}
+          rotulo="Alunos com chamada salva"
+          descricao={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
+          descritoPor={esperados > 0 ? descricaoId : undefined}
+          testId="cobertura-preenchida"
+        />
         <p id={descricaoId} className="sr-only">
           {turmas
             .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
@@ -101,6 +83,6 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
           </div>
         </details>
       )}
-    </div>
+    </CartaoIndicador>
   );
 }

@@ -75,7 +75,7 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`bg-secondary/60 relative grid gap-0.5 rounded-[1.25rem] p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          className={`bg-secondary relative grid gap-0.5 rounded-[1.25rem] p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
           style={
             {
               gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))`,

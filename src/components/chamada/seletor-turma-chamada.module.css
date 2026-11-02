@@ -18,11 +18,11 @@
   flex-direction: column;
   gap: 5px;
   border-radius: 1rem;
-  border-color: transparent;
+  border-color: var(--borda-controle);
   padding: 10px;
   white-space: normal;
   color: var(--foreground);
-  background-color: var(--secondary);
+  background-color: var(--superficie-controle);
   box-shadow: none;
   text-align: center;
   transition:
@@ -340,23 +340,3 @@
 }
 
 /* Os estados de seleção e conclusão mantêm suas cores próprias. */
-@media (forced-colors: none) {
-  :global(html:not(.dark)) .gatilho:not([data-situacao="concluida"]),
-  :global(html:not(.dark)) .serie:not([aria-pressed="true"]):not([data-situacao="concluida"]),
-  :global(html:not(.dark)) .turma:not([aria-pressed="true"]):not([data-situacao="concluida"]) {
-    background-color: transparent;
-    border-color: #d9ddda;
-  }
-  :global(html:not(.dark)) .blocoSerie:not([data-selecionada="true"]) {
-    border-color: #d9ddda;
-  }
-  @media (hover: hover) {
-    :global(html:not(.dark)) .gatilho:not([data-situacao="concluida"]):not(:disabled):hover,
-    :global(html:not(.dark))
-      .serie:not([aria-pressed="true"]):not([data-situacao="concluida"]):not(:disabled):hover,
-    :global(html:not(.dark))
-      .turma:not([aria-pressed="true"]):not([data-situacao="concluida"]):not(:disabled):hover {
-      background-color: color-mix(in oklab, var(--foreground) 5%, transparent);
-    }
-  }
-}
