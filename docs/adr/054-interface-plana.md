@@ -3,6 +3,7 @@
 - Status: aceita
 - Data: 2026-10-24
 - Substitui o acabamento de vidro descrito na interface e nas ADRs de identidade visual anteriores.
+- Substituído em parte pelo ADR-062 quanto à superfície e ao contorno de controles e campos.
 
 ## Contexto
 
