@@ -19,6 +19,14 @@
   }
 }
 
+.acao:disabled,
+.data > button:disabled {
+  border-color: var(--borda-desabilitada);
+  background-color: var(--superficie-desabilitada);
+  color: var(--texto-desabilitado);
+  cursor: not-allowed;
+}
+
 .marca {
   display: flex;
   height: 44px;

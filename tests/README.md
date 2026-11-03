@@ -16,7 +16,7 @@ Suítes do FrequenciApp com Vitest e Playwright.
 | PWA                       | `pnpm run test:pwa`                   | Build de produção no ar (`pnpm run build` e `pnpm start`).              |
 | API e unidade             | `pnpm test`                           | Idem, na ordem.                                                         |
 
-Os testes de componente usam os helpers de `tests/apoio`: `vite.ts` sobe a fixture e `navegador.ts` abre o Chromium e aplica o tema. A matriz de `tests/componentes/interface/primitivas.test.ts` cobre contraste, borda, raio, altura e foco das primitivas nos dois temas. O job `interface` do workflow `qualidade.yml` executa `pnpm run test:componentes`; os testes não precisam de banco nem do aplicativo no ar.
+Os testes de componente usam os helpers de `tests/apoio`: `vite.ts` sobe a fixture e `navegador.ts` abre o Chromium e aplica o tema. A matriz de `tests/componentes/interface/primitivas.test.ts` cobre contraste, borda, raio, altura, foco e estados desabilitados das primitivas nos dois temas. O guardrail de estrutura reprova opacidade manual para desabilitar controles e bordas transparentes fora das peças internas justificadas. O job `interface` do workflow `qualidade.yml` executa `pnpm run test:componentes`; os testes não precisam de banco nem do aplicativo no ar.
 
 ## Unidade
 

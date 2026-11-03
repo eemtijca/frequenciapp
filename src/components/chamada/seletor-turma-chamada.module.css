@@ -206,9 +206,6 @@
 .serie .percentual {
   flex-shrink: 0;
 }
-.gatilho {
-  border-color: transparent;
-}
 .gatilho .percentual {
   border-radius: 999px;
   padding: 3px 9px;
@@ -259,6 +256,8 @@
 .gatilho .nome {
   flex: 0 1 auto;
 }
+/* Peças internas do seletor: o anel e a borda de seleção já identificam o
+   bloco e as turmas, sem repetir a borda do controle externo. */
 .blocoSerie {
   min-width: 0;
   border: 1px solid transparent;

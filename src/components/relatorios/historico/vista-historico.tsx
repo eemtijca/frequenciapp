@@ -221,7 +221,7 @@ export default function VistaHistorico({
                       type="button"
                       disabled={bloqueado}
                       onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
-                      className="hover:bg-secondary/60 pressionavel flex w-full items-center gap-3 px-4 py-3 text-left transition-colors disabled:opacity-50"
+                      className="enabled:hover:bg-secondary/60 pressionavel flex w-full items-center gap-3 px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:text-[var(--texto-desabilitado)]"
                     >
                       <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
                         <span className="numerais-tabulares text-lg font-semibold">
