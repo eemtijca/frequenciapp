@@ -177,7 +177,7 @@ export function TelaEstado({
         <Icone size={26} strokeWidth={1.9} />
       </span>
       {codigo ? (
-        <span className="controle text-muted-foreground numerais-tabulares mt-3 px-2.5 py-1 text-[11px] font-semibold">
+        <span className="controle text-secondary-foreground numerais-tabulares mt-3 px-2.5 py-1 text-[11px] font-semibold">
           Erro {codigo}
         </span>
       ) : null}

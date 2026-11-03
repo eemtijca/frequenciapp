@@ -305,7 +305,7 @@ export function DialogoMostrarMes({
                 </p>
               )}
               {(catalogo.legadas.length > 0 || conferencias) && (
-                <details className="rounded-xl border p-3">
+                <details className="bg-secondary/30 rounded-xl p-3">
                   <summary className="cursor-pointer text-sm font-medium">Abas sem mês</summary>
                   <div className="mt-3 flex flex-col gap-3">
                     <p className="text-muted-foreground text-sm">

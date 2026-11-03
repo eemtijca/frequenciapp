@@ -3,7 +3,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect } from "vitest";
 import { contraste, type Rgb } from "../helpers/cor";
 
-export async function conferirContorno(page: Page, botao: Locator, tema: "light" | "dark") {
+export async function conferirSuperficieAcao(page: Page, botao: Locator, tema: "light" | "dark") {
   await botao.waitFor({ state: "visible" });
   expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
     tema === "dark",
@@ -29,14 +29,18 @@ export async function conferirContorno(page: Page, botao: Locator, tema: "light"
       ctx.fillRect(0, 0, 1, 1);
     }
     const superficie = Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    ctx.fillStyle = `rgb(${superficie.join(" ")})`;
+    ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = css.borderTopColor;
+    ctx.fillRect(0, 0, 1, 1);
+    const borda = Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
     ctx.fillStyle = css.color;
     ctx.fillRect(0, 0, 1, 1);
     const texto = Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
     return {
       fundo: css.backgroundColor,
-      borda: css.borderTopColor,
+      borda,
       larguraBorda: css.borderTopWidth,
-      estiloBorda: css.borderTopStyle,
       largura: caixa.width,
       altura: caixa.height,
       superficie,
@@ -47,10 +51,9 @@ export async function conferirContorno(page: Page, botao: Locator, tema: "light"
   expect(estilo.largura).toBeGreaterThanOrEqual(43.99);
   expect(estilo.altura).toBeGreaterThanOrEqual(43.99);
   expect(estilo.larguraBorda).toBe("1px");
-  expect(estilo.estiloBorda).toBe("solid");
   expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-  expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
   const rgb = (canais: number[]) => canais.map((n) => n / 255) as Rgb;
+  expect(contraste(rgb(estilo.borda), rgb(estilo.superficie))).toBeGreaterThanOrEqual(1.2);
   expect(contraste(rgb(estilo.texto), rgb(estilo.superficie))).toBeGreaterThanOrEqual(4.5);
   await page.keyboard.press("Tab");
   await botao.focus();

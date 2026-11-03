@@ -26,7 +26,7 @@ export function PendenciasAbaAntiga({
   const escolhas = new Map(resolucoes.map((item) => [chaveResolucaoAntiga(item), item]));
   const divergencias = pendencias.filter((item) => item.tipo === "frequencia");
   return (
-    <details className="mt-2 rounded-xl border p-3">
+    <details className="bg-secondary/30 mt-2 rounded-xl p-3">
       <summary className="text-falta-texto cursor-pointer font-medium">
         Resolver {total === 1 ? "1 pendência" : `${total} pendências`}
       </summary>

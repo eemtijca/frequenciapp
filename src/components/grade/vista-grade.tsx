@@ -501,7 +501,7 @@ export default function VistaGrade({
             valor={busca}
             onValor={setBusca}
             placeholder="Buscar aluno"
-            className="rounded-none border-0 border-b px-3 py-1.5"
+            className="rounded-none px-3 py-1.5"
           />
           {carregandoPeriodo ? (
             <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">

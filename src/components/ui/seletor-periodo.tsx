@@ -243,7 +243,7 @@ export function SeletorPeriodo({
       foraDoMes && !selecionado && !corrente && "text-muted-foreground/55",
       domingoResumo && !selecionado && "bg-primary/5",
       selecionado && "selecionado font-semibold",
-      !selecionado && corrente && "controle text-primary font-semibold",
+      !selecionado && corrente && "controle text-accent-foreground font-semibold",
       !selecionado && !corrente && "discreto",
     );
   }
@@ -444,14 +444,14 @@ export function SeletorPeriodo({
     >
       <CalendarDays
         size={16}
-        className="text-muted-foreground hidden shrink-0 @min-[11rem]:block"
+        className="text-secondary-foreground hidden shrink-0 @min-[11rem]:block"
         aria-hidden="true"
       />
       <span className="numerais-tabulares max-w-full min-w-0 shrink-0 font-semibold break-words">
         {rotulo}
       </span>
       {detalhe && (
-        <span className="text-muted-foreground max-w-full min-w-0 shrink-0 break-words">
+        <span className="detalhe-data text-secondary-foreground max-w-full min-w-0 shrink-0 break-words">
           {diaDaSemana ? (
             <>
               <span className="@min-[14rem]:hidden">{diaDaSemana[1]}</span>

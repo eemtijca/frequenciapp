@@ -210,7 +210,7 @@ export function SeletorHorario({ id, valor, disabled, rotuloAcessivel, agora, on
         "campo pressionavel flex h-11 w-full items-center justify-center gap-2 overflow-hidden px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed",
       )}
     >
-      <Clock size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
+      <Clock size={16} className="text-secondary-foreground shrink-0" aria-hidden="true" />
       <span className="numerais-tabulares truncate font-semibold">{valor || "--:--"}</span>
     </button>
   );

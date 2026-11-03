@@ -71,17 +71,16 @@ test("a ação Registrar se destaca da linha clara do aluno", async ({ page }, i
     (cor[1] ?? 0) / 255,
     (cor[2] ?? 0) / 255,
   ];
-  const bordaSuperficie = contraste(rgb(cores.borda), rgb(cores.superficie));
   const textoFundo = contraste(rgb(cores.texto), rgb(cores.fundoComposto));
   await info.attach("medidas", {
-    body: JSON.stringify({ cores, bordaSuperficie, textoFundo }),
+    body: JSON.stringify({ cores, textoFundo }),
     contentType: "application/json",
   });
   await page.screenshot({ path: info.outputPath("parcial-claro.png"), animations: "disabled" });
   expect(cores.fundo[3]).toBe(255);
   expect(textoFundo).toBeGreaterThanOrEqual(4.5);
   expect(cores.larguraBorda).toBe("1px");
-  expect(bordaSuperficie).toBeGreaterThanOrEqual(3);
+  expect(contraste(rgb(cores.borda), rgb(cores.superficie))).toBeGreaterThanOrEqual(1.3);
   await botao.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -112,12 +111,10 @@ test("a ação preserva o tema escuro e funciona com teclado", async ({ page }, 
     const css = getComputedStyle(no);
     return {
       fundo: css.backgroundColor,
-      borda: css.borderTopColor,
       larguraBorda: css.borderTopWidth,
     };
   });
   expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-  expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
   expect(estilo.larguraBorda).toBe("1px");
   const caixa = await botao.boundingBox();
   expect(caixa?.height).toBeGreaterThanOrEqual(44);

@@ -393,7 +393,7 @@ export default function IntegracaoSaidas({
                         {integracao.ultimoErro.erro ?? "sem detalhe"}
                       </p>
                     )}
-                    <details className="rounded-xl border p-3">
+                    <details className="bg-secondary/30 rounded-xl p-3">
                       <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
                         <History size={18} aria-hidden="true" />
                         Histórico de envios

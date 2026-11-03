@@ -1,4 +1,4 @@
-// Gatilho padrão dos seletores e campos de escolha, com a mesma moldura visual.
+// Gatilho padrão dos seletores e campos de escolha, com a mesma superfície visual.
 import type { ComponentPropsWithRef } from "react";
 import { cn } from "@/lib/utils";
 

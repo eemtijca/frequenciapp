@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
 import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { conferirContorno } from "../contorno-acao";
+import { conferirSuperficieAcao } from "../superficie-acao";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -68,7 +68,7 @@ it.each([
     }
     for (const nome of ["Editar", "Excluir Primeiro", "Tabela", "Exportar CSV de Primeiro"]) {
       const botao = cartao.getByRole("button", { name: nome, exact: true });
-      await conferirContorno(page, botao, tema);
+      await conferirSuperficieAcao(page, botao, tema);
     }
     await cartao.getByRole("button", { name: "Exportar CSV de Primeiro" }).press("Enter");
     expect(await page.getByTestId("confirmacoes").textContent()).toBe("1");

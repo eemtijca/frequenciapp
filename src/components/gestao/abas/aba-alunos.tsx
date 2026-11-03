@@ -97,8 +97,8 @@ const LinhaAluno = memo(function LinhaAluno({
           className="pressionavel -ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
         >
           <span
-            className={`flex size-5 items-center justify-center rounded border ${
-              selecionado ? "border-primary bg-primary text-primary-foreground" : "border-input"
+            className={`flex size-5 items-center justify-center rounded ${
+              selecionado ? "bg-primary text-primary-foreground" : "bg-secondary"
             }`}
           >
             {selecionado && <Check size={13} aria-hidden="true" />}
@@ -581,7 +581,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           valor={busca}
           onValor={setBusca}
           placeholder="Buscar aluno"
-          className="rounded-none border-0 border-b px-3 py-1.5"
+          className="rounded-none px-3 py-1.5"
         />
 
         {turmas.length === 0 ? (

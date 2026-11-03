@@ -75,7 +75,7 @@ export default function AbasDeslizantes<T extends string>({
           role="tablist"
           aria-label={rotuloAcessivel}
           onKeyDown={aoTeclar}
-          className={`bg-secondary relative grid gap-0.5 rounded-[1.25rem] p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
+          className={`trilho-abas relative grid gap-0.5 rounded-[1.25rem] p-1 sm:gap-1 ${acao ? "min-w-0 flex-1" : ""}`}
           style={
             {
               gridTemplateColumns: `repeat(${abas.length}, minmax(0, 1fr))`,
@@ -108,15 +108,15 @@ export default function AbasDeslizantes<T extends string>({
                 tabIndex={ativo ? 0 : -1}
                 disabled={bloqueada}
                 onClick={() => trocarAba(item.valor)}
-                className={`${ativo ? "rounded-2xl" : "discreto"} focus-visible:ring-ring/50 pressionavel relative z-10 flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs`}
+                className={`${ativo ? "rounded-2xl" : "discreto"} focus-visible:ring-ring pressionavel relative z-10 flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 px-0 text-[11px] leading-tight font-semibold focus-visible:ring-[3px] focus-visible:outline-none sm:flex-row sm:gap-1.5 sm:px-1 sm:text-xs`}
               >
                 <Icone
                   size={15}
-                  className={`relative z-10 ${ativo ? "text-primary" : "text-muted-foreground"}`}
+                  className={`relative z-10 ${ativo ? "text-accent-foreground" : "text-secondary-foreground"}`}
                   aria-hidden="true"
                 />
                 <span
-                  className={`relative z-10 min-w-0 text-center ${ativo ? "text-foreground" : "text-muted-foreground"}`}
+                  className={`relative z-10 min-w-0 text-center ${ativo ? "text-accent-foreground" : "text-secondary-foreground"}`}
                 >
                   {item.rotuloCurto ? (
                     <>

@@ -420,7 +420,7 @@ export function BlocoRiscoPlanilha({
               <Button
                 type="button"
                 variant="outline"
-                className="border-falta/40 text-falta-texto h-11"
+                className="text-falta-texto h-11"
                 disabled={chaveAtiva === "desconectar"}
               >
                 <Unplug size={16} aria-hidden="true" />

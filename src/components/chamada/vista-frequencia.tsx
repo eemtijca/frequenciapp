@@ -1169,7 +1169,7 @@ export default function VistaFrequencia({
                           onClick={() =>
                             setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
                           }
-                          className="controle aria-[pressed=true]:border-falta aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                          className="controle aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                         >
                           <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
                             {carregando ? "" : contagemFaltas}
@@ -1184,7 +1184,7 @@ export default function VistaFrequencia({
                               atual === "justificadas" ? "todos" : "justificadas",
                             )
                           }
-                          className="controle aria-[pressed=true]:border-justificada aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
+                          className="controle aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
                         >
                           <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
                             {carregando ? "" : contagemJustificadas}
@@ -1523,7 +1523,7 @@ export default function VistaFrequencia({
                                           aria-pressed={marcada}
                                           disabled={bloqueado}
                                           onClick={() => alternarAula(aluno.id, aula.id)}
-                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl border border-transparent px-3 text-xs font-medium transition-colors disabled:border-[var(--borda-desabilitada)] disabled:bg-[var(--superficie-desabilitada)] disabled:text-[var(--texto-desabilitado)] ${
+                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl px-3 text-xs font-medium transition-colors disabled:bg-[var(--superficie-desabilitada)] disabled:text-[var(--texto-desabilitado)] ${
                                             marcada
                                               ? "bg-falta-fraca text-falta-texto"
                                               : "bg-secondary text-secondary-foreground"

@@ -381,7 +381,7 @@ export default function DialogoEnvio({
             <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
               <legend className="sr-only">O que enviar</legend>
               <div className="grid grid-cols-2 gap-2">
-                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                <label className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg p-2.5">
                   <input
                     type="radio"
                     name="alcance-envio"
@@ -391,7 +391,7 @@ export default function DialogoEnvio({
                   />
                   <span>Só chamadas pendentes</span>
                 </label>
-                <label className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg border p-2.5">
+                <label className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg p-2.5">
                   <input
                     type="radio"
                     name="alcance-envio"
@@ -677,7 +677,7 @@ export default function DialogoEnvio({
                 {colunasRemoviveis.map((item) => (
                   <label
                     key={`coluna-${item.coluna}`}
-                    className="has-[:checked]:border-primary has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg border px-2 py-1 text-xs"
+                    className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs"
                   >
                     <input
                       type="checkbox"

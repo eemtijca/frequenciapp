@@ -18,16 +18,13 @@
   flex-direction: column;
   gap: 5px;
   border-radius: 1rem;
-  border-color: var(--borda-controle);
   padding: 10px;
   white-space: normal;
   color: var(--foreground);
   background-color: var(--superficie-controle);
   box-shadow: none;
   text-align: center;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease;
+  transition: background-color 180ms ease;
 }
 
 .gatilho:where([data-situacao="concluida"]),
@@ -38,9 +35,21 @@
 
 .serie:where([aria-pressed="true"]),
 .turma:where([aria-pressed="true"]) {
-  outline: 2px solid var(--justificada);
-  outline-offset: 2px;
-  background-color: color-mix(in oklab, var(--justificada) 10%, var(--card));
+  border-color: transparent;
+  background-color: color-mix(in oklab, var(--justificada) 16%, var(--card));
+  color: var(--justificada-texto);
+}
+
+.checkSelecao {
+  flex-shrink: 0;
+  color: var(--justificada);
+}
+
+.checkTurma {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  color: var(--justificada);
 }
 
 .gatilho:focus-visible,
@@ -63,7 +72,7 @@
 }
 
 .percentual {
-  color: var(--muted-foreground);
+  color: var(--secondary-foreground);
   font-size: 13px;
   font-weight: 600;
   line-height: 16px;
@@ -74,6 +83,10 @@
 .serie:where([data-situacao="concluida"]) .percentual,
 .turma:where([data-situacao="concluida"]) .percentual {
   color: var(--primary);
+}
+
+.serie:where([aria-pressed="true"]) .percentual {
+  color: var(--justificada-texto);
 }
 
 .barra {
@@ -117,7 +130,7 @@
 @media (forced-colors: active) {
   .serie,
   .turma {
-    border-color: ButtonText;
+    border: 1px solid ButtonText;
     background: Canvas;
     color: CanvasText;
     box-shadow: none;
@@ -237,7 +250,7 @@
 @media (forced-colors: active) {
   .gatilho {
     box-shadow: none;
-    border-color: Highlight;
+    border: 1px solid Highlight;
     background: Canvas;
     color: CanvasText;
   }
@@ -256,19 +269,18 @@
 .gatilho .nome {
   flex: 0 1 auto;
 }
-/* Peças internas do seletor: o anel e a borda de seleção já identificam o
-   bloco e as turmas, sem repetir a borda do controle externo. */
+/* Peças internas do seletor: o preenchimento identifica o bloco e as turmas,
+   sem repetir o contorno do controle externo. */
 .blocoSerie {
   min-width: 0;
-  border: 1px solid transparent;
   border-radius: 1rem;
   background: var(--card);
 }
 .blocoSerie[data-selecionada="true"] {
-  border-color: color-mix(in oklab, var(--justificada) 40%, var(--border));
+  background: color-mix(in oklab, var(--justificada) 6%, var(--card));
 }
 .serie {
-  border: 0;
+  border: 1px solid var(--borda-controle);
   border-radius: inherit;
   box-shadow: none;
 }
@@ -281,7 +293,7 @@
 }
 @media (forced-colors: active) {
   .blocoSerie {
-    border-color: ButtonText;
+    border: 1px solid ButtonText;
     background: Canvas;
     box-shadow: none;
   }
@@ -297,7 +309,6 @@
   aspect-ratio: 1;
   align-self: start;
   justify-self: center;
-  border-color: transparent;
   border-radius: 1rem;
   padding: 10px;
 }
@@ -327,7 +338,7 @@
 }
 @media (forced-colors: active) {
   .turma {
-    border-color: ButtonText;
+    border: 1px solid ButtonText;
   }
   .anel,
   .turma:where([data-situacao="pendente"]) .anel {

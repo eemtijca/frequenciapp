@@ -201,7 +201,7 @@ test("Chamada: painel compacto e barra cabem em telas pequenas e ampliadas", asy
       const circulo = await turma.boundingBox();
       expect(circulo?.height).toBeGreaterThanOrEqual(44);
       expect(circulo?.width).toBeLessThanOrEqual(64);
-      const anel = await turma.locator("svg").boundingBox();
+      const anel = await turma.locator("[data-progresso] svg").boundingBox();
       expect(anel?.width).toBeGreaterThanOrEqual((circulo?.width ?? 0) - 10);
       expect(Math.abs((circulo?.width ?? 0) - (circulo?.height ?? 0))).toBeLessThanOrEqual(1);
       expect((circulo?.x ?? 0) + (circulo?.width ?? 0)).toBeLessThanOrEqual(largura);

@@ -23,7 +23,7 @@ export function BarraBusca({
   className,
 }: Props) {
   return (
-    <div className={cn("campo flex items-center gap-2 px-3 py-1", className)}>
+    <div className={cn("campo campo-texto flex items-center gap-2 px-3 py-1", className)}>
       <Search size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
       <label htmlFor={id} className="sr-only">
         {rotulo}

@@ -30,7 +30,7 @@ describe("gatilho do seletor de período", () => {
     expect(html).toContain("seg.");
     expect(html).toContain("segunda-feira");
     expect(html).toContain("Hoje");
-    const detalhe = html.match(/<span class="text-muted-foreground [^"]+">/)?.[0] ?? "";
+    const detalhe = html.match(/<span class="detalhe-data [^"]+">/)?.[0] ?? "";
     const selo = html.match(/<span class="bg-primary\/15 [^"]+">/)?.[0] ?? "";
     expect(detalhe).not.toBe("");
     expect(selo).not.toBe("");

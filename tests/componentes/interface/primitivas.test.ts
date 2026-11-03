@@ -21,10 +21,13 @@ afterAll(async () => {
 interface Medida {
   fundo: Rgb;
   preenchimento: Rgb;
-  borda: Rgb;
+  linha: Rgb;
+  bordaTopo: Rgb;
+  imagemFundo: string;
   texto: Rgb;
   raio: string;
-  bordaPx: string;
+  bordaTopoPx: string;
+  bordaBasePx: string;
   altura: number;
 }
 
@@ -60,13 +63,21 @@ async function medir(page: Page, rotulo: string): Promise<Medida> {
     const estilo = getComputedStyle(campo);
     const texto = getComputedStyle(alvo);
     const fundoMedido = cor(getComputedStyle(fundo).backgroundColor);
+    const sonda = document.createElement("span");
+    sonda.style.color = "var(--linha-campo)";
+    document.body.append(sonda);
+    const corLinha = getComputedStyle(sonda).color;
+    sonda.remove();
     return {
       fundo: fundoMedido,
       preenchimento: compor(estilo.backgroundColor, fundoMedido),
-      borda: compor(estilo.borderTopColor, fundoMedido),
+      linha: compor(corLinha, fundoMedido),
+      bordaTopo: compor(estilo.borderTopColor, fundoMedido),
+      imagemFundo: estilo.backgroundImage,
       texto: cor(texto.color),
       raio: estilo.borderRadius,
-      bordaPx: estilo.borderTopWidth,
+      bordaTopoPx: estilo.borderTopWidth,
+      bordaBasePx: estilo.borderBottomWidth,
       altura: campo.getBoundingClientRect().height,
     };
   });
@@ -82,13 +93,25 @@ for (const tema of ["light", "dark"] as const) {
 
         for (const tipo of ["Texto", "Seletor", "Buscável", "Busca"] as const) {
           const medida = await medir(page, `${tipo} ${superficie}`);
-          expect(medida.bordaPx, `${tipo}: borda`).toBe("1px");
+          const temLinha = tipo === "Texto" || tipo === "Busca";
+          expect(medida.bordaTopoPx, `${tipo}: borda superior`).toBe(temLinha ? "0px" : "1px");
+          expect(medida.bordaBasePx, `${tipo}: borda inferior`).toBe(temLinha ? "0px" : "1px");
+          expect(medida.imagemFundo.includes("linear-gradient"), `${tipo}: linha de fundo`).toBe(
+            temLinha,
+          );
           expect(medida.raio, `${tipo}: raio`).toBe("16px");
           expect(medida.altura, `${tipo}: altura`).toBeGreaterThanOrEqual(43.99);
-          expect(
-            contraste(medida.borda, medida.fundo),
-            `${tipo}: contraste da borda`,
-          ).toBeGreaterThanOrEqual(3);
+          if (temLinha) {
+            expect(
+              contraste(medida.linha, medida.fundo),
+              `${tipo}: contraste da linha inferior`,
+            ).toBeGreaterThanOrEqual(3);
+          } else {
+            expect(
+              contraste(medida.bordaTopo, medida.fundo),
+              `${tipo}: contraste do fio`,
+            ).toBeGreaterThanOrEqual(1.3);
+          }
           expect(
             contraste(medida.texto, medida.preenchimento),
             `${tipo}: contraste do texto`,
@@ -108,10 +131,15 @@ for (const tema of ["light", "dark"] as const) {
         expect(desabilitado.preenchimento, "desabilitado: fundo distinto").not.toEqual(
           normal.preenchimento,
         );
-        expect(desabilitado.borda, "desabilitado: borda distinta").not.toEqual(normal.borda);
+        expect(desabilitado.imagemFundo, "desabilitado: linha distinta").not.toBe(
+          normal.imagemFundo,
+        );
 
         const invalido = await medir(page, `Inválido ${superficie}`);
-        expect(invalido.borda, "inválido: borda distinta").not.toEqual(normal.borda);
+        expect(invalido.preenchimento, "inválido: fundo distinto").not.toEqual(
+          normal.preenchimento,
+        );
+        expect(invalido.imagemFundo, "inválido: linha distinta").not.toBe(normal.imagemFundo);
       } finally {
         await page.close();
       }
@@ -126,6 +154,16 @@ for (const tema of ["light", "dark"] as const) {
       await page.goto(servidor.url);
       await aguardarTema(page, tema);
       const medidas = await page.evaluate(() => {
+        const tela = document.createElement("canvas");
+        tela.width = tela.height = 1;
+        const desenho = tela.getContext("2d");
+        if (!desenho) throw new Error("Canvas indisponível");
+        const cor = (valor: string): number[] => {
+          desenho.clearRect(0, 0, 1, 1);
+          desenho.fillStyle = valor;
+          desenho.fillRect(0, 0, 1, 1);
+          return Array.from(desenho.getImageData(0, 0, 1, 1).data).slice(0, 3);
+        };
         const criar = (expandido: boolean) => {
           const botao = document.createElement("button");
           botao.type = "button";
@@ -136,15 +174,33 @@ for (const tema of ["light", "dark"] as const) {
           const css = getComputedStyle(botao);
           return {
             fundo: css.backgroundColor,
-            borda: css.borderTopColor,
+            fundoRgb: cor(css.backgroundColor),
+            paginaRgb: cor(getComputedStyle(document.body).backgroundColor),
+            bordaTopoRgb: cor(css.borderTopColor),
+            bordaTopoPx: css.borderTopWidth,
             raio: css.borderRadius,
           };
         };
         return { expandido: criar(true), recolhido: criar(false) };
       });
+      const rgb = (canais: number[]): Rgb => [
+        (canais[0] ?? 0) / 255,
+        (canais[1] ?? 0) / 255,
+        (canais[2] ?? 0) / 255,
+      ];
       expect(medidas.expandido.raio).toBe("16px");
+      expect(medidas.expandido.bordaTopoPx).toBe("1px");
+      expect(medidas.expandido.fundo).not.toBe("rgba(0, 0, 0, 0)");
+      expect(medidas.recolhido.fundo).not.toBe("rgba(0, 0, 0, 0)");
       expect(medidas.expandido.fundo).not.toBe(medidas.recolhido.fundo);
-      expect(medidas.expandido.borda).not.toBe(medidas.recolhido.borda);
+      expect(
+        contraste(rgb(medidas.recolhido.bordaTopoRgb), rgb(medidas.recolhido.paginaRgb)),
+        "fio do controle contra a página",
+      ).toBeGreaterThanOrEqual(1.3);
+      expect(
+        contraste(rgb(medidas.recolhido.bordaTopoRgb), rgb(medidas.recolhido.fundoRgb)),
+        "fio do controle contra o fundo",
+      ).toBeGreaterThanOrEqual(1.2);
     } finally {
       await page.close();
     }
