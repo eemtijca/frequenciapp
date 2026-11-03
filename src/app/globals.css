@@ -99,15 +99,17 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --alerta: oklch(0.7 0.15 75);
   --alerta-fraca: oklch(0.965 0.045 90);
   --alerta-texto: oklch(0.45 0.1 65);
-  --border: oklch(0.9 0.006 90);
-  --input: oklch(0.62 0.008 90);
+  --border: oklch(0.93 0.005 90);
+  --input: oklch(0.64 0.008 90);
   --ring: oklch(0.55 0.1 160);
   /* Contrato de superfícies e controles compartilhados. */
   --borda-controle: var(--input);
   --superficie-controle: var(--secondary);
   --superficie-interna: oklch(0.975 0.003 90);
   --trilho: oklch(0.9 0.005 90);
-  --texto-desabilitado: oklch(0.52 0.008 90);
+  --superficie-desabilitada: oklch(0.92 0.003 90);
+  --borda-desabilitada: oklch(0.82 0.005 90);
+  --texto-desabilitado: oklch(0.48 0.008 90);
   --interruptor-fundo: oklch(0.9 0.005 90);
   --selecionado-fundo: color-mix(in oklab, var(--primary) 12%, var(--card));
   --selecionado-borda: color-mix(in oklab, var(--primary) 28%, var(--border));
@@ -124,7 +126,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --sidebar-primary-foreground: oklch(0.985 0.002 90);
   --sidebar-accent: oklch(0.945 0.016 160);
   --sidebar-accent-foreground: oklch(0.36 0.07 160);
-  --sidebar-border: oklch(0.9 0.006 90);
+  --sidebar-border: oklch(0.93 0.005 90);
   --sidebar-ring: oklch(0.55 0.1 160);
 }
 
@@ -137,7 +139,7 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --popover-foreground: oklch(0.945 0.003 90);
   --primary: oklch(0.7 0.13 160);
   --primary-foreground: oklch(0.21 0.04 160);
-  --secondary: oklch(0.3 0.006 90);
+  --secondary: oklch(0.28 0.006 90);
   --secondary-foreground: oklch(0.945 0.003 90);
   --muted: oklch(0.282 0.006 90);
   --muted-foreground: oklch(0.72 0.008 90);
@@ -155,14 +157,16 @@ body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bot
   --alerta: oklch(0.75 0.15 80);
   --alerta-fraca: oklch(0.32 0.06 80);
   --alerta-texto: oklch(0.85 0.14 85);
-  --border: oklch(1 0 0 / 18%);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 38%);
   --ring: oklch(0.66 0.1 160);
   --borda-controle: var(--input);
   --superficie-controle: var(--secondary);
   --superficie-interna: oklch(0.26 0.005 90);
   --trilho: oklch(1 0 0 / 14%);
-  --texto-desabilitado: oklch(0.62 0.008 90);
+  --superficie-desabilitada: oklch(0.22 0.005 90);
+  --borda-desabilitada: oklch(1 0 0 / 8%);
+  --texto-desabilitado: oklch(0.68 0.008 90);
   --interruptor-fundo: oklch(1 0 0 / 24%);
   --selecionado-fundo: color-mix(in oklab, var(--primary) 18%, var(--card));
   --selecionado-borda: color-mix(in oklab, var(--primary) 38%, var(--border));

@@ -930,7 +930,7 @@ export default function VistaFrequencia({
                 setCarregando(false);
                 nav.voltarParaHoje();
               }}
-              className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:opacity-50"
+              className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
             >
               Voltar para hoje
             </button>
@@ -1475,7 +1475,7 @@ export default function VistaFrequencia({
                                         atual === aluno.id ? null : aluno.id,
                                       )
                                     }
-                                    className={`${estilos.acao} pressionavel my-3 mr-2 h-11 shrink-0 px-3 text-xs font-medium disabled:opacity-50`}
+                                    className={`${estilos.acao} pressionavel my-3 mr-2 h-11 shrink-0 px-3 text-xs font-medium`}
                                   >
                                     Aulas
                                   </button>
@@ -1523,7 +1523,7 @@ export default function VistaFrequencia({
                                           aria-pressed={marcada}
                                           disabled={bloqueado}
                                           onClick={() => alternarAula(aluno.id, aula.id)}
-                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl border border-transparent px-3 text-xs font-medium transition-colors disabled:opacity-50 ${
+                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl border border-transparent px-3 text-xs font-medium transition-colors disabled:border-[var(--borda-desabilitada)] disabled:bg-[var(--superficie-desabilitada)] disabled:text-[var(--texto-desabilitado)] ${
                                             marcada
                                               ? "bg-falta-fraca text-falta-texto"
                                               : "bg-secondary text-secondary-foreground"
@@ -1538,7 +1538,7 @@ export default function VistaFrequencia({
                                     <button
                                       type="button"
                                       disabled={bloqueado}
-                                      className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
+                                      className="text-primary pressionavel font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
                                       onClick={() =>
                                         definirAulas(
                                           aluno.id,
@@ -1551,7 +1551,7 @@ export default function VistaFrequencia({
                                     <button
                                       type="button"
                                       disabled={bloqueado}
-                                      className="text-primary pressionavel font-medium hover:underline disabled:opacity-50"
+                                      className="text-primary pressionavel font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
                                       onClick={() => definirAulas(aluno.id, [])}
                                     >
                                       Nenhuma

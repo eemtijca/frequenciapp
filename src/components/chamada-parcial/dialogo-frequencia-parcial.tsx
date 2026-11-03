@@ -298,7 +298,7 @@ export function DialogoFrequenciaParcial({
                     aria-checked={edicao.tipo === tipo}
                     disabled={futuro && tipo !== "JUSTIFICADA"}
                     onClick={() => onEdicao({ ...edicao, tipo })}
-                    className="controle pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-45"
+                    className="controle pressionavel flex h-11 flex-1 items-center justify-center px-3 text-sm font-medium disabled:cursor-not-allowed"
                   >
                     {rotulo}
                   </button>

@@ -68,10 +68,12 @@
   }
 
   .selecionado,
+  .campo:where([aria-expanded="true"]),
   .controle:where(
       [aria-pressed="true"],
       [aria-selected="true"],
       [aria-checked="true"],
+      [aria-expanded="true"],
       [data-state="active"]
     ):not(.primario, .destrutivo) {
     border: 1px solid var(--selecionado-borda);
@@ -174,8 +176,8 @@
   .primario[aria-disabled="true"],
   .destrutivo:disabled,
   .destrutivo[aria-disabled="true"] {
-    border-color: var(--borda-controle);
-    background-color: var(--superficie-controle);
+    border-color: var(--borda-desabilitada);
+    background-color: var(--superficie-desabilitada);
     color: var(--texto-desabilitado);
     opacity: 1;
     cursor: not-allowed;
@@ -195,10 +197,12 @@
     }
 
     .selecionado:where(:not(:disabled, [aria-disabled="true"]):hover),
+    .campo:where([aria-expanded="true"]):not(:disabled):hover,
     .controle:where(
         [aria-pressed="true"],
         [aria-selected="true"],
         [aria-checked="true"],
+        [aria-expanded="true"],
         [data-state="active"]
       ):not(.primario, .destrutivo):where(:not(:disabled):hover) {
       background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
@@ -241,10 +245,12 @@
     }
 
     .selecionado,
+    .campo:where([aria-expanded="true"]),
     .controle:where(
       [aria-pressed="true"],
       [aria-selected="true"],
       [aria-checked="true"],
+      [aria-expanded="true"],
       [data-state="active"]
     ) {
       outline: 2px solid Highlight;

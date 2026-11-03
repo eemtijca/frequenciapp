@@ -15,8 +15,10 @@ A linguagem de blocos suaves foi aplicada com regras específicas para o tema cl
 - Controles neutros usam fundo suave e borda de 1 px nos dois temas.
 - Campos usam superfície de cartão e a mesma borda funcional dos controles.
 - O raio padrão é 16 px em cartões e controles, 12 px em superfícies internas e 999 px em pílulas.
-- Estados desabilitados usam `--texto-desabilitado` e `--superficie-controle`, sem `opacity` global.
+- Estados desabilitados usam `--superficie-desabilitada`, `--borda-desabilitada` e `--texto-desabilitado`, sem `opacity` global. O texto desabilitado mantém 4,5:1 e a superfície fica visualmente distinta do controle habilitado.
+- O estado expandido de seletores e divulgações usa o mesmo tratamento de seleção dos controles selecionados.
 - Texto normal deve ter 4,5:1; fronteira de controle e foco, 3:1; estados desabilitados precisam continuar legíveis.
+- Peças internas de um controle composto, como séries e turmas do seletor de turmas, podem usar o anel de seleção como contorno e não repetem a borda do controle externo.
 - Nenhum CSS de componente pode conter `html:not(.dark)`, `html.light`, hexadecimal ou `oklch` fixo.
 - As cores de gráfico são derivadas de `--primary`, `--falta` e `--foreground`, para manter a mesma relação perceptual nos dois temas.
 - A validação visual com Playwright descartável, em desktop e mobile, faz parte da definição de pronto.
