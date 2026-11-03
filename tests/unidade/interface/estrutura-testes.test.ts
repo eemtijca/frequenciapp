@@ -21,6 +21,7 @@ describe("estrutura dos testes de interface", () => {
 
   it("não usa os artefatos visuais removidos", () => {
     for (const arquivo of arquivos("tests", [".ts", ".tsx"])) {
+      if (arquivo.endsWith("estrutura-testes.test.ts")) continue;
       const texto = readFileSync(arquivo, "utf8");
       expect(texto, arquivo).not.toContain("controle-contornado");
       expect(texto, arquivo).not.toContain("paridade-campos");
