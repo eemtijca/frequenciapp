@@ -30,6 +30,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { useMinutoCorrente } from "@/lib/use-relogio";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,7 +73,11 @@ export default function VistaEntradas({
   const dia = nav.dia;
   const [turma, setTurma] = useState("");
   const [alunoId, setAlunoId] = useState("");
-  const [horario, setHorario] = useState(() => horaNoFuso(new Date().toISOString(), fuso));
+  const [horario, setHorario] = useState("");
+  const minuto = useMinutoCorrente();
+  const horarioInicial =
+    minuto === null ? "" : horaNoFuso(new Date(minuto * 60_000).toISOString(), fuso);
+  const horarioEfetivo = horario || horarioInicial;
   const [motivo, setMotivo] = useState("");
   const [momento, setMomento] = useState("");
   const [responsavelCodigo, setResponsavelCodigo] = useState("");
@@ -239,7 +244,7 @@ export default function VistaEntradas({
         ...corpoJson({
           alunoId,
           dia,
-          horario,
+          horario: horarioEfetivo,
           momento,
           responsavelRegistroCodigo: responsavelCodigo,
           ...(formaJustificativa === "texto"
@@ -415,7 +420,7 @@ export default function VistaEntradas({
               turma={turma}
               alunoId={alunoId}
               momento={momento}
-              horario={horario}
+              horario={horarioEfetivo}
               responsavel={responsavelCodigo}
               forma={formaJustificativa}
               texto={motivo}
@@ -543,7 +548,7 @@ export default function VistaEntradas({
           },
           { rotulo: "Dia", valor: rotuloData(dia) },
           { rotulo: "Momento", valor: momento ? rotuloMomento(momento) : "" },
-          { rotulo: "Horário", valor: horario },
+          { rotulo: "Horário", valor: horarioEfetivo },
           { rotulo: "Justificativa", valor: justificativaConfirmacao },
           {
             rotulo: "Observação",

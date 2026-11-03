@@ -56,6 +56,7 @@ import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { useMinutoCorrente } from "@/lib/use-relogio";
 
 interface Props {
   diaCorrente: string;
@@ -101,7 +102,11 @@ export default function VistaSaidas({
   const [turmaFiltro, setTurmaFiltro] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [momento, setMomento] = useState("");
-  const [horario, setHorario] = useState(() => horaNoFuso(new Date().toISOString(), fuso));
+  const [horario, setHorario] = useState("");
+  const minuto = useMinutoCorrente();
+  const horarioInicial =
+    minuto === null ? "" : horaNoFuso(new Date(minuto * 60_000).toISOString(), fuso);
+  const horarioEfetivo = horario || horarioInicial;
   const [formaJustificativa, setFormaJustificativa] = useState<FormaJustificativa>("catalogo");
   const [justificativa, setJustificativa] = useState("");
   const [texto, setTexto] = useState("");
@@ -284,7 +289,7 @@ export default function VistaSaidas({
           alunoId,
           dia,
           momento,
-          horario,
+          horario: horarioEfetivo,
           justificativa: formaJustificativa === "catalogo" ? justificativa : undefined,
           texto:
             formaJustificativa === "texto"
@@ -533,7 +538,7 @@ export default function VistaSaidas({
               turma={turmaFiltro}
               alunoId={alunoId}
               momento={momento}
-              horario={horario}
+              horario={horarioEfetivo}
               responsavel={responsavelCodigo}
               forma={formaJustificativa}
               texto={texto}
@@ -670,7 +675,7 @@ export default function VistaSaidas({
           { rotulo: "Turma", valor: turmaConfirmacao },
           { rotulo: "Dia", valor: rotuloDia },
           { rotulo: "Momento", valor: momento ? rotuloMomento(momento) : "" },
-          { rotulo: "Horário", valor: horario },
+          { rotulo: "Horário", valor: horarioEfetivo },
           { rotulo: "Justificativa", valor: justificativaConfirmacao },
           {
             rotulo: "Observação",
