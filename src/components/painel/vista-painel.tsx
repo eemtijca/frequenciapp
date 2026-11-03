@@ -500,7 +500,7 @@ export default function VistaPainel({
                         </span>
                         <BarraProgresso
                           valor={largura}
-                          tom={config?.tom ?? "primary"}
+                          tom={config?.tom ?? "muted"}
                           rotulo="Infrequência do dia"
                           descricao={texto}
                           testId="infrequencia-preenchida"

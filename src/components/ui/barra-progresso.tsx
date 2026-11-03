@@ -1,12 +1,13 @@
 // Barra de progresso compartilhada com trilho neutro e leitura acessível.
 import { cn } from "@/lib/utils";
 
-type TomBarra = "primary" | "alerta" | "falta";
+type TomBarra = "primary" | "alerta" | "falta" | "muted";
 
 const TONS: Record<TomBarra, string> = {
   primary: "bg-primary",
   alerta: "bg-alerta",
   falta: "bg-falta",
+  muted: "bg-muted",
 };
 
 interface Props {

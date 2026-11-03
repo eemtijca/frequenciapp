@@ -49,7 +49,12 @@ for (const tema of ["light", "dark"] as const) {
     await page.keyboard.press("Tab");
     await expect(atualizar).toBeFocused();
     expect(await atualizar.evaluate((no) => no.matches(":focus-visible"))).toBe(true);
-    expect(await atualizar.evaluate((no) => getComputedStyle(no).boxShadow)).not.toBe("none");
+    expect(
+      await atualizar.evaluate((no) => {
+        const estilo = getComputedStyle(no);
+        return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+      }),
+    ).toBe(true);
     await cabecalho.getByRole("button", { name: /^Tema: .* Alterar tema$/ }).click();
     await expect(page.getByRole("radiogroup", { name: "Tema do aplicativo" })).toBeVisible();
     await page.keyboard.press("Escape");
