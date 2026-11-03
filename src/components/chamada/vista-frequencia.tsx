@@ -17,7 +17,6 @@ import {
   CloudCheck,
   CalendarOff,
   CheckCircle2,
-  Check,
   ChartNoAxesCombined,
   FileText,
   Minus,
@@ -1450,15 +1449,9 @@ export default function VistaFrequencia({
                                   }
                                   className={`${estilos.marca} ${esmaecida ? "opacity-60" : ""}`}
                                 >
-                                  {desistente ? null : faltando ? (
-                                    codigo ? (
-                                      <FileText size={16} />
-                                    ) : (
-                                      <Minus size={16} />
-                                    )
-                                  ) : (
-                                    <Check size={16} />
-                                  )}
+                                  {!desistente &&
+                                    faltando &&
+                                    (codigo ? <FileText size={16} /> : <Minus size={16} />)}
                                   {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                                 </motion.span>
                               </div>

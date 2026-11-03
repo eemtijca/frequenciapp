@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O indicador de presença na Chamada mostra apenas a letra P, sem o ícone de confirmação ao lado.
+
 - Os controles clicáveis passam a usar superfície quase igual à do cartão e um fio de 1 px de baixo contraste nos temas claro e escuro. Botões, seletores, datas, abas, interruptores e divulgações não usam sombra; campos de texto e textarea mantêm apenas uma linha inferior funcional com 3:1. O foco de teclado continua visível, os cartões estáticos preservam a borda discreta e a seleção da Chamada recebe marca de seleção. A decisão está no [ADR-062](docs/adr/062-controles-de-superficie-suave.md).
 
 - Os controles desabilitados passam a ter superfície, borda e texto próprios, com pelo menos 4,5:1 no texto e sem opacidade manual. O estado expandido de seletores e divulgações usa o tratamento de seleção, e a borda decorativa dos cartões fica mais discreta.
