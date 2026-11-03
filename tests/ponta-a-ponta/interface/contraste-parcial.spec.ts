@@ -35,8 +35,16 @@ test("a ação Registrar se destaca da linha clara do aluno", async ({ page }, i
       desenho.fillRect(0, 0, 1, 1);
       return Array.from(desenho.getImageData(0, 0, 1, 1).data);
     };
+    const compor = (valor: string, base: number[]) => {
+      desenho.clearRect(0, 0, 1, 1);
+      desenho.fillStyle = `rgb(${base[0] ?? 0} ${base[1] ?? 0} ${base[2] ?? 0})`;
+      desenho.fillRect(0, 0, 1, 1);
+      desenho.fillStyle = valor;
+      desenho.fillRect(0, 0, 1, 1);
+      return Array.from(desenho.getImageData(0, 0, 1, 1).data);
+    };
     const css = getComputedStyle(no);
-    // Compor os fundos ancestrais: transparente não é preto.
+    // Compõe os fundos ancestrais: transparente não é preto.
     const camadas: string[] = [];
     for (let atual: Element | null = no; atual; atual = atual.parentElement) {
       camadas.unshift(getComputedStyle(atual).backgroundColor);
@@ -51,8 +59,9 @@ test("a ação Registrar se destaca da linha clara do aluno", async ({ page }, i
     const superficieComposta = Array.from(desenho.getImageData(0, 0, 1, 1).data);
     return {
       fundo: cor(css.backgroundColor),
+      fundoComposto: compor(css.backgroundColor, superficieComposta),
       texto: cor(css.color),
-      borda: cor(css.borderColor),
+      borda: compor(css.borderColor, superficieComposta),
       larguraBorda: css.borderTopWidth,
       superficie: superficieComposta,
     };
@@ -63,17 +72,16 @@ test("a ação Registrar se destaca da linha clara do aluno", async ({ page }, i
     (cor[2] ?? 0) / 255,
   ];
   const bordaSuperficie = contraste(rgb(cores.borda), rgb(cores.superficie));
-  const textoFundo = contraste(rgb(cores.texto), rgb(cores.superficie));
+  const textoFundo = contraste(rgb(cores.texto), rgb(cores.fundoComposto));
   await info.attach("medidas", {
     body: JSON.stringify({ cores, bordaSuperficie, textoFundo }),
     contentType: "application/json",
   });
   await page.screenshot({ path: info.outputPath("parcial-claro.png"), animations: "disabled" });
-  expect(cores.fundo[3]).toBe(0);
+  expect(cores.fundo[3]).toBe(255);
   expect(textoFundo).toBeGreaterThanOrEqual(4.5);
-  expect(parseFloat(cores.larguraBorda)).toBeGreaterThan(0);
-  // Contorno discreto e visível; não apresenta esta diferença como norma WCAG.
-  expect(bordaSuperficie).toBeGreaterThan(1);
+  expect(cores.larguraBorda).toBe("1px");
+  expect(bordaSuperficie).toBeGreaterThanOrEqual(3);
   await botao.click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -100,12 +108,28 @@ test("a ação preserva o tema escuro e funciona com teclado", async ({ page }, 
     exact: true,
   });
   expect(await botao.evaluate(fundo)).toBe(await anterior.evaluate(fundo));
+  const estilo = await botao.evaluate((no) => {
+    const css = getComputedStyle(no);
+    return {
+      fundo: css.backgroundColor,
+      borda: css.borderTopColor,
+      larguraBorda: css.borderTopWidth,
+    };
+  });
+  expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+  expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
+  expect(estilo.larguraBorda).toBe("1px");
   const caixa = await botao.boundingBox();
   expect(caixa?.height).toBeGreaterThanOrEqual(44);
   await page.keyboard.press("Tab");
   await botao.focus();
   await expect(botao).toBeFocused();
-  expect(await botao.evaluate((no) => getComputedStyle(no).boxShadow)).not.toBe("none");
+  expect(
+    await botao.evaluate((no) => {
+      const css = getComputedStyle(no);
+      return css.outlineStyle !== "none" || css.boxShadow !== "none";
+    }),
+  ).toBe(true);
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.screenshot({ path: info.outputPath("parcial-escuro.png"), animations: "disabled" });

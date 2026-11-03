@@ -37,7 +37,9 @@ import { ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
 import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
+import { BarraProgresso } from "@/components/ui/barra-progresso";
 import { Button } from "@/components/ui/button";
+import { CartaoIndicador } from "@/components/ui/cartao-indicador";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
@@ -50,7 +52,6 @@ import {
   useContextoAtualizacao,
   useAtualizacaoTela,
 } from "@/components/atualizacao/contexto-atualizacao";
-import estilos from "./vista-painel.module.css";
 
 interface Props {
   ativo: boolean;
@@ -75,19 +76,19 @@ const percentual = new Intl.NumberFormat("pt-BR", {
 const NIVEIS = {
   baixa: {
     rotulo: "Dentro do esperado",
-    barra: "bg-primary",
+    tom: "primary",
     texto: "text-primary",
     Icone: CheckCircle2,
   },
   atencao: {
     rotulo: "Atenção",
-    barra: "bg-alerta",
+    tom: "alerta",
     texto: "text-alerta-texto",
     Icone: TriangleAlert,
   },
   critica: {
     rotulo: "Acima do limite",
-    barra: "bg-falta",
+    tom: "falta",
     texto: "text-falta-texto",
     Icone: CircleAlert,
   },
@@ -380,7 +381,7 @@ export default function VistaPainel({
         <Button
           variant="outline"
           size="icon"
-          className={`size-11 shrink-0 ${estilos.seta}`}
+          className="size-11 shrink-0"
           aria-label="Dia anterior"
           onClick={() => nav.anterior()}
         >
@@ -409,7 +410,7 @@ export default function VistaPainel({
         <Button
           variant="outline"
           size="icon"
-          className={`size-11 shrink-0 ${estilos.seta}`}
+          className="size-11 shrink-0"
           aria-label="Dia seguinte"
           disabled={nav.seguinteDesabilitado}
           onClick={() => nav.seguinte()}
@@ -460,21 +461,17 @@ export default function VistaPainel({
           {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
 
           <div className="grid grid-cols-2 items-stretch gap-3">
-            <div
-              role="group"
-              className="superficie flex flex-col justify-between gap-2 p-3.5 sm:px-5 sm:py-4"
-              aria-label="Resumo do dia"
-              aria-busy={carregandoPainel}
+            <CartaoIndicador
+              titulo="Infrequência"
+              rotuloAcessivel="Resumo do dia"
+              ocupado={carregandoPainel}
             >
-              <div className="flex min-w-0 flex-col gap-1">
-                <h2 className="text-sm font-medium sm:text-base">Infrequência</h2>
-                {!feriado && !carregandoPainel && resumo.parciais > 0 && (
-                  <span className="text-muted-foreground text-xs">
-                    {resumo.parciais}{" "}
-                    {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
-                  </span>
-                )}
-              </div>
+              {!feriado && !carregandoPainel && resumo.parciais > 0 && (
+                <span className="text-muted-foreground text-xs">
+                  {resumo.parciais}{" "}
+                  {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+                </span>
+              )}
               <div className="flex flex-col gap-2">
                 {feriado ? (
                   <IndicadorFeriado nome={feriado.nome} />
@@ -501,22 +498,13 @@ export default function VistaPainel({
                         >
                           {config ? percentual.format(resumo.infrequencia) : "Sem dados"}
                         </span>
-                        <div
-                          role="progressbar"
-                          aria-label="Infrequência do dia"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={Math.round(largura)}
-                          aria-valuetext={texto}
-                          className="ring-border bg-secondary h-3 w-full overflow-hidden rounded-full ring-1 ring-inset"
-                        >
-                          <div
-                            data-testid="infrequencia-preenchida"
-                            aria-hidden="true"
-                            className={`h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none ${config?.barra ?? "bg-muted"}`}
-                            style={{ width: `${largura}%` }}
-                          />
-                        </div>
+                        <BarraProgresso
+                          valor={largura}
+                          tom={config?.tom ?? "muted"}
+                          rotulo="Infrequência do dia"
+                          descricao={texto}
+                          testId="infrequencia-preenchida"
+                        />
                         {config && Icone ? (
                           <span className={`flex items-center gap-1.5 text-xs ${config.texto}`}>
                             <Icone aria-hidden="true" className="size-4 shrink-0" />
@@ -528,7 +516,7 @@ export default function VistaPainel({
                   })()
                 )}
               </div>
-            </div>
+            </CartaoIndicador>
             <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
           </div>
 

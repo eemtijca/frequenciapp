@@ -6,7 +6,6 @@ import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import estilos from "./seletores-contorno.module.css";
 
 interface Props {
   id: string;
@@ -120,8 +119,7 @@ export function SeletorAno({
           aria-label={rotuloAcessivel}
           onClick={() => aoAbrir(!aberto)}
           className={cn(
-            "controle focus-visible:ring-ring pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-            estilos.contorno,
+            "campo pressionavel flex h-11 w-full items-center justify-center gap-2 px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed",
           )}
         >
           <CalendarDays
@@ -151,8 +149,7 @@ export function SeletorAno({
                 setFoco((atual) => Math.max(min, atual - ANOS_POR_BLOCO));
               }}
               className={cn(
-                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
-                estilos.contorno,
+                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed",
               )}
             >
               <ChevronLeft size={18} />
@@ -169,8 +166,7 @@ export function SeletorAno({
                 setFoco((atual) => Math.min(max, atual + ANOS_POR_BLOCO));
               }}
               className={cn(
-                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
-                estilos.contorno,
+                "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed",
               )}
             >
               <ChevronRight size={18} />

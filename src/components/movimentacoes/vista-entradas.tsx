@@ -25,8 +25,9 @@ import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atuali
 import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
+import { Campo } from "@/components/ui/campo";
+import { GrupoOpcoes } from "@/components/ui/grupo-opcoes";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
@@ -414,8 +415,7 @@ export default function VistaEntradas({
           >
             <h2 className="font-medium">Registrar entrada</h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-turma">Turma</Label>
+              <Campo id="entrada-turma" rotulo="Turma">
                 <Selecionar
                   id="entrada-turma"
                   value={turma || "todas"}
@@ -427,9 +427,8 @@ export default function VistaEntradas({
                   }}
                   opcoes={opcoesTurma}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
-                <Label htmlFor="entrada-aluno">Aluno</Label>
+              </Campo>
+              <Campo id="entrada-aluno" rotulo="Aluno" className="md:col-span-1 xl:col-span-2">
                 <Selecionar
                   id="entrada-aluno"
                   value={alunoId}
@@ -439,9 +438,8 @@ export default function VistaEntradas({
                   opcoes={opcoesAluno}
                   placeholder="Selecione o aluno"
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-momento">Momento da entrada</Label>
+              </Campo>
+              <Campo id="entrada-momento" rotulo="Momento da entrada">
                 <Selecionar
                   id="entrada-momento"
                   value={momento}
@@ -450,9 +448,8 @@ export default function VistaEntradas({
                   placeholder="Selecione a aula ou pausa"
                   opcoes={OPCOES_MOMENTO}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-horario">Horário da chegada</Label>
+              </Campo>
+              <Campo id="entrada-horario" rotulo="Horário da chegada">
                 <SeletorHorario
                   id="entrada-horario"
                   valor={horario}
@@ -461,41 +458,26 @@ export default function VistaEntradas({
                   agora={horaNoFuso(new Date().toISOString(), fuso)}
                   disabled={executando}
                 />
-              </div>
+              </Campo>
               <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
                 <legend className="text-sm font-medium">Justificativa</legend>
-                <div
-                  role="radiogroup"
-                  aria-label="Forma da justificativa"
-                  className="flex flex-wrap gap-2"
-                >
-                  {(
-                    [
-                      { valor: "texto", rotulo: "Escrever" },
-                      { valor: "catalogo", rotulo: "Selecionar tipo" },
-                    ] as const
-                  ).map((item) => (
-                    <button
-                      key={item.valor}
-                      type="button"
-                      role="radio"
-                      aria-checked={formaJustificativa === item.valor}
-                      disabled={executando}
-                      onClick={() => {
-                        setFormaJustificativa(item.valor);
-                        setMotivo("");
-                        setJustificativa("");
-                        setObservacao("");
-                      }}
-                      className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === item.valor ? "selecionado" : "controle-contornado"}`}
-                    >
-                      {item.rotulo}
-                    </button>
-                  ))}
-                </div>
+                <GrupoOpcoes
+                  rotulo="Forma da justificativa"
+                  valor={formaJustificativa}
+                  disabled={executando}
+                  onValor={(valor) => {
+                    setFormaJustificativa(valor);
+                    setMotivo("");
+                    setJustificativa("");
+                    setObservacao("");
+                  }}
+                  opcoes={[
+                    { valor: "texto", rotulo: "Escrever" },
+                    { valor: "catalogo", rotulo: "Selecionar tipo" },
+                  ]}
+                />
                 {formaJustificativa === "texto" ? (
-                  <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="entrada-motivo">Texto da justificativa</Label>
+                  <Campo id="entrada-motivo" rotulo="Texto da justificativa">
                     <Input
                       id="entrada-motivo"
                       required
@@ -507,11 +489,10 @@ export default function VistaEntradas({
                       placeholder="Descreva o motivo"
                       className="h-11"
                     />
-                  </div>
+                  </Campo>
                 ) : (
                   <>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="entrada-justificativa">Tipo</Label>
+                    <Campo id="entrada-justificativa" rotulo="Tipo">
                       <Selecionar
                         id="entrada-justificativa"
                         value={justificativa}
@@ -520,9 +501,8 @@ export default function VistaEntradas({
                         placeholder="Selecione a justificativa"
                         opcoes={opcoesJustificativa}
                       />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="entrada-observacao">Observação</Label>
+                    </Campo>
+                    <Campo id="entrada-observacao" rotulo="Observação">
                       <Input
                         id="entrada-observacao"
                         value={observacao}
@@ -532,12 +512,19 @@ export default function VistaEntradas({
                         placeholder="Opcional: descreva brevemente o motivo"
                         className="h-11"
                       />
-                    </div>
+                    </Campo>
                   </>
                 )}
               </fieldset>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="entrada-responsavel">Responsável pelo registro</Label>
+              <Campo
+                id="entrada-responsavel"
+                rotulo="Responsável pelo registro"
+                descricao={
+                  opcoesResponsavel.length === 0
+                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
+                    : undefined
+                }
+              >
                 <Selecionar
                   id="entrada-responsavel"
                   value={responsavelCodigo}
@@ -546,12 +533,7 @@ export default function VistaEntradas({
                   placeholder="Selecione quem registrou"
                   opcoes={opcoesResponsavel}
                 />
-                {opcoesResponsavel.length === 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
-                  </p>
-                )}
-              </div>
+              </Campo>
             </div>
             <div className="flex justify-end">
               <Button

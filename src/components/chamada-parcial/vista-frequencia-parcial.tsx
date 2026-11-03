@@ -67,7 +67,6 @@ import {
   type EdicaoParcial,
 } from "./dialogo-frequencia-parcial";
 import { DialogoEnviarParciais } from "./dialogo-enviar-parciais";
-import estilos from "./vista-frequencia-parcial.module.css";
 
 interface Props {
   series: Serie[];
@@ -798,7 +797,7 @@ export default function VistaFrequenciaParcial({
                                 disabled={
                                   ocupado || editorAberto || Boolean(feriado) || aluno.desistente
                                 }
-                                className={cn("h-11", estilos.acaoRegistro)}
+                                className="h-11"
                               >
                                 {registro ? <Pencil size={15} /> : <Plus size={15} />}
                                 {registro ? "Editar" : "Registrar"}

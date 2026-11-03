@@ -4,11 +4,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { normalizar } from "@/domain/frequencia";
+import { GatilhoSelecao } from "@/components/ui/gatilho-selecao";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PropsSelecionar } from "@/components/ui/selecionar";
 import { cn } from "@/lib/utils";
-import estilos from "./campos.module.css";
 
 export function SelecionarBuscavel({
   id,
@@ -112,9 +112,8 @@ export function SelecionarBuscavel({
   return (
     <Popover open={aberto} onOpenChange={mudarAberto}>
       <PopoverTrigger asChild>
-        <button
+        <GatilhoSelecao
           ref={gatilho}
-          type="button"
           id={id}
           role="combobox"
           aria-label={ariaLabel}
@@ -128,15 +127,11 @@ export function SelecionarBuscavel({
               mudarAberto(true);
             }
           }}
-          className={cn(
-            estilos.campo,
-            "controle border-input focus-visible:border-ring focus-visible:ring-ring/50 pressionavel flex h-11 w-full items-center justify-between gap-2 px-3 text-sm font-medium transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate",
-            className,
-          )}
+          className={cn("justify-between [&>span]:truncate", className)}
         >
           <span>{selecionada?.rotulo ?? placeholder}</span>
           <ChevronDown size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-        </button>
+        </GatilhoSelecao>
       </PopoverTrigger>
       <PopoverContent
         id={idPainel}

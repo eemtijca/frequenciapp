@@ -29,18 +29,20 @@ for (const rota of ["/", "/bi"]) {
               falta: "oklch(0.5 0.16 27)",
               justificada: "oklch(0.55 0.12 250)",
               alerta: "oklch(0.7 0.15 75)",
-              secondary: "oklch(0.955 0.005 90)",
-              input: "oklch(0.645 0.008 90)",
+              secondary: "oklch(0.965 0.004 90)",
+              input: "oklch(0.62 0.008 90)",
               accent: "oklch(0.945 0.016 160)",
+              trilho: "oklch(0.9 0.005 90)",
             }
           : {
               primary: "oklch(0.7 0.13 160)",
               falta: "oklch(0.55 0.17 27)",
               justificada: "oklch(0.66 0.12 250)",
               alerta: "oklch(0.75 0.15 80)",
-              secondary: "oklch(0.282 0.006 90)",
-              input: "oklch(1 0 0 / 20%)",
+              secondary: "oklch(0.3 0.006 90)",
+              input: "oklch(1 0 0 / 38%)",
               accent: "oklch(0.3 0.02 160)",
+              trilho: "oklch(1 0 0 / 14%)",
             };
       const medidas = await cartao.evaluate((no, esperados) => {
         const ctx = document.createElement("canvas").getContext("2d");

@@ -52,8 +52,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Campo } from "@/components/ui/campo";
+import { GrupoOpcoes } from "@/components/ui/grupo-opcoes";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { SeletorHorario } from "@/components/ui/seletor-horario";
@@ -533,8 +534,7 @@ export default function VistaSaidas({
           >
             <h2 className="font-medium">Registrar saída</h2>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-turma">Turma</Label>
+              <Campo id="saida-turma" rotulo="Turma">
                 <Selecionar
                   id="saida-turma"
                   value={turmaFiltro || "todas"}
@@ -545,9 +545,8 @@ export default function VistaSaidas({
                   placeholder="Todas as turmas"
                   opcoes={opcoesTurma}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5 md:col-span-1 xl:col-span-2">
-                <Label htmlFor="saida-aluno">Aluno</Label>
+              </Campo>
+              <Campo id="saida-aluno" rotulo="Aluno" className="md:col-span-1 xl:col-span-2">
                 <Selecionar
                   id="saida-aluno"
                   value={alunoId}
@@ -556,9 +555,8 @@ export default function VistaSaidas({
                   placeholder="Selecione o aluno"
                   opcoes={opcoesAluno}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-momento">Momento da saída</Label>
+              </Campo>
+              <Campo id="saida-momento" rotulo="Momento da saída">
                 <Selecionar
                   id="saida-momento"
                   value={momento}
@@ -569,9 +567,8 @@ export default function VistaSaidas({
                     rotulo: item.rotulo,
                   }))}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-horario">Horário da saída</Label>
+              </Campo>
+              <Campo id="saida-horario" rotulo="Horário da saída">
                 <SeletorHorario
                   id="saida-horario"
                   valor={horario}
@@ -580,9 +577,16 @@ export default function VistaSaidas({
                   agora={horaNoFuso(new Date().toISOString(), fuso)}
                   disabled={enviando}
                 />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="saida-responsavel">Responsável pela liberação</Label>
+              </Campo>
+              <Campo
+                id="saida-responsavel"
+                rotulo="Responsável pela liberação"
+                descricao={
+                  opcoesLiberador.length === 0
+                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
+                    : undefined
+                }
+              >
                 <Selecionar
                   id="saida-responsavel"
                   value={responsavelCodigo}
@@ -590,53 +594,32 @@ export default function VistaSaidas({
                   placeholder="Selecione quem liberou"
                   opcoes={opcoesLiberador}
                 />
-                {opcoesLiberador.length === 0 && (
-                  <p className="text-muted-foreground text-xs">
-                    Nenhum responsável cadastrado. Cadastre em Gestão, Configurações.
-                  </p>
-                )}
-              </div>
+              </Campo>
               <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
                 <legend className="text-sm font-medium">Justificativa</legend>
-                <div
-                  role="radiogroup"
-                  aria-label="Forma da justificativa"
-                  className="flex flex-wrap gap-2"
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={formaJustificativa === "texto"}
-                    onClick={() => {
-                      setFormaJustificativa("texto");
+                <GrupoOpcoes
+                  rotulo="Forma da justificativa"
+                  valor={formaJustificativa}
+                  onValor={(valor) => {
+                    setFormaJustificativa(valor);
+                    if (valor === "texto") {
                       setJustificativa("");
                       setObservacao("");
-                    }}
-                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "texto" ? "selecionado" : "controle-contornado"}`}
-                  >
-                    Escrever
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={formaJustificativa === "catalogo"}
-                    onClick={() => {
-                      setFormaJustificativa("catalogo");
-                      setTexto("");
-                    }}
-                    className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${formaJustificativa === "catalogo" ? "selecionado" : "controle-contornado"}`}
-                  >
-                    Selecionar tipo
-                  </button>
-                </div>
+                      return;
+                    }
+                    setTexto("");
+                  }}
+                  opcoes={[
+                    { valor: "texto", rotulo: "Escrever" },
+                    { valor: "catalogo", rotulo: "Selecionar tipo" },
+                  ]}
+                />
                 {formaJustificativa === "texto" ? (
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label htmlFor="saida-texto">Texto da justificativa</Label>
-                      <span className="text-muted-foreground numerais-tabulares text-xs">
-                        {texto.length}/{LIMITE_TEXTO_SAIDA}
-                      </span>
-                    </div>
+                  <Campo
+                    id="saida-texto"
+                    rotulo="Texto da justificativa"
+                    contador={`${texto.length}/${LIMITE_TEXTO_SAIDA}`}
+                  >
                     <Input
                       id="saida-texto"
                       value={texto}
@@ -645,11 +628,10 @@ export default function VistaSaidas({
                       placeholder="Descreva o motivo"
                       className="h-11"
                     />
-                  </div>
+                  </Campo>
                 ) : (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="saida-justificativa">Tipo</Label>
+                    <Campo id="saida-justificativa" rotulo="Tipo">
                       <Selecionar
                         id="saida-justificativa"
                         value={justificativa}
@@ -657,15 +639,13 @@ export default function VistaSaidas({
                         placeholder="Selecione a justificativa"
                         opcoes={opcoesJustificativa}
                       />
-                    </div>
+                    </Campo>
                     {duranteAula ? (
-                      <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label htmlFor="saida-texto">Texto da justificativa</Label>
-                          <span className="text-muted-foreground numerais-tabulares text-xs">
-                            {texto.length}/{LIMITE_TEXTO_SAIDA}
-                          </span>
-                        </div>
+                      <Campo
+                        id="saida-texto"
+                        rotulo="Texto da justificativa"
+                        contador={`${texto.length}/${LIMITE_TEXTO_SAIDA}`}
+                      >
                         <Input
                           id="saida-texto"
                           value={texto}
@@ -674,10 +654,9 @@ export default function VistaSaidas({
                           placeholder="Opcional"
                           className="h-11"
                         />
-                      </div>
+                      </Campo>
                     ) : justificativa === JUSTIFICATIVA_OUTROS ? (
-                      <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="saida-observacao">Observação</Label>
+                      <Campo id="saida-observacao" rotulo="Observação">
                         <Input
                           id="saida-observacao"
                           value={observacao}
@@ -686,7 +665,7 @@ export default function VistaSaidas({
                           placeholder="Descreva brevemente o motivo"
                           className="h-11"
                         />
-                      </div>
+                      </Campo>
                     ) : null}
                   </div>
                 )}

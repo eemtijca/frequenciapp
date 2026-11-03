@@ -21,7 +21,6 @@ import {
 } from "@/domain/frequencia";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import estilos from "./seletores-contorno.module.css";
 
 interface Props {
   id: string;
@@ -258,7 +257,6 @@ export function SeletorPeriodo({
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
           className={cn(
             "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none",
-            estilos.contorno,
           )}
         >
           <ChevronLeft size={18} />
@@ -272,8 +270,7 @@ export function SeletorPeriodo({
           disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
           className={cn(
-            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40",
-            estilos.contorno,
+            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed",
           )}
         >
           <ChevronRight size={18} />
@@ -442,8 +439,7 @@ export function SeletorPeriodo({
       aria-expanded={aberto}
       aria-label={`${rotuloAcessivel}: ${rotulo}${diaDaSemana ? `, ${diaDaSemana[0]}` : ""}${selo ? `, ${selo}` : ""}`}
       className={cn(
-        "controle focus-visible:ring-ring pressionavel @container flex min-h-11 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0 px-3 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
-        estilos.contorno,
+        "campo pressionavel @container flex min-h-11 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0 px-3 py-1 text-sm font-medium transition-colors disabled:cursor-not-allowed",
       )}
     >
       <CalendarDays

@@ -33,9 +33,9 @@ const SALVAGUARDAS = [
 const REPOSITORIO = "https://github.com/eemtijca/frequenciapp";
 const TITULO_CARTAO = "flex items-center gap-2 text-base font-semibold";
 const ACAO =
-  "controle controle-contornado pressionavel flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-sm font-medium underline-offset-4 hover:underline";
+  "controle pressionavel flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-sm font-medium underline-offset-4 hover:underline";
 const CHIP =
-  "controle controle-contornado pressionavel inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium";
+  "controle pressionavel inline-flex min-h-11 items-center gap-1.5 px-3 text-sm font-medium";
 
 export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props) {
   const focoAnterior = useRef<HTMLElement | null>(null);

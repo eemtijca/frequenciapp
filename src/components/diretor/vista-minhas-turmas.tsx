@@ -202,7 +202,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
               className={cn(
                 "controle pressionavel flex min-h-11 items-center px-4 text-sm font-medium transition-colors",
                 item.turmaId === turmaId && "selecionado",
-                item.turmaId !== turmaId && "controle-contornado",
+                item.turmaId !== turmaId && "controle",
               )}
             >
               {item.turma}
@@ -296,9 +296,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
                     onClick={() => setExibicao("grafico")}
                     className={cn(
                       "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "grafico"
-                        ? "selecionado"
-                        : "controle controle-contornado text-secondary-foreground",
+                      exibicao === "grafico" ? "selecionado" : "controle text-secondary-foreground",
                     )}
                   >
                     <ChartColumn size={16} aria-hidden="true" />
@@ -310,9 +308,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
                     onClick={() => setExibicao("tabela")}
                     className={cn(
                       "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "tabela"
-                        ? "selecionado"
-                        : "controle controle-contornado text-secondary-foreground",
+                      exibicao === "tabela" ? "selecionado" : "controle text-secondary-foreground",
                     )}
                   >
                     <Table2 size={16} aria-hidden="true" />
