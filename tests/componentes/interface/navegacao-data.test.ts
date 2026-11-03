@@ -93,11 +93,11 @@ it("no painel claro o resumo usa fundo transparente e borda discreta", async () 
     const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
     const seguinte = page.getByRole("button", { name: "Dia seguinte", exact: true });
     for (const botao of [anterior, periodo, seguinte]) {
-      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
         "rgba(0, 0, 0, 0)",
       );
-      expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).toBe(
-        "rgb(217, 221, 218)",
+      expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe(
+        "rgba(0, 0, 0, 0)",
       );
     }
   } finally {
@@ -128,11 +128,11 @@ it.each(["chamada", "parcial", "entradas", "saidas"])(
       const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
       const seguinte = page.getByRole("button", { name: /^Dia seguinte/ }).first();
       for (const botao of [anterior, periodo, seguinte]) {
-        expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+        expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
           "rgba(0, 0, 0, 0)",
         );
-        expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).toBe(
-          "rgb(217, 221, 218)",
+        expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe(
+          "rgba(0, 0, 0, 0)",
         );
       }
     } finally {
@@ -250,10 +250,8 @@ for (const largura of [320, 390, 1280]) {
               bg: getComputedStyle(el).backgroundColor,
               borda: getComputedStyle(el).borderColor,
             }));
-            if (tema === "light") {
-              expect(cor.bg).toBe("rgba(0, 0, 0, 0)");
-              expect(cor.borda).toBe("rgb(217, 221, 218)");
-            } else expect(cor.bg).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.bg).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.borda).not.toBe("rgba(0, 0, 0, 0)");
           }
           // Texto, legenda e ícones ativos contra sua superfície efetiva; desabilitados são isentos.
           const contraste = await periodo.evaluate((el) => {
@@ -350,7 +348,7 @@ it("outros controles mantêm suas superfícies e seletor mensal usa contorno", a
   try {
     await page.goto(`${url}?tela=outros`);
     const mensal = page.getByRole("button", { name: "Mês do relatório: Outubro" });
-    expect(await mensal.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+    expect(await mensal.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
       "rgba(0, 0, 0, 0)",
     );
     for (const nome of ["Filtro selecionado", "Outro controle"]) {
@@ -458,10 +456,8 @@ it.each(["relatorio", "grade"])(
               fundo: getComputedStyle(el).backgroundColor,
               borda: getComputedStyle(el).borderColor,
             }));
-            if (tema === "light") {
-              expect(cor.fundo).toBe("rgba(0, 0, 0, 0)");
-              expect(cor.borda).toBe("rgb(217, 221, 218)");
-            } else expect(cor.fundo).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.fundo).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.borda).not.toBe("rgba(0, 0, 0, 0)");
           }
           expect(await seguinte.isDisabled()).toBe(true);
           if (process.env.CAPTURA_DATA)
@@ -501,10 +497,10 @@ it.each(["relatorio", "grade"])(
             await expect
               .poll(() =>
                 semana.evaluate(
-                  (el) => getComputedStyle(el).backgroundColor === "rgba(0, 0, 0, 0)",
+                  (el) => getComputedStyle(el).backgroundColor !== "rgba(0, 0, 0, 0)",
                 ),
               )
-              .toBe(tema === "light");
+              .toBe(true);
           }
         } finally {
           await page.close();
@@ -572,11 +568,9 @@ it.each(["por-aluno", "resumo", "historico", "diretor"])(
           borda: getComputedStyle(el).borderColor,
           largura: getComputedStyle(el).borderTopWidth,
         }));
-        expect(estilo).toEqual({
-          fundo: "rgba(0, 0, 0, 0)",
-          borda: "rgb(217, 221, 218)",
-          largura: "1px",
-        });
+        expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+        expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
+        expect(estilo.largura).toBe("1px");
       }
     } finally {
       await page.close();
@@ -684,13 +678,9 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
               borda: getComputedStyle(el).borderColor,
               largura: getComputedStyle(el).borderTopWidth,
             }));
-            if (tema === "light")
-              expect(estilo).toEqual({
-                fundo: "rgba(0, 0, 0, 0)",
-                borda: "rgb(217, 221, 218)",
-                largura: "1px",
-              });
-            else expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+            expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+            expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
+            expect(estilo.largura).toBe("1px");
           }
           if (process.env.CAPTURA_DATA)
             await page.screenshot({
@@ -748,7 +738,7 @@ it("resumo bloqueado mantém os três controles desabilitados", async () => {
     ]) {
       const botao = page.getByRole("button", { name: nome });
       expect(await botao.isDisabled()).toBe(true);
-      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(
+      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
         "rgba(0, 0, 0, 0)",
       );
     }

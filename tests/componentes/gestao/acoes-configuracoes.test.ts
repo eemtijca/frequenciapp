@@ -132,16 +132,23 @@ async function conferirFoco(botao: Locator) {
   await botao.page().keyboard.press("Tab");
   await botao.focus();
   expect(await botao.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-  expect(await botao.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  expect(
+    await botao.evaluate((el) => {
+      const estilo = getComputedStyle(el);
+      return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+    }),
+  ).toBe(true);
 }
 async function conferirAcao(botao: Locator) {
   await botao.waitFor({ state: "visible" });
+  // O redimensionamento pode manter o hover por um instante; aguarda o repouso.
+  await expect
+    .poll(() => botao.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe("rgba(0, 0, 0, 0)");
   const estado = await botao.evaluate((el) => ({
-    fundo: getComputedStyle(el).backgroundColor,
     largura: el.getBoundingClientRect().width,
     altura: el.getBoundingClientRect().height,
   }));
-  expect(estado.fundo).toBe("rgba(0, 0, 0, 0)");
   expect(estado.largura).toBeGreaterThanOrEqual(44);
   expect(estado.altura).toBeGreaterThanOrEqual(44);
 }

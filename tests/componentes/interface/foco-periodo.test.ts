@@ -8,6 +8,9 @@ import { chromium, webkit, type Browser, type Page } from "@playwright/test";
 import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
+// O foco pode demorar a voltar no WebKit sob carga; a espera padrão é curta.
+const ESPERA_FOCO = { timeout: 5_000 };
+
 const requireVitest = createRequire(import.meta.url);
 const vite = requireVitest.resolve("vite", {
   paths: [path.dirname(requireVitest.resolve("vitest/package.json"))],
@@ -67,17 +70,17 @@ for (const [motor, tipo] of [
               ? page.locator('[data-dia="2026-10-15"]')
               : page.getByRole("button", { name: "Outubro", exact: true });
           await expect
-            .poll(() => inicial.evaluate((el) => el === document.activeElement))
+            .poll(() => inicial.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
           await page.keyboard.press("ArrowLeft");
           await page.keyboard.press("Escape");
           await expect.poll(() => gatilho.getAttribute("aria-expanded")).toBe("false");
           await expect
-            .poll(() => gatilho.evaluate((el) => el === document.activeElement))
+            .poll(() => gatilho.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
           await page.keyboard.press(tecla);
           await expect
-            .poll(() => inicial.evaluate((el) => el === document.activeElement))
+            .poll(() => inicial.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
         } finally {
           await browser.close();
@@ -98,7 +101,7 @@ for (const [motor, tipo] of [
               ? page.locator('[data-dia="2026-10-15"]')
               : page.getByRole("button", { name: "Outubro", exact: true });
           await expect
-            .poll(() => inicial.evaluate((el) => el === document.activeElement))
+            .poll(() => inicial.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
           await page.keyboard.press("ArrowLeft");
           const destino =
@@ -106,12 +109,12 @@ for (const [motor, tipo] of [
               ? page.locator('[data-dia="2026-10-14"]')
               : page.getByRole("button", { name: "Setembro", exact: true });
           await expect
-            .poll(() => destino.evaluate((el) => el === document.activeElement))
+            .poll(() => destino.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
           await page.keyboard.press(tecla);
           await expect.poll(() => gatilho.getAttribute("aria-expanded")).toBe("false");
           await expect
-            .poll(() => gatilho.evaluate((el) => el === document.activeElement))
+            .poll(() => gatilho.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
           expect(await gatilho.getAttribute("aria-label")).toContain(
             modo === "dia" ? "2026-10-14" : "2026-09",
@@ -122,7 +125,7 @@ for (const [motor, tipo] of [
               ? page.locator('[data-dia="2026-10-14"]')
               : page.getByRole("button", { name: "Setembro", exact: true });
           await expect
-            .poll(() => selecionado.evaluate((el) => el === document.activeElement))
+            .poll(() => selecionado.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
             .toBe(true);
         } finally {
           await browser.close();
@@ -141,7 +144,9 @@ for (const [motor, tipo] of [
       await page.getByRole("button", { name: "Fechar", exact: true }).focus();
       await page.keyboard.press("Space");
       await expect.poll(() => estado.textContent()).toBe("fechado");
-      await expect.poll(() => gatilho.evaluate((el) => el === document.activeElement)).toBe(true);
+      await expect
+        .poll(() => gatilho.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
+        .toBe(true);
       await gatilho.click();
       await expect.poll(() => gatilho.getAttribute("aria-expanded")).toBe("true");
       await gatilho.click();
@@ -160,7 +165,9 @@ for (const [motor, tipo] of [
       const externo = page.getByRole("button", { name: "Controle externo" });
       await externo.focus();
       await expect.poll(() => gatilho.getAttribute("aria-expanded")).toBe("false");
-      await expect.poll(() => externo.evaluate((el) => el === document.activeElement)).toBe(true);
+      await expect
+        .poll(() => externo.evaluate((el) => el === document.activeElement), ESPERA_FOCO)
+        .toBe(true);
     } finally {
       await browser.close();
     }

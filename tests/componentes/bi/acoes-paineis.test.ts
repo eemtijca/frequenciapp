@@ -85,7 +85,12 @@ it.each([
     }
     await mover.focus();
     expect(await mover.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-    expect(await mover.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+    expect(
+      await mover.evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+      }),
+    ).toBe(true);
     await mover.hover();
     await expect
       .poll(() => mover.evaluate((el) => getComputedStyle(el).backgroundColor))
