@@ -56,9 +56,10 @@ async function verificarDiscreto(no: Locator) {
   const caixa = await no.boundingBox();
   expect(caixa?.height).toBeGreaterThanOrEqual(44);
   expect(caixa?.width).toBeGreaterThanOrEqual(44);
-  await no.focus();
+  // A tecla anterior ativa a modalidade de teclado; o foco direto evita
+  // depender da ordem de tabulação, que muda com os menus do BI.
   await no.page().keyboard.press("Tab");
-  await no.page().keyboard.press("Shift+Tab");
+  await no.focus();
   expect(await no.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
   expect(
     await no.evaluate((el) => {
