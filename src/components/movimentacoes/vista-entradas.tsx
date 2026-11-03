@@ -25,15 +25,12 @@ import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atuali
 import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import { Campo } from "@/components/ui/campo";
-import { GrupoOpcoes } from "@/components/ui/grupo-opcoes";
-import { Input } from "@/components/ui/input";
-import { Selecionar } from "@/components/ui/selecionar";
+import { CamposMovimentacao } from "@/components/movimentacoes/campos-movimentacao";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { useMinutoCorrente } from "@/lib/use-relogio";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,7 +73,11 @@ export default function VistaEntradas({
   const dia = nav.dia;
   const [turma, setTurma] = useState("");
   const [alunoId, setAlunoId] = useState("");
-  const [horario, setHorario] = useState(() => horaNoFuso(new Date().toISOString(), fuso));
+  const [horario, setHorario] = useState("");
+  const minuto = useMinutoCorrente();
+  const horarioInicial =
+    minuto === null ? "" : horaNoFuso(new Date(minuto * 60_000).toISOString(), fuso);
+  const horarioEfetivo = horario || horarioInicial;
   const [motivo, setMotivo] = useState("");
   const [momento, setMomento] = useState("");
   const [responsavelCodigo, setResponsavelCodigo] = useState("");
@@ -243,7 +244,7 @@ export default function VistaEntradas({
         ...corpoJson({
           alunoId,
           dia,
-          horario,
+          horario: horarioEfetivo,
           momento,
           responsavelRegistroCodigo: responsavelCodigo,
           ...(formaJustificativa === "texto"
@@ -414,127 +415,51 @@ export default function VistaEntradas({
             noValidate
           >
             <h2 className="font-medium">Registrar entrada</h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <Campo id="entrada-turma" rotulo="Turma">
-                <Selecionar
-                  id="entrada-turma"
-                  value={turma || "todas"}
-                  disabled={executando}
-                  onValueChange={(valor) => {
-                    setTurma(valor === "todas" ? "" : valor);
-                    setErro("");
-                    setAlunoId("");
-                  }}
-                  opcoes={opcoesTurma}
-                />
-              </Campo>
-              <Campo id="entrada-aluno" rotulo="Aluno" className="md:col-span-1 xl:col-span-2">
-                <Selecionar
-                  id="entrada-aluno"
-                  value={alunoId}
-                  onValueChange={setAlunoId}
-                  disabled={executando}
-                  buscavel
-                  opcoes={opcoesAluno}
-                  placeholder="Selecione o aluno"
-                />
-              </Campo>
-              <Campo id="entrada-momento" rotulo="Momento da entrada">
-                <Selecionar
-                  id="entrada-momento"
-                  value={momento}
-                  disabled={executando}
-                  onValueChange={setMomento}
-                  placeholder="Selecione a aula ou pausa"
-                  opcoes={OPCOES_MOMENTO}
-                />
-              </Campo>
-              <Campo id="entrada-horario" rotulo="Horário da chegada">
-                <SeletorHorario
-                  id="entrada-horario"
-                  valor={horario}
-                  onValor={setHorario}
-                  rotuloAcessivel="Horário da chegada"
-                  agora={horaNoFuso(new Date().toISOString(), fuso)}
-                  disabled={executando}
-                />
-              </Campo>
-              <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
-                <legend className="text-sm font-medium">Justificativa</legend>
-                <GrupoOpcoes
-                  rotulo="Forma da justificativa"
-                  valor={formaJustificativa}
-                  disabled={executando}
-                  onValor={(valor) => {
-                    setFormaJustificativa(valor);
-                    setMotivo("");
-                    setJustificativa("");
-                    setObservacao("");
-                  }}
-                  opcoes={[
-                    { valor: "texto", rotulo: "Escrever" },
-                    { valor: "catalogo", rotulo: "Selecionar tipo" },
-                  ]}
-                />
-                {formaJustificativa === "texto" ? (
-                  <Campo id="entrada-motivo" rotulo="Texto da justificativa">
-                    <Input
-                      id="entrada-motivo"
-                      required
-                      minLength={2}
-                      maxLength={100}
-                      value={motivo}
-                      disabled={executando}
-                      onChange={(e) => setMotivo(e.target.value)}
-                      placeholder="Descreva o motivo"
-                      className="h-11"
-                    />
-                  </Campo>
-                ) : (
-                  <>
-                    <Campo id="entrada-justificativa" rotulo="Tipo">
-                      <Selecionar
-                        id="entrada-justificativa"
-                        value={justificativa}
-                        disabled={executando}
-                        onValueChange={setJustificativa}
-                        placeholder="Selecione a justificativa"
-                        opcoes={opcoesJustificativa}
-                      />
-                    </Campo>
-                    <Campo id="entrada-observacao" rotulo="Observação">
-                      <Input
-                        id="entrada-observacao"
-                        value={observacao}
-                        disabled={executando}
-                        maxLength={100}
-                        onChange={(e) => setObservacao(e.target.value)}
-                        placeholder="Opcional: descreva brevemente o motivo"
-                        className="h-11"
-                      />
-                    </Campo>
-                  </>
-                )}
-              </fieldset>
-              <Campo
-                id="entrada-responsavel"
-                rotulo="Responsável pelo registro"
-                descricao={
-                  opcoesResponsavel.length === 0
-                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
-                    : undefined
-                }
-              >
-                <Selecionar
-                  id="entrada-responsavel"
-                  value={responsavelCodigo}
-                  disabled={executando}
-                  onValueChange={setResponsavelCodigo}
-                  placeholder="Selecione quem registrou"
-                  opcoes={opcoesResponsavel}
-                />
-              </Campo>
-            </div>
+            <CamposMovimentacao
+              tipo="entrada"
+              turma={turma}
+              alunoId={alunoId}
+              momento={momento}
+              horario={horarioEfetivo}
+              responsavel={responsavelCodigo}
+              forma={formaJustificativa}
+              texto={motivo}
+              justificativa={justificativa}
+              observacao={observacao}
+              opcoesTurma={opcoesTurma}
+              opcoesAluno={opcoesAluno}
+              opcoesMomento={OPCOES_MOMENTO}
+              opcoesJustificativa={opcoesJustificativa}
+              opcoesResponsavel={opcoesResponsavel}
+              fuso={fuso}
+              enviando={executando}
+              textoObrigatorio
+              mostrarObservacao
+              responsavelDepois
+              descricaoResponsavel={
+                opcoesResponsavel.length === 0
+                  ? "Nenhum respons�vel cadastrado. Cadastre em Gest�o, Configura��es."
+                  : undefined
+              }
+              onTurma={(valor) => {
+                setTurma(valor);
+                setErro("");
+                setAlunoId("");
+              }}
+              onAluno={setAlunoId}
+              onMomento={setMomento}
+              onHorario={setHorario}
+              onResponsavel={setResponsavelCodigo}
+              onForma={(valor) => {
+                setFormaJustificativa(valor);
+                setMotivo("");
+                setJustificativa("");
+                setObservacao("");
+              }}
+              onTexto={setMotivo}
+              onJustificativa={setJustificativa}
+              onObservacao={setObservacao}
+            />{" "}
             <div className="flex justify-end">
               <Button
                 className="h-11 w-full px-6 sm:w-auto"
@@ -623,7 +548,7 @@ export default function VistaEntradas({
           },
           { rotulo: "Dia", valor: rotuloData(dia) },
           { rotulo: "Momento", valor: momento ? rotuloMomento(momento) : "" },
-          { rotulo: "Horário", valor: horario },
+          { rotulo: "Horário", valor: horarioEfetivo },
           { rotulo: "Justificativa", valor: justificativaConfirmacao },
           {
             rotulo: "Observação",
