@@ -67,7 +67,9 @@ for (const tema of ["light", "dark"] as const) {
       ).toHaveAttribute("data-grafico-sob-demanda", "visitado");
       await expect(
         page.locator('[data-cartao="primeiro"] .recharts-responsive-container'),
-      ).toHaveCount(0);
+      ).toHaveCount(1);
+      await expect(page.locator('[data-cartao="primeiro"]')).toHaveAttribute("data-ativo", "false");
+      await expect(page.locator('[data-cartao="primeiro"]')).toHaveCSS("visibility", "hidden");
       await page.getByRole("tab", { name: "Gráficos" }).focus();
       await page.keyboard.press("ArrowRight");
       await expect(page.getByRole("tab", { name: "Outra" })).toBeFocused();

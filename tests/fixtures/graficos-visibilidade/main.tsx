@@ -5,7 +5,7 @@ import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import GraficoSobDemanda from "@/components/graficos/grafico-sob-demanda";
 import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import "@/app/globals.css";
 
 const abas = [
@@ -19,6 +19,14 @@ const internas = [
 const grafico = (nome: string) => (
   <GraficoRosca titulo={nome} fatias={[{ nome: "Série A", valor: 3 }]} />
 );
+function FaixaControlada({
+  itens,
+}: {
+  itens: { id: string; rotulo: string; render: () => ReactNode }[];
+}) {
+  const [valor, setValor] = useState(itens[0]?.id ?? "");
+  return <FaixaGraficos itens={itens} valor={valor} onValor={setValor} />;
+}
 function CenarioLazyOculto() {
   const [visivel, setVisivel] = useState(false);
   return (
@@ -64,14 +72,17 @@ createRoot(root).render(
     <CenarioErro />
   ) : location.search === "?aquecimento" ? (
     <main style={{ paddingTop: 2500 }}>
-      <FaixaGraficos
-        ativo
-        cartoes={[
-          { id: "aquecido", nome: "Aquecido", conteudo: grafico("Rosca aquecida") },
-          { id: "vazio", nome: "Vazio", conteudo: <GraficoRosca titulo="Vazio" fatias={[]} /> },
+      <FaixaControlada
+        itens={[
+          { id: "aquecido", rotulo: "Aquecido", render: () => grafico("Rosca aquecida") },
+          {
+            id: "vazio",
+            rotulo: "Vazio",
+            render: () => <GraficoRosca titulo="Vazio" fatias={[]} />,
+          },
         ]}
       />
-      <FaixaGraficos ativo cartoes={[]} />
+      <FaixaControlada itens={[]} />
     </main>
   ) : (
     <main style={{ padding: 16 }}>
@@ -84,17 +95,24 @@ createRoot(root).render(
               abas={internas}
               dataPager="interno"
             >
-              {(aba, ativa) =>
+              {(aba) =>
                 aba === "graficos" ? (
                   <>
                     <label>
                       Observação <input aria-label="Observação" />
                     </label>
-                    <FaixaGraficos
-                      ativo={ativa}
-                      cartoes={[
-                        { id: "primeiro", nome: "Primeiro", conteudo: grafico("Rosca primeiro") },
-                        { id: "segundo", nome: "Segundo", conteudo: grafico("Rosca segundo") },
+                    <FaixaControlada
+                      itens={[
+                        {
+                          id: "primeiro",
+                          rotulo: "Primeiro",
+                          render: () => grafico("Rosca primeiro"),
+                        },
+                        {
+                          id: "segundo",
+                          rotulo: "Segundo",
+                          render: () => grafico("Rosca segundo"),
+                        },
                       ]}
                     />
                   </>
