@@ -256,7 +256,14 @@ for (const tema of ["light", "dark"] as const) {
         const cancelar = page.getByRole("button", { name: `Cancelar edição de ${codigo}` });
         expect(await salvar.getAttribute("data-variant")).toBe("secondary");
         expect(await cancelar.getAttribute("data-variant")).toBe("secondary");
-        expect(await campo.evaluate((el) => getComputedStyle(el).borderTopStyle)).not.toBe("none");
+        const estiloCampo = await campo.evaluate((el) => ({
+          fundo: getComputedStyle(el).backgroundColor,
+          bordaTopo: getComputedStyle(el).borderTopWidth,
+          imagemFundo: getComputedStyle(el).backgroundImage,
+        }));
+        expect(estiloCampo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+        expect(estiloCampo.bordaTopo).toBe("0px");
+        expect(estiloCampo.imagemFundo).toContain("linear-gradient");
         await campo.fill("x");
         expect(await salvar.isDisabled()).toBe(true);
         await cancelar.click();

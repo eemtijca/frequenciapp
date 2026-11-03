@@ -139,7 +139,7 @@ it.each([
     expect(dataVisivel.borda.left).toBeGreaterThanOrEqual(meio.x);
     expect(dataVisivel.borda.right).toBeLessThanOrEqual(meio.x + meio.width);
     if (largura < 1280) {
-      const detalhe = seletor.locator(":scope > span.text-muted-foreground");
+      const detalhe = seletor.locator(":scope > .detalhe-data");
       const medida = await detalhe.evaluate((el) => ({
         texto: (el as HTMLElement).innerText,
         largura: el.clientWidth,
@@ -187,7 +187,7 @@ it.each([
     await dialogo.getByRole("button", { name: "Mês anterior" }).click();
     await dialogo.locator(`[data-dia="${dia}"]`).click();
     await expect.poll(() => seletor.getAttribute("aria-label")).toContain(nome);
-    const medida = await seletor.locator(":scope > span.text-muted-foreground").evaluate((el) => ({
+    const medida = await seletor.locator(":scope > .detalhe-data").evaluate((el) => ({
       texto: (el as HTMLElement).innerText,
       largura: el.clientWidth,
       total: el.scrollWidth,

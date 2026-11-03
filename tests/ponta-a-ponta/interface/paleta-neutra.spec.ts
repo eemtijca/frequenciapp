@@ -35,8 +35,6 @@ for (const rota of ["/", "/bi"]) {
               trilho: "oklch(0.9 0.005 90)",
               border: "oklch(0.93 0.005 90)",
               "texto-desabilitado": "oklch(0.48 0.008 90)",
-              "superficie-desabilitada": "oklch(0.92 0.003 90)",
-              "borda-desabilitada": "oklch(0.82 0.005 90)",
             }
           : {
               primary: "oklch(0.7 0.13 160)",
@@ -49,8 +47,6 @@ for (const rota of ["/", "/bi"]) {
               trilho: "oklch(1 0 0 / 14%)",
               border: "oklch(1 0 0 / 12%)",
               "texto-desabilitado": "oklch(0.68 0.008 90)",
-              "superficie-desabilitada": "oklch(0.22 0.005 90)",
-              "borda-desabilitada": "oklch(1 0 0 / 8%)",
             };
       const medidas = await cartao.evaluate((no, esperados) => {
         const ctx = document.createElement("canvas").getContext("2d");
@@ -62,11 +58,37 @@ for (const rota of ["/", "/bi"]) {
           return Array.from(ctx.getImageData(0, 0, 1, 1).data);
         };
         const raiz = getComputedStyle(document.documentElement);
+        const sondaCor = (nome: string) => {
+          const elemento = document.createElement("span");
+          elemento.style.backgroundColor = `var(--${nome})`;
+          document.body.append(elemento);
+          const valor = cor(getComputedStyle(elemento).backgroundColor);
+          elemento.remove();
+          return valor;
+        };
+        const sonda = document.createElement("span");
+        sonda.style.backgroundColor = "var(--selecionado-fundo)";
+        sonda.style.color = "var(--selecionado-texto)";
+        document.body.append(sonda);
+        const selecionado = {
+          fundo: cor(getComputedStyle(sonda).backgroundColor),
+          texto: cor(getComputedStyle(sonda).color),
+        };
+        sonda.remove();
         return {
           fundo: cor(getComputedStyle(document.body).backgroundColor),
           texto: cor(getComputedStyle(document.body).color),
           cartao: cor(getComputedStyle(no).backgroundColor),
           textoCartao: cor(getComputedStyle(no).color),
+          selecionado,
+          superficies: {
+            controle: sondaCor("superficie-controle"),
+            bordaControle: sondaCor("borda-controle"),
+            trilho: sondaCor("superficie-trilho"),
+            desabilitada: sondaCor("superficie-desabilitada"),
+            bordaDesabilitada: sondaCor("borda-desabilitada"),
+          },
+          textoDesabilitado: cor(raiz.getPropertyValue("--texto-desabilitado").trim()),
           tokens: Object.fromEntries(
             Object.keys(esperados).map((nome) => [
               nome,
@@ -79,6 +101,26 @@ for (const rota of ["/", "/bi"]) {
         };
       }, esperados);
       expect(medidas.tokens).toEqual(medidas.tokensEsperados);
+      expect(
+        contraste(rgb(medidas.superficies.controle), rgb(medidas.cartao)),
+        "fundo do controle contra o cartão",
+      ).toBeGreaterThanOrEqual(1.05);
+      expect(
+        contraste(rgb(medidas.superficies.bordaControle), rgb(medidas.cartao)),
+        "borda do controle contra o cartão",
+      ).toBeGreaterThanOrEqual(1.4);
+      expect(
+        contraste(rgb(medidas.superficies.bordaControle), rgb(medidas.superficies.controle)),
+        "borda do controle contra o fundo do controle",
+      ).toBeGreaterThanOrEqual(1.2);
+      expect(
+        contraste(rgb(medidas.superficies.trilho), rgb(medidas.cartao)),
+        "trilho das abas contra o cartão",
+      ).toBeGreaterThanOrEqual(1.1);
+      expect(
+        contraste(rgb(medidas.textoDesabilitado), rgb(medidas.superficies.desabilitada)),
+        "texto desabilitado",
+      ).toBeGreaterThanOrEqual(4.5);
       if (tema === "light") {
         expect(medidas.fundo).toEqual([246, 246, 246, 255]);
         expect(medidas.cartao).toEqual([255, 255, 255, 255]);
@@ -87,6 +129,10 @@ for (const rota of ["/", "/bi"]) {
       }
       expect(contraste(rgb(medidas.texto), rgb(medidas.fundo))).toBeGreaterThanOrEqual(4.5);
       expect(contraste(rgb(medidas.textoCartao), rgb(medidas.cartao))).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contraste(rgb(medidas.selecionado.texto), rgb(medidas.selecionado.fundo)),
+        "texto selecionado",
+      ).toBeGreaterThanOrEqual(4.5);
       await page.screenshot({
         path: info.outputPath(`paleta-${rota === "/" ? "entrada" : "bi"}-${tema}.png`),
         animations: "disabled",

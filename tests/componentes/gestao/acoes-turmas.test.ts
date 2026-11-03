@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator } from "@playwright/test";
 import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { conferirContorno } from "../contorno-acao";
+import { conferirSuperficieAcao } from "../superficie-acao";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -112,7 +112,7 @@ for (const tema of ["light", "dark"] as const) {
         });
         expect(cores[0]).toBe(cores[1]);
         const nova = page.getByRole("button", { name: "Nova aula" });
-        await conferirContorno(page, nova, tema);
+        await conferirSuperficieAcao(page, nova, tema);
         await nova.press("Enter");
         expect(await page.getByRole("button", { name: "Cancelar", exact: true }).isVisible()).toBe(
           true,

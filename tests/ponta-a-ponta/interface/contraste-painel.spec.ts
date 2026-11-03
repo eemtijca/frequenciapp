@@ -40,7 +40,9 @@ function rgb(cor: number[]): Rgb {
   return [(cor[0] ?? 0) / 255, (cor[1] ?? 0) / 255, (cor[2] ?? 0) / 255];
 }
 
-test("as setas de data do painel têm fundo suave e borda no tema claro", async ({ page }, info) => {
+test("as setas de data do painel têm fundo suave e fio sutil no tema claro", async ({
+  page,
+}, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   await page.addInitScript(() => localStorage.setItem("theme", "system"));
@@ -51,21 +53,18 @@ test("as setas de data do painel têm fundo suave e borda no tema claro", async 
   await page.mouse.move(389, 843);
   const medida = await cores(anterior);
   const fundo = rgb(medida.fundo);
-  const borda = rgb(medida.borda);
-  const superficie = rgb(medida.superficie);
   const texto = rgb(medida.texto);
   await page.screenshot({ path: info.outputPath("painel-claro.png"), animations: "disabled" });
   await info.attach("medidas", {
     body: JSON.stringify({
       medida,
-      bordaSuperficie: contraste(borda, superficie),
       textoFundo: contraste(texto, fundo),
     }),
     contentType: "application/json",
   });
   expect(medida.fundoBruto[3]).toBe(255);
   expect(medida.larguraBorda).toBe("1px");
-  expect(contraste(borda, superficie)).toBeGreaterThanOrEqual(3);
+  expect(contraste(rgb(medida.borda), rgb(medida.superficie))).toBeGreaterThanOrEqual(1.3);
   expect(contraste(texto, fundo)).toBeGreaterThanOrEqual(4.5);
   await anterior.click();
   await expect(page.getByRole("button", { name: "Dia seguinte", exact: true })).toBeEnabled();
@@ -89,13 +88,12 @@ for (const tema of ["light", "dark"] as const) {
     // O resumo semanal não tem navegação de gráficos; o seletor de período
     // continua presente tanto no domingo quanto nos demais dias.
     const controle = await cores(periodo);
-    const superficie = rgb(seta.superficie);
     expect(seta.fundoBruto[3]).toBe(255);
     expect(controle.fundoBruto[3]).toBe(255);
     expect(seta.larguraBorda).toBe("1px");
     expect(controle.larguraBorda).toBe("1px");
-    expect(contraste(rgb(seta.borda), superficie)).toBeGreaterThanOrEqual(3);
-    expect(contraste(rgb(controle.borda), superficie)).toBeGreaterThanOrEqual(3);
+    expect(contraste(rgb(seta.borda), rgb(seta.superficie))).toBeGreaterThanOrEqual(1.3);
+    expect(contraste(rgb(controle.borda), rgb(controle.superficie))).toBeGreaterThanOrEqual(1.3);
     const caixa = await anterior.boundingBox();
     expect(caixa?.width).toBeGreaterThanOrEqual(44);
     expect(caixa?.height).toBeGreaterThanOrEqual(44);
@@ -123,6 +121,8 @@ for (const tema of ["light", "dark"] as const) {
     const coresGrafico = await cores(grafico);
     expect(coresGrafico.fundoBruto[3]).toBe(255);
     expect(coresGrafico.larguraBorda).toBe("1px");
-    expect(contraste(rgb(coresGrafico.borda), superficie)).toBeGreaterThanOrEqual(3);
+    expect(contraste(rgb(coresGrafico.borda), rgb(coresGrafico.superficie))).toBeGreaterThanOrEqual(
+      1.3,
+    );
   });
 }

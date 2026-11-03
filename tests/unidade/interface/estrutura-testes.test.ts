@@ -40,8 +40,10 @@ describe("estrutura dos testes de interface", () => {
 
   it("reserva bordas transparentes para peças internas justificadas", () => {
     // Blocos internos do seletor de turmas usam o anel de seleção; marcas de
-    // presença usam a borda transparente como espaçamento, não como controle.
+    // presença, ações ghost e estados selecionados usam a borda transparente
+    // como espaçamento, não como contorno visível.
     const excecoes = new Set([
+      "src/app/superficies.css",
       "src/components/chamada/seletor-turma-chamada.module.css",
       "src/components/chamada/vista-frequencia.module.css",
     ]);

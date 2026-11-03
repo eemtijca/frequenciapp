@@ -172,7 +172,7 @@ test.describe("autochecagem das medições", () => {
   }) => {
     const esperado = expectativaDoSeletor("2026-11-01", "2026-11-01");
     await page.setContent(
-      `<button aria-label="${esperado.aria}"><span id="data" style="display:none">${esperado.rotulo}</span><span class="text-muted-foreground">semana</span></button>`,
+      `<button aria-label="${esperado.aria}"><span id="data" style="display:none">${esperado.rotulo}</span><span class="detalhe-data">semana</span></button>`,
     );
     const botao = page.locator("button");
     const data = page.locator("#data");
@@ -194,12 +194,12 @@ test.describe("autochecagem das medições", () => {
   test("@anon exige ao menos uma variante visível do dia reconhecido", async ({ page }) => {
     const esperado = expectativaDoSeletor("2026-11-02", "2026-11-03");
     await page.setContent(
-      `<button aria-label="${esperado.aria}" style="color:black"><span>${esperado.rotulo}</span><span class="text-muted-foreground"><span style="display:none">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
+      `<button aria-label="${esperado.aria}" style="color:black"><span>${esperado.rotulo}</span><span class="detalhe-data"><span style="display:none">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
     );
     const botao = page.locator("button");
     await expect(conferirData(botao, "2026-11-02", "2026-11-03")).rejects.toThrow();
     await botao
-      .locator(".text-muted-foreground > span")
+      .locator(".detalhe-data > span")
       .first()
       .evaluate((el) => {
         el.style.display = "inline";
@@ -210,11 +210,11 @@ test.describe("autochecagem das medições", () => {
   test("@anon rejeita a única variante transparente e ancestrais ocultos", async ({ page }) => {
     const esperado = expectativaDoSeletor("2026-11-02", "2026-11-03");
     await page.setContent(
-      `<button aria-label="${esperado.aria}" style="color:black"><span>${esperado.rotulo}</span><span class="text-muted-foreground"><span id="unica" style="opacity:0">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
+      `<button aria-label="${esperado.aria}" style="color:black"><span>${esperado.rotulo}</span><span class="detalhe-data"><span id="unica" style="opacity:0">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
     );
     const botao = page.locator("button");
     const unica = page.locator("#unica");
-    const ancestral = botao.locator(":scope > .text-muted-foreground");
+    const ancestral = botao.locator(":scope > .detalhe-data");
     await expect(conferirData(botao, "2026-11-02", "2026-11-03")).rejects.toThrow();
     await unica.evaluate((el) => (el.style.opacity = "1"));
     await ancestral.evaluate((el) => (el.style.opacity = "0"));
@@ -229,11 +229,11 @@ test.describe("autochecagem das medições", () => {
   test("@anon rejeita cor transparente e opacidade cumulativa quase nula", async ({ page }) => {
     const esperado = expectativaDoSeletor("2026-11-02", "2026-11-03");
     await page.setContent(
-      `<button aria-label="${esperado.aria}"><span>${esperado.rotulo}</span><span class="text-muted-foreground"><span id="unica" style="color:transparent">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
+      `<button aria-label="${esperado.aria}"><span>${esperado.rotulo}</span><span class="detalhe-data"><span id="unica" style="color:transparent">${esperado.sigla}</span><span style="display:none">${esperado.detalhe}</span></span></button>`,
     );
     const botao = page.locator("button");
     const unica = page.locator("#unica");
-    const ancestral = botao.locator(":scope > .text-muted-foreground");
+    const ancestral = botao.locator(":scope > .detalhe-data");
     await expect(conferirData(botao, "2026-11-02", "2026-11-03")).rejects.toThrow();
     await unica.evaluate((el) => (el.style.color = "rgba(0, 0, 0, 0.2)"));
     await expect(conferirData(botao, "2026-11-02", "2026-11-03")).rejects.toThrow();
@@ -494,7 +494,7 @@ test.describe("seletor real com massa sintética", () => {
           })
           .toBeLessThan(0.1);
         await expect(gatilho.locator("svg")).toBeVisible();
-        const detalhe = gatilho.locator(":scope > span.text-muted-foreground");
+        const detalhe = gatilho.locator(":scope > span.detalhe-data");
         const partes = detalhe.locator(":scope > span");
         await expect(partes.nth(rem < 14 ? 0 : 1)).toBeVisible();
         await expect(partes.nth(rem < 14 ? 1 : 0)).toBeHidden();
@@ -716,7 +716,7 @@ async function conferirData(gatilho: Locator, dia: string, hoje: string) {
     expect(caixa.altura, JSON.stringify(medida)).toBeGreaterThan(0);
     expect(caixa.corte, JSON.stringify(medida)).toBeLessThanOrEqual(0.5);
   }
-  const detalhe = gatilho.locator(":scope > span.text-muted-foreground");
+  const detalhe = gatilho.locator(":scope > span.detalhe-data");
   if (esperado.sigla) {
     const partes = detalhe.locator(":scope > span");
     await expect(partes.nth(0)).toHaveText(esperado.sigla);

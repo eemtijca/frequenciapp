@@ -73,7 +73,7 @@ async function aguardarTema(page: Page, tema: "light" | "dark") {
   }, tema);
 }
 
-it("no painel claro o resumo usa fundo transparente e borda discreta", async () => {
+it("no painel claro o resumo usa fundo suave e fio sutil", async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
     await page.route("**/api/**", (route) =>
@@ -96,9 +96,7 @@ it("no painel claro o resumo usa fundo transparente e borda discreta", async () 
       expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
         "rgba(0, 0, 0, 0)",
       );
-      expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe(
-        "rgba(0, 0, 0, 0)",
-      );
+      expect(await botao.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
     }
   } finally {
     await page.close();
@@ -107,7 +105,7 @@ it("no painel claro o resumo usa fundo transparente e borda discreta", async () 
 
 // As demais visões usam o mesmo padrão, mas cada uma monta a sua própria navegação.
 it.each(["chamada", "parcial", "entradas", "saidas"])(
-  "aplica o contorno à navegação da tela %s",
+  "aplica a superfície com fio sutil à navegação da tela %s",
   async (tela) => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     try {
@@ -131,9 +129,7 @@ it.each(["chamada", "parcial", "entradas", "saidas"])(
         expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
           "rgba(0, 0, 0, 0)",
         );
-        expect(await botao.evaluate((el) => getComputedStyle(el).borderColor)).not.toBe(
-          "rgba(0, 0, 0, 0)",
-        );
+        expect(await botao.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
       }
     } finally {
       await page.close();
@@ -248,10 +244,10 @@ for (const largura of [320, 390, 1280]) {
           for (const botao of [anterior, periodo, seguinte]) {
             const cor = await botao.evaluate((el) => ({
               bg: getComputedStyle(el).backgroundColor,
-              borda: getComputedStyle(el).borderColor,
+              bordaPx: getComputedStyle(el).borderTopWidth,
             }));
             expect(cor.bg).not.toBe("rgba(0, 0, 0, 0)");
-            expect(cor.borda).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.bordaPx).toBe("1px");
           }
           // Texto, legenda e ícones ativos contra sua superfície efetiva; desabilitados são isentos.
           const contraste = await periodo.evaluate((el) => {
@@ -268,21 +264,22 @@ for (const largura of [320, 390, 1280]) {
                 .map((v) => v / 255)
                 .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
                 .reduce((s, v, i) => s + v * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
-            let fundo = getComputedStyle(el).backgroundColor;
-            for (let no: Element | null = el; no; no = no.parentElement) {
-              if (fundo !== "rgba(0, 0, 0, 0)") break;
-              fundo = getComputedStyle(no).backgroundColor;
-            }
-            if (fundo === "rgba(0, 0, 0, 0)")
-              fundo =
+            const fundoDe = (no: Element) => {
+              for (let atual: Element | null = no; atual; atual = atual.parentElement) {
+                const fundo = getComputedStyle(atual).backgroundColor;
+                if (fundo !== "rgba(0, 0, 0, 0)") return fundo;
+              }
+              return (
                 getComputedStyle(document.documentElement)
                   .getPropertyValue("--background")
                   .trim() ||
-                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6");
-            const l = lum(rgb(fundo));
+                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6")
+              );
+            };
             return Array.from(el.querySelectorAll("span, svg"))
               .filter((n) => getComputedStyle(n).display !== "none")
               .map((n) => {
+                const l = lum(rgb(fundoDe(n)));
                 const c = lum(rgb(getComputedStyle(n).color));
                 return (Math.max(c, l) + 0.05) / (Math.min(c, l) + 0.05);
               });
@@ -343,7 +340,7 @@ for (const largura of [320, 390, 1280]) {
   }
 }
 
-it("outros controles mantêm suas superfícies e seletor mensal usa contorno", async () => {
+it("outros controles mantêm suas superfícies e o seletor mensal usa fio sutil", async () => {
   const page = await browser.newPage();
   try {
     await page.goto(`${url}?tela=outros`);
@@ -454,10 +451,10 @@ it.each(["relatorio", "grade"])(
           for (const botao of botoes) {
             const cor = await botao.evaluate((el) => ({
               fundo: getComputedStyle(el).backgroundColor,
-              borda: getComputedStyle(el).borderColor,
+              bordaPx: getComputedStyle(el).borderTopWidth,
             }));
             expect(cor.fundo).not.toBe("rgba(0, 0, 0, 0)");
-            expect(cor.borda).not.toBe("rgba(0, 0, 0, 0)");
+            expect(cor.bordaPx).toBe("1px");
           }
           expect(await seguinte.isDisabled()).toBe(true);
           if (process.env.CAPTURA_DATA)
@@ -565,11 +562,9 @@ it.each(["por-aluno", "resumo", "historico", "diretor"])(
         await botao.waitFor();
         const estilo = await botao.evaluate((el) => ({
           fundo: getComputedStyle(el).backgroundColor,
-          borda: getComputedStyle(el).borderColor,
           largura: getComputedStyle(el).borderTopWidth,
         }));
         expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-        expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
         expect(estilo.largura).toBe("1px");
       }
     } finally {
@@ -675,11 +670,9 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           for (const botao of botoes) {
             const estilo = await botao.evaluate((el) => ({
               fundo: getComputedStyle(el).backgroundColor,
-              borda: getComputedStyle(el).borderColor,
               largura: getComputedStyle(el).borderTopWidth,
             }));
             expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-            expect(estilo.borda).not.toBe("rgba(0, 0, 0, 0)");
             expect(estilo.largura).toBe("1px");
           }
           if (process.env.CAPTURA_DATA)
