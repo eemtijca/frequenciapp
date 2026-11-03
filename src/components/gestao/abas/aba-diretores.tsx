@@ -484,7 +484,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
               {turmasOrdenadas.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Cadastre as turmas antes.</p>
               ) : (
-                <div className="grid max-h-56 grid-cols-2 gap-1 overflow-y-auto rounded-lg border p-2">
+                <div className="bg-secondary/30 grid max-h-56 grid-cols-2 gap-1 overflow-y-auto rounded-lg p-2">
                   {turmasOrdenadas.map((turma) => (
                     <label
                       key={turma.id}

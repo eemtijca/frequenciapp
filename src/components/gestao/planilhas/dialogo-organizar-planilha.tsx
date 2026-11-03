@@ -360,7 +360,7 @@ export function OrganizarPlanilha({
                     <details
                       key={item.aba}
                       open={indice === 0}
-                      className="min-w-0 rounded-lg border p-3"
+                      className="bg-secondary/30 min-w-0 rounded-lg p-3"
                     >
                       <summary className="cursor-pointer text-sm font-medium">
                         {item.aba}: {item.previa ? "Pronta" : "Não será alterada"}

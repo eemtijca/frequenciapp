@@ -11,26 +11,62 @@
 }
 
 @layer components {
-  .superficie,
-  .controle,
-  .campo,
-  .primario,
-  .destrutivo {
+  .superficie {
     border: 1px solid var(--border);
     border-radius: var(--superficie-raio);
     background-color: var(--card);
   }
 
+  .controle,
+  .campo {
+    border: 1px solid var(--borda-controle);
+    border-radius: var(--superficie-raio);
+    background-color: var(--card);
+  }
+
+  .primario,
+  .destrutivo {
+    border: 0;
+    border-radius: var(--superficie-raio);
+    background-color: var(--card);
+  }
+
   .controle {
-    border-color: var(--borda-controle);
     background-color: var(--superficie-controle);
     color: var(--secondary-foreground);
   }
 
   .campo {
-    border-color: var(--borda-controle);
-    background-color: var(--card);
+    background-color: var(--superficie-campo);
     color: var(--foreground);
+  }
+
+  .campo[data-placeholder] {
+    color: var(--secondary-foreground);
+  }
+
+  /* A imagem de fundo é uma linha sólida de 1 px, não um degradê decorativo. */
+  input.campo:not(.campo-integrado),
+  textarea.campo,
+  .campo-texto {
+    border: 0;
+    background-color: var(--card);
+    background-image: linear-gradient(var(--linha-campo), var(--linha-campo));
+    background-repeat: no-repeat;
+    background-position: left bottom;
+    background-size: 100% 1px;
+  }
+
+  .campo[aria-invalid="true"] {
+    background-color: var(--falta-fraca);
+    color: var(--falta-texto);
+  }
+
+  input.campo[aria-invalid="true"]:not(.campo-integrado),
+  textarea.campo[aria-invalid="true"],
+  .campo-texto:has([aria-invalid="true"]) {
+    background-color: var(--falta-fraca);
+    background-image: linear-gradient(var(--falta), var(--falta));
   }
 
   .superficie-interna {
@@ -44,7 +80,7 @@
   .discreto,
   .primario,
   .destrutivo {
-    transition-property: background-color, border-color, color, outline-color;
+    transition-property: background-color, border-color, color;
     transition-duration: 160ms;
     transition-timing-function: ease;
   }
@@ -56,13 +92,11 @@
   }
 
   .primario {
-    border-color: var(--primary);
     background-color: var(--primary);
     color: var(--primary-foreground);
   }
 
   .destrutivo {
-    border-color: var(--falta);
     background-color: var(--falta);
     color: var(--falta-foreground);
   }
@@ -76,7 +110,7 @@
       [aria-expanded="true"],
       [data-state="active"]
     ):not(.primario, .destrutivo) {
-    border: 1px solid var(--selecionado-borda);
+    border: 1px solid transparent;
     border-radius: var(--superficie-raio);
     background-color: var(--selecionado-fundo);
     color: var(--selecionado-texto);
@@ -87,19 +121,20 @@
   }
 
   .interruptor {
-    border: 1px solid var(--borda-controle);
+    border: 0;
     border-radius: var(--raio-pilula);
     background-color: var(--interruptor-fundo);
   }
 
   .interruptor > span {
-    border: 1px solid color-mix(in oklab, var(--foreground) 18%, transparent);
+    border: 0;
   }
 
   .campo.campo-integrado,
   .campo.campo-integrado:focus-visible,
   .campo.campo-integrado:focus-within {
     border: 0;
+    border-bottom: 0;
     border-radius: 0;
     background: transparent;
     box-shadow: none;
@@ -115,6 +150,10 @@
     contain-intrinsic-size: auto 320px;
   }
 
+  .trilho-abas {
+    background-color: var(--superficie-trilho);
+  }
+
   .indicador-abas {
     --aba-gap: 0.125rem;
     position: absolute;
@@ -122,7 +161,6 @@
     bottom: 0.25rem;
     left: 0.25rem;
     z-index: 0;
-    border: 1px solid var(--selecionado-borda);
     border-radius: var(--superficie-raio);
     background-color: var(--selecionado-fundo);
     transform: translateX(calc(var(--aba-indice) * (100% + var(--aba-gap))));
@@ -183,6 +221,16 @@
     cursor: not-allowed;
   }
 
+  input.campo:disabled,
+  input.campo[aria-disabled="true"],
+  textarea.campo:disabled,
+  textarea.campo[aria-disabled="true"],
+  .campo-texto:has(input:disabled),
+  .campo-texto:has(input[aria-disabled="true"]) {
+    background-color: var(--superficie-desabilitada);
+    background-image: linear-gradient(var(--borda-desabilitada), var(--borda-desabilitada));
+  }
+
   .discreto:disabled,
   .discreto[aria-disabled="true"] {
     color: var(--texto-desabilitado);
@@ -193,7 +241,7 @@
   @media (hover: hover) {
     .controle:where(:not(:disabled, [aria-disabled="true"]):hover),
     .discreto:where(:not(:disabled, [aria-disabled="true"]):hover) {
-      background-color: color-mix(in oklab, var(--primary) 6%, var(--superficie-controle));
+      background-color: color-mix(in oklab, var(--primary) 8%, var(--superficie-controle));
     }
 
     .selecionado:where(:not(:disabled, [aria-disabled="true"]):hover),
@@ -205,7 +253,7 @@
         [aria-expanded="true"],
         [data-state="active"]
       ):not(.primario, .destrutivo):where(:not(:disabled):hover) {
-      background-color: color-mix(in oklab, var(--primary) 16%, var(--card));
+      background-color: var(--selecionado-fundo-hover);
     }
 
     .primario:where(:not(:disabled):hover) {
@@ -232,10 +280,21 @@
     .interruptor,
     .primario,
     .destrutivo {
-      border-color: ButtonText;
+      border: 1px solid ButtonText;
       background: Canvas;
       color: CanvasText;
       box-shadow: none;
+    }
+
+    input.campo:not(.campo-integrado),
+    textarea.campo,
+    .campo-texto {
+      border: 1px solid ButtonText;
+      background-image: none;
+    }
+
+    .campo.campo-integrado {
+      border: 0;
     }
 
     .primario,

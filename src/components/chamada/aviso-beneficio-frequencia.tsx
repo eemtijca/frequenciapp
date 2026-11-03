@@ -30,7 +30,7 @@ export function AvisoBeneficioFrequencia({ nome, alertas }: Props) {
           type="button"
           aria-label={`Atenção: ${nome} passou do limite de faltas do mês. ${beneficios}.`}
           title={`Acima do limite de faltas: ${beneficios}`}
-          className="border-alerta/50 bg-alerta-fraca text-alerta-texto pressionavel focus-visible:ring-ring/50 relative z-10 inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full border px-1.5 outline-none before:absolute before:-inset-2 focus-visible:ring-[3px]"
+          className="bg-alerta-fraca text-alerta-texto pressionavel focus-visible:ring-ring/50 relative z-10 inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full px-1.5 outline-none before:absolute before:-inset-2 focus-visible:ring-[3px]"
         >
           <TriangleAlert size={16} aria-hidden="true" />
         </button>

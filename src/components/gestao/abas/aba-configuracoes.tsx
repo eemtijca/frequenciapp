@@ -684,7 +684,7 @@ function ConteudoConfiguracoes({
                 {series.map((serie) => (
                   <label
                     key={serie.id}
-                    className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                    className="faixa-toque bg-secondary/40 flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
                   >
                     <input
                       type="checkbox"
@@ -731,7 +731,7 @@ function ConteudoConfiguracoes({
                   {turmas.map((item) => (
                     <label
                       key={item.id}
-                      className="faixa-toque flex items-center gap-3 rounded-lg border px-3 py-2 text-sm"
+                      className="faixa-toque bg-secondary/40 flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
                     >
                       <input
                         type="checkbox"
@@ -803,7 +803,7 @@ function ConteudoConfiguracoes({
           </>
         }
       >
-        <details className="rounded-xl border p-3">
+        <details className="bg-secondary/30 rounded-xl p-3">
           <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
             <Plus size={18} aria-hidden="true" />
             Adicionar justificativa
@@ -977,7 +977,7 @@ function ConteudoConfiguracoes({
           </>
         }
       >
-        <details className="rounded-xl border p-3">
+        <details className="bg-secondary/30 rounded-xl p-3">
           <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
             <Plus size={18} aria-hidden="true" />
             Adicionar responsável

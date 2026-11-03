@@ -1235,7 +1235,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                             value={painel.anotacao}
                             maxLength={2000}
                             aria-label="Anotação do painel"
-                            className="controle border-input mt-3 min-h-20 w-full p-3"
+                            className="campo mt-3 min-h-20 w-full p-3"
                             onChange={(e) => alterarPainel({ ...painel, anotacao: e.target.value })}
                           />
                         </details>

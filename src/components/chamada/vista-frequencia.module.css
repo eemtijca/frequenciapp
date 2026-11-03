@@ -1,7 +1,6 @@
 /* Blocos suaves da Chamada, com cores restritas aos controles e às marcações. */
 .acao,
 .data > button {
-  border-color: var(--borda-controle);
   border-radius: 1rem;
   background-color: var(--superficie-controle);
   color: var(--foreground);
@@ -15,13 +14,12 @@
 @media (hover: hover) {
   .acao:not(:disabled):hover,
   .data > button:not(:disabled):hover {
-    background-color: color-mix(in oklab, var(--primary) 8%, var(--superficie-controle));
+    background-color: color-mix(in oklab, var(--primary) 10%, var(--superficie-controle));
   }
 }
 
 .acao:disabled,
 .data > button:disabled {
-  border-color: var(--borda-desabilitada);
   background-color: var(--superficie-desabilitada);
   color: var(--texto-desabilitado);
   cursor: not-allowed;
@@ -71,7 +69,10 @@
 
 @media (forced-colors: active) {
   .acao,
-  .data > button,
+  .data > button {
+    border: 1px solid ButtonText;
+  }
+
   .marca {
     border-color: ButtonText;
   }

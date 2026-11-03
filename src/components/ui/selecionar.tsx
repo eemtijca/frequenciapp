@@ -59,7 +59,11 @@ export function Selecionar({
         >
           <SelectPrimitive.Value placeholder={placeholder} />
           <SelectPrimitive.Icon asChild>
-            <ChevronDown size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
+            <ChevronDown
+              size={16}
+              className="text-secondary-foreground shrink-0"
+              aria-hidden="true"
+            />
           </SelectPrimitive.Icon>
         </GatilhoSelecao>
       </SelectPrimitive.Trigger>

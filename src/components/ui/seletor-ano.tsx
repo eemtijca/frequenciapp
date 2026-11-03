@@ -102,7 +102,7 @@ export function SeletorAno({
       "pressionavel numerais-tabulares focus-visible:ring-ring/50 flex h-11 items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
       fora && "text-muted-foreground/40 cursor-not-allowed",
       ano === selecionado && "selecionado font-semibold",
-      ano !== selecionado && ano === anoAtual && "controle text-primary font-semibold",
+      ano !== selecionado && ano === anoAtual && "controle text-accent-foreground font-semibold",
       ano !== selecionado && ano !== anoAtual && !fora && "discreto",
     );
   }
@@ -124,11 +124,15 @@ export function SeletorAno({
         >
           <CalendarDays
             size={16}
-            className="text-muted-foreground hidden shrink-0 sm:block"
+            className="text-secondary-foreground hidden shrink-0 sm:block"
             aria-hidden="true"
           />
           <span className="numerais-tabulares font-semibold">{valor}</span>
-          <ChevronDown size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
+          <ChevronDown
+            size={16}
+            className="text-secondary-foreground shrink-0"
+            aria-hidden="true"
+          />
         </button>
       </PopoverPrimitive.Anchor>
       <PopoverContent

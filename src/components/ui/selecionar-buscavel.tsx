@@ -129,8 +129,14 @@ export function SelecionarBuscavel({
           }}
           className={cn("justify-between [&>span]:truncate", className)}
         >
-          <span>{selecionada?.rotulo ?? placeholder}</span>
-          <ChevronDown size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
+          <span className={selecionada ? undefined : "text-secondary-foreground"}>
+            {selecionada?.rotulo ?? placeholder}
+          </span>
+          <ChevronDown
+            size={16}
+            className="text-secondary-foreground shrink-0"
+            aria-hidden="true"
+          />
         </GatilhoSelecao>
       </PopoverTrigger>
       <PopoverContent
