@@ -12,6 +12,12 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - As superfícies, os controles e os campos passam a usar um contrato único de tokens nos temas claro e escuro. Controles neutros têm fundo suave e borda de 1 px nos dois temas, campos usam a mesma borda funcional, o raio fica padronizado em 16 px e os estados desabilitados deixam de usar opacidade global. O contrato está no [ADR-061](docs/adr/061-superficies-controles-e-temas.md).
 
+- O carrossel do Painel mantém o gráfico montado durante a atualização automática e preserva o estado dos cartões já visitados, sem recarregar a visualização ao trocar de série.
+
+- Saídas e Entradas compartilham os mesmos campos de formulário, mantendo rótulos, ordem, validação e confirmação de cada tela.
+
+- Os testes de componente passam a usar fixtures e navegador compartilhados, uma matriz de contraste das primitivas e um job de interface no CI. As suítes antigas de cor exata foram substituídas pelo contrato de tokens.
+
 - O filtro dos seletores pesquisáveis mantém um indicador de foco visível em cores forçadas. O seletor de período recupera o foco ao fechar o calendário e permite a quebra de linha para preservar a leitura da data e do dia em telas estreitas.
 
 - A navegação, a conta, os comandos do cabeçalho, os atalhos da entrada, as ações por ícone nas listas da Gestão e as ações auxiliares e de organização dos gráficos do FrequenciBI deixam de ter fundos individuais em repouso, mantendo a seleção e as ações principais em destaque. No tema claro, as setas de data do Painel e as ações Registrar e Editar da Chamada Parcial ganham fundos mais visíveis. Em cores forçadas, a aba selecionada mantém um contorno mesmo depois que o foco muda.
