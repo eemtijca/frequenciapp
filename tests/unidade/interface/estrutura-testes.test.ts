@@ -31,6 +31,8 @@ describe("estrutura dos testes de interface", () => {
   it("mantém a infraestrutura compartilhada dos testes de componente", () => {
     expect(() => readFileSync("tests/apoio/vite.ts", "utf8")).not.toThrow();
     expect(() => readFileSync("tests/apoio/navegador.ts", "utf8")).not.toThrow();
-    expect(() => readFileSync("tests/componentes/interface/primitivas.test.ts", "utf8")).not.toThrow();
+    expect(() =>
+      readFileSync("tests/componentes/interface/primitivas.test.ts", "utf8"),
+    ).not.toThrow();
   });
 });

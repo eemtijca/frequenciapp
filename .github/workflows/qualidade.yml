@@ -73,8 +73,8 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
 
-      - name: Instalar Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Instalar navegadores
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: Testes de componente e visibilidade dos gráficos
         run: pnpm run test:componentes

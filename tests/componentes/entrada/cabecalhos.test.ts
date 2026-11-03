@@ -60,7 +60,12 @@ async function verificarDiscreto(no: Locator) {
   await no.page().keyboard.press("Tab");
   await no.page().keyboard.press("Shift+Tab");
   expect(await no.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-  expect(await no.evaluate((el) => { const estilo = getComputedStyle(el); return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none"; })).toBe(true);
+  expect(
+    await no.evaluate((el) => {
+      const estilo = getComputedStyle(el);
+      return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+    }),
+  ).toBe(true);
 }
 it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", async (tema, largura) => {
   const page = await browser.newPage({

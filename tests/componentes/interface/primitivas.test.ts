@@ -31,9 +31,7 @@ interface Medida {
 async function medir(page: Page, rotulo: string): Promise<Medida> {
   return page.getByLabel(rotulo, { exact: true }).evaluate((alvo) => {
     const campo =
-      alvo.closest(".campo:not(.campo-integrado)") ??
-      alvo.closest(".campo")?.parentElement ??
-      alvo;
+      alvo.closest(".campo:not(.campo-integrado)") ?? alvo.closest(".campo")?.parentElement ?? alvo;
     const area = alvo.closest("[data-superficie]");
     const fundo =
       area?.getAttribute("data-superficie") === "pagina"

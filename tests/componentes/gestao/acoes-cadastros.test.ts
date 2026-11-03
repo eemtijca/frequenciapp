@@ -219,7 +219,12 @@ it("edição, teclado e confirmação de exclusão de série são preservados", 
     const editar = page.getByRole("button", { name: "Editar série 1º ano" });
     await editar.focus();
     expect(await editar.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
-    expect(await editar.evaluate((el) => { const estilo = getComputedStyle(el); return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none"; })).toBe(true);
+    expect(
+      await editar.evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
+      }),
+    ).toBe(true);
     await page.keyboard.press("Enter");
     expect(await page.getByRole("dialog", { name: "Editar série" }).isVisible()).toBe(true);
     await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
