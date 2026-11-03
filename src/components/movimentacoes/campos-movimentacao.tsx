@@ -88,6 +88,9 @@ export function CamposMovimentacao({
   onObservacao,
 }: Props) {
   const saida = tipo === "saida";
+  const idTexto = saida ? "saida-texto" : "entrada-motivo";
+  const idObservacao = saida ? "saida-observacao" : "entrada-observacao";
+  const contador = saida ? `${texto.length}/100` : undefined;
   const campoResponsavel = (
     <Campo
       id={`${tipo}-responsavel`}
@@ -162,9 +165,9 @@ export function CamposMovimentacao({
           ]}
         />
         {forma === "texto" ? (
-          <Campo id={`${tipo}-texto`} rotulo="Texto da justificativa">
+          <Campo id={idTexto} rotulo="Texto da justificativa" contador={contador}>
             <Input
-              id={`${tipo}-texto`}
+              id={idTexto}
               value={texto}
               required={textoObrigatorio}
               minLength={textoObrigatorio ? 2 : undefined}
@@ -188,9 +191,9 @@ export function CamposMovimentacao({
               />
             </Campo>
             {mostrarTextoCatalogo ? (
-              <Campo id={`${tipo}-texto`} rotulo="Texto da justificativa">
+              <Campo id={idTexto} rotulo="Texto da justificativa" contador={contador}>
                 <Input
-                  id={`${tipo}-texto`}
+                  id={idTexto}
                   value={texto}
                   maxLength={100}
                   disabled={enviando}
@@ -201,9 +204,9 @@ export function CamposMovimentacao({
               </Campo>
             ) : null}
             {mostrarObservacao ? (
-              <Campo id={`${tipo}-observacao`} rotulo="Observação">
+              <Campo id={idObservacao} rotulo="Observação">
                 <Input
-                  id={`${tipo}-observacao`}
+                  id={idObservacao}
                   value={observacao}
                   maxLength={100}
                   disabled={enviando}
