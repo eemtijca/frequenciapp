@@ -331,7 +331,7 @@ test("no celular, o cartão ocupa a largura sem alargar a página e ajusta a alt
   await expect
     .poll(() =>
       page.getByRole("group", { name: "Cartões de gráficos" }).evaluate((elemento) => {
-        const cartao = elemento.querySelector("[data-cartao]:not([hidden])");
+        const cartao = elemento.querySelector('[data-cartao][data-ativo="true"]');
         return cartao ? elemento.clientHeight - cartao.getBoundingClientRect().height : Infinity;
       }),
     )
@@ -600,8 +600,13 @@ test.describe("gráfico personalizado por período", () => {
     const nomes = await page
       .locator('[role="article"][aria-roledescription="cartão"]')
       .evaluateAll((elementos) => elementos.map((item) => item.getAttribute("aria-label")));
-    expect(nomes.at(-2)).toMatch(/: Personalizado$/);
-    expect(nomes.at(-1)).toMatch(/: Desistentes$/);
+    expect(nomes.at(-1)).toMatch(/: Personalizado$/);
+    // Cartões ainda não visitados não são montados pelo carrossel.
+    await expect(
+      page
+        .getByRole("group", { name: "Cartões de gráficos" })
+        .getByRole("article", { name: /: Desistentes$/ }),
+    ).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Resumo do dia" })).toBeVisible();
     await escolherDataNoPeriodo(page, "Data inicial do gráfico", "2026-08-31");
     await escolherDataNoPeriodo(page, "Data final do gráfico", "2026-09-01");
