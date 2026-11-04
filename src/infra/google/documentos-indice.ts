@@ -80,11 +80,7 @@ export async function atualizarDocumentoIndice(
   }
   if (!resposta.ok) {
     if (resposta.status === 404)
-      throw new ErroHttp(
-        "O índice não foi encontrado no Google Drive. O vínculo foi liberado para recuperar o documento ou criar outro.",
-        409,
-        "INDICE_AUSENTE",
-      );
+      throw new ErroHttp("O índice não foi encontrado no Google Drive.", 409, "INDICE_AUSENTE");
     throw new ErroHttp(
       "Não foi possível abrir o índice. Confira a conta Google e o acesso ao documento.",
       502,

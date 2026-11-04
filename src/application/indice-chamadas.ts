@@ -87,11 +87,17 @@ async function atualizar(linha: LinhaIntegracao, recuperarId?: string, criar = f
     try {
       assinatura = await atualizarDocumentoIndice(acesso, documentoId, indice, registro.assinatura);
     } catch (erro) {
-      if (erro instanceof ErroHttp && erro.codigo === "INDICE_AUSENTE")
+      if (erro instanceof ErroHttp && erro.codigo === "INDICE_AUSENTE") {
         await banco().indiceChamada.updateMany({
           where: { id: registro.id, documentoId },
           data: { documentoId: null, assinatura: null },
         });
+        throw new ErroHttp(
+          "O índice não foi encontrado no Google Drive. O vínculo foi liberado para recuperar o documento ou criar outro.",
+          409,
+          "INDICE_AUSENTE",
+        );
+      }
       throw erro;
     }
     await banco().indiceChamada.update({
