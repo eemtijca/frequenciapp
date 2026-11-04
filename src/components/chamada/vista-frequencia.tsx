@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   ChartNoAxesCombined,
   FileText,
-  Minus,
   Pencil,
   LockKeyhole,
   LockKeyholeOpen,
@@ -1449,9 +1448,7 @@ export default function VistaFrequencia({
                                   }
                                   className={`${estilos.marca} ${esmaecida ? "opacity-60" : ""}`}
                                 >
-                                  {!desistente &&
-                                    faltando &&
-                                    (codigo ? <FileText size={16} /> : <Minus size={16} />)}
+                                  {!desistente && faltando && codigo && <FileText size={16} />}
                                   {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
                                 </motion.span>
                               </div>
