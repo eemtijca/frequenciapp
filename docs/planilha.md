@@ -100,7 +100,7 @@ Alterações manuais no texto e conteúdo não reconhecido no corpo impedem a at
 
 Se nenhum documento for encontrado após uma criação incerta, a Gestão permite **Não encontrei o documento** e **Criar outro índice**, com confirmação de que a nova tentativa pode criar outro arquivo no Drive. Essa ação só reinicia uma reserva pendente, sem documento confirmado.
 
-Se o documento for apagado ou o acesso for perdido, a próxima atualização libera o vínculo local. A Gestão permite então recuperar o arquivo pelo link ou criar outro índice, com a mesma confirmação de possível arquivo adicional.
+Se o documento for apagado ou não for encontrado no Drive, a próxima atualização libera o vínculo local. A Gestão permite então recuperar o arquivo pelo link ou criar outro índice, com a mesma confirmação de possível arquivo adicional.
 
 ### Retirar abas sem mês
 

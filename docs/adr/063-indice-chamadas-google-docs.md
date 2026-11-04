@@ -21,4 +21,4 @@ O índice exige ativar uma API adicional e aplicar uma migração. A criação �
 
 Se nenhum documento for encontrado após uma criação incerta, a Gestão permite **Não encontrei o documento** e **Criar outro índice**, com confirmação de que a nova tentativa pode criar outro arquivo no Drive. Essa ação só reinicia uma reserva pendente, sem documento confirmado.
 
-Se o documento for apagado ou o acesso for perdido, a próxima atualização libera o vínculo local. A recuperação pelo link ou a criação de outro índice volta a ficar disponível com confirmação explícita.
+Se o documento for apagado ou não for encontrado no Drive, a próxima atualização libera o vínculo local. A recuperação pelo link ou a criação de outro índice volta a ficar disponível com confirmação explícita.
