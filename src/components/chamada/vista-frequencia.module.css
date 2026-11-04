@@ -46,6 +46,11 @@
   color: var(--primary);
 }
 
+.marca[data-estado="P"][data-nao-iniciada="true"] {
+  background-color: var(--secondary);
+  color: var(--muted-foreground);
+}
+
 .marca[data-estado="F"] {
   background-color: var(--falta-fraca);
   color: var(--falta-texto);
