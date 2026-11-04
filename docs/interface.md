@@ -100,7 +100,7 @@ O estilo Blocos suaves se estende à navegação, conta, Painel, Relatórios, Al
 - Alvos de toque grandes, com `aria-pressed` nas linhas de aluno e `aria-current` na navegação.
 - Rótulos visíveis ou `sr-only` em todos os campos e botões de ícone; o botão de exibir senha alterna entre "Mostrar senha" e "Ocultar senha".
 - Seletor de período com foco no dia ou mês escolhido ao abrir, navegação por setas, Home, End, PageUp e PageDown, `aria-pressed` na célula ativa e foco devolvido ao gatilho ao fechar.
-- Foco visível em todos os interativos; contraste AA em texto, linha de campo e foco nos dois temas.
+- Foco visível na navegação por teclado, sem contorno nos cliques e toques diretos; foco programático de origem desconhecida permanece visível por acessibilidade, inclusive em cores forçadas. Contraste AA em texto, linha de campo e foco nos dois temas.
 - Barras de estado usam `aria-live="polite"` para anunciar salvamentos.
 - `prefers-reduced-motion` respeitado: transições e animações decorativas param quando o sistema pede, mas spinners e esqueletos de carregamento continuam animando para comunicar espera.
 - Áreas seguras respeitadas no topo, nas laterais e na base, inclusive no aplicativo instalado.

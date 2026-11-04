@@ -52,9 +52,9 @@
   color: var(--justificada);
 }
 
-.gatilho:focus-visible,
-.serie:focus-visible,
-.turma:focus-visible {
+.gatilho:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+.serie:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+.turma:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
   outline: 3px solid var(--justificada);
   outline-offset: 5px;
 }
@@ -284,10 +284,7 @@
   border-radius: inherit;
   box-shadow: none;
 }
-.serie[aria-pressed="true"] {
-  outline: none;
-}
-.serie:focus-visible {
+.serie:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
   outline: 3px solid var(--justificada);
   outline-offset: 2px;
 }

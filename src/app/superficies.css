@@ -141,6 +141,11 @@
     outline: none;
   }
 
+  html[data-modalidade-foco="teclado"] .campo.campo-integrado:focus:not(:where(.campo *)) {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
   .grafico-fatia {
     fill: var(--cor-fatia);
   }
@@ -196,12 +201,12 @@
     }
   }
 
-  .controle:focus-visible,
-  .campo:focus-visible,
-  .campo:focus-within,
-  .discreto:focus-visible,
-  .primario:focus-visible,
-  .destrutivo:focus-visible {
+  .controle:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+  .campo:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+  .campo:has(:focus-visible):not(:where(html[data-modalidade-foco="ponteiro"] *)),
+  .discreto:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+  .primario:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
+  .destrutivo:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -304,14 +309,15 @@
     }
 
     .selecionado,
-    .campo:where([aria-expanded="true"]),
-    .controle:where(
+    .campo:is([aria-expanded="true"]),
+    .controle:is(
       [aria-pressed="true"],
       [aria-selected="true"],
       [aria-checked="true"],
       [aria-expanded="true"],
       [data-state="active"]
     ) {
+      border: 2px solid Highlight;
       outline: 2px solid Highlight;
       outline-offset: -3px;
     }
@@ -336,16 +342,17 @@
 /* Foco visível também nas cores forçadas, acima das utilidades de outline. */
 @media (forced-colors: active) {
   :where(
-    button,
-    a,
-    input,
-    select,
-    textarea,
-    [role="button"],
-    [role="tab"],
-    [role="radio"],
-    [role="option"]
-  ):focus-visible {
+      button,
+      a,
+      input,
+      select,
+      textarea,
+      [role="button"],
+      [role="tab"],
+      [role="radio"],
+      [role="spinbutton"],
+      [role="option"]
+    ):focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
