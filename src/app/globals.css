@@ -4,6 +4,7 @@
 @import "./superficies.css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant focus-visible (&:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)));
 
 /* Mantém os avisos acima das ações do rascunho sem bloquear seus botões. */
 body:has([data-rodape-configuracoes]) [data-sonner-toaster][data-y-position="bottom"] {
@@ -359,17 +360,49 @@ input[type="month"] {
   [role="button"] {
     touch-action: manipulation;
   }
+  /* O navegador pode manter :focus-visible após clicar no controle já focado. */
+  html[data-modalidade-foco="ponteiro"]
+    :where(
+      button,
+      a,
+      input,
+      select,
+      textarea,
+      [role="button"],
+      [role="tab"],
+      [role="radio"],
+      [role="spinbutton"]
+    ):focus-visible {
+    outline: none;
+  }
   :where(
-    button,
-    a,
-    input,
-    select,
-    textarea,
-    [role="button"],
-    [role="tab"],
-    [role="radio"]
-  ):focus-visible {
+      button,
+      a,
+      input,
+      select,
+      textarea,
+      [role="button"],
+      [role="tab"],
+      [role="radio"],
+      [role="spinbutton"]
+    ):focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* A origem pode ser programática ou tecnologia assistiva, mesmo após clique. */
+@media (forced-colors: none) {
+  [data-foco-desconhecido]:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  /* Seleção continua identificável pela borda quando o contorno mostra o foco. */
+  [data-foco-desconhecido]:focus {
+    outline: 2px solid Highlight;
     outline-offset: 2px;
   }
 }

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
+import { ModalidadeFoco } from "@/components/ui/modalidade-foco";
 import CorDoTema from "@/components/pwa/cor-do-tema";
 import "./globals.css";
 
@@ -72,6 +73,7 @@ export default async function LayoutRaiz({
       <body
         className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground font-sans antialiased`}
       >
+        <ModalidadeFoco />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
