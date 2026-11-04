@@ -269,3 +269,26 @@ it("movimento reduzido desativa as animações e desmonta o conteúdo", async ()
     await page.close();
   }
 });
+
+it("turma selecionada não repete o ícone e mantém a borda em cores forçadas", async () => {
+  const page = await browser.newPage({ forcedColors: "active" });
+  try {
+    await page.goto(url);
+    await page.getByRole("button", { name: "Turmas", exact: true }).click({ timeout: 90000 });
+    const grupo = page.getByRole("group", { name: "Turmas de 1ª série" });
+    const selecionada = grupo.getByRole("button", { name: "1ª série A", exact: true });
+    const outra = grupo.getByRole("button", { name: "1ª série B", exact: true });
+    expect(await selecionada.getAttribute("aria-pressed")).toBe("true");
+    expect(await selecionada.locator("svg.lucide-check").count()).toBe(0);
+    const borda = (alvo: Locator) =>
+      alvo.evaluate((el) => {
+        const estilo = getComputedStyle(el);
+        return { cor: estilo.borderTopColor, largura: estilo.borderTopWidth };
+      });
+    const [selecionadaBorda, outraBorda] = await Promise.all([borda(selecionada), borda(outra)]);
+    expect(selecionadaBorda.largura).toBe("1px");
+    expect(selecionadaBorda.cor).not.toBe(outraBorda.cor);
+  } finally {
+    await page.close();
+  }
+});
