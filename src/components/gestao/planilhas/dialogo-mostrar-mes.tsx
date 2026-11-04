@@ -94,7 +94,11 @@ export function DialogoMostrarMes({
             corpoJson({ mes }),
           );
           setCatalogo(await pedir<Catalogo>("/api/planilha/mensal/visibilidade"));
-          setMensagem(resultado.avisoIndice ?? "Todos os meses preparados estão acessíveis.");
+          setMensagem(
+            resultado.avisoIndice
+              ? `Todos os meses preparados estão acessíveis. ${resultado.avisoIndice}`
+              : "Todos os meses preparados estão acessíveis.",
+          );
           await onAtualizar();
         }
         if (tipo === "conferir" || tipo === "rever") {

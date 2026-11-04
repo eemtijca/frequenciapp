@@ -74,6 +74,16 @@ describe("documento do índice", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("sinaliza documento ausente para liberar o vínculo local", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({}, { status: 404 })),
+    );
+    await expect(
+      atualizarDocumentoIndice("token-qa", "qa-documento", indice, null),
+    ).rejects.toMatchObject({ status: 409, codigo: "INDICE_AUSENTE" });
+  });
+
   it("não repete criação após perda de resposta", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

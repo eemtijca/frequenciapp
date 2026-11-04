@@ -12238,7 +12238,7 @@
             "description": "Sessão necessária."
           },
           "403": {
-            "description": "Administração e origem confiável necessárias."
+            "description": "Administração necessária."
           }
         }
       },
@@ -12258,7 +12258,8 @@
                   "documentoUrl": {
                     "type": "string",
                     "format": "uri",
-                    "description": "Link Google Docs para recuperar criação pendente."
+                    "maxLength": 500,
+                    "description": "Link Google Docs para recuperar criação pendente, inclusive com /u/N/."
                   },
                   "recriar": {
                     "type": "boolean",
@@ -12301,7 +12302,7 @@
             "description": "Administração e origem confiável necessárias."
           },
           "409": {
-            "description": "Criação pendente, mês ausente ou texto editado."
+            "description": "Criação pendente, mês ausente, documento ausente ou texto editado."
           },
           "429": {
             "description": "Limite de tentativas."

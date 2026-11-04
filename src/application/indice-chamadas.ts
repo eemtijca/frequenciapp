@@ -83,12 +83,17 @@ async function atualizar(linha: LinhaIntegracao, recuperarId?: string, criar = f
       throw new ErroHttp("Este arquivo já tem um índice vinculado.", 409);
     const documentoId = registro.documentoId ?? recuperarId;
     if (!documentoId) throw new ErroHttp("Informe o documento do índice.", 400);
-    const assinatura = await atualizarDocumentoIndice(
-      acesso,
-      documentoId,
-      indice,
-      registro.assinatura,
-    );
+    let assinatura: string;
+    try {
+      assinatura = await atualizarDocumentoIndice(acesso, documentoId, indice, registro.assinatura);
+    } catch (erro) {
+      if (erro instanceof ErroHttp && erro.codigo === "INDICE_AUSENTE")
+        await banco().indiceChamada.updateMany({
+          where: { id: registro.id, documentoId },
+          data: { documentoId: null, assinatura: null },
+        });
+      throw erro;
+    }
     await banco().indiceChamada.update({
       where: { id: registro.id },
       data: { documentoId, assinatura },
@@ -105,8 +110,9 @@ export async function prepararIndiceChamadas(admin: { id: string }, entrada: unk
     .object({
       documentoUrl: z
         .string()
+        .max(500, "Informe um link válido do Google Docs.")
         .regex(
-          /^https:\/\/docs\.google\.com\/document\/d\/([\w-]{1,200})(?:\/edit)?\/?(?:\?[^#]*)?(?:#.*)?$/,
+          /^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/([\w-]{1,200})(?:\/edit)?\/?(?:\?[^#]*)?(?:#.*)?$/,
         )
         .optional(),
       recriar: z.literal(true).optional(),

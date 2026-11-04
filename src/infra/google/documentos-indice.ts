@@ -78,11 +78,18 @@ export async function atualizarDocumentoIndice(
   } catch {
     throw new ErroHttp("Não foi possível consultar o índice agora.", 502);
   }
-  if (!resposta.ok)
+  if (!resposta.ok) {
+    if (resposta.status === 404)
+      throw new ErroHttp(
+        "O índice não foi encontrado no Google Drive. O vínculo foi liberado para recuperar o documento ou criar outro.",
+        409,
+        "INDICE_AUSENTE",
+      );
     throw new ErroHttp(
       "Não foi possível abrir o índice. Confira a conta Google e o acesso ao documento.",
       502,
     );
+  }
   const lido = esquema.safeParse(await resposta.json().catch(() => null));
   if (!lido.success || lido.data.documentId !== id)
     throw new ErroHttp("Não foi possível conferir o índice.", 502);

@@ -100,6 +100,8 @@ Alterações manuais no texto e conteúdo não reconhecido no corpo impedem a at
 
 Se nenhum documento for encontrado após uma criação incerta, a Gestão permite **Não encontrei o documento** e **Criar outro índice**, com confirmação de que a nova tentativa pode criar outro arquivo no Drive. Essa ação só reinicia uma reserva pendente, sem documento confirmado.
 
+Se o documento for apagado ou o acesso for perdido, a próxima atualização libera o vínculo local. A Gestão permite então recuperar o arquivo pelo link ou criar outro índice, com a mesma confirmação de possível arquivo adicional.
+
 ### Retirar abas sem mês
 
 Em **Meses da frequência**, abrir **Abas sem mês** e usar **Conferir abas antigas**. A conferência percorre uma aba vinculada por vez e mostra os destinos, as marcas a mover e as já preservadas. Depois, **Transferir e retirar** copia somente marcas P, F, FJ e S para células mensais vazias e remove a origem no mesmo lote atômico. Os meses precisam estar preparados. Cancelar a prévia não altera a planilha.

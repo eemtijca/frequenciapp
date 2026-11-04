@@ -33,6 +33,7 @@ export interface GoogleFalso {
   documentos(): string[];
   documento(id: string): { texto: string; pedidos: Objeto[] } | undefined;
   editarDocumento(id: string, texto: string): void;
+  removerDocumento(id: string): void;
   falharCriacaoDocumento(valor: number | "perder" | null): void;
   conectar(banco: pg.Client, finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL"): Promise<void>;
   codigoAutorizacao(): string;
@@ -641,6 +642,9 @@ export async function criarGoogleFalso(
       if (!documento) throw new Error("Documento sintético ausente.");
       documento.texto = texto;
       documento.revisao += 1;
+    },
+    removerDocumento: (id) => {
+      documentos.delete(id);
     },
     falharCriacaoDocumento: (valor) => {
       falhaDocumento = valor;

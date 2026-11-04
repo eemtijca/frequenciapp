@@ -1013,7 +1013,7 @@ describe("frequência organizada por turma e mês", () => {
     expect(catalogo.abas.some((aba) => aba.mes === "2026-09")).toBe(true);
     expect(
       catalogo.abas.every((aba) =>
-        /^https:\/\/docs.google.com\/spreadsheets\/d\/planilha-sintetica\/edit#gid=\d+$/.test(
+        /^https:\/\/docs\.google\.com\/spreadsheets\/d\/planilha-sintetica\/edit#gid=\d+$/.test(
           aba.url,
         ),
       ),
@@ -1308,7 +1308,7 @@ describe("frequência organizada por turma e mês", () => {
     expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: false });
     const antes = google.chamadas().filter((acao) => acao === "gravar").length;
     const criado = await dados<{ url: string }>(await chamar(rota, "POST", {}));
-    expect(criado.url).toMatch(/^https:\/\/docs.google.com\/document\/d\/documento-qa-1\/edit$/);
+    expect(criado.url).toMatch(/^https:\/\/docs\.google\.com\/document\/d\/documento-qa-1\/edit$/);
     expect(google.documentos()).toEqual(["documento-qa-1"]);
     const documento = google.documento("documento-qa-1");
     expect(documento?.texto).toContain("Índice das chamadas");
@@ -1337,6 +1337,23 @@ describe("frequência organizada por turma e mês", () => {
     expect(google.documento("documento-qa-1")?.texto).toBe(manual);
   });
 
+  it("libera o vínculo quando o documento do índice some do Drive", async () => {
+    const rota = "/api/planilha/mensal/indice";
+    await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
+    await dados(await chamar(rota, "POST", {}));
+    const id = google.documentos().at(-1);
+    if (!id) throw new Error("Documento do índice ausente.");
+    google.removerDocumento(id);
+    expect((await chamar(rota, "POST", {})).status).toBe(409);
+    expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: true });
+    const recriado = await dados<{ url: string }>(await chamar(rota, "POST", { recriar: true }));
+    expect(recriado.url).toContain("documento-qa-");
+    expect(await dados(await chamar(rota, "GET"))).toEqual({
+      url: recriado.url,
+      pendente: false,
+    });
+  });
+
   it("recupera criação incerta sem duplicar o documento e não repete uma recusa", async () => {
     const rota = "/api/planilha/mensal/indice";
     await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
@@ -1352,9 +1369,9 @@ describe("frequência organizada por turma e mês", () => {
     expect((await chamar(rota, "POST", {})).status).toBe(409);
     expect(google.documentos()).toHaveLength(anteriores + 1);
     const id = google.documentos().at(-1);
-    const documentoUrl = `https://docs.google.com/document/d/${id}/edit`;
+    const documentoUrl = `https://docs.google.com/document/u/0/d/${id}/edit`;
     expect(await dados(await chamar(rota, "POST", { documentoUrl }))).toEqual({
-      url: documentoUrl,
+      url: `https://docs.google.com/document/d/${id}/edit`,
       pendente: false,
     });
     expect(google.documentos()).toHaveLength(anteriores + 1);
