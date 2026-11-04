@@ -12206,6 +12206,111 @@
           }
         }
       }
+    },
+    "/api/planilha/mensal/indice": {
+      "get": {
+        "operationId": "consultarIndiceChamadas",
+        "summary": "Consultar o documento de links das chamadas",
+        "description": "Apenas administração. Consulta o vínculo local sem acessar ou escrever no Google.",
+        "tags": ["planilhas"],
+        "responses": {
+          "200": {
+            "description": "Estado do índice do arquivo selecionado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["url", "pendente"],
+                  "properties": {
+                    "url": {
+                      "type": ["string", "null"],
+                      "description": "Link do Google Docs, quando confirmado."
+                    },
+                    "pendente": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessão necessária."
+          },
+          "403": {
+            "description": "Administração e origem confiável necessárias."
+          }
+        }
+      },
+      "post": {
+        "operationId": "prepararIndiceChamadas",
+        "summary": "Criar ou atualizar o índice no Google Docs",
+        "description": "Apenas administração e origem confiável, com integração ativa e mês preparado. Usa drive.file e Google Docs API. Reserva a criação antes de enviar; criação incerta exige recuperar pelo link, sem duplicar. Texto manual e revisão concorrente são protegidos. Não repete escritas automaticamente.",
+        "tags": ["planilhas"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "documentoUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Link Google Docs para recuperar criação pendente."
+                  },
+                  "recriar": {
+                    "type": "boolean",
+                    "const": true,
+                    "description": "Reinicia somente criação pendente, após confirmar possível arquivo adicional. Não combinar com documentoUrl."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estado do índice do arquivo selecionado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["url", "pendente"],
+                  "properties": {
+                    "url": {
+                      "type": ["string", "null"],
+                      "description": "Link do Google Docs, quando confirmado."
+                    },
+                    "pendente": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo ou conexão inválidos."
+          },
+          "401": {
+            "description": "Sessão necessária."
+          },
+          "403": {
+            "description": "Administração e origem confiável necessárias."
+          },
+          "409": {
+            "description": "Criação pendente, mês ausente ou texto editado."
+          },
+          "429": {
+            "description": "Limite de tentativas."
+          },
+          "502": {
+            "description": "Falha no Google Docs."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -16179,6 +16284,10 @@
               "type": "string"
             },
             "example": ["2º B - Setembro"]
+          },
+          "avisoIndice": {
+            "type": "string",
+            "description": "Aviso de falha no índice, com liberação das abas preservada."
           }
         }
       },

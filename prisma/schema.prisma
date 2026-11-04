@@ -731,6 +731,18 @@ model IntegracaoPlanilha {
   @@map("integracoes_planilha")
 }
 
+// Documento gerenciado com links das chamadas, vinculado ao arquivo de origem.
+model IndiceChamada {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planilhaId   String   @unique @map("planilha_id") @db.VarChar(200)
+  documentoId  String?  @map("documento_id") @db.VarChar(200)
+  assinatura   String?  @db.VarChar(64)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+
+  @@map("indices_chamada")
+}
+
 // Histórico de sincronizações, uma linha por envio registrado. Serve ao
 // cálculo de dias pendentes e à prestação de contas, sem nomes.
 model SincronizacaoPlanilha {

@@ -30,6 +30,10 @@ function coluna(letra: string) {
 }
 
 export interface GoogleFalso {
+  documentos(): string[];
+  documento(id: string): { texto: string; pedidos: Objeto[] } | undefined;
+  editarDocumento(id: string, texto: string): void;
+  falharCriacaoDocumento(valor: number | "perder" | null): void;
   conectar(banco: pg.Client, finalidade?: "FREQUENCIA" | "SAIDAS" | "PARCIAL"): Promise<void>;
   codigoAutorizacao(): string;
   definirFuso(valor: string): void;
@@ -83,6 +87,8 @@ export async function criarGoogleFalso(
 ): Promise<GoogleFalso> {
   const abas: Aba[] = [];
   const chamadas: string[] = [];
+  const documentos = new Map<string, { texto: string; revisao: number; pedidos: Objeto[] }>();
+  let falhaDocumento: number | "perder" | null = null;
   let proximoId = 1;
   let proximoMetadado = 1;
   let fuso = "America/Fortaleza";
@@ -475,6 +481,76 @@ export async function criarGoogleFalso(
           );
           return;
         }
+        if (url.pathname.startsWith("/v1/documents")) {
+          if (url.pathname === "/v1/documents" && req.method === "POST") {
+            chamadas.push("criar_documento");
+            if (typeof falhaDocumento === "number") {
+              responder({ error: { message: "Criação recusada" } }, falhaDocumento);
+              return;
+            }
+            const documentId = `documento-qa-${documentos.size + 1}`;
+            documentos.set(documentId, { texto: "\n", revisao: 1, pedidos: [] });
+            if (falhaDocumento === "perder") {
+              req.socket.destroy();
+              return;
+            }
+            responder({ documentId });
+            return;
+          }
+          const id = url.pathname.split("/").at(-1)?.replace(":batchUpdate", "") ?? "";
+          const documento = documentos.get(id);
+          if (!documento) {
+            responder({ error: { message: "Documento inexistente" } }, 404);
+            return;
+          }
+          if (req.method === "GET") {
+            responder({
+              documentId: id,
+              revisionId: String(documento.revisao),
+              body: {
+                content: [
+                  { endIndex: 1, sectionBreak: {} },
+                  {
+                    endIndex: documento.texto.length + 1,
+                    paragraph: { elements: [{ textRun: { content: documento.texto } }] },
+                  },
+                ],
+              },
+            });
+            return;
+          }
+          chamadas.push("gravar_documento");
+          const dados = objeto(JSON.parse(corpo));
+          if (objeto(dados.writeControl).requiredRevisionId !== String(documento.revisao)) {
+            responder({ error: { message: "Revisão divergente" } }, 400);
+            return;
+          }
+          documento.pedidos = lista(dados.requests).map(objeto);
+          for (const pedido of documento.pedidos) {
+            if (pedido.deleteContentRange) {
+              const faixa = objeto(objeto(pedido.deleteContentRange).range);
+              documento.texto =
+                documento.texto.slice(0, numero(faixa.startIndex) - 1) +
+                documento.texto.slice(numero(faixa.endIndex) - 1);
+            }
+            if (pedido.insertText) {
+              const insercao = objeto(pedido.insertText);
+              const indice = numero(objeto(insercao.location).index) - 1;
+              documento.texto =
+                documento.texto.slice(0, indice) +
+                texto(insercao.text) +
+                documento.texto.slice(indice);
+            }
+          }
+          documento.revisao += 1;
+          if (perderResposta) {
+            perderResposta = false;
+            req.socket.destroy();
+            return;
+          }
+          responder({ replies: [] });
+          return;
+        }
         if (url.pathname.endsWith(":batchUpdate")) {
           chamadas.push("gravar");
           if (recusarGravacoes) {
@@ -553,6 +629,22 @@ export async function criarGoogleFalso(
     credencial = `frequenciapp-teste:${Buffer.from(`http://127.0.0.1:${endereco.port}`).toString("base64url")}`;
   }
   return {
+    documentos: () => [...documentos.keys()],
+    documento: (id) => {
+      const documento = documentos.get(id);
+      return documento
+        ? structuredClone({ texto: documento.texto, pedidos: documento.pedidos })
+        : undefined;
+    },
+    editarDocumento: (id, texto) => {
+      const documento = documentos.get(id);
+      if (!documento) throw new Error("Documento sintético ausente.");
+      documento.texto = texto;
+      documento.revisao += 1;
+    },
+    falharCriacaoDocumento: (valor) => {
+      falhaDocumento = valor;
+    },
     codigoAutorizacao: () => credencial,
     conectar: async (banco, finalidade = "FREQUENCIA") => {
       if (opcoes.semServidor)

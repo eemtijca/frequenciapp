@@ -68,3 +68,5 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-060](adr/060-restauracao-das-turmas-de-origem.md): volta dos alunos remanejados de uma série às turmas de origem, com prévia conferida e renumeração só das turmas afetadas.
 - [ADR-061](adr/061-superficies-controles-e-temas.md): contrato único de superfícies, controles e temas nos dois temas.
 - [ADR-062](adr/062-controles-de-superficie-suave.md): controles com fundo quase igual ao cartão, fio de baixo contraste, linha inferior nos campos e foco visível.
+
+- [ADR-063](adr/063-indice-chamadas-google-docs.md): índice das chamadas em Google Docs com links para as abas mensais.

@@ -25,7 +25,7 @@ O histórico e os detalhes da fila ficam recolhidos. Erros e pendências continu
 
 ## Conectar por OAuth e Sheets API
 
-1. Crie ou escolha um projeto Google Cloud e ative a Google Sheets API, a Google Picker API e a Google Drive API, necessária ao seletor. A leitura e a escrita da planilha continuam pela Sheets API.
+1. Crie ou escolha um projeto Google Cloud e ative a Google Sheets API, a Google Picker API e a Google Drive API, necessária ao seletor. Para o índice em documento, ative também a Google Docs API. A leitura e a escrita da planilha continuam pela Sheets API.
 2. Em Google Auth Platform, configure a marca e o público do aplicativo. No modo de teste, adicione a conta da escola como usuária de teste. O token de atualização de um aplicativo externo em teste pode expirar após sete dias; para uso contínuo, publique a configuração de autorização em produção.
 3. Crie um cliente OAuth do tipo Aplicativo da Web. Cadastre a origem pública do FrequenciApp e o URI de redirecionamento exato `https://SEU-DOMINIO/api/planilha/google/retorno`.
 4. Crie uma chave de API restrita à Google Picker API. Nas restrições de site, inclua a origem do FrequenciApp e `https://docs.google.com/*`, pois o Picker abre em um quadro desse domínio.
@@ -87,6 +87,18 @@ A identificação mensal usa metadados de turma, mês e geração, além do iden
 Ao preparar ou liberar os meses, as abas mensais ficam do mês mais recente para o mais antigo, incluindo a mudança de ano. O mês atual aparece antes dos anteriores; consultar um mês antigo mantém essa ordem. As turmas do mesmo mês conservam sua ordem, e abas manuais, legadas e cópias mantêm suas posições finais. Para corrigir a ordem de uma planilha já preparada, usar **Meses da frequência**, **Liberar meses**.
 
 Ao concluir **Preparar mês** para todas as turmas, a Gestão libera todos os meses preparados. Setembro, meses anteriores e outros anos continuam acessíveis; consultar um mês não oculta os demais. Em **Meses da frequência**, escolher o mês e abrir a turma pelo link direto do Google Planilhas. **Liberar meses** revela também as abas anteriormente ocultadas. A consulta do catálogo não grava nada, e abas manuais sem vínculo e cópias antigas mantêm a visibilidade original.
+
+### Índice das chamadas no Google Docs
+
+Em **Organizar**, abrir **Meses da frequência** e usar **Criar índice**. O aplicativo cria um Google Docs separado, com o título Índice das chamadas, meses do mais recente ao mais antigo e links diretos para cada turma na planilha atual. **Abrir índice** acessa o documento e **Atualizar índice** refaz a lista a partir das abas existentes. O índice contém nomes de turmas e links, sem listas de alunos ou cópias das chamadas. A criação mantém as permissões padrão da conta Google, sem compartilhar publicamente o documento.
+
+Ao concluir o preparo de todas as turmas ou usar **Liberar meses**, o índice já criado é atualizado. A consulta dos meses e do índice continua sem escrita. Uma falha no Google Docs informa um aviso e preserva o preparo das chamadas. Cada arquivo de frequência mantém seu próprio documento, inclusive depois de trocar de planilha e retornar ao arquivo anterior. Desconectar não apaga o documento.
+
+A Google Docs API deve estar ativada no mesmo projeto Google Cloud. O escopo continua `drive.file`, sem nova autorização ampla. A migração `20261104175743_indice_chamadas` persiste o vínculo fora da cópia JSON. A [ADR-063](adr/063-indice-chamadas-google-docs.md) descreve as proteções.
+
+Alterações manuais no texto e conteúdo não reconhecido no corpo impedem a atualização; o aplicativo preserva essas edições e informa a necessidade de conferência. A formatação e os links gerados são administrados pelo aplicativo. A escrita exige a revisão lida do Google Docs, impedindo sobrescrever uma edição concorrente. Se a criação perder a resposta, outra tentativa não cria um segundo documento: localizar o índice no Google Drive e informar seu link em **Recuperar índice**. Uma recusa explícita permite tentar criar novamente. Escritas não são repetidas automaticamente.
+
+Se nenhum documento for encontrado após uma criação incerta, a Gestão permite **Não encontrei o documento** e **Criar outro índice**, com confirmação de que a nova tentativa pode criar outro arquivo no Drive. Essa ação só reinicia uma reserva pendente, sem documento confirmado.
 
 ### Retirar abas sem mês
 
