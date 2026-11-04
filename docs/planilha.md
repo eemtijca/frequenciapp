@@ -82,6 +82,8 @@ Preparar cada mês antes de iniciar seus envios. **Enviar ao salvar** usa o mês
 
 A identificação mensal usa metadados de turma, mês e geração, além do identificador estável da aba. O histórico de sincronização registra `destino` para distinguir cada arquivo, aba e recriação; registros antigos mantêm esse campo nulo. A conferência da estrutura reutiliza o esquema salvo dos meses conhecidos e consulta seu catálogo, enquanto cada envio relê assinatura, identidade e conteúdo atuais. A migração `20261005145103_destino_mensal_planilha` deve ser aplicada antes de executar esta versão (ADR-037).
 
+Ao preparar ou liberar os meses, as abas mensais ficam do mês mais recente para o mais antigo, incluindo a mudança de ano. O mês atual aparece antes dos anteriores; consultar um mês antigo mantém essa ordem. As turmas do mesmo mês conservam sua ordem, e abas manuais, legadas e cópias mantêm suas posições finais. Para corrigir a ordem de uma planilha já preparada, usar **Meses da frequência**, **Liberar meses**.
+
 Ao concluir **Preparar mês** para todas as turmas, a Gestão libera todos os meses preparados. Setembro, meses anteriores e outros anos continuam acessíveis; consultar um mês não oculta os demais. Em **Meses da frequência**, escolher o mês e abrir a turma pelo link direto do Google Planilhas. **Liberar meses** revela também as abas anteriormente ocultadas. A consulta do catálogo não grava nada, e abas manuais sem vínculo e cópias antigas mantêm a visibilidade original.
 
 ### Retirar abas sem mês

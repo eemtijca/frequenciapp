@@ -331,7 +331,7 @@ describe("frequência organizada por turma e mês", () => {
     }
   });
 
-  it("prepara nomes de mês e dias úteis sem turma atual nem alteração da aba antiga", async () => {
+  it("prepara meses recentes primeiro, com dias úteis e sem alterar a aba antiga", async () => {
     for (const [mes, nome, uteis] of [
       ["2026-09", "Setembro", "01 02 03 04 07 08 09 10 11 14 15 16 17 18 21 22 23 24 25 28 29 30"],
       ["2026-10", "Outubro", "01 02 05 06 07 08 09 12 13 14 15 16 19 20 21 22 23 26 27 28 29 30"],
@@ -354,6 +354,7 @@ describe("frequência organizada por turma e mês", () => {
       expect(google.valor(mensal.aba, 2, 1)).toBe("QA Mensal Aluno A");
       expect(google.vinculos(mensal.aba)).toEqual([{ linha: 2, alunoId: alunos.A }]);
     }
+    expect(google.abas()).toEqual([LEGADA, mensais["2026-10"]?.aba, mensais["2026-09"]?.aba]);
     expect(cabecalho(LEGADA).filter(Boolean)).toEqual([
       "Aluno",
       "Turma atual",
@@ -787,7 +788,7 @@ describe("frequência organizada por turma e mês", () => {
     await dados<Mensal>(await preparar("2026-09"));
     expect(marca(setembro.aba, "26/09/2026")).toBe("F");
   });
-  it("mantém todos os meses visíveis, preserva o legado e mantém o envio histórico disponível", async () => {
+  it("ordena meses já existentes, preserva o conteúdo e mantém o envio histórico disponível", async () => {
     google.definirAba("QA Anotações", [["Anotações"], ["Preservar"]]);
     for (const [corpo, cookie, status] of [
       [{ mes: "2026-10" }, cookieCoordenacao, 403],
@@ -816,7 +817,23 @@ describe("frequência organizada por turma e mês", () => {
     expect(google.abasVisiveis()).toContain(LEGADA);
     const outubro = mensais["2026-10"]?.aba ?? "";
     const setembro = mensais["2026-09"]?.aba ?? "";
+    google.moverAba(setembro, google.abas().indexOf(outubro));
+    google.moverAba("QA Anotações", google.abas().indexOf(outubro));
+    const posicaoManual = google.abas().indexOf("QA Anotações");
+    const posicaoLegada = google.abas().indexOf(LEGADA);
+    const nomesPreservados = [LEGADA, outubro, setembro, "QA Anotações"];
+    const conteudoAntes = nomesPreservados.map((nome) => [
+      google.linha(nome, 1),
+      google.linha(nome, 2),
+    ]);
+    expect(google.abas().indexOf(setembro)).toBeLessThan(google.abas().indexOf(outubro));
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
+    expect(google.abas().indexOf(outubro)).toBeLessThan(google.abas().indexOf(setembro));
+    expect(google.abas()[posicaoManual]).toBe("QA Anotações");
+    expect(google.abas()[posicaoLegada]).toBe(LEGADA);
+    expect(nomesPreservados.map((nome) => [google.linha(nome, 1), google.linha(nome, 2)])).toEqual(
+      conteudoAntes,
+    );
     expect(google.abasVisiveis().sort()).toEqual([...google.abas()].sort());
     expect(marca(LEGADA, "30/09/2026")).toBe("F");
     expect(google.formulaDe(LEGADA, 2, 4)).toBe('=COUNTIF(C2:C2;"F")');
@@ -851,7 +868,11 @@ describe("frequência organizada por turma e mês", () => {
     ).toMatchObject([{ aba: setembro, resultado: "sucesso" }]);
     expect(marca(setembro, "30/09/2026")).toBe("F");
     expect(google.abasVisiveis()).toContain(setembro);
+    const ordem = google.abas();
+    const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-09" }));
+    expect(google.abas()).toEqual(ordem);
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas);
     expect(google.abasVisiveis().sort()).toEqual([...google.abas()].sort());
     await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
     google.removerAba("QA Anotações");

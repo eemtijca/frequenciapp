@@ -6860,7 +6860,7 @@
       "post": {
         "operationId": "prepararPlanilha",
         "summary": "Preparar a aba mensal de uma turma",
-        "description": "Apenas administração, com origem confiável, uma turma por requisição. Repetição reutiliza o destino já ajustado.",
+        "description": "Apenas administração, com origem confiável, uma turma por requisição. O mesmo lote ordena as abas mensais por ano e mês decrescentes, preservando a ordem das turmas no mês e as posições finais das demais abas. Repetição reutiliza o destino e corrige a ordem quando necessário.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -6967,7 +6967,7 @@
       "post": {
         "operationId": "definirVisibilidadePlanilha",
         "summary": "Liberar o histórico mensal na planilha",
-        "description": "Apenas administração e origem confiável. Revela todos os meses preparados e as abas legadas vinculadas, sem ocultar o histórico. O mês informado precisa estar preparado. Não repete escrita com resposta perdida.",
+        "description": "Apenas administração e origem confiável. Revela todos os meses preparados e as abas legadas vinculadas, sem ocultar o histórico. Ordena as abas mensais por ano e mês decrescentes, preservando a ordem das turmas no mês e as posições finais das demais abas. O mês informado precisa estar preparado. Não repete escrita com resposta perdida.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,
@@ -16148,7 +16148,7 @@
       "VisibilidadeMensal": {
         "type": "object",
         "title": "Visibilidade do mês",
-        "description": "Mês escolhido para mostrar as abas preparadas e ocultar os outros.",
+        "description": "Mês preparado usado para liberar o histórico e ordenar as abas mensais do mais recente para o mais antigo. Nenhum mês é ocultado.",
         "required": ["mes"],
         "properties": {
           "mes": {

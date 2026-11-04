@@ -55,6 +55,8 @@ export interface GoogleFalso {
     },
   ): void;
   renomearAba(nome: string, novo: string): void;
+  /** Usa o índice anterior ao movimento, como updateSheetProperties da Sheets API. */
+  moverAba(nome: string, indice: number): void;
   removerAba(nome: string): void;
   valor(nome: string, linha: number, coluna: number): string;
   linha(nome: string, linha: number): string[];
@@ -93,6 +95,13 @@ export async function criarGoogleFalso(
     if (!item) throw new Error("Aba sintética ausente.");
     return item;
   };
+  function moverAba(item: Aba, indice: number) {
+    if (!Number.isInteger(indice) || indice < 0 || indice > abas.length)
+      throw new Error("Posição de aba sintética inválida.");
+    const origem = abas.indexOf(item);
+    abas.splice(origem, 1);
+    abas.splice(indice > origem ? indice - 1 : indice, 0, item);
+  }
   function garantir(item: Aba, linha: number, indice: number): Celula {
     while (item.celulas.length < linha) item.celulas.push([]);
     const fileira = item.celulas[linha - 1];
@@ -197,6 +206,7 @@ export async function criarGoogleFalso(
         .map((item) => ({
           properties: {
             sheetId: item.id,
+            index: abas.indexOf(item),
             title: item.nome,
             hidden: item.oculta,
             sheetType: "GRID",
@@ -357,6 +367,7 @@ export async function criarGoogleFalso(
       if (propriedades.hidden === true && !abas.some((outra) => outra !== item && !outra.oculta))
         throw new Error("A planilha sintética precisa manter uma aba visível.");
       if (propriedades.hidden !== undefined) item.oculta = Boolean(propriedades.hidden);
+      if (propriedades.index !== undefined) moverAba(item, numero(propriedades.index, -1));
       Object.assign(item.propriedades, objeto(propriedades.gridProperties));
     } else if (pedido.copyPaste) {
       const dados = objeto(pedido.copyPaste);
@@ -626,6 +637,11 @@ export async function criarGoogleFalso(
     renomearAba: (nome, novo) => {
       const item = aba(nome);
       if (item) item.nome = novo;
+    },
+    moverAba: (nome, indice) => {
+      const item = aba(nome);
+      if (!item) throw new Error("Aba sintética ausente.");
+      moverAba(item, indice);
     },
     removerAba: (nome) => {
       const item = aba(nome);

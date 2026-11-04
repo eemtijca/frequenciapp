@@ -21,6 +21,7 @@ import {
 } from "./planilhas-api";
 import { pedidosDeApresentacao } from "./planilhas-apresentacao";
 import { enviarLoteAtomicoGoogle, ErroGoogle } from "./planilhas-escrita";
+import { planejarOrdemMensalGoogle } from "./planilhas-ordem-mensal";
 
 export const esquemaPreparacaoMensalGoogle = z.object({
   turmaOriginalId: z.string().uuid(),
@@ -371,6 +372,7 @@ async function atualizarAbaExistente(
     pedidos.push({
       updateSheetProperties: { properties: { sheetId, title: nome }, fields: "title" },
     });
+  pedidos.push(...planejarOrdemMensalGoogle(doc).pedidos);
   if (!pedidos.length) return { ...existente, criada: false, atualizada: false };
   try {
     await enviarLoteAtomicoGoogle(id, acesso, pedidos);
@@ -390,6 +392,7 @@ async function atualizarAbaExistente(
       if (
         identidade &&
         abaConferida &&
+        planejarOrdemMensalGoogle(conferido).pedidos.length === 0 &&
         feriadosDoMes(entrada).every((dia) =>
           feriadosDaAba(conferido, abaConferida, entrada.mes).has(dia),
         ) &&
@@ -444,22 +447,23 @@ export async function prepararAbaMensalGoogle(
   const geracao = randomUUID();
   const destino = `${doc.spreadsheetId}:${sheetId}:${geracao}`;
   try {
-    await enviarLoteAtomicoGoogle(
-      id,
-      acesso,
-      pedidosDePreparacao(sheetId, nome, geracao, dados.data),
-    );
+    await enviarLoteAtomicoGoogle(id, acesso, [
+      ...pedidosDePreparacao(sheetId, nome, geracao, dados.data),
+      ...planejarOrdemMensalGoogle(doc, { sheetId, mes }).pedidos,
+    ]);
   } catch (erro) {
     if (!(erro instanceof ErroGoogle)) throw erro;
     // Após resposta perdida ou criação concorrente, somente a leitura pode confirmar o lote.
     try {
-      const conferido = abasDoDocumento(await lerDocumentoGoogle(id, acesso)).find(
+      const documentoConferido = await lerDocumentoGoogle(id, acesso);
+      const conferido = abasDoDocumento(documentoConferido).find(
         (aba) =>
           aba.turmaOriginalId === turmaOriginalId &&
           aba.mes === mes &&
           aba.destino.startsWith(`${doc.spreadsheetId}:${sheetId}:`),
       );
-      if (conferido) return { ...conferido, criada: false, atualizada: false };
+      if (conferido && planejarOrdemMensalGoogle(documentoConferido).pedidos.length === 0)
+        return { ...conferido, criada: false, atualizada: false };
     } catch {
       // Mantém o resultado incerto do envio, sem repetir a escrita.
     }
@@ -468,7 +472,7 @@ export async function prepararAbaMensalGoogle(
   return { aba: nome, mes, turmaOriginalId, destino, criada: true, atualizada: false };
 }
 
-/** Mantém todo o histórico preparado acessível, inclusive ao consultar outro mês. */
+/** Revela o histórico preparado e ordena os meses do mais recente para o mais antigo. */
 export async function mostrarMesGoogle(
   id: string,
   acesso: string,
@@ -487,7 +491,7 @@ export async function mostrarMesGoogle(
       !aba.properties.title.startsWith("_frequenciapp_backup_") &&
       (!aba.properties.sheetType || aba.properties.sheetType === "GRID"),
   );
-  const pedidos = reconhecidas
+  const pedidos: Record<string, unknown>[] = reconhecidas
     .filter((aba) => aba.properties.hidden)
     .map((aba) => ({
       updateSheetProperties: {
@@ -495,6 +499,18 @@ export async function mostrarMesGoogle(
         fields: "hidden",
       },
     }));
+  const ordenacao = planejarOrdemMensalGoogle(doc);
+  pedidos.push(...ordenacao.pedidos);
   if (pedidos.length) await enviarLoteAtomicoGoogle(id, acesso, pedidos);
-  return { mes, visiveis: reconhecidas.map((aba) => aba.properties.title), ocultadas: [] };
+  const nomesVisiveis = new Map(
+    reconhecidas.map((aba) => [aba.properties.sheetId, aba.properties.title]),
+  );
+  return {
+    mes,
+    visiveis: ordenacao.ordem.flatMap((sheetId) => {
+      const nome = nomesVisiveis.get(sheetId);
+      return nome === undefined ? [] : [nome];
+    }),
+    ocultadas: [],
+  };
 }
