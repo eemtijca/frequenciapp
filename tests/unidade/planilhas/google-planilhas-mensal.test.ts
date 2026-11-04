@@ -870,6 +870,33 @@ describe("preparação das abas mensais", () => {
     expect(lotes).toHaveLength(2);
   });
 
+  it("ordena dias trocados ao redor de um feriado removido no meio da tabela", async () => {
+    const { celulas, conteudos, lotes, criada, sheetId, linhas, moverColunas } =
+      await prepararOutubroDesordenado();
+    const coluna28 = linhas[0]?.indexOf("28/10/2026") ?? -1;
+    const coluna30 = linhas[0]?.indexOf("30/10/2026") ?? -1;
+    expect(coluna28).toBeGreaterThan(0);
+    expect(coluna30).toBeGreaterThan(coluna28);
+    moverColunas(sheetId, coluna28, coluna28 + 1, coluna30 + 1);
+    const calendario = { ...entrada, feriados: ["2026-10-30"] };
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", calendario)).resolves.toMatchObject({
+      destino: criada.destino,
+      atualizada: true,
+    });
+    const cabecalho = celulas.get(sheetId)?.[0] ?? [];
+    expect(cabecalho).toEqual([
+      "Aluno",
+      ...diasDaPlanilhaMensal(entrada.mes, [], calendario.feriados).map(rotuloData),
+    ]);
+    expect(cabecalho.slice(-2)).toEqual(["28/10/2026", "29/10/2026"]);
+    expect(celulas.get(sheetId)?.[1]?.[cabecalho.indexOf("28/10/2026")]).toBe("F");
+    expect(celulas.get(sheetId)?.[1]?.[cabecalho.indexOf("29/10/2026")]).toBe("FJ");
+    expect(conteudos.get(sheetId)?.get(`1:${cabecalho.indexOf("28/10/2026")}`)?.note).toBe(
+      "QA Chamada retroativa",
+    );
+    expect(lotes).toHaveLength(2);
+  });
+
   it("recusa feriado transferido com registros antes de reordenar qualquer coluna", async () => {
     const { celulas, conteudos, lotes, sheetId, linhas } = await prepararOutubroDesordenado();
     const coluna30 = linhas[0]?.indexOf("30/10/2026") ?? -1;
