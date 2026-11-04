@@ -45,13 +45,6 @@
   color: var(--justificada);
 }
 
-.checkTurma {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  color: var(--justificada);
-}
-
 .gatilho:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
 .serie:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
 .turma:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
@@ -336,6 +329,9 @@
 @media (forced-colors: active) {
   .turma {
     border: 1px solid ButtonText;
+  }
+  .turma:where([aria-pressed="true"]) {
+    border-color: Highlight;
   }
   .anel,
   .turma:where([data-situacao="pendente"]) .anel {
