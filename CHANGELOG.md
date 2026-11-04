@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A Chamada identifica quando ainda não foi iniciada, com faixa compacta, P neutro e ação Iniciar opcional. O início ou a marcação de um aluno cria um rascunho em andamento, inclusive sem faltas; o salvamento direto com todos presentes continua disponível. A interface também distingue chamada salva e correção com alterações não salvas.
+
 - Os indicadores de presença e falta na Chamada mostram apenas as letras P e F, sem ícone de confirmação ou traço ao lado.
 
 - Os controles clicáveis passam a usar superfície quase igual à do cartão e um fio de 1 px de baixo contraste nos temas claro e escuro. Botões, seletores, datas, abas, interruptores e divulgações não usam sombra; campos de texto e textarea mantêm apenas uma linha inferior funcional com 3:1. O foco de teclado continua visível, os cartões estáticos preservam a borda discreta e a seleção da Chamada recebe marca de seleção. A decisão está no [ADR-062](docs/adr/062-controles-de-superficie-suave.md).

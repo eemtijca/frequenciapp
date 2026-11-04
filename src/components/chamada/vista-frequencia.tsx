@@ -18,8 +18,10 @@ import {
   CalendarOff,
   CheckCircle2,
   ChartNoAxesCombined,
+  CircleDashed,
   FileText,
   Pencil,
+  Play,
   LockKeyhole,
   LockKeyholeOpen,
   LoaderCircle,
@@ -180,6 +182,7 @@ export default function VistaFrequencia({
   const [resumoAberto, setResumoAberto] = useState(false);
   const [sabadoDesbloqueado, setSabadoDesbloqueado] = useState<string | null>(null);
   const idResumo = useId();
+  const listaAlunosRef = useRef<HTMLUListElement>(null);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
   // Lista gravada da chamada; nula enquanto o dia não foi salvo.
@@ -579,6 +582,35 @@ export default function VistaFrequencia({
     (ehSabado && !sabadoLiberado);
   const travado = ocupado || sujo;
   const podeSalvar = !bloqueado && (sujo || revisaoSalva === 0);
+  const chamadaNaoIniciada = leituraConfirmada && revisaoSalva === 0 && !sujo;
+  const mostrarSituacao =
+    leituraConfirmada &&
+    !carregando &&
+    !erro &&
+    !conflito &&
+    !feriado &&
+    (!ehSabado || sabadoLiberado) &&
+    participantes.length > 0;
+  const tituloSituacao = chamadaNaoIniciada
+    ? "Chamada não iniciada"
+    : sujo
+      ? revisaoSalva === 0
+        ? "Em andamento"
+        : "Alterações não salvas"
+      : "Chamada salva";
+
+  function iniciarChamada() {
+    if (!mostrarSituacao || !chamadaNaoIniciada || bloqueado || chaveCarregada.current !== chave)
+      return;
+    setFiltro("todos");
+    // Um rascunho sem faltas também preserva o início da conferência dos alunos.
+    setSujo(true);
+    requestAnimationFrame(() => {
+      listaAlunosRef.current
+        ?.querySelector<HTMLButtonElement>("button[data-marcar-falta]:not(:disabled)")
+        ?.focus();
+    });
+  }
 
   const alternarFalta = useCallback(
     (alunoId: string) => {
@@ -814,13 +846,21 @@ export default function VistaFrequencia({
           ? sujo
             ? "Falha ao salvar"
             : "Falha ao carregar"
-          : sujo
-            ? "Pendente"
-            : atualizadoEm
-              ? dataSalva && horaSalva
-                ? `Salva em ${dataSalva} às ${horaSalva}`
-                : "Chamada salva"
-              : "Nova chamada";
+          : !leituraConfirmada
+            ? "Carregando..."
+            : sujo
+              ? revisaoSalva === 0
+                ? "Em andamento"
+                : "Alterações não salvas"
+              : atualizadoEm
+                ? dataSalva && horaSalva
+                  ? `Salva em ${dataSalva} às ${horaSalva}`
+                  : "Chamada salva"
+                : ehSabado && !sabadoLiberado
+                  ? "Sábado bloqueado"
+                  : participantes.length === 0
+                    ? "Sem alunos"
+                    : "Não iniciada";
 
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
   if (turmas.length === 0) {
@@ -1108,6 +1148,7 @@ export default function VistaFrequencia({
                 )}
                 <Button
                   className={`${estilos.salvar} shrink-0`}
+                  variant={chamadaNaoIniciada ? "secondary" : "default"}
                   onClick={() => setConfirmarSalvamento(true)}
                   disabled={!podeSalvar}
                 >
@@ -1156,6 +1197,7 @@ export default function VistaFrequencia({
                     <div className="bg-secondary/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                       <h2 className="font-medium">{tituloResumo}</h2>
                       <span className="text-muted-foreground numerais-tabulares text-xs">
+                        {leituraConfirmada && revisaoSalva === 0 && !erro ? "Prévia · " : ""}
                         {rotuloDia}
                       </span>
                     </div>
@@ -1277,6 +1319,42 @@ export default function VistaFrequencia({
               </section>
 
               <div className="superficie overflow-hidden">
+                {mostrarSituacao && (
+                  <div
+                    role="region"
+                    aria-label="Situação da chamada"
+                    className="flex items-center gap-3 border-b px-4 py-3"
+                  >
+                    {chamadaNaoIniciada ? (
+                      <CircleDashed
+                        className="text-muted-foreground size-5 shrink-0"
+                        aria-hidden="true"
+                      />
+                    ) : sujo ? (
+                      <Pencil className="text-alerta-texto size-5 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <CloudCheck className="text-primary size-5 shrink-0" aria-hidden="true" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-sm font-semibold">
+                        {salvando ? "Salvando..." : tituloSituacao}
+                      </h2>
+                      {(chamadaNaoIniciada || sujo) && (
+                        <p className="text-muted-foreground mt-0.5 text-xs">
+                          {chamadaNaoIniciada
+                            ? "Confira os alunos e salve."
+                            : "Salve para confirmar."}
+                        </p>
+                      )}
+                    </div>
+                    {chamadaNaoIniciada && (
+                      <Button onClick={iniciarChamada} disabled={bloqueado}>
+                        <Play size={16} aria-hidden="true" />
+                        Iniciar
+                      </Button>
+                    )}
+                  </div>
+                )}
                 {filtro !== "todos" && (
                   <div className="flex justify-end px-4 py-2 text-xs">
                     <button
@@ -1319,7 +1397,7 @@ export default function VistaFrequencia({
                     </button>
                   </div>
                 ) : (
-                  <ul aria-label="Alunos da chamada" className="divide-y">
+                  <ul ref={listaAlunosRef} aria-label="Alunos da chamada" className="divide-y">
                     {visiveis.map((aluno) => {
                       const nomeExibido = nomeNaChamada(
                         aluno.nome,
@@ -1362,6 +1440,7 @@ export default function VistaFrequencia({
                                   >
                                     <button
                                       type="button"
+                                      data-marcar-falta
                                       aria-pressed={faltando}
                                       disabled={bloqueado || desistente}
                                       aria-label={`${nomeExibido}${
@@ -1373,7 +1452,9 @@ export default function VistaFrequencia({
                                           ? "desistente. Marcação bloqueada."
                                           : faltando
                                             ? `${codigo ? `falta justificada, ${rotuloJustificativa(codigo, catalogoJustificativas)}` : "falta"} em ${marcadas} de ${totalAulasDoDia} aulas. Toque para voltar a presente.`
-                                            : "presente. Toque para marcar falta."
+                                            : chamadaNaoIniciada
+                                              ? "presença inicial, chamada não iniciada. Toque para marcar falta."
+                                              : "presente. Toque para marcar falta."
                                       }${
                                         temAcumulado && acumulado
                                           ? ` No mês. ${fraseAcumulado(acumulado.faltas, acumulado.faltasJustificadas)}`
@@ -1446,6 +1527,7 @@ export default function VistaFrequencia({
                                   data-estado={
                                     desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"
                                   }
+                                  data-nao-iniciada={chamadaNaoIniciada && !desistente && !faltando}
                                   className={`${estilos.marca} ${esmaecida ? "opacity-60" : ""}`}
                                 >
                                   {!desistente && faltando && codigo && <FileText size={16} />}
