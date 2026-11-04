@@ -45,6 +45,55 @@ function simularGoogle(
   const celulas = new Map<number, string[][]>();
   const conteudos = new Map<number, Map<string, ConteudoCelula>>();
   const controle = { modo };
+  const moverColunas = (sheetId: number, inicio: number, fim: number, destinoOriginal: number) => {
+    const quantidade = fim - inicio;
+    const destino = destinoOriginal > inicio ? destinoOriginal - quantidade : destinoOriginal;
+    const posicao = (indice: number) => {
+      if (indice >= inicio && indice < fim) return destino + indice - inicio;
+      const restante = indice >= fim ? indice - quantidade : indice;
+      return restante >= destino ? restante + quantidade : restante;
+    };
+    const linhas = celulas.get(sheetId) ?? [];
+    const largura = Math.max(fim, destinoOriginal, ...linhas.map((linha) => linha.length));
+    for (const linha of linhas) {
+      while (linha.length < largura) linha.push("");
+      const trecho = linha.splice(inicio, quantidade);
+      linha.splice(destino, 0, ...trecho);
+    }
+    const extras = conteudos.get(sheetId);
+    if (extras)
+      conteudos.set(
+        sheetId,
+        new Map(
+          [...extras].map(([chave, conteudo]) => {
+            const [linha, coluna] = chave.split(":").map(Number);
+            return [`${linha}:${posicao(coluna ?? 0)}`, conteudo];
+          }),
+        ),
+      );
+    for (const item of documento.developerMetadata ?? []) {
+      const local = item.location.dimensionRange as
+        | {
+            sheetId?: number;
+            dimension?: string;
+            startIndex?: number;
+            endIndex?: number;
+            startColumnIndex?: number;
+            endColumnIndex?: number;
+          }
+        | undefined;
+      if (!local || local.sheetId !== sheetId) continue;
+      const indice = local.dimension === "COLUMNS" ? local.startIndex : local.startColumnIndex;
+      if (indice === undefined) continue;
+      if (local.dimension === "COLUMNS") {
+        local.startIndex = posicao(indice);
+        local.endIndex = local.startIndex + 1;
+      } else {
+        local.startColumnIndex = posicao(indice);
+        local.endColumnIndex = local.startColumnIndex + 1;
+      }
+    }
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: URL | string, opcoes?: RequestInit) => {
@@ -123,6 +172,20 @@ function simularGoogle(
               documento.sheets.splice(indice > origem ? indice - 1 : indice, 0, aba);
             }
           }
+          if (pedido.moveDimension) {
+            const movimento = pedido.moveDimension as {
+              source: { sheetId: number; dimension: string; startIndex: number; endIndex: number };
+              destinationIndex: number;
+            };
+            if (movimento.source.dimension !== "COLUMNS")
+              throw new Error("A ordenação mensal sintética exige colunas.");
+            moverColunas(
+              movimento.source.sheetId,
+              movimento.source.startIndex,
+              movimento.source.endIndex,
+              movimento.destinationIndex,
+            );
+          }
           if (pedido.deleteDimension) {
             const exclusao = pedido.deleteDimension as {
               range: { sheetId: number; startIndex: number; endIndex: number };
@@ -130,6 +193,20 @@ function simularGoogle(
             const { sheetId, startIndex, endIndex } = exclusao.range;
             for (const linha of celulas.get(sheetId) ?? [])
               linha.splice(startIndex, endIndex - startIndex);
+            const extras = conteudos.get(sheetId);
+            if (extras)
+              conteudos.set(
+                sheetId,
+                new Map(
+                  [...extras].flatMap(([chave, conteudo]) => {
+                    const [linha, coluna] = chave.split(":").map(Number);
+                    if (coluna === undefined || (coluna >= startIndex && coluna < endIndex))
+                      return [];
+                    const nova = coluna >= endIndex ? coluna - (endIndex - startIndex) : coluna;
+                    return [[`${linha}:${nova}`, conteudo]];
+                  }),
+                ),
+              );
             documento.developerMetadata = documento.developerMetadata?.filter((item) => {
               const local = item.location.dimensionRange as
                 | {
@@ -212,7 +289,7 @@ function simularGoogle(
       });
     }),
   );
-  return { documento, lotes, requisicoes, celulas, conteudos, controle };
+  return { documento, lotes, requisicoes, celulas, conteudos, controle, moverColunas };
 }
 
 function inserirLegada(documento: DocumentoGoogle, celulas: Map<number, string[][]>) {
@@ -264,6 +341,29 @@ function marcarMensal(documento: DocumentoGoogle, id: number, mes = entrada.mes)
         metadataValue,
         location: { sheetId: id },
       });
+}
+
+async function prepararOutubroDesordenado() {
+  const google = simularGoogle();
+  const criada = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+  const aba = google.documento.sheets.find((item) => item.properties.title === criada.aba);
+  if (!aba) throw new Error("Aba mensal ausente no teste.");
+  const sheetId = aba.properties.sheetId;
+  const linhas = google.celulas.get(sheetId);
+  if (!linhas?.[0] || !linhas[1]) throw new Error("Células mensais ausentes no teste.");
+  const coluna28 = linhas[0].indexOf("28/10/2026");
+  const coluna29 = linhas[0].indexOf("29/10/2026");
+  linhas[1][coluna28] = "F";
+  linhas[1][coluna29] = "FJ";
+  google.conteudos.set(
+    sheetId,
+    new Map([
+      [`1:${coluna28}`, { note: "QA Chamada retroativa" }],
+      [`2:${coluna29}`, { userEnteredValue: { formulaValue: "=1+1" } }],
+    ]),
+  );
+  google.moverColunas(sheetId, coluna28, coluna28 + 1, coluna29 + 1);
+  return { ...google, criada, sheetId, linhas };
 }
 
 afterEach(() => {
@@ -695,6 +795,116 @@ describe("preparação das abas mensais", () => {
     expect(cabecalho).not.toContain("12/10/2026");
     expect(cabecalho).toContain("13/10/2026");
   });
+
+  it("ordena chamadas retroativas sem perder marcas, notas, fórmulas e coluna manual", async () => {
+    const google = await prepararOutubroDesordenado();
+    const { documento, celulas, conteudos, lotes, criada, sheetId, linhas } = google;
+    const cabecalho = linhas[0];
+    const aluno = linhas[1];
+    if (!cabecalho || !aluno) throw new Error("Linhas mensais ausentes no teste.");
+    const manual = cabecalho.indexOf("28/10/2026");
+    const ultima = cabecalho.length;
+    cabecalho.push("Observação manual");
+    aluno[ultima] = "QA Conferência";
+    google.moverColunas(sheetId, ultima, ultima + 1, manual);
+    const marcadores = () =>
+      documento.developerMetadata
+        ?.filter((item) => item.metadataKey === "frequenciapp.coluna")
+        .map((item) => {
+          const local = item.location.dimensionRange as
+            { startIndex?: number; startColumnIndex?: number } | undefined;
+          return [item.metadataId, cabecalho[local?.startIndex ?? local?.startColumnIndex ?? -1]];
+        });
+    const vinculos = structuredClone(marcadores());
+    const abas = structuredClone(documento.sheets);
+    expect(cabecalho.indexOf("29/10/2026")).toBeLessThan(cabecalho.indexOf("28/10/2026"));
+
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toEqual({
+      ...criada,
+      criada: false,
+      atualizada: true,
+    });
+
+    const esperado = ["Aluno", ...diasDaPlanilhaMensal(entrada.mes).map(rotuloData)];
+    esperado.splice(manual, 0, "Observação manual");
+    expect(celulas.get(sheetId)?.[0]).toEqual(esperado);
+    expect(aluno[cabecalho.indexOf("28/10/2026")]).toBe("F");
+    expect(aluno[cabecalho.indexOf("29/10/2026")]).toBe("FJ");
+    expect(aluno[manual]).toBe("QA Conferência");
+    expect(conteudos.get(sheetId)?.get(`1:${cabecalho.indexOf("28/10/2026")}`)).toEqual({
+      note: "QA Chamada retroativa",
+    });
+    expect(conteudos.get(sheetId)?.get(`2:${cabecalho.indexOf("29/10/2026")}`)).toEqual({
+      userEnteredValue: { formulaValue: "=1+1" },
+    });
+    expect(marcadores()).toEqual(vinculos);
+    expect(documento.sheets).toEqual(abas);
+    expect(lotes).toHaveLength(2);
+    expect(lotes[1]?.length).toBeGreaterThan(0);
+    expect(lotes[1]?.every((pedido) => pedido.moveDimension)).toBe(true);
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toMatchObject({
+      destino: criada.destino,
+      atualizada: false,
+    });
+    expect(lotes).toHaveLength(2);
+  });
+
+  it("ordena o dia 28 antes do 29 ao retirar a coluna vazia do feriado transferido para 30", async () => {
+    const { celulas, conteudos, lotes, criada, sheetId } = await prepararOutubroDesordenado();
+    const calendario = { ...entrada, feriados: ["2026-10-30"] };
+    await expect(prepararAbaMensalGoogle("arquivo", "acesso", calendario)).resolves.toMatchObject({
+      destino: criada.destino,
+      atualizada: true,
+    });
+    const cabecalho = celulas.get(sheetId)?.[0] ?? [];
+    expect(cabecalho).toEqual([
+      "Aluno",
+      ...diasDaPlanilhaMensal(entrada.mes, [], calendario.feriados).map(rotuloData),
+    ]);
+    expect(cabecalho.slice(-2)).toEqual(["28/10/2026", "29/10/2026"]);
+    expect(celulas.get(sheetId)?.[1]?.[cabecalho.indexOf("28/10/2026")]).toBe("F");
+    expect(celulas.get(sheetId)?.[1]?.[cabecalho.indexOf("29/10/2026")]).toBe("FJ");
+    expect(conteudos.get(sheetId)?.get(`1:${cabecalho.indexOf("28/10/2026")}`)?.note).toBe(
+      "QA Chamada retroativa",
+    );
+    expect(lotes).toHaveLength(2);
+  });
+
+  it("recusa feriado transferido com registros antes de reordenar qualquer coluna", async () => {
+    const { celulas, conteudos, lotes, sheetId, linhas } = await prepararOutubroDesordenado();
+    const coluna30 = linhas[0]?.indexOf("30/10/2026") ?? -1;
+    conteudos.get(sheetId)?.set(`999:${coluna30}`, { note: "QA Conferir feriado" });
+    const antes = structuredClone(celulas.get(sheetId));
+    const notas = structuredClone(conteudos.get(sheetId));
+    await expect(
+      prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, feriados: ["2026-10-30"] }),
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Há registros") });
+    expect(celulas.get(sheetId)).toEqual(antes);
+    expect(conteudos.get(sheetId)).toEqual(notas);
+    expect(lotes).toHaveLength(1);
+  });
+
+  it.each(["resposta_perdida", "resposta_perdida_antes"] as const)(
+    "confirma a ordem cronológica somente após a movimentação efetiva com %s",
+    async (modo) => {
+      const { controle, celulas, lotes, criada, sheetId } = await prepararOutubroDesordenado();
+      const antes = structuredClone(celulas.get(sheetId));
+      controle.modo = modo;
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const preparo = prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+      if (modo === "resposta_perdida") {
+        await expect(preparo).resolves.toMatchObject({ destino: criada.destino, atualizada: true });
+        expect(celulas.get(sheetId)?.[0]).toEqual([
+          "Aluno",
+          ...diasDaPlanilhaMensal(entrada.mes).map(rotuloData),
+        ]);
+      } else {
+        await expect(preparo).rejects.toMatchObject({ recusado: false });
+        expect(celulas.get(sheetId)).toEqual(antes);
+      }
+      expect(lotes).toHaveLength(2);
+    },
+  );
 
   it("retira coluna própria vazia de feriado e aceita novos preparos sem essa data", async () => {
     const { documento, celulas, lotes, requisicoes } = simularGoogle();

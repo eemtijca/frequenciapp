@@ -6860,7 +6860,7 @@
       "post": {
         "operationId": "prepararPlanilha",
         "summary": "Preparar a aba mensal de uma turma",
-        "description": "Apenas administração, com origem confiável, uma turma por requisição. O mesmo lote ordena as abas mensais por ano e mês decrescentes, preservando a ordem das turmas no mês e as posições finais das demais abas. Repetição reutiliza o destino e corrige a ordem quando necessário.",
+        "description": "Apenas administração, com origem confiável, uma turma por requisição. O mesmo lote ordena as abas mensais por ano e mês decrescentes, preservando a ordem das turmas no mês e as posições finais das demais abas. Reordena cronologicamente as colunas próprias de dias, preservando registros, fórmulas, notas e as posições finais das colunas manuais. Repetição reutiliza o destino e corrige a ordem quando necessário.",
         "tags": ["planilhas"],
         "requestBody": {
           "required": true,

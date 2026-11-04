@@ -21,6 +21,7 @@ import {
 } from "./planilhas-api";
 import { pedidosDeApresentacao } from "./planilhas-apresentacao";
 import { enviarLoteAtomicoGoogle, ErroGoogle } from "./planilhas-escrita";
+import { planejarOrdemDiasGoogle } from "./planilhas-ordem-dias";
 import { planejarOrdemMensalGoogle } from "./planilhas-ordem-mensal";
 
 export const esquemaPreparacaoMensalGoogle = z.object({
@@ -234,8 +235,8 @@ function feriadosDaAba(doc: DocumentoGoogle, aba: AbaGoogle, mes: string): Set<s
   return new Set(dias);
 }
 
-/** Confere as colunas próprias e impede apagar conteúdo em datas que viraram feriados. */
-async function colunasParaRemover(
+/** Confere e ordena os dias próprios sem apagar registros de datas que viraram feriados. */
+async function planejarAtualizacaoColunas(
   id: string,
   acesso: string,
   doc: DocumentoGoogle,
@@ -243,7 +244,7 @@ async function colunasParaRemover(
   mes: string,
   sabadosLetivos: string[],
   feriados: string[],
-): Promise<number[]> {
+): Promise<Record<string, unknown>[]> {
   const marcadores = metadadosDaAba(doc, aba).filter(
     (item) => item.metadataKey === "frequenciapp.coluna",
   );
@@ -334,7 +335,29 @@ async function colunasParaRemover(
         );
     }
   }
-  return remover.sort((a, b) => b - a);
+  // Ordena antes das exclusões para usar as posições originais da leitura.
+  return [
+    ...planejarOrdemDiasGoogle(
+      aba.properties.sheetId,
+      mes,
+      cabecalho,
+      formulas,
+      new Set(indices.filter((indice) => !remover.includes(indice)).map((indice) => indice + 1)),
+      aba.merges,
+    ),
+    ...remover
+      .sort((a, b) => b - a)
+      .map((indice) => ({
+        deleteDimension: {
+          range: {
+            sheetId: aba.properties.sheetId,
+            dimension: "COLUMNS",
+            startIndex: indice,
+            endIndex: indice + 1,
+          },
+        },
+      })),
+  ];
 }
 
 async function atualizarAbaExistente(
@@ -348,7 +371,7 @@ async function atualizarAbaExistente(
   if (!aba) return estruturaMensalInesperada();
   const sheetId = aba.properties.sheetId;
   const nome = nomeDisponivel(doc, entrada, sheetId);
-  const remover = await colunasParaRemover(
+  const pedidos = await planejarAtualizacaoColunas(
     id,
     acesso,
     doc,
@@ -357,11 +380,6 @@ async function atualizarAbaExistente(
     entrada.sabadosLetivos,
     entrada.feriados,
   );
-  const pedidos: Record<string, unknown>[] = remover.map((indice) => ({
-    deleteDimension: {
-      range: { sheetId, dimension: "COLUMNS", startIndex: indice, endIndex: indice + 1 },
-    },
-  }));
   const feriadosAnteriores = feriadosDaAba(doc, aba, entrada.mes);
   pedidos.push(
     ...feriadosDoMes(entrada)
@@ -397,7 +415,7 @@ async function atualizarAbaExistente(
           feriadosDaAba(conferido, abaConferida, entrada.mes).has(dia),
         ) &&
         !(
-          await colunasParaRemover(
+          await planejarAtualizacaoColunas(
             id,
             acesso,
             conferido,

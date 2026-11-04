@@ -61,8 +61,11 @@ export interface GoogleFalso {
   valor(nome: string, linha: number, coluna: number): string;
   linha(nome: string, linha: number): string[];
   definirValor(nome: string, linha: number, coluna: number, valor: string): void;
+  definirFormula(nome: string, linha: number, coluna: number, formula: string): void;
   definirNota(nome: string, linha: number, coluna: number, nota: string): void;
   formulaDe(nome: string, linha: number, coluna: number): string;
+  notaDe(nome: string, linha: number, coluna: number): string;
+  moverColuna(nome: string, origem: number, destino: number): void;
   apresentacao(nome: string): { congeladasLinhas: number; faixas: Objeto[] };
   vinculos(nome: string): { linha: number; alunoId: string }[];
   feriadosDaAba(nome: string): string[];
@@ -327,16 +330,26 @@ export async function criarGoogleFalso(
       const dados = objeto(pedido.moveDimension);
       const origem = objeto(dados.source);
       const item = peloId(origem.sheetId);
-      if (origem.dimension !== "ROWS") throw new Error("Movimento sintético exige linhas.");
+      if (origem.dimension !== "ROWS" && origem.dimension !== "COLUMNS")
+        throw new Error("Dimensão sintética inválida.");
       const inicio = numero(origem.startIndex);
       const quantidade = numero(origem.endIndex) - inicio;
       const destinoOriginal = numero(dados.destinationIndex);
       const destino = destinoOriginal > inicio ? destinoOriginal - quantidade : destinoOriginal;
-      const linhas = item.celulas.splice(inicio, quantidade);
-      item.celulas.splice(destino, 0, ...linhas);
+      if (origem.dimension === "ROWS") {
+        const linhas = item.celulas.splice(inicio, quantidade);
+        item.celulas.splice(destino, 0, ...linhas);
+      } else {
+        for (const fileira of item.celulas) {
+          while (fileira.length < Math.max(inicio + quantidade, destinoOriginal))
+            fileira.push({ valor: "", formula: "" });
+          const colunas = fileira.splice(inicio, quantidade);
+          fileira.splice(destino, 0, ...colunas);
+        }
+      }
       for (const meta of item.metadados) {
         const faixa = objeto(objeto(meta.location).dimensionRange);
-        if (faixa.dimension !== "ROWS") continue;
+        if (faixa.dimension !== origem.dimension) continue;
         const indice = numero(faixa.startIndex);
         if (indice >= inicio && indice < inicio + quantidade) {
           faixa.startIndex = destino + indice - inicio;
@@ -653,11 +666,31 @@ export async function criarGoogleFalso(
       const item = aba(nome);
       if (item) garantir(item, linha, indice).valor = valor;
     },
+    definirFormula: (nome, linha, indice, formula) => {
+      const item = aba(nome);
+      if (item) garantir(item, linha, indice).formula = formula;
+    },
     definirNota: (nome, linha, indice, nota) => {
       const item = aba(nome);
       if (item) garantir(item, linha, indice).nota = nota;
     },
     formulaDe: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.formula ?? "",
+    notaDe: (nome, linha, indice) => aba(nome)?.celulas[linha - 1]?.[indice - 1]?.nota ?? "",
+    moverColuna: (nome, origem, destino) => {
+      const item = aba(nome);
+      if (!item) throw new Error("Aba sintética ausente.");
+      escrever({
+        moveDimension: {
+          source: {
+            sheetId: item.id,
+            dimension: "COLUMNS",
+            startIndex: origem - 1,
+            endIndex: origem,
+          },
+          destinationIndex: destino > origem ? destino : destino - 1,
+        },
+      });
+    },
     apresentacao: (nome) => ({
       congeladasLinhas: numero(aba(nome)?.propriedades.frozenRowCount),
       faixas: structuredClone(aba(nome)?.faixas ?? []),
