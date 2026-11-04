@@ -273,6 +273,34 @@ it.each(["none", "active"] as const)(
   },
 );
 
+it("movimento reduzido remove imediatamente o anel do pseudo-elemento ao clicar", async () => {
+  const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+  try {
+    await pagina.goto(url);
+    await pagina.locator('[data-pronto="sim"]').waitFor();
+    const botao = pagina.getByRole("button", { name: "Superfície controle" });
+    const sombra = () => botao.evaluate((el) => getComputedStyle(el, "::after").boxShadow);
+    const antes = await sombra();
+    for (let i = 0; i < 12 && !(await botao.evaluate((el) => document.activeElement === el)); i++) {
+      await pagina.keyboard.press("Tab");
+    }
+    expect(await botao.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await sombra()).not.toBe(antes);
+    // Congela a linha do tempo: uma transição residual não pode depender do próximo frame.
+    const cdp = await pagina.context().newCDPSession(pagina);
+    await cdp.send("Animation.enable");
+    await cdp.send("Animation.setPlaybackRate", { playbackRate: 0 });
+    await botao.click();
+    expect(await botao.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await pagina.evaluate(() => document.documentElement.dataset.modalidadeFoco)).toBe(
+      "ponteiro",
+    );
+    expect(await sombra()).toBe(antes);
+  } finally {
+    await pagina.close();
+  }
+});
+
 it.each(["controle", "discreto", "primário", "destrutivo"] as const)(
   "clique na superfície %s já focada pelo teclado remove apenas o indicador de foco",
   async (variante) => {
