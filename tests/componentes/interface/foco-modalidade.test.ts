@@ -551,17 +551,17 @@ it("seletor real em cores forçadas preserva seleção e foco desconhecido", asy
     await pagina.getByRole("button", { name: "Turmas", exact: true }).click();
     const serie = pagina.getByRole("button", { name: "1ª série", exact: true, pressed: true });
     const turma = pagina.getByRole("button", { name: "1ª série A", exact: true, pressed: true });
+    const marcaSerie = serie.locator("svg.lucide-check");
+    expect(await marcaSerie.isVisible()).toBe(true);
+    expect(await turma.locator("svg.lucide-check").count()).toBe(0);
     for (const alvo of [serie, turma]) {
-      const marca = alvo.locator("svg.lucide-check");
-      expect(await marca.isVisible()).toBe(true);
       await alvo.evaluate((el: HTMLElement) => el.focus());
       expect(await alvo.getAttribute("data-foco-desconhecido")).toBe("");
       expect(await alvo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
       expect(await alvo.evaluate((el) => getComputedStyle(el).outlineOffset)).toBe("2px");
-      expect(await marca.isVisible()).toBe(true);
     }
     expect(await serie.getAttribute("aria-pressed")).toBe("true");
-    expect(await serie.locator("svg.lucide-check").isVisible()).toBe(true);
+    expect(await marcaSerie.isVisible()).toBe(true);
   } finally {
     await pagina.close();
   }

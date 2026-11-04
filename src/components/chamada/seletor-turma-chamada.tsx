@@ -279,9 +279,6 @@ export function SeletorTurmaChamada({
                           onClick={() => onEscolher(opcao.id)}
                           className={estilos.turma}
                         >
-                          {ativo && (
-                            <Check size={12} aria-hidden="true" className={estilos.checkTurma} />
-                          )}
                           <span className={estilos.nome} aria-hidden="true">
                             {opcao.nome}
                           </span>
