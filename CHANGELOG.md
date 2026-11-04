@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O contorno de foco deixa de aparecer em cliques e toques diretos, mas permanece na navegação por teclado. O foco programático de origem desconhecida continua visível por acessibilidade, inclusive em cores forçadas.
+
 - A Chamada identifica quando ainda não foi iniciada, com faixa compacta, P neutro e ação Iniciar opcional. O início ou a marcação de um aluno cria um rascunho em andamento, inclusive sem faltas; o salvamento direto com todos presentes continua disponível. A interface também distingue chamada salva e correção com alterações não salvas.
 
 - Os indicadores de presença e falta na Chamada mostram apenas as letras P e F, sem ícone de confirmação ou traço ao lado.
