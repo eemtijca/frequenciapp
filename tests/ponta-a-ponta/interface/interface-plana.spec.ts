@@ -246,7 +246,11 @@ test.describe("interface compartilhada", () => {
     await conferirSuperficieSolida(dialogo);
     await conferirSuperficieSolida(dialogo.getByRole("button", { name: "Cancelar", exact: true }));
     const nome = dialogo.getByLabel("Nome", { exact: true });
-    await nome.focus();
+    await expect(nome).toBeFocused();
+    expect(await nome.evaluate((elemento) => getComputedStyle(elemento).outlineStyle)).toBe("none");
+    await page.keyboard.press("Shift+Tab");
+    await expect(nome).not.toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(nome).toBeFocused();
     const foco = await nome.evaluate((elemento) => {
       const css = getComputedStyle(elemento);
