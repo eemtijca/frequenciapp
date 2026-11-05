@@ -72,6 +72,11 @@ async function dados<T>(resposta: Response, status = 200): Promise<T> {
 
 async function limpar() {
   await banco.query(
+    "delete from tentativas_entrada where chave = 'planilha:indice:' || (select id::text from usuarios where email = $1)",
+    [EMAIL_ADMIN],
+  );
+  await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
+  await banco.query(
     "delete from feriados where nome like 'QA Mensal Calendário%' and dia between '2024-02-01' and '2024-02-29'",
   );
   await banco.query(`delete from sincronizacoes_planilha where turma_original_id in (${daSerie})`);
@@ -1008,7 +1013,7 @@ describe("frequência organizada por turma e mês", () => {
     expect(catalogo.abas.some((aba) => aba.mes === "2026-09")).toBe(true);
     expect(
       catalogo.abas.every((aba) =>
-        /^https:\/\/docs.google.com\/spreadsheets\/d\/planilha-sintetica\/edit#gid=\d+$/.test(
+        /^https:\/\/docs\.google\.com\/spreadsheets\/d\/planilha-sintetica\/edit#gid=\d+$/.test(
           aba.url,
         ),
       ),
@@ -1220,7 +1225,6 @@ describe("frequência organizada por turma e mês", () => {
     expect(google.valor(outubro, 2, colunaOutubro)).toBe("F");
     expect(google.valor(outubro, 3, colunaOutubro)).toBe("FJ");
   });
-
   it("recoloca o dia 28 antes do 29 no preparo, preservando colunas completas e posições manuais", async () => {
     const outubro = mensais["2026-10"];
     if (!outubro) throw new Error("Aba mensal ausente.");
@@ -1272,5 +1276,112 @@ describe("frequência organizada por turma e mês", () => {
     });
     expect(cabecalho(outubro.aba).filter(Boolean)).toEqual(esperado);
     expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+  });
+
+  it("cria um único Google Docs, atualiza os meses e preserva texto manual", async () => {
+    const rota = "/api/planilha/mensal/indice";
+    for (const cookie of ["", cookieCoordenacao]) {
+      expect((await chamar(rota, "GET", undefined, cookie)).status).toBe(cookie ? 403 : 401);
+      expect((await chamar(rota, "POST", {}, cookie)).status).toBe(cookie ? 403 : 401);
+    }
+    expect(
+      (await chamar(rota, "POST", { documentoUrl: "https://fora.exemplo/arquivo" })).status,
+    ).toBe(400);
+    const indevida = await fetch(`${APP_URL}${rota}`, {
+      method: "POST",
+      headers: {
+        Origin: "https://fora.exemplo",
+        Cookie: cookieAdmin,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+    expect(indevida.status).toBe(403);
+    expect(
+      (
+        await chamar(rota, "POST", {
+          documentoUrl: "https://docs.google.com/document/d/documento-qa-inexistente/edit",
+        })
+      ).status,
+    ).toBe(409);
+    expect(google.documentos()).toHaveLength(0);
+    expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: false });
+    const antes = google.chamadas().filter((acao) => acao === "gravar").length;
+    const criado = await dados<{ url: string }>(await chamar(rota, "POST", {}));
+    expect(criado.url).toMatch(/^https:\/\/docs\.google\.com\/document\/d\/documento-qa-1\/edit$/);
+    expect(google.documentos()).toEqual(["documento-qa-1"]);
+    const documento = google.documento("documento-qa-1");
+    expect(documento?.texto).toContain("Índice das chamadas");
+    expect(documento?.texto.indexOf("Outubro de 2026")).toBeLessThan(
+      documento?.texto.indexOf("Setembro de 2026") ?? 0,
+    );
+    const links = documento?.pedidos.filter((pedido) => pedido.updateTextStyle) ?? [];
+    expect(links.length).toBeGreaterThan(1);
+    expect(JSON.stringify(links)).toContain(
+      "https://docs.google.com/spreadsheets/d/planilha-sintetica/edit#gid=",
+    );
+    expect(await dados(await chamar(rota, "POST", {}))).toEqual({ ...criado, pendente: false });
+    expect(google.chamadas().filter((acao) => acao === "gravar_documento")).toHaveLength(1);
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(antes);
+    await dados(await preparar("2026-08"));
+    await dados(await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }));
+    expect(google.documento("documento-qa-1")?.texto).toContain("Agosto de 2026");
+    expect(google.documentos()).toHaveLength(1);
+    const manual = `${google.documento("documento-qa-1")?.texto}QA Nota manual\n`;
+    google.editarDocumento("documento-qa-1", manual);
+    expect((await chamar(rota, "POST", {})).status).toBe(409);
+    const visibilidade = await dados<{ avisoIndice: string }>(
+      await chamar("/api/planilha/mensal/visibilidade", "POST", { mes: "2026-10" }),
+    );
+    expect(visibilidade.avisoIndice).toContain("editado");
+    expect(google.documento("documento-qa-1")?.texto).toBe(manual);
+  });
+
+  it("libera o vínculo quando o documento do índice some do Drive", async () => {
+    const rota = "/api/planilha/mensal/indice";
+    await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
+    await dados(await chamar(rota, "POST", {}));
+    const id = google.documentos().at(-1);
+    if (!id) throw new Error("Documento do índice ausente.");
+    google.removerDocumento(id);
+    expect((await chamar(rota, "POST", {})).status).toBe(409);
+    expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: true });
+    const recriado = await dados<{ url: string }>(await chamar(rota, "POST", { recriar: true }));
+    expect(recriado.url).toContain("documento-qa-");
+    expect(await dados(await chamar(rota, "GET"))).toEqual({
+      url: recriado.url,
+      pendente: false,
+    });
+  });
+
+  it("recupera criação incerta sem duplicar o documento e não repete uma recusa", async () => {
+    const rota = "/api/planilha/mensal/indice";
+    await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
+    google.falharCriacaoDocumento(403);
+    expect((await chamar(rota, "POST", {})).status).toBe(502);
+    expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: false });
+    const anteriores = google.documentos().length;
+    google.falharCriacaoDocumento("perder");
+    expect((await chamar(rota, "POST", {})).status).toBe(502);
+    expect(google.documentos()).toHaveLength(anteriores + 1);
+    expect(await dados(await chamar(rota, "GET"))).toEqual({ url: null, pendente: true });
+    google.falharCriacaoDocumento(null);
+    expect((await chamar(rota, "POST", {})).status).toBe(409);
+    expect(google.documentos()).toHaveLength(anteriores + 1);
+    const id = google.documentos().at(-1);
+    const documentoUrl = `https://docs.google.com/document/u/0/d/${id}/edit`;
+    expect(await dados(await chamar(rota, "POST", { documentoUrl }))).toEqual({
+      url: `https://docs.google.com/document/d/${id}/edit`,
+      pendente: false,
+    });
+    expect(google.documentos()).toHaveLength(anteriores + 1);
+    expect((await chamar(rota, "POST", { recriar: true })).status).toBe(409);
+    await banco.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
+    google.falharCriacaoDocumento(503);
+    expect((await chamar(rota, "POST", {})).status).toBe(502);
+    expect((await chamar(rota, "POST", {})).status).toBe(409);
+    google.falharCriacaoDocumento(null);
+    await dados(await chamar(rota, "POST", { recriar: true }));
+    expect(google.documentos()).toHaveLength(anteriores + 2);
   });
 });

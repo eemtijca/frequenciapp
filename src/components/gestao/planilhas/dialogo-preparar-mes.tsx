@@ -152,8 +152,13 @@ export function DialogoPrepararMes({
         setResultados([...saida]);
       }
       if (saida.every((item) => item.estado === "preparada")) {
+        let avisoIndice: string | undefined;
         try {
-          await pedir("/api/planilha/mensal/visibilidade", corpoJson({ mes }));
+          const acesso = await pedir<{ avisoIndice?: string }>(
+            "/api/planilha/mensal/visibilidade",
+            corpoJson({ mes }),
+          );
+          avisoIndice = acesso.avisoIndice;
         } catch (erro) {
           setInterrupcao({
             mensagem: mensagemAmigavel(
@@ -165,7 +170,8 @@ export function DialogoPrepararMes({
           await onAtualizar();
           return;
         }
-        avisarSucesso(`Abas de ${rotuloMes(mes).toLowerCase()} preparadas.`);
+        if (avisoIndice) avisarInfo("Chamadas preparadas.", avisoIndice);
+        else avisarSucesso(`Abas de ${rotuloMes(mes).toLowerCase()} preparadas.`);
       } else if (!interrompida) {
         avisarInfo("Há turmas pendentes.", "Confira o resultado de cada turma.");
       }

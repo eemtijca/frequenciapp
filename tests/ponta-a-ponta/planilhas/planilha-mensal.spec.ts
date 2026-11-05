@@ -56,6 +56,7 @@ test.beforeEach(async () => {
   massaIniciada = true;
   await criarMassaE2E();
   await comBanco(async (cliente) => {
+    await cliente.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
     const feriados = await lerFeriados(cliente);
     const bloqueados = new Set([...feriados, ...(await lerDiasComFrequencia(cliente))]);
     // Não usa o dia da Chamada: uma limpeza interrompida não deve contaminar o Painel.
@@ -108,6 +109,7 @@ test.afterEach(async () => {
     async () => {
       if (!conexaoVerificada || !massaIniciada) return;
       await comBanco(async (cliente) => {
+        await cliente.query("delete from indices_chamada where planilha_id = 'planilha-sintetica'");
         await cliente.query(
           `delete from sincronizacoes_planilha where turma_original_id in
             (select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'E2E Ano')`,
@@ -804,4 +806,30 @@ test("resolve homônimos, preserva aluno histórico e escolhe a marca antes de r
   expect(google.valor(mensal, linhaHistorico, coluna)).toBe("P");
   expect(linhaHistorico).toBeLessThan(linhaAtual);
   expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+});
+
+test("cria e abre o índice das chamadas no Google Docs sem duplicar o documento", async ({
+  page,
+}) => {
+  const cartao = await abrirPlanilha(page);
+  await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
+  const preparo = page.getByRole("alertdialog");
+  await preparo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
+  await expect(preparo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
+  await preparo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
+  const indice = page.getByRole("region", { name: "Índice das chamadas", exact: true });
+  await expect(indice.getByRole("button", { name: "Criar índice", exact: true })).toBeEnabled();
+  await indice.getByRole("button", { name: "Criar índice", exact: true }).click();
+  const abrir = indice.getByRole("link", { name: "Abrir índice", exact: true });
+  await expect(abrir).toHaveAttribute(
+    "href",
+    "https://docs.google.com/document/d/documento-qa-1/edit",
+  );
+  expect(google.documentos()).toHaveLength(1);
+  expect(google.documento("documento-qa-1")?.texto).toContain(rotuloMes(mes));
+  for (const turma of turmas) expect(google.documento("documento-qa-1")?.texto).toContain(turma);
+  await indice.getByRole("button", { name: "Atualizar índice", exact: true }).click();
+  await expect(indice.getByRole("status")).toHaveText("Índice atualizado.");
+  expect(google.documentos()).toHaveLength(1);
 });

@@ -10,6 +10,7 @@ import {
   type ResolucaoAntiga,
 } from "@/domain/planilha-legado";
 import { PendenciasAbaAntiga } from "./pendencias-aba-antiga";
+import { IndiceChamadas } from "./indice-chamadas";
 import { corpoJson, pedir, ErroApi } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -88,9 +89,16 @@ export function DialogoMostrarMes({
           );
         }
         if (tipo === "liberar") {
-          await pedir("/api/planilha/mensal/visibilidade", corpoJson({ mes }));
+          const resultado = await pedir<{ avisoIndice?: string }>(
+            "/api/planilha/mensal/visibilidade",
+            corpoJson({ mes }),
+          );
           setCatalogo(await pedir<Catalogo>("/api/planilha/mensal/visibilidade"));
-          setMensagem("Todos os meses preparados estão acessíveis.");
+          setMensagem(
+            resultado.avisoIndice
+              ? `Todos os meses preparados estão acessíveis. ${resultado.avisoIndice}`
+              : "Todos os meses preparados estão acessíveis.",
+          );
           await onAtualizar();
         }
         if (tipo === "conferir" || tipo === "rever") {
@@ -259,6 +267,7 @@ export function DialogoMostrarMes({
             <>
               {meses.length > 0 ? (
                 <>
+                  <IndiceChamadas disabled={ocupado} />
                   <Selecionar
                     id="planilha-mes-acesso"
                     value={mes}

@@ -763,6 +763,14 @@ Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Libera
 - 400 mês inválido; 409 mês sem abas preparadas ou alteração concorrente; 429 excesso de alterações.
 - Preparar mês chama esta operação ao concluir todas as turmas. Falha não desfaz o preparo; Meses da frequência permite conferir e liberar o acesso depois.
 
+### GET e POST /api/planilha/mensal/indice
+
+Apenas administração. GET retorna `{ url: string | null, pendente: boolean }` para o arquivo de frequência selecionado, sem acessar o Google nem escrever. POST exige origem confiável, integração ativa, mês preparado e corpo `{ documentoUrl?: string, recriar?: true }`. Cria ou atualiza um Google Docs com links por mês e turma e retorna a mesma estrutura. `documentoUrl` recupera uma criação incerta, inclusive com `/u/N/` no link, apontando para um documento vazio ou com o conteúdo gerado esperado. Um documento já vinculado não pode ser substituído por esse parâmetro. `recriar: true` reinicia somente uma criação pendente após confirmação na interface; não aceita `documentoUrl` junto e pode criar outro arquivo no Drive.
+
+O vínculo é persistido por arquivo. Reserva local anterior à criação impede duplicatas após resposta perdida. Google Docs API deve estar ativada; drive.file continua sendo o único escopo. O texto manual e a revisão concorrente são protegidos; formatação e links gerados são reconstruídos. POST usa a trava da frequência, limite de 20 tentativas por administrador e auditoria. 400 para corpo ou conexão inválidos; 401 sem sessão; 403 sem administração ou origem confiável; 409 para ausência de mês, criação pendente, documento ausente ou texto editado; 429 para limite; 502 para falha do Google. Documento apagado ou ausente libera o vínculo local para recuperação pelo link ou nova criação. Escritas não são repetidas automaticamente.
+
+Concluir o preparo ou liberar os meses atualiza somente índice existente. `POST /api/planilha/mensal/visibilidade` pode incluir `avisoIndice: string` sem invalidar a liberação das abas.
+
 ### POST /api/planilha/mensal/legado
 
 Corpo: `{ "aba": string, "planoHash"?: string, "descartarComplementos"?: boolean, "senha"?: string, "resolucoes"?: Resolucao[] }`, limitado a 1.000.000 bytes. Apenas administração e origem confiável. Sem hash, retorna `{ "previa": {"aba", "impressao", "planoHash", "preenchidas", "conferidas", "substituidas", "mantidas", "alunosIncluidos", "resolucoesAplicadas", "totalPendencias", "pendencias", "destinos", "complementos", "urlAntiga", "removida": false} }`, sem escrever. A assinatura vincula a conferência ao administrador, conexão, turma e escolhas. Com hash válido e sem pendências, relê as abas e reúne inclusões, marcas e retirada em um único lote atômico. Retorna `{ "removida": true, "aba" }` e atualiza o mapa e a auditoria.

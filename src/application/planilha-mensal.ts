@@ -18,6 +18,7 @@ import { listarTodosAlunos } from "./alunos";
 import { listarFeriados } from "./calendario-letivo";
 import { chamarIntegracao, idDaIntegracao, lerLinha } from "./planilha-comum";
 import { detectarAba, esquemaSalvo, sabadosComChamadaSalva, type EsquemaSalvo } from "./planilha";
+import { atualizarIndiceExistente } from "./indice-chamadas";
 
 const entradaMensal = z.object({
   turmaOriginalId: z.string().uuid(),
@@ -154,7 +155,8 @@ export async function mostrarMesDaFrequencia(admin: { id: string }, entrada: unk
       await comTransacao(async (tx) => {
         await auditar(tx, admin.id, "planilha.mostrar_mes", `mes:${dados.data.mes}`);
       });
-      return resultado;
+      const avisoIndice = await atualizarIndiceExistente(linha);
+      return { ...resultado, ...(avisoIndice ? { avisoIndice } : {}) };
     }),
   );
 }
