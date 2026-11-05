@@ -2,7 +2,7 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
@@ -15,6 +15,22 @@ let servidor: Awaited<ReturnType<typeof createServer>>;
 let navegador: Browser;
 let url: string;
 
+// O rastreamento considera o ponteiro recente por 1 segundo.
+async function aguardarFimDaJanelaPonteiro(pagina: Page) {
+  await pagina.waitForTimeout(1100);
+}
+
+async function indicadorDeFoco(alvo: Locator) {
+  return alvo.evaluate((el) => {
+    const css = getComputedStyle(el);
+    return (css.outlineStyle !== "none" && css.outlineWidth !== "0px") || css.boxShadow !== "none";
+  });
+}
+
+function marcadorDesconhecido(pagina: Page) {
+  return pagina.evaluate(() => document.documentElement.hasAttribute("data-foco-desconhecido"));
+}
+
 it.each(["none", "active"] as const)(
   "toque cancelado preserva foco programático e não reverte foco alterado (%s)",
   async (forcedColors) => {
@@ -25,8 +41,9 @@ it.each(["none", "active"] as const)(
       const origem = pagina.getByRole("button", { name: "Superfície controle" });
       const outro = pagina.getByRole("textbox", { name: "Nome" });
       await pagina.getByRole("button", { name: "Primeira ação" }).click();
+      await aguardarFimDaJanelaPonteiro(pagina);
       await origem.evaluate((el: HTMLElement) => el.focus());
-      expect(await origem.getAttribute("data-foco-desconhecido")).toBe("");
+      expect(await marcadorDesconhecido(pagina)).toBe(true);
       const caixa = await origem.boundingBox();
       if (!caixa) throw new Error("Origem indisponível");
       const cdp = await pagina.context().newCDPSession(pagina);
@@ -39,14 +56,14 @@ it.each(["none", "active"] as const)(
         cdp.send("Input.dispatchTouchEvent", { type: "touchCancel", touchPoints: [] });
       await iniciar();
       await cancelar();
-      expect(await origem.getAttribute("data-foco-desconhecido")).toBe("");
+      expect(await marcadorDesconhecido(pagina)).toBe(true);
       expect(await origem.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
       await iniciar();
       await outro.evaluate((el: HTMLElement) => el.focus());
       await cancelar();
       expect(await outro.evaluate((el) => document.activeElement === el)).toBe(true);
       expect(await outro.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
-      expect(await origem.getAttribute("data-foco-desconhecido")).toBeNull();
+      expect(await marcadorDesconhecido(pagina)).toBe(true);
     } finally {
       await pagina.close();
     }
@@ -177,7 +194,7 @@ it.each(["none", "active"] as const)(
           };
           return visivel(el) || Boolean(el.parentElement && visivel(el.parentElement));
         });
-      expect(await indicador()).toBe(true);
+      expect(await indicador()).toBe(false);
       const antes = await campo.getAttribute("aria-activedescendant");
       await pagina.keyboard.press("ArrowDown");
       expect(await campo.getAttribute("aria-activedescendant")).not.toBe(antes);
@@ -253,7 +270,7 @@ afterAll(async () => {
 });
 
 it.each(["none", "active"] as const)(
-  "foco programático em outro campo após clique permanece visível (cores forçadas: %s)",
+  "foco programático sem interação recente permanece visível (cores forçadas: %s)",
   async (forcedColors) => {
     const pagina = await navegador.newPage({ forcedColors, reducedMotion: "reduce" });
     try {
@@ -263,6 +280,7 @@ it.each(["none", "active"] as const)(
       const destino = pagina.getByRole("textbox", { name: "Inválido" });
       await origem.click();
       expect(await origem.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("none");
+      await aguardarFimDaJanelaPonteiro(pagina);
       await destino.evaluate((el: HTMLElement) => el.focus());
       expect(await destino.evaluate((el) => document.activeElement === el)).toBe(true);
       expect(await destino.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
@@ -281,7 +299,7 @@ it("movimento reduzido remove imediatamente o anel do pseudo-elemento ao clicar"
     const botao = pagina.getByRole("button", { name: "Superfície controle" });
     const sombra = () => botao.evaluate((el) => getComputedStyle(el, "::after").boxShadow);
     const antes = await sombra();
-    for (let i = 0; i < 12 && !(await botao.evaluate((el) => document.activeElement === el)); i++) {
+    for (let i = 0; i < 40 && !(await botao.evaluate((el) => document.activeElement === el)); i++) {
       await pagina.keyboard.press("Tab");
     }
     expect(await botao.evaluate((el) => document.activeElement === el)).toBe(true);
@@ -318,7 +336,7 @@ it.each(["controle", "discreto", "primário", "destrutivo"] as const)(
       const antes = await estilo();
       for (
         let i = 0;
-        i < 12 && !(await botao.evaluate((el) => document.activeElement === el));
+        i < 40 && !(await botao.evaluate((el) => document.activeElement === el));
         i++
       ) {
         await pagina.keyboard.press("Tab");
@@ -412,7 +430,7 @@ it.each(["Turmas", "1ª série", "1ª série A"] as const)(
       const gatilho = pagina.getByRole("button", { name: "Turmas", exact: true });
       for (
         let i = 0;
-        i < 20 && !(await gatilho.evaluate((el) => document.activeElement === el));
+        i < 40 && !(await gatilho.evaluate((el) => document.activeElement === el));
         i++
       )
         await pagina.keyboard.press("Tab");
@@ -448,9 +466,10 @@ it("seletor real: foco programático na série selecionada é visível", async (
       document.head.append(modulo);
     });
     await pagina.getByRole("button", { name: "Turmas", exact: true }).click();
+    await aguardarFimDaJanelaPonteiro(pagina);
     const serie = pagina.getByRole("button", { name: "1ª série", exact: true, pressed: true });
     await serie.evaluate((el: HTMLElement) => el.focus());
-    expect(await serie.getAttribute("data-foco-desconhecido")).toBe("");
+    expect(await marcadorDesconhecido(pagina)).toBe(true);
     expect(await serie.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
     expect(await serie.getAttribute("aria-pressed")).toBe("true");
   } finally {
@@ -477,8 +496,9 @@ it.each(["claro", "escuro"] as const)(
       });
       const selecao = await selecionado.evaluate(borda);
       await pagina.getByRole("button", { name: "Primeira ação" }).click();
+      await aguardarFimDaJanelaPonteiro(pagina);
       await selecionado.evaluate((el: HTMLElement) => el.focus());
-      expect(await selecionado.getAttribute("data-foco-desconhecido")).toBe("");
+      expect(await marcadorDesconhecido(pagina)).toBe(true);
       expect(await selecionado.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
       expect(await selecionado.evaluate((el) => getComputedStyle(el).outlineOffset)).toBe("2px");
       expect(await selecionado.evaluate(borda)).toEqual(selecao);
@@ -549,6 +569,7 @@ it("seletor real em cores forçadas preserva seleção e foco desconhecido", asy
       document.head.append(modulo);
     });
     await pagina.getByRole("button", { name: "Turmas", exact: true }).click();
+    await aguardarFimDaJanelaPonteiro(pagina);
     const serie = pagina.getByRole("button", { name: "1ª série", exact: true, pressed: true });
     const turma = pagina.getByRole("button", { name: "1ª série A", exact: true, pressed: true });
     const marcaSerie = serie.locator("svg.lucide-check");
@@ -556,7 +577,7 @@ it("seletor real em cores forçadas preserva seleção e foco desconhecido", asy
     expect(await turma.locator("svg.lucide-check").count()).toBe(0);
     for (const alvo of [serie, turma]) {
       await alvo.evaluate((el: HTMLElement) => el.focus());
-      expect(await alvo.getAttribute("data-foco-desconhecido")).toBe("");
+      expect(await marcadorDesconhecido(pagina)).toBe(true);
       expect(await alvo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
       expect(await alvo.evaluate((el) => getComputedStyle(el).outlineOffset)).toBe("2px");
     }
@@ -574,6 +595,7 @@ it("foco programático no mesmo campo após desfocar não herda clique antigo", 
     await pagina.locator('[data-pronto="sim"]').waitFor();
     const campo = pagina.getByRole("textbox", { name: "Nome" });
     await campo.click();
+    await aguardarFimDaJanelaPonteiro(pagina);
     await campo.evaluate((el: HTMLElement) => el.blur());
     await campo.evaluate((el: HTMLElement) => el.focus());
     expect(await campo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
@@ -598,13 +620,14 @@ it("clicar em outro campo mantém a origem de ponteiro", async () => {
 });
 
 it.each(["none", "active"] as const)(
-  "foco programático em botão após clique em outro botão é perceptível (%s)",
+  "foco programático em botão após a janela de ponteiro é perceptível (%s)",
   async (forcedColors) => {
     const pagina = await navegador.newPage({ forcedColors, reducedMotion: "reduce" });
     try {
       await pagina.goto(url);
       await pagina.locator('[data-pronto="sim"]').waitFor();
       await pagina.getByRole("button", { name: "Primeira ação" }).click();
+      await aguardarFimDaJanelaPonteiro(pagina);
       const destino = pagina.getByRole("button", { name: "Superfície controle" });
       await destino.evaluate((el: HTMLElement) => el.focus());
       expect(await destino.evaluate((el) => document.activeElement === el)).toBe(true);
@@ -806,30 +829,194 @@ it.each(["teclado", "ponteiro"] as const)(
       const gatilho = pagina.getByRole("button", { name: "Abrir diálogo" });
       const antes = await gatilho.evaluate((el) => getComputedStyle(el).outlineStyle);
       if (modo === "teclado") {
-        for (let i = 0; i < 6; i++) await pagina.keyboard.press("Tab");
+        for (
+          let i = 0;
+          i < 40 && !(await gatilho.evaluate((el) => document.activeElement === el));
+          i++
+        ) {
+          await pagina.keyboard.press("Tab");
+        }
         expect(await gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
         await pagina.keyboard.press("Enter");
       } else {
         await gatilho.click();
       }
       await pagina.getByRole("dialog", { name: "Diálogo de teste" }).waitFor();
-      expect(
-        await pagina
-          .getByRole("textbox", { name: "Campo do diálogo" })
-          .evaluate((el) => document.activeElement === el),
-      ).toBe(true);
+      const campoDialogo = pagina.getByRole("textbox", { name: "Campo do diálogo" });
+      expect(await campoDialogo.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await campoDialogo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe(
+        modo === "teclado" ? "solid" : "none",
+      );
       if (modo === "teclado") await pagina.keyboard.press("Escape");
       else await pagina.getByRole("button", { name: "Concluir" }).click();
       await expect.poll(() => gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
       const depois = await gatilho.evaluate((el) => getComputedStyle(el).outlineStyle);
-      // O retorno programático após clique tem origem desconhecida: mostra foco por segurança.
       expect(antes).toBe("none");
-      expect(depois).toBe("solid");
+      expect(depois).toBe(modo === "teclado" ? "solid" : "none");
     } finally {
       await pagina.close();
     }
   },
 );
+
+it.each(["teclado", "ponteiro"] as const)(
+  "popover de menu: %s abre, fecha e devolve o foco conforme a origem",
+  async (modo) => {
+    const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+    try {
+      await pagina.goto(url);
+      await pagina.locator('[data-pronto="sim"]').waitFor();
+      const gatilho = pagina.getByRole("button", { name: "Abrir menu de teste" });
+      if (modo === "teclado") {
+        for (
+          let i = 0;
+          i < 40 && !(await gatilho.evaluate((el) => document.activeElement === el));
+          i++
+        ) {
+          await pagina.keyboard.press("Tab");
+        }
+        expect(await gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
+        await pagina.keyboard.press("Enter");
+      } else {
+        await gatilho.click();
+      }
+      const menu = pagina.getByRole("menu", { name: "Menu de teste" });
+      await menu.waitFor();
+      const primeiro = pagina.getByRole("menuitem", { name: "Primeiro item" });
+      expect(await primeiro.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(primeiro)).toBe(modo === "teclado");
+
+      if (modo === "teclado") await pagina.keyboard.press("Escape");
+      else await gatilho.click();
+      await expect.poll(() => gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(gatilho)).toBe(modo === "teclado");
+    } finally {
+      await pagina.close();
+    }
+  },
+);
+
+it.each(["teclado", "ponteiro"] as const)(
+  "select real: %s abre sem contorno e setas ativam o indicador",
+  async (modo) => {
+    const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+    try {
+      await pagina.goto(url);
+      await pagina.locator('[data-pronto="sim"]').waitFor();
+      const gatilho = pagina.getByRole("combobox", { name: "Seleção simples" });
+      if (modo === "teclado") {
+        for (
+          let i = 0;
+          i < 40 && !(await gatilho.evaluate((el) => document.activeElement === el));
+          i++
+        ) {
+          await pagina.keyboard.press("Tab");
+        }
+        expect(await gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
+        await pagina.keyboard.press("Enter");
+      } else {
+        await gatilho.click();
+      }
+      const opcao = pagina.getByRole("option", { name: "Alfa" });
+      await opcao.waitFor();
+      expect(await opcao.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(opcao)).toBe(modo === "teclado");
+      await pagina.keyboard.press("ArrowDown");
+      const beta = pagina.getByRole("option", { name: "Beta" });
+      await expect.poll(() => beta.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(beta)).toBe(true);
+      await pagina.keyboard.press("Escape");
+      await expect.poll(() => gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(gatilho)).toBe(true);
+    } finally {
+      await pagina.close();
+    }
+  },
+);
+
+it("interruptor alterna sem contorno no clique e com contorno no teclado", async () => {
+  const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+  try {
+    await pagina.goto(url);
+    await pagina.locator('[data-pronto="sim"]').waitFor();
+    const interruptor = pagina.getByRole("switch", { name: "Interruptor de teste" });
+    await interruptor.click();
+    expect(await interruptor.getAttribute("aria-checked")).toBe("true");
+    expect(await indicadorDeFoco(interruptor)).toBe(false);
+    await pagina.keyboard.press("Shift+Tab");
+    await pagina.keyboard.press("Tab");
+    expect(await interruptor.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await indicadorDeFoco(interruptor)).toBe(true);
+  } finally {
+    await pagina.close();
+  }
+});
+
+it("resumo, cartão, conteúdo editável e link seguem a mesma regra", async () => {
+  const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+  try {
+    await pagina.goto(url);
+    await pagina.locator('[data-pronto="sim"]').waitFor();
+    const alvos = [
+      pagina.locator("summary").filter({ hasText: "Resumo de teste" }),
+      pagina.getByRole("button", { name: "Cartão focável" }),
+      pagina.getByRole("textbox", { name: "Anotação editável" }),
+      pagina.getByRole("link", { name: "Link de teste" }),
+    ];
+    for (const alvo of alvos) {
+      await alvo.click();
+      expect(await alvo.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(alvo)).toBe(false);
+      await pagina.keyboard.press("Shift+Tab");
+      await pagina.keyboard.press("Tab");
+      expect(await alvo.evaluate((el) => document.activeElement === el)).toBe(true);
+      expect(await indicadorDeFoco(alvo)).toBe(true);
+    }
+  } finally {
+    await pagina.close();
+  }
+});
+
+it("foco programático dentro da janela de ponteiro não mostra contorno", async () => {
+  const pagina = await navegador.newPage({ reducedMotion: "reduce" });
+  try {
+    await pagina.goto(url);
+    await pagina.locator('[data-pronto="sim"]').waitFor();
+    await pagina.getByRole("button", { name: "Primeira ação" }).click();
+    const destino = pagina.getByRole("button", { name: "Superfície controle" });
+    await destino.evaluate((el: HTMLElement) => el.focus());
+    expect(await destino.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await marcadorDesconhecido(pagina)).toBe(false);
+    expect(await indicadorDeFoco(destino)).toBe(false);
+  } finally {
+    await pagina.close();
+  }
+});
+
+it("toque no diálogo não deixa contorno ao abrir nem ao fechar", async () => {
+  const pagina = await navegador.newPage({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 800 },
+    reducedMotion: "reduce",
+  });
+  try {
+    await pagina.goto(url);
+    await pagina.locator('[data-pronto="sim"]').waitFor();
+    const gatilho = pagina.getByRole("button", { name: "Abrir diálogo" });
+    await gatilho.tap();
+    const dialogo = pagina.getByRole("dialog", { name: "Diálogo de teste" });
+    await dialogo.waitFor();
+    const campo = pagina.getByRole("textbox", { name: "Campo do diálogo" });
+    expect(await campo.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await indicadorDeFoco(campo)).toBe(false);
+    await pagina.getByRole("button", { name: "Concluir" }).tap();
+    await expect.poll(() => gatilho.evaluate((el) => document.activeElement === el)).toBe(true);
+    expect(await indicadorDeFoco(gatilho)).toBe(false);
+  } finally {
+    await pagina.close();
+  }
+});
 
 it("botão alterna entre foco visível por teclado e interação de ponteiro", async () => {
   const pagina = await navegador.newPage({ reducedMotion: "reduce" });
@@ -901,21 +1088,23 @@ it("label direto não deixa marcador; foco desconhecido é limpo no clique e des
     const campo = pagina.locator("#campo-rotulado");
     await pagina.getByText("Rótulo externo").click();
     expect(await campo.evaluate((el) => document.activeElement === el)).toBe(true);
-    expect(await campo.getAttribute("data-foco-desconhecido")).toBeNull();
+    expect(await marcadorDesconhecido(pagina)).toBe(false);
     await pagina.getByRole("button", { name: "Primeira ação" }).click();
+    await aguardarFimDaJanelaPonteiro(pagina);
     await campo.evaluate((el: HTMLElement) => el.focus());
-    expect(await campo.getAttribute("data-foco-desconhecido")).toBe("");
+    expect(await marcadorDesconhecido(pagina)).toBe(true);
     expect(await campo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
     await campo.click();
-    expect(await campo.getAttribute("data-foco-desconhecido")).toBeNull();
+    expect(await marcadorDesconhecido(pagina)).toBe(false);
+    await aguardarFimDaJanelaPonteiro(pagina);
     await pagina
       .getByRole("button", { name: "Superfície controle" })
       .evaluate((el: HTMLElement) => el.focus());
-    expect(await campo.getAttribute("data-foco-desconhecido")).toBeNull();
+    expect(await marcadorDesconhecido(pagina)).toBe(true);
     const destino = pagina.getByRole("button", { name: "Superfície controle" });
-    expect(await destino.getAttribute("data-foco-desconhecido")).toBe("");
+    expect(await marcadorDesconhecido(pagina)).toBe(true);
     await destino.evaluate((el: HTMLElement) => el.blur());
-    expect(await destino.getAttribute("data-foco-desconhecido")).toBeNull();
+    expect(await marcadorDesconhecido(pagina)).toBe(false);
   } finally {
     await pagina.close();
   }
@@ -935,8 +1124,9 @@ it("foco desconhecido preserva seleção e erro em cores forçadas", async () =>
     const selecaoAntes = await selecionado.evaluate((el) => getComputedStyle(el).outlineOffset);
     const erroAntes = await invalido.evaluate(aparencia);
     await pagina.getByRole("button", { name: "Primeira ação" }).click();
+    await aguardarFimDaJanelaPonteiro(pagina);
     await selecionado.evaluate((el: HTMLElement) => el.focus());
-    expect(await selecionado.getAttribute("data-foco-desconhecido")).toBe("");
+    expect(await marcadorDesconhecido(pagina)).toBe(true);
     expect(await selecionado.evaluate((el) => getComputedStyle(el).outlineOffset)).toBe("2px");
     expect(selecaoAntes).toBe("-3px");
     expect(await selecionado.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("2px");

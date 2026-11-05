@@ -4,6 +4,8 @@
 import { useEffect } from "react";
 
 export type OrigemFoco = "ponteiro" | "teclado";
+// Cobre o foco síncrono de abertura e a devolução após as animações de saída.
+const JANELA_PONTEIRO_MS = 1000;
 const restauracoes = new WeakMap<EventTarget, OrigemFoco>();
 
 /** Mantém a origem de uma devolução de foco conhecida, inclusive após animações. */
@@ -28,9 +30,16 @@ export function ModalidadeFoco() {
       desconhecido: boolean;
     } | null = null;
     let limpezaPonteiro: ReturnType<typeof setTimeout> | undefined;
+    let ultimoPonteiroEm = Number.NEGATIVE_INFINITY;
+    const ponteiroRecente = () => performance.now() - ultimoPonteiroEm < JANELA_PONTEIRO_MS;
     const limparMarcador = () => {
-      focoDesconhecido?.removeAttribute("data-foco-desconhecido");
+      raiz.removeAttribute("data-foco-desconhecido");
       focoDesconhecido = null;
+    };
+    const marcarDesconhecido = (alvo: Element) => {
+      limparMarcador();
+      focoDesconhecido = alvo;
+      raiz.setAttribute("data-foco-desconhecido", "");
     };
     const ponteiro = (evento: PointerEvent) => {
       if (evento.isTrusted) {
@@ -41,8 +50,10 @@ export function ModalidadeFoco() {
           desconhecido: focoDesconhecido === document.activeElement,
         };
         alvoPonteiro = evento.target;
+        ultimoPonteiroEm = performance.now();
         raiz.dataset.modalidadeFoco = "ponteiro";
-        if (pertenceAoPonteiro(document.activeElement)) limparMarcador();
+        // Um novo gesto de ponteiro torna obsoleto qualquer foco desconhecido.
+        limparMarcador();
       }
     };
     const pertenceAoPonteiro = (alvo: EventTarget | null) => {
@@ -52,24 +63,32 @@ export function ModalidadeFoco() {
       return elemento?.closest("label")?.control === alvo;
     };
     const foco = (evento: FocusEvent) => {
-      const origem = evento.target ? restauracoes.get(evento.target) : undefined;
+      const alvo = evento.target;
+      const origem = alvo ? restauracoes.get(alvo) : undefined;
       if (origem) raiz.dataset.modalidadeFoco = origem;
-      const diretoDoPonteiro = origem === "ponteiro" || pertenceAoPonteiro(evento.target);
+      if (origem === "ponteiro") ultimoPonteiroEm = performance.now();
+      if (origem === "teclado") ultimoPonteiroEm = Number.NEGATIVE_INFINITY;
+      const diretoDoPonteiro = origem === "ponteiro" || pertenceAoPonteiro(alvo);
+      // O foco programático que decorre de um clique ou toque recente é do
+      // ponteiro, ainda que o navegador o trate como :focus-visible.
+      const doPonteiro = origem !== "teclado" && (diretoDoPonteiro || ponteiroRecente());
       limparMarcador();
-      if (!diretoDoPonteiro && raiz.dataset.modalidadeFoco !== "teclado") {
-        if (evento.target instanceof Element) {
-          focoDesconhecido = evento.target;
-          focoDesconhecido.setAttribute("data-foco-desconhecido", "");
-        }
-      }
-      if (raiz.dataset.modalidadeFoco === "ponteiro" && !diretoDoPonteiro) {
-        delete raiz.dataset.modalidadeFoco;
-      }
       alvoPonteiro = null;
+      if (doPonteiro) {
+        raiz.dataset.modalidadeFoco = "ponteiro";
+        return;
+      }
+      if (origem === "teclado" || raiz.dataset.modalidadeFoco === "teclado") return;
+      if (alvo instanceof Element) marcarDesconhecido(alvo);
+      if (raiz.dataset.modalidadeFoco === "ponteiro") delete raiz.dataset.modalidadeFoco;
     };
     const desfoco = (evento: FocusEvent) => {
       limparMarcador();
-      if (raiz.dataset.modalidadeFoco === "ponteiro" && !pertenceAoPonteiro(evento.relatedTarget)) {
+      if (
+        raiz.dataset.modalidadeFoco === "ponteiro" &&
+        !pertenceAoPonteiro(evento.relatedTarget) &&
+        !ponteiroRecente()
+      ) {
         delete raiz.dataset.modalidadeFoco;
       }
     };
@@ -77,20 +96,32 @@ export function ModalidadeFoco() {
     const fimClique = (evento: MouseEvent) => {
       if (evento.isTrusted) limpezaPonteiro = setTimeout(() => (alvoPonteiro = null), 0);
     };
-    const restaurarFocoAnterior = () => {
+    const restaurarFocoAnterior = (cancelado = false) => {
+      const focoAtual = document.activeElement;
+      const focoDoPonteiro = pertenceAoPonteiro(focoAtual);
       alvoPonteiro = null;
-      if (antesDoPonteiro && document.activeElement === antesDoPonteiro.foco) {
+      ultimoPonteiroEm = Number.NEGATIVE_INFINITY;
+      if (antesDoPonteiro && focoAtual === antesDoPonteiro.foco) {
         if (antesDoPonteiro.modalidade) raiz.dataset.modalidadeFoco = antesDoPonteiro.modalidade;
         else delete raiz.dataset.modalidadeFoco;
         if (antesDoPonteiro.desconhecido && antesDoPonteiro.foco) {
-          focoDesconhecido = antesDoPonteiro.foco;
-          focoDesconhecido.setAttribute("data-foco-desconhecido", "");
+          marcarDesconhecido(antesDoPonteiro.foco);
         }
+      } else if (
+        cancelado &&
+        !focoDoPonteiro &&
+        focoAtual instanceof Element &&
+        focoAtual !== document.body
+      ) {
+        // Um gesto cancelado não pode apagar o foco programático que ocorreu
+        // durante ele.
+        delete raiz.dataset.modalidadeFoco;
+        marcarDesconhecido(focoAtual);
       }
       antesDoPonteiro = null;
     };
     const cancelarPonteiro = (evento: PointerEvent) => {
-      if (evento.isTrusted) restaurarFocoAnterior();
+      if (evento.isTrusted) restaurarFocoAnterior(true);
     };
     const soltarPonteiro = (evento: PointerEvent) => {
       if (!evento.isTrusted || !(alvoPonteiro instanceof Element)) return;
@@ -110,6 +141,7 @@ export function ModalidadeFoco() {
       "PageUp",
       "PageDown",
     ]);
+    const teclasAtivacao = new Set(["Enter", " ", "Escape"]);
     const teclado = (evento: KeyboardEvent) => {
       const alvo = evento.target;
       const editaTexto =
@@ -123,15 +155,20 @@ export function ModalidadeFoco() {
         alvo instanceof Element &&
         alvo.hasAttribute("aria-activedescendant") &&
         (evento.key === "ArrowUp" || evento.key === "ArrowDown");
+      const navegaPorTeclado =
+        evento.key === "Tab" ||
+        evento.key === "Escape" ||
+        (!editaTexto && (teclasNavegacao.has(evento.key) || teclasAtivacao.has(evento.key))) ||
+        navegaOpcoes;
       if (
         evento.isTrusted &&
-        (evento.key === "Tab" || !editaTexto || navegaOpcoes) &&
+        navegaPorTeclado &&
         !evento.metaKey &&
         !evento.ctrlKey &&
-        !evento.altKey &&
-        teclasNavegacao.has(evento.key)
+        !evento.altKey
       ) {
         raiz.dataset.modalidadeFoco = "teclado";
+        ultimoPonteiroEm = Number.NEGATIVE_INFINITY;
         alvoPonteiro = null;
         limparMarcador();
       }
