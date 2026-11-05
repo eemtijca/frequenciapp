@@ -744,9 +744,11 @@ Falhas conhecidas de acesso ao Google ou de leitura de uma aba são apresentadas
 
 Corpo: `{ "turmaOriginalId": UUID, "mes": "AAAA-MM" }`. Exige administração e origem confiável. Prepara uma turma por requisição, com Aluno, datas de segunda a sexta, sábados com chamada salva daquela origem, alunos e vínculos. O título usa o mês por extenso, como `1º A · Outubro`; em colisão com a mesma turma e mês de outro ano, acrescenta o ano. Em uma aba mensal existente, renomeia e remove somente colunas próprias reconhecidas de Turma atual, domingos e sábados sem chamada salva para aquela origem, preservando linhas, demais células e destino. Repetição reutiliza o destino já ajustado. Aba manual com o mesmo nome, estrutura inesperada ou outra atualização em andamento responde 409.
 
+O mesmo lote ordena as abas mensais por ano e mês decrescentes, preservando a ordem das turmas no mesmo mês e as posições finais das abas não mensais. A ordenação também é corrigida ao preparar novamente uma aba existente; após resposta incerta, a leitura precisa confirmar a ordem antes de informar sucesso.
+
 Feriados são lidos no servidor sob a mesma trava e omitidos das datas mensais. Em abas existentes, uma coluna própria de feriado só é removida após conferir todas as linhas: valor, fórmula ou nota abaixo do cabeçalho responde 409 e impede a escrita. A leitura aceita até 20.000 linhas e limita cada bloco a 20.000 células; dimensões ausentes ou maiores impedem a remoção. Colunas manuais permanecem preservadas. O marcador histórico `frequenciapp.feriado` permite reconhecer uma data omitida; excluir o feriado não recria a coluna imediatamente, e o envio posterior pode inserir a data que voltou a ser letiva.
 
-- 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira apenas quando a aba existente foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
+- 200 `{ "aba", "mes", "turmaOriginalId", "destino", "criada", "atualizada" }`; `atualizada` é verdadeira quando a aba existente ou a ordem mensal foi ajustada; 400 mês inválido; 404 turma inexistente; 429 excesso de preparos.
 - Depois do primeiro preparo de uma turma, cada mês exige a própria aba preparada. Mapa aceita a mesma turma em meses diferentes; o servidor confere a identificação mensal no Google e preserva meses preparados durante outra conferência.
 
 ### GET /api/planilha/mensal/visibilidade
@@ -755,7 +757,7 @@ Apenas administração. Retorna `{ "abas": [{"aba", "mes", "turmaOriginalId", "d
 
 ### POST /api/planilha/mensal/visibilidade
 
-Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Libera todos os meses preparados e as abas legadas reconhecidas no mapa. Nenhum mês é ocultado. Abas manuais sem vínculo e cópias antigas permanecem intactas. Usa a mesma trava do preparo e envio; não repete automaticamente uma escrita com resposta perdida.
+Corpo: `{ "mes": "AAAA-MM" }`. Exige administração e origem confiável. Libera todos os meses preparados e as abas legadas reconhecidas no mapa. Ordena as abas mensais do mês mais recente para o mais antigo, sem priorizar o mês consultado. Preserva a ordem das turmas de um mesmo mês e as posições finais das abas não mensais. Nenhum mês é ocultado. Abas manuais sem vínculo e cópias antigas permanecem intactas. Usa a mesma trava do preparo e envio; não repete automaticamente uma escrita com resposta perdida.
 
 - 200 `{ "mes", "visiveis": string[], "ocultadas": [] }`. O campo `ocultadas` permanece por compatibilidade.
 - 400 mês inválido; 409 mês sem abas preparadas ou alteração concorrente; 429 excesso de alterações.

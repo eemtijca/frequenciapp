@@ -14,6 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A turma selecionada na Chamada deixa de exibir o ícone de seleção sobreposto ao botão. O fundo azul identifica a seleção; em cores forçadas, a borda mantém o destaque.
 
+- A planilha de chamada organiza as abas mensais do mês mais recente para o mais antigo ao preparar ou liberar os meses. A ordem das turmas no mês, as posições finais das demais abas e os registros são preservados.
+
 - A Chamada identifica quando ainda não foi iniciada, com faixa compacta, P neutro e ação Iniciar opcional. O início ou a marcação de um aluno cria um rascunho em andamento, inclusive sem faltas; o salvamento direto com todos presentes continua disponível. A interface também distingue chamada salva e correção com alterações não salvas.
 
 - Os indicadores de presença e falta na Chamada mostram apenas as letras P e F, sem ícone de confirmação ou traço ao lado.

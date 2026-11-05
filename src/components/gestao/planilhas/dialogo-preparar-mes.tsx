@@ -206,7 +206,7 @@ export function DialogoPrepararMes({
             </AlertDialogTitle>
             <AlertDialogDescription>
               {resultados === null
-                ? "Organiza as abas do mês, preservando dias úteis e sábados com chamada salva. Retira Turma atual, domingos e sábados sem chamada. Ao concluir, mostra apenas este mês."
+                ? "Organiza as abas do mês, preservando dias úteis e sábados com chamada salva. Retira Turma atual, domingos e sábados sem chamada. Os meses mais recentes ficam primeiro."
                 : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -104,7 +104,7 @@ function simularGoogle(
           }
           if (pedido.updateSheetProperties) {
             const atualizacao = pedido.updateSheetProperties as {
-              properties: { sheetId: number; title?: string; hidden?: boolean };
+              properties: { sheetId: number; title?: string; hidden?: boolean; index?: number };
             };
             const aba = documento.sheets.find(
               (item) => item.properties.sheetId === atualizacao.properties.sheetId,
@@ -113,6 +113,15 @@ function simularGoogle(
               aba.properties.title = atualizacao.properties.title;
             if (aba && atualizacao.properties.hidden !== undefined)
               aba.properties.hidden = atualizacao.properties.hidden;
+            if (aba && atualizacao.properties.index !== undefined) {
+              const origem = documento.sheets.indexOf(aba);
+              const indice = atualizacao.properties.index;
+              if (!Number.isInteger(indice) || indice < 0 || indice > documento.sheets.length)
+                throw new Error("Posição de aba sintética inválida.");
+              // A Sheets API interpreta o índice antes de remover a aba da posição atual.
+              documento.sheets.splice(origem, 1);
+              documento.sheets.splice(indice > origem ? indice - 1 : indice, 0, aba);
+            }
           }
           if (pedido.deleteDimension) {
             const exclusao = pedido.deleteDimension as {
@@ -194,7 +203,13 @@ function simularGoogle(
         });
       }
       if (String(url).includes("/values/")) throw new Error("O catálogo não deve ler células.");
-      return Response.json(documento);
+      return Response.json({
+        ...documento,
+        sheets: documento.sheets.map((aba, index) => ({
+          ...aba,
+          properties: { ...aba.properties, index },
+        })),
+      });
     }),
   );
   return { documento, lotes, requisicoes, celulas, conteudos, controle };
@@ -317,6 +332,110 @@ describe("identificação do mês da planilha", () => {
 });
 
 describe("preparação das abas mensais", () => {
+  it("organiza meses e anos do mais recente ao mais antigo e mantém a posição das abas manuais", async () => {
+    const google = simularGoogle();
+    google.celulas.set(1, [["QA Anotações"], ["Preservar"]]);
+    const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-09",
+    });
+    google.documento.sheets.push({ properties: { sheetId: 42, title: "QA Manual" } });
+    google.celulas.set(42, [["QA Conteúdo manual"]]);
+    const novembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-11",
+    });
+    const dezembroAnterior = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2025-12",
+    });
+    const janeiro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2027-01",
+    });
+    expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+      "1º A",
+      janeiro.aba,
+      "QA Manual",
+      novembro.aba,
+      setembro.aba,
+      dezembroAnterior.aba,
+    ]);
+    expect(google.celulas.get(1)).toEqual([["QA Anotações"], ["Preservar"]]);
+    expect(google.celulas.get(42)).toEqual([["QA Conteúdo manual"]]);
+    expect(google.lotes).toHaveLength(4);
+  });
+
+  it("reprepara um mês antigo corrigindo a ordem sem alterar células e não repete a escrita", async () => {
+    const google = simularGoogle();
+    const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-09",
+    });
+    google.documento.sheets.reverse();
+    const celulas = structuredClone(google.celulas);
+    const metadados = structuredClone(google.documento.developerMetadata);
+    const antes = google.lotes.length;
+    const resultado = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-09",
+    });
+    expect(resultado).toMatchObject({ destino: setembro.destino, criada: false, atualizada: true });
+    expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+      outubro.aba,
+      setembro.aba,
+      "1º A",
+    ]);
+    expect(google.celulas).toEqual(celulas);
+    expect(google.documento.developerMetadata).toEqual(metadados);
+    expect(google.lotes).toHaveLength(antes + 1);
+    await expect(
+      prepararAbaMensalGoogle("arquivo", "acesso", { ...entrada, mes: "2026-09" }),
+    ).resolves.toMatchObject({ criada: false, atualizada: false });
+    expect(google.lotes).toHaveLength(antes + 1);
+  });
+
+  it.each(["resposta_perdida", "resposta_perdida_antes"] as const)(
+    "confere a ordem na recuperação de %s durante o preparo existente",
+    async (modo) => {
+      const google = simularGoogle();
+      const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+      const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        mes: "2026-09",
+      });
+      google.documento.sheets.reverse();
+      google.controle.modo = modo;
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const antes = google.lotes.length;
+      const preparo = prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        mes: "2026-09",
+      });
+      if (modo === "resposta_perdida") {
+        await expect(preparo).resolves.toMatchObject({
+          destino: setembro.destino,
+          criada: false,
+          atualizada: true,
+        });
+        expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+          outubro.aba,
+          setembro.aba,
+          "1º A",
+        ]);
+      } else {
+        await expect(preparo).rejects.toThrow();
+        expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+          setembro.aba,
+          outubro.aba,
+          "1º A",
+        ]);
+      }
+      expect(google.lotes).toHaveLength(antes + 1);
+    },
+  );
+
   it("ordena os nomes e grava o vínculo de cada aluno na mesma posição", async () => {
     const { documento, celulas } = simularGoogle();
     const alunos = [
@@ -869,13 +988,23 @@ describe("preparação das abas mensais", () => {
   it.each(["resposta_perdida", "concorrente"] as const)(
     "confirma a criação por leitura após %s sem repetir a escrita",
     async (modo) => {
-      const { lotes } = simularGoogle(modo);
+      const google = simularGoogle();
+      const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+        ...entrada,
+        mes: "2026-09",
+      });
+      google.controle.modo = modo;
       vi.spyOn(console, "error").mockImplementation(() => undefined);
       await expect(prepararAbaMensalGoogle("arquivo", "acesso", entrada)).resolves.toMatchObject({
         criada: false,
         mes: entrada.mes,
       });
-      expect(lotes).toHaveLength(1);
+      expect(google.lotes).toHaveLength(2);
+      expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+        "1º A",
+        nomeAbaMensal(entrada.rotulo, entrada.mes),
+        setembro.aba,
+      ]);
     },
   );
 
@@ -1034,6 +1163,36 @@ describe("conferência mensal antes da escrita", () => {
 });
 
 describe("visibilidade mensal", () => {
+  it("ordena o histórico existente mesmo quando todas as abas estão visíveis", async () => {
+    const google = simularGoogle();
+    const setembro = await prepararAbaMensalGoogle("arquivo", "acesso", {
+      ...entrada,
+      mes: "2026-09",
+    });
+    const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);
+    google.documento.sheets = [
+      ...google.documento.sheets.slice(0, 1),
+      ...google.documento.sheets.slice(1).reverse(),
+    ];
+    google.documento.sheets.splice(2, 0, {
+      properties: { sheetId: 42, title: "QA Manual", hidden: true },
+    });
+    const celulas = structuredClone(google.celulas);
+    const antes = google.lotes.length;
+    await mostrarMesGoogle("arquivo", "acesso", "2026-09", []);
+    expect(google.documento.sheets.map((aba) => aba.properties.title)).toEqual([
+      "1º A",
+      outubro.aba,
+      "QA Manual",
+      setembro.aba,
+    ]);
+    expect(google.documento.sheets[2]?.properties.hidden).toBe(true);
+    expect(google.celulas).toEqual(celulas);
+    expect(google.lotes).toHaveLength(antes + 1);
+    await mostrarMesGoogle("arquivo", "acesso", "2026-10", []);
+    expect(google.lotes).toHaveLength(antes + 1);
+  });
+
   it("revela todos os meses e o legado reconhecido sem esconder outras abas", async () => {
     const google = simularGoogle();
     const outubro = await prepararAbaMensalGoogle("arquivo", "acesso", entrada);

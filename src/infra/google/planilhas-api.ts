@@ -24,7 +24,7 @@ const CHAVES_METADADOS = [
   "frequenciapp.saidas.esquema",
 ];
 const CAMPOS_ESTRUTURA =
-  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,hidden,sheetType,gridProperties),charts(chartId),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
+  "spreadsheetId,spreadsheetUrl,properties(title,timeZone),developerMetadata(metadataId,metadataKey,metadataValue,location),sheets(properties(sheetId,title,index,hidden,sheetType,gridProperties),charts(chartId),merges,bandedRanges(bandedRangeId,range),developerMetadata(metadataId,metadataKey,metadataValue,location),data(rowMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location)),columnMetadata(developerMetadata(metadataId,metadataKey,metadataValue,location))))";
 const CAMPOS_CELULAS =
   "sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(formattedValue,userEnteredValue))))";
 const CAMPOS_CELULAS_COM_NOTAS =
@@ -67,6 +67,7 @@ const metadado = z.object({
 const propriedades = z.object({
   sheetId: z.number(),
   title: z.string(),
+  index: z.number().int().nonnegative().optional(),
   hidden: z.boolean().optional(),
   sheetType: z.string().optional(),
   gridProperties: z
