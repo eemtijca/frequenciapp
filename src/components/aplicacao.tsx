@@ -53,6 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { restaurarFoco, type OrigemFoco } from "@/components/ui/modalidade-foco";
 import {
   Dialog,
   DialogClose,
@@ -224,6 +225,23 @@ function MenuMovel({
   // é passado ao conteúdo durante a renderização.
   const [destinoFoco, setDestinoFoco] = useState<DestinoFocoMenu>("gatilho");
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const origemFocoRef = useRef<OrigemFoco | undefined>(undefined);
+
+  function registrarPonteiro(evento: { isTrusted: boolean }) {
+    if (evento.isTrusted) origemFocoRef.current = "ponteiro";
+  }
+
+  function registrarTeclado(evento: React.KeyboardEvent | KeyboardEvent) {
+    if (
+      evento.isTrusted &&
+      !evento.altKey &&
+      !evento.ctrlKey &&
+      !evento.metaKey &&
+      !["Shift", "Control", "Alt", "Meta"].includes(evento.key)
+    ) {
+      origemFocoRef.current = "teclado";
+    }
+  }
 
   // A mudança de largura encerra também o modal, liberando o fundo e o foco.
   useEffect(() => {
@@ -262,6 +280,8 @@ function MenuMovel({
           className="relative size-11 shrink-0"
           aria-label="Abrir menu"
           title="Menu"
+          onPointerDownCapture={registrarPonteiro}
+          onKeyDownCapture={registrarTeclado}
         >
           <Menu size={22} aria-hidden="true" />
           {pendente && (
@@ -278,6 +298,10 @@ function MenuMovel({
         showCloseButton={false}
         aria-modal="true"
         aria-describedby={undefined}
+        onPointerDownCapture={registrarPonteiro}
+        onKeyDownCapture={registrarTeclado}
+        onPointerDownOutside={(evento) => registrarPonteiro(evento.detail.originalEvent)}
+        onEscapeKeyDown={registrarTeclado}
         onOpenAutoFocus={(evento) => {
           evento.preventDefault();
           menuRef.current
@@ -287,9 +311,12 @@ function MenuMovel({
         onCloseAutoFocus={(evento) => {
           // Chega depois de o Radix devolver o body; a marca já pode sair.
           raizRef.current?.removeAttribute("data-gaveta-aberta");
-          if (destinoFoco === "gatilho") return;
           evento.preventDefault();
+          if (destinoFoco === "gatilho") {
+            restaurarFoco(gatilhoRef.current, origemFocoRef.current);
+          }
           if (destinoFoco === "conteudo") conteudoRef.current?.focus();
+          origemFocoRef.current = undefined;
         }}
       >
         <DialogTitle className="sr-only">Menu do aplicativo</DialogTitle>

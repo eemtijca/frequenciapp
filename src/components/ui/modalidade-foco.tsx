@@ -3,6 +3,20 @@
 // Distingue o ponteiro do teclado sem alterar o foco do navegador.
 import { useEffect } from "react";
 
+export type OrigemFoco = "ponteiro" | "teclado";
+const restauracoes = new WeakMap<EventTarget, OrigemFoco>();
+
+/** Mantém a origem de uma devolução de foco conhecida, inclusive após animações. */
+export function restaurarFoco(elemento: HTMLElement | null, origem?: OrigemFoco) {
+  if (!elemento) return;
+  if (origem) restauracoes.set(elemento, origem);
+  try {
+    elemento.focus({ preventScroll: true });
+  } finally {
+    restauracoes.delete(elemento);
+  }
+}
+
 export function ModalidadeFoco() {
   useEffect(() => {
     const raiz = document.documentElement;
@@ -38,7 +52,9 @@ export function ModalidadeFoco() {
       return elemento?.closest("label")?.control === alvo;
     };
     const foco = (evento: FocusEvent) => {
-      const diretoDoPonteiro = pertenceAoPonteiro(evento.target);
+      const origem = evento.target ? restauracoes.get(evento.target) : undefined;
+      if (origem) raiz.dataset.modalidadeFoco = origem;
+      const diretoDoPonteiro = origem === "ponteiro" || pertenceAoPonteiro(evento.target);
       limparMarcador();
       if (!diretoDoPonteiro && raiz.dataset.modalidadeFoco !== "teclado") {
         if (evento.target instanceof Element) {
