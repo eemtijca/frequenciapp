@@ -1428,9 +1428,13 @@ async function aplicarSimulacao(
         simulacao.modalidade,
         new Date(inicio),
       );
-      // Coluna ou linha nova muda a assinatura: o esquema salvo acompanha,
+      // Coluna nova ou reordenada muda a assinatura: o esquema salvo acompanha,
       // para o próximo envio não pedir nova conferência de estrutura.
-      if (Number(contagens.colunasCriadas ?? 0) > 0 || Number(contagens.linhasCriadas ?? 0) > 0) {
+      if (
+        Number(contagens.colunasCriadas ?? 0) > 0 ||
+        Number(contagens.linhasCriadas ?? 0) > 0 ||
+        Number(contagens.colunasOrdenadas ?? 0) > 0
+      ) {
         try {
           await salvarEsquemaDaAba(await detectarAba(linha, plano.aba), linha);
         } catch {

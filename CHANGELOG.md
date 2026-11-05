@@ -282,6 +282,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As abas mensais da chamada mantêm os dias em ordem cronológica após envios retroativos, inclusive datas liberadas depois de feriado. Preparar o mês novamente corrige colunas já fora de ordem, preservando registros, fórmulas, notas e posições finais das colunas manuais.
+
 - O seletor passa a limitar a lista à altura disponível e a rolá-la, para que uma opção fora da primeira tela continue alcançável. Antes, a lista era cortada e o clique não chegava nela.
 
 - A Chamada Parcial mostra D para o aluno desistente, como a Chamada, no lugar de Presente. A rota de registros personalizados devolve a marca D com a descrição Desistente para quem segue na lista gravada da chamada, e a planilha da Chamada Parcial passa a receber Desistente em vez de Dia inteiro. O desistente também não pode mais ser editado pela Chamada Parcial.

@@ -159,7 +159,9 @@ async function diaLivreDoCalendario(): Promise<string> {
       where dia between '2024-02-01' and '2024-02-29'`,
   );
   const salvas = new Set(ocupadas.rows.map((linha) => linha.dia));
-  const dia = diasDaPlanilhaMensal(MES_CALENDARIO).find((data) => !salvas.has(data));
+  const dia = diasDaPlanilhaMensal(MES_CALENDARIO)
+    .slice(1, -1)
+    .find((data) => !salvas.has(data));
   if (!dia) throw new Error("Data útil livre ausente na massa mensal de teste.");
   return dia;
 }
@@ -648,6 +650,10 @@ describe("frequência organizada por turma e mês", () => {
       { aba: outubro.aba, resultado: "sucesso" },
     ]);
     expect(marca(outubro.aba, "03/10/2026")).toBe("F");
+    expect(cabecalho(outubro.aba).filter(Boolean)).toEqual([
+      "Aluno",
+      ...diasDaPlanilhaMensal("2026-10", ["2026-10-03"]).map(rotuloData),
+    ]);
     expect(cabecalho(outubro.aba)).not.toContain("04/10/2026");
     expect(cabecalho(outubro.aba)).not.toContain("Turma atual");
     const chamadas = await banco.query(
@@ -693,6 +699,10 @@ describe("frequência organizada por turma e mês", () => {
         )
         .toBe("SUCESSO:CONCLUIDO");
       expect(marca(outubro.aba, "10/10/2026")).toBe("P");
+      expect(cabecalho(outubro.aba).filter(Boolean)).toEqual([
+        "Aluno",
+        ...diasDaPlanilhaMensal("2026-10", ["2026-10-03", "2026-10-10"]).map(rotuloData),
+      ]);
       expect(cabecalho(outubro.aba)).not.toContain("11/10/2026");
       expect(cabecalho(outubro.aba)).not.toContain("17/10/2026");
       await dados<Mensal>(await preparar("2026-10"));
@@ -925,9 +935,10 @@ describe("frequência organizada por turma e mês", () => {
         { aba: preparada.aba, resultado: "sucesso" },
       ]);
       expect(marca(preparada.aba, rotuloData(dia))).toBe("F");
-      expect(cabecalho(preparada.aba).filter(Boolean).sort()).toEqual(
-        ["Aluno", ...diasDaPlanilhaMensal(MES_CALENDARIO).map(rotuloData)].sort(),
-      );
+      expect(cabecalho(preparada.aba).filter(Boolean)).toEqual([
+        "Aluno",
+        ...diasDaPlanilhaMensal(MES_CALENDARIO).map(rotuloData),
+      ]);
       expect(
         cabecalho(preparada.aba).filter((valor) => valor && valor !== rotuloData(dia)),
       ).toEqual(["Aluno", ...datas]);
@@ -1208,5 +1219,58 @@ describe("frequência organizada por turma e mês", () => {
     expect(google.valor(setembro, 2, colunaSetembro)).toBe("FJ");
     expect(google.valor(outubro, 2, colunaOutubro)).toBe("F");
     expect(google.valor(outubro, 3, colunaOutubro)).toBe("FJ");
+  });
+
+  it("recoloca o dia 28 antes do 29 no preparo, preservando colunas completas e posições manuais", async () => {
+    const outubro = mensais["2026-10"];
+    if (!outubro) throw new Error("Aba mensal ausente.");
+    const original = cabecalho(outubro.aba).filter(Boolean);
+    const coluna28 = original.indexOf("28/10/2026") + 1;
+    const coluna29 = original.indexOf("29/10/2026") + 1;
+    expect(coluna28).toBeGreaterThan(0);
+    expect(coluna29).toBeGreaterThan(coluna28);
+    google.definirValor(outubro.aba, 2, coluna28, "F");
+    google.definirNota(outubro.aba, 2, coluna28, "QA Nota de 28/10");
+    google.definirValor(outubro.aba, 2, coluna29, "FJ");
+    google.definirFormula(outubro.aba, 2, coluna29, '="FJ"');
+    // Reproduz a coluna retroativa acrescentada depois dos dias já existentes.
+    google.moverColuna(outubro.aba, coluna28, original.length);
+    const manual = original.length + 1;
+    const posicaoManual = coluna28 + 1;
+    google.definirValor(outubro.aba, 1, manual, "QA Observações");
+    google.definirValor(outubro.aba, 2, manual, "QA Complemento");
+    google.definirNota(outubro.aba, 2, manual, "QA Nota manual");
+    google.moverColuna(outubro.aba, manual, posicaoManual);
+    const esperado = [...original];
+    esperado.splice(posicaoManual - 1, 0, "QA Observações");
+    expect(cabecalho(outubro.aba).indexOf("29/10/2026")).toBeLessThan(
+      cabecalho(outubro.aba).indexOf("28/10/2026"),
+    );
+    const vinculos = google.vinculos(outubro.aba);
+    const escritas = google.chamadas().filter((acao) => acao === "gravar").length;
+    google.perderProximaResposta();
+    expect(await dados<Mensal>(await preparar("2026-10"))).toMatchObject({
+      destino: outubro.destino,
+      criada: false,
+      atualizada: true,
+    });
+    expect(cabecalho(outubro.aba).filter(Boolean)).toEqual(esperado);
+    expect(marca(outubro.aba, "28/10/2026")).toBe("F");
+    expect(marca(outubro.aba, "29/10/2026")).toBe("FJ");
+    const atual28 = esperado.indexOf("28/10/2026") + 1;
+    const atual29 = esperado.indexOf("29/10/2026") + 1;
+    expect(google.notaDe(outubro.aba, 2, atual28)).toBe("QA Nota de 28/10");
+    expect(google.formulaDe(outubro.aba, 2, atual29)).toBe('="FJ"');
+    expect(google.valor(outubro.aba, 2, posicaoManual)).toBe("QA Complemento");
+    expect(google.notaDe(outubro.aba, 2, posicaoManual)).toBe("QA Nota manual");
+    expect(google.vinculos(outubro.aba)).toEqual(vinculos);
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
+    expect(await dados<Mensal>(await preparar("2026-10"))).toMatchObject({
+      destino: outubro.destino,
+      criada: false,
+      atualizada: false,
+    });
+    expect(cabecalho(outubro.aba).filter(Boolean)).toEqual(esperado);
+    expect(google.chamadas().filter((acao) => acao === "gravar")).toHaveLength(escritas + 1);
   });
 });

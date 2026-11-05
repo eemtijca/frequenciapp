@@ -439,3 +439,147 @@ describe("escrita com ordenação de saídas por turma", () => {
     ).toThrow("Confira as células mescladas na tabela antes de ordenar as saídas.");
   });
 });
+
+function documentoMensal(colunas: number[]): DocumentoGoogle {
+  const mensal = structuredClone(documento);
+  const aba = mensal.sheets[0];
+  if (!aba) throw new Error("Aba mensal sintética ausente.");
+  aba.developerMetadata = [
+    ...[
+      ["frequenciapp.aba", "1"],
+      ["frequenciapp.turma", "10000000-0000-4000-8000-000000000001"],
+      ["frequenciapp.mes", "2026-10"],
+      ["frequenciapp.geracao", "20000000-0000-4000-8000-000000000001"],
+    ].flatMap(([metadataKey, metadataValue], indice) =>
+      metadataKey && metadataValue
+        ? [{ metadataId: indice + 10, metadataKey, metadataValue, location: { sheetId: 7 } }]
+        : [],
+    ),
+    ...colunas.map((coluna) => ({
+      metadataId: coluna + 20,
+      metadataKey: "frequenciapp.coluna",
+      metadataValue: "1",
+      location: {
+        dimensionRange: { sheetId: 7, startColumnIndex: coluna - 1, endColumnIndex: coluna },
+      },
+    })),
+  ];
+  return mensal;
+}
+
+describe("escrita mensal com dias cronológicos", () => {
+  it("grava a chamada retroativa antes de levar sua coluna para a posição cronológica", () => {
+    const linhas = [
+      ["Aluno", "27/10/2026", "29/10/2026"],
+      ["QA Aluno", "P", "FJ"],
+    ];
+    const plano = planejarEscritaGoogle(
+      documentoMensal([1, 2, 3]),
+      "Turma",
+      linhas,
+      [],
+      1,
+      assinarAba("Turma", linhas[0] ?? [], []),
+      [
+        { tipo: "inserirColunas", antesDe: null, cabecalhoLinha: 1, rotulos: ["28/10/2026"] },
+        { tipo: "preencher", linha: 2, coluna: 4, valor: "F", dia: "2026-10-28" },
+        { tipo: "ordenarAlunos", coluna: 1 },
+      ],
+      false,
+    );
+    expect(plano.requests.at(-1)).toEqual({
+      moveDimension: {
+        source: { sheetId: 7, dimension: "COLUMNS", startIndex: 3, endIndex: 4 },
+        destinationIndex: 2,
+      },
+    });
+    expect(plano.requests.at(-2)).toMatchObject({
+      updateCells: {
+        range: { startRowIndex: 1, startColumnIndex: 3 },
+        rows: [{ values: [{ userEnteredValue: { stringValue: "F" } }] }],
+      },
+    });
+    expect(plano.contagens).toMatchObject({
+      preenchidas: 1,
+      colunasCriadas: 1,
+      colunasOrdenadas: 1,
+    });
+    expect(plano.diasBloqueados).toEqual([]);
+    expect(plano.destrutiva).toBe(false);
+    expect(linhas).toEqual([
+      ["Aluno", "27/10/2026", "29/10/2026"],
+      ["QA Aluno", "P", "FJ"],
+    ]);
+  });
+
+  it("preserva todos os marcadores ao inserir antes de datas que já estão fora de ordem", () => {
+    const linhas = [
+      ["Aluno", "30/10/2026", "29/10/2026"],
+      ["QA Aluno", "P", "FJ"],
+    ];
+    const plano = planejarEscritaGoogle(
+      documentoMensal([1, 2, 3]),
+      "Turma",
+      linhas,
+      [],
+      1,
+      assinarAba("Turma", linhas[0] ?? [], []),
+      [{ tipo: "inserirColunas", antesDe: 2, cabecalhoLinha: 1, rotulos: ["28/10/2026"] }],
+      false,
+    );
+    expect(plano.requests.at(-1)).toEqual({
+      moveDimension: {
+        source: { sheetId: 7, dimension: "COLUMNS", startIndex: 3, endIndex: 4 },
+        destinationIndex: 2,
+      },
+    });
+    expect(plano.contagens.colunasOrdenadas).toBe(1);
+  });
+
+  it("recalcula os marcadores depois de retirar uma coluna anterior às datas fora de ordem", () => {
+    const linhas = [["Aluno", "27/10/2026", "29/10/2026", "28/10/2026"], ["QA Aluno"]];
+    const plano = planejarEscritaGoogle(
+      documentoMensal([1, 2, 3, 4]),
+      "Turma",
+      linhas,
+      [],
+      1,
+      assinarAba("Turma", linhas[0] ?? [], []),
+      [{ tipo: "removerColunas", colunas: [2] }],
+      true,
+    );
+    expect(plano.requests).toEqual([
+      {
+        deleteDimension: {
+          range: { sheetId: 7, dimension: "COLUMNS", startIndex: 1, endIndex: 2 },
+        },
+      },
+      {
+        moveDimension: {
+          source: { sheetId: 7, dimension: "COLUMNS", startIndex: 2, endIndex: 3 },
+          destinationIndex: 1,
+        },
+      },
+    ]);
+    expect(plano.contagens.colunasOrdenadas).toBe(1);
+  });
+
+  it("mantém a posição das datas em abas sem identificação mensal", () => {
+    const linhas = [
+      ["Aluno", "29/10/2026", "28/10/2026"],
+      ["QA Aluno", "P", "F"],
+    ];
+    const plano = planejarEscritaGoogle(
+      documento,
+      "Turma",
+      linhas,
+      [],
+      1,
+      assinarAba("Turma", linhas[0] ?? [], []),
+      [{ tipo: "ordenarAlunos", coluna: 1 }],
+      false,
+    );
+    expect(plano.requests).toEqual([]);
+    expect(plano.contagens.colunasOrdenadas ?? 0).toBe(0);
+  });
+});

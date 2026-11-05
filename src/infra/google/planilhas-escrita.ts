@@ -9,6 +9,7 @@ import {
   planejarOrdenacaoLinhasPlanilha,
 } from "@/domain/ordenacao-planilha";
 import type { AbaMensalPlanilha } from "@/domain/planilha-mensal";
+import { planejarOrdemDiasGoogle } from "./planilhas-ordem-dias";
 import { controleTravaPlanilhaFrequencia } from "../trava-planilha-frequencia";
 import { controleTravaPlanilhaMovimentacoes } from "../trava-planilha-movimentacoes";
 import { ErroHttp } from "@/infra/erros";
@@ -21,6 +22,7 @@ import {
   marcadoresDaAba,
   mesclagensDaAssinatura,
   metadadosDaAba,
+  mensalDaAbaGoogle,
   invalidarDocumentoGoogle,
   motivoDoGoogle,
   type DocumentoGoogle,
@@ -342,7 +344,8 @@ export function planejarEscritaGoogle(
   const diasBloqueados = new Set<string>();
   const metadados = metadadosDaAba(doc, aba);
   let linhasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.linha", "ROWS"));
-  const colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
+  let colunasCriadas = new Set(marcadoresDaAba(doc, aba, "frequenciapp.coluna", "COLUMNS"));
+  const mesclagens = (aba.merges ?? []).map((mesclagem) => ({ ...mesclagem }));
   const vinculos = metadados.filter((item) => item.metadataKey === "frequenciapp.aluno");
   let linhasOrdenaveis = new Set([
     ...linhasCriadas,
@@ -444,11 +447,16 @@ export function planejarEscritaGoogle(
       for (const fileira of formulas)
         fileira.splice(antes - 1, 0, ...item.rotulos.map(() => false));
       posicoesColunas.splice(antes - 1, 0, ...item.rotulos.map(() => null));
-      for (const marcada of [...colunasCriadas]) {
-        if (marcada >= antes) {
-          colunasCriadas.delete(marcada);
-          colunasCriadas.add(marcada + item.rotulos.length);
-        }
+      colunasCriadas = new Set(
+        [...colunasCriadas].map((marcada) =>
+          marcada >= antes ? marcada + item.rotulos.length : marcada,
+        ),
+      );
+      for (const mesclagem of mesclagens) {
+        if ((mesclagem.startColumnIndex ?? 0) >= antes - 1)
+          mesclagem.startColumnIndex = (mesclagem.startColumnIndex ?? 0) + item.rotulos.length;
+        if (mesclagem.endColumnIndex !== undefined && mesclagem.endColumnIndex > antes - 1)
+          mesclagem.endColumnIndex += item.rotulos.length;
       }
       item.rotulos.forEach((rotulo, indice) => {
         const coluna = antes + indice;
@@ -555,7 +563,17 @@ export function planejarEscritaGoogle(
         for (const fileira of valores) fileira.splice(coluna - 1, 1);
         for (const fileira of formulas) fileira.splice(coluna - 1, 1);
         posicoesColunas.splice(coluna - 1, 1);
-        colunasCriadas.delete(coluna);
+        colunasCriadas = new Set(
+          [...colunasCriadas]
+            .filter((atual) => atual !== coluna)
+            .map((atual) => (atual > coluna ? atual - 1 : atual)),
+        );
+        for (const mesclagem of mesclagens) {
+          if ((mesclagem.startColumnIndex ?? 0) >= coluna)
+            mesclagem.startColumnIndex = (mesclagem.startColumnIndex ?? 0) - 1;
+          if (mesclagem.endColumnIndex !== undefined && mesclagem.endColumnIndex >= coluna)
+            mesclagem.endColumnIndex -= 1;
+        }
         capacidadeColunas -= 1;
         contar("removidasColunas");
       }
@@ -663,6 +681,20 @@ export function planejarEscritaGoogle(
         );
       }
     }
+  }
+  const mensal = mensalDaAbaGoogle(doc, aba);
+  if (mensal) {
+    // Só move as colunas depois das escritas, que ainda usam as coordenadas da prévia.
+    const ordenacao = planejarOrdemDiasGoogle(
+      sheetId,
+      mensal.mes,
+      valores[cabecalhoLinha - 1] ?? [],
+      formulas[cabecalhoLinha - 1] ?? [],
+      colunasCriadas,
+      mesclagens,
+    );
+    requests.push(...ordenacao);
+    if (ordenacao.length > 0) contagens.colunasOrdenadas = ordenacao.length;
   }
   return {
     requests,
