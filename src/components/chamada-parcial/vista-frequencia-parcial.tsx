@@ -686,7 +686,7 @@ export default function VistaFrequenciaParcial({
               Carregando chamada parcial...
             </p>
           ) : (
-            <div className="superficie overflow-hidden">
+            <div className="superficie @container overflow-hidden">
               <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
                 <span className="numerais-tabulares">
                   {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
@@ -713,7 +713,8 @@ export default function VistaFrequenciaParcial({
                 </p>
               ) : (
                 <div>
-                  <div className="text-muted-foreground bg-secondary/40 hidden grid-cols-[minmax(0,1fr)_11rem_9rem_auto] items-center gap-3 border-b px-4 py-2 text-xs font-medium md:grid">
+                  {/* As colunas fixas e o nome precisam caber no cartão, não apenas na tela. */}
+                  <div className="text-muted-foreground bg-secondary/40 hidden grid-cols-[minmax(0,1fr)_11rem_9rem_13rem] items-center gap-3 border-b px-4 py-2 text-xs font-medium @min-[48rem]:grid">
                     <span>Aluno</span>
                     <span>Situação</span>
                     <span>Registro na Seduc</span>
@@ -734,14 +735,14 @@ export default function VistaFrequenciaParcial({
                         >
                           {/* No celular: nome e situação à esquerda, ações à direita e a
                               Seduc embaixo, só quando existe. No desktop, uma coluna para cada. */}
-                          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 md:grid-cols-[minmax(0,1fr)_11rem_9rem_auto]">
+                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center gap-x-3 gap-y-1 @min-[48rem]:grid-cols-[minmax(0,1fr)_11rem_9rem_13rem]">
                             <div className="col-start-1 row-start-1 min-w-0">
                               <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
                               {aluno.desistente && (
                                 <span className="text-muted-foreground text-xs">Desistente</span>
                               )}
                             </div>
-                            <div className="col-start-1 row-start-2 min-w-0 md:col-start-2 md:row-start-1">
+                            <div className="col-start-1 row-start-2 min-w-0 @min-[48rem]:col-start-2 @min-[48rem]:row-start-1">
                               <span
                                 title={aluno.desistente ? "Desistente" : resumo}
                                 className={cn(
@@ -765,10 +766,10 @@ export default function VistaFrequenciaParcial({
                               </span>
                             </div>
                             {exigeConferenciaSeduc(registro) && (
-                              <div className="col-span-2 row-start-3 flex items-center gap-2 pt-1 md:col-span-1 md:col-start-3 md:row-start-1 md:pt-0">
+                              <div className="col-span-2 row-start-3 flex items-center gap-2 pt-1 @min-[48rem]:col-span-1 @min-[48rem]:col-start-3 @min-[48rem]:row-start-1 @min-[48rem]:pt-0">
                                 <Label
                                   htmlFor={`parcial-seduc-${aluno.id}`}
-                                  className="text-xs md:sr-only"
+                                  className="text-xs @min-[48rem]:sr-only"
                                   title="Registro na Seduc"
                                 >
                                   Registro na Seduc
@@ -787,7 +788,7 @@ export default function VistaFrequenciaParcial({
                                 />
                               </div>
                             )}
-                            <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1 md:col-start-4 md:row-span-1">
+                            <div className="col-start-2 row-span-2 row-start-1 flex flex-wrap justify-end gap-1 @min-[48rem]:col-start-4 @min-[48rem]:row-span-1">
                               <Button
                                 type="button"
                                 variant="secondary"
