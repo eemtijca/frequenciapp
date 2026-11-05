@@ -201,12 +201,9 @@
     }
   }
 
-  .controle:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
-  .campo:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
-  .campo:has(:focus-visible):not(:where(html[data-modalidade-foco="ponteiro"] *)),
-  .discreto:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
-  .primario:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
-  .destrutivo:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
+  /* O contorno de foco é definido uma vez em globals.css. Aqui fica apenas o
+     caso composto do campo que contém o controle focado. */
+  .campo:has(:focus-visible):not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -341,18 +338,7 @@
 
 /* Foco visível também nas cores forçadas, acima das utilidades de outline. */
 @media (forced-colors: active) {
-  :where(
-      button,
-      a,
-      input,
-      select,
-      textarea,
-      [role="button"],
-      [role="tab"],
-      [role="radio"],
-      [role="spinbutton"],
-      [role="option"]
-    ):focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
+  :focus-visible:not([tabindex="-1"]):not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }

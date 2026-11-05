@@ -360,32 +360,14 @@ input[type="month"] {
   [role="button"] {
     touch-action: manipulation;
   }
-  /* O navegador pode manter :focus-visible após clicar no controle já focado. */
-  html[data-modalidade-foco="ponteiro"]
-    :where(
-      button,
-      a,
-      input,
-      select,
-      textarea,
-      [role="button"],
-      [role="tab"],
-      [role="radio"],
-      [role="spinbutton"]
-    ):focus-visible {
+  /* O ponteiro não deixa contorno, inclusive quando o navegador mantém
+     :focus-visible após clicar no controle já focado. */
+  html[data-modalidade-foco="ponteiro"] :focus {
     outline: none;
   }
-  :where(
-      button,
-      a,
-      input,
-      select,
-      textarea,
-      [role="button"],
-      [role="tab"],
-      [role="radio"],
-      [role="spinbutton"]
-    ):focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
+  /* Teclado e foco de origem desconhecida mantêm o indicador em qualquer
+     elemento focável, não apenas nos controles nativos. */
+  :focus-visible:not([tabindex="-1"]):not(:where(html[data-modalidade-foco="ponteiro"] *)) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -393,7 +375,7 @@ input[type="month"] {
 
 /* A origem pode ser programática ou tecnologia assistiva, mesmo após clique. */
 @media (forced-colors: none) {
-  [data-foco-desconhecido]:focus {
+  html[data-foco-desconhecido] :focus {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
@@ -401,7 +383,7 @@ input[type="month"] {
 
 @media (forced-colors: active) {
   /* Seleção continua identificável pela borda quando o contorno mostra o foco. */
-  [data-foco-desconhecido]:focus {
+  html[data-foco-desconhecido] :focus {
     outline: 2px solid Highlight;
     outline-offset: 2px;
   }
