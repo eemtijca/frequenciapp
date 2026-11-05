@@ -65,6 +65,7 @@ export function ModalidadeFoco() {
     const foco = (evento: FocusEvent) => {
       const alvo = evento.target;
       const origem = alvo ? restauracoes.get(alvo) : undefined;
+      if (origem) raiz.dataset.modalidadeFoco = origem;
       if (origem === "ponteiro") ultimoPonteiroEm = performance.now();
       if (origem === "teclado") ultimoPonteiroEm = Number.NEGATIVE_INFINITY;
       const diretoDoPonteiro = origem === "ponteiro" || pertenceAoPonteiro(alvo);
