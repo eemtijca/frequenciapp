@@ -13,16 +13,20 @@ const turma: Turma = {
   serieNome: serie.nome,
   horarios: [],
 };
-const alunos: Aluno[] = ["Presente", "Justificado", "Parcial", "Sem registro"].map(
-  (nome, indice) => ({
-    id: `aluno-${indice}`,
-    nome: `Aluno ${nome}`,
-    turmaId: turma.id,
-    turmaOriginalId: turma.id,
-    ordem: indice,
-    ativo: true,
-  }),
-);
+const alunos: Aluno[] = [
+  "Presente",
+  "Justificado",
+  "Parcial",
+  "Sem registro",
+  "Maria Eduarda de Albuquerque e Silva",
+].map((nome, indice) => ({
+  id: `aluno-${indice}`,
+  nome: `Aluno ${nome}`,
+  turmaId: turma.id,
+  turmaOriginalId: turma.id,
+  ordem: indice,
+  ativo: true,
+}));
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
 createRoot(raiz).render(

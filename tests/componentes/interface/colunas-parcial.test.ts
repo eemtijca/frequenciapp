@@ -49,7 +49,7 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
       [16, 20].map((fonte) => ({ width, fonte, coluna: 0 })),
     ),
     ...[16, 20].flatMap((fonte) =>
-      [480, 43 * fonte, 43 * fonte + 4].map((coluna) => ({ width: 1440, fonte, coluna })),
+      [480, 48 * fonte, 48 * fonte + 4].map((coluna) => ({ width: 1440, fonte, coluna })),
     ),
   ]) {
     for (const tema of ["light", "dark"]) {
@@ -182,7 +182,7 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
         expect(geometria.fonte).toBe(fonte);
         expect(geometria.menu).toBe(width >= 1024 ? 15 * fonte : 0);
         expect(geometria.padding).toBe((width >= 1024 ? 2 : width >= 640 ? 1.5 : 1) * fonte);
-        expect(geometria.desktop).toBe(geometria.largura - 2 >= 43 * fonte);
+        expect(geometria.desktop).toBe(geometria.largura - 2 >= 48 * fonte);
         const erros = await page.evaluate(() => {
           const erros: string[] = [];
           const secao = document.querySelector('[data-testid="chamada-parcial"]');
@@ -197,7 +197,7 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
           const colunas = cabecalho.parentElement?.children;
           if (!colunas || colunas.length !== 4 || !colunas[1] || !colunas[2] || !colunas[3])
             return ["Colunas ausentes"];
-          if (lista.children.length !== 4) return ["Quantidade de linhas incorreta"];
+          if (lista.children.length !== 5) return ["Quantidade de linhas incorreta"];
           const cabSituacao = colunas[1].getBoundingClientRect();
           const cabSeduc = colunas[2].getBoundingClientRect();
           const cabAcoes = colunas[3].getBoundingClientRect();
