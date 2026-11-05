@@ -17,6 +17,82 @@ async function conferirFocoNoDialogo(dialogo: Locator): Promise<void> {
 }
 
 test.describe("menu lateral", () => {
+  for (const forcedColors of ["none", "active"] as const) {
+    test(`devolve foco sem contorno após ponteiro e preserva teclado (cores forçadas: ${forcedColors})`, async ({
+      page,
+      hasTouch,
+    }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce", forcedColors });
+      await page.addInitScript(() => localStorage.setItem("theme", "system"));
+      await page.goto("/");
+      await aguardarHidratacao(page);
+      const abrir = page.getByRole("button", { name: "Abrir menu", exact: true });
+      const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
+      const fechar = menu.getByRole("button", { name: "Fechar menu", exact: true });
+      const acionar = async (alvo: Locator, position?: { x: number; y: number }) => {
+        if (hasTouch) await alvo.tap({ position });
+        else await alvo.click({ position });
+      };
+      const indicadores = () =>
+        abrir.evaluate((elemento) => {
+          const estilo = getComputedStyle(elemento);
+          return {
+            contorno: estilo.outlineStyle,
+            largura: estilo.outlineWidth,
+            sombra: estilo.boxShadow,
+            sombraDepois: getComputedStyle(elemento, "::after").boxShadow,
+          };
+        });
+      const semFoco = await indicadores();
+      const conferirRetorno = async (visivel: boolean) => {
+        await expect(menu).toBeHidden();
+        await expect(abrir).toBeFocused();
+        await expect(abrir).toHaveAttribute("aria-expanded", "false");
+        if (visivel) {
+          await expect(abrir).toHaveCSS("outline-style", "solid");
+          await expect(abrir).toHaveCSS("outline-width", "2px");
+        } else {
+          await expect.poll(indicadores).toEqual(semFoco);
+        }
+      };
+
+      for (const destino of ["botao", "veu", "secao"] as const) {
+        await acionar(abrir);
+        await expect(menu).toBeVisible();
+        if (destino === "botao") await acionar(fechar);
+        else if (destino === "veu") {
+          await acionar(page.locator('[data-slot="dialog-veu"]'), { x: 387, y: 422 });
+        } else {
+          await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
+        }
+        await conferirRetorno(false);
+      }
+
+      await page.keyboard.press("Enter");
+      await expect(menu).toBeVisible();
+      await page.keyboard.press("Escape");
+      await conferirRetorno(true);
+
+      // A última interação determina o contorno, mesmo quando a abertura foi por outra via.
+      await acionar(abrir);
+      await expect(menu).toBeVisible();
+      await page.keyboard.press("Escape");
+      await conferirRetorno(true);
+
+      await page.keyboard.press("Enter");
+      await expect(menu).toBeVisible();
+      await acionar(fechar);
+      await conferirRetorno(false);
+
+      await page.keyboard.press("Tab");
+      const atualizar = page.getByRole("banner").getByRole("button", { name: "Atualizar tela" });
+      await expect(atualizar).toBeFocused();
+      await expect(atualizar).toHaveCSS("outline-style", "solid");
+      await expect(atualizar).toHaveCSS("outline-width", "2px");
+    });
+  }
+
   test("abre pelo teclado, contém o foco e devolve o foco ao fechar", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");

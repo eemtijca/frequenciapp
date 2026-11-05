@@ -44,6 +44,7 @@ for (const tema of ["light", "dark"] as const) {
     await fechar.click();
     const abrir = cabecalho.getByRole("button", { name: "Abrir menu" });
     await expect(abrir).toBeFocused();
+    await expect(abrir).toHaveCSS("outline-style", "none");
     const atualizar = cabecalho.getByRole("button", { name: "Atualizar tela" });
     await expect(atualizar).toBeEnabled();
     await page.keyboard.press("Tab");
