@@ -1,0 +1,17 @@
+{{- if and .Values.backup.enabled .Values.backup.database.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-backup
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.backup.database.persistence.accessModes | nindent 4 }}
+  {{- with .Values.backup.database.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.database.persistence.size }}
+{{- end }}

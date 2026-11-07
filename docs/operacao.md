@@ -139,6 +139,8 @@ pg_dump "$DIRECT_URL" -F c -f frequenciapp-$(date +%F).dump
 
 Frequência sugerida: diária para uso letivo ativo. O arquivo é pequeno, texto puro comprimido, e cobre a totalidade dos dados.
 
+Em servidor auto-hospedado, a rotina de [backup-servidor.md](backup-servidor.md) executa o dump, cifra com GPG ou age, copia para um diretório local, envia por rclone e confere o SHA-256 da cópia remota. A restauração também tem script e runbook próprios.
+
 ### Cópia JSON pela Gestão
 
 A administração também pode baixar e importar uma cópia JSON em Gestão, Configurações, Cópia de segurança. O download exige a senha atual da administração e oferece ZIP protegido por senha; extrair o JSON antes de importar. Ela reúne séries, turmas, aulas, alunos, chamadas, saídas e configurações, serve para migração entre instalações e conferência, e a importação mescla sem sobrescrever o que já existe. A cópia JSON não substitui o `pg_dump`: para restauração completa e rotinas de operação, use o dump do banco. Cuidados em [downloads.md](downloads.md).
@@ -215,6 +217,8 @@ pnpm run build
 ```
 
 As migrations são aditivas por padrão. O changelog avisa quando houver passo destrutivo.
+
+Em servidor com Compose, a rotina de [auto-hospedagem.md](auto-hospedagem.md) faz backup, valida a configuração, baixa ou constrói a imagem, aplica a atualização, confere a saúde e executa rollback em caso de falha. Migrações novas bloqueiam a atualização automática por padrão.
 
 ## Operação do FrequenciBI
 

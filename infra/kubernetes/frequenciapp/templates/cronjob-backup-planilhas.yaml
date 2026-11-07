@@ -1,0 +1,74 @@
+{{- if and .Values.backup.enabled .Values.backup.spreadsheets.enabled }}
+{{- $segredoPlanilhas := required "Defina backup.spreadsheets.existingSecret" .Values.backup.spreadsheets.existingSecret -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-backup-planilhas
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.spreadsheets.schedule | quote }}
+  concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "frequenciapp.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: backup-planilhas
+              image: {{ include "frequenciapp.backupImage" . | quote }}
+              imagePullPolicy: {{ .Values.backupImage.pullPolicy }}
+              command: ["bash", "scripts/servidor/backup-planilhas-interno.sh"]
+              envFrom:
+                - secretRef:
+                    name: {{ $segredoPlanilhas }}
+              env:
+                - name: BACKUP_RCLONE_CONFIG
+                  value: /etc/frequenciapp/rclone.conf
+                - name: BACKUP_PLANILHAS_LOCAL
+                  value: {{ and .Values.backup.spreadsheets.local .Values.backup.database.persistence.enabled | quote }}
+                - name: BACKUP_PLANILHAS_DIR
+                  value: /backups/planilhas
+                - name: HOME
+                  value: /tmp
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              volumeMounts:
+                - name: arquivos-backup
+                  mountPath: /etc/frequenciapp
+                  readOnly: true
+                - name: backups
+                  mountPath: /backups
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: arquivos-backup
+              secret:
+                secretName: {{ include "frequenciapp.backupFilesSecret" . }}
+                defaultMode: 0440
+            - name: backups
+              {{- if .Values.backup.database.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "frequenciapp.fullname" . }}-backup
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

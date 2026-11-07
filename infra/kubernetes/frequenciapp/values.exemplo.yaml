@@ -1,0 +1,40 @@
+# Exemplo de valores de produção. Copie para um arquivo privado fora do Git.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/eemtijca/frequenciapp
+  tag: "1.2.3"
+
+backupImage:
+  repository: ghcr.io/eemtijca/frequenciapp-backup
+  tag: "1.2.3"
+
+existingSecret: frequenciapp-segredos
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-producao
+  hosts:
+    - host: frequencia.exemplo.br
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: frequenciapp-tls
+      hosts:
+        - frequencia.exemplo.br
+
+backup:
+  enabled: true
+  filesSecret: frequenciapp-backup-arquivos
+  database:
+    enabled: true
+    existingSecret: frequenciapp-backup-banco
+    persistence:
+      enabled: true
+      size: 20Gi
+  spreadsheets:
+    enabled: true
+    existingSecret: frequenciapp-backup-planilhas

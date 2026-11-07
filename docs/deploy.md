@@ -49,6 +49,14 @@ docker compose -p frequenciapp-test down -v --remove-orphans
 
 Se a migration inicial for recriada durante o desenvolvimento, bancos antigos precisam ser removidos ou recriados. O comando `pnpm exec prisma migrate reset --force` também serve para um ambiente local descartável.
 
+## Servidor auto-hospedado
+
+O repositório inclui referências para VPS, servidor dedicado e máquina on-premises, com Caddy ou Nginx, TLS público ou interno, backup do banco e atualização por cron. O guia está em [auto-hospedagem.md](auto-hospedagem.md) e o backup em [backup-servidor.md](backup-servidor.md).
+
+A aplicação e o banco não publicam portas no host. Apenas o proxy publica 80 e 443. As migrações continuam no entrypoint por padrão; em plataformas que rodam a migração em Job separado, usar `MIGRAR_NA_PARTIDA=false` e executar `node ./docker/app/migrar.mjs` antes da aplicação.
+
+O backup do banco usa `pg_dump`, GPG ou age, rclone e verificação por download. O backup das planilhas usa a rotina existente em um contêiner com rclone. As duas rotinas são independentes.
+
 ## Imagem avulsa
 
 ```bash
@@ -182,14 +190,29 @@ Os workflows ficam em `.github/workflows/`:
 | `schema-preview.yml` | Schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal |
 | `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                               |
 | `publicacao.yml`     | Publicação da imagem no GHCR                                                  |
+| `servidor.yml`       | Validação de Compose, Caddy, Nginx, scripts e workflows de servidor           |
+
+### Automação opcional por variável
+
+Os workflows de operação continuam disponíveis para nuvem e podem ser desativados numa instalação auto-hospedada:
+
+| Variável                  | Efeito                                                  |
+| ------------------------- | ------------------------------------------------------- |
+| `DEPLOY_TARGET=servidor`  | Ignora deploy, migração de produção e preview de Vercel |
+| `AGENDA_EXTERNA=servidor` | Ignora as agendas de notificações e fila no GitHub      |
+| `BACKUP_EXTERNO=servidor` | Ignora o backup externo de planilhas no GitHub          |
+
+Sem as variáveis, o comportamento anterior é preservado. Os valores podem ser definidos com `gh variable set DEPLOY_TARGET --body servidor`.
 
 Para acompanhar e operar workflows e releases pelo terminal, use o GitHub CLI (`gh`): confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Depois use `gh run list`, `gh run watch`, `gh run view --log-failed`, `gh pr checks --watch` e `gh release create`. Nunca inclua segredos em comandos.
 
 O Dependabot atualiza as dependências (ecossistema npm, com `pnpm-lock.yaml`), o GitHub Actions e o Docker semanalmente, agrupando versões minor e patch.
 
+A publicação de release gera imagens `linux/amd64` e `linux/arm64` para a aplicação e para `frequenciapp-backup`. A imagem de backup deriva da aplicação e acrescenta PostgreSQL 17, rclone, GPG e age.
+
 ## VPS sem TLS (rede interna)
 
-Quando não há proxy reverso com TLS, defina no `.env`:
+Para a referência completa com proxy e TLS, consultar [auto-hospedagem.md](auto-hospedagem.md). Quando não há proxy reverso com TLS, defina no `.env`:
 
 ```text
 PERMITIR_HTTP=true

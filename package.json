@@ -48,6 +48,7 @@
     "infra:floci:aws": "bash infra/floci/testar.sh aws",
     "infra:floci:azure": "bash infra/floci/testar.sh azure",
     "infra:floci:gcp": "bash infra/floci/testar.sh gcp",
+    "servidor:validar": "bash infra/servidor/validar.sh",
     "postinstall": "prisma generate && node scripts/assets/copiar-swagger-ui.mjs"
   },
   "dependencies": {

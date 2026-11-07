@@ -40,6 +40,7 @@ jobs:
   preparar:
     name: Preparar schema do preview
     if: >-
+      (vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel') &&
       github.event_name == 'pull_request' &&
       github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -75,6 +76,7 @@ jobs:
   limpar:
     name: Limpar schema do preview
     if: >-
+      (vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel') &&
       github.event_name == 'pull_request' &&
       github.event.action == 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository
@@ -105,8 +107,9 @@ jobs:
   fallback:
     name: Atualizar schema de fallback
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'fallback')
+      (vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel') &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'fallback'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: preview
@@ -135,8 +138,9 @@ jobs:
   faxina:
     name: Faxina dos schemas de preview
     if: >-
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'faxina')
+      (vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel') &&
+      (github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.acao == 'faxina'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: preview

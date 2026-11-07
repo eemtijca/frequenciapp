@@ -3,7 +3,8 @@ name: Infraestrutura
 on:
   pull_request:
     paths:
-      - "infra/**"
+      - "infra/terraform/**"
+      - "infra/floci/**"
       - ".github/workflows/infra.yml"
   workflow_dispatch:
 

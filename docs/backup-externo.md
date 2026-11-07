@@ -2,7 +2,7 @@
 
 Rotina opcional para copiar as planilhas para um armazenamento escolhido pela escola, sem SDK ou biblioteca de provedor no FrequenciApp. O transporte usa o executável externo rclone. Origem e destino ficam na configuração do executor: Dropbox, outro serviço compatível ou disco local. Trocar o destino não altera o pacote, o banco nem a aplicação.
 
-A rotina roda fora da Vercel e do processo que atende o celular, em executor Linux com Node 24, dependências do projeto instaladas e rclone disponível no `PATH`. O workflow do GitHub Actions agenda a execução pela madrugada quando publicado na branch padrão e configurado com os secrets. Um executor próprio também pode usar cron. Nenhum arquivo real é enviado na instalação ou nos testes.
+A rotina roda fora da Vercel e do processo que atende o celular, em executor Linux com Node 24, dependências do projeto instaladas e rclone disponível no `PATH`. Em servidor auto-hospedado, ela pode rodar no contêiner `backup-planilhas` descrito em [backup-servidor.md](backup-servidor.md), sem Node no host. O workflow do GitHub Actions continua como opção para nuvem e pode ser desativado com `BACKUP_EXTERNO=servidor`. Um executor próprio também pode usar cron. Nenhum arquivo real é enviado na instalação ou nos testes.
 
 ## Proteções
 

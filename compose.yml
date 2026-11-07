@@ -8,17 +8,18 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: frequencia
-      POSTGRES_PASSWORD: frequencia
-      POSTGRES_DB: frequencia
-    # Só o próprio host alcança o banco: a senha fixa abaixo não pode ficar
+      POSTGRES_USER: ${POSTGRES_USER:-frequencia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-frequencia}
+      POSTGRES_DB: ${POSTGRES_DB:-frequencia}
+    # Só o próprio host alcança o banco: a senha padrão abaixo não pode ficar
     # exposta na rede. Os comandos do host e o CI usam localhost.
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U frequencia -d frequencia"]
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-frequencia} -d ${POSTGRES_DB:-frequencia}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -26,6 +27,7 @@ services:
 
   app:
     build: .
+    image: ${APP_IMAGEM:-frequenciapp:local}
     restart: unless-stopped
     depends_on:
       db:
@@ -33,9 +35,11 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
-      DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+      DATABASE_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
+      DIRECT_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      COMMIT_SHA: ${COMMIT_SHA:-}
+      MIGRAR_NA_PARTIDA: ${MIGRAR_NA_PARTIDA:-true}
       PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}

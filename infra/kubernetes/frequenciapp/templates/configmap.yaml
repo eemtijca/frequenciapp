@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+data:
+  TZ_APP: {{ .Values.config.TZ_APP | quote }}
+  PERMITIR_HTTP: {{ .Values.config.PERMITIR_HTTP | quote }}
+  MIGRAR_NA_PARTIDA: {{ .Values.config.MIGRAR_NA_PARTIDA | quote }}
+  TMPDIR: /tmp

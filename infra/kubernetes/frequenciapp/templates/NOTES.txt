@@ -1,0 +1,23 @@
+FrequenciApp instalado no namespace {{ .Release.Namespace }}.
+
+Serviço interno:
+  http://{{ include "frequenciapp.fullname" . }}:{{ .Values.service.port }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress:
+{{- range .Values.ingress.hosts }}
+  https://{{ .host }}
+{{- end }}
+{{- else }}
+
+O Ingress está desativado. Configure a exposição externa para usar HTTPS.
+{{- end }}
+
+Agenda: {{ ternary "ativa" "desativada" .Values.agenda.enabled }}
+Backup: {{ ternary "ativo" "desativado" .Values.backup.enabled }}
+
+As migrações rodam no initContainer com a mesma imagem da aplicação.
+O contêiner principal usa MIGRAR_NA_PARTIDA=false.
+
+Segredos não são criados a partir de values em produção. Use existingSecret.

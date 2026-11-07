@@ -1,0 +1,94 @@
+{{- if and .Values.backup.enabled .Values.backup.database.enabled }}
+{{- $segredoBanco := required "Defina backup.database.existingSecret" .Values.backup.database.existingSecret -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-backup-banco
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.backup.database.schedule | quote }}
+  concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.backup.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.backup.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "frequenciapp.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: backup-banco
+              image: {{ include "frequenciapp.backupImage" . | quote }}
+              imagePullPolicy: {{ .Values.backupImage.pullPolicy }}
+              command: ["bash", "scripts/servidor/backup-banco.sh"]
+              envFrom:
+                - secretRef:
+                    name: {{ $segredoBanco }}
+              env:
+                - name: BACKUP_MODO
+                  value: url
+                - name: SERVIDOR_AMBIENTE_INJETADO
+                  value: "true"
+                - name: BACKUP_INCLUIR_AMBIENTE
+                  value: "false"
+                - name: BACKUP_DIR
+                  value: /backups
+                - name: BACKUP_BANCO_DIR
+                  value: /backups/banco
+                - name: ESTADO_DIR
+                  value: /state
+                - name: BACKUP_RCLONE_CONFIG
+                  value: /etc/frequenciapp/rclone.conf
+                - name: BACKUP_GPG_CHAVE_PUBLICA
+                  value: /etc/frequenciapp/backup-publica.asc
+                - name: BACKUP_AGE_DESTINATARIOS
+                  value: /etc/frequenciapp/age-recipients.txt
+                - name: BACKUP_VERIFICAR_REMOTO
+                  value: "true"
+                - name: BACKUP_RETER_DIAS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                - name: BACKUP_ESPACO_MINIMO_MB
+                  value: {{ .Values.backup.minimumSpaceMB | quote }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              volumeMounts:
+                - name: arquivos-backup
+                  mountPath: /etc/frequenciapp
+                  readOnly: true
+                - name: backups
+                  mountPath: /backups
+                - name: estado
+                  mountPath: /state
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: arquivos-backup
+              secret:
+                secretName: {{ include "frequenciapp.backupFilesSecret" . }}
+                defaultMode: 0440
+            - name: backups
+              {{- if .Values.backup.database.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "frequenciapp.fullname" . }}-backup
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            - name: estado
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

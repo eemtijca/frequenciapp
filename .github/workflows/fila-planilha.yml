@@ -15,6 +15,7 @@ concurrency:
 jobs:
   verificar:
     name: Processar a fila de envios às planilhas
+    if: vars.AGENDA_EXTERNA != 'servidor'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

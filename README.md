@@ -183,6 +183,8 @@ A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/REA
 
 O build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de migrações na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
+Para VPS, servidor dedicado ou máquina on-premises, o guia de [auto-hospedagem](docs/auto-hospedagem.md) cobre Caddy ou Nginx, TLS público ou interno, backup do banco e atualização com rollback. O backup e a restauração estão em [docs/backup-servidor.md](docs/backup-servidor.md).
+
 ## Privacidade
 
 O aplicativo registra cadastro escolar, frequência e os registros operacionais necessários, incluindo presença parcial e autoria da confirmação manual da Seduc. A integração opcional com Google Planilhas, desligada por padrão, envia os campos de cada finalidade aos arquivos escolhidos pela escola. A confirmação manual não transmite dados ao sistema da Seduc. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
@@ -228,6 +230,9 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/planilha.md](docs/planilha.md)                                                       | Integração opcional com Google Planilhas.           |
 | [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                     |
 | [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.             |
+| [docs/auto-hospedagem.md](docs/auto-hospedagem.md)                                         | Servidor próprio, proxy TLS, agenda e atualização.  |
+| [docs/kubernetes.md](docs/kubernetes.md)                                                   | Chart Helm, Ingress, migração, agenda e backup.     |
+| [docs/backup-servidor.md](docs/backup-servidor.md)                                         | Dump, cifra, rclone, retenção e restauração.        |
 | [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                     |
 | [docs/seguranca.md](docs/seguranca.md)                                                     | Autenticação, sessões, CSRF, papéis e cabeçalhos.   |
 | [docs/lgpd.md](docs/lgpd.md)                                                               | Dados tratados, minimização e direitos.             |

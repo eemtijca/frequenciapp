@@ -15,6 +15,9 @@
 | [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
 | [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |
+| [auto-hospedagem.md](auto-hospedagem.md)             | Servidor próprio com Caddy, Nginx, agenda e atualização.   |
+| [kubernetes.md](kubernetes.md)                       | Chart Helm, Ingress, migração, agenda e backup.            |
+| [backup-servidor.md](backup-servidor.md)             | Dump do banco, cifra, rclone, retenção e restauração.      |
 | [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
@@ -70,3 +73,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-062](adr/062-controles-de-superficie-suave.md): controles com fundo quase igual ao cartão, fio de baixo contraste, linha inferior nos campos e foco visível.
 
 - [ADR-063](adr/063-indice-chamadas-google-docs.md): índice das chamadas em Google Docs com links para as abas mensais.
+- [ADR-064](adr/064-auto-hospedagem-servidor.md): contrato portátil, proxy TLS, backup, agenda e atualização em servidor próprio.
