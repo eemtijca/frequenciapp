@@ -19,10 +19,7 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER:-frequencia} -d ${POSTGRES_DB:-frequencia}",
-        ]
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-frequencia} -d ${POSTGRES_DB:-frequencia}"]
       interval: 5s
       timeout: 3s
       retries: 20
