@@ -162,6 +162,7 @@ Regras:
 - Cada commit é atômico: contém uma única mudança lógica, completa e autossuficiente. O código compila e as verificações passam em cada commit.
 - Não misture contextos no mesmo commit, como formatação, refatoração e mudança de comportamento. Se o commit cabe em mais de um tipo, divida.
 - O histórico exposto não contém trabalho em andamento nem correção de revisão. Durante o desenvolvimento, use `git commit --fixup <commit>` e limpe a branch com `git rebase -i --autosquash` antes de publicar.
+- Faça um commit atômico ao final de cada conjunto de mudanças concluído, em vez de acumular tudo para o final. Se o conjunto for correção de um commit anterior, use `git commit --fixup` e limpe com `git rebase -i --autosquash` antes de publicar.
 - Todos os commits do mesmo assunto ficam em uma única branch e um único pull request.
 - Prefira mudanças pequenas e revisáveis, na linha do [Google Engineering Practices](https://google.github.io/eng-practices/review/developer/small-cls.html): cerca de 100 linhas é um tamanho razoável e 1000 é grande demais. Se o assunto não fechar em um pull request único, combine a divisão antes de começar.
 - Use o corpo para explicar o porquê quando a descrição não bastar.
