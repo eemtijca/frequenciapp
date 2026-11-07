@@ -20,6 +20,7 @@ permissions:
 jobs:
   migrar:
     name: Aplicar migrations em produção
+    if: vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel' || vars.DEPLOY_TARGET == 'cloud'
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15

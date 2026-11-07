@@ -19,3 +19,4 @@ worklog.md
 playwright-report/
 test-results/
 prisma/migrations/*.sql
+infra/kubernetes/*/templates/

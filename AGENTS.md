@@ -35,6 +35,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - Ícones: o desenho mestre é `design/icone/mestre.svg` e os PNGs de `public/` saem dele por `pnpm run icones:gerar`; não edite os PNGs à mão. Ao trocar qualquer ícone, suba a `VERSAO` em `public/sw.js`.
 - Capturas do README: `pnpm run capturas:readme` ou `pnpm run capturas:readme:docker`, com o aplicativo no ar e a semente aplicada. Os PNGs ficam em `docs/imagens/` e não são editados à mão; capturas locais vão para `docs/imagens/locais/`.
 - Servidor auto-hospedado: `pnpm run servidor:validar` confere ShellCheck, sintaxe dos scripts, Compose, Caddy e Nginx. O guia está em `docs/auto-hospedagem.md` e o backup em `docs/backup-servidor.md`.
+- Kubernetes: `helm lint infra/kubernetes/frequenciapp`, `helm template` e `kubeconform -strict` validam o chart. O guia está em `docs/kubernetes.md` e o chart em `infra/kubernetes/frequenciapp`.
 
 ## Ferramentas externas
 
@@ -71,4 +72,5 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - O `apporiginal.html` na raiz é uma referência local do aplicativo original, ignorada pelo Git. Não faz parte do entregável; não faça commit, formatação nem porte cego dele.
 - Os arquivos de servidor ficam em `infra/servidor` e `scripts/servidor`; as sobreposições são `compose.servidor*.yml`. A aplicação e o banco não publicam portas no host: apenas Caddy ou Nginx expõe 80 e 443. O backup usa GPG ou age e exige a chave privada fora do servidor; nunca coloque chaves, `rclone.conf` ou `app.env` no Git.
 - O `.gitignore` libera apenas `infra/servidor/Caddyfile`; o `Caddyfile` da raiz continua ignorado. Certificados internos do Nginx ficam em `infra/servidor/nginx/certificados/` e não são versionados.
+- O chart Helm não instala PostgreSQL nem controlador de Ingress. O initContainer executa a migração e o contêiner principal usa `MIGRAR_NA_PARTIDA=false`. Os CronJobs de backup exigem `backup.filesSecret` com `rclone.conf`, chave pública e destinatários age, além dos Secrets de variáveis de banco e planilhas.
 - Referência profunda: o índice `docs/README.md` aponta arquitetura, banco, api, interface, testes, segurança e operação; as decisões estão em `docs/adr/`, e a integração com a planilha tem `docs/planilha.md`. Atualize a documentação correspondente e os testes quando o comportamento mudar.

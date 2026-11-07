@@ -45,6 +45,7 @@ jobs:
 
   migrar:
     needs: validar
+    if: vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel'
     runs-on: ubuntu-latest
     environment: release
     timeout-minutes: 15
@@ -102,6 +103,7 @@ jobs:
 
   verificar:
     needs: [validar, implantar]
+    if: vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel'
     runs-on: ubuntu-latest
     steps:
       - name: Conferir a saúde

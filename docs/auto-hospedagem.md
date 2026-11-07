@@ -2,7 +2,7 @@
 
 Guia para executar o FrequenciApp em um servidor Linux próprio, como VPS, servidor dedicado ou máquina on-premises. A aplicação continua sendo um processo Next.js com PostgreSQL 17; o repositório entrega referências de proxy, backup, agenda e atualização que podem ser substituídas.
 
-O contrato portátil e as decisões estão na [ADR-064](adr/064-auto-hospedagem-servidor.md). O backup do banco e a restauração estão em [backup-servidor.md](backup-servidor.md).
+O contrato portátil e as decisões estão na [ADR-064](adr/064-auto-hospedagem-servidor.md). O backup do banco e a restauração estão em [backup-servidor.md](backup-servidor.md). Para Kubernetes, consultar [kubernetes.md](kubernetes.md).
 
 ## Contrato portátil
 
@@ -224,7 +224,23 @@ O script chama:
 - `/api/planilha/fila/agenda`;
 - `/api/indicadores/agenda`.
 
-Todas as chamadas usam `Authorization: Bearer` com `CRON_SECRET`. O instalador cria a linha a cada cinco minutos. No GitHub, definir `AGENDA_EXTERNA=servidor` para desativar os workflows antigos.
+Todas as chamadas usam `Authorization: Bearer` com `CRON_SECRET`. O instalador cria a linha a cada cinco minutos.
+
+## Desativar a automação do GitHub
+
+A instalação auto-hospedada pode desativar os workflows de operação sem removê-los:
+
+```text
+DEPLOY_TARGET=servidor
+AGENDA_EXTERNA=servidor
+BACKUP_EXTERNO=servidor
+```
+
+- `DEPLOY_TARGET=servidor` ignora deploy, migração de produção e preview de Vercel.
+- `AGENDA_EXTERNA=servidor` ignora notificações e fila no GitHub.
+- `BACKUP_EXTERNO=servidor` ignora o backup externo de planilhas no GitHub.
+
+Sem as variáveis, o comportamento anterior é preservado para Vercel, AWS, Azure e GCP. Os valores podem ser definidos com `gh variable set`.
 
 ## Atualização
 

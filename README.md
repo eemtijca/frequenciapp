@@ -231,6 +231,7 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                     |
 | [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.             |
 | [docs/auto-hospedagem.md](docs/auto-hospedagem.md)                                         | Servidor próprio, proxy TLS, agenda e atualização.  |
+| [docs/kubernetes.md](docs/kubernetes.md)                                                   | Chart Helm, Ingress, migração, agenda e backup.     |
 | [docs/backup-servidor.md](docs/backup-servidor.md)                                         | Dump, cifra, rclone, retenção e restauração.        |
 | [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                     |
 | [docs/seguranca.md](docs/seguranca.md)                                                     | Autenticação, sessões, CSRF, papéis e cabeçalhos.   |

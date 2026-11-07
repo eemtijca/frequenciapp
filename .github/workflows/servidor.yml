@@ -6,9 +6,11 @@ on:
     paths:
       - "compose.servidor*.yml"
       - "infra/servidor/**"
+      - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
+      - "docs/kubernetes.md"
       - ".github/workflows/servidor.yml"
   workflow_dispatch:
 
@@ -30,6 +32,32 @@ jobs:
 
       - name: Validar servidor
         run: bash infra/servidor/validar.sh
+
+      - name: Validar chart Helm
+        run: |
+          mkdir -p "$RUNNER_TEMP/helm"
+          docker run --rm -v "$PWD:/repo" -w /repo alpine/helm:latest \
+            lint infra/kubernetes/frequenciapp \
+            --set existingSecret=frequenciapp-segredos
+          docker run --rm \
+            -v "$PWD:/repo" \
+            -v "$RUNNER_TEMP/helm:/out" \
+            -w /repo \
+            alpine/helm:latest \
+            template frequenciapp infra/kubernetes/frequenciapp \
+            --namespace frequenciapp \
+            --set existingSecret=frequenciapp-segredos \
+            --set image.tag=1.2.3 \
+            --set backup.enabled=true \
+            --set backup.filesSecret=frequenciapp-backup-arquivos \
+            --set backup.database.existingSecret=frequenciapp-backup-banco \
+            --set backup.spreadsheets.existingSecret=frequenciapp-backup-planilhas \
+            --set backup.database.persistence.enabled=true \
+            --output-dir /out
+          docker run --rm \
+            -v "$RUNNER_TEMP/helm:/out" \
+            ghcr.io/yannh/kubeconform:latest \
+            -strict -summary /out
 
       - name: Validar workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color

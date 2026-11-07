@@ -16,6 +16,7 @@
 | [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
 | [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |
 | [auto-hospedagem.md](auto-hospedagem.md)             | Servidor próprio com Caddy, Nginx, agenda e atualização.   |
+| [kubernetes.md](kubernetes.md)                       | Chart Helm, Ingress, migração, agenda e backup.            |
 | [backup-servidor.md](backup-servidor.md)             | Dump do banco, cifra, rclone, retenção e restauração.      |
 | [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |

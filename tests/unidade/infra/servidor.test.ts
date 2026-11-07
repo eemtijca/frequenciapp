@@ -116,4 +116,33 @@ describe("servidor auto-hospedado", () => {
     expect(ignorados).toContain("/Caddyfile");
     expect(ignorados).toContain("infra/servidor/nginx/certificados/");
   });
+
+  it("mantém o chart Helm com migração, agenda e backup", async () => {
+    const chart = await ler("infra/kubernetes/frequenciapp/Chart.yaml");
+    const deployment = await ler("infra/kubernetes/frequenciapp/templates/deployment.yaml");
+    const values = await ler("infra/kubernetes/frequenciapp/values.yaml");
+
+    expect(chart).toContain("name: frequenciapp");
+    expect(deployment).toContain("initContainers");
+    expect(deployment).toContain('node", "./docker/app/migrar.mjs');
+    expect(values).toContain('MIGRAR_NA_PARTIDA: "false"');
+    expect(values).toContain("agenda:");
+    expect(values).toContain("backup:");
+    expect(values).toContain("existingSecret");
+  });
+
+  it("publica imagens AMD64 e ARM64 e desativa workflows por variável", async () => {
+    const publicacao = await ler(".github/workflows/publicacao.yml");
+    const agenda = await ler(".github/workflows/notificacoes.yml");
+    const fila = await ler(".github/workflows/fila-planilha.yml");
+    const backup = await ler(".github/workflows/backup-externo.yml");
+    const migracoes = await ler(".github/workflows/migracoes.yml");
+
+    expect(publicacao).toContain("linux/amd64,linux/arm64");
+    expect(publicacao).toContain("github.repository }}-backup");
+    expect(agenda).toContain("vars.AGENDA_EXTERNA != 'servidor'");
+    expect(fila).toContain("vars.AGENDA_EXTERNA != 'servidor'");
+    expect(backup).toContain("vars.BACKUP_EXTERNO != 'servidor'");
+    expect(migracoes).toContain("vars.DEPLOY_TARGET");
+  });
 });

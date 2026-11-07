@@ -15,6 +15,7 @@ concurrency:
 jobs:
   verificar:
     name: Verificar avisos da escola
+    if: vars.AGENDA_EXTERNA != 'servidor'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

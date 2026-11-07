@@ -58,9 +58,12 @@ fi
 
 if [ -n "${BACKUP_REMOTO:-}" ]; then
   [ -n "${BACKUP_RCLONE_CONFIG:-}" ] || erro "Defina BACKUP_RCLONE_CONFIG."
-  [ -f "$BACKUP_RCLONE_CONFIG" ] || erro "Configuração do rclone não encontrada."
-  [ "$(stat -c '%a' "$BACKUP_RCLONE_CONFIG")" = "600" ] ||
-    erro "A configuração do rclone deve ter permissão 600."
+  verificar_permissao_arquivo "$BACKUP_RCLONE_CONFIG"
+  # Em Kubernetes o Secret é montado com dono e modo do volume. A cópia
+  # privada garante a permissão 600 exigida pelo processo de transporte.
+  cp "$BACKUP_RCLONE_CONFIG" "$tmp/rclone.conf"
+  chmod 600 "$tmp/rclone.conf"
+  BACKUP_RCLONE_CONFIG="$tmp/rclone.conf"
 fi
 
 cifrar() {

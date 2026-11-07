@@ -7,10 +7,16 @@ if [ -z "${BACKUP_RCLONE_CONFIG:-}" ] || [ ! -f "$BACKUP_RCLONE_CONFIG" ]; then
   exit 1
 fi
 
-if [ "$(stat -c '%a' "$BACKUP_RCLONE_CONFIG")" != "600" ]; then
-  echo "[backup-planilhas] A configuração do rclone deve ter permissão 600." >&2
+config_original="$BACKUP_RCLONE_CONFIG"
+modo_config=$(stat -c '%a' "$config_original")
+if (( (8#$modo_config & 8#037) != 0 )); then
+  echo "[backup-planilhas] Permissão insegura na configuração do rclone." >&2
   exit 1
 fi
+BACKUP_RCLONE_CONFIG=$(mktemp "${TMPDIR:-/tmp}/frequenciapp-rclone.XXXXXX")
+trap 'rm -f "$BACKUP_RCLONE_CONFIG"' EXIT
+cp "$config_original" "$BACKUP_RCLONE_CONFIG"
+chmod 600 "$BACKUP_RCLONE_CONFIG"
 
 saida=$(node scripts/backup/backup-externo.mjs)
 printf '%s\n' "$saida"

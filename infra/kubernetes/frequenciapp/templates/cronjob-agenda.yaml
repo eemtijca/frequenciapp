@@ -1,0 +1,59 @@
+{{- if .Values.agenda.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-agenda
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.agenda.schedule | quote }}
+  concurrencyPolicy: {{ .Values.agenda.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.agenda.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.agenda.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .Values.agenda.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.agenda.activeDeadlineSeconds }}
+      template:
+        metadata:
+          labels:
+            {{- include "frequenciapp.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: agenda
+              image: {{ include "frequenciapp.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["node", "scripts/servidor/agenda.mjs"]
+              env:
+                - name: AGENDA_URL
+                  value: {{ include "frequenciapp.appUrl" . | quote }}
+                - name: AGENDA_TIMEOUT
+                  value: "300"
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.agenda.existingSecret | default (include "frequenciapp.secretName" .) }}
+                      key: CRON_SECRET
+                {{- with .Values.agenda.extraEnv }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.agenda.resources | nindent 16 }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: {{ .Values.persistence.tmp.sizeLimit }}
+{{- end }}
