@@ -34,6 +34,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - Etiquetas: `pnpm run etiquetas:sync` cria ou atualiza as etiquetas do GitHub conforme `.github/labels.json`.
 - Ícones: o desenho mestre é `design/icone/mestre.svg` e os PNGs de `public/` saem dele por `pnpm run icones:gerar`; não edite os PNGs à mão. Ao trocar qualquer ícone, suba a `VERSAO` em `public/sw.js`.
 - Capturas do README: `pnpm run capturas:readme` ou `pnpm run capturas:readme:docker`, com o aplicativo no ar e a semente aplicada. Os PNGs ficam em `docs/imagens/` e não são editados à mão; capturas locais vão para `docs/imagens/locais/`.
+- Servidor auto-hospedado: `pnpm run servidor:validar` confere ShellCheck, sintaxe dos scripts, Compose, Caddy e Nginx. O guia está em `docs/auto-hospedagem.md` e o backup em `docs/backup-servidor.md`.
 
 ## Ferramentas externas
 
@@ -68,4 +69,6 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 - Nenhum teste usa dados reais. As suítes criam e limpam a própria massa: prefixo `QA` na suíte de API e `E2E` no Playwright. Dados reais de alunos nunca entram no Git nem em issue.
 - As chamadas usam OAuth e Sheets API; o índice separado usa a Google Docs API com o mesmo escopo drive.file (ADR-063). Os testes de API e navegador simulam respostas HTTP do Google com `tests/helpers/google-falso.ts`; o redirecionamento de transporte é carregado somente pelo servidor de testes. `public/sw.js` é o service worker de verdade, coberto por `pnpm run test:pwa`.
 - O `apporiginal.html` na raiz é uma referência local do aplicativo original, ignorada pelo Git. Não faz parte do entregável; não faça commit, formatação nem porte cego dele.
+- Os arquivos de servidor ficam em `infra/servidor` e `scripts/servidor`; as sobreposições são `compose.servidor*.yml`. A aplicação e o banco não publicam portas no host: apenas Caddy ou Nginx expõe 80 e 443. O backup usa GPG ou age e exige a chave privada fora do servidor; nunca coloque chaves, `rclone.conf` ou `app.env` no Git.
+- O `.gitignore` libera apenas `infra/servidor/Caddyfile`; o `Caddyfile` da raiz continua ignorado. Certificados internos do Nginx ficam em `infra/servidor/nginx/certificados/` e não são versionados.
 - Referência profunda: o índice `docs/README.md` aponta arquitetura, banco, api, interface, testes, segurança e operação; as decisões estão em `docs/adr/`, e a integração com a planilha tem `docs/planilha.md`. Atualize a documentação correspondente e os testes quando o comportamento mudar.

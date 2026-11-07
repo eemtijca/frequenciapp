@@ -4,13 +4,15 @@ Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, 
 
 ## Variáveis da aplicação
 
-| Variável      | Obrigatória | Padrão              | Descrição                                                                                                                    |
-| ------------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| DATABASE_URL  | sim         |                     | Connection string do runtime da API e do Prisma Client.                                                                      |
-| AUTH_SECRET   | sim         |                     | Segredo de 32 caracteres ou mais que assina o cookie de sessão. Gere com `openssl rand -base64 32`.                          |
-| TZ_APP        | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente, os rótulos e os limites de data. Precisa ser um fuso IANA válido.                   |
-| NODE_ENV      | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure, salvo quando o HTTP está liberado.                            |
-| PERMITIR_HTTP | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
+| Variável          | Obrigatória | Padrão              | Descrição                                                                                                                    |
+| ----------------- | ----------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| DATABASE_URL      | sim         |                     | Connection string do runtime da API e do Prisma Client.                                                                      |
+| AUTH_SECRET       | sim         |                     | Segredo de 32 caracteres ou mais que assina o cookie de sessão. Gere com `openssl rand -base64 32`.                          |
+| TZ_APP            | não         | `America/Fortaleza` | Fuso usado para resolver o dia corrente, os rótulos e os limites de data. Precisa ser um fuso IANA válido.                   |
+| NODE_ENV          | não         | `development`       | Modo de execução; em produção o cookie de sessão marca Secure, salvo quando o HTTP está liberado.                            |
+| PERMITIR_HTTP     | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
+| MIGRAR_NA_PARTIDA | não         | `true`              | Aplica as migrações no entrypoint. Use `false` quando a plataforma roda a migração em Job separado.                          |
+| COMMIT_SHA        | não         | `local`             | Revisão exibida em `/api/saude`.                                                                                             |
 
 Para as planilhas de frequência e de saídas por OAuth, configure as cinco variáveis juntas:
 
@@ -132,6 +134,12 @@ docker compose up --build
 ```
 
 O Compose sobe o PostgreSQL 17 com volume persistente, aplica as migrações pela `DIRECT_URL` e inicia o servidor. As URLs internas usam o host `db`. Para criar o administrador inicial na partida, defina `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` no `.env`; o bootstrap não altera uma conta que já exista. Os detalhes de orquestração estão em [deploy.md](deploy.md).
+
+As credenciais do banco no Compose são configuráveis por `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`, com padrão `frequencia`. O valor padrão serve apenas para desenvolvimento. Em produção, usar uma senha longa e sem caracteres que precisem de codificação na URL, como `openssl rand -hex 24`.
+
+## Servidor auto-hospedado
+
+VPS, servidor dedicado e máquina on-premises usam o mesmo contrato de ambiente. A aplicação e o banco ficam sem portas publicadas; Caddy ou Nginx termina o TLS. O guia completo está em [auto-hospedagem.md](auto-hospedagem.md), o backup em [backup-servidor.md](backup-servidor.md) e a decisão na [ADR-064](adr/064-auto-hospedagem-servidor.md).
 
 ## Conexão do PostgreSQL
 

@@ -49,6 +49,14 @@ docker compose -p frequenciapp-test down -v --remove-orphans
 
 Se a migration inicial for recriada durante o desenvolvimento, bancos antigos precisam ser removidos ou recriados. O comando `pnpm exec prisma migrate reset --force` também serve para um ambiente local descartável.
 
+## Servidor auto-hospedado
+
+O repositório inclui referências para VPS, servidor dedicado e máquina on-premises, com Caddy ou Nginx, TLS público ou interno, backup do banco e atualização por cron. O guia está em [auto-hospedagem.md](auto-hospedagem.md) e o backup em [backup-servidor.md](backup-servidor.md).
+
+A aplicação e o banco não publicam portas no host. Apenas o proxy publica 80 e 443. As migrações continuam no entrypoint por padrão; em plataformas que rodam a migração em Job separado, usar `MIGRAR_NA_PARTIDA=false` e executar `node ./docker/app/migrar.mjs` antes da aplicação.
+
+O backup do banco usa `pg_dump`, GPG ou age, rclone e verificação por download. O backup das planilhas usa a rotina existente em um contêiner com rclone. As duas rotinas são independentes.
+
 ## Imagem avulsa
 
 ```bash
@@ -189,7 +197,7 @@ O Dependabot atualiza as dependências (ecossistema npm, com `pnpm-lock.yaml`), 
 
 ## VPS sem TLS (rede interna)
 
-Quando não há proxy reverso com TLS, defina no `.env`:
+Para a referência completa com proxy e TLS, consultar [auto-hospedagem.md](auto-hospedagem.md). Quando não há proxy reverso com TLS, defina no `.env`:
 
 ```text
 PERMITIR_HTTP=true

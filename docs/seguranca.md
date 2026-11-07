@@ -85,6 +85,19 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 - Toda ação é auditada sem nomes de alunos: conexão, esquema, mapa, envios, destrave e restauração.
 - A Chamada Parcial exige sessão com `operar`, validação de origem nas mutações e revisão vigente para corrigir, confirmar ou remover. Sua confirmação manual guarda data e nome da conta responsável, é limpa após correção e não dispara requisição à Seduc. O envio Google não altera essa confirmação; registros e histórico entram somente na cópia administrativa, sem credenciais.
 
+## Auto-hospedagem
+
+- A aplicação e o banco não publicam portas no host. Apenas Caddy ou Nginx expõe 80 e 443.
+- O proxy repassa `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host`; a aplicação usa o último item do encaminhamento para o limite de tentativas.
+- Com CDN ou balanceador à frente, configurar proxies confiáveis no proxy de borda. Sem isso, o limite por dispositivo pode enxergar o endereço do CDN.
+- O TLS pode usar ACME público ou CA interna. No modo interno, a raiz da CA precisa ser instalada nos dispositivos da escola para o PWA e o cookie Secure funcionarem.
+- `PERMITIR_HTTP=false` é o padrão e deve ser mantido com TLS.
+- O backup do banco é cifrado com GPG de chave pública ou age. A chave privada fica fora do servidor, com dois custodiantes.
+- O `app.env` cifrado contém `AUTH_SECRET`, credenciais Google e senha do banco. O inventário de chaves está em [backup-servidor.md](backup-servidor.md).
+- O arquivo `rclone.conf` fica com permissão 600 e não entra no Git.
+- A conta de implantação no grupo `docker` tem privilégio equivalente a root. Usar conta dedicada, chave SSH e acesso restrito.
+- `MIGRAR_NA_PARTIDA=false` não dispensa a migração: ela precisa ocorrer em Job ou etapa anterior à aplicação.
+
 ## Superfície de dependências
 
 Distribuição enxuta: framework, UI, Prisma 7 com adaptador pg, zod, Motion e dotenv para o CLI. Nenhuma dependência de serviços externos em runtime, o que elimina toda uma classe de risco de integração. O service worker é código próprio, auditável em um arquivo.
