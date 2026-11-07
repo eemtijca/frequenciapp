@@ -3,7 +3,7 @@
 // Painel Turmas recolhível, com séries que agrupam as turmas e seu progresso.
 // A seleção continua independente da conclusão, com nomes e estados acessíveis.
 import { useId, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia } from "@/domain/relatorios";
@@ -243,9 +243,6 @@ export function SeletorTurmaChamada({
                     <span className={estilos.percentual} aria-hidden="true">
                       {percentual === null ? "-" : `${percentual}%`}
                     </span>
-                    {ehAtiva && (
-                      <Check size={15} aria-hidden="true" className={estilos.checkSelecao} />
-                    )}
                     <ChevronDown aria-hidden="true" className={estilos.seta} />
                     <span id={`${id}-serie-${grupo.id}`} className="sr-only">
                       {descricao}
