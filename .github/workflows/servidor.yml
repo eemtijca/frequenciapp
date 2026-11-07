@@ -1,0 +1,35 @@
+# Valida os arquivos de servidor auto-hospedado e a sintaxe dos workflows.
+name: Servidor
+
+on:
+  pull_request:
+    paths:
+      - "compose.servidor*.yml"
+      - "infra/servidor/**"
+      - "scripts/servidor/**"
+      - "docs/auto-hospedagem.md"
+      - "docs/backup-servidor.md"
+      - ".github/workflows/servidor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: servidor-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validar:
+    name: Compose, proxies, scripts e workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validar servidor
+        run: bash infra/servidor/validar.sh
+
+      - name: Validar workflows
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color

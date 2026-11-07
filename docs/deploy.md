@@ -190,6 +190,7 @@ Os workflows ficam em `.github/workflows/`:
 | `schema-preview.yml` | Schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal |
 | `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                               |
 | `publicacao.yml`     | Publicação da imagem no GHCR                                                  |
+| `servidor.yml`       | Validação de Compose, Caddy, Nginx, scripts e workflows de servidor           |
 
 Para acompanhar e operar workflows e releases pelo terminal, use o GitHub CLI (`gh`): confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Depois use `gh run list`, `gh run watch`, `gh run view --log-failed`, `gh pr checks --watch` e `gh release create`. Nunca inclua segredos em comandos.
 
