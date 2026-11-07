@@ -1,0 +1,46 @@
+# Sobreposição do proxy Nginx e do Certbot para servidor auto-hospedado.
+
+services:
+  nginx:
+    build:
+      context: ./infra/servidor/nginx
+    image: ${NGINX_IMAGEM:-frequenciapp-nginx:local}
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${PROXY_HTTP_PORTA:-80}:80"
+      - "${PROXY_HTTPS_PORTA:-443}:443"
+    volumes:
+      - ${CERTBOT_CERTS_DIR:-./infra/servidor/nginx/certificados}:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    networks:
+      - publica
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 10s
+
+  certbot:
+    image: certbot/certbot:v5.9.0
+    profiles: ["certbot"]
+    restart: "no"
+    volumes:
+      - ${CERTBOT_CERTS_DIR:-./infra/servidor/nginx/certificados}:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: ["certbot"]
+    networks:
+      - publica
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  certbot_www:

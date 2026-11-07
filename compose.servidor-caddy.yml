@@ -1,0 +1,39 @@
+# Sobreposição do proxy Caddy para servidor auto-hospedado.
+
+services:
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${PROXY_HTTP_PORTA:-80}:80"
+      - "${PROXY_HTTPS_PORTA:-443}:443"
+      - "${PROXY_HTTPS_PORTA:-443}:443/udp"
+    environment:
+      DOMINIO: ${DOMINIO:?Defina DOMINIO no arquivo de ambiente}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    volumes:
+      - ./${CADDYFILE:-infra/servidor/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - publica
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 10s
+
+volumes:
+  caddy_data:
+  caddy_config:

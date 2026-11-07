@@ -1,0 +1,71 @@
+# Sobreposição comum de produção para servidor auto-hospedado.
+# Use junto de compose.servidor-caddy.yml ou compose.servidor-nginx.yml.
+
+services:
+  db:
+    # O banco fica apenas na rede interna e não publica portas no host.
+    ports: !reset []
+    networks:
+      - interna
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  app:
+    # O proxy é o único ponto exposto. A aplicação não publica portas.
+    ports: !reset []
+    environment:
+      PERMITIR_HTTP: "false"
+      COMMIT_SHA: ${COMMIT_SHA:-}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - interna
+      - publica
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 30s
+
+  backup-planilhas:
+    build:
+      context: .
+      dockerfile: infra/servidor/backup/Dockerfile
+      args:
+        APP_IMAGEM: ${APP_IMAGEM:-frequenciapp:local}
+    image: ${APP_IMAGEM_BACKUP:-frequenciapp-backup:local}
+    profiles: ["backup"]
+    restart: "no"
+    depends_on:
+      app:
+        condition: service_healthy
+    env_file:
+      - ${APP_ENV_FILE:-/etc/frequenciapp/app.env}
+      - ${OPS_ENV_FILE:-/etc/frequenciapp/ops.env}
+    environment:
+      BACKUP_RCLONE_CONFIG: ${BACKUP_RCLONE_CONFIG:-/etc/frequenciapp/rclone.conf}
+      BACKUP_DESTINO: ${BACKUP_DESTINO:-}
+      BACKUP_PLANILHAS_LOCAL: ${BACKUP_PLANILHAS_LOCAL:-true}
+      BACKUP_PLANILHAS_DIR: /backups/planilhas
+    volumes:
+      - ${SERVIDOR_CONFIG_DIR:-/etc/frequenciapp}:/etc/frequenciapp:ro
+      - ${BACKUP_HOST_DIR:-/var/backups/frequenciapp}:/backups
+    entrypoint: ["/bin/bash", "scripts/servidor/backup-planilhas-interno.sh"]
+    networks:
+      - publica
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  interna:
+    internal: true
+  publica:

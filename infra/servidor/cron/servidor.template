@@ -1,0 +1,12 @@
+# Modelo de /etc/cron.d/frequenciapp gerado por scripts/servidor/instalar-rotinas.sh.
+# O usuário da coluna de execução precisa pertencer ao grupo docker.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO="@MAILTO@"
+CRON_TZ=@CRON_TZ@
+
+@AGENDA_HORARIO@ @SERVIDOR_USUARIO@ @APP_DIR@/scripts/servidor/agenda.sh >>@LOG_DIR@/agenda.log 2>&1
+@BACKUP_HORARIO@ @SERVIDOR_USUARIO@ @APP_DIR@/scripts/servidor/backup-banco.sh >>@LOG_DIR@/backup.log 2>&1
+@BACKUP_PLANILHAS_HORARIO@ @SERVIDOR_USUARIO@ @APP_DIR@/scripts/servidor/backup-planilhas.sh >>@LOG_DIR@/backup-planilhas.log 2>&1
+@ATUALIZAR_HORARIO@ @SERVIDOR_USUARIO@ @APP_DIR@/scripts/servidor/atualizar.sh >>@LOG_DIR@/atualizacao.log 2>&1
+@CERTBOT_RENOVAR_HORARIO@ @SERVIDOR_USUARIO@ @APP_DIR@/scripts/servidor/renovar-certificado.sh >>@LOG_DIR@/certificado.log 2>&1

@@ -36,6 +36,7 @@ server.log
 # Sistema
 .DS_Store
 *.pem
+infra/servidor/nginx/certificados/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -46,7 +47,7 @@ yarn-error.log*
 
 # Sandbox local (não fazem parte do entregável)
 bun.lock
-Caddyfile
+/Caddyfile
 .zscripts/
 analysis/
 .postgres/
