@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O seletor de turmas da Chamada deixa de mostrar o ícone de confirmação ao lado da série selecionada. A série escolhida continua destacada pela cor e, em cores forçadas, pela borda do bloco.
+
 - As colunas de situação, registro na Seduc e ações da Chamada Parcial ficam alinhadas quando há espaço no cartão. Em áreas estreitas, a disposição se adapta sem cortar as ações, inclusive com fonte ampliada.
 
 - O contorno de foco aparece apenas na navegação por teclado. Cliques, toques e o foco devolvido por diálogos, menus, seletores e popovers abertos ou fechados por ponteiro não deixam contorno. O foco programático sem interação recente permanece visível por acessibilidade, inclusive em cores forçadas.

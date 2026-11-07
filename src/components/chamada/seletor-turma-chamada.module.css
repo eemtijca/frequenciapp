@@ -40,11 +40,6 @@
   color: var(--justificada-texto);
 }
 
-.checkSelecao {
-  flex-shrink: 0;
-  color: var(--justificada);
-}
-
 .gatilho:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
 .serie:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)),
 .turma:focus-visible:not(:where(html[data-modalidade-foco="ponteiro"] *)) {
