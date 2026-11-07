@@ -8,11 +8,7 @@ if (!segredo) {
   process.exit(1);
 }
 
-const rotas = [
-  "/api/notificacoes/agenda",
-  "/api/planilha/fila/agenda",
-  "/api/indicadores/agenda",
-];
+const rotas = ["/api/notificacoes/agenda", "/api/planilha/fila/agenda", "/api/indicadores/agenda"];
 
 let falhas = 0;
 
