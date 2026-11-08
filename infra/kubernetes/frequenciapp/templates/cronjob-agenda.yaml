@@ -7,6 +7,9 @@ metadata:
     {{- include "frequenciapp.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.agenda.schedule | quote }}
+  {{- with .Values.agenda.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
   concurrencyPolicy: {{ .Values.agenda.concurrencyPolicy }}
   successfulJobsHistoryLimit: {{ .Values.agenda.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.agenda.failedJobsHistoryLimit }}

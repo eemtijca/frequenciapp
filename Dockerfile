@@ -41,6 +41,8 @@ RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # 4. Execução (somente o necessário)
 FROM node:24-bookworm-slim AS execucao
+ARG COMMIT_SHA=local
+LABEL org.opencontainers.image.revision=$COMMIT_SHA
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

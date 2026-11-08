@@ -140,9 +140,12 @@ A URL interna padrão é `http://<release>:3000`. O segredo vem de `CRON_SECRET`
 agenda:
   enabled: true
   schedule: "*/5 * * * *"
+  timeZone: "America/Fortaleza"
   appUrl: ""
   existingSecret: ""
 ```
+
+O campo `timeZone` exige Kubernetes 1.27 ou superior. O mesmo vale para `backup.database.timeZone` e `backup.spreadsheets.timeZone`.
 
 ## Backup
 
@@ -173,7 +176,7 @@ O `backup.database.existingSecret` deve conter:
 | `BACKUP_REMOTO`            | Destino rclone                                |
 | `RCLONE_CONFIG_PASS`       | Senha da configuração do rclone, quando usada |
 
-A rotina usa `BACKUP_MODO=url`, `BACKUP_INCLUIR_AMBIENTE=false` e `BACKUP_RETER_DIAS` do values.
+A rotina usa `BACKUP_MODO=url`, `BACKUP_INCLUIR_AMBIENTE=false`, `BACKUP_RETER_DIAS`, `BACKUP_RETER_MINIMO` e `BACKUP_RETER_REMOTO` do values.
 
 ### Secret das planilhas
 

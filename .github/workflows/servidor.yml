@@ -1,13 +1,17 @@
-# Valida os arquivos de servidor auto-hospedado e a sintaxe dos workflows.
+# Valida os arquivos de servidor auto-hospedado, os workflows e as rotinas.
 name: Servidor
 
 on:
   pull_request:
     paths:
       - "compose.servidor*.yml"
+      - "compose.yml"
+      - "Dockerfile"
       - "infra/servidor/**"
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
+      - "tests/servidor/**"
+      - "package.json"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
       - "docs/kubernetes.md"
@@ -25,7 +29,7 @@ jobs:
   validar:
     name: Compose, proxies, scripts e workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -61,3 +65,40 @@ jobs:
 
       - name: Validar workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+
+      - name: Instalar ferramentas dos ensaios
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck rclone age postgresql-common
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" |
+            sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Sintaxe e ShellCheck
+        run: |
+          for script in scripts/servidor/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -x -P scripts/servidor scripts/servidor/*.sh
+          shellcheck -x -P tests/servidor tests/servidor/*.sh
+
+      - name: Ensaio de atualização com dublês
+        run: bash tests/servidor/atualizacao.sh
+
+      - name: Ensaio de backup e restauração em Compose
+        run: bash tests/servidor/backup-restauracao.sh
+
+      - name: Ensaio de restauração por URL
+        run: bash tests/servidor/restauracao-url.sh
+
+      - name: Ensaio de atualização em Compose descartável
+        run: bash tests/servidor/atualizacao-integracao.sh
+
+      - name: Derrubar contêineres remanescentes
+        if: always()
+        run: |
+          docker ps -aq --filter "name=frequenciapp-" | xargs -r docker rm -f

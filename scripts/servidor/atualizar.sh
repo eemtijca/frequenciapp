@@ -9,7 +9,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 carregar_ambiente
 travar atualizacao 0
 
-if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ]; then
+if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
+  [ "${ATUALIZAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
   ATUALIZAR_SAUDE_URL="https://${DOMINIO}/api/saude"
 fi
 
@@ -18,10 +19,12 @@ ATUALIZAR_REF="${ATUALIZAR_REF:-origin/main}"
 ATUALIZAR_REMOTO="${ATUALIZAR_REMOTO:-origin}"
 ATUALIZAR_BACKUP_ANTES="${ATUALIZAR_BACKUP_ANTES:-true}"
 ATUALIZAR_PERMITIR_MIGRACOES="${ATUALIZAR_PERMITIR_MIGRACOES:-false}"
+ATUALIZAR_VERIFICAR_IMAGEM="${ATUALIZAR_VERIFICAR_IMAGEM:-true}"
 ATUALIZAR_TIMEOUT_SAUDE="${ATUALIZAR_TIMEOUT_SAUDE:-180}"
 ATUALIZAR_ESPACO_MINIMO_MB="${ATUALIZAR_ESPACO_MINIMO_MB:-2048}"
 APP_IMAGEM_REPOSITORIO="${APP_IMAGEM_REPOSITORIO:-ghcr.io/eemtijca/frequenciapp}"
 APP_IMAGEM_BACKUP_REPOSITORIO="${APP_IMAGEM_BACKUP_REPOSITORIO:-${APP_IMAGEM_REPOSITORIO}-backup}"
+BACKUP_PLANILHAS_HABILITADO="${BACKUP_PLANILHAS_HABILITADO:-true}"
 
 simular=false
 forcar=false
@@ -63,6 +66,10 @@ TEXTO
   esac
 done
 
+if [ "$ATUALIZAR_BACKUP_ANTES" != "true" ]; then
+  erro "O backup anterior é obrigatório. ATUALIZAR_BACKUP_ANTES=false não é aceito."
+fi
+
 [ -n "$modo_override" ] && ATUALIZAR_MODO="$modo_override"
 case "$ATUALIZAR_MODO" in
   auto | release | main) ;;
@@ -71,13 +78,7 @@ esac
 
 estado="$ESTADO_DIR/estado.json"
 falha="$ESTADO_DIR/falha.json"
-
-ler_campo() {
-  local arquivo="$1"
-  local campo="$2"
-  [ -f "$arquivo" ] || return 0
-  grep -o "\"$campo\":\"[^\"]*\"" "$arquivo" | head -n 1 | cut -d'"' -f4 || true
-}
+estado_backup="$ESTADO_DIR/ultimo-backup.json"
 
 escrever_estado() {
   local modo="$1"
@@ -97,16 +98,188 @@ escrever_falha() {
   local ref="$1"
   local commit="$2"
   local motivo="$3"
+  local migracoes="$4"
   mkdir -p "$ESTADO_DIR"
-  printf '{"em":"%s","ref":"%s","commit":"%s","motivo":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ref" "$commit" "$motivo" >"$falha.tmp"
+  printf '{"em":"%s","ref":"%s","commit":"%s","motivo":"%s","migracoesPossivelmenteAplicadas":%s}\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ref" "$commit" "$motivo" "$migracoes" >"$falha.tmp"
   mv "$falha.tmp" "$falha"
   chmod 600 "$falha"
 }
 
 limpar_falha() { rm -f "$falha"; }
 
+worktree=""
+worktree_base=""
+
+limpar_worktree() {
+  if [ -n "$worktree" ]; then
+    git -C "$APP_DIR" worktree remove --force "$worktree" >/dev/null 2>&1 ||
+      rm -rf "$worktree"
+  fi
+  if [ -n "$worktree_base" ]; then
+    rm -rf "$worktree_base"
+  fi
+  worktree=""
+  worktree_base=""
+}
+trap 'limpar_worktree' EXIT
+
+criar_worktree() {
+  local commit="$1"
+  limpar_worktree
+  worktree_base=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-atualizacao.XXXXXX")
+  worktree="$worktree_base/worktree"
+  git -C "$APP_DIR" worktree prune
+  git -C "$APP_DIR" worktree add --detach "$worktree" "$commit" >/dev/null ||
+    erro "Não foi possível criar a worktree do commit $commit."
+}
+
+validar_backup_obrigatorio() {
+  local marco="$1"
+  local dir_backup="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
+  local arquivo
+  local sha
+  local calculado
+
+  [ -f "$estado_backup" ] || erro "O backup não gravou o estado esperado."
+  [ "$estado_backup" -nt "$marco" ] ||
+    erro "O estado do backup não foi atualizado nesta execução."
+
+  arquivo=$(ler_campo_json "$estado_backup" "arquivo")
+  sha=$(ler_campo_json "$estado_backup" "sha256")
+  [ -n "$arquivo" ] || erro "O estado do backup não informa o arquivo."
+  [ -n "$sha" ] || erro "O estado do backup não informa o checksum."
+  [ -f "$dir_backup/$arquivo" ] ||
+    erro "O arquivo de backup não existe em $dir_backup."
+
+  calculado=$(sha256sum "$dir_backup/$arquivo" | cut -d' ' -f1)
+  [ "$calculado" = "$sha" ] ||
+    erro "O checksum do backup local não confere."
+
+  if [ -n "${BACKUP_REMOTO:-}" ] && [ "${BACKUP_VERIFICAR_REMOTO:-true}" = "true" ]; then
+    [ "$(ler_campo_json "$estado_backup" "verificadoRemoto")" = "true" ] ||
+      erro "O backup remoto não foi verificado."
+  fi
+}
+
+executar_backup_obrigatorio() {
+  local marco="$ESTADO_DIR/.marco-backup.$$"
+  mkdir -p "$ESTADO_DIR"
+  : >"$marco"
+  log "Executando backup obrigatório antes da atualização."
+  if ! "$DIR/backup-banco.sh"; then
+    rm -f "$marco"
+    erro "O backup falhou; a atualização foi cancelada."
+  fi
+  validar_backup_obrigatorio "$marco"
+  rm -f "$marco"
+}
+
+revisao_da_imagem() {
+  docker image inspect \
+    --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' \
+    "$1" 2>/dev/null || true
+}
+
+verificar_imagem_alvo() {
+  local imagem="$1"
+  local commit="$2"
+  local revisao
+  revisao=$(revisao_da_imagem "$imagem")
+  if [ "$revisao" != "$commit" ]; then
+    erro "A imagem $imagem não corresponde ao commit $commit (revisão: ${revisao:-ausente})."
+  fi
+}
+
+construir_app_na_worktree() {
+  local imagem="$1"
+  local commit="$2"
+  (
+    montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem" COMMIT_SHA="$commit" compose build "$SERVIDOR_SERVICO_APP"
+  )
+}
+
+construir_backup_na_worktree() {
+  local imagem_app="$1"
+  local imagem_backup="$2"
+  local commit="$3"
+  (
+    montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
+      compose --profile backup build "$SERVIDOR_SERVICO_BACKUP_PLANILHAS"
+  )
+}
+
+validar_compose_na_worktree() {
+  local imagem="$1"
+  local imagem_backup="$2"
+  local commit="$3"
+  (
+    montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
+      compose config --quiet
+  )
+}
+
+garantir_imagem_anterior() {
+  local commit="$1"
+  local imagem_estado="$2"
+  local imagem_backup_estado="$3"
+  local container
+  local imagem_container
+  local destino
+
+  container=$(compose ps -q "$SERVIDOR_SERVICO_APP" 2>/dev/null || true)
+  if [ -n "$container" ]; then
+    imagem_container=$(docker inspect --format '{{.Image}}' "$container" 2>/dev/null || true)
+    if [ -n "$imagem_container" ]; then
+      destino="${APP_IMAGEM_ANTERIOR:-frequenciapp-rollback:${commit:0:12}}"
+      docker tag "$imagem_container" "$destino" >/dev/null
+      ANTERIOR_IMAGEM="$destino"
+      ANTERIOR_BACKUP="$imagem_backup_estado"
+      log "Imagem anterior preservada como $destino."
+      return 0
+    fi
+  fi
+
+  if [ -n "$imagem_estado" ] && docker image inspect "$imagem_estado" >/dev/null 2>&1; then
+    ANTERIOR_IMAGEM="$imagem_estado"
+    ANTERIOR_BACKUP="$imagem_backup_estado"
+    return 0
+  fi
+
+  log "A imagem anterior não está disponível; construindo a partir do commit $commit."
+  criar_worktree "$commit"
+  destino="${APP_IMAGEM_ANTERIOR:-frequenciapp-rollback:${commit:0:12}}"
+  construir_app_na_worktree "$destino" "$commit"
+  verificar_imagem_alvo "$destino" "$commit"
+  ANTERIOR_IMAGEM="$destino"
+  ANTERIOR_BACKUP="$imagem_backup_estado"
+}
+
+falhar_atualizacao() {
+  local motivo="$1"
+  local migracoes="$2"
+  log "$motivo Iniciando rollback."
+  git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
+  if ! APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
+    COMMIT_SHA="$ANTERIOR_COMMIT" compose up -d --wait --no-build \
+    --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
+    log "O rollback também falhou; intervenção manual necessária."
+  fi
+  escrever_falha "$alvo_ref" "$alvo_commit" "$motivo" "$migracoes"
+  notificar falha "Atualização falhou e o rollback foi tentado."
+  exit 1
+}
+
+[ -d "$APP_DIR/.git" ] || erro "Checkout Git não encontrado em $APP_DIR."
+verificar_instalacao
+
 if [ "$registrar" = true ]; then
+  if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
+    erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de registrar."
+  fi
   commit=$(git -C "$APP_DIR" rev-parse HEAD)
   ref=$(git -C "$APP_DIR" describe --tags --exact-match 2>/dev/null || git -C "$APP_DIR" rev-parse --short HEAD)
   modo_registro="main"
@@ -122,7 +295,6 @@ if [ "$registrar" = true ]; then
   exit 0
 fi
 
-[ -d "$APP_DIR/.git" ] || erro "Checkout Git não encontrado em $APP_DIR."
 if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
   erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de atualizar."
 fi
@@ -138,14 +310,17 @@ if [ -n "$tag_estavel" ] &&
   tag_estavel=""
 fi
 
-modo_atual=$(ler_campo "$estado" "modo")
-ref_atual=$(ler_campo "$estado" "ref")
-commit_atual=$(ler_campo "$estado" "commit")
-imagem_atual=$(ler_campo "$estado" "imagem")
-imagem_backup_atual=$(ler_campo "$estado" "imagemBackup")
+modo_atual=$(ler_campo_json "$estado" "modo")
+ref_atual=$(ler_campo_json "$estado" "ref")
+commit_atual=$(ler_campo_json "$estado" "commit")
+imagem_atual=$(ler_campo_json "$estado" "imagem")
+imagem_backup_atual=$(ler_campo_json "$estado" "imagemBackup")
 
+head_commit=$(git -C "$APP_DIR" rev-parse HEAD)
 if [ -z "$commit_atual" ]; then
-  commit_atual=$(git -C "$APP_DIR" rev-parse HEAD)
+  commit_atual="$head_commit"
+elif [ "$commit_atual" != "$head_commit" ] && [ "$forcar" = false ]; then
+  erro "O estado registrado aponta para $commit_atual, mas o checkout está em $head_commit. Registre o estado ou use --forcar."
 fi
 if [ -z "$ref_atual" ]; then
   ref_atual=$(git -C "$APP_DIR" describe --tags --always 2>/dev/null || printf '%s' "${commit_atual:0:12}")
@@ -209,8 +384,29 @@ esac
 log "Modo atual: ${modo_atual:-desconhecido}; modo alvo: $alvo_modo."
 log "Referência alvo: $alvo_ref ($alvo_commit)."
 
+migracoes_novas=false
+migracoes=$(git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations || true)
+if [ -n "$migracoes" ]; then
+  migracoes_novas=true
+fi
+
 if [ "$simular" = true ]; then
   log "Simulação: nenhuma alteração será aplicada."
+  log "Backup obrigatório antes da aplicação: sim."
+  if [ "$migracoes_novas" = true ]; then
+    if [ "$permitir_migracoes" = "true" ]; then
+      log "Migrações novas serão permitidas por opção explícita."
+    else
+      log "Migrações novas bloqueariam a atualização; use --permitir-migracoes."
+    fi
+  else
+    log "Sem migrações novas entre o estado atual e o alvo."
+  fi
+  if [ "$BACKUP_PLANILHAS_HABILITADO" = "true" ]; then
+    log "O backup de planilhas habilitado também será considerado."
+  else
+    log "O backup de planilhas está desabilitado e não será construído."
+  fi
   exit 0
 fi
 
@@ -220,10 +416,14 @@ if [ "$commit_atual" = "$alvo_commit" ] && [ "$forcar" = false ]; then
 fi
 
 if [ -f "$falha" ] && [ "$forcar" = false ]; then
-  falha_ref=$(ler_campo "$falha" "ref")
+  falha_ref=$(ler_campo_json "$falha" "ref")
   if [ "$falha_ref" = "$alvo_ref" ]; then
     erro "A versão $alvo_ref falhou antes. Use --forcar após corrigir."
   fi
+fi
+
+if [ "$migracoes_novas" = true ] && [ "$permitir_migracoes" != "true" ]; then
+  erro "Há migrações novas. Revise e repita com --permitir-migracoes ou defina ATUALIZAR_PERMITIR_MIGRACOES=true."
 fi
 
 livre=$(espaco_livre_mb "$APP_DIR")
@@ -231,80 +431,60 @@ if [ "${livre:-0}" -lt "$ATUALIZAR_ESPACO_MINIMO_MB" ]; then
   erro "Espaço insuficiente em $APP_DIR: ${livre:-0} MB livres."
 fi
 
+executar_backup_obrigatorio
+
+ANTERIOR_COMMIT="$commit_atual"
+ANTERIOR_IMAGEM=""
+ANTERIOR_BACKUP="$imagem_backup_atual"
+garantir_imagem_anterior "$ANTERIOR_COMMIT" "$imagem_atual" "$imagem_backup_atual"
+
+log "Preparando o commit alvo em worktree isolada."
+criar_worktree "$alvo_commit"
+
 if [ "$alvo_modo" = "release" ]; then
   log "Baixando a imagem $alvo_imagem."
-  APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" compose pull app
-  if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-    compose --profile backup pull backup-planilhas; then
-    log "Imagem de backup não publicada; construindo a partir da aplicação."
-    APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-      compose --profile backup build backup-planilhas
+  APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" compose pull "$SERVIDOR_SERVICO_APP"
+
+  if [ "$BACKUP_PLANILHAS_HABILITADO" = "true" ]; then
+    if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
+      compose --profile backup pull "$SERVIDOR_SERVICO_BACKUP_PLANILHAS"; then
+      log "Imagem de backup não publicada; construindo a partir da aplicação."
+      construir_backup_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit"
+    fi
   fi
 else
-  log "Construindo a imagem $alvo_imagem."
-  APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" compose build app
-  APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-    compose --profile backup build backup-planilhas
-fi
-
-if [ -n "$commit_atual" ] &&
-  git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations | grep -q .; then
-  if [ "$permitir_migracoes" != "true" ]; then
-    erro "Há migrações novas. Revise e repita com --permitir-migracoes ou defina ATUALIZAR_PERMITIR_MIGRACOES=true."
+  log "Construindo a imagem $alvo_imagem a partir do commit alvo."
+  construir_app_na_worktree "$alvo_imagem" "$alvo_commit"
+  if [ "$BACKUP_PLANILHAS_HABILITADO" = "true" ]; then
+    construir_backup_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit"
   fi
 fi
 
-if [ "$ATUALIZAR_BACKUP_ANTES" = "true" ] && [ -n "$modo_atual" ]; then
-  log "Executando backup antes da atualização."
-  if ! "$DIR/backup-banco.sh"; then
-    erro "O backup falhou; a atualização foi cancelada."
-  fi
-else
-  log "Backup anterior não executado nesta atualização."
+if [ "$ATUALIZAR_VERIFICAR_IMAGEM" = "true" ]; then
+  verificar_imagem_alvo "$alvo_imagem" "$alvo_commit"
 fi
 
-anterior_commit=$(git -C "$APP_DIR" rev-parse HEAD)
-anterior_imagem="$imagem_atual"
-anterior_backup="$imagem_backup_atual"
-if [ -z "$anterior_imagem" ]; then
-  anterior_imagem="${APP_IMAGEM:-frequenciapp:main-${anterior_commit:0:12}}"
-fi
-if [ -z "$anterior_backup" ]; then
-  anterior_backup="${APP_IMAGEM_BACKUP:-frequenciapp-backup:main-${anterior_commit:0:12}}"
-fi
+validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
+  erro "A configuração do Compose não é válida na versão alvo."
 
 log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose config --quiet; then
-  git -C "$APP_DIR" checkout --detach "$anterior_commit"
-  erro "A configuração do Compose não é válida na versão alvo."
+  git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
+  erro "A configuração do Compose não é válida no checkout alvo."
 fi
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose up -d --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
-  log "A versão alvo não ficou saudável; iniciando rollback."
-  git -C "$APP_DIR" checkout --detach "$anterior_commit"
-  APP_IMAGEM="$anterior_imagem" APP_IMAGEM_BACKUP="$anterior_backup" \
-    COMMIT_SHA="$anterior_commit" compose up -d --wait --no-build --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE" ||
-    log "O rollback também falhou; intervenção manual necessária."
-  escrever_falha "$alvo_ref" "$alvo_commit" "Falha de saúde após a atualização."
-  notificar falha "Atualização falhou e o rollback foi tentado."
-  exit 1
+  falhar_atualizacao "Falha de saúde após a atualização." "$migracoes_novas"
 fi
 
 if [ -n "${ATUALIZAR_SAUDE_URL:-}" ]; then
   log "Conferindo $ATUALIZAR_SAUDE_URL."
   if ! curl -fsS --retry 12 --retry-delay 5 --retry-all-errors --max-time 15 "$ATUALIZAR_SAUDE_URL" >/dev/null; then
-    log "A saúde pública falhou; iniciando rollback."
-    git -C "$APP_DIR" checkout --detach "$anterior_commit"
-    APP_IMAGEM="$anterior_imagem" APP_IMAGEM_BACKUP="$anterior_backup" \
-      COMMIT_SHA="$anterior_commit" compose up -d --wait --no-build --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE" ||
-      log "O rollback também falhou; intervenção manual necessária."
-    escrever_falha "$alvo_ref" "$alvo_commit" "Falha na saúde pública após a atualização."
-    notificar falha "Atualização falhou na saúde pública."
-    exit 1
+    falhar_atualizacao "Falha na saúde pública após a atualização." "$migracoes_novas"
   fi
 fi
 

@@ -8,6 +8,9 @@ metadata:
     {{- include "frequenciapp.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.backup.database.schedule | quote }}
+  {{- with .Values.backup.database.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
   concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
   successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
@@ -59,6 +62,10 @@ spec:
                   value: "true"
                 - name: BACKUP_RETER_DIAS
                   value: {{ .Values.backup.retentionDays | quote }}
+                - name: BACKUP_RETER_MINIMO
+                  value: {{ .Values.backup.retentionMinimum | quote }}
+                - name: BACKUP_RETER_REMOTO
+                  value: {{ .Values.backup.remoteRetention | quote }}
                 - name: BACKUP_ESPACO_MINIMO_MB
                   value: {{ .Values.backup.minimumSpaceMB | quote }}
               resources:
