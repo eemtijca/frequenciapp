@@ -96,11 +96,14 @@ O CronJob chama notificações, fila e indicadores a cada cinco minutos. A URL i
 agenda:
   enabled: true
   schedule: "*/5 * * * *"
+  timeZone: "America/Fortaleza"
 ```
+
+O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior. Sem ele, o agendador usa o fuso do cluster. Os mesmos valores existem em `backup.database.timeZone` e `backup.spreadsheets.timeZone`.
 
 ## Backup
 
-O backup é opcional. O chart cria CronJobs separados para banco e planilhas quando `backup.enabled=true`.
+O backup é opcional. O chart cria CronJobs separados para banco e planilhas quando `backup.enabled=true`. `backup.retentionMinimum` preserva as cópias confirmadas e `backup.remoteRetention` habilita a limpeza remota opcional.
 
 O `backup.filesSecret` contém `rclone.conf`, `backup-publica.asc` e `age-recipients.txt`. O `backup.database.existingSecret` contém as variáveis do banco e o `backup.spreadsheets.existingSecret` contém as variáveis das planilhas.
 

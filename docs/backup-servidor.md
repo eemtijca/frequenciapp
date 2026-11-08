@@ -8,12 +8,12 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 
 ## Proteções
 
-- O dump é cifrado antes de sair do servidor.
+- O dump é cifrado em fluxo, sem arquivo temporário em texto claro.
 - A chave privada fica fora do servidor, em cofre ou gerenciador de senhas.
-- A cópia remota é conferida por download e SHA-256.
+- A cópia remota é conferida por download e comparação com o hash local original.
 - O envio usa `rclone copy --immutable`, sem espelhar exclusões.
-- O destino remoto não tem expurgo automático.
-- A retenção local preserva sempre a cópia mais recente.
+- O destino remoto não tem expurgo automático, salvo `BACKUP_RETER_REMOTO=true`.
+- A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de cinco.
 - Falhas retornam código 1 e não gravam confirmação.
 - Nenhum teste usa dados reais.
 
@@ -34,6 +34,7 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A imagem de backup já inclui o cliente.
 - Usar uma role somente leitura com `pg_read_all_data` quando possível.
 - A Transaction pooler do Supabase não é adequada para `pg_dump`.
+- A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. A opção `--sem-validacao` é uma decisão explícita de risco.
 
 ## Imagem de backup
 
@@ -131,44 +132,48 @@ Regras:
 
 ## Variáveis do backup
 
-| Variável                   | Padrão                                | Uso                                |
-| -------------------------- | ------------------------------------- | ---------------------------------- |
-| `BACKUP_MODO`              | `compose` no host, `url` no contêiner | Origem do dump                     |
-| `BACKUP_DATABASE_URL`      | vazio                                 | URL para modo `url`                |
-| `BACKUP_DIR`               | `/var/backups/frequenciapp`           | Diretório local                    |
-| `BACKUP_BANCO_DIR`         | `BACKUP_DIR/banco`                    | Dumps do banco                     |
-| `BACKUP_PLANILHAS_DIR`     | `BACKUP_DIR/planilhas`                | Cópias das planilhas               |
-| `BACKUP_RETER_DIAS`        | `30`                                  | Retenção local                     |
-| `BACKUP_ESPACO_MINIMO_MB`  | `512`                                 | Espaço mínimo antes do dump        |
-| `BACKUP_CRIPTOGRAFIA`      | `gpg`                                 | `gpg` ou `age`                     |
-| `BACKUP_GPG_DESTINATARIO`  | vazio                                 | Fingerprint ou e-mail              |
-| `BACKUP_GPG_CHAVE_PUBLICA` | vazio                                 | Chave pública GPG                  |
-| `BACKUP_AGE_DESTINATARIOS` | vazio                                 | Arquivo de destinatários age       |
-| `BACKUP_REMOTO`            | vazio                                 | Destino rclone do banco            |
-| `BACKUP_RCLONE_CONFIG`     | vazio                                 | Configuração do rclone             |
-| `RCLONE_CONFIG_PASS`       | vazio                                 | Senha da configuração do rclone    |
-| `BACKUP_VERIFICAR_REMOTO`  | `true`                                | Confere o arquivo remoto           |
-| `BACKUP_INCLUIR_AMBIENTE`  | `true` no Compose                     | Cifra o `app.env` junto            |
-| `BACKUP_AMBIENTE_ARQUIVO`  | `/etc/frequenciapp/app.env`           | Arquivo de ambiente                |
-| `BACKUP_PLANILHAS_LOCAL`   | `true`                                | Copia o ZIP confirmado para o host |
-| `BACKUP_ORIGEM`            | vazio                                 | Origem rclone das planilhas        |
-| `BACKUP_DESTINO`           | vazio                                 | Destino rclone das planilhas       |
-| `BACKUP_CHAVE`             | vazio                                 | Chave do ZIP AES-256 das planilhas |
+| Variável                           | Padrão                                | Uso                                |
+| ---------------------------------- | ------------------------------------- | ---------------------------------- |
+| `BACKUP_MODO`                      | `compose` no host, `url` no contêiner | Origem do dump                     |
+| `BACKUP_DATABASE_URL`              | vazio                                 | URL para modo `url`                |
+| `BACKUP_DIR`                       | `/var/backups/frequenciapp`           | Diretório local                    |
+| `BACKUP_BANCO_DIR`                 | `BACKUP_DIR/banco`                    | Dumps do banco                     |
+| `BACKUP_PLANILHAS_DIR`             | `BACKUP_DIR/planilhas`                | Cópias das planilhas               |
+| `BACKUP_RETER_DIAS`                | `30`                                  | Retenção local                     |
+| `BACKUP_RETER_MINIMO`              | `5`                                   | Cópias confirmadas sempre mantidas |
+| `BACKUP_RETER_REMOTO`              | `false`                               | Limpeza remota opcional            |
+| `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | Banco descartável no modo URL      |
+| `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior          |
+| `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump        |
+| `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                     |
+| `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint ou e-mail              |
+| `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                  |
+| `BACKUP_AGE_DESTINATARIOS`         | vazio                                 | Arquivo de destinatários age       |
+| `BACKUP_REMOTO`                    | vazio                                 | Destino rclone do banco            |
+| `BACKUP_RCLONE_CONFIG`             | vazio                                 | Configuração do rclone             |
+| `RCLONE_CONFIG_PASS`               | vazio                                 | Senha da configuração do rclone    |
+| `BACKUP_VERIFICAR_REMOTO`          | `true`                                | Confere o arquivo remoto           |
+| `BACKUP_INCLUIR_AMBIENTE`          | `true` no Compose                     | Cifra o `app.env` junto            |
+| `BACKUP_AMBIENTE_ARQUIVO`          | `/etc/frequenciapp/app.env`           | Arquivo de ambiente                |
+| `BACKUP_PLANILHAS_LOCAL`           | `true`                                | Copia o ZIP confirmado para o host |
+| `BACKUP_ORIGEM`                    | vazio                                 | Origem rclone das planilhas        |
+| `BACKUP_DESTINO`                   | vazio                                 | Destino rclone das planilhas       |
+| `BACKUP_CHAVE`                     | vazio                                 | Chave do ZIP AES-256 das planilhas |
 
 ## Fluxo do banco
 
 1. Validar ambiente, permissões, espaço e trava.
-2. Executar `pg_dump -Fc`.
+2. Executar `pg_dump -Fc` em um fluxo que passa por `pg_restore -l` e pela cifra.
 3. Usar `--schema` quando `DATABASE_SCHEMA` estiver definida.
-4. Validar o arquivo com `pg_restore -l`.
-5. Calcular SHA-256.
-6. Cifrar com GPG ou age.
-7. Calcular SHA-256 do arquivo cifrado.
-8. Copiar para o diretório local.
-9. Enviar com `rclone copy --immutable`.
-10. Baixar o arquivo remoto e comparar o SHA-256.
-11. Gravar `ultimo-backup.json` apenas após sucesso.
-12. Aplicar a retenção local.
+4. Confirmar que o fluxo passou na validação do `pg_restore`.
+5. Calcular SHA-256 do arquivo cifrado.
+6. Cifrar o arquivo de ambiente pela entrada padrão, quando configurado.
+7. Copiar para o diretório local.
+8. Enviar com `rclone copy --immutable` e guardar o hash local.
+9. Baixar cada arquivo remoto e comparar com o hash local original.
+10. Gravar `ultimo-backup.json` apenas após sucesso.
+11. Aplicar a retenção local com o mínimo de cópias.
+12. Aplicar a retenção remota somente se ela estiver habilitada.
 
 Execução manual no Compose:
 
@@ -212,14 +217,15 @@ frequenciapp-20261107T033000Z-a1b2c3d4-ambiente.env.gpg.sha256
 
 ## Retenção local
 
-`BACKUP_RETER_DIAS` define a retenção. A rotina:
+`BACKUP_RETER_DIAS` define a retenção por idade e `BACKUP_RETER_MINIMO` define o número de cópias confirmadas que nunca são removidas, com padrão de cinco. A rotina:
 
 - remove apenas arquivos com o prefixo `frequenciapp-`;
-- nunca remove a cópia mais recente;
-- não mexe no destino remoto;
+- preserva sempre as `BACKUP_RETER_MINIMO` cópias mais recentes, mesmo acima do limite de idade;
+- remove as cópias mais antigas somente quando existem cópias confirmadas além do mínimo;
+- não roda se o upload ou a verificação remota falhar;
 - pode ser desativada com `BACKUP_RETER_DIAS=0`.
 
-O destino remoto deve usar versionamento, object lock ou política de ciclo de vida definida pela escola. O histórico do provedor não é uma política de retenção.
+`BACKUP_RETER_REMOTO=true` aplica os mesmos limites ao destino remoto. A limpeza remota é opcional e não exclui nada em caso de falha. O destino remoto deve usar versionamento, object lock ou política de ciclo de vida definida pela escola. O histórico do provedor não é uma política de retenção.
 
 ## Restauração
 
@@ -233,24 +239,32 @@ scripts/servidor/restaurar.sh \
 
 O script:
 
-1. Confere o checksum, quando o arquivo `.sha256` existe.
-2. Decifra com GPG ou age.
-3. Para a aplicação.
-4. Cria uma cópia de segurança antes da restauração, salvo `--sem-copia`.
-5. Recria o banco.
-6. Executa `pg_restore`.
-7. Sobe a aplicação e aguarda a saúde.
+1. Monta e confere a instalação Compose.
+2. Confere o checksum, quando o arquivo `.sha256` existe.
+3. Decifra com GPG ou age em diretório privado.
+4. Valida o formato com `pg_restore -l`.
+5. Cria um banco descartável e restaura o dump nele.
+6. Confere o histórico de migrações, as tabelas e os dados no banco validado.
+7. Cria uma cópia de segurança antes da troca, salvo `--sem-copia`.
+8. Para a aplicação.
+9. Renomeia o banco em uso para um nome de recuperação e o banco validado para o nome de produção.
+10. Sobe a aplicação e aguarda a saúde.
+11. Em falha, mantém ou volta ao banco anterior e tenta religar a aplicação.
+12. Preserva o banco anterior até a conferência, salvo `RESTAURAR_MANTER_ANTERIOR=false`.
+
+O banco anterior não é descartado automaticamente. Depois de conferir login, saúde e migrações, remova-o com o comando exibido pelo script.
 
 ### URL externa
 
 ```bash
-scripts/servidor/restaurar.sh \
+BACKUP_RESTAURACAO_URL_VALIDACAO='postgresql://usuario:senha@host:5432/frequencia_validacao' \
+  scripts/servidor/restaurar.sh \
   --arquivo /caminho/backup.dump.age \
   --confirmar \
   --sem-copia
 ```
 
-No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo.
+No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo. A URL de validação precisa apontar para um banco descartável e ser diferente da URL de destino. A opção `--sem-validacao` substitui o banco sem o ensaio prévio e deve ser usada somente com uma decisão registrada.
 
 ### Restauração com chave offline
 
@@ -271,6 +285,16 @@ O script aceita `--entrada -` e não grava o dump em texto puro no servidor.
 - Conferir contagens agregadas.
 - Revisar a fila e os vínculos das planilhas antes de reativar envios.
 - Conferir o `AUTH_SECRET` usado. Um segredo diferente exige reconectar o Google.
+- Conferir o banco anterior e removê-lo somente depois da validação.
+- Conferir `ultima-restauracao.json` em `/var/lib/frequenciapp`.
+
+### Escopo e objetos globais
+
+O dump usa `--schema` quando `DATABASE_SCHEMA` está definida e exclui publicações e assinaturas. Roles, ACLs, extensões e outros objetos globais não fazem parte do arquivo e precisam existir ou ser recriados no destino. A restauração usa `--no-owner` e `--no-acl`, portanto as permissões são definidas pela role que executa o comando.
+
+### Privacidade dos temporários
+
+O backup cifra o dump em fluxo. A restauração decifra em um diretório temporário com permissão restrita e o remove ao final, inclusive em falha. Um arquivo recebido por `--entrada -` também é gravado apenas nesse diretório privado.
 
 ## Backup das planilhas
 
@@ -337,10 +361,15 @@ Regras:
 - Dump nos modos `compose` e `url`.
 - Cifra GPG e age.
 - Upload e conferência por rclone local.
-- Restauração em banco separado.
-- Falha de dump, cifra, upload e verificação.
+- Restauração em banco separado e comparação de dados, schema e migrações.
+- Falha de dump, cifra, upload, verificação, checksum e permissões.
+- Detecção de arquivo e checksum remotos adulterados.
+- Retenção mínima de cinco cópias e preservação após falha.
+- Fluxo URL separado do Compose.
 - Limpeza de temporários.
 - Verificação de permissões e ausência de segredos em log.
+
+Os comandos estão em `tests/servidor/README.md`. O fluxo `Servidor` do GitHub Actions executa ShellCheck, a validação dos arquivos de servidor e os ensaios descartáveis.
 
 ## Diagnóstico
 
@@ -367,5 +396,7 @@ Regras:
 - Conferir checksum.
 - Conferir se a chave privada é a mesma da cópia.
 - Conferir versão do `pg_restore`.
-- Conferir permissões da role.
-- Conferir se o banco está vazio ou se `--clean` é permitido.
+- Conferir permissões da role e a permissão para criar, renomear e remover bancos.
+- Conferir `BACKUP_RESTAURACAO_URL_VALIDACAO` no modo URL.
+- Conferir se a aplicação voltou após o rollback e se o banco anterior permanece.
+- Conferir `ultima-restauracao.json` em `/var/lib/frequenciapp`.

@@ -10,6 +10,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
+
+- A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
+
+- O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
+
+- O instalador das rotinas valida o fuso do daemon do cron e só grava `CRON_TZ` quando a implementação comprova suporte. Os CronJobs do Helm aceitam `timeZone`.
+
 - O seletor de turmas da Chamada deixa de mostrar o ícone de confirmação ao lado da série selecionada. A série escolhida continua destacada pela cor e, em cores forçadas, pela borda do bloco.
 
 - As colunas de situação, registro na Seduc e ações da Chamada Parcial ficam alinhadas quando há espaço no cartão. Em áreas estreitas, a disposição se adapta sem cortar as ações, inclusive com fonte ampliada.
