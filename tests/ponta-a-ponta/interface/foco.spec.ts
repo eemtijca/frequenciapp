@@ -1,6 +1,6 @@
 // Confere o contorno de foco em diálogos, menus e seletores reais do aplicativo.
 import { expect, test, type Page } from "@playwright/test";
-import { abrirMenuConta, aguardarHidratacao } from "../helpers/pagina";
+import { abrirDiaSeResumo, abrirMenuConta, aguardarHidratacao } from "../helpers/pagina";
 
 async function indicadorDeFoco(page: Page): Promise<boolean> {
   return page.evaluate(() => {
@@ -41,6 +41,7 @@ test.describe("foco em componentes reais", () => {
     await page.addInitScript(() => localStorage.setItem("theme", "light"));
     await page.goto("/");
     await aguardarHidratacao(page);
+    await abrirDiaSeResumo(page);
     const gatilho = page.locator("#dia-painel");
     await gatilho.click();
     const calendario = page.getByRole("dialog", { name: /Dia do painel/ });
