@@ -45,7 +45,7 @@ describe("servidor auto-hospedado", () => {
     expect(https).toContain("X-Forwarded-Proto");
   });
 
-  it("mantém backup com Compose, URL, GPG e age", async () => {
+  it("mantém backup com Compose, URL, GPG, age e retenção mínima", async () => {
     const backup = await ler("scripts/servidor/backup-banco.sh");
     const imagem = await ler("infra/servidor/backup/Dockerfile");
 
@@ -56,20 +56,53 @@ describe("servidor auto-hospedado", () => {
     expect(backup).toContain("pg_restore -l");
     expect(backup).toContain("sha256sum");
     expect(backup).toContain("rclone_limpo copy");
+    expect(backup).toContain("BACKUP_RETER_MINIMO");
+    expect(backup).toContain("BACKUP_RETER_REMOTO");
+    expect(backup).toContain("--verificar");
+    expect(backup).toContain("gerar_dump_cifrado");
+    expect(backup).toContain("hashes[$nome]");
     expect(imagem).toContain("postgresql-client-17");
     expect(imagem).toContain("rclone");
     expect(imagem).toContain("age");
   });
 
-  it("mantém atualização com modos, backup, migração e rollback", async () => {
+  it("monta e confere a instalação antes das rotinas", async () => {
+    const comum = await ler("scripts/servidor/comum.sh");
+
+    expect(comum).toContain("COMPOSE_ARQUIVOS");
+    expect(comum).toContain("SERVIDOR_SERVICO_APP");
+    expect(comum).toContain("verificar_instalacao");
+    expect(comum).toContain("config --services");
+    expect(comum).toContain("--project-directory");
+  });
+
+  it("mantém atualização com worktree, backup obrigatório, migração e rollback", async () => {
     const atualizar = await ler("scripts/servidor/atualizar.sh");
+    const dockerfile = await ler("Dockerfile");
+    const compose = await ler("compose.yml");
 
     expect(atualizar).toContain("auto | release | main");
-    expect(atualizar).toContain("ATUALIZAR_BACKUP_ANTES");
+    expect(atualizar).toContain("validar_backup_obrigatorio");
+    expect(atualizar).toContain("worktree add");
     expect(atualizar).toContain("prisma/migrations");
     expect(atualizar).toContain("--permitir-migracoes");
     expect(atualizar).toContain("checkout --detach");
     expect(atualizar).toContain("escrever_falha");
+    expect(atualizar).toContain("org.opencontainers.image.revision");
+    expect(atualizar).toContain("migracoesPossivelmenteAplicadas");
+    expect(dockerfile).toContain("org.opencontainers.image.revision");
+    expect(compose).toContain("COMMIT_SHA: ${COMMIT_SHA:-}");
+  });
+
+  it("restaura em banco validado e preserva o banco anterior", async () => {
+    const restaurar = await ler("scripts/servidor/restaurar.sh");
+
+    expect(restaurar).toContain("BACKUP_RESTAURACAO_URL_VALIDACAO");
+    expect(restaurar).toContain("--clean --if-exists");
+    expect(restaurar).toContain("banco_temp");
+    expect(restaurar).toContain("alter database");
+    expect(restaurar).toContain("RESTAURAR_MANTER_ANTERIOR");
+    expect(restaurar).toContain("pg_restore -l");
   });
 
   it("mantém as rotinas com trava e limpeza", async () => {
@@ -103,11 +136,33 @@ describe("servidor auto-hospedado", () => {
       "BACKUP_CRIPTOGRAFIA=gpg",
       "BACKUP_GPG_DESTINATARIO=",
       "BACKUP_MODO=compose",
+      "BACKUP_RETER_MINIMO=5",
+      "BACKUP_RETER_REMOTO=false",
       "ATUALIZAR_MODO=auto",
+      "ATUALIZAR_VERIFICAR_IMAGEM=true",
+      "RESTAURAR_MANTER_ANTERIOR=true",
       "AGENDA_HORARIO=",
+      "CRON_TZ=",
     ]) {
       expect(exemplo, variavel).toContain(variavel);
     }
+  });
+
+  it("valida o fuso do cron e agenda os CronJobs do Kubernetes", async () => {
+    const instalador = await ler("scripts/servidor/instalar-rotinas.sh");
+    const agenda = await ler("infra/kubernetes/frequenciapp/templates/cronjob-agenda.yaml");
+    const backupBanco = await ler(
+      "infra/kubernetes/frequenciapp/templates/cronjob-backup-banco.yaml",
+    );
+    const valores = await ler("infra/kubernetes/frequenciapp/values.yaml");
+
+    expect(instalador).toContain("CRON_FUSO_SISTEMA");
+    expect(instalador).toContain("cron_suporta_tz");
+    expect(instalador).toContain("servidor.template");
+    expect(agenda).toContain("agenda.timeZone");
+    expect(backupBanco).toContain("backup.database.timeZone");
+    expect(valores).toContain("retentionMinimum: 5");
+    expect(valores).toContain("remoteRetention: false");
   });
 
   it("libera o Caddyfile do servidor e ignora certificados internos", async () => {

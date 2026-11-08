@@ -8,6 +8,9 @@ metadata:
     {{- include "frequenciapp.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.backup.spreadsheets.schedule | quote }}
+  {{- with .Values.backup.spreadsheets.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
   concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
   successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}

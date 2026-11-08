@@ -22,3 +22,5 @@ RUN apt-get update \
   && apt-get clean
 
 USER node
+# Fora do Compose, a imagem não tem acesso ao serviço db. O modo URL é o padrão.
+ENV BACKUP_MODO=url
