@@ -21,6 +21,8 @@
     "test:componentes": "vitest run --config tests/componentes/vitest.config.ts && playwright test --config=playwright.graficos-visibilidade.config.ts",
     "test:graficos-visibilidade": "playwright test --config=playwright.graficos-visibilidade.config.ts",
     "test:api": "vitest run --config vitest.api.config.ts",
+    "test:servidor": "bash tests/servidor/executar.sh",
+    "test:servidor:rapido": "bash tests/servidor/atualizacao.sh",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
