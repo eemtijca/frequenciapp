@@ -4,5 +4,21 @@
   "buildCommand": "pnpm run vercel-build",
   "installCommand": "NODE_ENV=development pnpm install --frozen-lockfile",
   "outputDirectory": ".next",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "git": {
+    "deploymentEnabled": {
+      "fix/contrato-operacional": false,
+      "fix/historico-chamadas": false,
+      "fix/historico-movimentacoes": false,
+      "fix/fila-recuperavel": false,
+      "fix/rotinas-configuraveis": false,
+      "fix/ambiente-execucao": false,
+      "fix/catalogo-backups": false,
+      "fix/fluxo-restauracao": false,
+      "fix/persistencia-local": false,
+      "fix/rotinas-http": false,
+      "fix/rotinas-preview": false,
+      "fix/publicacao-revisao": false
+    }
+  }
 }
