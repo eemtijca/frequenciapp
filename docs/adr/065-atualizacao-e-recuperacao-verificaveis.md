@@ -27,6 +27,7 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - Migrações novas continuam bloqueadas por padrão.
 - O rollback volta a imagem e o commit, mas não desfaz migrações aplicadas. A falha registra essa possibilidade e a recuperação do banco é feita pelo script de restauração.
 - A atualização preserva o mesmo projeto e os mesmos volumes do Compose.
+- A simulação consulta somente objetos e referências Git locais, sem fetch, alteração do índice, escrita de estado ou aquisição de trava. Ela não chama Docker e não atesta configuração, imagem ou saúde. Referência ou objetos locais ausentes bloqueiam a simulação sem busca implícita; falha na comparação de migrações não equivale a ausência de migrações. Registrar estado durante a simulação é recusado.
 
 ### Backup
 

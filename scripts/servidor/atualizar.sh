@@ -6,31 +6,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=comum.sh
 . "$DIR/comum.sh"
 
-carregar_ambiente
-travar atualizacao 0
-
-if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
-  [ "${ATUALIZAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
-  ATUALIZAR_SAUDE_URL="https://${DOMINIO}/api/saude"
-fi
-
-ATUALIZAR_MODO="${ATUALIZAR_MODO:-auto}"
-ATUALIZAR_REF="${ATUALIZAR_REF:-origin/main}"
-ATUALIZAR_REMOTO="${ATUALIZAR_REMOTO:-origin}"
-ATUALIZAR_BACKUP_ANTES="${ATUALIZAR_BACKUP_ANTES:-true}"
-ATUALIZAR_PERMITIR_MIGRACOES="${ATUALIZAR_PERMITIR_MIGRACOES:-false}"
-ATUALIZAR_VERIFICAR_IMAGEM="${ATUALIZAR_VERIFICAR_IMAGEM:-true}"
-ATUALIZAR_TIMEOUT_SAUDE="${ATUALIZAR_TIMEOUT_SAUDE:-180}"
-ATUALIZAR_ESPACO_MINIMO_MB="${ATUALIZAR_ESPACO_MINIMO_MB:-2048}"
-APP_IMAGEM_REPOSITORIO="${APP_IMAGEM_REPOSITORIO:-ghcr.io/eemtijca/frequenciapp}"
-APP_IMAGEM_BACKUP_REPOSITORIO="${APP_IMAGEM_BACKUP_REPOSITORIO:-${APP_IMAGEM_REPOSITORIO}-backup}"
-BACKUP_PLANILHAS_HABILITADO="${BACKUP_PLANILHAS_HABILITADO:-true}"
-
 simular=false
 forcar=false
 modo_override=""
 registrar=false
-permitir_migracoes="$ATUALIZAR_PERMITIR_MIGRACOES"
+permitir_migracoes_por_opcao=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -47,7 +27,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --permitir-migracoes)
-      permitir_migracoes=true
+      permitir_migracoes_por_opcao=true
       shift
       ;;
     --modo)
@@ -65,6 +45,42 @@ TEXTO
       ;;
   esac
 done
+
+if [ "$simular" = true ] && [ "$registrar" = true ]; then
+  erro "A simulação não permite registrar estado."
+fi
+
+if [ "$simular" = true ]; then
+  # Impede atualização opcional do índice e busca implícita de objetos ausentes.
+  export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
+fi
+
+carregar_ambiente
+
+ATUALIZAR_MODO="${ATUALIZAR_MODO:-auto}"
+ATUALIZAR_REF="${ATUALIZAR_REF:-origin/main}"
+ATUALIZAR_REMOTO="${ATUALIZAR_REMOTO:-origin}"
+ATUALIZAR_BACKUP_ANTES="${ATUALIZAR_BACKUP_ANTES:-true}"
+ATUALIZAR_PERMITIR_MIGRACOES="${ATUALIZAR_PERMITIR_MIGRACOES:-false}"
+ATUALIZAR_VERIFICAR_IMAGEM="${ATUALIZAR_VERIFICAR_IMAGEM:-true}"
+ATUALIZAR_TIMEOUT_SAUDE="${ATUALIZAR_TIMEOUT_SAUDE:-180}"
+ATUALIZAR_ESPACO_MINIMO_MB="${ATUALIZAR_ESPACO_MINIMO_MB:-2048}"
+APP_IMAGEM_REPOSITORIO="${APP_IMAGEM_REPOSITORIO:-ghcr.io/eemtijca/frequenciapp}"
+APP_IMAGEM_BACKUP_REPOSITORIO="${APP_IMAGEM_BACKUP_REPOSITORIO:-${APP_IMAGEM_REPOSITORIO}-backup}"
+BACKUP_PLANILHAS_HABILITADO="${BACKUP_PLANILHAS_HABILITADO:-true}"
+permitir_migracoes="$ATUALIZAR_PERMITIR_MIGRACOES"
+if [ "$permitir_migracoes_por_opcao" = true ]; then
+  permitir_migracoes=true
+fi
+
+if [ "$simular" = false ]; then
+  travar atualizacao 0
+fi
+
+if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
+  [ "${ATUALIZAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
+  ATUALIZAR_SAUDE_URL="https://${DOMINIO}/api/saude"
+fi
 
 if [ "$ATUALIZAR_BACKUP_ANTES" != "true" ]; then
   erro "O backup anterior é obrigatório. ATUALIZAR_BACKUP_ANTES=false não é aceito."
@@ -274,7 +290,19 @@ falhar_atualizacao() {
 }
 
 [ -d "$APP_DIR/.git" ] || erro "Checkout Git não encontrado em $APP_DIR."
-verificar_instalacao
+if [ "$simular" = true ] && ! git --no-lazy-fetch --version >/dev/null 2>&1; then
+  # Git anterior a 2.45 ignora GIT_NO_LAZY_FETCH; recusa clones parciais antes de consultar objetos.
+  if git -C "$APP_DIR" config --get-regexp \
+    '^(extensions\.partialclone|remote\..*\.(promisor|partialclonefilter))$' >/dev/null; then
+    erro "Não foi possível comparar as migrações sem busca implícita: este Git não permite simular clones parciais."
+  else
+    status_config=$?
+    [ "$status_config" -eq 1 ] || erro "Não foi possível verificar a configuração Git para a simulação."
+  fi
+fi
+if [ "$simular" = false ]; then
+  verificar_instalacao
+fi
 
 if [ "$registrar" = true ]; then
   if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
@@ -299,8 +327,12 @@ if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
   erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de atualizar."
 fi
 
-log "Buscando referências em $ATUALIZAR_REMOTO."
-git -C "$APP_DIR" fetch --tags --prune --force "$ATUALIZAR_REMOTO"
+if [ "$simular" = true ]; then
+  log "Simulação com referências locais; o remoto não será consultado nem atualizado."
+else
+  log "Buscando referências em $ATUALIZAR_REMOTO."
+  git -C "$APP_DIR" fetch --tags --prune --force "$ATUALIZAR_REMOTO"
+fi
 
 tag_estavel=$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname |
   grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
@@ -350,7 +382,12 @@ definir_release() {
 definir_main() {
   alvo_modo="main"
   alvo_ref="$ATUALIZAR_REF"
-  alvo_commit=$(git -C "$APP_DIR" rev-parse "$ATUALIZAR_REF")
+  if ! alvo_commit=$(git -C "$APP_DIR" rev-parse --verify --end-of-options "$ATUALIZAR_REF^{commit}" 2>/dev/null); then
+    if [ "$simular" = true ]; then
+      erro "A referência local $ATUALIZAR_REF não está disponível. A simulação não busca objetos ausentes."
+    fi
+    erro "A referência $ATUALIZAR_REF não está disponível após a busca no remoto."
+  fi
   alvo_imagem="${APP_IMAGEM_REPOSITORIO}:main-${alvo_commit:0:12}"
   alvo_backup="${APP_IMAGEM_BACKUP_REPOSITORIO}:main-${alvo_commit:0:12}"
 }
@@ -385,13 +422,14 @@ log "Modo atual: ${modo_atual:-desconhecido}; modo alvo: $alvo_modo."
 log "Referência alvo: $alvo_ref ($alvo_commit)."
 
 migracoes_novas=false
-migracoes=$(git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations || true)
+migracoes=$(git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations) ||
+  erro "Não foi possível comparar as migrações entre o estado atual e o alvo com os objetos disponíveis."
 if [ -n "$migracoes" ]; then
   migracoes_novas=true
 fi
 
 if [ "$simular" = true ]; then
-  log "Simulação: nenhuma alteração será aplicada."
+  log "Simulação: nenhuma alteração será aplicada; configuração Compose, imagem e saúde não foram verificadas."
   log "Backup obrigatório antes da aplicação: sim."
   if [ "$migracoes_novas" = true ]; then
     if [ "$permitir_migracoes" = "true" ]; then

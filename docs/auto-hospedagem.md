@@ -295,6 +295,8 @@ scripts/servidor/atualizar.sh --permitir-migracoes
 scripts/servidor/atualizar.sh --registrar
 ```
 
+O modo `--simular` usa somente referências e objetos Git já disponíveis localmente. Ele não faz fetch, não atualiza tags ou referências, não altera o índice nem `FETCH_HEAD`, não cria estado ou trava e não chama Docker, backup ou build. A saída não comprova que o remoto esteja atualizado, nem valida Compose, imagem ou saúde. Se a referência alvo ou os objetos necessários para comparar as migrações não estiverem disponíveis localmente, inclusive em clone parcial, a simulação recusa com diagnóstico, sem buscá-los. Falha de comparação não equivale a ausência de migrações. A combinação `--simular --registrar` é recusada. Quando o Git não oferece a opção `--no-lazy-fetch`, clones parciais são recusados preventivamente nesse modo; clones completos continuam aceitos. A operação normal mantém sua busca explícita de referências.
+
 A primeira instalação pode ser registrada com `--registrar` depois da subida manual. O modo `auto` usa o estado em `/var/lib/frequenciapp/estado.json`.
 
 O Kubernetes e as plataformas gerenciadas usam o próprio rollout. O contrato da aplicação e a imagem publicada são os mesmos.

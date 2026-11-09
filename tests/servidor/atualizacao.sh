@@ -224,13 +224,61 @@ grep -q 'APP_IMAGEM_BACKUP=teste/backup' "$DOCKER_LOG" || falhar "a imagem de ba
 grep -q 'frequenciapp-atualizacao.*build app' "$DOCKER_LOG" ||
   falhar "a imagem não foi construída na worktree isolada."
 
-# A simulação não altera commit nem executa backup ou build.
+# A simulação usa somente referências locais e não cria estado operacional.
 preparar_repositorio
+git -C "$REPO" tag v1.2.3 "$COMMIT_ANTERIOR"
+git --git-dir="$REMOTO" update-ref refs/tags/v1.2.3 "$COMMIT_ALVO"
+git -C "$REPO" update-ref refs/remotes/origin/removida "$COMMIT_ANTERIOR"
+refs_antes=$(git -C "$REPO" show-ref)
+refs_remoto_antes=$(git --git-dir="$REMOTO" show-ref)
+indice_antes=$(sha256sum "$REPO/.git/index")
+worktrees_antes=$(git -C "$REPO" worktree list --porcelain)
+[ ! -e "$REPO/.git/FETCH_HEAD" ] || falhar "a fixture já contém FETCH_HEAD."
+rm -rf "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_DIR"
 status=$(executar_atualizacao --simular)
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a simulação falhou."; }
 [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_ANTERIOR" ] || falhar "a simulação alterou o commit."
+[ "$(git -C "$REPO" show-ref)" = "$refs_antes" ] || falhar "a simulação alterou referências ou tags locais."
+[ "$(git --git-dir="$REMOTO" show-ref)" = "$refs_remoto_antes" ] || falhar "a simulação alterou referências ou tags do remoto local."
+[ "$(sha256sum "$REPO/.git/index")" = "$indice_antes" ] || falhar "a simulação alterou o índice."
+[ "$(git -C "$REPO" worktree list --porcelain)" = "$worktrees_antes" ] || falhar "a simulação alterou worktrees."
+[ ! -e "$REPO/.git/FETCH_HEAD" ] || falhar "a simulação criou FETCH_HEAD."
+[ ! -e "$ESTADO_DIR" ] || falhar "a simulação criou estado ou trava."
+[ ! -e "$LOG_DIR" ] || falhar "a simulação criou diretório de log."
+[ ! -e "$BACKUP_DIR" ] || falhar "a simulação criou diretório de backup."
 [ ! -s "$BACKUP_CHAMADAS" ] || falhar "a simulação executou backup."
-! grep -q 'build ' "$DOCKER_LOG" || falhar "a simulação executou build."
+[ ! -s "$DOCKER_LOG" ] || falhar "a simulação chamou Docker."
+grep -q 'referências locais' "$TMP_RAIZ/saida.log" || falhar "a simulação não informou o uso de referências locais."
+
+# Estado e FETCH_HEAD preexistentes também permanecem byte a byte.
+mkdir -p "$ESTADO_DIR"
+printf '{"modo":"main","commit":"%s"}\n' "$COMMIT_ANTERIOR" >"$ESTADO_DIR/estado.json"
+printf 'trava anterior\n' >"$ESTADO_DIR/atualizacao.lock"
+printf 'busca anterior\n' >"$REPO/.git/FETCH_HEAD"
+arquivos_antes=$(sha256sum "$ESTADO_DIR/estado.json" "$ESTADO_DIR/atualizacao.lock" "$REPO/.git/FETCH_HEAD")
+status=$(executar_atualizacao --simular)
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a simulação com estado anterior falhou."; }
+[ "$(sha256sum "$ESTADO_DIR/estado.json" "$ESTADO_DIR/atualizacao.lock" "$REPO/.git/FETCH_HEAD")" = "$arquivos_antes" ] ||
+  falhar "a simulação alterou o estado, a trava ou FETCH_HEAD anteriores."
+
+# Registrar estado não é uma operação permitida durante simulação.
+preparar_repositorio
+rm -rf "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_DIR"
+status=$(executar_atualizacao --simular --registrar)
+exigir_falha "$status" "a simulação permitiu registrar estado."
+[ ! -e "$ESTADO_DIR" ] || falhar "o registro recusado criou estado ou trava."
+[ ! -e "$REPO/.git/FETCH_HEAD" ] || falhar "o registro recusado buscou referências."
+[ ! -s "$DOCKER_LOG" ] || falhar "o registro recusado chamou Docker."
+
+# Referência ausente é diagnosticada sem uma busca implícita no remoto.
+preparar_repositorio
+rm -rf "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_DIR"
+status=$(ATUALIZAR_REF=origin/inexistente executar_atualizacao --simular)
+exigir_falha "$status" "a simulação aceitou referência local ausente."
+grep -q 'referência local' "$TMP_RAIZ/saida.log" || falhar "a referência ausente não teve diagnóstico claro."
+[ ! -e "$ESTADO_DIR" ] || falhar "a referência ausente criou estado ou trava."
+[ ! -e "$REPO/.git/FETCH_HEAD" ] || falhar "a referência ausente foi buscada no remoto."
+[ ! -s "$DOCKER_LOG" ] || falhar "a referência ausente chamou Docker."
 
 # Árvore suja é recusada antes de qualquer alteração.
 preparar_repositorio
@@ -292,5 +340,67 @@ status=$(executar_atualizacao)
 unset BACKUP_PLANILHAS_HABILITADO
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a atualização sem backup de planilhas falhou."; }
 ! grep -q 'teste/backup' "$DOCKER_LOG" || falhar "a imagem opcional foi construída."
+
+# Um clone parcial mantém os commits disponíveis, mas não a árvore do alvo.
+preparar_clone_parcial() {
+  preparar_repositorio
+  git -C "$REPO" reset -q --hard "$COMMIT_ALVO"
+  mkdir -p "$REPO/prisma/migrations/0002_parcial"
+  printf 'select 1;\n' >"$REPO/prisma/migrations/0002_parcial/migration.sql"
+  git -C "$REPO" add prisma
+  git -C "$REPO" commit -qm "migracao do clone parcial"
+  git -C "$REPO" push -q origin main "$COMMIT_ANTERIOR:refs/heads/stable"
+  COMMIT_ALVO=$(git -C "$REPO" rev-parse HEAD)
+  ARVORE_ALVO=$(git -C "$REPO" rev-parse 'HEAD^{tree}')
+  git --git-dir="$REMOTO" config uploadpack.allowFilter true
+  git --git-dir="$REMOTO" config uploadpack.allowAnySHA1InWant true
+  REPO="$TMP_RAIZ/parcial"
+  rm -rf "$REPO"
+  git clone -q --filter=tree:0 --no-checkout --branch stable "file://$REMOTO" "$REPO"
+  git -C "$REPO" checkout -q stable
+  # Enumera só os objetos locais, inclusive no Git sem suporte a GIT_NO_LAZY_FETCH.
+  objetos_locais=$(git -C "$REPO" cat-file --batch-all-objects --batch-check='%(objectname)')
+  if grep -Fxq "$ARVORE_ALVO" <<<"$objetos_locais"; then
+    falhar "a fixture parcial já contém a árvore alvo."
+  fi
+  rm -rf "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_DIR"
+}
+
+for cenario_parcial in disponivel indisponivel extensao filtro; do
+  preparar_clone_parcial
+  case "$cenario_parcial" in
+    indisponivel)
+      git -C "$REPO" remote set-url origin "file://$TMP_RAIZ/remoto-inexistente.git"
+      ;;
+    extensao)
+      git -C "$REPO" config --unset remote.origin.promisor
+      git -C "$REPO" config --unset remote.origin.partialclonefilter
+      git -C "$REPO" config extensions.partialClone origin
+      ;;
+    filtro)
+      git -C "$REPO" config --unset remote.origin.promisor
+      ;;
+  esac
+  objetos_antes=$(git -C "$REPO" count-objects -v)
+  refs_antes=$(git -C "$REPO" show-ref)
+  indice_antes=$(sha256sum "$REPO/.git/index")
+  trace_parcial="$TMP_RAIZ/git-parcial.log"
+  rm -f "$trace_parcial"
+  status=$(GIT_TRACE="$trace_parcial" executar_atualizacao --simular)
+  [ "$(git -C "$REPO" count-objects -v)" = "$objetos_antes" ] ||
+    falhar "a simulação baixou objetos ausentes no clone parcial."
+  [ "$(git -C "$REPO" show-ref)" = "$refs_antes" ] || falhar "o clone parcial mudou referências."
+  [ "$(sha256sum "$REPO/.git/index")" = "$indice_antes" ] || falhar "o clone parcial mudou o índice."
+  if [ -f "$trace_parcial" ] && grep -Eq 'built-in: git fetch|run_command:.* fetch ' "$trace_parcial"; then
+    falhar "a simulação tentou fetch implícito no clone parcial."
+  fi
+  exigir_falha "$status" "a simulação ignorou uma comparação de migrações impossível."
+  grep -q 'comparar as migrações' "$TMP_RAIZ/saida.log" ||
+    falhar "a comparação incompleta não teve diagnóstico claro."
+  ! grep -q 'Sem migrações novas' "$TMP_RAIZ/saida.log" ||
+    falhar "a simulação afirmou ausência de migrações sem conseguir comparar."
+  [ ! -e "$ESTADO_DIR" ] || falhar "o clone parcial criou estado ou trava."
+  [ ! -s "$DOCKER_LOG" ] || falhar "o clone parcial chamou Docker."
+done
 
 printf 'Ensaios do atualizador concluídos.\n'
