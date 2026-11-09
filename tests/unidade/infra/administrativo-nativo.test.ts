@@ -404,7 +404,9 @@ it.each([
   else if (modo === "tipo") log.Type = "json-file";
   else Reflect.set(log, "Config", null);
   const antes = JSON.stringify(raw);
-  expect(() => normalizarPostgres(raw, spec, imagem, f.id)).toThrow(/nativa/);
+  expect(() => normalizarPostgres(raw, spec, imagem, f.id)).toThrow(
+    /^Recurso nativo divergente\.$/,
+  );
   expect(JSON.stringify(raw)).toBe(antes);
   expect(f.chamadas.some((c) => /\/(start|exec)$/.test(c.caminho) || c.metodo === "DELETE")).toBe(
     false,
