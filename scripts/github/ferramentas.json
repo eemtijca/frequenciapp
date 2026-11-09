@@ -1,0 +1,367 @@
+{
+  "descricao": "Pins de ferramentas e consumidores. Licenças upstream não substituem SBOM ou prova de execução.",
+  "ferramentas": {
+    "helm": {
+      "versao": "4.3.1",
+      "imagem": "alpine/helm:4.3.1@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          90
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/alpine/helm/manifests/4.3.1",
+        "https://raw.githubusercontent.com/helm/helm/v4.3.1/LICENSE",
+        "https://api.github.com/repos/helm/helm/releases/tags/v4.3.1",
+        "https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz.sha256sum",
+        "https://get.helm.sh/helm-v4.3.1-linux-arm64.tar.gz.sha256sum"
+      ],
+      "estado": "harness_pendente"
+    },
+    "kubeconform": {
+      "versao": "0.8.0",
+      "imagem": "ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          91
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://ghcr.io/v2/yannh/kubeconform/manifests/v0.8.0",
+        "https://raw.githubusercontent.com/yannh/kubeconform/v0.8.0/LICENSE",
+        "https://api.github.com/repos/yannh/kubeconform/releases/tags/v0.8.0"
+      ],
+      "estado": "harness_pendente"
+    },
+    "actionlint": {
+      "versao": "1.7.12",
+      "imagem": "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667",
+      "licenca": {
+        "ferramenta": "MIT",
+        "fontes": [
+          93
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/rhysd/actionlint/manifests/1.7.12",
+        "https://raw.githubusercontent.com/rhysd/actionlint/v1.7.12/LICENSE.txt",
+        "https://api.github.com/repos/rhysd/actionlint/releases/tags/v1.7.12"
+      ],
+      "estado": "harness_pendente"
+    },
+    "shellcheck": {
+      "versao": "0.11.0",
+      "imagem": "koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d",
+      "licenca": {
+        "ferramenta": "GPL-3 (Cabal; não inferir or-later)",
+        "fontes": [
+          100
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/koalaman/shellcheck/manifests/v0.11.0",
+        "https://raw.githubusercontent.com/koalaman/shellcheck/v0.11.0/LICENSE"
+      ],
+      "estado": "pin_declarado",
+      "arquivo": {
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz",
+        "sha256": "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+      }
+    },
+    "openssl": {
+      "versao": "3.5.9",
+      "imagem": "alpine/openssl:3.5.9@sha256:6821afa2476e11be343f29275f2ca24291720ff0a7148bd131fd8e314ff26d9e",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          101
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/alpine/openssl/manifests/3.5.9",
+        "https://raw.githubusercontent.com/openssl/openssl/openssl-3.5.9/LICENSE.txt"
+      ],
+      "estado": "pin_declarado"
+    },
+    "node": {
+      "versao": "24.22.2",
+      "imagem": "node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9",
+      "licenca": {
+        "ferramenta": "MIT com avisos de terceiros no LICENSE",
+        "fontes": [
+          105
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/library/node/manifests/24.22.2-bookworm-slim",
+        "https://raw.githubusercontent.com/nodejs/node/v24.22.2/LICENSE"
+      ],
+      "estado": "pin_declarado"
+    },
+    "nginx": {
+      "versao": "1.30.6",
+      "imagem": "nginx:1.30.6-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+      "licenca": {
+        "ferramenta": "BSD-2-Clause",
+        "fontes": [
+          103
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/library/nginx/manifests/1.30.6-alpine",
+        "https://raw.githubusercontent.com/nginx/nginx/release-1.30.6/LICENSE"
+      ],
+      "estado": "pin_declarado"
+    },
+    "caddy": {
+      "versao": "2.11.9",
+      "imagem": "caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          109
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/library/caddy/manifests/2.11.9-alpine",
+        "https://raw.githubusercontent.com/caddyserver/caddy/v2.11.9/LICENSE"
+      ],
+      "estado": "pin_declarado"
+    },
+    "playwright": {
+      "versao": "1.64.1-noble",
+      "imagem": "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          111
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://mcr.microsoft.com/v2/playwright/manifests/v1.64.1-noble",
+        "https://raw.githubusercontent.com/microsoft/playwright/v1.64.1/LICENSE"
+      ],
+      "estado": "pin_declarado"
+    },
+    "buildkit": {
+      "versao": "0.34.2",
+      "imagem": "moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe",
+      "licenca": {
+        "ferramenta": "Apache-2.0",
+        "fontes": [
+          227
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/moby/buildkit/manifests/v0.34.2",
+        "https://raw.githubusercontent.com/moby/buildkit/v0.34.2/LICENSE",
+        "https://raw.githubusercontent.com/docker/buildx/v0.38.2/driver/bkimage/bkimage.go",
+        "https://raw.githubusercontent.com/docker/setup-buildx-action/8d2750c68a42422c14e847fe6c8ac0403b4cbd6f/action.yml",
+        "https://docs.docker.com/build/builders/drivers/docker-container/"
+      ],
+      "estado": "pin_declarado"
+    },
+    "binfmt": {
+      "versao": "qemu-v10.2.3-68",
+      "imagem": "tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
+      "licenca": {
+        "ferramenta": "MIT para wrapper binfmt; QEMU GPL-2.0 e termos de componentes",
+        "fontes": [
+          231
+        ],
+        "escopo": "Licença do projeto principal; não constitui SBOM/auditoria de todas as camadas da distribuição."
+      },
+      "fontes": [
+        "https://registry-1.docker.io/v2/tonistiigi/binfmt/manifests/qemu-v10.2.3-68",
+        "https://raw.githubusercontent.com/tonistiigi/binfmt/deploy/v10.2.3-68/LICENSE",
+        "https://raw.githubusercontent.com/docker/setup-qemu-action/c7c53464625b32c7a7e944ae62b3e17d2b600130/action.yml",
+        "https://api.github.com/repos/tonistiigi/binfmt/git/ref/tags/deploy/v10.2.3-68",
+        "https://raw.githubusercontent.com/qemu/qemu/v10.2.3/COPYING"
+      ],
+      "estado": "pin_declarado"
+    },
+    "terraform": {
+      "versao": "1.17.1",
+      "licenca": "BUSL-1.1",
+      "fonte": "https://releases.hashicorp.com/terraform/1.17.1/terraform_1.17.1_SHA256SUMS"
+    },
+    "vercel": {
+      "versao": "65.12.1",
+      "integridade": "sha512-6JpFmuzqWziB7GY9nOFp6wZtVdoPCvyWStsnH3qloNDhp+hW61fpoIvclKumoSUsOKR2wL+TcHXySxF8TvFO1g==",
+      "licenca": "Apache-2.0",
+      "fonte": "https://registry.npmjs.org/vercel/65.12.1"
+    },
+    "buildx": {
+      "versao": "v0.38.2",
+      "licenca": "Apache-2.0",
+      "fonte": "https://github.com/docker/buildx/releases/tag/v0.38.2"
+    }
+  },
+  "actions": [
+    "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+    "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+    "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3",
+    "actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13",
+    "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+    "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+    "docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8",
+    "docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+    "docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302",
+    "docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+    "docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130",
+    "github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+    "github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+    "hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd",
+    "pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115"
+  ],
+  "usos": [
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "ferramenta": "shellcheck",
+      "trecho": "koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d"
+    },
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "ferramenta": "openssl",
+      "trecho": "alpine/openssl:3.5.9@sha256:6821afa2476e11be343f29275f2ca24291720ff0a7148bd131fd8e314ff26d9e"
+    },
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "ferramenta": "caddy",
+      "trecho": "caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee"
+    },
+    {
+      "arquivo": "Dockerfile",
+      "ferramenta": "node",
+      "trecho": "node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9"
+    },
+    {
+      "arquivo": "infra/servidor/nginx/Dockerfile",
+      "ferramenta": "nginx",
+      "trecho": "nginx:1.30.6-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311"
+    },
+    {
+      "arquivo": "compose.servidor-caddy.yml",
+      "ferramenta": "caddy",
+      "trecho": "caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee"
+    },
+    {
+      "arquivo": ".github/workflows/infra.yml",
+      "ferramenta": "terraform",
+      "trecho": "terraform_version: \"1.17.1\""
+    },
+    {
+      "arquivo": ".github/workflows/implantacao.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/backup-externo.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/qualidade.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/testes.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/build.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/servidor.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/schema-preview.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": ".github/workflows/publicacao.yml",
+      "ferramenta": "buildkit",
+      "trecho": "moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe"
+    },
+    {
+      "arquivo": ".github/workflows/publicacao.yml",
+      "ferramenta": "binfmt",
+      "trecho": "tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0"
+    },
+    {
+      "arquivo": "tests/isolamento/dependencias.Dockerfile",
+      "ferramenta": "playwright",
+      "trecho": "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f"
+    },
+    {
+      "arquivo": ".github/workflows/implantacao.yml",
+      "ferramenta": "vercel",
+      "trecho": "pnpm exec vercel"
+    },
+    {
+      "arquivo": ".github/workflows/infra.yml",
+      "ferramenta": "buildx",
+      "trecho": "version: v0.38.2"
+    },
+    {
+      "arquivo": ".github/workflows/infra.yml",
+      "ferramenta": "buildkit",
+      "trecho": "moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe"
+    },
+    {
+      "arquivo": ".github/workflows/testes.yml",
+      "ferramenta": "buildx",
+      "trecho": "version: v0.38.2"
+    },
+    {
+      "arquivo": ".github/workflows/testes.yml",
+      "ferramenta": "buildkit",
+      "trecho": "moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe"
+    },
+    {
+      "arquivo": ".github/workflows/publicacao.yml",
+      "ferramenta": "buildx",
+      "trecho": "version: v0.38.2"
+    },
+    {
+      "arquivo": ".github/workflows/infra.yml",
+      "ferramenta": "node",
+      "trecho": "node-version: 24.22.2"
+    },
+    {
+      "arquivo": "infra/terraform/validar.sh",
+      "ferramenta": "terraform",
+      "trecho": "node scripts/github/conferir-ferramentas.mjs --terraform"
+    },
+    {
+      "arquivo": "infra/floci/testar.sh",
+      "ferramenta": "terraform",
+      "trecho": "node scripts/github/conferir-ferramentas.mjs --terraform"
+    }
+  ],
+  "schemas": "infra/kubernetes/schemas/manifesto.json",
+  "gates": [
+    "Helm, kubeconform e actionlint aguardam harness administrativo verificado; tabela não libera wrappers bloqueados.",
+    "Engines Playwright, builds de distribuição e providers requerem ensaios posteriores autorizados."
+  ]
+}

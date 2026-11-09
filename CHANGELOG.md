@@ -10,6 +10,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A automação passa a registrar pins e consumidores de ferramentas.
+
+- A simulação de atualização da auto-hospedagem usa apenas referências Git locais e preserva referências, índice, estado e travas. Ela não consulta o remoto nem chama Docker, backup ou build, informa os limites da verificação e recusa registro de estado durante a simulação.
+
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.

@@ -34,7 +34,7 @@ done
 docker run --rm \
   -v "$REPO:/mnt" \
   -w /mnt \
-  koalaman/shellcheck:stable \
+  koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d \
   -x -P scripts/servidor scripts/servidor/*.sh
 
 docker compose \
@@ -56,7 +56,7 @@ for caddyfile in Caddyfile Caddyfile.interno; do
     -e "ACME_EMAIL=$ACME_EMAIL" \
     -e "ACME_CA=$ACME_CA" \
     -v "$REPO/infra/servidor/$caddyfile:/etc/caddy/Caddyfile:ro" \
-    caddy:2.11-alpine \
+    caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee \
     caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 done
 
@@ -68,7 +68,7 @@ docker run --rm --add-host app:127.0.0.1 \
 mkdir -p "$tmp/certificados/live/frequenciapp"
 docker run --rm \
   -v "$tmp/certificados:/cert" \
-  alpine/openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+  alpine/openssl:3.5.9@sha256:6821afa2476e11be343f29275f2ca24291720ff0a7148bd131fd8e314ff26d9e req -x509 -nodes -newkey rsa:2048 -days 1 \
   -subj "/CN=teste" \
   -keyout /cert/live/frequenciapp/privkey.pem \
   -out /cert/live/frequenciapp/fullchain.pem >/dev/null 2>&1

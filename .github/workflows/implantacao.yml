@@ -61,7 +61,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 24.22.2
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -93,13 +93,16 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
+          node-version: 24.22.2
+
+      - name: Instalar ferramentas pelo lock sem executar scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Publicar na Vercel
         run: |
-          pnpm dlx vercel@latest pull --yes --environment=production --token="$VERCEL_TOKEN"
-          pnpm dlx vercel@latest build --prod --token="$VERCEL_TOKEN"
-          pnpm dlx vercel@latest deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+          pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          pnpm exec vercel build --prod --token="$VERCEL_TOKEN"
+          pnpm exec vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
   verificar:
     needs: [validar, implantar]

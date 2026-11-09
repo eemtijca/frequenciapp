@@ -37,3 +37,11 @@ O release é o artefato: a tag `vX.Y.Z` e a imagem publicada no GHCR são a font
 1. Gerar a imagem pela `publicacao.yml` (dispatch manual) ou com `docker build`.
 2. Executar o contêiner apontando para o schema de Preview e conferir `/api/saude` e o login.
 3. Rodar `pnpm run infra:floci` para exercitar o Terraform nos emuladores.
+
+## Ferramentas e atualização
+
+O inventário `scripts/github/ferramentas.json` registra versões, digests de índices OCI, licenças upstream, fontes e consumidores. Vercel é resolvida pelo lock congelado. Node e Terraform têm versões exatas. Imagens de validação são distintas de tags locais e das imagens de distribuição da aplicação. A coerência dos consumidores precisa passar no CI; um inventário isolado não aprova o uso.
+
+O Dependabot propõe majors separadamente e agrupa apenas minor e patch, incluindo Dockerfiles fora da raiz. Referências em shell, JSON central, schemas locais, downloads transitivos e digests precisam de conferência explícita; o detector não atualiza todos automaticamente. Não há auto-upgrade ou deploy de produção. As licenças do projeto principal não constituem SBOM de todas as camadas. Pacotes apt, chave PGDG, Engine, Compose e sistema do runner ainda exigem política própria de snapshot e proveniência.
+
+`validar-ferramentas-infra.mjs` executa Helm lint/template, kubeconform estrito com 11 schemas locais verificados e actionlint, sem fallback de schemas por rede. Sua execução real permanece condicionada ao harness administrativo aprovado; unidades com executores falsos não são esse gate.

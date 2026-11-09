@@ -39,3 +39,7 @@ As entradas do changelog vêm dos títulos dos pull requests, escritos no presen
 - Antes de aplicar migrações no release, confirme um backup recente do banco e registre no checklist.
 - Para reverter o aplicativo, promova o deployment anterior no provedor.
 - Para reverter dados, crie uma migração corretiva; uma migração aplicada nunca é editada.
+
+## Ferramentas
+
+Os pins, fontes e consumidores ficam em `scripts/github/ferramentas.json`. Atualizações são propostas revisadas com CI, nunca auto-deploy. Conferir digests multiarch, licenças e ferramentas transitivas; Node, Terraform e Vercel exatos não congelam o sistema inteiro do runner. Helm, kubeconform, actionlint, imagens finais e engines de navegador precisam de ensaios próprios no isolamento aprovado. Versão Playwright no lock e na imagem: 1.64.1.

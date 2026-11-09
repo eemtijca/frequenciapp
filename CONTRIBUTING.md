@@ -241,6 +241,10 @@ Corrija as falhas antes de pedir nova revisão. Pull requests sem verificações
 
 Mescle por squash, em um único commit por pull request. Apague a branch após o merge. Não faça force-push em `main` nem reescreva o histórico já mesclado.
 
+## Coerência das ferramentas
+
+O lock e a imagem oficial de Playwright usam 1.64.1. O inventário `scripts/github/ferramentas.json` registra versão, digest, licença upstream e consumidores. Atualizações maiores continuam como propostas individuais; aprovação e CI não significam atualização ou deploy automático. Antes dos navegadores, abrir e fechar cada engine no ambiente exclusivo. Helm, kubeconform, actionlint e privilégios de banco têm gates próprios; unidade com dublês não os substitui.
+
 ## Padrões de código
 
 - Código e comentários em português, curtos e diretos.

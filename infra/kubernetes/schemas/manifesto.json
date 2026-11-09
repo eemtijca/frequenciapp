@@ -1,0 +1,62 @@
+{
+  "descricao": "Schemas upstream para validação offline; licença Apache-2.0.",
+  "revisao": "c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2",
+  "kubernetes": "1.27.0",
+  "arquivos": [
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/configmap-v1.json",
+      "sha256": "1db2c4fecb34d1cf4c5a95b8eb85c45a6c5da1700a3b3992f6fea1ca3f9185b0",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/configmap-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/pod-v1.json",
+      "sha256": "5013a372a3e2f772ddc04794a77a69827e09db48bac3b2ff5caefe0aacd27a03",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/pod-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/horizontalpodautoscaler-autoscaling-v2.json",
+      "sha256": "a24f3fcd1757b1be4dbaea1a78512261696b96a2b35faceffc3ee8357e20a69d",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/horizontalpodautoscaler-autoscaling-v2.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/secret-v1.json",
+      "sha256": "5268ec66a32ead60c5ef8ceba0a8b19ffa096d9781bf7b2cd3b0e5d7f29e6c77",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/secret-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/serviceaccount-v1.json",
+      "sha256": "dff52c024ebc6202d762035f62e14baca42eabff1e2977cffe3179a97bca8f70",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/serviceaccount-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/deployment-apps-v1.json",
+      "sha256": "60a071a5b410754b175cbefc32f07af6f79e56e3e4fb40f427d5950ab7d6f78d",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/deployment-apps-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/poddisruptionbudget-policy-v1.json",
+      "sha256": "d30edb8cc06d3bc5f3c84835dd8b1308c3b4c6b638d5d80bf65c7b53a184db54",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/poddisruptionbudget-policy-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/cronjob-batch-v1.json",
+      "sha256": "42c8aa4f47e30d34a7fb1211f3491a8ebb47ba68cbc97b95c053074e49e6cc54",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/cronjob-batch-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/service-v1.json",
+      "sha256": "1b97511615341de26a7757d98155b7c60f1224c72661c2076375a583ef7cc534",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/service-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/ingress-networking-v1.json",
+      "sha256": "44b31b26dde54204cf60370b9d6c7a2bc241ff41aebd2732feb2c7a59f97fd1b",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/ingress-networking-v1.json"
+    },
+    {
+      "arquivo": "infra/kubernetes/schemas/v1.27.0-standalone-strict/persistentvolumeclaim-v1.json",
+      "sha256": "28bb6ad991bf8dd3edeb3ae79ea4afed17c44688a8be61a3d6af331995817e8d",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/c416d7b0da0751bd8ebe5be4fa4c8e8274e3bbe2/v1.27.0-standalone-strict/persistentvolumeclaim-v1.json"
+    }
+  ]
+}
