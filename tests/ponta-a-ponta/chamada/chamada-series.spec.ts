@@ -401,6 +401,56 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(serie().getByText("100%", { exact: true })).toBeVisible();
 });
 
+for (const falha of ["QuotaExceededError", "SecurityError"]) {
+  test(`Chamada: ${falha} preserva rascunho anterior após recarregar`, async ({ page }) => {
+    await salvarPelaApi(page, "A");
+    let secao = await abrirChamada(page);
+    const grupo = await abrirPrimeiraSerie(secao);
+    await grupo.getByRole("button", { name: "Faixa Um E2E Serie A", exact: true }).click();
+    await desbloquearChamada(secao);
+    const aluno = secao.getByRole("button", { name: /^E2E Serie 1A:/ });
+    await aluno.click();
+    await expect(aluno).toHaveAttribute("aria-pressed", "true");
+    const turmaId = turmasDoProgresso.get("A") ?? "";
+    const lerCopia = () =>
+      page.evaluate((id) => {
+        const chave = Object.keys(sessionStorage).find(
+          (k) => k.startsWith("frequencia:rascunho:") && k.endsWith(`:${id}`),
+        );
+        return chave ? sessionStorage.getItem(chave) : null;
+      }, turmaId);
+    await expect.poll(lerCopia).toContain('"faltas":[{');
+    const anterior = await lerCopia();
+    await page.evaluate((nome) => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (chave: string, valor: string) {
+        if (this === sessionStorage && chave.startsWith("frequencia:rascunho:"))
+          throw new DOMException("Falha sintética", nome);
+        original.call(this, chave, valor);
+      };
+    }, falha);
+    await aluno.click();
+    await expect(aluno).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByText(/As alterações mais recentes estão apenas nesta aba/),
+    ).toBeVisible();
+    expect(await lerCopia()).toBe(anterior);
+    await page.reload();
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Chamada", "chamada");
+    secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
+    await expect(
+      page.getByText("Rascunho recuperado. Desbloqueie a chamada, confira e salve.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(secao.getByRole("button", { name: /^E2E Serie 1A:/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+}
+
 test("Chamada: carregamento e falha de leitura mostram estado neutro até a recuperação", async ({
   page,
 }) => {
