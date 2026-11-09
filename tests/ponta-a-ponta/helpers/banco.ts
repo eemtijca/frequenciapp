@@ -1,5 +1,6 @@
 // Acesso direto ao banco da suíte de ponta a ponta: contas fixas, contagens e
 // limpeza da massa com prefixo E2E. Nunca usa dados reais.
+import { verificarIsolamento } from "../../helpers/isolamento.mjs";
 import pg from "pg";
 import { hashearSenha } from "../../../src/infra/auth/hash";
 import { selecionarSchema } from "../../../src/infra/schema-postgres.mjs";
@@ -19,22 +20,15 @@ export const COORD_E2E = {
   nome: "Demo",
 };
 
-function urlDoBanco(): string {
-  return (
-    process.env.DIRECT_URL ??
-    process.env.DATABASE_URL ??
-    "postgresql://frequencia:frequencia@localhost:5432/frequencia"
-  );
-}
-
 /** Abre uma conexão, executa a operação e fecha, mesmo em falha. */
 export async function comBanco<T>(operacao: (cliente: pg.Client) => Promise<T>): Promise<T> {
-  const cliente = new pg.Client({ connectionString: urlDoBanco() });
+  const { databaseUrl } = await verificarIsolamento();
+  const cliente = new pg.Client({ connectionString: databaseUrl });
   let erroOperacao: unknown;
   let falhou = false;
   try {
     await cliente.connect();
-    await selecionarSchema(cliente, process.env.DATABASE_URL ?? urlDoBanco());
+    await selecionarSchema(cliente, databaseUrl);
     return await operacao(cliente);
   } catch (erro) {
     erroOperacao = erro;

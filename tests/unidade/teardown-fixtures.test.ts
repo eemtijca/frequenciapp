@@ -1,4 +1,6 @@
 import { expect, it, vi } from "vitest";
+// As consultas são dublês, sem banco ou runtime. A guarda tem regressão própria.
+vi.mock("../helpers/isolamento.mjs", () => ({ verificarIsolamento: async () => ({}) }));
 import {
   conectarDiretores,
   finalizarDiretores,

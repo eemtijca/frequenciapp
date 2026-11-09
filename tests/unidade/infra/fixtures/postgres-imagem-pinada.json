@@ -1,0 +1,84 @@
+{
+  "descricao": "Fixture sintética da imagem PostgreSQL pinada, derivada de inspeção documental sanitizada; não representa captura byte-idêntica de um daemon.",
+  "captura": {
+    "metodo": "GET",
+    "caminho": "/images/postgres%3A17-alpine%40sha256%3A3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac/json",
+    "resposta": {
+      "Architecture": "amd64",
+      "Author": "",
+      "Comment": "buildkit.dockerfile.v0",
+      "Config": {
+        "AttachStderr": false,
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "Cmd": [
+          "postgres"
+        ],
+        "Domainname": "",
+        "Entrypoint": [
+          "docker-entrypoint.sh"
+        ],
+        "Env": [
+          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          "GOSU_VERSION=1.19",
+          "LANG=en_US.utf8",
+          "PG_MAJOR=17",
+          "PG_VERSION=17.11",
+          "PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979",
+          "DOCKER_PG_LLVM_DEPS=llvm21-dev \t\tclang21",
+          "PGDATA=/var/lib/postgresql/data"
+        ],
+        "ExposedPorts": {
+          "5432/tcp": {}
+        },
+        "Hostname": "",
+        "Image": "",
+        "Labels": null,
+        "OnBuild": null,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "StopSignal": "SIGINT",
+        "Tty": false,
+        "User": "",
+        "Volumes": {
+          "/var/lib/postgresql/data": {}
+        },
+        "WorkingDir": "/"
+      },
+      "Created": "2026-11-05T19:09:47.216787824Z",
+      "DockerVersion": "",
+      "GraphDriver": {
+        "Data": null,
+        "Name": "overlayfs"
+      },
+      "Id": "sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac",
+      "Metadata": {
+        "LastTagTime": "2026-01-01T00:00:00Z"
+      },
+      "Os": "linux",
+      "Parent": "",
+      "RepoDigests": [
+        "postgres@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac"
+      ],
+      "RepoTags": [
+        "postgres:17-alpine"
+      ],
+      "RootFS": {
+        "Layers": [
+          "sha256:75f1d9657d880da5f75298e8f40e9928bb6e260c50d26f97af196845307e3064",
+          "sha256:dcf8d10f969e433c128a25da4bb09e3b152a5478c2989e45cb9881739fb232f1",
+          "sha256:2ff59a9bc77c1c767b6d6a6d4dc53cf45a810a57933308408d53f79e4f846415",
+          "sha256:d79747e37a45868de0bc460dbe96d27816190993b442d05a55ec75128b92137e",
+          "sha256:6293d63320d43eb182cc9434462d316f0aa041af8606eeabc5b7f382bcce52a1",
+          "sha256:75d49893befdec2731c55d3084403194b84ba2b2796eaf34f544a0a86c653724",
+          "sha256:9373011742b79f8ed7fddea352069b61e2aff898e2846783f2961ee49f193d81",
+          "sha256:c828c0bdb9621016857b8149314eed06d20fcc951578e259976c02e9abb14902",
+          "sha256:0390a3b3131eddd1f0155d889114b3be43f812322b892bd81cb3042c5a91d7ed",
+          "sha256:cd394f8e4ff2ce7d78d531038cc93f13e39cb93d4bb15fa1e92cbd2d8c022602"
+        ],
+        "Type": "layers"
+      },
+      "Size": 423196241
+    }
+  }
+}

@@ -38,6 +38,7 @@ async function carregar(caminho: string) {
     },
   }));
   vi.doMock("@/infra/schema-postgres.mjs", () => ({ selecionarSchema: selecionar }));
+  vi.doMock("../helpers/isolamento.mjs", () => ({ verificarIsolamento: async () => ({}) }));
   vi.doMock("../helpers/feriados-banco", () => ({
     conferirConexaoFixture: () => undefined,
     lerFeriados: async () => [],
@@ -70,6 +71,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.doUnmock("vitest");
   vi.doUnmock("pg");
+  vi.doUnmock("../helpers/isolamento.mjs");
   vi.doUnmock("@/infra/schema-postgres.mjs");
   vi.doUnmock("../helpers/feriados-banco");
 });

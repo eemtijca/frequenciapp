@@ -3,6 +3,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { request } from "@playwright/test";
+import { exigirIsolamento, verificarIsolamento } from "../helpers/isolamento.mjs";
 import {
   ADMIN_E2E,
   COORD_E2E,
@@ -10,7 +11,6 @@ import {
   massaDeDemonstracaoPresente,
 } from "./helpers/banco";
 
-const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 const PASTA_ESTADO = path.resolve("tests/ponta-a-ponta/.auth");
 
 interface Conta {
@@ -19,6 +19,7 @@ interface Conta {
 }
 
 async function guardarEstado(conta: Conta, arquivo: string): Promise<void> {
+  const baseURL = exigirIsolamento().appUrl;
   const contexto = await request.newContext({ baseURL });
   try {
     const resposta = await contexto.post("/api/auth/entrar", {
@@ -37,6 +38,7 @@ async function guardarEstado(conta: Conta, arquivo: string): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  await verificarIsolamento();
   // As capturas do README rodam com a semente aplicada; as suítes, sem ela.
   const capturas = process.env.CAPTURAS === "1";
   if (!capturas && (await massaDeDemonstracaoPresente())) {

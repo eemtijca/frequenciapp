@@ -2,8 +2,10 @@
 # Funções compartilhadas dos ensaios descartáveis do servidor.
 set -Eeuo pipefail
 
+# shellcheck source=isolamento-entradas.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/isolamento-entradas.sh"
+
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TESTE_DIR="$RAIZ/tests/servidor"
 TMP_RAIZ=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-servidor.XXXXXX")
 PROJETO="frequenciapp-teste-$$"
 
@@ -13,13 +15,14 @@ falhar() {
 }
 
 limpar_ambiente() {
-  docker compose --project-directory "$RAIZ" --project-name "$PROJETO" \
-    -f "$TESTE_DIR/compose.yml" down -v --remove-orphans >/dev/null 2>&1 || true
+  # Este helper não cria pilhas reais. Só os temporários locais lhe pertencem.
   rm -rf "$TMP_RAIZ"
 }
 trap 'limpar_ambiente' EXIT
 
 preparar_ambiente() {
+  # Uma chamada dentro de if desliga errexit; a recusa precisa encerrar também ali.
+  exigir_harness_administrativo backup-restauracao || exit 78
   export COMPOSE_PROJECT_NAME="$PROJETO"
   export APP_DIR="$RAIZ"
   export APP_ENV_FILE="$TMP_RAIZ/app.env"
@@ -63,8 +66,7 @@ preparar_ambiente() {
 }
 
 compose_teste() {
-  docker compose --project-directory "$RAIZ" --project-name "$PROJETO" \
-    -f "$TESTE_DIR/compose.yml" "$@"
+  exigir_harness_administrativo compose-servidor || exit 78
 }
 
 iniciar_compose_teste() {

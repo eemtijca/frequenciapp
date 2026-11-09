@@ -1,4 +1,4 @@
-# Valida os arquivos de servidor auto-hospedado, os workflows e as rotinas.
+# Valida dublês e explicita ensaios bloqueados até provar o perímetro administrativo.
 name: Servidor
 
 on:
@@ -11,7 +11,9 @@ on:
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "tests/servidor/**"
+      - "tests/unidade/infra/isolamento*"
       - "package.json"
+      - "pnpm-lock.yaml"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
       - "docs/kubernetes.md"
@@ -23,82 +25,105 @@ permissions:
 
 concurrency:
   group: servidor-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   validar:
-    name: Compose, proxies, scripts e workflows
+    name: Dublês, scripts e bloqueios administrativos explícitos
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash --noprofile --norc -e -o pipefail {0}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Validar servidor
-        run: bash infra/servidor/validar.sh
+      - name: Preparar evidências
+        run: mkdir -p test-results/servidor
 
-      - name: Validar chart Helm
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - name: Instalar dependências sem scripts de instalação
+        run: pnpm install --frozen-lockfile --ignore-scripts 2>&1 | tee test-results/servidor/dependencias.log
+
+      - name: Conferir inventário de ferramentas
+        run: node scripts/github/conferir-ferramentas.mjs
+
+      - name: Instalar ShellCheck
         run: |
-          mkdir -p "$RUNNER_TEMP/helm"
-          docker run --rm -v "$PWD:/repo" -w /repo alpine/helm:latest \
-            lint infra/kubernetes/frequenciapp \
-            --set existingSecret=frequenciapp-segredos
-          docker run --rm \
-            -v "$PWD:/repo" \
-            -v "$RUNNER_TEMP/helm:/out" \
-            -w /repo \
-            alpine/helm:latest \
-            template frequenciapp infra/kubernetes/frequenciapp \
-            --namespace frequenciapp \
-            --set existingSecret=frequenciapp-segredos \
-            --set image.tag=1.2.3 \
-            --set backup.enabled=true \
-            --set backup.filesSecret=frequenciapp-backup-arquivos \
-            --set backup.database.existingSecret=frequenciapp-backup-banco \
-            --set backup.spreadsheets.existingSecret=frequenciapp-backup-planilhas \
-            --set backup.database.persistence.enabled=true \
-            --output-dir /out
-          docker run --rm \
-            -v "$RUNNER_TEMP/helm:/out" \
-            ghcr.io/yannh/kubeconform:latest \
-            -strict -summary /out
-
-      - name: Validar workflows
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
-
-      - name: Instalar ferramentas dos ensaios
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck rclone age postgresql-common
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" |
-            sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          destino="$RUNNER_TEMP/shellcheck"
+          mkdir -p "$destino"
+          url="$(node -p 'require("./scripts/github/ferramentas.json").ferramentas.shellcheck.arquivo.url')"
+          sha="$(node -p 'require("./scripts/github/ferramentas.json").ferramentas.shellcheck.arquivo.sha256')"
+          curl --fail --location --proto '=https' --tlsv1.2 "$url" -o "$destino/shellcheck.tar.xz"
+          printf '%s  %s\n' "$sha" "$destino/shellcheck.tar.xz" | sha256sum --check -
+          tar -xJf "$destino/shellcheck.tar.xz" --directory "$destino" --strip-components=1 shellcheck-v0.11.0/shellcheck
+          printf '%s\n' "$destino" >> "$GITHUB_PATH"
 
       - name: Sintaxe e ShellCheck
+        if: ${{ !cancelled() }}
         run: |
-          for script in scripts/servidor/*.sh; do
-            bash -n "$script"
-          done
-          shellcheck -x -P scripts/servidor scripts/servidor/*.sh
-          shellcheck -x -P tests/servidor tests/servidor/*.sh
+          {
+            for script in scripts/servidor/*.sh tests/servidor/*.sh; do
+              bash -n "$script"
+            done
+            shellcheck -x -P scripts/servidor scripts/servidor/*.sh
+            shellcheck -x -P tests/servidor tests/servidor/*.sh
+          } 2>&1 | tee test-results/servidor/shellcheck.log
+
+      - name: Recusas administrativas com clientes falsos
+        if: ${{ !cancelled() }}
+        run: |
+          pnpm exec vitest run --config vitest.config.ts --maxWorkers=1 \
+            tests/unidade/infra/isolamento-servidor.test.ts \
+            tests/unidade/infra/isolamento-entradas-servidor.test.ts \
+            2>&1 | tee test-results/servidor/unidade.log
 
       - name: Ensaio de atualização com dublês
-        run: bash tests/servidor/atualizacao.sh
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/atualizacao.sh 2>&1 | tee test-results/servidor/atualizacao-dubles.log
+
+      # As validações reais continuam obrigatórias e não aprovam por falta de harness.
+      # O helper retorna 78 sem criar recursos; não existe limpeza por nome ou busca.
+      - name: Validar servidor e proxies (bloqueado sem harness)
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/isolamento-entradas.sh validar-servidor 2>&1 | tee test-results/servidor/validar-servidor.log
+
+      - name: Validar chart Helm (bloqueado sem harness)
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/isolamento-entradas.sh validar-helm 2>&1 | tee test-results/servidor/validar-helm.log
+
+      - name: Validar workflows (bloqueado sem harness)
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/isolamento-entradas.sh validar-workflows 2>&1 | tee test-results/servidor/validar-workflows.log
 
       - name: Ensaio de backup e restauração em Compose
-        run: bash tests/servidor/backup-restauracao.sh
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/backup-restauracao.sh 2>&1 | tee test-results/servidor/backup-restauracao.log
 
       - name: Ensaio de restauração por URL
-        run: bash tests/servidor/restauracao-url.sh
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/restauracao-url.sh 2>&1 | tee test-results/servidor/restauracao-url.log
 
       - name: Ensaio de atualização em Compose descartável
-        run: bash tests/servidor/atualizacao-integracao.sh
+        if: ${{ !cancelled() }}
+        run: bash tests/servidor/atualizacao-integracao.sh 2>&1 | tee test-results/servidor/atualizacao-integracao.log
 
-      - name: Derrubar contêineres remanescentes
+      - name: Preservar evidências inclusive em falha
         if: always()
-        run: |
-          docker ps -aq --filter "name=frequenciapp-" | xargs -r docker rm -f
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: servidor-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/servidor
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7

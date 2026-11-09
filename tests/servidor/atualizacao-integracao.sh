@@ -2,6 +2,14 @@
 # Confirma em Compose descartável que a atualização usa o commit alvo e preserva volumes e proxy.
 set -Eeuo pipefail
 
+# shellcheck source=isolamento-entradas.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/isolamento-entradas.sh"
+# Não adota projeto existente nem instala cleanup antes da prova.
+exigir_harness_administrativo atualizacao-integracao || {
+  if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then exit 78; fi
+  return 78
+}
+
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-integracao.XXXXXX")
 REPO="$TMP/repo"

@@ -1,8 +1,11 @@
-// Somente login anônimo, sem globalSetup, conta de teste ou webServer.
-// O servidor e o banco descartáveis são preparados externamente.
+// Somente login anônimo, sem preparar contas ou iniciar servidor.
+// A guarda confirma o runtime descartável antes das requisições.
 import { defineConfig, devices } from "@playwright/test";
+import { exigirIsolamento } from "./tests/helpers/isolamento.mjs";
+const baseURL = exigirIsolamento().appUrl;
 
 export default defineConfig({
+  globalSetup: "./tests/isolamento/setup-playwright.ts",
   testDir: "./tests/ponta-a-ponta",
   testMatch: /(?:^|[\\/])legibilidade-real\.spec\.ts$/,
   grep: /@anon/,
@@ -13,7 +16,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     ...devices["Desktop Chrome"],
-    baseURL: process.env.TEST_BASE_URL ?? "http://localhost:3000",
+    baseURL,
     storageState: { cookies: [], origins: [] },
     serviceWorkers: "block",
     screenshot: "only-on-failure",

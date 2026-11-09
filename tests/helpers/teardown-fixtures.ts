@@ -1,7 +1,10 @@
+// Exige a mesma prova de isolamento na preparação e na limpeza das fixtures.
 import type pg from "pg";
+import { verificarIsolamento } from "./isolamento.mjs";
 import { executarLimpezas } from "./limpeza-fixture";
 
 export async function conectarDiretores(cliente: pg.Client, selecionar: () => Promise<void>) {
+  await verificarIsolamento();
   try {
     await cliente.connect();
     await selecionar();
@@ -12,6 +15,7 @@ export async function conectarDiretores(cliente: pg.Client, selecionar: () => Pr
 }
 
 export async function limparDiretores(banco: pg.Client, independente = false) {
+  await verificarIsolamento();
   const daSerie =
     "select t.id from turmas t join series s on s.id = t.serie_id where s.nome = 'QD Ano'";
   const acoes = [
@@ -47,6 +51,7 @@ export async function limparSabado(
   justificativa: string,
   independente = false,
 ) {
+  await verificarIsolamento();
   const acoes = [
     () =>
       banco.query(
@@ -90,6 +95,7 @@ export async function removerFeriadoEmConexaoNova(
   let primeiroErro: unknown;
   try {
     conferir(cliente);
+    await verificarIsolamento();
     await cliente.connect();
     conferir(cliente);
     await selecionar(cliente);

@@ -8,15 +8,15 @@ Suítes, convenções e o que cada uma protege. Os comandos completos estão no 
 
 ## Suítes
 
-| Suíte            | Comando              | Pré-requisitos                                                 |
-| ---------------- | -------------------- | -------------------------------------------------------------- |
-| Unidade          | `pnpm run test:unit` | Nenhum                                                         |
-| Contratos de API | `pnpm run test:api`  | Aplicativo no ar, admin e coordenação de teste, `DATABASE_URL` |
-| Ponta a ponta    | `pnpm run test:e2e`  | Aplicativo no ar (ou Compose) e navegadores do Playwright      |
-| PWA              | `pnpm run test:pwa`  | Build de produção no ar                                        |
-| Ambas as de API  | `pnpm test`          | Idem, na ordem                                                 |
+| Suíte            | Comando              | Pré-requisitos                         |
+| ---------------- | -------------------- | -------------------------------------- |
+| Unidade          | `pnpm run test:unit` | Nenhum                                 |
+| Contratos de API | `pnpm run test:api`  | Docker e pilha exclusiva do executor   |
+| Ponta a ponta    | `pnpm run test:e2e`  | Docker e imagem Playwright do executor |
+| PWA              | `pnpm run test:pwa`  | Docker e build próprio do executor     |
+| Ambas as de API  | `pnpm test`          | Idem, na ordem                         |
 
-A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta para o aplicativo em `APP_URL` (padrão `http://localhost:3000`), entra com as contas de teste e exercita os contratos. A de ponta a ponta usa Playwright headless com execução serial e cobre a interface de verdade.
+A suíte de unidade roda sem banco. API e navegador usam o [executor de isolamento](../tests/isolamento/README.md), com runtime e banco exclusivos por rodada, configuração sintética e namespace sem rotas. URLs locais e flags isoladas não liberam os testes. A prova antecede fixtures e limpezas, inclusive com filtros ou casos ignorados. A suíte de ponta a ponta usa Playwright headless com execução serial.
 
 ## Unidade
 
@@ -78,7 +78,7 @@ A suíte de unidade roda em qualquer máquina sem banco. A de contratos aponta p
 - restauração das turmas de origem (`tests/api/gestao/restauracao-origens.test.ts`, massa com prefixo QA Restaurar): 401, 403 da coordenação e de origem inválida, 400 sem confirmação, sem prévia, com prévia vazia ou com campo extra, 404 série inexistente, 409 com a mesma contagem e outros alunos ou com um aluno a menos, sem alterar ninguém, sucesso com a numeração conferida, aluno vindo de outra série e transferência permanente da outra série intocados, faltas, chamada e participantes idênticos, saída reagrupada na turma de origem pelo relatório de saídas e entradas, auditoria de resumo e por aluno só com identificadores, repetição da mesma prévia com `jaAplicado` e concorrência com Reorganizar turmas sem numeração repetida.
 - diretores de turma (`tests/unidade/cadastros/diretores.test.ts`, massa com prefixo QD): cadastro barrado para a coordenação, criação com turma, identificador repetido ou com arroba recusado, conta fora da Equipe, entrada recusada antes da emissão, palavra-chave em blocos, entrada pelo identificador com primeiro uso e cookie de sessão, **todas as rotas da equipe com 403 para o diretor** (lidas dos arquivos de rota), troca obrigatória com palavra diferente e validade renovada, retirada de turma na hora (vínculo do dia apagado, vínculo antigo encerrado ontem), estatísticas barradas antes da troca da palavra, para a coordenação e para turma fora do vínculo, período recortado ao início do vínculo e categorias liberadas só pelos parâmetros, palavra vencida e revogada recusadas com a sessão derrubada, parâmetros com faixas e faltas obrigatórias e limite de tentativas pelo parâmetro, contado no banco.
 
-A suíte cria e limpa a própria massa (série, turmas, aulas, alunos, contas e dias de teste isolados) antes e depois, de modo que execuções repetidas não acumulam estado. Rodar com a connection string correta exportada (ver [tests/README.md](../tests/README.md)). No CI, o serviço `app` usa a rede do host e carrega `tests/helpers/redirecionar-google.mjs` por `NODE_OPTIONS` (ver `compose.ci.yml`). Somente tokens sintéticos encaminham requisições OAuth e Sheets API ao Google falso no loopback; os endereços de produção permanecem fixos.
+A suíte cria e limpa a própria massa somente depois de comprovar o runtime HTTP e o banco da rodada. O executor gera a configuração, aplica migrações no banco novo e inicia o app sem herdar URLs ou segredos. CI e execução local usam o mesmo comando. O transporte Google é importado apenas no runtime de teste e encaminha tokens sintéticos ao loopback compartilhado. Não há rede de host, portas publicadas ou saída para serviços reais.
 
 - Integração com Google Planilhas contra OAuth e Sheets API simulados: conexão, estrutura, mapa, células ocupadas e fórmulas preservadas, marcadores, identificação por código após renomeação, saídas, entradas, envio automático, autorização revogada e resposta perdida sem repetição. Rotas antigas respondem 404 e configuração com endpoint é recusada.
 
@@ -110,7 +110,7 @@ A integração do terceiro arquivo é testada contra OAuth e Sheets API simulado
 
 ## Ponta a ponta
 
-A execução usa a imagem oficial da Microsoft, sem instalar navegadores no host: rode `pnpm run test:e2e:docker` com o aplicativo no ar. O script e a alternativa no host estão em [tests/README.md](../tests/README.md).
+A execução usa a imagem oficial da Microsoft dentro da pilha exclusiva: `pnpm run test:e2e:docker` prepara seu próprio aplicativo e banco. A versão de Playwright corresponde ao lock. Não apontar a suíte para um servidor externo. Comandos direcionados e restrições estão em [tests/README.md](../tests/README.md).
 
 Os specs em `tests/ponta-a-ponta/` rodam com Playwright headless e cobrem entrada e saída (barra lateral no desktop e menu do aplicativo no celular), campos de senha com exibir e ocultar, lembrar o acesso no dispositivo com sessão persistente e e-mail preenchido, banco vazio sem carregamento infinito, troca de visão pelos botões com destaque da seção ativa na barra lateral e no menu do aplicativo, integração com Google Planilhas contra respostas HTTP simuladas do Google (conexão Google, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), planilha de saídas (configuração na Gestão, envio pela vista Saídas e reenvio sem duplicar), diretores de turma na Gestão (identificador inválido sinalizado, cadastro com turma, palavra-chave exibida uma vez, revogação só com motivo e parâmetros de acesso; o diretor entra pelo identificador, troca a palavra no diálogo obrigatório e vê só a própria turma, com gráficos, tabela e nenhuma navegação da equipe), relação de alunos em CSV (botões inteiros no celular, arquivo fora do padrão sinalizado antes de conferir, importação com prévia e exportação no mesmo schema), extras do 3º ano (Alunos por origem, busca por origem na Chamada, turma original no nome acessível, sem círculo ao lado do nome, na turma reorganizada e origem em massa), saída durante a aula com texto opcional, justificativa escrita e responsável do catálogo de quem libera, tema de três opções, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover com teclado e atalhos, abas da Gestão com toque e teclado, responsividade, login simétrico, campos do login com margem no celular, histórico, grade com divisórias, períodos e coluna acumulada, saídas antecipadas, cópia de segurança e PWA, além de toasts em todas as ações, trava de toque duplo nas ações de rede, tipografia Plus Jakarta Sans com JetBrains Mono nos números e telas de estado (404, sessão expirada e avisos internos). A configuração, os projetos de navegador e o CI estão em [tests/README.md](../tests/README.md).
 
@@ -132,16 +132,28 @@ O Resumo dos Relatórios verifica filtros, comparação entre séries e turmas, 
 
 ## Capturas do README
 
-As imagens do README são geradas por `tests/ponta-a-ponta/interface/imagens.spec.ts` e gravadas em `docs/imagens/`, com o aplicativo no ar e a semente de desenvolvimento aplicada. O spec usa o estado de sessão criado pelo setup global e captura o Painel em 1440x900 no Chromium (claro e escuro), a Chamada em 390x844 no mobile-chrome (claro e escuro) e, no desktop, o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão, sem dados reais. Aplique a semente antes de capturar; sem ela o spec falha com a orientação para rodar `pnpm run seed`. Para regenerar:
+As imagens do README são geradas por `tests/ponta-a-ponta/interface/imagens.spec.ts` em `/work/docs/imagens/`, na pilha descartável. O spec usa o estado de sessão criado pelo setup global e captura o Painel em 1440x900 no Chromium (claro e escuro), a Chamada em 390x844 no mobile-chrome (claro e escuro) e, no desktop, o Resumo dos Relatórios, as Saídas e entradas e a aba Turmas da Gestão, sem dados reais. O comando aplica a semente dentro da rodada comprovada; não preparar uma instalação externa. Para regenerar:
 
 ```bash
-pnpm run capturas:readme         # Playwright local, com o aplicativo no ar
-pnpm run capturas:readme:docker  # imagem oficial da Microsoft, com o aplicativo no ar
+pnpm run capturas:readme
+pnpm run capturas:readme:docker
 ```
+
+O executor exporta as sete imagens por lista exata para `artefatos/docs/imagens/` no diretório privado impresso, antes de remover o container. Remove as imagens antigas somente da cópia de build para não aceitar resultado anterior quando um caso é ignorado. Não copia automaticamente sobre `docs/imagens/` do checkout ou arquivos existentes. `--artefatos /caminho/absoluto/novo` permite escolher outro destino privado fora do checkout; o pai precisa existir e nenhum componente pode ser link. Manifestos, sessões e arquivos de ambiente não são exportáveis. Após revisar as imagens recuperadas, a cópia para os caminhos versionados é uma decisão manual. Detalhes e exemplo completo estão em [tests/README.md](../tests/README.md).
 
 Quando o dia corrente é feriado ou fim de semana, o spec volta ao último dia letivo com chamada para a captura sair com dados.
 
-Os PNGs versionados em `docs/imagens/` não são editados à mão. Quando a interface mudar, regenere as capturas e confira o diff das imagens no pull request. A galeria fica em `docs/imagens/README.md` e o teste `tests/unidade/interface/readme-imagens.test.ts` limita a largura e o peso das imagens exibidas no README.
+Os PNGs versionados não são editados à mão. A galeria fica em `docs/imagens/README.md` e o teste `tests/unidade/interface/readme-imagens.test.ts` limita largura e peso das imagens exibidas no README.
+
+## Cobertura de distribuição e limites de verificação
+
+O workflow `testes.yml` chama `node tests/isolamento/executar.mjs --validar-distribuicao` antes das suítes. Essa fase valida `compose.yml` sozinho e com `compose.ci.yml` por `config --quiet`, em ambiente sintético sem carregar `.env`, sem iniciar os serviços descritos. A sobreposição legada ainda declara rede de host e bind; validação de configuração não autoriza executá-la.
+
+A fase constrói o Dockerfile de distribuição a partir da cópia autorizada e usa sua imagem final, não a testimage com dependências de desenvolvimento. Nela, executa migrador, `criar-admin.mjs --somente-criar`, `criar-coordenacao.mjs` e `scripts/seed/seed.mjs`, conferindo depois contas ativas, nove turmas e alunos persistidos. Banco novo em tmpfs, namespace `none`, inspeções de ownership, zero portas/binds e canário vizinho antecedem as escritas. Essa fase não valida saúde HTTP da distribuição e não partilha a base semeada com API ou E2E.
+
+As regressões unitárias verificam seleção da imagem e comandos reais planejados, recusas anteriores à migração e leitura do resultado persistido por dublês. Não são prova de Docker, PostgreSQL ou Actions reais. A integração dessa fase e a regeneração efetiva das capturas continuam pendentes de execução autorizada em candidato estabilizado. A configuração anônima de legibilidade seleciona specs sem sessão, mas o provisionador atual ainda cria contas sintéticas.
+
+Arquivos novos de outros lotes não entram no build por varredura de untracked. A opção `--fontes-novas` recebe uma lista explícita de caminhos relativos e hashes SHA-256, revisada previamente; divergência de hash, caminho privado ou link interrompe a cópia. O inventário privado permite auditar o que entrou. O [contrato completo](../tests/isolamento/README.md) descreve a política e os gates pendentes.
 
 ## Convenções
 

@@ -1,6 +1,6 @@
 # Testes
 
-Para os contratos de notificações, gerar chaves sintéticas com `node tests/gerar-ambiente-push.mjs /tmp/frequenciapp-push.env` e carregar esse arquivo no ambiente do aplicativo e da suíte (`set -a`, `. /tmp/frequenciapp-push.env`, `set +a`). O CI prepara automaticamente o mesmo conjunto no aplicativo e nos testes. Os contratos também podem validar o par automático: omitir as três variáveis VAPID e definir somente o mesmo `CRON_SECRET` sintético no servidor e nos testes. Não reutilizar chaves de produção. A suíte não envia push a dispositivos externos; a configuração e a entrega no aparelho são conferidas pela opção de teste da instalação.
+O executor gera `AUTH_SECRET` e `CRON_SECRET` sintéticos por rodada. A configuração automática de VAPID deriva o mesmo par no app e nos testes. Não carregar chaves ou arquivos de ambiente da instalação. A suíte não envia push a dispositivos externos; a configuração e a entrega em aparelho real não são comprovadas por esses testes.
 
 Suítes do FrequenciApp com Vitest e Playwright.
 
@@ -11,9 +11,9 @@ Suítes do FrequenciApp com Vitest e Playwright.
 | Unidade                   | `pnpm run test:unit`                  | Nenhum.                                                                 |
 | Componentes               | `pnpm run test:componentes`           | Chromium instalado pelo Playwright; sem aplicativo ou banco.            |
 | Visibilidade dos gráficos | `pnpm run test:graficos-visibilidade` | Chromium; fixture Vite isolada. Não há passo próprio no workflow atual. |
-| Contratos de API          | `pnpm run test:api`                   | Aplicativo no ar, banco migrado, contas de teste.                       |
-| Ponta a ponta             | `pnpm run test:e2e`                   | Aplicativo no ar e navegadores instalados.                              |
-| PWA                       | `pnpm run test:pwa`                   | Build de produção no ar (`pnpm run build` e `pnpm start`).              |
+| Contratos de API          | `pnpm run test:api`                   | Docker, pilha exclusiva criada pelo executor.                           |
+| Ponta a ponta             | `pnpm run test:e2e`                   | Docker, navegador da imagem do executor.                                |
+| PWA                       | `pnpm run test:pwa`                   | Docker, build próprio preparado pelo executor.                          |
 | API e unidade             | `pnpm test`                           | Idem, na ordem.                                                         |
 
 Os testes de componente usam os helpers de `tests/apoio`: `vite.ts` sobe a fixture e `navegador.ts` abre o Chromium e aplica o tema. A matriz de `tests/componentes/interface/primitivas.test.ts` cobre contraste, borda, raio, altura, foco e estados desabilitados das primitivas nos dois temas. O guardrail de estrutura reprova opacidade manual para desabilitar controles e bordas transparentes fora das peças internas justificadas. O job `interface` do workflow `qualidade.yml` executa `pnpm run test:componentes`; os testes não precisam de banco nem do aplicativo no ar.
@@ -55,78 +55,37 @@ podem impedir uma escolha; a contagem de passos não tem teto arbitrário.
 
 O contrato `schema-preview.test.ts` cria schemas descartáveis no mesmo banco para verificar o isolamento do Prisma e das consultas SQL diretas. A conexão de testes precisa de permissão `CREATE` no database; cada execução remove apenas os schemas que criou.
 
-A suíte aponta para o aplicativo em execução. O banco de testes precisa estar acessível para a limpeza da massa; exporte a connection string no comando porque ambientes locais podem ter outro valor de `DATABASE_URL` no shell. Os scripts administrativos preferem `DIRECT_URL` quando a variável está definida:
+API e navegador usam somente a pilha criada pelo [executor de isolamento](isolamento/README.md). Não exportar URLs de banco, segredos, `APP_URL`, `TEST_BASE_URL` ou `NODE_OPTIONS` no host. O executor recusa esse ambiente antes de provisionar. Uma URL local ou um banco sem alunos não comprovam exclusividade.
 
 ```bash
-# 1. banco migrado
-pnpm exec prisma migrate deploy
-
-# 2. contas de teste (padrões demo@escola.exemplo e direcao@escola.exemplo)
-ADMIN_EMAIL=direcao@escola.exemplo ADMIN_SENHA=DirecaoFrequencia2026 ADMIN_NOME=Direção pnpm run criar-admin
-CONTA_EMAIL=demo@escola.exemplo CONTA_SENHA=DemoFrequencia2026 CONTA_NOME=Demo pnpm run criar-coordenacao
-
-# 3. aplicativo de testes com configuração Google sintética
-# Usar os mesmos DATABASE_URL e AUTH_SECRET no servidor e nas suítes.
-export GOOGLE_CLIENT_ID=cliente-sintetico
-export GOOGLE_CLIENT_SECRET=segredo-sintetico
-export GOOGLE_REDIRECT_URI=http://localhost:3000/api/planilha/google/retorno
-export GOOGLE_PICKER_API_KEY=picker-sintetico
-export GOOGLE_PROJECT_NUMBER=123456789
-NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--import $(pwd)/tests/helpers/redirecionar-google.mjs" pnpm run dev
-
-# 4. suíte
-# As fixtures de banco exigem DATABASE_URL e DIRECT_URL iguais e explícitas.
-DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
-DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+node tests/isolamento/executar.mjs -- pnpm exec vitest run --config vitest.api.config.ts tests/api/sistema/documentacao.test.ts
 pnpm run test:api
 ```
 
-Variáveis aceitas:
+Cada rodada usa banco novo, runtime de produção próprio e contas sintéticas. Não executar comandos administrativos no banco de uma instalação para preparar os testes. A guarda valida o namespace sem rotas, o manifesto privado, a prova do processo HTTP, o marcador do banco, papel, schema e todos os checksums de migração antes de liberar fixtures. O setup de API roda antes da importação dos contratos; o setup de navegador valida antes da primeira leitura ou alteração de conta.
 
-- `APP_URL`: endereço do aplicativo (padrão `http://localhost:3000`).
-- `TESTE_ADMIN_EMAIL` e `TESTE_ADMIN_SENHA`: credenciais da administração de teste.
-- `TESTE_EMAIL` e `TESTE_SENHA`: credenciais da coordenação de teste.
-- `DATABASE_URL`: limpeza da massa (dias e entidades prefixadas com QA).
-- `DIRECT_URL`: conexão preferida pelos comandos administrativos e exigida igual a `DATABASE_URL` pelas fixtures que recusam banco ambíguo.
+O transporte Google de teste aceita somente loopback no namespace compartilhado da rodada. O runtime e os testes recebem o mesmo segredo sintético, sem herdar credenciais do host. A rede bloqueia integrações externas, mesmo quando um token não é reconhecido pelo redirecionador.
 
 O contrato `entradas.test.ts` cobre duplicidade, validação, momento, responsável ativo e nome histórico, turma histórica, separação da chamada, cópia JSON, desistência e permissões.
 
 A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e remove a própria massa antes e depois; execuções repetidas não acumulam estado. Não use dados reais em hipótese alguma.
 
-Os testes de planilha criam um servidor HTTP local que responde nos formatos OAuth e Sheets API, com dados sintéticos. O módulo de transporte acima aceita apenas tokens de teste e endereço HTTP em `127.0.0.1`. Não carregar esse módulo em produção. O Compose de CI monta o módulo somente no serviço de testes. O `AUTH_SECRET` usado para cifrar a conexão sintética precisa ser o mesmo do aplicativo; o script do Playwright repassa esse segredo ao contêiner.
+Os testes de planilha criam um servidor HTTP local que responde nos formatos OAuth e Sheets API, com dados sintéticos. O módulo de transporte aceita apenas tokens de teste e endereço HTTP em `127.0.0.1`. Não carregar esse módulo em produção. O executor o importa somente no processo de runtime de teste e gera o mesmo `AUTH_SECRET` sintético para aplicativo e suíte.
 
 ## Ponta a ponta com Playwright
 
-Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. O aplicativo precisa estar no ar antes (`docker compose up -d` ou `pnpm run dev`):
+O wrapper usa o mesmo executor, sem montar o repositório, socket Docker, home ou segredos do host. A imagem de navegador corresponde à versão 1.64.1 resolvida no lock, com digest no inventário de ferramentas, e usa Node 24. Antes da suíte, cada engine deve iniciar e encerrar com essa instalação; o caminho do executável não comprova as dependências de WebKit.
 
 ```bash
-pnpm run test:e2e:docker            # todos os projetos
-pnpm run test:e2e:docker:chromium   # só o Chromium
-pnpm run capturas:readme            # capturas do README em docs/imagens
+pnpm run test:e2e:docker
+pnpm run test:e2e:docker:chromium
+node tests/isolamento/executar.mjs -- pnpm exec playwright test tests/ponta-a-ponta/chamada/frequencia.spec.ts --project=chromium --workers=1 --retries=0
+pnpm run test:pwa
 ```
 
-O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test` (a imagem não expõe um binário global). Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
+Os configs que usam o aplicativo real recusam execução sem prova, inclusive na coleta e em execuções filtradas. Não iniciam nem reutilizam servidor externo. O executor já inicia o build de produção, inclusive para PWA. As configurações de componentes Vite, sem aplicativo ou banco, continuam independentes.
 
-Como alternativa, instale os navegadores no host e mantenha a configuração já presente no repositório:
-
-```bash
-pnpm add -D @playwright/test
-pnpm exec playwright install --with-deps chromium webkit
-pnpm run dev            # ou docker compose up -d
-pnpm exec playwright test    # headless, execução serial
-```
-
-- `playwright.config.ts`: projetos `chromium`, `mobile-chrome` (Pixel 7) e `mobile-webkit` (iPhone 13), `globalSetup` que garante as contas e grava o estado de sessão em `tests/ponta-a-ponta/.auth/`, e `webServer` que sobe o servidor de desenvolvimento quando `PLAYWRIGHT_SKIP_WEBSERVER` não é `1`.
-- `playwright.pwa.config.ts`: roda os specs de PWA contra o build de produção, onde o service worker é o real.
-- Helpers em `tests/ponta-a-ponta/helpers/`: autenticação, acesso ao banco para massa e utilidades de página (hidratação, troca de visão e rolagem do paginador).
-- Specs atuais: autenticação com campos de senha exibir/ocultar e opção de manter conectado, banco sem turmas, chamada diária com falta justificada, chamada por aula com saída parcial e S na grade, seletor de período próprio em popover, troca de visão, seção ativa na barra lateral e no menu do aplicativo, abas da Gestão com toque e teclado, integração com Google Planilhas contra OAuth e Sheets API simulados (conexão Google, estrutura, mapa, prévia na Grade, exportação CSV e desconexão), extras do 3º ano (Alunos por origem, busca por origem na Chamada e origem em massa), saída durante a aula com texto opcional, responsividade (barra lateral, modal centralizado no celular, login simétrico e campos com margem) e tema de três opções.
-- `estados.spec.ts`: verifica 404 e reentrada com aviso de sessão expirada. A consulta de atualização do Painel recebe um 401 real depois do clique; a limpeza do cookie ocorre nessa consulta, para não concorrer com pedidos de fundo. O service worker é bloqueado nesse spec para permitir a interceptação.
-- `entradas.spec.ts`: calendário brasileiro mesmo em navegador inglês, navegação diária, seleção de momento e responsável, chegada atrasada, recarga, remoção confirmada e fluxo de aba/prévia/envio com API falsa. Esse spec e `planilha.spec.ts` bloqueiam o service worker para permitir interceptação de requisições. O PWA continua coberto pela suíte própria.
-- `painel-filtros.spec.ts`: gráficos diários por escopo e gráfico Personalizado entre meses, filtros de série e turma, intervalo inválido, ausência de chamadas, presença sem faltas, recuperação de falha e largura de 360 px. A consulta de período é simulada com alunos sintéticos da própria massa; somente esse grupo bloqueia o service worker. A consulta real por período é coberta pelos contratos de API.
-- `horarios.spec.ts`: cadastro das disciplinas por dia na Gestão, recarga e nova tentativa sem perder o formulário, consulta por turma, dia e semana pela coordenação, aulas inativas omitidas e Sem disciplina. Confere semana e edição em 360 pixels e anexa capturas sintéticas ao relatório.
-- Massa: prefixo `E2E` e limpeza antes e depois; nenhum dado real.
-
-O script do contêiner já define `PLAYWRIGHT_SKIP_WEBSERVER=1` e `TEST_BASE_URL`; fora dele, exporte as duas variáveis com o aplicativo no ar. O CI sobe o Compose, instala o Chromium no runner e roda `pnpm run test:e2e:chromium`, publicando relatório e traces em caso de falha. No CI, o serviço `app` usa a rede do host e carrega o transporte de testes por `NODE_OPTIONS` (ver `compose.ci.yml`), para OAuth e Sheets API simulados responderem no loopback do runner.
+Cada comando cria uma rodada própria; não partilhar banco entre suítes. Sessões sintéticas ficam somente no container e não são exportadas. Capturas e relatórios autorizados são recuperados no destino privado informado pelo executor, antes da remoção dos containers. A interface interativa e o navegador com janela não são expostos pelo executor sem portas de host.
 
 ## Legibilidade: fixture e aplicativo real
 
@@ -157,13 +116,14 @@ O spec autenticado usa a massa E2E padrão e a remove. Tanto seu helper quanto o
 e podem redefinir contas fixas, mesmo que o teste aborte escritas da página.
 Use exclusivamente banco e servidor descartáveis, isolados e sem outras suítes
 concorrentes; nunca aponte para uma base real. O runner padrão descobre esse spec
-junto com os demais. Para executar apenas os seis casos de login e as oito
-autochecagens sem globalSetup,
-sem ler estado de sessão e sem iniciar servidor automaticamente, com o servidor
-descartável já no ar:
+junto com os demais. Para selecionar apenas os seis casos de login e as oito
+autochecagens, sem ler estado de sessão no spec, com servidor descartável criado
+pelo executor, usar o comando abaixo. O provisionador ainda cria as contas
+sintéticas antes de qualquer comando, inclusive nessa configuração anônima;
+não se trata de execução sem preparo ou sem escrita no banco.
 
 ```bash
-TEST_BASE_URL=http://localhost:3000 pnpm exec playwright test --config=playwright.legibilidade-anon.config.ts
+node tests/isolamento/executar.mjs -- pnpm exec playwright test --config=playwright.legibilidade-anon.config.ts
 ```
 
 Para a comparação RED/GREEN, execute o mesmo spec de login sobre o build da base
@@ -178,11 +138,19 @@ fallback não comprova RED do E2E real.
 
 Além das suítes, a validação inclui inspeção visual das telas (captura e análise por modelo de visão) e os specs de navegador cobrindo login com erro e sucesso, campos de senha com exibir e ocultar, lembrar o acesso no dispositivo (sessão persistente e e-mail preenchido), banco vazio, chamada diária com falta justificada, chamada por aula com saída parcial, painel com gráficos, seletor de período próprio em popover, troca de visão com seção ativa, barra lateral no desktop e menu lateral no celular, abas da Gestão com toque e teclado, histórico, grade com divisórias e períodos, gestão completa (série, turma com aulas, aluno, contas e configurações), saídas antecipadas, cópia de segurança, troca de senha, tema de três opções, login simétrico, campos do login com margem no celular, PWA e larguras de celular e desktop.
 
-As capturas oficiais do README ficam em `docs/imagens/` e são geradas por `tests/ponta-a-ponta/interface/imagens.spec.ts`, com o aplicativo no ar e a semente aplicada:
+Os PNGs do spec são produzidos em `/work/docs/imagens/`, dentro da pilha descartável. Os comandos abaixo aplicam a semente somente nessa rodada comprovada e recuperam as sete imagens em `artefatos/docs/imagens/`, no diretório privado impresso na saída, sem alterar o checkout:
 
 ```bash
-pnpm run capturas:readme         # Playwright local
-pnpm run capturas:readme:docker  # imagem oficial, com o aplicativo no ar
+pnpm run capturas:readme
+pnpm run capturas:readme:docker
 ```
 
-O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, sempre com massa sintética. Não edite os PNGs à mão: regenere pelo comando e revise o diff. A galeria fica em `docs/imagens/README.md` e o teste `tests/unidade/interface/readme-imagens.test.ts` limita a largura e o peso das imagens do README. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.
+Para escolher um destino recuperável, existente apenas como diretório pai privado, usar o executor diretamente. O caminho final deve ser absoluto, novo, fora do checkout e sem links:
+
+```bash
+node tests/isolamento/executar.mjs --artefatos "$HOME/evidencias/capturas-rodada-nova" -- sh -c 'CONTA_EMAIL=demo@escola.exemplo SEED_PERFIL=leve pnpm run seed && CAPTURAS=1 pnpm exec playwright test tests/ponta-a-ponta/interface/imagens.spec.ts --project=chromium --project=mobile-chrome'
+```
+
+O spec captura o Painel em 1440x900 no Chromium e a Chamada em 390x844 no mobile-chrome, nos temas claro e escuro, além de Relatórios, Saídas e Gestão, sempre com massa sintética. Antes do build de capturas, o executor retira da cópia as sete imagens antigas; uma captura ignorada não passa como resultado novo. A ausência de uma imagem obrigatória reprova a exportação, preservando as demais evidências. Só após revisão visual cabe copiar manualmente os PNGs escolhidos para `docs/imagens/` e revisar o diff; nenhuma substituição automática de arquivo versionado é feita. Não editar os PNGs à mão. A galeria fica em `docs/imagens/README.md` e o teste `tests/unidade/interface/readme-imagens.test.ts` limita largura e peso das imagens. Capturas locais de validação vão para `docs/imagens/locais/`, fora do versionamento.
+
+A exportação, o modo de distribuição e a política de fontes novas têm regressões com dublês. Isso não comprova geração integrada de PNG, execução da imagem final ou CI remoto. Os gates integrados pendentes e o contrato de `--fontes-novas` estão no [guia do executor](isolamento/README.md).

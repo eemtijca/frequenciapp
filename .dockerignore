@@ -21,3 +21,7 @@ worklog.md
 compose*.yml
 bun.lock
 generated/
+# Mantém planos privados e evidências fora de qualquer contexto de build.
+.hermes
+test-results
+playwright-report

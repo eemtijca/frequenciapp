@@ -1,6 +1,10 @@
 import pg from "pg";
 import { afterEach, expect, it, vi } from "vitest";
 import { comBanco } from "../ponta-a-ponta/helpers/banco";
+// O ciclo de vida usa dublê; a recusa real fica em infra/isolamento*.test.ts.
+vi.mock("../helpers/isolamento.mjs", () => ({
+  verificarIsolamento: async () => ({ databaseUrl: process.env.DATABASE_URL }),
+}));
 
 it("não mascara erro da operação quando fechamento da conexão falha", async () => {
   const original = new Error("operação");

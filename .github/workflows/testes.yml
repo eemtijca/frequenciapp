@@ -1,3 +1,4 @@
+# Executa pilhas sintéticas e conserva somente evidências mínimas por allowlist.
 name: Testes
 
 on:
@@ -10,146 +11,63 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write # Necessário para o cache GHA do build Docker.
 
 env:
-  # AUTH_SECRET é exigida na interpolação do compose.yml; o valor em
-  # execução no contêiner vem do compose.ci.yml.
-  AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
-  DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-  DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-  TZ_APP: America/Fortaleza
-  APP_URL: http://127.0.0.1:3000
+  EVIDENCIAS_CI: frequenciapp-ci-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   testes:
-    name: Compose, migrações e contratos
+    name: Pilhas exclusivas, API, navegador e PWA
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
-
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Instalar dependências
-        run: pnpm install --frozen-lockfile
-
-      - name: Preparar chaves sintéticas de push
-        run: node tests/gerar-ambiente-push.mjs "$GITHUB_ENV"
-
-      - name: Validar configurações do Compose
-        run: |
-          docker compose config --quiet
-          docker compose -f compose.yml -f compose.ci.yml config --quiet
+          node-version: 24.22.2
 
       - name: Setup Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - name: Construir imagem (com cache, valida o Dockerfile)
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
-          push: false
-          load: true
-          tags: frequenciapp:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          version: v0.38.2
+          driver-opts: image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
 
-      - name: Gerar cliente Prisma
-        run: pnpm run db:generate
+      - name: Reservar destinos exclusivos de evidências
+        id: evidencias_preparo
+        run: node tests/isolamento/evidencias-ci.mjs preparar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI"
 
-      - name: Subir aplicação e banco
-        run: docker compose -f compose.yml -f compose.ci.yml up -d
+      - name: Compose, migrações, administração e seed da imagem de distribuição
+        if: ${{ !cancelled() && steps.evidencias_preparo.outcome == 'success' }}
+        run: node tests/isolamento/evidencias-ci.mjs executar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI" --etapa distribuicao -- node tests/isolamento/executar.mjs --validar-distribuicao
 
-      - name: Aguardar a aplicação
-        run: |
-          for tentativa in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/api/saude > /dev/null; then
-              echo "Aplicação disponível após ${tentativa} tentativa(s)."
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "A aplicação não respondeu no tempo esperado."
-          docker compose -f compose.yml -f compose.ci.yml logs app
-          exit 1
+      - name: Contratos de API com banco e runtime exclusivos
+        if: ${{ !cancelled() && steps.evidencias_preparo.outcome == 'success' }}
+        run: node tests/isolamento/evidencias-ci.mjs executar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI" --etapa api -- node tests/isolamento/executar.mjs --artefatos "$RUNNER_TEMP/$EVIDENCIAS_CI/privado/api" -- pnpm exec vitest run --config vitest.api.config.ts --reporter=json --outputFile=test-results/api.json
 
-      - name: Validar scripts administrativos no contêiner
-        run: |
-          # Exercita o dotenv e o driver pg dentro da imagem, além do
-          # módulo de decisão do bootstrap (--somente-criar).
-          docker compose -f compose.yml -f compose.ci.yml exec -T \
-            -e ADMIN_EMAIL=bootstrap@escola.exemplo \
-            -e ADMIN_SENHA=BootstrapFrequencia2026 \
-            -e ADMIN_NOME=Bootstrap \
-            app node scripts/administracao/criar-admin.mjs --somente-criar
+      - name: Navegador com nova pilha exclusiva
+        if: ${{ !cancelled() && steps.evidencias_preparo.outcome == 'success' }}
+        run: node tests/isolamento/evidencias-ci.mjs executar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI" --etapa e2e -- node tests/isolamento/executar.mjs --artefatos "$RUNNER_TEMP/$EVIDENCIAS_CI/privado/e2e" -- sh -c 'PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/e2e.json pnpm exec playwright test --project=chromium --reporter=json'
 
-      - name: Criar administrador de teste
-        env:
-          ADMIN_EMAIL: direcao@escola.exemplo
-          ADMIN_SENHA: DirecaoFrequencia2026
-          ADMIN_NOME: Direção
-        run: pnpm run criar-admin
+      - name: PWA com nova pilha exclusiva e build de produção
+        if: ${{ !cancelled() && steps.evidencias_preparo.outcome == 'success' }}
+        run: node tests/isolamento/evidencias-ci.mjs executar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI" --etapa pwa -- node tests/isolamento/executar.mjs --artefatos "$RUNNER_TEMP/$EVIDENCIAS_CI/privado/pwa" -- sh -c 'PLAYWRIGHT_JSON_OUTPUT_NAME=test-results/pwa.json pnpm exec playwright test --config=playwright.pwa.config.ts --project=chromium --reporter=json'
 
-      - name: Criar coordenação de teste
-        env:
-          CONTA_EMAIL: demo@escola.exemplo
-          CONTA_SENHA: DemoFrequencia2026
-          CONTA_NOME: Demo
-        run: pnpm run criar-coordenacao
+      - name: Coletar resumo estruturado mesmo após falha
+        if: ${{ always() && steps.evidencias_preparo.outcome == 'success' }}
+        run: node tests/isolamento/evidencias-ci.mjs coletar --raiz "$RUNNER_TEMP/$EVIDENCIAS_CI"
 
-      - name: Testes de contratos da API
-        run: pnpm run test:api
-
-      - name: Instalar navegadores do Playwright
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Testes de ponta a ponta (Playwright)
-        env:
-          # localhost: o storageState do Playwright envia o cookie Secure do
-          # build de produção quando o host é tratado como local.
-          TEST_BASE_URL: http://localhost:3000
-          PLAYWRIGHT_SKIP_WEBSERVER: "1"
-          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-        run: pnpm run test:e2e:chromium
-
-      - name: Testes de PWA (Playwright)
-        env:
-          TEST_BASE_URL: http://localhost:3000
-          PLAYWRIGHT_SKIP_WEBSERVER: "1"
-          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-        run: pnpm run test:pwa --project=chromium
-
-      - name: Validar a semente de demonstração
-        # Depois do e2e: o cenário de banco vazio depende da base limpa.
-        env:
-          CONTA_EMAIL: demo@escola.exemplo
-          DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
-          SEED_PERFIL: leve
-        run: pnpm run seed
-
-      - name: Publicar relatório do Playwright
-        if: failure()
+      # Não publicar relatórios brutos, capturas, sessões, traces ou diretórios privados.
+      # Os sete PNGs oficiais exigem canal privado expressamente autorizado.
+      - name: Preservar somente resultados mínimos por sete dias
+        if: ${{ always() && steps.evidencias_preparo.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          name: testes-minimos-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/${{ env.EVIDENCIAS_CI }}/publico/resumo.json
+          if-no-files-found: error
+          overwrite: false
+          include-hidden-files: false
           retention-days: 7
-
-      - name: Exibir logs em caso de falha
-        if: failure()
-        run: docker compose -f compose.yml -f compose.ci.yml logs
-
-      - name: Derrubar o ambiente
-        if: always()
-        run: docker compose -f compose.yml -f compose.ci.yml down -v --remove-orphans

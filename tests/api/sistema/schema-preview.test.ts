@@ -4,8 +4,9 @@ import { randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import pg from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "../../../generated/prisma/client";
+import { criarAmbienteSchemaPreview } from "../../helpers/schema-preview-ambiente";
 
 const configuracao = vi.hoisted(() => ({
   databaseUrl: "",
@@ -15,7 +16,7 @@ const configuracao = vi.hoisted(() => ({
 }));
 vi.mock("@/infra/ambiente", () => ({ ambiente: configuracao }));
 
-import { banco, objetoDoBanco } from "@/infra/banco";
+import { objetoDoBanco } from "@/infra/banco";
 import { lerParametrosAcesso } from "@/application/parametros-acesso";
 import { lerEstadoPlanilha } from "@/application/planilha";
 import { ordenarAlunosDasTurmas } from "@/application/ordenacao-turmas";
@@ -27,8 +28,7 @@ const schemaControle = `QA_controle-${sufixo}`;
 const schemaAusente = `QA_ausente_${sufixo}`;
 const schemasCriados: string[] = [];
 const clientes = new Map<string, PrismaClient>();
-const globalComBanco = globalThis as unknown as { prisma?: PrismaClient };
-const prismaAnterior = globalComBanco.prisma;
+let ambienteSchema: ReturnType<typeof criarAmbienteSchemaPreview> | undefined;
 let administrador: pg.Client;
 let conexao: string;
 
@@ -37,16 +37,8 @@ function identificador(valor: string): string {
 }
 
 function selecionarRuntime(schema: string): PrismaClient {
-  const url = new URL(conexao);
-  url.searchParams.set("schema", schema);
-  // Uma regressão no SQL direto só alcança outro schema descartável.
-  // O destino diverge do Preview para detectar dependência de search_path.
-  url.searchParams.set("options", `-c search_path=${identificador(schemaControle)}`);
-  configuracao.databaseUrl = url.toString();
-  globalComBanco.prisma = clientes.get(schema);
-  const cliente = banco();
-  clientes.set(schema, cliente);
-  return cliente;
+  if (!ambienteSchema) throw new Error("O ambiente dos schemas descartáveis não foi preparado.");
+  return ambienteSchema.selecionar(schema);
 }
 
 async function prepararSchema(schema: string, quantidadeChamadas: number) {
@@ -106,6 +98,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  ambienteSchema = criarAmbienteSchemaPreview(conexao, schemaControle, configuracao, clientes);
   for (const [schema, janela] of [
     [schemaPreview, 21],
     [schemaControle, 22],
@@ -121,9 +114,14 @@ beforeEach(async () => {
   }
 });
 
+afterEach(() => {
+  ambienteSchema?.restaurar();
+  ambienteSchema = undefined;
+});
+
 afterAll(async () => {
+  ambienteSchema?.restaurar();
   await Promise.all([...clientes.values()].map((cliente) => cliente.$disconnect()));
-  globalComBanco.prisma = prismaAnterior;
   if (administrador) {
     try {
       for (const schema of schemasCriados) {

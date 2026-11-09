@@ -1,0 +1,244 @@
+{
+  "descricao": "Inspect documental de contêiner criado e nunca iniciado, com identidades e credencial exclusivamente sintéticas. Não comprova execução PostgreSQL.",
+  "proveniencia": {
+    "substituicoes": [
+      {
+        "caminho": "/caminho",
+        "valorSintetico": "/containers/9999999999999999999999999999999999999999999999999999999999999999/json"
+      },
+      {
+        "caminho": "/resposta/Id",
+        "valorSintetico": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      {
+        "caminho": "/resposta/Created",
+        "valorSintetico": "2026-01-01T00:00:00Z"
+      },
+      {
+        "caminho": "/resposta/Name",
+        "valorSintetico": "/fadm-12341234123412341234123412341234"
+      },
+      {
+        "caminho": "/resposta/Config/Hostname",
+        "valorSintetico": "fadm-12341234123412341234123412341234"
+      },
+      {
+        "caminho": "/resposta/Config/Env/8",
+        "valorSintetico": "POSTGRES_DB=ft_12341234123412341234123412341234"
+      },
+      {
+        "caminho": "/resposta/Config/Env/10",
+        "valorSintetico": "POSTGRES_PASSWORD=abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd"
+      },
+      {
+        "caminho": "/resposta/Config/Env/11",
+        "valorSintetico": "POSTGRES_USER=ft_12341234123412341234123412341234"
+      },
+      {
+        "caminho": "/resposta/Config/Labels/br.frequenciapp.isolamento",
+        "valorSintetico": "12341234123412341234123412341234"
+      },
+      {
+        "caminho": "/resposta/NetworkSettings/Networks/none/NetworkID",
+        "valorSintetico": "8888888888888888888888888888888888888888888888888888888888888888"
+      }
+    ]
+  },
+  "captura": {
+    "metodo": "GET",
+    "caminho": "/containers/9999999999999999999999999999999999999999999999999999999999999999/json",
+    "resposta": {
+      "Id": "9999999999999999999999999999999999999999999999999999999999999999",
+      "Created": "2026-01-01T00:00:00Z",
+      "Path": "docker-entrypoint.sh",
+      "Args": ["postgres", "-c", "listen_addresses=127.0.0.1"],
+      "State": {
+        "Status": "created",
+        "Running": false,
+        "Paused": false,
+        "Restarting": false,
+        "OOMKilled": false,
+        "Dead": false,
+        "Pid": 0,
+        "ExitCode": 0,
+        "Error": "",
+        "StartedAt": "0001-01-01T00:00:00Z",
+        "FinishedAt": "0001-01-01T00:00:00Z"
+      },
+      "Image": "sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac",
+      "ResolvConfPath": "",
+      "HostnamePath": "",
+      "HostsPath": "",
+      "LogPath": "",
+      "Name": "/fadm-12341234123412341234123412341234",
+      "RestartCount": 0,
+      "Driver": "overlayfs",
+      "Platform": "linux",
+      "MountLabel": "",
+      "ProcessLabel": "",
+      "AppArmorProfile": "",
+      "ExecIDs": null,
+      "HostConfig": {
+        "Binds": null,
+        "ContainerIDFile": "",
+        "LogConfig": {
+          "Type": "local",
+          "Config": {
+            "max-file": "1",
+            "max-size": "1m"
+          }
+        },
+        "NetworkMode": "none",
+        "PortBindings": {},
+        "RestartPolicy": {
+          "Name": "no",
+          "MaximumRetryCount": 0
+        },
+        "AutoRemove": false,
+        "VolumeDriver": "",
+        "VolumesFrom": null,
+        "ConsoleSize": [0, 0],
+        "CapAdd": null,
+        "CapDrop": ["ALL"],
+        "CgroupnsMode": "private",
+        "Dns": null,
+        "DnsOptions": null,
+        "DnsSearch": null,
+        "ExtraHosts": null,
+        "GroupAdd": null,
+        "IpcMode": "private",
+        "Cgroup": "",
+        "Links": null,
+        "OomScoreAdj": 0,
+        "PidMode": "",
+        "Privileged": false,
+        "PublishAllPorts": false,
+        "ReadonlyRootfs": true,
+        "SecurityOpt": ["no-new-privileges:true"],
+        "Tmpfs": {
+          "/tmp": "rw,nosuid,nodev,noexec,size=16777216,mode=1777",
+          "/var/lib/postgresql/data": "rw,nosuid,nodev,noexec,size=536870912,mode=1777",
+          "/var/run/postgresql": "rw,nosuid,nodev,noexec,size=16777216,mode=1777"
+        },
+        "UTSMode": "",
+        "UsernsMode": "",
+        "ShmSize": 67108864,
+        "Runtime": "runc",
+        "Isolation": "",
+        "CpuShares": 0,
+        "Memory": 536870912,
+        "NanoCpus": 1000000000,
+        "CgroupParent": "",
+        "BlkioWeight": 0,
+        "BlkioWeightDevice": null,
+        "BlkioDeviceReadBps": null,
+        "BlkioDeviceWriteBps": null,
+        "BlkioDeviceReadIOps": null,
+        "BlkioDeviceWriteIOps": null,
+        "CpuPeriod": 0,
+        "CpuQuota": 0,
+        "CpuRealtimePeriod": 0,
+        "CpuRealtimeRuntime": 0,
+        "CpusetCpus": "",
+        "CpusetMems": "",
+        "Devices": null,
+        "DeviceCgroupRules": null,
+        "DeviceRequests": null,
+        "MemoryReservation": 0,
+        "MemorySwap": 1073741824,
+        "MemorySwappiness": null,
+        "OomKillDisable": false,
+        "PidsLimit": 128,
+        "Ulimits": null,
+        "CpuCount": 0,
+        "CpuPercent": 0,
+        "IOMaximumIOps": 0,
+        "IOMaximumBandwidth": 0,
+        "MaskedPaths": [
+          "/proc/acpi",
+          "/proc/asound",
+          "/proc/interrupts",
+          "/proc/kcore",
+          "/proc/keys",
+          "/proc/latency_stats",
+          "/proc/sched_debug",
+          "/proc/scsi",
+          "/proc/timer_list",
+          "/proc/timer_stats",
+          "/sys/devices/virtual/powercap",
+          "/sys/firmware"
+        ],
+        "ReadonlyPaths": ["/proc/bus", "/proc/fs", "/proc/irq", "/proc/sys", "/proc/sysrq-trigger"]
+      },
+      "GraphDriver": {
+        "Data": null,
+        "Name": "overlayfs"
+      },
+      "Mounts": [],
+      "Config": {
+        "Hostname": "fadm-12341234123412341234123412341234",
+        "Domainname": "",
+        "User": "postgres",
+        "AttachStdin": false,
+        "AttachStdout": false,
+        "AttachStderr": false,
+        "ExposedPorts": {
+          "5432/tcp": {}
+        },
+        "Tty": false,
+        "OpenStdin": false,
+        "StdinOnce": false,
+        "Env": [
+          "DOCKER_PG_LLVM_DEPS=",
+          "GOSU_VERSION=1.19",
+          "LANG=en_US.utf8",
+          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+          "PGDATA=/var/lib/postgresql/data/pgdata",
+          "PG_MAJOR=17",
+          "PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979",
+          "PG_VERSION=17.11",
+          "POSTGRES_DB=ft_12341234123412341234123412341234",
+          "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 --auth-local=scram-sha-256",
+          "POSTGRES_PASSWORD=abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+          "POSTGRES_USER=ft_12341234123412341234123412341234"
+        ],
+        "Cmd": ["postgres", "-c", "listen_addresses=127.0.0.1"],
+        "Image": "sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac",
+        "Volumes": {
+          "/var/lib/postgresql/data": {}
+        },
+        "WorkingDir": "/",
+        "Entrypoint": ["docker-entrypoint.sh"],
+        "Labels": {
+          "br.frequenciapp.isolamento": "12341234123412341234123412341234",
+          "br.frequenciapp.isolamento.tipo": "banco"
+        },
+        "StopSignal": "SIGINT"
+      },
+      "NetworkSettings": {
+        "SandboxID": "",
+        "SandboxKey": "",
+        "Ports": {},
+        "Networks": {
+          "none": {
+            "IPAMConfig": null,
+            "Links": null,
+            "Aliases": null,
+            "DriverOpts": null,
+            "GwPriority": 0,
+            "NetworkID": "8888888888888888888888888888888888888888888888888888888888888888",
+            "EndpointID": "",
+            "Gateway": "",
+            "IPAddress": "",
+            "MacAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "DNSNames": null
+          }
+        }
+      }
+    }
+  }
+}

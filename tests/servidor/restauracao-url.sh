@@ -2,6 +2,14 @@
 # Ensaia o fluxo de restauração por URL em PostgreSQL 17 descartável.
 set -Eeuo pipefail
 
+# shellcheck source=isolamento-entradas.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/isolamento-entradas.sh"
+# Antes de temporários, clientes e traps, inclusive quando o arquivo é importado.
+exigir_harness_administrativo restauracao-url || {
+  if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then exit 78; fi
+  return 78
+}
+
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-url.XXXXXX")
 BANCO="frequenciapp-url-$$"
