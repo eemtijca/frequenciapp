@@ -8,6 +8,7 @@ on:
       - opened
       - synchronize
       - reopened
+      - ready_for_review
       - closed
     paths:
       - prisma/**
@@ -43,6 +44,7 @@ jobs:
       (vars.DEPLOY_TARGET == '' || vars.DEPLOY_TARGET == 'vercel') &&
       github.event_name == 'pull_request' &&
       github.event.action != 'closed' &&
+      github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -10,16 +10,26 @@ uso() {
   cat <<'TEXTO'
 Uso:
   restaurar.sh --arquivo CAMINHO --confirmar [--sem-copia] [--aplicacao-parada]
-  restaurar.sh --entrada - --confirmar [--sem-copia] [--aplicacao-parada]
+  restaurar.sh --entrada - --confirmar [--escopo-legado SCHEMA] [--sem-copia] [--aplicacao-parada]
+  restaurar.sh --diagnosticar ID.json --confirmar
+  restaurar.sh --recuperar ID.json --confirmar
 
-No modo URL, informe BACKUP_RESTAURACAO_URL_VALIDACAO para validar em um banco
-descartável. A opção --sem-validacao só é aceita nesse modo e assume o risco de
-substituir o banco sem o ensaio prévio.
+Sem recibo individual válido, exige --escopo-legado com o schema exato após revisão externa.
+Compose exige RESTAURAR_MANTER_ANTERIOR=true; não há descarte automático.
+Diários em ESTADO_DIR/restauracoes bloqueiam nova troca enquanto houver recuperação pendente.
+--aplicacao-parada conserva a aplicação parada e não comprova saúde funcional.
+
+O modo de validação URL pré-provisionada não é aceito sem prova de ownership.
+A opção --sem-validacao só é aceita no modo URL e assume explicitamente o risco
+de substituir o escopo sem o ensaio interno. Nunca ocorre fallback automático.
 TEXTO
 }
 
 arquivo=""
 entrada=""
+recuperacao=""
+diagnostico=""
+escopo_legado=""
 confirmar=false
 fazer_copia=true
 aplicacao_parada=false
@@ -33,6 +43,18 @@ while [ "$#" -gt 0 ]; do
       ;;
     --entrada)
       entrada="${2:-}"
+      shift 2
+      ;;
+    --recuperar)
+      recuperacao="${2:-}"
+      shift 2
+      ;;
+    --diagnosticar)
+      diagnostico="${2:-}"
+      shift 2
+      ;;
+    --escopo-legado)
+      escopo_legado="${2:-}"
       shift 2
       ;;
     --confirmar)
@@ -66,7 +88,11 @@ done
   erro "A restauração exige --confirmar."
 }
 
-if [ -z "$arquivo" ] && [ -z "$entrada" ]; then
+if [ -n "$recuperacao$diagnostico" ]; then
+  [ -z "$arquivo$entrada" ] && { [ -z "$recuperacao" ] || [ -z "$diagnostico" ]; } || erro "Selecione somente um modo de restauração."
+elif [ -n "$arquivo" ] && [ -n "$entrada" ]; then
+  erro "Selecione somente uma fonte de restauração: --arquivo ou --entrada -."
+elif [ -z "$arquivo" ] && [ -z "$entrada" ]; then
   uso
   erro "Informe --arquivo ou --entrada -."
 fi
@@ -96,14 +122,15 @@ case "$BACKUP_MODO" in
     ;;
   url)
     [ -n "$BACKUP_DATABASE_URL" ] || erro "Defina BACKUP_DATABASE_URL ou DIRECT_URL."
-    if [ "$sem_validacao" = false ] && [ -z "$BACKUP_RESTAURACAO_URL_VALIDACAO" ]; then
-      erro "Defina BACKUP_RESTAURACAO_URL_VALIDACAO ou use --sem-validacao com decisão explícita."
+    if [ "$sem_validacao" = false ]; then
+      erro "A validação URL pré-provisionada está indisponível sem prova de identidade e ownership. A comparação textual de URLs não autoriza limpeza. Use validação isolada externa; --sem-validacao continua sendo decisão explícita de risco."
     fi
     ;;
   *)
     erro "BACKUP_MODO inválido: $BACKUP_MODO."
     ;;
 esac
+
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-restauracao.XXXXXX")
 umask 077
@@ -112,9 +139,58 @@ estado_restauracao="$ESTADO_DIR/ultima-restauracao.json"
 usuario="${POSTGRES_USER:-frequencia}"
 banco="${POSTGRES_DB:-frequencia}"
 temp_criado=false
-banco_trocado=false
 app_parada=false
 banco_anterior=""
+diario=""
+fase=""
+concluida=false
+
+catalogo_bancos() {
+  compose exec -T "$SERVIDOR_SERVICO_DB" psql -X -q -U "$usuario" -d postgres -v ON_ERROR_STOP=1 -tA <<'SQL'
+-- restauracao:catalogo
+select coalesce(json_agg(json_build_object('oid',oid::bigint,'nome',datname) order by oid),'[]'::json) from pg_database;
+SQL
+}
+
+reconciliar_troca() {
+  local catalogo
+  catalogo=$(catalogo_bancos) || return 1
+  fase=$(printf '%s\n' "$catalogo" | node "$DIR/restauracao.mjs" reconciliar "$diario") || return 1
+}
+
+intencao_troca() {
+  node "$DIR/restauracao.mjs" intencao "$diario" "$1"
+}
+
+renomear_banco() {
+  local oid="$1" origem="$2" destino="$3"
+  compose exec -T "$SERVIDOR_SERVICO_DB" psql -X -q -U "$usuario" -d postgres \
+    -v ON_ERROR_STOP=1 -v oid="$oid" -v origem="$origem" -v destino="$destino" <<'SQL'
+-- restauracao:renomear
+select pg_terminate_backend(pid) from pg_stat_activity
+ where datid=:'oid'::oid and pid<>pg_backend_pid();
+select format('ALTER DATABASE %I RENAME TO %I',datname,:'destino')
+ from pg_database where oid=:'oid'::oid and datname=:'origem'
+\gexec
+SQL
+}
+
+recuperar_original() {
+  reconciliar_troca || return 1
+  if [ "$fase" = substituto-promovido ]; then
+    intencao_troca isolar-substituto || return 1
+    renomear_banco "$substituto_oid" "$banco" "$banco_falha" || true
+    reconciliar_troca || return 1
+    [ "$fase" = substituto-isolado ] || return 1
+  fi
+  if [ "$fase" = original-renomeado ] || [ "$fase" = substituto-isolado ]; then
+    intencao_troca recuperar-original || return 1
+    renomear_banco "$original_oid" "$banco_anterior" "$banco" || true
+    reconciliar_troca || return 1
+  fi
+  [ "$fase" = validado ] || [ "$fase" = recuperacao-concluida ] || return 1
+  node "$DIR/restauracao.mjs" finalizar "$diario" recuperado
+}
 
 escrever_estado_restauracao() {
   local status="$1"
@@ -131,11 +207,49 @@ consultar_alvo() {
   local alvo="$1"
   local sql="$2"
   if [ "$BACKUP_MODO" = "compose" ]; then
-    printf '%s\n' "$sql" | compose exec -T "$SERVIDOR_SERVICO_DB" psql \
-      -U "$usuario" -d "$alvo" -v schema="$DATABASE_SCHEMA" -tA
+    printf '%s\n' "$sql" | compose exec -T "$SERVIDOR_SERVICO_DB" psql -X -q \
+      -U "$usuario" -d "$alvo" -v ON_ERROR_STOP=1 -v schema="$DATABASE_SCHEMA" -tA
   else
-    printf '%s\n' "$sql" | psql "$alvo" -v schema="$DATABASE_SCHEMA" -tA
+    printf '%s\n' "$sql" | psql "$alvo" -X -q -v ON_ERROR_STOP=1 -v schema="$DATABASE_SCHEMA" -tA
   fi
+}
+
+validar_escopo_alvo() {
+  local alvo="$1" modo="${2:-integral}" inventario sql
+  sql=$(cat <<'SQL'
+-- restauracao:inventario
+with namespaces as (
+ select oid,nspname from pg_namespace
+ where nspname !~ '^pg_' and nspname<>'information_schema'
+), objetos as (
+ select distinct n.nspname as schema, (pg_identify_object(d.classid,d.objid,d.objsubid)).type as tipo
+ from pg_depend d join namespaces n on d.refclassid='pg_namespace'::regclass and d.refobjid=n.oid
+), dependencias as (
+ select d.*, (pg_identify_object(d.classid,d.objid,d.objsubid)).schema as origem,
+ (pg_identify_object(d.refclassid,d.refobjid,d.refobjsubid)).schema as destino
+ from pg_depend d
+), externas as (
+ select * from dependencias
+ where (origem=:'schema' and destino is not null and destino<>:'schema' and destino !~ '^pg_' and destino<>'information_schema')
+ or (destino=:'schema' and origem is not null and origem<>:'schema' and origem !~ '^pg_' and origem<>'information_schema')
+ or (origem=:'schema' and destino is null and refobjid>=16384 and refclassid not in ('pg_namespace'::regclass))
+)
+select json_build_object('versao',1,
+ 'schemas',(select coalesce(json_agg(nspname order by nspname),'[]'::json) from namespaces),
+ 'objetos',(select coalesce(json_agg(objetos),'[]'::json) from objetos),
+ 'extensoes',(select coalesce(json_agg(extname order by extname),'[]'::json) from pg_extension),
+ 'largeObjects',(select count(*) from pg_largeobject_metadata),
+ 'dependenciasExternas',(select count(*) from externas),
+ 'globais', (select count(*) from pg_foreign_server)+(select count(*) from pg_event_trigger)
+ +(select count(*) from pg_publication)+(select count(*) from pg_subscription)
+ +(select count(*) from pg_default_acl)+(select count(*) from pg_seclabel)
+ +(select count(*) from pg_cast where oid>=16384)
+ +(select count(*) from pg_language where lanname not in ('internal','c','sql','plpgsql'))
+ +(select count(*) from pg_db_role_setting where setdatabase=(select oid from pg_database where datname=current_database())));
+SQL
+)
+  inventario=$(consultar_alvo "$alvo" "$sql") || erro "Consulta do inventário falhou; nenhuma troca autorizada."
+  printf '%s\n' "$inventario" | node "$DIR/restauracao-escopo.mjs" "$DATABASE_SCHEMA" "$modo" || erro "Escopo não suportado; nenhum objeto adicional será apagado."
 }
 
 restaurar_em_alvo() {
@@ -148,7 +262,7 @@ restaurar_em_alvo() {
     compose exec -T "$SERVIDOR_SERVICO_DB" pg_restore -U "$usuario" -d "$alvo" \
       "${opcoes[@]}" <"$dump"
   else
-    pg_restore -d "$alvo" "${opcoes[@]}" <"$dump"
+    pg_restore -d "$alvo" --schema="$DATABASE_SCHEMA" --strict-names "${opcoes[@]}" <"$dump"
   fi
 }
 
@@ -194,40 +308,79 @@ validar_banco_restaurado() {
 limpar_restauracao() {
   local status=$?
   set +e
-  if [ "$status" -ne 0 ] && [ "$banco_trocado" = true ]; then
-    log "Falha após a troca de banco; tentando voltar ao banco anterior."
-    banco_falha="${banco}_falha_$(date -u +%Y%m%dT%H%M%SZ)_$$"
-    if compose exec -T "$SERVIDOR_SERVICO_DB" psql -U "$usuario" -d postgres \
-      -v ON_ERROR_STOP=1 -v banco="$banco" -v anterior="$banco_anterior" \
-      -v falha="$banco_falha" <<'SQL'
-select pg_terminate_backend(pid) from pg_stat_activity
- where datname in (:'banco', :'anterior') and pid <> pg_backend_pid();
-alter database :"banco" rename to :"falha";
-alter database :"anterior" rename to :"banco";
-SQL
-    then
-      banco_trocado=false
-      banco_anterior="$banco_falha"
-    else
-      log "A volta ao banco anterior também falhou."
+  if [ "$status" -ne 0 ] && [ -n "$diario" ] && [ "$concluida" = false ]; then
+    # Mesmo uma resposta SQL perdida exige leitura do catálogo, nunca flags locais.
+    local pode_recuperar=true
+    if [ "$app_parada" = true ] && [ "$aplicacao_parada" = false ]; then
+      compose stop "$SERVIDOR_SERVICO_APP" >/dev/null || pode_recuperar=false
     fi
+    if [ "$pode_recuperar" = true ] && recuperar_original; then
+      log "Original recuperado por OID; substituto preservado."
+      if [ "$app_parada" = true ] && [ "$aplicacao_parada" = false ]; then
+        compose up -d --wait --no-build --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP" || {
+          node "$DIR/restauracao.mjs" finalizar "$diario" recuperacao-pendente
+          log "Original recuperado, mas a aplicação não foi religada."
+        }
+      fi
+    else
+      node "$DIR/restauracao.mjs" finalizar "$diario" recuperacao-pendente
+      log "Recuperação não confirmada. Preservar bancos e diário $diario; não religar automaticamente."
+    fi
+  elif [ "$status" -ne 0 ] && [ -z "$diario" ]; then
+    escrever_estado_restauracao falha "Restauração interrompida antes da troca."
   fi
-  if [ "$status" -ne 0 ] && [ "$app_parada" = true ]; then
-    compose up -d --wait --no-build --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" \
-      "$SERVIDOR_SERVICO_APP" || log "Não foi possível religar a aplicação."
+  # Não apagar bancos no trap: preservar original, substituto e evidência de criação incerta.
+  rm -rf "$tmp"
+  if [ "$status" -ne 0 ]; then notificar falha "Restauração do banco falhou."; fi
+  return "$status"
+}
+if [ -n "$recuperacao$diagnostico" ]; then
+  [ "$BACKUP_MODO" = compose ] || erro "Reentrada de troca exige modo Compose."
+  id_diario="${recuperacao:-$diagnostico}"
+  [[ "$id_diario" =~ ^[a-f0-9]{32}\.json$ ]] || erro "Informe o identificador exato do diário, sem caminho."
+  diario="$ESTADO_DIR/restauracoes/$id_diario"
+  [ "$(node "$DIR/restauracao.mjs" campo "$diario" alvo)" = "$SERVIDOR_ALVO_CHAVE" ] || erro "O diário pertence a outro alvo."
+  if [ -n "$diagnostico" ]; then
+    catalogo=$(catalogo_bancos) || erro "Catálogo indisponível."
+    printf '%s\n' "$catalogo" | node "$DIR/restauracao.mjs" diagnosticar "$diario"
+    rm -rf "$tmp"
+    exit 0
   fi
-  if [ "$temp_criado" = true ] && [ "$banco_trocado" = false ]; then
-    compose exec -T "$SERVIDOR_SERVICO_DB" dropdb -U "$usuario" --force "$banco_temp" \
-      >/dev/null 2>&1 || true
+  [ "$(node "$DIR/restauracao.mjs" campo "$diario" status)" != sucesso ] || erro "Operação concluída não é recuperação pendente."
+  banco=$(node "$DIR/restauracao.mjs" campo "$diario" ativo)
+  banco_temp=$(node "$DIR/restauracao.mjs" campo "$diario" temporario)
+  banco_anterior=$(node "$DIR/restauracao.mjs" campo "$diario" anterior)
+  banco_falha=$(node "$DIR/restauracao.mjs" campo "$diario" falha)
+  original_oid=$(node "$DIR/restauracao.mjs" campo "$diario" originalOid)
+  substituto_oid=$(node "$DIR/restauracao.mjs" campo "$diario" substitutoOid)
+  gerenciar_app=$(node "$DIR/restauracao.mjs" campo "$diario" gerenciarApp)
+  reconciliar_troca || erro "Catálogo ambíguo. Preservar todos os bancos."
+  if [ "$gerenciar_app" = true ]; then
+    intencao_troca parar-para-recuperar
+    compose stop "$SERVIDOR_SERVICO_APP" >/dev/null || erro "Parada não confirmada."
+  fi
+  if ! recuperar_original; then
+    node "$DIR/restauracao.mjs" finalizar "$diario" recuperacao-pendente
+    erro "Recuperação não confirmada; preservar diário e bancos."
+  fi
+  if [ "$gerenciar_app" = true ]; then
+    compose up -d --wait --no-build --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP" || {
+      node "$DIR/restauracao.mjs" finalizar "$diario" recuperacao-pendente
+      erro "Original recuperado, aplicação ainda parada."
+    }
   fi
   rm -rf "$tmp"
-  if [ "$status" -ne 0 ]; then
-    escrever_estado_restauracao "falha" "Restauração interrompida." ||
-      log "Não foi possível gravar o estado da restauração."
-    notificar falha "Restauração do banco falhou."
-  fi
-}
+  log "Recuperação explícita confirmada por OIDs; bancos preservados."
+  exit 0
+fi
+if [ "$BACKUP_MODO" = compose ]; then
+  node "$DIR/restauracao.mjs" pendentes "$ESTADO_DIR/restauracoes" "$SERVIDOR_ALVO_CHAVE" || erro "Resolver a operação pendente antes de outra restauração."
+fi
 trap 'limpar_restauracao' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+node "$DIR/restauracao-escopo.mjs" entrada "$arquivo" "$DATABASE_SCHEMA" "$escopo_legado" || erro "Escopo da entrada não confirmado."
 
 if [ -n "$entrada" ] && [ "$entrada" = "-" ]; then
   log "Lendo dump decifrado da entrada padrão."
@@ -268,6 +421,8 @@ fi
 validar_dump
 
 if [ "$BACKUP_MODO" = "compose" ]; then
+  validar_escopo_alvo "$banco" integral
+  [ "$RESTAURAR_MANTER_ANTERIOR" = true ] || erro "A restauração recuperável exige RESTAURAR_MANTER_ANTERIOR=true. O descarte precisa de revisão explícita dos OIDs após o aceite."
   banco_temp="${banco}_restauracao_$(date -u +%Y%m%dT%H%M%SZ)_$$"
   banco_anterior="${banco}_anterior_$(date -u +%Y%m%dT%H%M%SZ)_$$"
   log "Criando o banco descartável $banco_temp."
@@ -277,6 +432,7 @@ if [ "$BACKUP_MODO" = "compose" ]; then
   log "Restaurando e validando o dump no banco descartável."
   restaurar_em_alvo "$banco_temp"
   validar_banco_restaurado "$banco_temp"
+  validar_escopo_alvo "$banco_temp" integral
 
   if [ "$fazer_copia" = true ]; then
     log "Criando uma cópia de segurança antes da restauração."
@@ -285,25 +441,39 @@ if [ "$BACKUP_MODO" = "compose" ]; then
     fi
   fi
 
+  catalogo=$(catalogo_bancos) || erro "Não foi possível identificar os bancos."
+  mkdir -p "$ESTADO_DIR/restauracoes"
+  chmod 700 "$ESTADO_DIR/restauracoes"
+  banco_falha="${banco}_falha_$(date -u +%Y%m%dT%H%M%SZ)_$$"
+  diario="$ESTADO_DIR/restauracoes/$(node -e 'process.stdout.write(require("node:crypto").randomBytes(16).toString("hex"))').json"
+  printf '%s\n' "$catalogo" | node "$DIR/restauracao.mjs" iniciar "$diario" "$SERVIDOR_ALVO_CHAVE" \
+    "$banco" "$banco_temp" "$banco_anterior" "$banco_falha" "$([ "$aplicacao_parada" = false ] && printf true || printf false)" || erro "Não foi possível persistir a intenção de troca."
+  original_oid=$(node "$DIR/restauracao.mjs" campo "$diario" originalOid)
+  substituto_oid=$(node "$DIR/restauracao.mjs" campo "$diario" substitutoOid)
+  intencao_troca parar-aplicacao
+  app_parada=true
   if [ "$aplicacao_parada" = false ]; then
     log "Parando a aplicação para trocar o banco."
     compose stop "$SERVIDOR_SERVICO_APP" >/dev/null
   fi
-  app_parada=true
 
   log "Trocando o banco validado pelo banco em uso."
-  compose exec -T "$SERVIDOR_SERVICO_DB" psql -U "$usuario" -d postgres \
-    -v ON_ERROR_STOP=1 -v banco="$banco" -v temp="$banco_temp" -v anterior="$banco_anterior" <<'SQL'
-select pg_terminate_backend(pid) from pg_stat_activity
- where datname in (:'banco', :'temp') and pid <> pg_backend_pid();
-alter database :"banco" rename to :"anterior";
-alter database :"temp" rename to :"banco";
-SQL
-  banco_trocado=true
+  validar_escopo_alvo "$banco" integral
+  intencao_troca renomear-original
+  renomear_banco "$original_oid" "$banco" "$banco_anterior"
+  reconciliar_troca
+  [ "$fase" = original-renomeado ] || erro "Primeira renomeação não confirmada."
+  intencao_troca promover-substituto
+  renomear_banco "$substituto_oid" "$banco_temp" "$banco"
+  reconciliar_troca
+  [ "$fase" = substituto-promovido ] || erro "Promoção não confirmada."
   temp_criado=false
 
   log "Subindo a aplicação."
-  compose up -d --wait --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP"
+  intencao_troca subir-aplicacao
+  if [ "$aplicacao_parada" = false ]; then
+    compose up -d --wait --no-build --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP"
+  fi
 
   if [ -n "${RESTAURAR_SAUDE_URL:-}" ]; then
     log "Conferindo $RESTAURAR_SAUDE_URL."
@@ -311,23 +481,15 @@ SQL
       --max-time 15 "$RESTAURAR_SAUDE_URL" >/dev/null ||
       erro "A saúde pública não respondeu após a restauração."
   fi
+  reconciliar_troca
+  [ "$fase" = substituto-promovido ] || erro "Estado final de promoção divergiu."
+  node "$DIR/restauracao.mjs" finalizar "$diario" sucesso
+  concluida=true
   app_parada=false
-
-  escrever_estado_restauracao "sucesso" "" ||
-    log "Não foi possível gravar o estado da restauração."
   log "Restauração concluída. O banco anterior permanece como $banco_anterior."
-  if [ "$RESTAURAR_MANTER_ANTERIOR" = "false" ]; then
-    if compose exec -T "$SERVIDOR_SERVICO_DB" dropdb -U "$usuario" --force "$banco_anterior" >/dev/null; then
-      log "O banco anterior foi descartado por RESTAURAR_MANTER_ANTERIOR=false."
-      banco_trocado=false
-    else
-      log "Aviso: não foi possível descartar o banco anterior $banco_anterior."
-    fi
-  else
-    log "Após conferir login, saúde e migrações, remova o banco anterior com:"
-    log "  scripts/servidor/compose.sh exec -T db dropdb -U $usuario --force $banco_anterior"
-  fi
+  log "O diário $diario preserva OIDs e nomes para conferência explícita antes de qualquer descarte."
 else
+  validar_escopo_alvo "$BACKUP_DATABASE_URL" limitado
   if [ "$fazer_copia" = true ]; then
     log "Criando uma cópia de segurança antes da restauração."
     if ! BACKUP_MODO="$BACKUP_MODO" "$DIR/backup-banco.sh"; then
@@ -335,23 +497,12 @@ else
     fi
   fi
 
-  if [ "$sem_validacao" = false ]; then
-    log "Validando o dump no banco descartável configurado."
-    if [ "$BACKUP_RESTAURACAO_URL_VALIDACAO" = "$BACKUP_DATABASE_URL" ]; then
-      erro "A URL de validação precisa ser diferente da URL de destino."
-    fi
-    restaurar_url="$BACKUP_RESTAURACAO_URL_VALIDACAO"
-    pg_restore -d "$restaurar_url" --clean --if-exists --no-owner --no-acl \
-      --single-transaction --exit-on-error <"$dump"
-    validar_banco_restaurado "$restaurar_url"
-  else
-    log "A validação em banco descartável foi dispensada por --sem-validacao."
-  fi
+  log "A validação em banco descartável foi dispensada explicitamente por --sem-validacao."
 
   log "Restaurando o dump na URL de destino."
-  pg_restore -d "$BACKUP_DATABASE_URL" --clean --if-exists --no-owner --no-acl \
-    --single-transaction --exit-on-error <"$dump"
+  restaurar_em_alvo "$BACKUP_DATABASE_URL"
   validar_banco_restaurado "$BACKUP_DATABASE_URL"
+  validar_escopo_alvo "$BACKUP_DATABASE_URL" limitado
   escrever_estado_restauracao "sucesso" ""
   log "Restauração concluída. Confira a aplicação externa, /api/saude, o login e as migrações."
 fi

@@ -34,7 +34,7 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A imagem de backup já inclui o cliente.
 - Usar uma role somente leitura com `pg_read_all_data` quando possível.
 - A Transaction pooler do Supabase não é adequada para `pg_dump`.
-- A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. A opção `--sem-validacao` é uma decisão explícita de risco.
+- Validação URL pré-provisionada está indisponível sem prova de identidade e ownership; uma URL diferente não autoriza limpeza. `--sem-validacao` continua sendo decisão explícita de risco, sem fallback automático.
 
 ## Imagem de backup
 
@@ -142,7 +142,7 @@ Regras:
 | `BACKUP_RETER_DIAS`                | `30`                                  | Retenção local                     |
 | `BACKUP_RETER_MINIMO`              | `5`                                   | Cópias confirmadas sempre mantidas |
 | `BACKUP_RETER_REMOTO`              | `false`                               | Limpeza remota opcional            |
-| `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | Banco descartável no modo URL      |
+| `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | Modo pré-provisionado indisponível |
 | `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior          |
 | `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump        |
 | `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                     |
@@ -256,15 +256,9 @@ O banco anterior não é descartado automaticamente. Depois de conferir login, s
 
 ### URL externa
 
-```bash
-BACKUP_RESTAURACAO_URL_VALIDACAO='postgresql://usuario:senha@host:5432/frequencia_validacao' \
-  scripts/servidor/restaurar.sh \
-  --arquivo /caminho/backup.dump.age \
-  --confirmar \
-  --sem-copia
-```
+A rotina não aceita a validação URL pré-provisionada sem prova de identidade e ownership. A comparação textual de URLs foi retirada do caminho permitido. Não cria nonce em banco arbitrário e não faz fallback para dispensar validação.
 
-No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo. A URL de validação precisa apontar para um banco descartável e ser diferente da URL de destino. A opção `--sem-validacao` substitui o banco sem o ensaio prévio e deve ser usada somente com uma decisão registrada.
+No modo `url`, a aplicação precisa ser parada pela plataforma. A opção explícita `--sem-validacao` mantém o risco separado de restaurar sem ensaio interno; a recuperação deve ser exercitada externamente em ambiente autorizado e descartável antes dessa decisão. A integração de um destino de validação criado e possuído pela própria operação continua pendente.
 
 ### Restauração com chave offline
 
@@ -291,6 +285,10 @@ O script aceita `--entrada -` e não grava o dump em texto puro no servidor.
 ### Escopo e objetos globais
 
 O dump usa `--schema` quando `DATABASE_SCHEMA` está definida e exclui publicações e assinaturas. Roles, ACLs, extensões e outros objetos globais não fazem parte do arquivo e precisam existir ou ser recriados no destino. A restauração usa `--no-owner` e `--no-acl`, portanto as permissões são definidas pela role que executa o comando.
+
+### Limites de aceite da restauração
+
+A troca Compose ainda requer integração isolada das falhas entre renomeações e reconciliação por OID; preservar o banco anterior não prova preservação de objetos no banco ativo. O inventário prévio de schemas, large objects, extensões e dependências frente ao escopo do dump continua obrigatório antes do aceite. Sem esses ensaios, este candidato não autoriza operação em dados reais.
 
 ### Privacidade dos temporários
 
