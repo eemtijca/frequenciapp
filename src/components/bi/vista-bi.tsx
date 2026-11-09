@@ -114,6 +114,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const [prontoLocal, setProntoLocal] = useState(false);
   const [armazenar, setArmazenar] = useState(true);
   const [chave, setChave] = useState("");
+  const [persistirDados, setPersistirDados] = useState(true);
   const [erro, setErro] = useState("");
   const [apresentacao, setApresentacao] = useState(false);
   const [prepararImpressao, setPrepararImpressao] = useState(false);
@@ -358,7 +359,9 @@ export default function VistaBi({ fuso }: { fuso: string }) {
       setPrepararImpressao(false);
     }
   });
-  const { executando: entrando, executar: entrarAgora } = useAcaoUnica(() => entrar(chave.trim()));
+  const { executando: entrando, executar: entrarAgora } = useAcaoUnica(() =>
+    entrar(chave.trim(), persistirDados),
+  );
   const { executando: confirmando, executar: confirmarAgora } = useAcaoUnica(async () => {
     if (!confirmacao) return;
     try {
@@ -727,6 +730,14 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 placeholder="Cole a chave recebida"
                 required
               />
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={persistirDados}
+                  onChange={(evento) => setPersistirDados(evento.target.checked)}
+                />
+                Guardar chave e consultas para uso offline neste dispositivo
+              </label>
               <Button
                 type="submit"
                 className="w-full"
@@ -739,8 +750,10 @@ export default function VistaBi({ fuso }: { fuso: string }) {
               </Button>
             </form>
             <p className="text-muted-foreground text-xs">
-              A chave fica neste navegador e permite consultar dados pessoais. Use um dispositivo
-              autorizado e remova a chave ao sair.
+              Ao guardar, a chave e os dados pessoais ficam disponíveis neste navegador, inclusive
+              offline. Em dispositivo compartilhado, desmarque a opção para consultar apenas nesta
+              aba. Esquecer a chave tenta remover também as consultas guardadas; bloqueios do
+              navegador podem impedir a remoção.
             </p>
             {fonte.erro && (
               <p role="alert" className="text-falta-texto text-sm">
@@ -1374,7 +1387,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                   size="sm"
                   variant="ghost"
                   disabled={fonte.ocupado}
-                  onClick={() => void entrar(acesso.chave)}
+                  onClick={() => void entrar(acesso.chave, acesso.persistir)}
                 >
                   Conferir chave novamente
                 </Button>

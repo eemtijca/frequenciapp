@@ -20,8 +20,10 @@ export function lerSegredoBi() {
 export function guardarSegredoBi(chave: string) {
   localStorage.setItem(`${PREFIXO}chave`, chave);
 }
-export function esquecerSegredoBi() {
-  localStorage.removeItem(`${PREFIXO}chave`);
+export function esquecerSegredoBi(chaveEsperada?: string) {
+  const chave = `${PREFIXO}chave`;
+  if (chaveEsperada === undefined || localStorage.getItem(chave) === chaveEsperada)
+    localStorage.removeItem(chave);
 }
 export async function identificadorCacheBi(chave: string) {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(chave));
@@ -87,8 +89,28 @@ export async function cacheBi<T>(
   });
 }
 export async function limparTudoBi() {
-  for (const k of Object.keys(localStorage)) if (k.startsWith(PREFIXO)) localStorage.removeItem(k);
-  await cacheBi("limpar", "");
+  let falhou = false;
+  try {
+    for (const chave of Object.keys(localStorage)) {
+      if (!chave.startsWith(PREFIXO)) continue;
+      try {
+        localStorage.removeItem(chave);
+      } catch {
+        falhou = true;
+      }
+    }
+  } catch {
+    falhou = true;
+  }
+  try {
+    await cacheBi("limpar", "");
+  } catch {
+    falhou = true;
+  }
+  if (falhou)
+    throw new Error(
+      "Não foi possível remover todos os dados locais. Confira as permissões do navegador e tente novamente.",
+    );
 }
 export interface RetratoBi extends PaginaBi {
   completo: true;
