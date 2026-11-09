@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+bash "$DIR/confirmacao.sh"
+bash "$DIR/concorrencia.sh"
 bash "$DIR/atualizacao.sh"
 bash "$DIR/backup-restauracao.sh"
 bash "$DIR/restauracao-url.sh"

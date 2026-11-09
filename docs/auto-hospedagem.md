@@ -425,3 +425,7 @@ O chart Helm aceita `agenda.timeZone`, `backup.database.timeZone` e `backup.spre
 - [Caddy: opções globais](https://caddyserver.com/docs/caddyfile/options)
 - [Nginx: imagem oficial](https://hub.docker.com/_/nginx)
 - [Certbot: imagem oficial](https://hub.docker.com/r/certbot/certbot)
+
+## Identidade operacional
+
+As rotinas exigem Node disponível no host e `jq` para leitura tipada de estado. Definir `COMPOSE_PROJECT_NAME` explicitamente e revisar projeto, daemon, serviços e mounts antes de executar `scripts/servidor/identidade.sh --adotar --confirmar`. O arquivo `SERVIDOR_IDENTIDADE_ARQUIVO` não é sobrescrito automaticamente; mudanças de identidade exigem nova revisão. `SERVIDOR_LOCK_DIR` deve ser compartilhado pelas cópias da instalação, pertencer ao operador e ter modo 0700. A trava é local ao host, não distribuída.

@@ -9,6 +9,7 @@ RUN apt-get update \
     ca-certificates \
     curl \
     gnupg \
+    jq \
     rclone \
     age \
   && install -d /usr/share/postgresql-common/pgdg \

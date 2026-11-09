@@ -7,5 +7,5 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/comum.sh"
 
 carregar_ambiente
-montar_compose
-exec "${COMPOSE[@]}" exec -T app node scripts/servidor/agenda.mjs
+verificar_instalacao
+exec "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_APP" node scripts/servidor/agenda.mjs

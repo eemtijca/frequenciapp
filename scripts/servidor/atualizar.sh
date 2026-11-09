@@ -7,7 +7,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/comum.sh"
 
 carregar_ambiente
-travar atualizacao 0
 
 if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
   [ "${ATUALIZAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
@@ -157,7 +156,7 @@ validar_backup_obrigatorio() {
     erro "O checksum do backup local não confere."
 
   if [ -n "${BACKUP_REMOTO:-}" ] && [ "${BACKUP_VERIFICAR_REMOTO:-true}" = "true" ]; then
-    [ "$(ler_campo_json "$estado_backup" "verificadoRemoto")" = "true" ] ||
+    backup_remoto_confirmado "$estado_backup" ||
       erro "O backup remoto não foi verificado."
   fi
 }
@@ -196,6 +195,7 @@ construir_app_na_worktree() {
   local commit="$2"
   (
     montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem" COMMIT_SHA="$commit" conferir_identidade conferir
     APP_IMAGEM="$imagem" COMMIT_SHA="$commit" compose build "$SERVIDOR_SERVICO_APP"
   )
 }
@@ -206,6 +206,7 @@ construir_backup_na_worktree() {
   local commit="$3"
   (
     montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade conferir
     APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
       compose --profile backup build "$SERVIDOR_SERVICO_BACKUP_PLANILHAS"
   )
@@ -217,6 +218,7 @@ validar_compose_na_worktree() {
   local commit="$3"
   (
     montar_compose_em "$worktree"
+    APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade conferir
     APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
       compose config --quiet
   )
@@ -263,6 +265,8 @@ falhar_atualizacao() {
   local migracoes="$2"
   log "$motivo Iniciando rollback."
   git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
+  APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
+    COMMIT_SHA="$ANTERIOR_COMMIT" conferir_identidade conferir
   if ! APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
     COMMIT_SHA="$ANTERIOR_COMMIT" compose up -d --wait --no-build \
     --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
@@ -275,6 +279,7 @@ falhar_atualizacao() {
 
 [ -d "$APP_DIR/.git" ] || erro "Checkout Git não encontrado em $APP_DIR."
 verificar_instalacao
+travar atualizacao 0
 
 if [ "$registrar" = true ]; then
   if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
@@ -310,11 +315,14 @@ if [ -n "$tag_estavel" ] &&
   tag_estavel=""
 fi
 
-modo_atual=$(ler_campo_json "$estado" "modo")
-ref_atual=$(ler_campo_json "$estado" "ref")
-commit_atual=$(ler_campo_json "$estado" "commit")
-imagem_atual=$(ler_campo_json "$estado" "imagem")
-imagem_backup_atual=$(ler_campo_json "$estado" "imagemBackup")
+modo_atual=""; ref_atual=""; commit_atual=""; imagem_atual=""; imagem_backup_atual=""
+if [ -f "$estado" ]; then
+  modo_atual=$(ler_campo_json "$estado" "modo")
+  ref_atual=$(ler_campo_json "$estado" "ref")
+  commit_atual=$(ler_campo_json "$estado" "commit")
+  imagem_atual=$(ler_campo_json "$estado" "imagem")
+  imagem_backup_atual=$(ler_campo_json "$estado" "imagemBackup")
+fi
 
 head_commit=$(git -C "$APP_DIR" rev-parse HEAD)
 if [ -z "$commit_atual" ]; then
@@ -441,6 +449,9 @@ garantir_imagem_anterior "$ANTERIOR_COMMIT" "$imagem_atual" "$imagem_backup_atua
 log "Preparando o commit alvo em worktree isolada."
 criar_worktree "$alvo_commit"
 
+validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
+  erro "A configuração ou identidade do Compose alvo não foi conferida."
+
 if [ "$alvo_modo" = "release" ]; then
   log "Baixando a imagem $alvo_imagem."
   APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" compose pull "$SERVIDOR_SERVICO_APP"
@@ -469,6 +480,9 @@ validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
 
 log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"
+
+APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
+  COMMIT_SHA="$alvo_commit" conferir_identidade conferir
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose config --quiet; then
