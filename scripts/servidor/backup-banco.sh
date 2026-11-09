@@ -40,7 +40,10 @@ BACKUP_INCLUIR_AMBIENTE="${BACKUP_INCLUIR_AMBIENTE:-true}"
 BACKUP_AMBIENTE_ARQUIVO="${BACKUP_AMBIENTE_ARQUIVO:-$APP_ENV_FILE}"
 BACKUP_VERIFICAR_REMOTO="${BACKUP_VERIFICAR_REMOTO:-true}"
 BACKUP_RETER_REMOTO="${BACKUP_RETER_REMOTO:-false}"
+BACKUP_CATALOGO_PERSISTENTE="${BACKUP_CATALOGO_PERSISTENTE:-true}"
+export BACKUP_MODO BACKUP_CRIPTOGRAFIA BACKUP_RETER_DIAS BACKUP_RETER_MINIMO BACKUP_CATALOGO_PERSISTENTE
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
+export DATABASE_SCHEMA
 
 case "$BACKUP_MODO" in
   compose | url) ;;
@@ -71,6 +74,7 @@ else
 fi
 export SERVIDOR_ALVO_CHAVE
 travar backup-banco 0
+unset BACKUP_BANCO_VERIFICADO
 estado="$ESTADO_DIR/ultimo-backup.json"
 
 mkdir -p "$BACKUP_BANCO_DIR"
@@ -79,7 +83,9 @@ mkdir -p "$ESTADO_DIR"
 chmod 700 "$ESTADO_DIR" 2>/dev/null || true
 
 tmp=$(mktemp -d "$BACKUP_BANCO_DIR/.tmp.XXXXXX")
-trap 'status=$?; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
+trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 umask 077
 
 definir_extensao() {
@@ -94,12 +100,19 @@ preparar_criptografia() {
   if [ "$BACKUP_CRIPTOGRAFIA" = "gpg" ]; then
     [ -n "${BACKUP_GPG_DESTINATARIO:-}" ] || erro "Defina BACKUP_GPG_DESTINATARIO."
     [ -f "${BACKUP_GPG_CHAVE_PUBLICA:-}" ] || erro "Defina BACKUP_GPG_CHAVE_PUBLICA."
-    export GNUPGHOME="$tmp/gnupg"
-    mkdir -m 700 "$GNUPGHOME"
+    iniciar_home_gpg
     gpg --batch --import "$BACKUP_GPG_CHAVE_PUBLICA" >/dev/null ||
       erro "Não foi possível importar a chave pública GPG."
+    validar_destinatario_gpg
   else
     [ -f "${BACKUP_AGE_DESTINATARIOS:-}" ] || erro "Defina BACKUP_AGE_DESTINATARIOS."
+    [[ "${BACKUP_AGE_DESTINATARIOS_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || erro "Defina pin independente BACKUP_AGE_DESTINATARIOS_SHA256."
+    cp -- "$BACKUP_AGE_DESTINATARIOS" "$tmp/destinatarios.age"
+    chmod 600 "$tmp/destinatarios.age"
+    BACKUP_AGE_DESTINATARIOS="$tmp/destinatarios.age"
+    BACKUP_DESTINATARIO_VERIFICADO=$(sha256sum "$BACKUP_AGE_DESTINATARIOS" | cut -d' ' -f1)
+    [ "$BACKUP_DESTINATARIO_VERIFICADO" = "$BACKUP_AGE_DESTINATARIOS_SHA256" ] || erro "Destinatários age divergem do pin independente."
+    export BACKUP_DESTINATARIO_VERIFICADO
   fi
 }
 
@@ -108,7 +121,7 @@ cifrar_fluxo() {
   case "$BACKUP_CRIPTOGRAFIA" in
     gpg)
       gpg --batch --yes --trust-model always \
-        --recipient "$BACKUP_GPG_DESTINATARIO" \
+        --recipient "${BACKUP_DESTINATARIO_VERIFICADO}!" \
         --output "$destino" --encrypt
       ;;
     age)
@@ -162,6 +175,10 @@ verificar_item_remoto() {
 
 verificar_ultimo_backup() {
   [ -f "$estado" ] || erro "Não há estado de backup em $estado."
+  local recibo
+  recibo=$(ler_campo_json "$estado" recibo)
+  [[ "$recibo" =~ ^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}\.confirmado\.json$ ]] || erro "Backup legado exige adoção/verificação explícita."
+  node "$DIR/recibos.mjs" conferir-estado "$BACKUP_BANCO_DIR" "$estado" || erro "Recibo, escopo ou artefatos inválidos."
   local arquivo
   local sha
   local ambiente
@@ -193,6 +210,10 @@ verificar_ultimo_backup() {
 if [ "$verificar_somente" = true ]; then
   verificar_ultimo_backup
   exit 0
+fi
+
+if [ "$BACKUP_MODO" = "compose" ]; then
+  conferir_banco_compose
 fi
 
 preparar_criptografia
@@ -319,92 +340,58 @@ if [ -n "${BACKUP_REMOTO:-}" ]; then
 fi
 
 aplicar_retencao_local() {
-  [ "$BACKUP_RETER_DIAS" -gt 0 ] || return 0
-  local dumps=()
-  local total
-  local i
-  local nome
-  local prefixo
-  local arquivo_antigo
-  mapfile -t dumps < <(
-    find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f \
-      \( -name 'frequenciapp-*.dump.gpg' -o -name 'frequenciapp-*.dump.age' \) \
-      -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2- || true
-  )
-  total=${#dumps[@]}
-  log "Retenção local: $total cópia(s), mínimo de $BACKUP_RETER_MINIMO."
-  for ((i = BACKUP_RETER_MINIMO; i < total; i++)); do
-    arquivo_antigo="${dumps[$i]}"
-    if [ -z "$(find "$arquivo_antigo" -maxdepth 0 -mtime +"$BACKUP_RETER_DIAS" -print 2>/dev/null)" ]; then
-      continue
-    fi
-    nome=$(basename "$arquivo_antigo")
-    prefixo="${nome%%.dump.*}"
-    log "Removendo o backup antigo $prefixo."
-    if ! find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name "$prefixo*" -delete 2>/dev/null; then
-      log "Aviso: não foi possível remover o backup antigo $prefixo."
-    fi
-  done
+  if [ "$BACKUP_MODO" = url ]; then
+    log "Retenção local conservadora: identidade do banco URL não demonstrada; nenhum expurgo."
+    return 0
+  fi
+  node "$DIR/recibos.mjs" planejar-local "$BACKUP_BANCO_DIR" >"$tmp/plano-local" || erro "Plano local inválido."
+  local conjunto nome
+  while IFS=$'\t' read -r conjunto nome; do
+    [ -n "$nome" ] || continue
+    rm -- "$BACKUP_BANCO_DIR/$nome" || erro "Expurgo local parcial; preservar recibo e revisar o conjunto $conjunto."
+  done <"$tmp/plano-local"
 }
 
 aplicar_retencao_remota() {
-  [ "$BACKUP_RETER_REMOTO" = "true" ] || return 0
-  [ "$BACKUP_RETER_DIAS" -gt 0 ] || return 0
+  [ "$BACKUP_RETER_REMOTO" = true ] || return 0
   [ -n "${BACKUP_REMOTO:-}" ] || return 0
-  local nomes=()
-  local total
-  local i
-  local nome
-  local base_remota
-  local data
-  local epoca
-  local agora
-  local idade
-  agora=$(date -u +%s)
-  mapfile -t nomes < <(
-    rclone_limpo lsf "${BACKUP_REMOTO%/}" --files-only --include 'frequenciapp-*.dump.*' 2>/dev/null |
-      grep -v '\.sha256$' | sort -r || true
-  )
-  total=${#nomes[@]}
-  for ((i = BACKUP_RETER_MINIMO; i < total; i++)); do
-    nome="${nomes[$i]}"
-    data="${nome#frequenciapp-}"
-    data="${data%%-*}"
-    case "$data" in
-      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;;
-      *) continue ;;
-    esac
-    epoca=$(date -u -d "${data:0:4}-${data:4:2}-${data:6:2} ${data:9:2}:${data:11:2}:${data:13:2}" +%s 2>/dev/null || true)
-    [ -n "$epoca" ] || continue
-    idade=$((agora - epoca))
-    [ "$idade" -gt $((BACKUP_RETER_DIAS * 86400)) ] || continue
-    base_remota="${nome%%.dump.*}"
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/$nome" >/dev/null 2>&1 || true
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/$nome.sha256" >/dev/null 2>&1 || true
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/${base_remota}-ambiente.env.${extensao}" >/dev/null 2>&1 || true
-  done
+  if [ "$BACKUP_CATALOGO_PERSISTENTE" != true ] || [ "$BACKUP_MODO" = url ]; then
+    log "Expurgo remoto suspenso: catálogo persistente e identidade do alvo precisam ser demonstrados."
+    return 0
+  fi
+  RCLONE_CONFIG="$BACKUP_RCLONE_CONFIG" node "$DIR/backup-recibos.mjs" expurgar-remoto \
+    "$ESTADO_DIR/recibos" "$ESTADO_DIR/expurgos" ||
+    erro "Expurgo remoto parcial ou não comprovado; catálogo e registro preservados."
 }
 
-mkdir -p "$ESTADO_DIR"
-printf '{"em":"%s","modo":"%s","criptografia":"%s","arquivo":"%s","sha256":"%s","tamanho":%s,"schema":"%s","retencaoDias":%s,"retencaoMinima":%s,"ambiente":"%s","ambienteSha256":"%s","remoto":"%s","verificadoRemoto":%s}\n' \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  "$BACKUP_MODO" \
-  "$BACKUP_CRIPTOGRAFIA" \
-  "$(basename "$arquivo")" \
-  "$sha" \
-  "$tamanho" \
-  "$DATABASE_SCHEMA" \
-  "$BACKUP_RETER_DIAS" \
-  "$BACKUP_RETER_MINIMO" \
-  "${ambiente_arquivo##*/}" \
-  "$ambiente_sha" \
-  "${BACKUP_REMOTO:-}" \
-  "$verificado_remoto" >"$estado.tmp"
+# O catálogo independente não é baixado do provedor e sobrevive ao expurgo local.
+recibo="${base}.confirmado.json"
+RECIBO_REMOTO_VERIFICADO="$verificado_remoto" node "$DIR/recibos.mjs" criar "$BACKUP_BANCO_DIR" "$base" >"$tmp/$recibo" ||
+  erro "Não foi possível confirmar o conjunto."
+if [ -n "${BACKUP_REMOTO:-}" ]; then
+  rclone_limpo copyto "$tmp/$recibo" "${BACKUP_REMOTO%/}/$recibo" || erro "Publicação remota do recibo falhou."
+  verificar_item_remoto "$recibo" "$(sha256sum "$tmp/$recibo" | cut -d' ' -f1)"
+fi
+mkdir -p "$ESTADO_DIR/recibos"
+chmod 700 "$ESTADO_DIR/recibos"
+cp "$tmp/$recibo" "$ESTADO_DIR/recibos/$recibo.tmp"
+chmod 600 "$ESTADO_DIR/recibos/$recibo.tmp"
+mv "$ESTADO_DIR/recibos/$recibo.tmp" "$ESTADO_DIR/recibos/$recibo"
+cp "$tmp/$recibo" "$BACKUP_BANCO_DIR/$recibo.tmp"
+chmod 600 "$BACKUP_BANCO_DIR/$recibo.tmp"
+mv "$BACKUP_BANCO_DIR/$recibo.tmp" "$BACKUP_BANCO_DIR/$recibo"
+node --input-type=module - "$tmp/$recibo" "$BACKUP_MODO" <<'NODE' >"$estado.tmp"
+import fs from 'node:fs';
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const arquivo = r.artefatos.find(a => a.nome.includes('.dump.') && !a.nome.endsWith('.sha256'));
+const ambiente = r.artefatos.find(a => a.nome.includes('-ambiente.env.') && !a.nome.endsWith('.sha256'));
+process.stdout.write(JSON.stringify({em:r.em,modo:process.argv[3],criptografia:r.criptografia,arquivo:arquivo.nome,sha256:arquivo.sha256,schema:r.escopo.schema,ambiente:ambiente?.nome??'',ambienteSha256:ambiente?.sha256??'',remoto:r.remoto,verificadoRemoto:r.etapas.remotoVerificado,recibo:r.base+'.confirmado.json'})+'\n');
+NODE
+chmod 600 "$estado.tmp"
 mv "$estado.tmp" "$estado"
-chmod 600 "$estado"
 
-aplicar_retencao_local
 aplicar_retencao_remota
+aplicar_retencao_local
 
 notificar sucesso "Backup do banco concluído."
 log "Backup concluído: $nome_arquivo (${tamanho} bytes)."
