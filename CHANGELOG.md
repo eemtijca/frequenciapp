@@ -14,6 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
 
+- O modo URL da restauração confere a identidade do servidor e do banco de validação e do destino, recusando a mesma base mesmo quando as URLs usam grafias diferentes.
+
 - O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
 
 - O instalador das rotinas valida o fuso do daemon do cron e só grava `CRON_TZ` quando a implementação comprova suporte. Os CronJobs do Helm aceitam `timeZone`.
