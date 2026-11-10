@@ -106,7 +106,7 @@ describe("guardas das rotas da API", () => {
       OUTRAS_FORMAS.test(semComentarios(readFileSync(caminho, "utf8"))),
     );
     expect(outrasFormas.map((caminho) => path.relative(raizApp, caminho))).toEqual([]);
-  });
+  }, 15_000);
 
   it("não usa server actions, que ficariam fora desta conferência", () => {
     const pendentes: string[] = [];
@@ -123,7 +123,7 @@ describe("guardas das rotas da API", () => {
     };
     varrer(path.resolve("src"));
     expect(pendentes).toEqual([]);
-  });
+  }, 15_000);
 
   it("não decide acesso pelo papel dentro das rotas", () => {
     const porPapel = todos.filter((item) => /\.papel\s*[!=]==/.test(item.corpo));

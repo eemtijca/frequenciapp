@@ -2,7 +2,9 @@
 // SHA-256 e assinado por AUTH_SECRET. Conta desativada cai na hora.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import type { Prisma } from "../../../generated/prisma/client";
 import { banco } from "@/infra/banco";
+import { comTransacao } from "@/infra/transacoes";
 import { duracaoDaSessao } from "@/domain/sessao";
 import type { Identidade } from "@/domain/usuarios";
 
@@ -36,31 +38,46 @@ function hashDoToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+type ClienteDeSessao = Pick<Prisma.TransactionClient, "sessao">;
+
+/** Sessão criada no banco, ainda sem cookie: o cookie só sai depois do commit. */
+export interface SessaoPendente {
+  token: string;
+  expiraEm: Date;
+  persistente: boolean;
+}
+
 /**
- * Cria uma sessão nova e grava o cookie HttpOnly. Com `lembrar`, o cookie é
- * persistente por 30 dias; sem, é cookie de sessão com validade de 12 horas.
- * `cookiesSeguros` decide o atributo Secure (produção sem HTTP liberado).
- * `expiraAte` fixa a validade no servidor (sessão do diretor, limitada pelos
- * parâmetros e pela palavra-chave) e força cookie de sessão.
+ * Grava a sessão no cliente informado e devolve o token para o cookie. Deve
+ * rodar na mesma transação que revalida a conta e a credencial, antes de
+ * qualquer cookie, para uma revogação concorrente não deixar acesso aberto.
  */
-export async function criarSessao(
+export async function registrarSessao(
+  cliente: ClienteDeSessao,
   usuarioId: string,
-  segredo: string,
-  cookiesSeguros: boolean,
   lembrar: boolean,
   expiraAte?: Date,
-): Promise<void> {
+): Promise<SessaoPendente> {
   const token = randomBytes(32).toString("hex");
-  const expiraEm = expiraAte ?? new Date(Date.now() + duracaoDaSessao(lembrar));
   const persistente = lembrar && !expiraAte;
-  await banco().sessao.create({ data: { tokenHash: hashDoToken(token), usuarioId, expiraEm } });
+  const expiraEm = expiraAte ?? new Date(Date.now() + duracaoDaSessao(lembrar));
+  await cliente.sessao.create({ data: { tokenHash: hashDoToken(token), usuarioId, expiraEm } });
+  return { token, expiraEm, persistente };
+}
+
+/** Grava o cookie assinado. Chamar somente depois do commit da sessão. */
+export async function gravarCookieSessao(
+  sessao: SessaoPendente,
+  segredo: string,
+  cookiesSeguros: boolean,
+): Promise<void> {
   const armazem = await cookies();
-  armazem.set(NOME_COOKIE, valorAssinado(token, segredo), {
+  armazem.set(NOME_COOKIE, valorAssinado(sessao.token, segredo), {
     httpOnly: true,
     sameSite: "lax",
     secure: cookiesSeguros,
     path: "/",
-    ...(persistente ? { expires: expiraEm } : {}),
+    ...(sessao.persistente ? { expires: sessao.expiraEm } : {}),
   });
 }
 
@@ -97,14 +114,16 @@ export async function encerrarSessao(segredo: string, cookiesSeguros: boolean): 
   if (valor) {
     const token = conferirValor(valor, segredo);
     if (token) {
-      const atual = await banco().sessao.findUnique({
-        where: { tokenHash: hashDoToken(token) },
-        select: { id: true },
+      const tokenHash = hashDoToken(token);
+      await comTransacao(async (tx) => {
+        const atual = await tx.sessao.findUnique({
+          where: { tokenHash },
+          select: { id: true },
+        });
+        if (atual) await tx.assinaturaPush.deleteMany({ where: { sessaoId: atual.id } });
+        // Repetir a saída de uma sessão já revogada continua sendo sucesso.
+        await tx.sessao.deleteMany({ where: { tokenHash } });
       });
-      if (atual) await banco().assinaturaPush.deleteMany({ where: { sessaoId: atual.id } });
-      await banco()
-        .sessao.delete({ where: { tokenHash: hashDoToken(token) } })
-        .catch(() => undefined);
     }
   }
   armazem.set(NOME_COOKIE, "", {
