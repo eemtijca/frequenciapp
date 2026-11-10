@@ -12,8 +12,8 @@ A saída antecipada guardava apenas o aluno, o dia, o momento e o motivo. A turm
 
 - A saída passa a gravar a turma histórica, o nome da turma e um retrato versionado das aulas, com identificador, ordem, início e fim.
 - Para o dia corrente, a referência vem da matrícula e da grade vigentes. Para uma data passada, a referência vem da chamada salva do aluno naquele dia, quando ela existe e tem retrato de aulas.
-- Sem chamada salva com retrato, a saída retroativa só é criada com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A referência fica `DESCONHECIDA`, a conferência parcial é bloqueada até revisão humana e a auditoria registra o motivo.
-- A consulta de saídas e a Chamada Parcial usam a referência gravada, não a turma atual. Saídas antigas sem referência continuam legíveis, mas exigem conferência.
+- Sem chamada salva com retrato, a saída retroativa só é criada com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A referência fica `DESCONHECIDA`, a auditoria registra o motivo e a conferência parcial usa a chamada salva ou a grade atual como estimativa sinalizada.
+- A consulta de saídas e a Chamada Parcial preferem a referência gravada. Saídas antigas sem referência usam a chamada salva ou a grade atual como estimativa sinalizada.
 - O filtro por turma nas listas e relatórios usa `turma_historica_id`, preservando a turma do momento do registro.
 - Nenhuma aula é inferida a partir de identificadores de aulas antigas: o retrato guarda os horários completos.
 
@@ -27,8 +27,8 @@ A saída antecipada guardava apenas o aluno, o dia, o momento e o motivo. A turm
 ## Consequências
 
 - A migração `l06_referencia_historica_saidas` acrescenta as colunas e é aditiva.
-- A saída retroativa sem chamada salva exige confirmação explícita e fica sem conferência automática até revisão.
+- A saída retroativa sem chamada salva exige confirmação explícita e a conferência parcial é uma estimativa sinalizada.
 - A interface de Saídas mostra o diálogo de motivo quando a referência não pode ser comprovada.
-- A conferência parcial recusa assinatura de saída sem referência confiável.
+- A conferência parcial continua exigindo assinatura e revisão vigentes; a estimativa aparece na observação.
 - O backup inclui os novos campos; a restauração preserva o retrato.
 - Mudanças futuras na grade não alteram saídas já registradas.

@@ -10,7 +10,7 @@ vi.mock("@/infra/banco", () => ({
 }));
 import { consultarSaidasParciais } from "@/application/saidas-parciais";
 import { listarSaidas } from "@/application/saidas";
-it("não deriva aulas nem turma de saída legada pela matrícula atual", async () => {
+it("sinaliza a estimativa da matrícula atual em saída legada", async () => {
   const tx = {
     saidaAntecipada: {
       findMany: async () => [
@@ -53,7 +53,8 @@ it("não deriva aulas nem turma de saída legada pela matrícula atual", async (
     tx as unknown as Parameters<typeof consultarSaidasParciais>[0],
     { gte: new Date(), lte: new Date() },
   );
-  expect(resultado[0]).toMatchObject({ turmaId: null, aulasConferiveis: false });
+  expect(resultado[0]).toMatchObject({ turmaId: "B", aulasConferiveis: true });
+  expect(resultado[0]?.observacao).toContain("estimadas");
 });
 it("mantém saída em A depois da transferência para B", async () => {
   const linha = {

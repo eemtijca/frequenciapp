@@ -538,7 +538,7 @@ Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": 
 
 A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
-No dia corrente, a turma e as aulas vêm da matrícula e da grade vigentes. Em data passada, a rota usa a chamada salva do aluno naquele dia quando ela tem retrato de aulas. Sem esse retrato, responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`; o cliente reenvia com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A saída fica com referência `DESCONHECIDA`, exige conferência na Chamada Parcial e registra o motivo na auditoria ([ADR-069](adr/069-referencia-historica-saidas.md)).
+No dia corrente, a turma e as aulas vêm da matrícula e da grade vigentes. Em data passada, a rota usa a chamada salva do aluno naquele dia quando ela tem retrato de aulas. Sem esse retrato, responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`; o cliente reenvia com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A saída fica com referência `DESCONHECIDA`, a auditoria registra o motivo e a Chamada Parcial usa a chamada salva ou a grade atual como estimativa sinalizada ([ADR-069](adr/069-referencia-historica-saidas.md)).
 
 - 201 `{"saida": Saida}`.
 - 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, domingo, data futura ou responsável fora do catálogo. Domingo responde com a mensagem Domingo não tem aula. Escolha um dia de segunda a sábado.
