@@ -379,7 +379,7 @@ Período inclusivo, com `turmaId` opcional.
 
 ### POST /api/frequencias
 
-Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean }`.
+Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean, "confirmarHistorico"?: boolean, "motivo"?: string }`.
 
 Três formas de faltas:
 
@@ -397,6 +397,8 @@ Domingo não tem aula nem chamada: a rota responde 400 ("Domingo não tem aula n
 
 Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes. O salvamento e o cadastro de feriado travam a tabela de feriados antes de ler, então, se os dois acontecem ao mesmo tempo para a mesma data, um deles sempre vê o outro: a chamada responde 400 ou o feriado responde 409, nunca os dois aceitos (ver `docs/banco.md`).
 
+Chamada em data passada: quando a composição da turma na data não pode ser comprovada, a rota responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`. O cliente reenvia a mesma chamada com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A confirmação é gravada na mesma transação em `confirmacoes_historicas`, com autor, motivo e a lista usada ([ADR-066](adr/066-politica-retroativa.md)). Quando a composição é compatível, a gravação segue sem confirmação. A chamada existente prevalece e não consulta a composição atual.
+
 Semântica da `revisao`:
 
 - `0` cria a primeira versão. Se já existe frequência do dia e turma, responde 409 com a versão vigente.
@@ -409,7 +411,7 @@ Validações: o dia não pode ser futuro (fuso da escola); as aulas precisam per
 Respostas:
 
 - 200 `{"frequencia": Frequencia}` com a revisão incrementada.
-- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
+- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta; `{"error", "codigo": "JUSTIFICATIVAS_ALTERADAS"}` quando as propostas mudaram; `{"error", "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"}` quando a composição histórica não pode ser comprovada.
 - 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, quando a justificativa não pertence ao catálogo, ou quando outra validação falha.
 - 401 sem sessão; 403 sem capacidade de operação; 404 turma inexistente.
 

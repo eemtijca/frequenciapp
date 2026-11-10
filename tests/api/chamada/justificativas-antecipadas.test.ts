@@ -72,6 +72,15 @@ const dados = (dia = historico, mais: Record<string, unknown> = {}) => ({
   revisao: 0,
   ...mais,
 });
+const corpoChamada = (dia = historico, mais: Record<string, unknown> = {}) => ({
+  dia,
+  turmaId: turma,
+  revisao: 0,
+  faltas: [],
+  confirmarHistorico: true,
+  motivo: "Teste sintético de justificativa antecipada",
+  ...mais,
+});
 async function gravar(entrada: unknown) {
   const r = await chamar("/api/frequencias-parciais", "POST", entrada);
   expect(r.status).toBe(200);
@@ -256,16 +265,7 @@ describe("Justificativas antecipadas", () => {
         )
       ).status,
     ).toBe(400);
-    expect(
-      (
-        await chamar("/api/frequencias", "POST", {
-          dia: futuro,
-          turmaId: turma,
-          revisao: 0,
-          faltas: [],
-        })
-      ).status,
-    ).toBe(400);
+    expect((await chamar("/api/frequencias", "POST", corpoChamada(futuro))).status).toBe(400);
     expect(
       (
         await chamar(
@@ -303,14 +303,8 @@ describe("Justificativas antecipadas", () => {
   });
   it("recusa o período inteiro quando uma chamada histórica está sem aulas de referência", async () => {
     expect(
-      (
-        await chamar("/api/frequencias", "POST", {
-          dia: historico,
-          turmaId: turma,
-          revisao: 0,
-          faltas: [aluno],
-        })
-      ).status,
+      (await chamar("/api/frequencias", "POST", corpoChamada(historico, { faltas: [aluno] })))
+        .status,
     ).toBe(200);
     await cliente.query(
       "delete from aulas_chamada where frequencia_id in (select id from frequencias where turma_id=$1)",
@@ -357,18 +351,13 @@ describe("Justificativas antecipadas", () => {
     expect(leitura.justificativasAntecipadas).toMatchObject([
       { id: salva.registro.id, justificativa: primeiraJustificativa.codigo, alunoId: aluno },
     ]);
-    const r = await chamar("/api/frequencias", "POST", {
-      dia: historico,
-      turmaId: turma,
-      revisao: 0,
-      faltas: [],
-    });
+    const r = await chamar("/api/frequencias", "POST", corpoChamada());
     expect(r.status).toBe(200);
-    const chamada = (await r.json()).frequencia;
-    expect(chamada.faltas).toEqual([
+    const chamadaSalva = (await r.json()).frequencia;
+    expect(chamadaSalva.faltas).toEqual([
       expect.objectContaining({ alunoId: aluno, justificativa: primeiraJustificativa.codigo }),
     ]);
-    expect(chamada.alunos).toContain(colega);
+    expect(chamadaSalva.alunos).toContain(colega);
   });
   it("recusa uma proposta desatualizada e permite a correção explícita da equipe", async () => {
     const salva = await gravar(dados());
@@ -381,13 +370,7 @@ describe("Justificativas antecipadas", () => {
         justificativa: segundaJustificativa.codigo,
       }),
     );
-    const requisicao = {
-      dia: historico,
-      turmaId: turma,
-      revisao: 0,
-      faltas: [],
-      justificativasAntecipadas: anterior,
-    };
+    const requisicao = corpoChamada(historico, { justificativasAntecipadas: anterior });
     const conflito = await chamar("/api/frequencias", "POST", requisicao);
     expect(conflito.status).toBe(409);
     expect((await conflito.json()).codigo).toBe("JUSTIFICATIVAS_ALTERADAS");
@@ -406,12 +389,11 @@ describe("Justificativas antecipadas", () => {
     expect((await lerChamada()).frequencia.faltas).toEqual([]);
   });
   it("corrige só o aluno escolhido em chamada já salva e preserva a confirmação do colega", async () => {
-    const r = await chamar("/api/frequencias", "POST", {
-      dia: historico,
-      turmaId: turma,
-      revisao: 0,
-      faltas: [aluno, colega],
-    });
+    const r = await chamar(
+      "/api/frequencias",
+      "POST",
+      corpoChamada(historico, { faltas: [aluno, colega] }),
+    );
     expect(r.status).toBe(200);
     expect(
       (
@@ -439,14 +421,7 @@ describe("Justificativas antecipadas", () => {
         ?.registradoSeduc,
     ).toBe(true);
     expect(
-      (
-        await chamar("/api/frequencias", "POST", {
-          dia: historico,
-          turmaId: turma,
-          revisao: 1,
-          faltas: [],
-        })
-      ).status,
+      (await chamar("/api/frequencias", "POST", corpoChamada(historico, { revisao: 1 }))).status,
     ).toBe(409);
   });
   it("acompanha o aluno transferido sem aplicar a justificativa na turma antiga", async () => {
@@ -460,14 +435,8 @@ describe("Justificativas antecipadas", () => {
       { alunoId: aluno, turmaId: outraTurma },
     ]);
     expect(
-      (
-        await chamar("/api/frequencias", "POST", {
-          dia: historico,
-          turmaId: outraTurma,
-          revisao: 0,
-          faltas: [],
-        })
-      ).status,
+      (await chamar("/api/frequencias", "POST", corpoChamada(historico, { turmaId: outraTurma })))
+        .status,
     ).toBe(200);
     expect((await lerChamada(historico, outraTurma)).frequencia.faltas).toMatchObject([
       { alunoId: aluno, justificativa: primeiraJustificativa.codigo },
@@ -485,16 +454,7 @@ describe("Justificativas antecipadas", () => {
         )
       ).status,
     ).toBe(409);
-    expect(
-      (
-        await chamar("/api/frequencias", "POST", {
-          dia: historico,
-          turmaId: turma,
-          revisao: 0,
-          faltas: [],
-        })
-      ).status,
-    ).toBe(200);
+    expect((await chamar("/api/frequencias", "POST", corpoChamada())).status).toBe(200);
     expect(
       (
         await chamar(`/api/frequencias-parciais/${salva.registro.id}`, "DELETE", {

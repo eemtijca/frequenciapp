@@ -66,7 +66,17 @@ async function criarAluno(nome: string, turmaId: string): Promise<string> {
 async function salvar(dia: string, turmaId: string, faltas: string[], revisao: number) {
   const resposta = await chamar(
     "/api/frequencias",
-    { method: "POST", body: JSON.stringify({ dia, turmaId, faltas, revisao }) },
+    {
+      method: "POST",
+      body: JSON.stringify({
+        dia,
+        turmaId,
+        faltas,
+        revisao,
+        confirmarHistorico: true,
+        motivo: "Teste sintético da turma reorganizada",
+      }),
+    },
     cookieCoord,
   );
   expect(resposta.status).toBe(200);

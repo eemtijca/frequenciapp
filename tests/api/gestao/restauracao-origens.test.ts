@@ -177,6 +177,8 @@ beforeAll(async () => {
       dia: "2026-06-23",
       faltas: [ids.Davi],
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da restauração de origens",
     }),
   );
   // Saída registrada durante o remanejamento: o relatório agrupa pela turma atual do aluno.

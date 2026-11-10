@@ -272,19 +272,25 @@ export async function atualizarHorario(
  * desativar: a exclusão é barrada com mensagem orientando.
  */
 export async function removerHorario(admin: { id: string }, id: string): Promise<void> {
-  const existente = await banco().horario.findUnique({
-    where: { id },
-    include: { _count: { select: { faltas: true } } },
-  });
-  if (!existente) throw new ErroHttp("Aula não encontrada.", 404);
-  if (existente._count.faltas > 0) {
-    throw new ErroHttp(
-      "Esta aula já tem faltas registradas e não pode ser excluída. Desative-a para retirá-la das próximas chamadas.",
-      409,
-    );
-  }
-  const rotulo = await rotuloDaTurma(existente.turmaId);
   await comTransacao(async (tx) => {
+    const existente = await tx.horario.findUnique({
+      where: { id },
+      include: { _count: { select: { faltas: true, aulasChamada: true } } },
+    });
+    if (!existente) throw new ErroHttp("Aula não encontrada.", 404);
+    if (existente._count.faltas > 0) {
+      throw new ErroHttp(
+        "Esta aula já tem faltas registradas e não pode ser excluída. Desative-a para retirá-la das próximas chamadas.",
+        409,
+      );
+    }
+    if (existente._count.aulasChamada > 0) {
+      throw new ErroHttp(
+        "Esta aula integra chamadas salvas e não pode ser excluída. Desative-a para retirá-la das próximas chamadas.",
+        409,
+      );
+    }
+    const rotulo = await rotuloDaTurma(existente.turmaId);
     await tx.horario.delete({ where: { id } });
     await auditar(tx, admin.id, "horario.excluir", `aula ${existente.ordem} de ${rotulo}`);
   });

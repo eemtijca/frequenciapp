@@ -45,7 +45,18 @@ async function limpar() {
 }
 
 async function salvar(turmaId: string, dia: string, faltas: string[]) {
-  expect((await chamar("/api/frequencias", { turmaId, dia, faltas, revisao: 0 })).status).toBe(200);
+  expect(
+    (
+      await chamar("/api/frequencias", {
+        turmaId,
+        dia,
+        faltas,
+        revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético da ordenação da planilha",
+      })
+    ).status,
+  ).toBe(200);
 }
 
 async function enviar(turmaOriginalId: string, ate = DIA) {
