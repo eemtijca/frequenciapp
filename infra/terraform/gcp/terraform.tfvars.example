@@ -5,5 +5,11 @@ projeto                = "frequenciapp-prod"
 regiao                 = "us-central1"
 ambiente               = "prod"
 imagem_aplicacao       = "us-central1-docker.pkg.dev/frequenciapp-prod/frequenciapp-prod:versao"
+revisao_aplicacao      = "0000000000000000000000000000000000000000"
+migracao_confirmada_sha = "0000000000000000000000000000000000000000"
+schema_aplicacao       = "frequenciapp"
+runtime_provisionado   = true
+url_runtime            = "postgresql://papel_runtime:senha@host:5432/frequencia?sslmode=require"
+url_migracao           = "postgresql://papel_migracao:senha@host:5432/frequencia?sslmode=require"
 habilitar_rede_privada = true
 emails_alarme          = ["operacao@exemplo.br"]

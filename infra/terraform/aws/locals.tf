@@ -43,8 +43,12 @@ locals {
 
   ssl_modo = var.modo_local ? "" : "?sslmode=require"
 
-  # O dono do schema é a própria conexão de runtime: DATABASE_URL e DIRECT_URL
-  # valem para o mesmo usuário administrador, em banco e senha únicos.
+  # Credenciais previamente provisionadas; nunca derivar o runtime do administrador.
+  url_runtime  = var.url_runtime
+  url_migracao = var.url_migracao
+
+  # O ensaio local é sintético e usa a credencial descartável do emulador; ele
+  # não atesta a separação de papéis exigida em produção.
   url_banco_local = format(
     "postgresql://%s:%s@%s:%s/frequencia%s",
     "frequencia",
@@ -53,15 +57,11 @@ locals {
     aws_db_instance.banco.port,
     local.ssl_modo,
   )
-
-  url_banco_producao = format(
-    "postgresql://%s:%s@%s:%s/frequencia%s",
-    "frequencia",
-    ephemeral.random_password.banco.result,
-    aws_db_instance.banco.address,
-    aws_db_instance.banco.port,
-    local.ssl_modo,
-  )
+  url_runtime_efetiva  = var.modo_local ? (var.url_runtime != null ? var.url_runtime : local.url_banco_local) : local.url_runtime
+  url_migracao_efetiva = var.modo_local ? (var.url_migracao != null ? var.url_migracao : local.url_banco_local) : local.url_migracao
+  # O schema exclusivo é pré-requisito de produção; o emulador usa o public,
+  # que já existe, para o ciclo local não exigir provisionamento externo.
+  schema_aplicacao_efetiva = var.modo_local && var.schema_aplicacao == "frequenciapp" ? "public" : var.schema_aplicacao
 
   url_aplicacao = var.dominio != null ? "https://${var.dominio}" : (
     var.modo_local ? "http://localhost:3000" : "https://${aws_lb.principal.dns_name}"

@@ -1,90 +1,100 @@
-# Publica a imagem no GHCR em release estável ou por dispatch manual.
+# Publica duas imagens somente após conciliar versão, tag e commit do pacote.
 name: Publicação da imagem
-
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       versao:
-        description: Versão da imagem, sem o v, como 1.0.0
+        description: Versão estável sem v; executar o workflow na tag correspondente
         required: true
         type: string
-
-concurrency:
-  group: publicacao-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
-  packages: write
-
 jobs:
-  imagem:
+  validar:
     if: github.event_name != 'release' || github.event.release.prerelease == false
     runs-on: ubuntu-latest
+    outputs:
+      versao: ${{ steps.identidade.outputs.versao }}
+      tag: ${{ steps.identidade.outputs.tag }}
+      sha: ${{ steps.identidade.outputs.sha }}
+      latest: ${{ steps.identidade.outputs.latest }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.release.tag_name || github.ref }}
-
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+      - name: Inventariar releases antes de publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+      - id: identidade
+        env:
+          PUBLICACAO_RELEASES: ${{ runner.temp }}/releases.json
+        run: node scripts/github/validar-publicacao.mjs
+  imagem:
+    needs: validar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: publicacao-${{ needs.validar.outputs.versao }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.validar.outputs.sha }}
+          persist-credentials: false
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-
+        with:
+          image: tonistiigi/binfmt:qemu-v10.2.3-68@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
+        with:
+          version: v0.38.2
+          driver-opts: image=moby/buildkit:v0.34.2@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Definir as tags e os rótulos
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=${{ inputs.versao }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=sha
-          flavor: latest=auto
-
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.validar.outputs.versao }}
+            ghcr.io/${{ github.repository }}:sha-${{ needs.validar.outputs.sha }}
+            ${{ needs.validar.outputs.latest == 'true' && format('ghcr.io/{0}:latest', github.repository) || '' }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.validar.outputs.versao }}
+            org.opencontainers.image.revision=${{ needs.validar.outputs.sha }}
+            org.opencontainers.image.ref.name=${{ needs.validar.outputs.tag }}
           build-args: |
-            COMMIT_SHA=${{ github.sha }}
+            COMMIT_SHA=${{ needs.validar.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Definir as tags da imagem de backup
-        id: meta-backup
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ghcr.io/${{ github.repository }}-backup
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=${{ inputs.versao }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=sha
-          flavor: latest=auto
-
-      - name: Construir e publicar a imagem de backup
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: infra/servidor/backup
           file: infra/servidor/backup/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            APP_IMAGEM=ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
-          tags: ${{ steps.meta-backup.outputs.tags }}
-          labels: ${{ steps.meta-backup.outputs.labels }}
+            APP_IMAGEM=ghcr.io/${{ github.repository }}:${{ needs.validar.outputs.versao }}
+          tags: |
+            ghcr.io/${{ github.repository }}-backup:${{ needs.validar.outputs.versao }}
+            ghcr.io/${{ github.repository }}-backup:sha-${{ needs.validar.outputs.sha }}
+            ${{ needs.validar.outputs.latest == 'true' && format('ghcr.io/{0}-backup:latest', github.repository) || '' }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.validar.outputs.versao }}
+            org.opencontainers.image.revision=${{ needs.validar.outputs.sha }}
+            org.opencontainers.image.ref.name=${{ needs.validar.outputs.tag }}
           cache-from: type=gha,scope=backup
           cache-to: type=gha,mode=max,scope=backup

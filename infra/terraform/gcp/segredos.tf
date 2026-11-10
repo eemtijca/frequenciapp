@@ -1,7 +1,6 @@
 # Segredos da aplicação no Secret Manager. Em produção os valores nascem
 # efêmeros e só chegam ao cofre; no modo local valem os valores de
-# desenvolvimento do tfvars. DATABASE_URL e DIRECT_URL usam o mesmo
-# administrador do schema.
+# desenvolvimento do tfvars. Runtime e migração recebem credenciais distintas.
 
 ephemeral "random_password" "banco" {
   length  = 32
@@ -33,9 +32,9 @@ resource "google_secret_manager_secret" "database_url" {
 
 resource "google_secret_manager_secret_version" "database_url" {
   secret      = google_secret_manager_secret.database_url.id
-  secret_data = var.modo_local ? local.url_banco_local : null
+  secret_data = var.modo_local ? local.url_runtime_efetiva : null
 
-  secret_data_wo         = var.modo_local ? null : local.url_banco_producao
+  secret_data_wo         = var.modo_local ? null : local.url_runtime_efetiva
   secret_data_wo_version = var.modo_local ? null : var.versao_segredos
 }
 
@@ -54,9 +53,9 @@ resource "google_secret_manager_secret" "direct_url" {
 
 resource "google_secret_manager_secret_version" "direct_url" {
   secret      = google_secret_manager_secret.direct_url.id
-  secret_data = var.modo_local ? local.url_banco_local : null
+  secret_data = var.modo_local ? local.url_migracao_efetiva : null
 
-  secret_data_wo         = var.modo_local ? null : local.url_banco_producao
+  secret_data_wo         = var.modo_local ? null : local.url_migracao_efetiva
   secret_data_wo_version = var.modo_local ? null : var.versao_segredos
 }
 
