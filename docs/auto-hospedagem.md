@@ -198,7 +198,7 @@ scripts/servidor/compose.sh up -d --build nginx
 scripts/servidor/renovar-certificado.sh --inicial
 ```
 
-O script emite o certificado com Certbot, recria o Nginx e ele passa a usar a configuração HTTPS. A renovação é agendada pelo cron:
+O script emite o certificado com Certbot, recria o Nginx e ele passa a usar a configuração HTTPS. A porta 80 continua atendendo ao desafio HTTP-01 e redireciona as demais requisições para HTTPS. A renovação é agendada pelo cron:
 
 ```bash
 scripts/servidor/renovar-certificado.sh --dry-run
