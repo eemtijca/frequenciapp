@@ -17,10 +17,6 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
@@ -36,13 +32,12 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
 
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /
+      - /infra/servidor/nginx
+      - /infra/servidor/backup
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -55,7 +50,3 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - version-update:semver-major
