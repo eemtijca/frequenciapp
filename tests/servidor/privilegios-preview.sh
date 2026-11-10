@@ -229,8 +229,6 @@ for _tentativa in $(seq 1 120); do
   if docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
     break
   fi
-  estado=$(docker inspect -f '{{.State.Status}}' "$BANCO" 2>/dev/null || true)
-  [ "$estado" = "running" ] || break
   sleep 1
 done
 if ! docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then

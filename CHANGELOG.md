@@ -305,7 +305,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - A fila de envios automáticos passa a gravar a intenção escolar na mesma transação da frequência, da justificativa aplicada à chamada, da saída e da entrada. Um dispatcher separado retoma intenções pendentes, distingue sucesso, falha de preparo, origem não processada e conferência de escrita incerta, mostra as pendências com ação e impede que uma reserva vencida finalize o item do novo dono. A decisão está na [ADR-074](docs/adr/074-outbox-escolar-e-conferencia-da-fila.md).
-
+- O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
 - As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).
 
