@@ -37,6 +37,7 @@ import type {
 import { diasDoMes } from "@/domain/frequencia";
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
+import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
 import { cn } from "@/lib/utils";
 import { MenuConta, type AcaoConta } from "@/components/conta/menu-conta";
 import { ProvedorAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
@@ -655,6 +656,7 @@ export default function Aplicacao({
       } catch {
         // Sem armazenamento: a tela de entrada abre sem o aviso.
       }
+      void expurgarBiNoLogout().catch(() => undefined);
       router.refresh();
     }
     window.addEventListener("beforeunload", avisarSaida);
@@ -675,6 +677,11 @@ export default function Aplicacao({
     } catch {
       toast.error("Não foi possível sair. Tente novamente.");
       return;
+    }
+    try {
+      await expurgarBiNoLogout();
+    } catch {
+      // A sessão encerra mesmo quando o navegador bloqueia o armazenamento local.
     }
     avisarSucesso("Sessão encerrada.");
     router.refresh();
