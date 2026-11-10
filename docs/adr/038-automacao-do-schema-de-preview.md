@@ -1,28 +1,27 @@
-# ADR-038: Automação do schema de preview por pull request
+# ADR-038: Automação de preview e fronteira de confiança
 
-Estado: aceita. Data: 2026-10-06.
+Estado: contrato anterior parcialmente suspenso; topologia dedicada pendente de aceite.
 
 ## Contexto
 
-O Preview compartilha o database da produção e usa um schema próprio, com os papéis `preview_app` e `preview_migrador` sem acesso a `public`. O preparo era manual: aplicar as migrações e criar a conta de teste a cada mudança de banco. Com dois pull requests mexendo em `prisma/**` ao mesmo tempo, o schema compartilhado acumulava migrações não fundidas e o preview de um podia quebrar o do outro. Dependabot e pull requests de fork não recebem os segredos do GitHub Actions, e a Vercel publica previews de branches sem conhecer o schema escolhido.
+Um schema separa nomes de objetos, não comprova a fronteira de privilégios efetivos. Roles podem receber acesso por PUBLIC ou memberships; grants da instalação não foram examinados. Não se afirma exploração nem isolamento da instalação a partir de inspeção estática.
 
-## Decisão
+## Contrato implementado na proposta
 
-- O workflow `schema-preview.yml` cria, migra e remove `preview_pr_<número>` para pull requests do próprio repositório que mudam `prisma/**`.
-- O schema de fallback `preview` é mantido em dia por um job em cada push na `main`. Pull requests sem mudança de banco, Dependabot e forks usam esse fallback.
-- A limpeza roda no fechamento do pull request e uma faxina semanal derruba schemas órfãos, consultando os pull requests abertos pela API do GitHub.
-- O apontamento da branch é opcional: com `VERCEL_TOKEN`, `VERCEL_PROJECT_ID` e a branch do pull request, o workflow define `DATABASE_SCHEMA=preview_pr_<número>` no escopo da branch e dispara um deployment. Sem o token, o schema é criado e migrado, e a branch usa o fallback até o ajuste manual.
-- O aplicativo continua agnóstico: a seleção de schema vem de `DATABASE_SCHEMA` ou do parâmetro da URL, sem variável de plataforma no código.
-- O script `scripts/banco/preview-schema.mjs` concentra criar, limpar e fiscalizar; o migrador e o `criar-admin` são reaproveitados, com a trava consultiva alinhada ao Prisma CLI.
+- `schema-preview.yml` somente valida propostas, inclusive forks e sincronizações, sem environment de preview ou segredos de banco e plataforma. O ambiente do validador subprocessado é mínimo e usa conexão fictícia.
+- Manutenção privilegiada fica em `schema-preview-confiavel.yml`, exclusivamente por dispatch na `main`, com checkout do SHA completo de `PREVIEW_TRUSTED_SHA`. O SHA precisa ter 40 hexadecimais e ser ancestral de `origin/main`, conferido por `git fetch` e `git merge-base --is-ancestor` antes do checkout, do segredo e de qualquer script. Scripts, lock e migrações dessa revisão precisam de revisão humana antes da indicação.
+- `PREVIEW_MANUTENCAO_APROVADA=true` é um gate operacional explícito, não um valor configurado por esta mudança. O mantenedor precisa confirmar proteções reais do environment `preview` e acesso a segredos. Uma variável não substitui aprovação do environment.
+- A manutenção aceita apenas fallback, limpeza de PR identificado numericamente e faxina. Não consome branch, artefato ou lock do PR e não aplica SQL proposto por ele com credencial compartilhada.
+- Preparo automático e redeploy de PR ficam suspensos. A política nativa da Vercel também é externa ao Actions e exige conferência do mantenedor.
 
-## Alternativas
+## Faxina completa
 
-Manter o preparo manual deixaria a colisão entre pull requests e o erro de apontamento. Usar um banco por pull request exigiria plano pago do Supabase ou outro provedor, contrariando a decisão de manter a Vercel e o Supabase como uma opção entre outras. Rodar as migrações no build da Vercel executaria DDL a cada build e levaria credencial de migração ao runtime. Derivar o schema no código a partir de variáveis da plataforma quebraria o agnosticismo e não cobriria Dependabot e forks.
+A API é consultada por páginas numéricas construídas na origem fixa do GitHub, com 100 itens por página e ordenação por criação. O leitor não segue URLs de Link nem redirects com token. A página curta final encerra a listagem. Erro HTTP, JSON inválido, formato estranho, número inválido, repetição de número ou limite de paginação interrompem antes de qualquer DROP. Somente nomes canônicos `preview_pr_<inteiro positivo>` entram na decisão.
 
-## Consequências
+A listagem REST é viva, não um snapshot transacional. Uma alteração concorrente capaz de mudar páginas exige repetir o inventário, não aproveitar uma resposta parcial. A unidade cobre duas páginas cheias, PR ativo na última página e zero remoções nos erros; a integração com PostgreSQL exclusivo continua um gate separado.
 
-- Cada pull request de banco tem migrações, contas e dados isolados; o fallback cobre o restante.
-- O schema de preview vira estado descartável: a faxina e o fechamento removem o que sobra, e a reconstrução é sempre possível pelo workflow.
-- O workflow exige o environment `preview` com `DIRECT_URL_PREVIEW` e `ADMIN_SENHA_PREVIEW`; sem eles, o job falha de forma visível em vez de migrar o destino errado.
-- O apontamento automático da Vercel depende de um token e de variáveis; sem eles, o ajuste é manual e documentado.
-- A faxina depende da API do GitHub e roda semanalmente; schemas de pull requests abertos são preservados.
+## Hipótese de privilégios e decisão pendente
+
+A caracterização do legado em rodada sintética exclusiva, com canários, PUBLIC, membership e duas identidades, pertence ao executor de isolamento da issue #423-C e não integra esta frente. O ensaio mutante não foi executado. Seu resultado, quando autorizado, caracteriza o banco sintético, não os grants de serviços reais. O provisionador legado não foi alterado para remediar uma hipótese sem essa prova.
+
+A proposta segura para migrações não confiáveis é um banco descartável dedicado por preview, com credenciais e rede limitadas ao próprio banco, fora da instalação e de outros previews. Isso não está aprovado nem provisionado. Exige decisão de custo, retenção, owner, descarte, bootstrap e inventário de privilégios efetivos. Não revogar PUBLIC globalmente no banco compartilhado nem transformar uma recusa em prova de segurança.

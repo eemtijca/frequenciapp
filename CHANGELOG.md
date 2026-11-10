@@ -407,6 +407,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Segurança
 
 - A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
+- A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
 
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.
 
