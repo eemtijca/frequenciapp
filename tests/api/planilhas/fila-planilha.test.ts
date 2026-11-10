@@ -520,6 +520,8 @@ describe("intenção e conferência", () => {
       turmaId,
       faltas: [],
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da fila",
     });
     expect(chamada.status).toBe(200);
     const intencao = await sql().query<{ evento_id: string; revisao_evento: number }>(
