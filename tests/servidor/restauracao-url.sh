@@ -81,6 +81,7 @@ values ('00000000-0000-0000-0000-000000000001', repeat('a', 64), '0001_teste', n
 SQL
 
 docker exec "$BANCO" pg_dump -U frequencia -d origem -Fc >"$TMP/dump"
+(cd "$TMP" && sha256sum dump >dump.sha256)
 docker exec "$BANCO" createdb -U frequencia destino
 docker exec "$BANCO" createdb -U frequencia validacao
 
@@ -93,6 +94,17 @@ export BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/
 export BACKUP_RESTAURACAO_URL_VALIDACAO="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/validacao"
 export DATABASE_SCHEMA=public
 mkdir -p "$ESTADO_DIR"
+
+if RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=false \
+  "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$TMP/dump" --confirmar --sem-copia \
+  >"$TMP/divergente.log" 2>&1; then
+  cat "$TMP/divergente.log" >&2
+  echo "FALHOU: a restauração aceitou migrações divergentes." >&2
+  exit 1
+fi
+grep -q 'migrações do dump divergem' "$TMP/divergente.log" ||
+  { cat "$TMP/divergente.log" >&2; echo "FALHOU: a recusa de migração divergente não apareceu." >&2; exit 1; }
+export RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true
 
 "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$TMP/dump" --confirmar --sem-copia
 

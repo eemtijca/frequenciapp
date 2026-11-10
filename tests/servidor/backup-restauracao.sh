@@ -6,6 +6,7 @@ set -Eeuo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 preparar_ambiente
+export RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true
 iniciar_compose_teste
 preparar_banco_sintetico
 
@@ -55,7 +56,7 @@ if command -v age-keygen >/dev/null 2>&1 && command -v age >/dev/null 2>&1; then
   export BACKUP_AGE_CHAVE_PRIVADA="$TMP_RAIZ/age.txt"
   "$RAIZ/scripts/servidor/backup-banco.sh"
   dump_age=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name '*.dump.age' \
-    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2- || true)
+    -exec stat -c '%Y %n' {} \; 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2- || true)
   [ -n "$dump_age" ] || falhar "o backup age não gerou arquivo."
   executar_sql "$POSTGRES_DB" 'delete from alunos' >/dev/null
   "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump_age" --confirmar --sem-copia
