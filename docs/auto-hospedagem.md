@@ -290,8 +290,8 @@ Antes de aplicar:
 
 1. O Compose é montado e validado com `docker compose config --quiet`.
 2. A árvore Git precisa estar limpa e o estado registrado precisa corresponder ao checkout.
-3. Migrações novas bloqueiam a atualização por padrão.
-4. O backup do banco é obrigatório e o estado recém-gravado é conferido.
+3. Migrações novas bloqueiam a atualização por padrão. Com `MIGRAR_NA_PARTIDA=false`, a atualização também recusa até `ATUALIZAR_MIGRACAO_EXTERNA=true` confirmar que a migração foi aplicada fora do entrypoint.
+4. O backup do banco é obrigatório e o estado recém-gravado é conferido. A atualização exige confirmação remota, salvo `ATUALIZAR_PERMITIR_BACKUP_LOCAL=true` com decisão explícita.
 5. A imagem alvo é baixada ou construída na worktree do commit alvo.
 6. O rótulo OCI da imagem é comparado com o commit alvo.
 7. A configuração do Compose do alvo é validada antes de alterar o checkout principal.
@@ -300,9 +300,17 @@ Antes de aplicar:
 
 O backup de planilhas é opcional. Quando `BACKUP_PLANILHAS_HABILITADO=false`, a imagem `backup-planilhas` não é baixada nem construída.
 
+A atualização automática pelo cron não é instalada por padrão. `ATUALIZAR_HABILITADO=false` mantém a rotina fora do cron; defina `true` somente depois de revisar a agenda e o rollback.
+
 `ATUALIZAR_VERIFICAR_IMAGEM=true` confere o rótulo da imagem antes da aplicação. `ATUALIZAR_BACKUP_ANTES=false` é rejeitado porque o backup anterior é obrigatório.
 
+Quando o healthcheck usa HTTPS com CA interna, defina `ATUALIZAR_SAUDE_CA` e `RESTAURAR_SAUDE_CA` com o caminho do certificado. Sem a CA, o `curl` usa o repositório do sistema.
+
 O rollback da imagem e do commit não desfaz uma migração já aplicada. Em caso de falha após uma migração, use o backup gerado antes da atualização e o procedimento de restauração. O arquivo `falha.json` registra se havia migrações novas.
+
+A restauração e o backup de planilhas usam `imagem` e `imagemBackup` de `estado.json` quando o processo não recebe `APP_IMAGEM` ou `APP_IMAGEM_BACKUP` explicitamente. O estado gravado pelo último update evita voltar para a imagem local inicial.
+
+A restauração recusa um dump cujo histórico de migrações não seja um prefixo do checkout. `RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true` só deve ser usado em uma decisão explícita e controlada.
 
 Uso manual:
 
