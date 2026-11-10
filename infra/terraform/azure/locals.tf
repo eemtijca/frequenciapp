@@ -31,21 +31,23 @@ locals {
 
   retencao_backup = var.modo_local ? 7 : var.retencao_backup_dias
 
-  # O dono do schema é a própria conexão de runtime: DATABASE_URL e DIRECT_URL
-  # valem para o mesmo usuário administrador, em banco e senha únicos.
-  url_banco_producao = format(
-    "postgresql://%s:%s@%s:5432/frequencia?sslmode=require",
-    "frequencia",
-    ephemeral.random_password.banco.result,
-    azurerm_postgresql_flexible_server.banco.fqdn,
-  )
+  # Credenciais previamente provisionadas; nunca derivar o runtime do administrador.
+  url_runtime  = var.url_runtime
+  url_migracao = var.url_migracao
 
+  # O ensaio local é sintético e usa a credencial descartável do emulador; ele
+  # não atesta a separação de papéis exigida em produção.
   url_banco_local = format(
     "postgresql://%s:%s@%s/frequencia",
     "frequencia",
     var.senha_banco_local,
     local.endereco_banco_local,
   )
+  url_runtime_efetiva  = var.modo_local ? (var.url_runtime != null ? var.url_runtime : local.url_banco_local) : local.url_runtime
+  url_migracao_efetiva = var.modo_local ? (var.url_migracao != null ? var.url_migracao : local.url_banco_local) : local.url_migracao
+  # O schema exclusivo é pré-requisito de produção; o emulador usa o public,
+  # que já existe, para o ciclo local não exigir provisionamento externo.
+  schema_aplicacao_efetiva = var.modo_local && var.schema_aplicacao == "frequenciapp" ? "public" : var.schema_aplicacao
 
   url_aplicacao = var.modo_local ? "http://localhost:3000" : (
     var.dominio != null ? "https://${var.dominio}" : "https://${local.nome_base}-api.azurewebsites.net"
