@@ -7,6 +7,9 @@ on:
       - "compose.servidor*.yml"
       - "compose.yml"
       - "Dockerfile"
+      - ".dockerignore"
+      - "docker/app/**"
+      - "src/infra/schema-postgres.mjs"
       - "infra/servidor/**"
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
@@ -34,6 +37,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verificar configuração e migrações sintéticas
+        run: node --test tests/servidor/configuracao-segura.test.mjs tests/servidor/migrar-incompleta.test.mjs
 
       - name: Validar servidor
         run: bash infra/servidor/validar.sh
