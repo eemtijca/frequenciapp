@@ -93,6 +93,12 @@ describe("inventário de ferramentas", () => {
 
   it("recusa pendência de action resolvida sem atualizar o inventário", () => {
     const inventario = lerInventario();
+    inventario.pendencias.push({
+      tipo: "action",
+      arquivo: ".github/workflows/infra.yml",
+      referencia: "actions/cache@v4",
+      motivo: "teste sintético de pendência resolvida",
+    });
     const pendencia = inventario.pendencias.find((item) => item.referencia === "actions/cache@v4");
     if (!pendencia) throw new Error("Inventário sem a pendência esperada do actions/cache.");
     const arquivos = montarArquivos(inventario);

@@ -104,80 +104,66 @@
     {
       "referencia": "pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115",
       "versao": "v6.1.1"
+    },
+    {
+      "referencia": "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+      "versao": "v4"
+    },
+    {
+      "referencia": "hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd",
+      "versao": "v3"
     }
   ],
-  "pendencias": [
-    {
-      "tipo": "action",
-      "arquivo": ".github/workflows/infra.yml",
-      "referencia": "actions/cache@v4",
-      "motivo": "O workflow pertence ao integrador; a pinagem exige editar o arquivo fora desta lane."
-    },
-    {
-      "tipo": "action",
-      "arquivo": ".github/workflows/infra.yml",
-      "referencia": "hashicorp/setup-terraform@v3",
-      "motivo": "O workflow pertence ao integrador; a pinagem exige editar o arquivo fora desta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": ".github/workflows/servidor.yml",
-      "referencia": "alpine/helm:latest",
-      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": ".github/workflows/servidor.yml",
-      "referencia": "ghcr.io/yannh/kubeconform:latest",
-      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": ".github/workflows/servidor.yml",
-      "referencia": "rhysd/actionlint:latest",
-      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "compose.servidor-caddy.yml",
-      "referencia": "caddy:2.11-alpine",
-      "motivo": "O Compose de servidor não pertence a esta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "infra/servidor/nginx/Dockerfile",
-      "referencia": "FROM nginx:1.30-alpine",
-      "motivo": "O Dockerfile do proxy não pertence a esta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "infra/servidor/validar.sh",
-      "referencia": "alpine/openssl",
-      "motivo": "O script de validação não pertence a esta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "infra/servidor/validar.sh",
-      "referencia": "caddy:2.11-alpine",
-      "motivo": "O script de validação não pertence a esta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "infra/servidor/validar.sh",
-      "referencia": "koalaman/shellcheck:stable",
-      "motivo": "O script de validação não pertence a esta lane."
-    },
-    {
-      "tipo": "imagem",
-      "arquivo": "tests/playwright-container.sh",
-      "referencia": "mcr.microsoft.com/playwright:v1.63.0-noble",
-      "motivo": "A imagem diverge do Playwright 1.64.1 do lock e o script não pertence a esta lane."
-    }
-  ],
+  "pendencias": [],
   "usos": [
     {
       "arquivo": "Dockerfile",
       "trecho": "FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": ".github/workflows/servidor.yml",
+      "trecho": "alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": ".github/workflows/servidor.yml",
+      "trecho": "ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": ".github/workflows/servidor.yml",
+      "trecho": "rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "compose.servidor-caddy.yml",
+      "trecho": "caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "infra/servidor/nginx/Dockerfile",
+      "trecho": "FROM nginx:1.30-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "trecho": "alpine/openssl:latest@sha256:6821afa2476e11be343f29275f2ca24291720ff0a7148bd131fd8e314ff26d9e",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "trecho": "caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "infra/servidor/validar.sh",
+      "trecho": "koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/playwright-container.sh",
+      "trecho": "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
       "estado": "pinado"
     }
   ],
