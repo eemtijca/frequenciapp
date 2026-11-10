@@ -647,11 +647,7 @@ describe("lista da fila", () => {
     // Enviados e descartados saem da lista, mas continuam nas contagens.
     // O dispatcher pode mover o primeiro item para EM_ANDAMENTO durante a leitura;
     // a ordem dos identificadores é o contrato estável desta lista.
-    expect(daSuite.map((item) => item.id)).toEqual([
-      ids.AGUARDANDO,
-      ids.FALHOU,
-      ids.EM_ANDAMENTO,
-    ]);
+    expect(daSuite.map((item) => item.id)).toEqual([ids.AGUARDANDO, ids.FALHOU, ids.EM_ANDAMENTO]);
     expect(estado.itens.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(
       true,
     );
