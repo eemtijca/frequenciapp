@@ -87,3 +87,9 @@ Revogar a palavra-chave, gerar outra ou desativar o diretor remove todas as assi
 ## Validação
 
 Os testes geram chaves e contas sintéticas, sem enviar mensagens a serviços externos. `tests/gerar-ambiente-push.mjs` escreve as variáveis somente no arquivo de ambiente indicado. A suíte de PWA simula a assinatura do navegador para testar adesão e cancelamento. Um evento simulado no worker de produção confere o conteúdo solicitado à API de notificação; a exibição pelo sistema operacional é simulada no Chromium sem interface. A entrega a um celular depende da configuração da instalação e deve ser conferida pela opção de teste no próprio dispositivo.
+
+## Seleção da agenda externa
+
+`AGENDA_NOTIFICACOES=false` desliga somente notificações na agenda agrupada; `AGENDA_PLANILHAS` e `AGENDA_INDICADORES` são independentes. Valores ausentes conservam `true`; valores diferentes de `true` e `false` bloqueiam a execução antes de qualquer chamada. Uma falha em outra rotina não impede a consulta de notificações.
+
+No GitHub Actions, `NOTIFICACOES_APP_URL` define o endereço da instalação e a variável de repositório `AGENDA_NOTIFICACOES` controla o passo correspondente. A agenda do servidor e o CronJob do Helm usam as mesmas variáveis e o mesmo timeout validado de `AGENDA_TIMEOUT`. `AGENDA_EXTERNA=servidor` continua desligando os workflows externos.

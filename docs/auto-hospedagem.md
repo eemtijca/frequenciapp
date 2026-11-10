@@ -248,6 +248,18 @@ O script chama:
 
 Todas as chamadas usam `Authorization: Bearer` com `CRON_SECRET`. O instalador cria a linha a cada cinco minutos.
 
+Cada rotina pode ser desligada de forma independente:
+
+```text
+AGENDA_URL=http://127.0.0.1:3000
+AGENDA_TIMEOUT=300
+AGENDA_NOTIFICACOES=true
+AGENDA_PLANILHAS=true
+AGENDA_INDICADORES=true
+```
+
+Os seletores aceitam apenas `true` ou `false`; ausência conserva `true` e qualquer outro valor encerra antes das chamadas. `AGENDA_TIMEOUT` é um inteiro positivo de até 2147483 segundos, aplicado a cada requisição. Uma falha ou timeout em uma rotina não impede as seguintes, e todas desligadas encerram sem exigir `CRON_SECRET`. O wrapper passa URL, timeout e seletores por `compose exec -e` ao serviço de aplicação configurado. Desligar uma função não remove dados nem itens de fila, e o backup de planilhas tem controle separado.
+
 ## Desativar a automação do GitHub
 
 A instalação auto-hospedada pode desativar os workflows de operação sem removê-los:
@@ -353,7 +365,7 @@ O cron agenda no fuso do daemon. O fuso da aplicação continua em `TZ_APP`.
 
 ## Kubernetes
 
-O chart Helm aceita `agenda.timeZone`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`. O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior. Sem o valor, o agendador usa o fuso do cluster.
+O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`. A agenda tem seletores próprios para notificações, planilhas e indicadores. O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior. Sem o valor, o agendador usa o fuso do cluster. O backup do banco exige PVC ou destino remoto explícito, e o gate de upgrade continua exigindo o recibo no PVC; o detalhamento está em [kubernetes.md](kubernetes.md).
 
 ## Monitoramento
 
@@ -420,18 +432,6 @@ O chart Helm aceita `agenda.timeZone`, `backup.database.timeZone` e `backup.spre
 - Imagem alvo indisponível no registro.
 - Espaço insuficiente para build.
 
-## Referências
-
-- [ADR-064](adr/064-auto-hospedagem-servidor.md)
-- [Backup do servidor](backup-servidor.md)
-- [Operação](operacao.md)
-- [Ambiente](ambiente.md)
-- [Segurança](seguranca.md)
-- [Caddy: HTTPS automático](https://caddyserver.com/docs/automatic-https)
-- [Caddy: opções globais](https://caddyserver.com/docs/caddyfile/options)
-- [Nginx: imagem oficial](https://hub.docker.com/_/nginx)
-- [Certbot: imagem oficial](https://hub.docker.com/r/certbot/certbot)
-
 ## Identidade operacional
 
 As rotinas exigem Node.js e `jq` no host. O `COMPOSE_PROJECT_NAME` é obrigatório e deve ser definido em `/etc/frequenciapp/ops.env`; sem ele, as rotinas recusam a operação. A identidade reúne o ID do daemon, o projeto, os serviços `app` e `db`, os labels do Compose e as montagens persistentes do banco.
@@ -455,3 +455,16 @@ O arquivo `SERVIDOR_IDENTIDADE_ARQUIVO`, padrão `/etc/frequenciapp/identidade.j
 A trava deriva da chave da identidade. Operações do mesmo projeto são serializadas, inclusive backup, restauração, atualização, agenda e cron. Projetos independentes usam arquivos de trava diferentes e progridem em paralelo. No modo URL, sem identidade de projeto verificável, backup e restauração usam uma trava conservadora compartilhada entre operações de URL. `SERVIDOR_LOCK_DIR` deve pertencer ao operador e ter modo 0700. O descritor 9 pode ser herdado por um processo filho legítimo, e a revalidação confere se ele aponta para a trava do mesmo projeto. A trava é local ao host, não distribuída.
 
 A atualização só aceita backup remoto confirmado quando `verificadoRemoto` é o booleano `true`. `false`, campo ausente, texto, nulo ou JSON truncado bloqueiam a atualização.
+
+## Referências
+
+- [ADR-064](adr/064-auto-hospedagem-servidor.md)
+- [ADR-071](adr/071-agendas-independentes-e-timeout.md)
+- [Backup do servidor](backup-servidor.md)
+- [Operação](operacao.md)
+- [Ambiente](ambiente.md)
+- [Segurança](seguranca.md)
+- [Caddy: HTTPS automático](https://caddyserver.com/docs/automatic-https)
+- [Caddy: opções globais](https://caddyserver.com/docs/caddyfile/options)
+- [Nginx: imagem oficial](https://hub.docker.com/_/nginx)
+- [Certbot: imagem oficial](https://hub.docker.com/r/certbot/certbot)

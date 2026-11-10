@@ -102,9 +102,16 @@ O CronJob chama notificações, fila e indicadores a cada cinco minutos. A URL i
 ```yaml
 agenda:
   enabled: true
+  notifications: true
+  spreadsheets: true
+  indicators: true
   schedule: "*/5 * * * *"
   timeZone: "America/Fortaleza"
+  timeoutSeconds: 300
+  appUrl: ""
 ```
+
+Cada função é uma chamada independente: desligar uma não impede as demais e uma falha não interrompe as seguintes. `timeoutSeconds` vale para cada requisição e aceita inteiros de 1 a 2147483. A URL interna padrão é `http://<release>:3000` e pode ser trocada por `appUrl`. Manter apenas uma agenda de indicadores entre servidor, Kubernetes e Actions, porque execuções concorrentes repetem trabalho.
 
 O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior e é sempre renderizado com `America/Fortaleza` por padrão. Os mesmos valores existem em `backup.database.timeZone` e `backup.spreadsheets.timeZone` e podem ser sobrescritos.
 
@@ -113,6 +120,8 @@ O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior e é sempre re
 O backup é opcional na instalação, mas o gate de upgrade exige um backup do banco confirmado. O chart cria CronJobs separados para banco e planilhas quando `backup.enabled=true`. `backup.retentionMinimum` preserva as cópias confirmadas e `backup.remoteRetention` habilita a limpeza remota opcional.
 
 Cada rotina tem o próprio PVC `ReadWriteOnce`: `-backup-banco` para o dump e o recibo, `-backup-planilhas` para os arquivos confirmados. O estado do banco fica em `/backups/estado/ultimo-backup.json`; o backup das planilhas fica em `/backups/planilhas`. O PVC do banco é obrigatório para o gate de upgrade. Sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado. Os PVCs usam `helm.sh/resource-policy: keep` e não são removidos pelo `helm uninstall`.
+
+O backup do banco exige PVC ou `backup.database.remote.enabled=true`. Com `backup.database.local=true`, o PVC é obrigatório. No modo somente remoto, definir `local=false` e `persistence.enabled=false`; o chart injeta `BACKUP_EXIGIR_REMOTO=true` e a rotina recusa remoto vazio ou verificação desligada. Como o recibo fica no PVC, uma instalação somente remota não passa no gate de upgrade sem `backupGate.ensaioSemProtecao=true`.
 
 A instalação anterior que usava o PVC único `-backup` recebe dois volumes novos no upgrade. O conteúdo antigo não é migrado. Fazer um backup novo depois do upgrade e antes do próximo upgrade com o gate.
 
@@ -147,7 +156,7 @@ O ensaio reproduzível roda em contêiner, sem cluster:
 bash tests/kubernetes/validar.sh
 ```
 
-O script executa `helm lint`, `helm template`, `kubeconform -strict`, testa a recusa do gate sem backup, o modo de ensaio, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente e o `timeZone`.
+O script executa `helm lint`, `helm template`, `kubeconform -strict`, testa a recusa do gate sem backup, o modo de ensaio, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente, o `timeZone`, a recusa de backup sem PVC e sem remoto, o modo somente remoto e as oito combinações da agenda.
 
 Validação manual:
 
