@@ -24,8 +24,8 @@ dump=$(ultimo_arquivo_backup)
 quantidade_dumps=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name 'frequenciapp-*.dump.gpg' | wc -l)
 [ "$quantidade_dumps" -eq 6 ] ||
   falhar "a retenção preservou as cinco cópias sem recibo e a nova cópia confirmada (encontradas $quantidade_dumps)."
-grep -q '"retencaoMinima":5' "$ESTADO_DIR/ultimo-backup.json" ||
-  falhar "o estado não registrou a retenção mínima."
+grep -q '"recibo":"frequenciapp-[0-9TZ-]*-[a-f0-9]*\.confirmado\.json"' "$ESTADO_DIR/ultimo-backup.json" ||
+  falhar "o estado não apontou para o recibo confirmado."
 if find "$BACKUP_BANCO_DIR" -maxdepth 1 -name '*.dump' -print -quit | grep -q .; then
   falhar "há dump em texto claro no diretório de backup."
 fi
