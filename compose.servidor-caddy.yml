@@ -2,7 +2,7 @@
 
 services:
   caddy:
-    image: caddy:2.11-alpine
+    image: caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
     restart: unless-stopped
     depends_on:
       app:
