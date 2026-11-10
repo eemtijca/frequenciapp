@@ -316,6 +316,26 @@ status=$(executar_atualizacao --simular)
 [ ! -s "$BACKUP_CHAMADAS" ] || falhar "a simulação executou backup."
 ! grep -q 'build ' "$DOCKER_LOG" || falhar "a simulação executou build."
 
+# A simulação também não busca nem altera refs e tags remotas.
+preparar_instalacao
+git -C "$REPO" checkout -q -b avanco-remoto "$COMMIT_ALVO"
+printf 'terceira versao\n' >"$REPO/README.md"
+git -C "$REPO" add README.md
+git -C "$REPO" commit -qm "terceira versao"
+git -C "$REPO" push -q origin avanco-remoto:main
+git -C "$REPO" tag v9.9.9
+git -C "$REPO" push -q origin v9.9.9
+git -C "$REPO" checkout -q main
+git -C "$REPO" branch -D avanco-remoto >/dev/null
+git -C "$REPO" tag -d v9.9.9 >/dev/null
+antes_refs=$(git -C "$REPO" for-each-ref --format='%(refname) %(objectname)')
+status=$(executar_atualizacao --simular)
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a simulação com remoto à frente falhou."; }
+depois_refs=$(git -C "$REPO" for-each-ref --format='%(refname) %(objectname)')
+[ "$antes_refs" = "$depois_refs" ] || falhar "a simulação alterou refs ou tags."
+grep -q 'sem buscar referências' "$TMP_RAIZ/saida.log" ||
+  falhar "a simulação não avisou que usa as refs locais."
+
 # Árvore suja é recusada antes de qualquer alteração.
 preparar_instalacao
 printf 'sujo\n' >"$REPO/nao-rastreado.txt"

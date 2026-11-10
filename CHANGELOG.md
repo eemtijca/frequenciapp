@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
+
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
 
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
