@@ -1,5 +1,4 @@
-# PostgreSQL Flexible Server. O dono do schema é a própria conexão de runtime,
-# sem papel separado: DATABASE_URL e DIRECT_URL usam o mesmo administrador.
+# PostgreSQL Flexible Server com bootstrap administrativo separado dos papéis da aplicação.
 
 ephemeral "random_password" "banco" {
   length  = 32

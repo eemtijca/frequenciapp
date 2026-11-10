@@ -16,6 +16,13 @@ resource "google_cloud_run_v2_service" "api" {
   ingress             = "INGRESS_TRAFFIC_ALL"
   deletion_protection = var.modo_local ? false : true
 
+  lifecycle {
+    precondition {
+      condition     = local.migracao_confirmada
+      error_message = "Executar o job da revisão e atestar privilégios antes de promover o Cloud Run."
+    }
+  }
+
   template {
     service_account = google_service_account.api.email
 
@@ -56,6 +63,18 @@ resource "google_cloud_run_v2_service" "api" {
       }
 
       env {
+        name  = "MIGRAR_NA_PARTIDA"
+        value = "false"
+      }
+      env {
+        name  = "DATABASE_SCHEMA"
+        value = local.schema_aplicacao_efetiva
+      }
+      env {
+        name  = "COMMIT_SHA"
+        value = var.revisao_aplicacao
+      }
+      env {
         name  = "NODE_ENV"
         value = "production"
       }
@@ -84,7 +103,7 @@ resource "google_cloud_run_v2_service" "api" {
       # mesmos nomes apontam para versões do Secret Manager.
       env {
         name  = "DATABASE_URL"
-        value = var.modo_local ? local.url_banco_local : null
+        value = var.modo_local ? local.url_runtime_efetiva : null
 
         dynamic "value_source" {
           for_each = var.modo_local ? [] : [1]
@@ -92,22 +111,6 @@ resource "google_cloud_run_v2_service" "api" {
           content {
             secret_key_ref {
               secret  = google_secret_manager_secret.database_url.id
-              version = "latest"
-            }
-          }
-        }
-      }
-
-      env {
-        name  = "DIRECT_URL"
-        value = var.modo_local ? local.url_banco_local : null
-
-        dynamic "value_source" {
-          for_each = var.modo_local ? [] : [1]
-
-          content {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.direct_url.id
               version = "latest"
             }
           }
@@ -152,7 +155,6 @@ resource "google_cloud_run_v2_service" "api" {
 resource "google_secret_manager_secret_iam_member" "api" {
   for_each = var.modo_local ? toset([]) : toset([
     google_secret_manager_secret.database_url.secret_id,
-    google_secret_manager_secret.direct_url.secret_id,
     google_secret_manager_secret.auth_secret.secret_id,
     google_secret_manager_secret.cron.secret_id,
   ])

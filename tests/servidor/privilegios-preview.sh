@@ -226,12 +226,14 @@ docker run -d --name "$BANCO" \
   postgres:17-alpine >/dev/null
 
 for _tentativa in $(seq 1 120); do
-  if docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+  # O servidor temporário da inicialização escuta apenas o socket local; exigir
+  # TCP evita considerá-lo pronto antes da troca para o servidor definitivo.
+  if docker exec "$BANCO" pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-if ! docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+if ! docker exec "$BANCO" pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
   docker inspect -f 'status={{.State.Status}} exit={{.State.ExitCode}}' "$BANCO" >&2 || true
   docker logs "$BANCO" >&2 || true
   falhar "o PostgreSQL descartável não ficou pronto."

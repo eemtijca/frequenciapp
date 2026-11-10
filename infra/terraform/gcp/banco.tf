@@ -1,7 +1,7 @@
 # PostgreSQL gerenciado. Em produção a senha é efêmera e gravada apenas no
 # Secret Manager, e a instância fica na rede privada com backup e PITR; no modo
 # local valem a senha de desenvolvimento, o IP público e a proteção desligada.
-# O dono do schema é a própria conexão de runtime, sem papel separado.
+# A conta de bootstrap não é entregue ao runtime; papéis de aplicação são provisionados separadamente.
 
 resource "google_sql_database_instance" "banco" {
   name             = "${local.nome_base}-banco"
@@ -48,9 +48,8 @@ resource "google_sql_database" "frequencia" {
 }
 
 resource "google_sql_user" "admin" {
-  # O papel administrativo do Cloud SQL é o postgres, que atende o runtime e as
-  # migrações; a API não exclui esse papel, então a exclusão o abandona e ele
-  # desaparece junto com a instância.
+  # Bootstrap administrativo, nunca distribuído aos containers da aplicação.
+  # A API preserva esse papel até a exclusão da instância.
   name     = "postgres"
   project  = local.projeto
   instance = google_sql_database_instance.banco.name

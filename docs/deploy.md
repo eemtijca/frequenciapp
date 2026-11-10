@@ -99,7 +99,7 @@ Com `pg` 8.16 ou superior, `sslmode=require` passou a verificar o certificado e 
 
 ## Vercel
 
-A Vercel usa a integração nativa de Git para publicar a `main`. O arquivo `vercel.json` define:
+A integração nativa de Git da Vercel é um ator externo cuja configuração real precisa de confirmação e coordenação antes de habilitar a orquestração. O arquivo `vercel.json` define:
 
 - framework `nextjs`;
 - `pnpm install --frozen-lockfile` como instalação;
@@ -123,15 +123,11 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 
 ### Ordem de publicação
 
-1. provisionar o projeto Supabase e a role do aplicativo;
-2. configurar `DATABASE_URL` e `DIRECT_URL` na Vercel;
-3. configurar `DIRECT_URL_PROD` como segredo do GitHub;
-4. aplicar as migrações pelo workflow `migracoes.yml`;
-5. confirmar `pnpm exec prisma migrate status` com a conexão de sessão;
-6. publicar a `main` na Vercel;
-7. verificar login, frequência, histórico e `/api/saude`.
+`implantacao.yml` é o proprietário único de validar/buildar, migrar, publicar sem domínio, promover e verificar saúde por SHA. `migracoes.yml` delega essa sequência. A `main` é aceita antes da primeira release estável; tags estáveis são obrigatórias depois. `DIRECT_URL_PROD` é entregue somente ao processo migrador pelo adaptador. A CLI Vercel vem do lock, sem `dlx` ou `latest`. Com `DEPLOY_TARGET` diferente de vazio ou `vercel`, a sequência de produção é ignorada e o servidor próprio segue o guia de auto-hospedagem.
 
-O build da Vercel não executa migrations. O workflow de CD usa `DIRECT_URL_PROD`, que deve conter a Session pooler.
+`publicacao.yml` valida versão, tag e commit antes do login no GHCR, lê o inventário de releases e mantém `latest` monotônico. Uma imagem antiga republicada mantém a própria versão e `sha-<SHA>`, sem mover o canal estável para trás. O comando manual precisa ser executado na tag `vX.Y.Z`; a branch de mesmo nome é recusada.
+
+O gate `IMPLANTACAO_ATESTADO` vincula a revisão ao backup, recuperação, migrações expansivas e coordenação do auto-deploy nativo. Não preencher por conveniência. As proteções reais do GitHub e da Vercel precisam de confirmação do mantenedor. Falha posterior à entrada em migração pode deixar schema aplicado; não é rollback de banco. Detalhes em [releases.md](releases.md).
 
 ### Preview e manutenção
 
@@ -154,7 +150,7 @@ Os workflows ficam em `.github/workflows/`:
 | `qualidade.yml`      | Formatação, lint, tipos e testes unitários                           |
 | `build.yml`          | Build de produção do Next.js                                         |
 | `testes.yml`         | Compose, migração, contas de teste e contratos de API                |
-| `migracoes.yml`      | `prisma migrate deploy` na `main` e no ambiente `production`         |
+| `migracoes.yml`      | Delegação manual para a sequência completa em `implantacao.yml`      |
 | `schema-preview.yml` | Validação sem segredos; manutenção privilegiada em workflow separado |
 | `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                      |
 | `publicacao.yml`     | Publicação da imagem no GHCR                                         |
