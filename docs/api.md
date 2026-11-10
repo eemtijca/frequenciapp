@@ -494,9 +494,9 @@ Ao criar a partir da base, `baseChamada` confere a revisão, a participação do
 
 `JUSTIFICADA` exige código do mesmo catálogo da Chamada, sem turno nem aulas. Aceita data futura até 366 dias à frente e observação de até 200 caracteres, guardada somente para Outros. `ate` cria um intervalo inclusivo de até 31 dias civis; domingos e feriados cadastrados são pulados, e a resposta traz os dias efetivamente gravados. O intervalo exige aluno ativo na mesma turma, sem desistência nas datas e sem personalizações sobrepostas; conflito em qualquer dia recusa o lote inteiro. Correções de registros existentes continuam individuais e com revisão.
 
-Sem Chamada salva, a justificativa não cria frequência nem presume presenças. No dia correspondente, aparece na primeira Chamada como FJ em todas as aulas. Havendo chamada salva, corrige somente esse aluno, preserva lista, aulas e colegas, incrementa a revisão e invalida apenas sua confirmação na SEDUC. A fila existente de frequência é acionada quando ligada; falha após a gravação retorna `aviso`, sem transformar um salvamento confirmado em erro. Remover a personalização ou convertê-la em presença não apaga FJ já aplicada: a correção do histórico é feita na Chamada.
+Sem Chamada salva, a justificativa não cria frequência nem presume presenças. No dia correspondente, aparece na primeira Chamada como FJ em todas as aulas. Havendo chamada salva, corrige somente esse aluno, preserva lista, aulas e colegas, incrementa a revisão e invalida apenas sua confirmação na SEDUC. A intenção de envio entra no mesmo commit da correção; a agenda apenas acelera o envio e uma falha posterior não desfaz o registro. Remover a personalização ou convertê-la em presença não apaga FJ já aplicada: a correção do histórico é feita na Chamada.
 
-- 200 `{ "registro": FrequenciaParcial, "registros": FrequenciaParcial[], "aviso"?: string }` no POST; `registro` é o primeiro dia, preservado para compatibilidade.
+- 200 `{ "registro": FrequenciaParcial, "registros": FrequenciaParcial[] }` no POST; `registro` é o primeiro dia, preservado para compatibilidade.
 - Para criar, a revisão pode ser omitida ou zero. Para corrigir um registro já existente por aluno e dia, é obrigatória a revisão vigente.
 - Correção efetiva incrementa revisão e limpa a confirmação da Seduc. Repetir o mesmo conteúdo não altera a confirmação nem a revisão. Nome e turma históricos continuam preservados.
 - 400 conteúdo inválido, presença futura, período maior que 31 dias, data além do limite de agendamento ou domingo isolado ("Domingo não tem aula nem chamada."); 404 aluno inexistente; 409 revisão obsoleta, base alterada ou aluno fora da lista salva, transferência concorrente ou aluno desativado/desistente em registro novo sem base.
@@ -928,17 +928,42 @@ Apaga a autorização OAuth e o esquema e desliga a integração de saídas. Ape
 
 ## Fila de envios automáticos às planilhas
 
-Fila FIFO durável dos envios automáticos de frequência, saídas e entradas ([ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md)). Os registros enfileiram sozinhos; as rotas abaixo servem à Gestão e à agenda. Nenhuma devolve nome de aluno.
+Fila FIFO durável dos envios automáticos de frequência, saídas e entradas ([ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md) e [ADR-069](adr/069-outbox-escolar-e-conferencia-da-fila.md)). O salvamento escolar grava uma intenção mínima na mesma transação do registro. Um dispatcher separado transforma a intenção em item da fila e confirma o recibo; a agenda e o botão Processar agora retomam o que ficou pendente. As rotas abaixo servem à Gestão e à agenda e nunca devolvem nome de aluno.
 
-| Método e rota                               | Quem                   | O que faz                                                                          |
-| ------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
-| `GET /api/planilha/fila`                    | Administração          | Contagens por estado e até 50 itens não enviados, na ordem de processamento.       |
-| `POST /api/planilha/fila/processar`         | Administração          | Processa até 20 itens agora e devolve o resumo.                                    |
-| `POST /api/planilha/fila/{id}/descartar`    | Administração          | Descarta um item que aguarda a vez; outro estado responde 409.                     |
-| `POST /api/planilha/fila/{id}/reenfileirar` | Administração          | Devolve ao fim da fila um item com falha ou descartado; outro estado responde 409. |
-| `GET /api/planilha/fila/agenda`             | `CRON_SECRET` (Bearer) | Processa até 50 itens; cookie, mesmo de administrador, não autoriza (403).         |
+| Método e rota                               | Quem                   | O que faz                                                                                                                          |
+| ------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/planilha/fila`                    | Administração          | Contagens, conferências pendentes e até 50 itens abertos, com falha ou com conferência, na ordem de processamento.                 |
+| `POST /api/planilha/fila/processar`         | Administração          | Despacha intenções pendentes, processa até 20 itens agora e devolve o resumo.                                                      |
+| `POST /api/planilha/fila/{id}/descartar`    | Administração          | Descarta um item que aguarda a vez; outro estado responde 409.                                                                     |
+| `POST /api/planilha/fila/{id}/reenfileirar` | Administração          | Devolve ao fim da fila um item com falha ou descartado, ou uma pendência segura sem escrita incerta; escrita incerta responde 409. |
+| `POST /api/planilha/fila/{id}/resolver`     | Administração          | Registra a conferência de uma pendência sem reenviar dados; exige evidência do mesmo escopo ou confirmação explícita.              |
+| `GET /api/planilha/fila/agenda`             | `CRON_SECRET` (Bearer) | Despacha intenções e processa até 50 itens; cookie, mesmo de administrador, não autoriza (403).                                    |
 
-O resumo do processamento traz `processados`, `concluidos`, `falhas`, `abertos` e `aguardandoAte` (próximo instante em que a fila volta a andar, quando há espera ou reserva). Descartar e reenfileirar entram na auditoria. Identificador que não é UUID responde 400, e item inexistente, 404.
+`GET /api/planilha/fila` devolve `contagens`, `conferenciasPendentes` e `itens`. Cada item traz `classe`, `requerConferencia`, `podeReprocessar`, `podeResolver`, `falhaPreparo`, `escopos` com origem e destino, além dos campos de identificação, dia, turma, tentativas, resultado, erro e próxima tentativa.
+
+A classe separa os desfechos:
+
+- `sucesso`: `enviado`, `desligado` ou `sem_trabalho`. Nada a fazer.
+- `preparo`: `falha_preparo`, quando a preparação falhou antes de qualquer escrita. A fila agenda nova tentativa automática.
+- `origem_nao_processada`: `nao_processado` ou pendência segura como `sem_mapa`, `pendente_manual` e `sem_autor`. A repetição é segura depois de corrigir o motivo.
+- `conferencia`: `sem_confirmacao`. Houve escrita possível sem confirmação; a fila não repete o envio sozinha.
+- `falha`: `falhou` ou `limite`, com nova tentativa automática até o limite.
+
+O resumo do processamento traz `processados`, `concluidos`, `falhas`, `abertos` e `aguardandoAte` (próximo instante em que a fila volta a andar, quando há espera ou reserva). Descartar, reenfileirar e resolver entram na auditoria. Identificador que não é UUID responde 400, e item inexistente, 404.
+
+### Resolução de conferência
+
+`POST /api/planilha/fila/{id}/resolver` encerra uma pendência de `sem_confirmacao` sem reenviar dados. Quando o item guarda o instante da tentativa e o destino exato, a rota exige um registro `SUCESSO` posterior no mesmo destino, turma e período, sem células ocupadas ou fórmulas puladas. Uma conferência em outro destino ou período responde 409 e preserva a pendência.
+
+Recorte antigo, incompleto ou com destino desconhecido não permite provar o escopo. Nesse caso, o corpo `{ "confirmado": true }` registra a conferência explícita da pessoa administradora na auditoria. A confirmação não substitui a evidência de um destino conhecido. Item sem escrita incerta responde 409 e deve ser tratado por `reenfileirar`.
+
+### Reprocessamento seguro
+
+`POST /api/planilha/fila/{id}/reenfileirar` aceita item com falha, descartado ou pendência segura com `sem_mapa`, `pendente_manual`, `nao_processado`, `falha_preparo` ou `sem_autor`. A ação cria um item novo no fim da fila, com tentativas zeradas, e marca a pendência anterior como resolvida quando ela já estava concluída. Item com `sem_confirmacao` responde 409 até a conferência pela rota de resolução.
+
+### Agenda e retenção
+
+`GET /api/planilha/fila/agenda` usa o mesmo segredo das notificações e processa até 50 itens. Itens concluídos sem pendência são apagados depois de sete dias; falhos e descartados, depois de trinta. Pendências de conferência não entram no expurgo comum até serem resolvidas.
 
 ## Planilha de chamada parcial
 

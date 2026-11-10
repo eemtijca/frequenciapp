@@ -8107,7 +8107,7 @@
       "get": {
         "operationId": "obterFila",
         "summary": "Consultar a fila de envios automáticos",
-        "description": "Apenas administração. Contagens por estado e até 50 itens ainda não enviados (aguardando, em andamento e com falha), na ordem de processamento, sem nome de aluno. Concluídos e descartados entram só nas contagens.",
+        "description": "Apenas administração. Contagens por estado, total de conferências pendentes e até 50 itens ainda não enviados, com falha ou com conferência, na ordem de processamento, sem nome de aluno. Cada item informa a classe (aberto, sucesso, preparo, origem não processada, conferência ou falha), o que pode ser reprocessado e o que exige conferência. Concluídos e descartados sem pendência entram só nas contagens.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -8128,6 +8128,7 @@
                         "FALHOU": 1,
                         "DESCARTADO": 0
                       },
+                      "conferenciasPendentes": 1,
                       "itens": []
                     }
                   }
@@ -8151,7 +8152,7 @@
       "post": {
         "operationId": "processarFila",
         "summary": "Processar a fila de envios agora",
-        "description": "Apenas administração e origem confiável. Processa até 20 itens e devolve o resumo, com aguardandoAte quando há espera.",
+        "description": "Apenas administração e origem confiável. Despacha as intenções escolares ainda pendentes, processa até 20 itens e devolve o resumo, com aguardandoAte quando há espera.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -8251,7 +8252,7 @@
       "post": {
         "operationId": "reenfileirarFila",
         "summary": "Reenfileirar um item da fila",
-        "description": "Apenas administração e origem confiável. Devolve ao fim da fila um item com falha ou descartado; outro estado responde 409.",
+        "description": "Apenas administração e origem confiável. Devolve ao fim da fila um item com falha ou descartado, ou uma pendência segura sem mapa, pendente de conferência manual, com falha de preparo ou sem autor. Escrita incerta com sem_confirmacao responde 409 e exige a rota de resolução antes de qualquer novo envio.",
         "tags": ["planilhas"],
         "parameters": [
           {
@@ -8269,6 +8270,83 @@
         "responses": {
           "200": {
             "description": "Item reenfileirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "ok": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/planilha/fila/{id}/resolver": {
+      "post": {
+        "operationId": "resolverFila",
+        "summary": "Resolver a conferência de um item da fila",
+        "description": "Apenas administração e origem confiável. Encerra uma pendência de conferência sem reenviar dados. Com escopo completo e destino conhecido, exige um sucesso posterior no mesmo destino, turma e período, sem células ocupadas ou fórmulas puladas. Recorte antigo, incompleto ou sem destino exige confirmado verdadeiro, registrado na auditoria. Pendência sem escrita incerta responde 409 e deve ser tentada novamente.",
+        "tags": ["planilhas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Identificador do item.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "9d2f5b1a-3f70-4c8e-9c1d-2a6e7b4c5d30"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FilaResolucao"
+              },
+              "examples": {
+                "Confirmação manual": {
+                  "summary": "Confirmação manual",
+                  "value": {
+                    "confirmado": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conferência registrada.",
             "content": {
               "application/json": {
                 "schema": {
@@ -16748,12 +16826,25 @@
       "FilaItem": {
         "type": "object",
         "title": "Item da fila",
-        "description": "Envio automático aguardando, em andamento ou encerrado.",
+        "description": "Envio automático aguardando, em andamento, encerrado ou com conferência pendente.",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
             "example": "9d2f5b1a-3f70-4c8e-9c1d-2a6e7b4c5d30"
+          },
+          "classe": {
+            "type": "string",
+            "enum": [
+              "aberto",
+              "sucesso",
+              "preparo",
+              "origem_nao_processada",
+              "conferencia",
+              "falha"
+            ],
+            "description": "Separa o item aberto, o sucesso, a falha de preparo, a origem não processada, a conferência de escrita incerta e a falha confirmada.",
+            "example": "conferencia"
           },
           "tipo": {
             "type": "string",
@@ -16763,7 +16854,7 @@
           "estado": {
             "type": "string",
             "enum": ["AGUARDANDO", "EM_ANDAMENTO", "CONCLUIDO", "FALHOU", "DESCARTADO"],
-            "example": "AGUARDANDO"
+            "example": "CONCLUIDO"
           },
           "dia": {
             "type": "string",
@@ -16794,7 +16885,82 @@
                 "type": "null"
               }
             ],
+            "description": "Resultado do envio. enviado, desligado e sem_trabalho são sucesso; falha_preparo e nao_processado são repetíveis; sem_mapa, pendente_manual e sem_autor pedem ação; sem_confirmacao exige conferência.",
+            "example": "sem_confirmacao"
+          },
+          "requerConferencia": {
+            "type": "boolean",
+            "description": "Indica atenção do operador. Escrita incerta exige a rota de resolução; pendência segura pode ser tentada novamente.",
+            "example": true
+          },
+          "podeReprocessar": {
+            "type": "boolean",
+            "description": "A repetição é segura e não duplica escrita incerta.",
+            "example": false
+          },
+          "podeResolver": {
+            "type": "boolean",
+            "description": "A rota de resolução pode encerrar a pendência com evidência ou confirmação explícita.",
+            "example": true
+          },
+          "falhaPreparo": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Código técnico curto da falha de preparo, sem dados de aluno.",
             "example": null
+          },
+          "escopos": {
+            "type": "array",
+            "description": "Origens e destinos alcançados pela tentativa, sem nomes de aluno nem conteúdo da planilha.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "origemId": {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "origemRotulo": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "destino": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "example": [
+              {
+                "origemId": "3c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+                "origemRotulo": "1º ano A",
+                "destino": "aba:1º A · Outubro"
+              }
+            ]
           },
           "erro": {
             "oneOf": [
@@ -16826,11 +16992,30 @@
           }
         }
       },
+      "FilaResolucao": {
+        "type": "object",
+        "title": "Resolução da fila",
+        "description": "Confirmação explícita usada quando o recorte antigo ou incompleto não permite provar o destino e o período. A evidência de sucesso no mesmo escopo continua obrigatória quando disponível.",
+        "properties": {
+          "confirmado": {
+            "type": "boolean",
+            "const": true,
+            "description": "Confirma que o operador conferiu a planilha. Fica registrada na auditoria.",
+            "example": true
+          }
+        },
+        "additionalProperties": false
+      },
       "FilaEstado": {
         "type": "object",
         "title": "Estado da fila",
-        "description": "Contagens por estado e até 50 itens ainda não enviados, na ordem de processamento, sem nome de aluno.",
+        "description": "Contagens por estado, conferências pendentes e até 50 itens abertos, com falha ou com conferência, na ordem de processamento, sem nome de aluno.",
         "properties": {
+          "conferenciasPendentes": {
+            "type": "integer",
+            "description": "Total de itens com conferência pendente, sem o limite da lista.",
+            "example": 1
+          },
           "contagens": {
             "type": "object",
             "properties": {
@@ -18253,11 +18438,6 @@
               "$ref": "#/components/schemas/FrequenciaParcial"
             },
             "description": "Todos os dias salvos no POST por período, em ordem. registro preserva o primeiro para compatibilidade."
-          },
-          "aviso": {
-            "type": "string",
-            "description": "Justificativa já salva; falha posterior ao preparar a fila exige conferir o envio, sem repetir o registro.",
-            "example": "Justificativa salva. Confira o envio automático em Gestão e reenvie pela prévia se necessário."
           }
         }
       },
