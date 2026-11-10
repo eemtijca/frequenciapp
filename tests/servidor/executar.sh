@@ -9,6 +9,7 @@ bash "$DIR/concorrencia.sh"
 bash "$DIR/locks-operador.sh"
 bash "$DIR/atualizacao.sh"
 bash "$DIR/backup-restauracao.sh"
+bash "$DIR/nginx-acme.sh"
 bash "$DIR/restauracao-url.sh"
 bash "$DIR/atualizacao-integracao.sh"
 
