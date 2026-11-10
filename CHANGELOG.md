@@ -406,6 +406,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Segurança
 
+- O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
+
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.
 
 - Redefinir a senha de uma conta pela Gestão encerra todas as sessões e assinaturas de aviso dela, como já fazia a desativação, que passa a remover também as assinaturas. Antes, um acesso comprometido continuava valendo por até 30 dias depois da redefinição.
