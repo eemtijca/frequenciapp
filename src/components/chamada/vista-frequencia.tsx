@@ -206,6 +206,7 @@ export default function VistaFrequencia({
   const justificativasAntecipadasRef = useRef<RevisaoJustificativaAntecipada[]>([]);
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
+  const falhaRascunho = useRef("");
   const semMovimento = useReducedMotion() ?? false;
 
   const atualizarTela = useCallback(() => {
@@ -323,8 +324,16 @@ export default function VistaFrequencia({
         try {
           const bruto = sessionStorage.getItem(chaveRascunho(usuario.id, dia, turmaId));
           if (bruto) {
-            const rascunho = JSON.parse(bruto) as Rascunho;
-            if (rascunho.versao !== 3) {
+            let rascunho: Rascunho;
+            try {
+              rascunho = JSON.parse(bruto) as Rascunho;
+            } catch {
+              // Apenas conteúdo comprovadamente inválido pode ser descartado.
+              sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+              toast.error("O rascunho local estava ilegível e não foi recuperado.");
+              return;
+            }
+            if (!rascunho || rascunho.versao !== 3 || !Array.isArray(rascunho.faltas)) {
               sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
             } else {
               setAusencias(paraAusencias(rascunho.faltas));
@@ -356,7 +365,9 @@ export default function VistaFrequencia({
             }
           }
         } catch {
-          sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+          toast.error(
+            "Não foi possível ler ou remover o rascunho local. A chamada continua disponível; a cópia anterior não foi descartada automaticamente.",
+          );
         }
       })
       .catch((excecao: unknown) => {
@@ -403,8 +414,15 @@ export default function VistaFrequencia({
         ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
       };
       sessionStorage.setItem(chaveRascunho(usuario.id, dia, turmaId), JSON.stringify(rascunho));
+      falhaRascunho.current = "";
     } catch {
-      sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+      const chave = chaveRascunho(usuario.id, dia, turmaId);
+      if (falhaRascunho.current !== chave) {
+        falhaRascunho.current = chave;
+        toast.error(
+          "As alterações mais recentes estão apenas nesta aba. Não foi possível atualizar o rascunho local; uma cópia anterior pode continuar disponível.",
+        );
+      }
     }
   }, [
     sujo,
@@ -759,7 +777,9 @@ export default function VistaFrequencia({
       try {
         sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
       } catch {
-        // rascunho já removido
+        toast.error(
+          "A frequência foi salva, mas não foi possível remover o rascunho deste navegador.",
+        );
       }
       const total = dados.frequencia.faltas.length;
       const justificadas = dados.frequencia.faltas.filter((falta) => falta.justificativa).length;
@@ -805,7 +825,8 @@ export default function VistaFrequencia({
     try {
       sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
     } catch {
-      // rascunho já removido
+      toast.error("Não foi possível remover o rascunho local. Ele pode reaparecer ao recarregar.");
+      return;
     }
     setRecarregar((valor) => valor + 1);
     toast("Rascunho descartado.", {
