@@ -1,4 +1,4 @@
-// Valida o retrato mínimo da saída, incluindo identidade, ordem e intervalos coerentes.
+// Valida o retrato mínimo da saída, incluindo identidade e horários válidos.
 import { z } from "zod";
 import { ehHoraValida } from "@/domain/frequencia";
 export const esquemaAulasReferencia = z
@@ -18,16 +18,13 @@ export const esquemaAulasReferencia = z
       .max(99),
   })
   .strict()
-  .refine(({ aulas }) => {
-    const ordenadas = [...aulas].sort((a, b) => a.ordem - b.ordem);
-    return (
+  .refine(
+    ({ aulas }) =>
       new Set(aulas.map((a) => a.id)).size === aulas.length &&
       new Set(aulas.map((a) => a.ordem)).size === aulas.length &&
-      ordenadas.every(
-        (a, i) => a.inicio < a.fim && (i === 0 || (ordenadas[i - 1]?.fim ?? "99:99") <= a.inicio),
-      )
-    );
-  }, "Aulas de referência incoerentes.");
+      aulas.every((a) => a.inicio < a.fim),
+    "Aulas de referência incoerentes.",
+  );
 export const camposReferenciaSaida = {
   turmaHistoricaId: z.uuid().nullish(),
   turmaHistoricaNome: z.string().trim().min(1).max(200).nullish(),

@@ -1,4 +1,4 @@
-// O JSON histórico exige versão, identidade e intervalos coerentes, sem aceitar inferências.
+// O JSON histórico exige versão, identidade e horários válidos, sem aceitar inferências.
 import { expect, it } from "vitest";
 import { esquemaAulasReferencia, referenciaSaidaCoerente } from "@/application/referencia-saida";
 const id = "00000000-0000-4000-8000-000000000001";
@@ -46,7 +46,7 @@ it.each(
     ],
     [
       { id, ordem: 1, inicio: "07:00", fim: "08:00" },
-      { id: "00000000-0000-4000-8000-000000000002", ordem: 2, inicio: "07:30", fim: "08:30" },
+      { id: "00000000-0000-4000-8000-000000000002", ordem: 1, inicio: "08:00", fim: "09:00" },
     ],
   ].map((aulas) => ({ aulas })),
 )("recusa referência incoerente: %j", ({ aulas }) => {
