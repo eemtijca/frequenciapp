@@ -89,6 +89,37 @@ valores_backup=(
   --set backup.spreadsheets.persistence.enabled=true
 )
 
+valores_backup_banco=(
+  --set existingSecret=frequenciapp-segredos
+  --set image.tag=1.2.3
+  --set backupImage.tag=1.2.3
+  --set backup.enabled=true
+  --set backup.filesSecret=frequenciapp-backup-arquivos
+  --set backup.database.existingSecret=frequenciapp-backup-banco
+  --set backup.spreadsheets.enabled=false
+)
+
+renderizar_cronjob_banco() {
+  local destino="$1"
+  shift
+  helm template frequenciapp "$CHART" \
+    --namespace frequenciapp \
+    --show-only templates/cronjob-backup-banco.yaml \
+    "${valores_backup_banco[@]}" "$@" >"$destino"
+}
+
+recusar_renderizacao() {
+  local rotulo="$1"
+  local mensagem="$2"
+  shift 2
+  if helm template frequenciapp "$CHART" \
+    --namespace frequenciapp \
+    "${valores_backup_banco[@]}" "$@" >"$TMP/$rotulo.yaml" 2>"$TMP/$rotulo.log"; then
+    falhar "O chart aceitou a configuração recusada: $rotulo"
+  fi
+  exigir_texto "$mensagem" "$TMP/$rotulo.log"
+}
+
 printf '[kubernetes] Lint do chart\n'
 helm lint "$CHART" --namespace frequenciapp --set existingSecret=frequenciapp-segredos
 helm lint "$CHART" --namespace frequenciapp "${valores_backup[@]}"
@@ -161,6 +192,52 @@ exigir_texto 'mais de 36 horas' "$TMP/gate-antigo.txt"
 executar_gate "$TMP/gate/vazio" -e ENSAIO_SEM_PROTECAO=true \
   >"$TMP/gate-ensaio.txt" 2>&1 || falhar "O modo de ensaio sem proteção não foi aceito."
 exigir_texto 'ENSAIO SEM PROTECAO' "$TMP/gate-ensaio.txt"
+
+printf '[kubernetes] Persistência efetiva do backup do banco\n'
+recusar_renderizacao 'sem-pvc-sem-remoto' 'Backup de banco exige PVC ou remoto explicitamente habilitado' \
+  --set backup.database.local=false \
+  --set backup.database.persistence.enabled=false \
+  --set backup.database.remote.enabled=false
+recusar_renderizacao 'local-sem-pvc' 'backup.database.local exige persistência habilitada' \
+  --set backup.database.local=true \
+  --set backup.database.persistence.enabled=false \
+  --set backup.database.remote.enabled=true
+recusar_renderizacao 'local-nao-booleano' 'backup.database.local deve ser booleano' \
+  --set-string backup.database.local=sim
+recusar_renderizacao 'persistencia-nao-booleana' 'backup.database.persistence.enabled deve ser booleano' \
+  --set-string backup.database.persistence.enabled=sim
+recusar_renderizacao 'remoto-nao-booleano' 'backup.database.remote.enabled deve ser booleano' \
+  --set-string backup.database.remote.enabled=sim
+
+renderizar_cronjob_banco "$TMP/banco-pvc.yaml" \
+  --set backup.database.local=true \
+  --set backup.database.persistence.enabled=true
+exigir_texto 'name: BACKUP_EXIGIR_REMOTO' "$TMP/banco-pvc.yaml"
+grep -A1 'name: BACKUP_EXIGIR_REMOTO' "$TMP/banco-pvc.yaml" | grep -q '"false"' ||
+  falhar 'O backup com PVC não deve exigir remoto.'
+grep -A1 'name: BACKUP_CATALOGO_PERSISTENTE' "$TMP/banco-pvc.yaml" | grep -q '"true"' ||
+  falhar 'O catálogo deve ser persistente com PVC.'
+exigir_texto 'claimName: frequenciapp-backup-banco' "$TMP/banco-pvc.yaml"
+
+renderizar_cronjob_banco "$TMP/banco-remoto.yaml" \
+  --set backup.database.local=false \
+  --set backup.database.persistence.enabled=false \
+  --set backup.database.remote.enabled=true
+grep -A1 'name: BACKUP_EXIGIR_REMOTO' "$TMP/banco-remoto.yaml" | grep -q '"true"' ||
+  falhar 'O backup somente remoto deve exigir destino remoto.'
+grep -A1 'name: BACKUP_CATALOGO_PERSISTENTE' "$TMP/banco-remoto.yaml" | grep -q '"false"' ||
+  falhar 'O backup somente remoto não deve declarar catálogo persistente.'
+exigir_ausencia 'claimName: frequenciapp-backup-banco' "$TMP/banco-remoto.yaml"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --is-upgrade \
+  "${valores_backup_banco[@]}" \
+  --set backup.database.local=false \
+  --set backup.database.persistence.enabled=false \
+  --set backup.database.remote.enabled=true >"$TMP/upgrade-remoto.yaml"
+kubeconform_file "$TMP/upgrade-remoto.yaml"
+exigir_texto 'value: /backups/estado' "$TMP/upgrade-remoto.yaml"
 
 printf '[kubernetes] Checksums de ConfigMap e Secret\n'
 helm template frequenciapp "$CHART" \
@@ -244,5 +321,64 @@ helm template frequenciapp "$CHART" \
   --set-string agenda.timeZone=America/Sao_Paulo \
   --show-only templates/cronjob-agenda.yaml >"$TMP/agenda-fuso.yaml"
 exigir_texto 'timeZone: "America/Sao_Paulo"' "$TMP/agenda-fuso.yaml"
+
+printf '[kubernetes] Agenda independente e timeout\n'
+valor_env() {
+  grep -A1 -- "- name: $1" "$2" | sed -n '2s/.*value: "\([^"]*\)".*/\1/p'
+}
+for mascara in 0 1 2 3 4 5 6 7; do
+  notificacoes=false
+  planilhas=false
+  indicadores=false
+  ((mascara & 1)) && notificacoes=true
+  ((mascara & 2)) && planilhas=true
+  ((mascara & 4)) && indicadores=true
+  helm template frequenciapp "$CHART" \
+    --namespace frequenciapp \
+    --set existingSecret=frequenciapp-segredos \
+    --set agenda.notifications="$notificacoes" \
+    --set agenda.spreadsheets="$planilhas" \
+    --set agenda.indicators="$indicadores" \
+    --show-only templates/cronjob-agenda.yaml >"$TMP/agenda-$mascara.yaml"
+  [ "$(valor_env AGENDA_NOTIFICACOES "$TMP/agenda-$mascara.yaml")" = "$notificacoes" ] ||
+    falhar "AGENDA_NOTIFICACOES divergente na máscara $mascara."
+  [ "$(valor_env AGENDA_PLANILHAS "$TMP/agenda-$mascara.yaml")" = "$planilhas" ] ||
+    falhar "AGENDA_PLANILHAS divergente na máscara $mascara."
+  [ "$(valor_env AGENDA_INDICADORES "$TMP/agenda-$mascara.yaml")" = "$indicadores" ] ||
+    falhar "AGENDA_INDICADORES divergente na máscara $mascara."
+done
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --show-only templates/cronjob-agenda.yaml >"$TMP/agenda-padrao.yaml"
+[ "$(valor_env AGENDA_TIMEOUT "$TMP/agenda-padrao.yaml")" = "300" ] ||
+  falhar 'AGENDA_TIMEOUT padrão deve ser 300.'
+[ "$(valor_env AGENDA_URL "$TMP/agenda-padrao.yaml")" = "http://frequenciapp:3000" ] ||
+  falhar 'AGENDA_URL padrão deve apontar para o Service interno.'
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set agenda.timeoutSeconds=45 \
+  --set agenda.appUrl=http://agenda.interna:3000 \
+  --show-only templates/cronjob-agenda.yaml >"$TMP/agenda-customizada.yaml"
+[ "$(valor_env AGENDA_TIMEOUT "$TMP/agenda-customizada.yaml")" = "45" ] ||
+  falhar 'AGENDA_TIMEOUT não usa agenda.timeoutSeconds.'
+[ "$(valor_env AGENDA_URL "$TMP/agenda-customizada.yaml")" = "http://agenda.interna:3000" ] ||
+  falhar 'AGENDA_URL não usa agenda.appUrl.'
+
+for caso in 'agenda.notifications=sim|deve ser booleano' 'agenda.timeoutSeconds=0|deve ser um inteiro entre 1 e 2147483' 'agenda.timeoutSeconds=2147484|deve ser um inteiro entre 1 e 2147483'; do
+  configuracao="${caso%%|*}"
+  mensagem="${caso#*|}"
+  if helm template frequenciapp "$CHART" \
+    --namespace frequenciapp \
+    --set existingSecret=frequenciapp-segredos \
+    --set-string "$configuracao" \
+    --show-only templates/cronjob-agenda.yaml >"$TMP/agenda-invalida.yaml" 2>"$TMP/agenda-invalida.log"; then
+    falhar "O chart aceitou agenda inválida: $configuracao"
+  fi
+  exigir_texto "$mensagem" "$TMP/agenda-invalida.log"
+done
 
 printf '[kubernetes] Ensaios do chart concluídos.\n'
