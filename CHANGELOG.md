@@ -303,6 +303,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
+- As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
 
