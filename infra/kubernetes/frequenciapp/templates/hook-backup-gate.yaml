@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-backup-gate
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-upgrade,pre-rollback
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        {{- include "frequenciapp.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: backup-gate
+          image: {{ include "frequenciapp.backupImage" . | quote }}
+          imagePullPolicy: {{ .Values.backupImage.pullPolicy }}
+          command: ["bash", "/scripts/verificar-backup.sh"]
+          env:
+            - name: ESTADO_DIR
+              value: /backups/estado
+            - name: BACKUP_BANCO_DIR
+              value: /backups/banco
+            - name: BACKUP_GATE_IDADE_MAXIMA_HORAS
+              value: {{ .Values.backupGate.maxAgeHours | quote }}
+            - name: BACKUP_GATE_EXIGIR_REMOTO
+              value: {{ .Values.backupGate.requireRemoteVerification | quote }}
+            - name: ENSAIO_SEM_PROTECAO
+              value: {{ .Values.backupGate.ensaioSemProtecao | quote }}
+            - name: HOME
+              value: /tmp
+          resources:
+            {{- toYaml .Values.backupGate.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+            - name: backups
+              mountPath: /backups
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: script
+          configMap:
+            name: {{ include "frequenciapp.fullname" . }}-backup-gate-script
+            defaultMode: 0555
+        - name: backups
+          {{- if and .Values.backup.enabled .Values.backup.database.enabled .Values.backup.database.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "frequenciapp.fullname" . }}-backup-banco
+            readOnly: true
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
