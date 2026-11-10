@@ -61,6 +61,28 @@ if [ "${BACKUP_PLANILHAS_LOCAL:-true}" = "true" ]; then
     exit 1
   fi
   chmod 600 "$pasta/$arquivo" "$pasta/$arquivo.confirmado.json"
+
+  reter_dias="${BACKUP_RETER_DIAS:-30}"
+  reter_minimo="${BACKUP_RETER_MINIMO:-5}"
+  case "$reter_dias" in '' | *[!0-9]*) echo "[backup-planilhas] BACKUP_RETER_DIAS inválido." >&2; exit 1 ;; esac
+  case "$reter_minimo" in '' | *[!0-9]*) echo "[backup-planilhas] BACKUP_RETER_MINIMO inválido." >&2; exit 1 ;; esac
+  agora=$(date +%s)
+  mapfile -t copias < <(
+    find "$pasta" -maxdepth 1 -type f -name 'frequenciapp-*.zip' -exec stat -c '%Y %n' {} \; | sort -n
+  )
+  total=${#copias[@]}
+  for ((indice = 0; indice < total; indice += 1)); do
+    linha="${copias[$indice]}"
+    mtime="${linha%% *}"
+    caminho="${linha#* }"
+    base="${caminho%.zip}"
+    [ -f "$base.confirmado.json" ] || continue
+    idade=$(( (agora - ${mtime%.*}) / 86400 ))
+    restantes=$((total - indice))
+    if [ "$idade" -gt "$reter_dias" ] && [ "$restantes" -gt "$reter_minimo" ]; then
+      rm -f "$caminho" "$base.confirmado.json"
+    fi
+  done
 fi
 
 echo "[backup-planilhas] Cópia concluída: $arquivo"
