@@ -6,7 +6,8 @@ A decisão e o contrato portátil estão na [ADR-064](../../../docs/adr/064-auto
 
 ## O que o chart entrega
 
-- Deployment com initContainer de migração.
+- Deployment com initContainer de migração e checksum de ConfigMap e Secret no template do Pod.
+- Hook `pre-upgrade` e `pre-rollback` que exige backup do banco confirmado.
 - Service ClusterIP na porta 3000.
 - Ingress opcional.
 - ConfigMap para variáveis não sensíveis.
@@ -16,7 +17,7 @@ A decisão e o contrato portátil estão na [ADR-064](../../../docs/adr/064-auto
 - `emptyDir` para `/tmp` e `/app/.next/cache`.
 - CronJob de agenda a cada cinco minutos.
 - CronJobs opcionais de backup do banco e das planilhas.
-- PVC opcional de backup.
+- PVC próprio para o backup do banco e para o backup das planilhas.
 - HPA e PDB opcionais.
 
 O chart não instala PostgreSQL, cert-manager, ingress controller, External Secrets, rclone ou chaves. Esses recursos são escolhidos pela organização.
@@ -83,6 +84,10 @@ O chart não recomenda `secrets.create` em produção. Quando usado, os valores 
 
 Para External Secrets, criar o Secret com as mesmas chaves e apontar `existingSecret` para o nome.
 
+O template do Pod recebe a anotação `checksum/secret`. Com `secrets.create=true`, o checksum sai do conteúdo do Secret gerenciado. Com `existingSecret`, o Helm consulta o Secret no cluster e usa o conteúdo; quando a consulta não existe, como em `helm template` offline, o checksum usa `existingSecretRevision`. Ao trocar o Secret fora do Helm sem alterar a revisão, o rollout não é disparado. Atualizar `existingSecretRevision` é a forma explícita de provocar o rollout nesse caso.
+
+O ConfigMap também entra no checksum do Pod pela anotação `checksum/config`. Alterar qualquer variável de `config` reinicia os Pods no próximo upgrade.
+
 ## Ingress e TLS
 
 O chart não escolhe o controlador. Exemplos de anotações:
@@ -118,11 +123,24 @@ node ./docker/app/migrar.mjs
 
 O contêiner principal recebe `MIGRAR_NA_PARTIDA=false`. O migrador usa a trava consultiva do banco e a conferência de checksum já existente.
 
+### Confirmação de backup antes do upgrade
+
+O `helm upgrade` e o `helm rollback` de revisões que declaram o hook executam primeiro o Job `backup-gate`. O Job usa a imagem de backup, não recebe Secret e lê o recibo `ultimo-backup.json` gravado pela rotina do banco no PVC `-backup-banco`. O gate confere:
+
+- a existência do recibo;
+- a idade do backup contra `backupGate.maxAgeHours`, com padrão de 36 horas;
+- o checksum SHA-256 do arquivo confirmado;
+- a verificação remota quando `backupGate.requireRemoteVerification=true`.
+
+Sem recibo válido, o hook falha e o Helm não inicia a migração nem o rollout. A primeira instalação não executa o hook porque não há dados anteriores. O modo `backupGate.ensaioSemProtecao=true` existe apenas para ensaio explícito: ele permite o upgrade sem backup e não oferece proteção nem promessa de recuperação. O padrão é `false` e o modo é anunciado no `helm install` e no `helm upgrade`.
+
+O gate é sempre renderizado e exige que o backup do banco esteja habilitado e que `backup.database.persistence.enabled=true`. Um backup feito fora do chart não é reconhecido.
+
 Recomendações:
 
 - Primeira instalação com `replicaCount: 1`.
 - Revisar migrações destrutivas no CHANGELOG.
-- Fazer backup antes de atualizar.
+- Manter o backup do banco habilitado antes do primeiro upgrade.
 - Não escalar réplicas durante uma migração longa.
 - Em caso de falha, o Pod reinicia e repete a migração; a trava evita concorrência.
 
@@ -145,7 +163,7 @@ agenda:
   existingSecret: ""
 ```
 
-O campo `timeZone` exige Kubernetes 1.27 ou superior. O mesmo vale para `backup.database.timeZone` e `backup.spreadsheets.timeZone`.
+O campo `timeZone` é sempre renderizado e exige Kubernetes 1.27 ou superior. O padrão é `America/Fortaleza` e pode ser sobrescrito em `agenda.timeZone`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`.
 
 ## Backup
 
@@ -189,9 +207,15 @@ O `backup.spreadsheets.existingSecret` deve conter:
 | `BACKUP_CHAVE`       | Chave do ZIP AES-256                          |
 | `RCLONE_CONFIG_PASS` | Senha da configuração do rclone, quando usada |
 
-### PVC
+### PVCs, estado e fuso
 
-`backup.database.persistence.enabled=true` cria um PVC compartilhado para `/backups`. Sem PVC, o backup local é efêmero e o destino remoto precisa estar configurado.
+Cada rotina tem o próprio PVC `ReadWriteOnce`. O backup do banco usa `-backup-banco` em `/backups`. O backup das planilhas usa `-backup-planilhas` em `/backups`. Os dois CronJobs nunca compartilham o mesmo volume.
+
+A atualização de uma instalação anterior cria os dois PVCs novos e não move o conteúdo do PVC antigo `-backup`. Executar o backup do banco depois do upgrade e antes do próximo upgrade com o gate.
+
+O estado do backup do banco fica em `/backups/estado/ultimo-backup.json`, no PVC do banco. O backup das planilhas mantém o arquivo confirmado e o `.confirmado.json` em `/backups/planilhas`, no PVC das planilhas. Os PVCs carregam `helm.sh/resource-policy: keep` e não são removidos pelo `helm uninstall`.
+
+`backup.database.persistence.enabled` e `backup.spreadsheets.persistence.enabled` são `true` por padrão. Sem o PVC do banco, o recibo não sobrevive ao Job e o gate de upgrade falha. Sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado.
 
 ```yaml
 backup:
@@ -200,12 +224,17 @@ backup:
   database:
     enabled: true
     existingSecret: frequenciapp-backup-banco
+    timeZone: America/Fortaleza
     persistence:
       enabled: true
       size: 20Gi
   spreadsheets:
     enabled: true
     existingSecret: frequenciapp-backup-planilhas
+    timeZone: America/Fortaleza
+    persistence:
+      enabled: true
+      size: 10Gi
 ```
 
 O backup do banco usa `BACKUP_MODO=url` e não executa `docker compose`.
@@ -222,7 +251,7 @@ helm upgrade frequenciapp infra/kubernetes/frequenciapp \
   --set backupImage.tag=1.2.4
 ```
 
-O initContainer aplica as migrações antes de o contêiner principal subir. O rollout usa `RollingUpdate`.
+O hook `backup-gate` confirma o backup antes de o initContainer aplicar as migrações. O rollout usa `RollingUpdate`. Se o gate falhar, a revisão anterior continua no ar e nenhuma migração é executada.
 
 Rollback do Helm:
 
@@ -234,6 +263,16 @@ helm rollback frequenciapp <revisao> --namespace frequenciapp
 O rollback do Helm não desfaz migração aplicada. Em caso de migração destrutiva, usar o runbook de restauração.
 
 ## Testes
+
+O ensaio reproduzível roda em contêiner e não usa cluster:
+
+```bash
+bash tests/kubernetes/validar.sh
+```
+
+Ele executa `helm lint`, `helm template`, `kubeconform -strict` e confere o gate de backup, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente e o `timeZone`.
+
+Validação manual:
 
 ```bash
 helm lint infra/kubernetes/frequenciapp
@@ -254,13 +293,14 @@ helm uninstall frequenciapp --namespace frequenciapp
 kubectl delete namespace frequenciapp
 ```
 
-O PVC de backup não é removido automaticamente. Conferir a política de retenção antes de apagar.
+Os PVCs de backup não são removidos automaticamente por causa da anotação `helm.sh/resource-policy: keep`. Conferir a política de retenção antes de apagar. Uma reinstalação que precise recriar os volumes exige a remoção manual dos PVCs antigos.
 
 ## Limitações
 
 - O chart não instala PostgreSQL.
 - O chart não instala cert-manager, ingress controller, External Secrets ou operador de backup.
-- O backup local em PVC não é recuperação de desastre. Manter destino remoto.
+- O backup local em PVC não é recuperação de desastre. Manter destino remoto e ativar `backupGate.requireRemoteVerification` quando a política exigir.
+- O gate reconhece apenas o recibo do backup do banco feito pelo próprio chart. Snapshots externos do PostgreSQL não contam.
 - O CronJob de backup usa a imagem de backup, não a imagem da aplicação.
 - O `values.exemplo.yaml` é ilustrativo e não contém segredos reais.
 - A primeira instalação deve usar uma réplica. O aumento de réplicas depende de migração concluída e do limite de tentativas compartilhado no banco.
