@@ -304,6 +304,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As saídas antecipadas passam a guardar a turma e o retrato de aulas do momento, com confirmação explícita e auditoria quando a referência histórica não pode ser comprovada. A Chamada Parcial e os relatórios usam a turma histórica, e a conferência é recusada sem retrato confiável. A decisão está na [ADR-069](docs/adr/069-referencia-historica-saidas.md).
 - O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
 - As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).

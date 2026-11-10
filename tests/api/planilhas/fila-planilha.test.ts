@@ -113,6 +113,8 @@ async function registrar(indice: number, dia: string) {
     momento: "aula_2",
     justificativa: "C",
     liberadoPorCodigo: "QFLIB",
+    confirmarHistorico: true,
+    motivo: "Teste sintético da fila de saídas",
   });
   expect(resposta.status).toBe(201);
 }

@@ -267,6 +267,13 @@ export interface FaltaAluno {
 
 /** Saída antecipada registrada pela coordenação, separada da chamada. */
 export interface SaidaAntecipada {
+  turmaHistoricaId?: string | null;
+  turmaHistoricaNome?: string | null;
+  aulasReferencia?: {
+    versao: 1;
+    aulas: { id: string; ordem: number; inicio: string; fim: string }[];
+  } | null;
+  origemReferencia?: "MATRICULA_VIGENTE" | "CHAMADA_HISTORICA" | "DESCONHECIDA";
   id: string;
   alunoId: string;
   dia: string;

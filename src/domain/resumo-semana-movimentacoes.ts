@@ -44,25 +44,20 @@ interface MovimentoAgregado {
 function movimentosDeSaidas(
   saidas: readonly SaidaAntecipada[],
   alunos: readonly Aluno[],
-  turmas: readonly Turma[],
   dias: readonly string[],
 ): MovimentoAgregado[] {
   const alunosPorId = new Map(alunos.map((aluno) => [aluno.id, aluno]));
-  const turmasPorId = new Map(turmas.map((turma) => [turma.id, turma]));
   return saidas.flatMap((saida) => {
     if (!dias.includes(saida.dia)) return [];
     const aluno = alunosPorId.get(saida.alunoId);
     if (!aluno) return [];
-    // A saída não guarda a turma da época: vale a turma atual do aluno.
-    const turmaId = aluno.turmaId;
-    const turma = turmasPorId.get(turmaId);
     return [
       {
         id: `saida:${saida.id}`,
         alunoId: aluno.id,
         nome: aluno.nome,
-        turmaId,
-        turmaRotulo: turma?.rotulo ?? "Sem turma",
+        turmaId: saida.turmaHistoricaId ?? "desconhecida",
+        turmaRotulo: saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
         dia: saida.dia,
       },
     ];
@@ -97,15 +92,21 @@ function agregar(
   const porDia = new Map(dias.map((dia) => [dia, 0]));
   const porTurma = new Map<string, TurmaNoResumoSemanaMovimentacoes>();
   const porAluno = new Map<string, AlunoNoResumoSemanaMovimentacoes>();
+  const rotulosPorAluno = new Map<string, Set<string>>();
   for (const movimento of movimentos) {
     porDia.set(movimento.dia, (porDia.get(movimento.dia) ?? 0) + 1);
-    const turma = porTurma.get(movimento.turmaId) ?? {
+    // Saídas preservam também renomeações, como o relatório de movimentações.
+    const chaveTurma =
+      tipo === "saida"
+        ? JSON.stringify([movimento.turmaId, movimento.turmaRotulo])
+        : movimento.turmaId;
+    const turma = porTurma.get(chaveTurma) ?? {
       turmaId: movimento.turmaId,
       rotulo: movimento.turmaRotulo,
       total: 0,
     };
     turma.total += 1;
-    porTurma.set(movimento.turmaId, turma);
+    porTurma.set(chaveTurma, turma);
     const aluno = porAluno.get(movimento.alunoId) ?? {
       alunoId: movimento.alunoId,
       nome: movimento.nome,
@@ -113,6 +114,12 @@ function agregar(
       total: 0,
     };
     aluno.total += 1;
+    if (tipo === "saida") {
+      const rotulos = rotulosPorAluno.get(movimento.alunoId) ?? new Set<string>();
+      rotulos.add(movimento.turmaRotulo);
+      rotulosPorAluno.set(movimento.alunoId, rotulos);
+      aluno.turma = [...rotulos].join(" · ");
+    }
     porAluno.set(movimento.alunoId, aluno);
   }
   return {
@@ -126,7 +133,14 @@ function agregar(
     ),
     total: movimentos.length,
     totalAlunos: porAluno.size,
-    totalTurmas: porTurma.size,
+    totalTurmas:
+      tipo === "saida"
+        ? new Set(
+            movimentos
+              .filter((item) => item.turmaId !== "desconhecida")
+              .map((item) => item.turmaId),
+          ).size
+        : porTurma.size,
   };
 }
 
@@ -169,7 +183,7 @@ export function resumirMovimentacoes(
     };
     return agregar(
       "saida",
-      movimentosDeSaidas(deSaidas.saidas, deSaidas.alunos, deSaidas.turmas, deSaidas.dias),
+      movimentosDeSaidas(deSaidas.saidas, deSaidas.alunos, deSaidas.dias),
       deSaidas.dias,
     );
   }

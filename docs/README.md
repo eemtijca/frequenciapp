@@ -80,4 +80,5 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-066](adr/066-politica-retroativa.md): chamada retroativa com composição comprovada ou confirmação explícita, auditoria e retrato de aulas.
 - [ADR-067](adr/067-identidade-operacional-e-travas.md): identidade explícita do projeto Compose, bootstrap, trava por projeto e confirmação remota booleana.
 - [ADR-068](adr/068-kubernetes-backup-e-rollout.md): backup confirmado antes do upgrade, rollout por checksum, PVCs separados e fuso dos CronJobs.
+- [ADR-069](adr/069-referencia-historica-saidas.md): turma e aulas históricas nas saídas, com confirmação explícita quando a referência não pode ser comprovada.
 - [ADR-070](adr/070-catalogo-e-recibos-de-backup.md): catálogo independente, recibos versionados, retenção por cópias confirmadas e expurgo remoto por membros exatos.
