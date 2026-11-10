@@ -11,6 +11,7 @@ bash "$DIR/atualizacao.sh"
 bash "$DIR/backup-restauracao.sh"
 bash "$DIR/nginx-acme.sh"
 bash "$DIR/restauracao-url.sh"
+bash "$DIR/privilegios-preview.sh"
 bash "$DIR/atualizacao-integracao.sh"
 
 printf 'Todos os ensaios do servidor foram concluídos.\n'
