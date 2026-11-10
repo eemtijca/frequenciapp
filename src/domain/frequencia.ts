@@ -726,6 +726,21 @@ export function partesNoFuso(agora: Date, fuso: string): { diaSemana: number; mi
 }
 
 /**
+ * Classifica a cobertura das faltas pelos IDs de aulas do retrato, sem
+ * consultar a grade atual. Falta fora do retrato não vira presença parcial:
+ * a falta prevalece e só a cobertura parcial das aulas registradas vira S.
+ */
+export function classificarFaltasPorAulas(
+  faltas: ReadonlyMap<string, boolean>,
+  aulas: ReadonlySet<string>,
+): Marca {
+  if (faltas.size === 0) return "P";
+  const integral = [...faltas.values()].every(Boolean) ? "FJ" : "F";
+  const cobertas = [...faltas.keys()].filter((id) => aulas.has(id)).length;
+  return cobertas > 0 && cobertas < aulas.size ? "S" : integral;
+}
+
+/**
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
  * aulas. Regra: falta em todas as aulas do dia vira F, ou FJ quando todas as
  * faltas do dia têm justificativa; falta em parte vira S (saiu antes ou chegou
@@ -782,10 +797,7 @@ export function marcaDoAluno(
       .flatMap((frequencia) => frequencia.aulas ?? []),
   );
   if (retrato.size > 0) {
-    const faltando = [...faltasDoAluno.keys()].filter((horarioId) => retrato.has(horarioId)).length;
-    // Falta só fora do retrato, ou cobrindo tudo, continua integral.
-    if (faltando === 0 || faltando >= retrato.size) return marcaIntegral;
-    return "S";
+    return classificarFaltasPorAulas(faltasDoAluno, retrato);
   }
 
   const aulasDaTurma = [...turmasDaChamada].flatMap((turmaId) =>

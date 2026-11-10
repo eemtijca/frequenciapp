@@ -204,12 +204,12 @@ test.beforeAll(async () => {
     );
     for (const nome of ["A", "B"]) {
       const turma = await cliente.query<{ id: string }>(
-        "insert into turmas (serie_id, nome) values ($1, $2) returning id",
+        "insert into turmas (serie_id, nome, criado_em) values ($1, $2, '2020-01-01T12:00:00Z') returning id",
         [serie.rows[0]?.id, nome],
       );
       const id = turma.rows[0]?.id ?? "";
       const aluno = await cliente.query<{ id: string }>(
-        "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ($1, $2, $2, 1, true) returning id",
+        "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ($1, $2, $2, 1, true, '2020-01-01T12:00:00Z') returning id",
         [`${PREFIXO} Aluna ${nome}`, id],
       );
       await cliente.query(

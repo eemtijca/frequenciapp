@@ -74,6 +74,8 @@ async function chamada(dia: string, turma: "A" | "B", faltas: string[] = [], rev
     turmaId: turmas[turma],
     faltas,
     revisao,
+    confirmarHistorico: true,
+    motivo: "Teste sintético do envio incremental",
   });
   expect(resposta.status).toBe(200);
 }
