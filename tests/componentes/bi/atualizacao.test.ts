@@ -54,6 +54,7 @@ async function abrir(paginado = false, timezoneId = "UTC"): Promise<Page> {
     });
   });
   await page.goto(url);
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(`fbi_${"z".repeat(43)}`);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   return page;

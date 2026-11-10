@@ -136,6 +136,7 @@ async function preparar(page: Page, dados = massa) {
 }
 async function abrir(page: Page) {
   await preparar(page);
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
@@ -166,6 +167,73 @@ async function acaoDoBi(page: Page, nome: string) {
   await page.getByRole("button", { name: "Mais ações da análise", exact: true }).click();
   await page.getByRole("button", { name: nome, exact: true }).click();
 }
+async function contarRetratos(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const abrir = indexedDB.open("frequencibi-dados-v1", 1);
+      abrir.onsuccess = () => resolve(abrir.result);
+      abrir.onerror = () => reject(abrir.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const pedido = db.transaction("retratos").objectStore("retratos").count();
+        pedido.onsuccess = () => resolve(pedido.result);
+        pedido.onerror = () => reject(pedido.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+test("opção sem persistência mantém consultas só na aba e preserva personalização", async ({
+  page,
+}) => {
+  await preparar(page);
+  await expect(
+    page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo"),
+  ).not.toBeChecked();
+  await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
+  await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
+  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+  expect(await contarRetratos(page)).toBe(0);
+  expect(
+    await page.evaluate(() => localStorage.getItem("frequencibi:personalizacao")),
+  ).not.toBeNull();
+  await page.reload();
+  await expect(page.getByLabel("Chave de acesso", { exact: true })).toBeVisible();
+});
+
+test("resposta de conjunto atrasada não repõe dados depois de esquecer chave", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await preparar(page);
+  let liberar: () => void = () => undefined;
+  const espera = new Promise<void>((resolve) => {
+    liberar = resolve;
+  });
+  let pendente = false;
+  await page.route("**/api/bi?*", async (rota) => {
+    if (new URL(rota.request().url()).searchParams.get("recurso") !== "turmas")
+      return rota.fallback();
+    pendente = true;
+    await espera;
+    await rota.fallback();
+  });
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
+  await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
+  await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
+  await expect.poll(() => pendente).toBe(true);
+  await page.getByRole("button", { name: "Esquecer chave", exact: true }).click();
+  await expect(page.getByLabel("Chave de acesso", { exact: true })).toBeVisible();
+  liberar();
+  await expect.poll(() => contarRetratos(page)).toBe(0);
+  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+  expect(
+    await page.evaluate(() => localStorage.getItem("frequencibi:personalizacao")),
+  ).not.toBeNull();
+});
+
 test("portão recusa chave inválida e consulta sem cookie, com taxas consistentes e sem excesso horizontal", async ({
   page,
 }) => {
@@ -384,6 +452,7 @@ test("armazenamento bloqueado avisa e mantém a leitura; importação incompatí
   });
   await page.reload();
   await aguardarHidratacao(page, "#chave-bi");
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
