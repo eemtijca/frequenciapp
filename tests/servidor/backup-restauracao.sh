@@ -50,6 +50,8 @@ if command -v age-keygen >/dev/null 2>&1 && command -v age >/dev/null 2>&1; then
   age-keygen -y "$TMP_RAIZ/age.txt" >"$TMP_RAIZ/age-destinatarios.txt"
   export BACKUP_CRIPTOGRAFIA=age
   export BACKUP_AGE_DESTINATARIOS="$TMP_RAIZ/age-destinatarios.txt"
+  BACKUP_AGE_DESTINATARIOS_SHA256="$(sha256sum "$TMP_RAIZ/age-destinatarios.txt" | cut -d' ' -f1)"
+  export BACKUP_AGE_DESTINATARIOS_SHA256
   export BACKUP_AGE_CHAVE_PRIVADA="$TMP_RAIZ/age.txt"
   "$RAIZ/scripts/servidor/backup-banco.sh"
   dump_age=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name '*.dump.age' \
