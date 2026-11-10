@@ -63,6 +63,13 @@ jobs:
             ghcr.io/yannh/kubeconform:latest \
             -strict -summary /out
 
+      - name: Ensaiar chart Kubernetes
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:stable \
+            -x tests/kubernetes/validar.sh \
+            infra/kubernetes/frequenciapp/files/verificar-backup.sh
+          bash tests/kubernetes/validar.sh
+
       - name: Validar workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
 
