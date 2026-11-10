@@ -38,6 +38,10 @@ describe("servidor auto-hospedado", () => {
 
     expect(http).toContain("acme-challenge");
     expect(http).toContain("return 503");
+    expect(https).toContain("listen 80;");
+    expect(https).toContain("location ^~ /.well-known/acme-challenge/");
+    expect(https).toContain("root /var/www/certbot;");
+    expect(https).toContain("return 301 https://$host$request_uri;");
     expect(https).toContain("listen 443 ssl");
     expect(https).toContain("ssl_protocols TLSv1.2 TLSv1.3");
     expect(https).toContain("proxy_pass http://app:3000");
