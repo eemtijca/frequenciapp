@@ -82,6 +82,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A chamada retroativa passa a ser permitida com confirmação explícita e auditoria quando a composição da turma não pode ser comprovada. A ordem das listas históricas fica estável, o retrato de aulas é usado na classificação e a exclusão de aula com histórico é recusada. A decisão está na [ADR-066](docs/adr/066-politica-retroativa.md).
+
 - O repositório passa a ter uma referência de auto-hospedagem para VPS, servidor dedicado e máquina on-premises. O Compose de produção remove a publicação das portas da aplicação e do banco, aceita credenciais próprias e oferece Caddy ou Nginx, com TLS público por ACME ou CA interna. A aplicação aceita `MIGRAR_NA_PARTIDA=false` para plataformas que executam a migração em Job separado. O backup do banco usa `pg_dump`, GPG de chave pública ou age, rclone, conferência por SHA-256 e restauração com script. A agenda, a atualização e a renovação do certificado do Nginx são agendadas por cron. A decisão está na [ADR-064](docs/adr/064-auto-hospedagem-servidor.md).
 
 - O chart Helm do FrequenciApp entrega Deployment com initContainer de migração, Service, Ingress opcional, ConfigMap, Secret ou `existingSecret`, agenda em CronJob e backup opcional do banco e das planilhas. O workflow de publicação passa a gerar imagens AMD64 e ARM64 para a aplicação e para o backup. Os workflows de agenda, backup externo e deploy de nuvem podem ser desativados por `AGENDA_EXTERNA`, `BACKUP_EXTERNO` e `DEPLOY_TARGET`, preservando o comportamento anterior quando as variáveis não existem.
