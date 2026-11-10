@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { createRequire } from "node:module";
 import path from "node:path";
 import os from "node:os";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
 // O parser já pertence ao ESLint instalado; não há instalação ou resolução pela rede.
@@ -30,7 +31,6 @@ type Opcoes = {
   ref?: string;
   sha?: string;
   versaoDelegada?: string;
-  primeiraRelease?: boolean;
   versaoPacote?: string;
   sujo?: boolean;
   atestado?: boolean;
@@ -95,13 +95,13 @@ globalThis.fetch=async(url,opcoes)=>{registrar('saude',[String(url),opcoes.redir
 `,
     );
     writeFileSync(path.join(pasta, "evento.json"), JSON.stringify(opcoes.evento ?? { inputs: {} }));
-    writeFileSync(
-      path.join(pasta, "releases.json"),
-      JSON.stringify(opcoes.primeiraRelease ? [[]] : [[{ draft: false, prerelease: false }]]),
-    );
     const resultado = spawnSync(
       process.execPath,
-      ["--import", path.join(pasta, "saude.mjs"), "scripts/github/orquestrar-implantacao.mjs"],
+      [
+        "--import",
+        pathToFileURL(path.join(pasta, "saude.mjs")).href,
+        "scripts/github/orquestrar-implantacao.mjs",
+      ],
       {
         cwd: pasta,
         encoding: "utf8",
@@ -112,7 +112,6 @@ globalThis.fetch=async(url,opcoes)=>{registrar('saude',[String(url),opcoes.redir
           HOME: pasta,
           TMPDIR: pasta,
           GITHUB_EVENT_PATH: path.join(pasta, "evento.json"),
-          IMPLANTACAO_RELEASES: path.join(pasta, "releases.json"),
           GITHUB_EVENT_NAME: "release" in (opcoes.evento ?? {}) ? "release" : "workflow_dispatch",
           GITHUB_REF: opcoes.ref ?? "refs/tags/v1.2.3",
           GITHUB_SHA: opcoes.sha ?? shaTag,
@@ -182,12 +181,13 @@ describe("entrada completa da implantação", () => {
         : undefined;
     const resultado = executarEntrada({ versaoDelegada: exportada });
     conferirSucesso(resultado);
-    expect(entrada).toMatchObject({ type: "string", required: false });
+    expect(entrada).toMatchObject({ type: "string", required: true });
     expect(comum.on.workflow_call?.inputs?.versao).toMatchObject({
       type: "string",
-      required: false,
+      required: true,
     });
     expect(job?.uses).toBe("./.github/workflows/implantacao.yml");
+    expect(comum.on.push).toBeUndefined();
   });
   it("a CLI aceita versão explícita do reusable mesmo sem evento.inputs", () => {
     conferirSucesso(executarEntrada({ versaoDelegada: "v1.2.3" }));
@@ -200,15 +200,6 @@ describe("entrada completa da implantação", () => {
       }),
     );
   });
-  it("preserva main sem versão somente antes da primeira release", () => {
-    const resultado = executarEntrada({
-      ref: "refs/heads/main",
-      primeiraRelease: true,
-      versaoDelegada: "",
-    });
-    expect(resultado.status).toBe(0);
-    expect(resultado.chamadas.filter((c) => c.etapa !== "git").map((c) => c.etapa)).toEqual(etapas);
-  });
   it.each<[string, Opcoes, string]>([
     ["versão ausente", {}, "SemVer"],
     ["versão divergente", { versaoDelegada: "1.2.4" }, "tag completa"],
@@ -217,7 +208,7 @@ describe("entrada completa da implantação", () => {
       { versaoDelegada: "1.2.3", ref: "refs/heads/v1.2.3" },
       "Evento fora do regime",
     ],
-    ["main depois de release", { ref: "refs/heads/main" }, "Evento fora do regime"],
+    ["main", { versaoDelegada: "1.2.3", ref: "refs/heads/main" }, "Evento fora do regime"],
     ["SHA divergente", { versaoDelegada: "1.2.3", sha: "c".repeat(40) }, "SHA esperado"],
     ["pacote divergente", { versaoDelegada: "1.2.3", versaoPacote: "0.1.0" }, "package.json"],
     ["checkout sujo", { versaoDelegada: "1.2.3", sujo: true }, "Command failed"],

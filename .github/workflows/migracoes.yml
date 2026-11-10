@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       versao:
-        description: Versão da tag estável; vazio somente antes da primeira release na main
+        description: Versão estável sem v; executar o workflow na tag correspondente
         type: string
-        required: false
+        required: true
 permissions:
   contents: read
 jobs:

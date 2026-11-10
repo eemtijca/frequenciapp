@@ -7,11 +7,7 @@ export type AtestadoImplantacao = {
   migracoesExpansivas: boolean;
   autoDeployCoordenado: boolean;
 };
-export function selecionarEvento(opcoes: {
-  evento: string;
-  ref: string;
-  haRelease: boolean;
-}): "main" | "tag";
+export function selecionarEvento(opcoes: { evento: string; ref: string }): "tag";
 export function orquestrar(opcoes: {
   sha: string;
   destino: string;

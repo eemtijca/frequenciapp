@@ -72,19 +72,15 @@ describe("proprietário único de implantação", () => {
       expect(chamadas).toBe(0);
     }
   });
-  it("preserva main antes da primeira release e tags depois", () => {
-    expect(selecionarEvento({ evento: "push", ref: "refs/heads/main", haRelease: false })).toBe(
-      "main",
+  it("aceita somente tag estável, nunca a main ou uma branch homônima", () => {
+    expect(selecionarEvento({ evento: "release", ref: "refs/tags/v1.2.3" })).toBe("tag");
+    expect(selecionarEvento({ evento: "workflow_dispatch", ref: "refs/tags/v1.2.3" })).toBe("tag");
+    expect(() => selecionarEvento({ evento: "push", ref: "refs/heads/main" })).toThrow(
+      "Evento fora do regime",
     );
     expect(() =>
-      selecionarEvento({ evento: "push", ref: "refs/heads/main", haRelease: true }),
-    ).toThrow();
-    expect(selecionarEvento({ evento: "release", ref: "refs/tags/v1.2.3", haRelease: true })).toBe(
-      "tag",
-    );
-    expect(() =>
-      selecionarEvento({ evento: "workflow_dispatch", ref: "refs/heads/v1.2.3", haRelease: true }),
-    ).toThrow();
+      selecionarEvento({ evento: "workflow_dispatch", ref: "refs/heads/v1.2.3" }),
+    ).toThrow("Evento fora do regime");
   });
   it("remove o dono paralelo e fixa a seção mutante no workflow comum", () => {
     const antigo = readFileSync(".github/workflows/migracoes.yml", "utf8");
@@ -94,5 +90,7 @@ describe("proprietário único de implantação", () => {
     expect(comum).toContain("group: implantacao-producao");
     expect(comum).toContain("cancel-in-progress: false");
     expect(comum).toContain("node scripts/github/orquestrar-implantacao.mjs");
+    expect(comum).not.toMatch(/^\s*push:/m);
+    expect(comum).not.toContain("IMPLANTACAO_RELEASES");
   });
 });

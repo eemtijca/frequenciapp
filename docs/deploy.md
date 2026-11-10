@@ -123,7 +123,7 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 
 ### Ordem de publicação
 
-`implantacao.yml` é o proprietário único de validar/buildar, migrar, publicar sem domínio, promover e verificar saúde por SHA. `migracoes.yml` delega essa sequência. A `main` é aceita antes da primeira release estável; tags estáveis são obrigatórias depois. `DIRECT_URL_PROD` é entregue somente ao processo migrador pelo adaptador. A CLI Vercel vem do lock, sem `dlx` ou `latest`. Com `DEPLOY_TARGET` diferente de vazio ou `vercel`, a sequência de produção é ignorada e o servidor próprio segue o guia de auto-hospedagem.
+`implantacao.yml` é o proprietário único de validar/buildar, migrar, publicar sem domínio, promover e verificar saúde por SHA. `migracoes.yml` delega essa sequência. A implantação aceita somente tag estável; push na `main` não inicia produção. `DIRECT_URL_PROD` é entregue somente ao processo migrador pelo adaptador. A CLI Vercel vem do lock, sem `dlx` ou `latest`. Com `DEPLOY_TARGET` diferente de vazio ou `vercel`, a sequência de produção é ignorada e o servidor próprio segue o guia de auto-hospedagem.
 
 `publicacao.yml` valida versão, tag e commit antes do login no GHCR, lê o inventário de releases e mantém `latest` monotônico. Uma imagem antiga republicada mantém a própria versão e `sha-<SHA>`, sem mover o canal estável para trás. O comando manual precisa ser executado na tag `vX.Y.Z`; a branch de mesmo nome é recusada.
 

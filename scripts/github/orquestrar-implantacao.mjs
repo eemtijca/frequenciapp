@@ -5,15 +5,13 @@ import { pathToFileURL } from "node:url";
 import { validarPublicacao } from "./validar-publicacao.mjs";
 
 const filas = new Map();
-export function selecionarEvento({ evento, ref, haRelease }) {
-  if (!haRelease && ["push", "workflow_dispatch"].includes(evento) && ref === "refs/heads/main")
-    return "main";
+export function selecionarEvento({ evento, ref }) {
   if (
     ["release", "workflow_dispatch"].includes(evento) &&
     /^refs\/tags\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(ref)
   )
     return "tag";
-  throw new Error("Evento fora do regime: main antes da primeira release, tags estáveis depois.");
+  throw new Error("Evento fora do regime: a implantação exige uma tag estável vX.Y.Z.");
 }
 
 export async function orquestrar({ sha, destino, atestado, executar }) {
@@ -149,25 +147,17 @@ async function principal() {
   if (![undefined, "", "vercel"].includes(ambiente.DEPLOY_TARGET))
     throw new Error("Destino sem adaptador aprovado; não migrar isoladamente.");
   const evento = JSON.parse(readFileSync(ambiente.GITHUB_EVENT_PATH, "utf8"));
-  const releases = JSON.parse(readFileSync(ambiente.IMPLANTACAO_RELEASES, "utf8"));
-  if (!Array.isArray(releases) || !releases.every(Array.isArray))
-    throw new Error("Inventário de releases incompleto.");
-  const haRelease = releases.flat().some((r) => !r.draft && !r.prerelease);
-  const modo = selecionarEvento({
+  selecionarEvento({
     evento: ambiente.GITHUB_EVENT_NAME,
     ref: ambiente.GITHUB_REF,
-    haRelease,
   });
-  if (modo === "tag") {
-    if (evento.release?.draft || evento.release?.prerelease)
-      throw new Error("Release não estável.");
-    // O reusable recebe inputs próprios, que não precisam existir no evento do caller.
-    const versao = (
-      evento.release?.tag_name ??
-      (ambiente.IMPLANTACAO_VERSAO || evento.inputs?.versao)
-    )?.replace(/^v/, "");
-    validarPublicacao({ versao, ref: ambiente.GITHUB_REF, sha: ambiente.GITHUB_SHA });
-  }
+  if (evento.release?.draft || evento.release?.prerelease) throw new Error("Release não estável.");
+  // O reusable recebe inputs próprios, que não precisam existir no evento do caller.
+  const versao = (
+    evento.release?.tag_name ??
+    (ambiente.IMPLANTACAO_VERSAO || evento.inputs?.versao)
+  )?.replace(/^v/, "");
+  validarPublicacao({ versao, ref: ambiente.GITHUB_REF, sha: ambiente.GITHUB_SHA });
   await orquestrar({
     sha: ambiente.GITHUB_SHA,
     destino: "producao",

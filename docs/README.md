@@ -83,6 +83,6 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-069](adr/069-referencia-historica-saidas.md): turma e aulas históricas nas saídas, com confirmação explícita quando a referência não pode ser comprovada.
 - [ADR-070](adr/070-catalogo-e-recibos-de-backup.md): catálogo independente, recibos versionados, retenção por cópias confirmadas e expurgo remoto por membros exatos.
 - [ADR-071](adr/071-agendas-independentes-e-timeout.md): seleção independente das rotinas da agenda, timeout validado por requisição e propagação no servidor, Kubernetes e Actions.
-- [ADR-072](adr/072-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação, identidade de publicação por tag, SHA e pacote, e `latest` monotônico.
+- [ADR-072](adr/072-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação por tag estável, identidade de publicação por SHA e pacote, e `latest` monotônico.
 - [ADR-073](adr/073-papeis-de-runtime-separados.md): conexões distintas para runtime e migração, jobs de migração por nuvem e SQL de grants sem privilégios administrativos.
 - [ADR-074](adr/074-outbox-escolar-e-conferencia-da-fila.md): intenção escolar na mesma transação, despacho recuperável, conferência de escrita incerta e fencing da reserva.

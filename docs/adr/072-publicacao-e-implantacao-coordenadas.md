@@ -2,7 +2,7 @@
 
 ## Estado
 
-Aceita em 2026-11-10.
+Aceita em 2026-11-10. Revisada em 2026-11-10 para restringir a implantação à tag estável.
 
 ## Contexto
 
@@ -15,7 +15,7 @@ As issues #413 e #417 registraram o risco. A correção não pode depender das p
 - `implantacao.yml` é o único proprietário da sequência de produção: validar, construir, migrar, publicar sem domínio, promover e conferir a saúde por SHA.
 - `migracoes.yml` não mantém um caminho paralelo. O workflow manual delega a sequência inteira com `workflow_call` e `secrets: inherit`.
 - A seção mutante usa a trava `implantacao-producao` com `cancel-in-progress: false`. Eventos intercalados da mesma implantação são serializados; destinos diferentes usam filas próprias no orquestrador.
-- A seleção aceita `main` somente antes da primeira release estável. Depois de existir uma release estável, a entrada é a tag SemVer completa, tanto no evento `release` quanto no dispatch manual.
+- A seleção aceita somente a tag SemVer completa, tanto no evento `release` quanto no dispatch manual. Push na `main` não inicia produção, inclusive antes da primeira release estável.
 - O atestado `IMPLANTACAO_ATESTADO` vincula SHA, destino, backup verificado, recuperação verificada, migrações expansivas e coordenação do auto-deploy nativo. Sem os quatro booleanos verdadeiros para o mesmo SHA, a sequência não começa.
 - A falha antes da migração é reportada como interrupção segura. A falha a partir da migração informa que o schema pode ter sido aplicado e que rollback de imagem não reverte o banco; não existe repetição automática de etapa mutante.
 - `publicacao.yml` valida a identidade antes do login no registry. A versão precisa ser SemVer estável, a referência precisa ser `refs/tags/v<versao>`, a tag, leve ou anotada, precisa resolver para o SHA do checkout, o commit precisa ser ancestral da `main` e o `package.json` desse commit precisa declarar a mesma versão.
@@ -28,12 +28,14 @@ As issues #413 e #417 registraram o risco. A correção não pode depender das p
 - Migrar depois do deploy: recusada porque a aplicação nova poderia servir tráfego sobre um schema antigo.
 - Publicar `latest` em toda versão estável: recusada porque um dispatch de versão antiga faria o canal estável regredir.
 - Aceitar branch homônima à tag: recusada porque a referência não prova que a versão publicada está no commit revisado.
+- Permitir a `main` antes da primeira release: recusada porque a produção deixaria de ter uma revisão versionada e o gatilho de push criaria execuções fora da política de tag.
 - Exigir apenas a tag no evento de release: recusada porque o dispatch manual continuaria escolhendo uma referência divergente.
 - Repetir a etapa de migração automaticamente após falha: recusada porque não há como garantir que a transação anterior não deixou schema aplicado.
 
 ## Consequências
 
 - A publicação de imagem e a implantação passam a depender do mesmo validador de identidade.
+- A primeira implantação também exige tag estável; a `main` não é um caminho de produção.
 - Cada tag estável tem uma única revisão canônica para a aplicação, o backup e a saúde.
 - `latest` pode ficar atrás da última tag publicada, por decisão explícita, quando uma versão antiga é republicada.
 - O mantenedor precisa preencher o atestado com os valores da revisão antes de liberar a implantação.

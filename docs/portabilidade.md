@@ -10,7 +10,7 @@ As duas imagens usam a versão canônica, `sha-<SHA completo>` e `latest` estáv
 
 ## Proprietário de implantação
 
-`implantacao.yml` concentra a seção serializada `implantacao-producao`, sem cancelamento da operação em curso. `migracoes.yml` delega a sequência inteira. A seleção aceita `main` antes da primeira release estável e somente tags estáveis depois, com inventário completo de releases. Primeiro valida e constrói, depois migra, publica sem domínio, promove e confere a saúde com o SHA esperado. A trava do migrador no banco permanece intacta.
+`implantacao.yml` concentra a seção serializada `implantacao-producao`, sem cancelamento da operação em curso. `migracoes.yml` delega a sequência inteira. A seleção aceita somente tag estável, inclusive antes da primeira release; push na `main` não inicia produção. Primeiro valida e constrói, depois migra, publica sem domínio, promove e confere a saúde com o SHA esperado. A trava do migrador no banco permanece intacta.
 
 O atestado `IMPLANTACAO_ATESTADO` precisa corresponder ao SHA e destino e confirmar backup, recuperação, compatibilidade expansiva e coordenação do auto-deploy nativo. Este repositório não preenche um atestado real nem modifica plataformas. Sem essa confirmação, não há migração. Falha após iniciá-la pode deixar schema aplicado: rollback de imagem não desfaz banco, e não existe repetição mutante automática.
 

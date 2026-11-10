@@ -10,11 +10,11 @@ O projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) e m
 - Versão menor: funcionalidade nova compatível com as versões anteriores.
 - Versão de correção: correção de comportamento, segurança e dependências.
 
-Enquanto a primeira versão pública não é lançada, a versão permanece fixada em `0.1.0` e as mudanças acumulam na seção Não publicado do changelog. O deploy continua acompanhando a `main`.
+Enquanto a primeira versão pública não é lançada, a versão permanece fixada em `0.1.0` e as mudanças acumulam na seção Não publicado do changelog. Não há deploy de produção pela `main`, nem antes da primeira release: a implantação exige uma tag estável.
 
 ## Fluxo a partir da v1.0.0
 
-A primeira release será a `v1.0.0`. A partir dela:
+A primeira release será a `v1.0.0` e inaugura o único caminho de produção:
 
 1. o [release-please](https://github.com/googleapis/release-please) mantém um pull request de release com a versão e o changelog;
 2. o merge do pull request de release cria a tag `vX.Y.Z` e a release imutável no GitHub;
@@ -36,7 +36,7 @@ As entradas do changelog vêm dos títulos dos pull requests, escritos no presen
 
 ## Backup, compatibilidade e recuperação
 
-A seção mutante usa `cancel-in-progress:false` e uma chave comum por destino. `migracoes.yml` não migra mais por um caminho paralelo. O inventário de releases escolhe `main` apenas antes da primeira release estável e tags depois. O migrador mantém as duas travas consultivas e a conferência de checksums.
+A seção mutante usa `cancel-in-progress:false` e uma chave comum por destino. `migracoes.yml` não migra mais por um caminho paralelo. A implantação aceita somente tag estável, inclusive antes da primeira release; push na `main` não inicia produção. O migrador mantém as duas travas consultivas e a conferência de checksums.
 
 Antes da primeira mutação, o mantenedor registra `IMPLANTACAO_ATESTADO` com `sha`, `destino: "producao"`, `backupVerificado`, `recuperacaoVerificada`, `migracoesExpansivas` e `autoDeployCoordenado`. Todos os booleanos precisam ser verdadeiros para a revisão em questão. Atestar não executa backup nem ensaio de recuperação; o recibo depende dessas verificações reais previamente autorizadas. Configuração nativa de auto-deploy e proteções dos environments permanecem externas e não verificadas por unidade.
 
