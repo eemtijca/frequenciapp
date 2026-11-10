@@ -14,7 +14,7 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - O envio usa `rclone copy --immutable`, sem espelhar exclusões.
 - O destino remoto não tem expurgo automático, salvo `BACKUP_RETER_REMOTO=true`.
 - A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de cinco.
-- Falhas retornam código 1 e não gravam confirmação.
+- Falhas de geração ou transporte não publicam recibo. Falha de expurgo pode ocorrer após a confirmação do novo conjunto e retorna erro sem anunciar limpeza completa.
 - Nenhum teste usa dados reais.
 
 ## Modos do banco
@@ -76,9 +76,15 @@ Configuração:
 
 ```text
 BACKUP_CRIPTOGRAFIA=gpg
-BACKUP_GPG_DESTINATARIO=backup@escola.exemplo.br
+BACKUP_GPG_DESTINATARIO=FINGERPRINT_COMPLETO_DA_CHAVE_DE_CIFRA
+BACKUP_GPG_FINGERPRINT=FINGERPRINT_COMPLETO_DA_CHAVE_PRIMARIA
+GPG_BASE_CURTA=/tmp
 BACKUP_GPG_CHAVE_PUBLICA=/etc/frequenciapp/backup-publica.asc
 ```
+
+O pin da chave primária precisa ser conferido por canal independente do arquivo público. Guardar ambos em uma área que o mesmo atacante substitui não cria uma nova âncora de confiança. O destinatário deve ser fingerprint completo da primária ou da subchave de cifra; ambiguidade, revogação e expiração bloqueiam a operação. O recibo registra a chave de cifra selecionada, não uma chave privada nem prova de posse dela.
+
+`GPG_BASE_CURTA` deve existir e permitir criar um home privado 0700. A rotina separa esse home da área do dump, confere dono e tamanho do socket informado por `gpgconf` e encerra apenas o agente do home criado pela operação. Não usa nem encerra agente pessoal herdado.
 
 ### age
 
@@ -98,6 +104,7 @@ Configuração:
 ```text
 BACKUP_CRIPTOGRAFIA=age
 BACKUP_AGE_DESTINATARIOS=/etc/frequenciapp/backup-age-destinatarios.txt
+BACKUP_AGE_DESTINATARIOS_SHA256=HASH_SHA256_CONFERIDO_POR_CANAL_INDEPENDENTE
 ```
 
 ## rclone
@@ -146,7 +153,7 @@ Regras:
 | `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior          |
 | `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump        |
 | `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                     |
-| `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint ou e-mail              |
+| `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint completo               |
 | `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                  |
 | `BACKUP_AGE_DESTINATARIOS`         | vazio                                 | Arquivo de destinatários age       |
 | `BACKUP_REMOTO`                    | vazio                                 | Destino rclone do banco            |
@@ -171,9 +178,9 @@ Regras:
 7. Copiar para o diretório local.
 8. Enviar com `rclone copy --immutable` e guardar o hash local.
 9. Baixar cada arquivo remoto e comparar com o hash local original.
-10. Gravar `ultimo-backup.json` apenas após sucesso.
-11. Aplicar a retenção local com o mínimo de cópias.
-12. Aplicar a retenção remota somente se ela estiver habilitada.
+10. Publicar recibo individual versionado após as etapas exigidas e manter cópia no catálogo persistente `ESTADO_DIR/recibos`.
+11. Atualizar atomicamente `ultimo-backup.json`, que é ponteiro e não catálogo histórico.
+12. Planejar expurgo por recibos válidos do mesmo alvo; verificar novamente o remoto contra o catálogo local independente antes de excluir seus membros exatos.
 
 Execução manual no Compose:
 
@@ -217,15 +224,19 @@ frequenciapp-20261107T033000Z-a1b2c3d4-ambiente.env.gpg.sha256
 
 ## Retenção local
 
-`BACKUP_RETER_DIAS` define a retenção por idade e `BACKUP_RETER_MINIMO` define o número de cópias confirmadas que nunca são removidas, com padrão de cinco. A rotina:
+`BACKUP_RETER_DIAS` define a idade e `BACKUP_RETER_MINIMO` protege os conjuntos confirmados mais recentes, com padrão de cinco. A confirmação exige recibo `<base>.confirmado.json` versão 1 com escopo, alvo, formato, destinatário, lista exata de artefatos, hashes e etapas tipadas. Recibo local só conta se todos os membros e checksums conferirem; nomes, legados ou uploads incompletos não contam nem autorizam exclusão por prefixo.
 
-- remove apenas arquivos com o prefixo `frequenciapp-`;
-- preserva sempre as `BACKUP_RETER_MINIMO` cópias mais recentes, mesmo acima do limite de idade;
-- remove as cópias mais antigas somente quando existem cópias confirmadas além do mínimo;
-- não roda se o upload ou a verificação remota falhar;
-- pode ser desativada com `BACKUP_RETER_DIAS=0`.
+A etapa `recuperacaoExercitada` permanece `false`: cifra, hash, transporte e listagem não comprovam recuperação. O ensaio completo em estação isolada com chave privada separada, restauração oficial e comparação de dados, constraints e migrações continua obrigatório. Cópias legadas exigem adoção e verificação explícitas, não confirmação retroativa por nome.
 
-`BACKUP_RETER_REMOTO=true` aplica os mesmos limites ao destino remoto. A limpeza remota é opcional e não exclui nada em caso de falha. O destino remoto deve usar versionamento, object lock ou política de ciclo de vida definida pela escola. O histórico do provedor não é uma política de retenção.
+O catálogo em `ESTADO_DIR/recibos` é independente do provedor. Sem persistência comprovada (`BACKUP_CATALOGO_PERSISTENTE=false`), o expurgo remoto é suspenso. No modo URL, ambos os expurgos ficam conservadoramente suspensos até existir identidade operacional verificável do banco, sem usar URL ou senha como identidade.
+
+A exclusão deriva apenas dos membros validados do recibo, inclusive ambiente e seu checksum com a extensão original. Recibo remoto é removido por último. A limpeza remota é opcional (`BACKUP_RETER_REMOTO=true`) e usa `backup-recibos.mjs`, chamado pelo consumidor `backup-banco.sh` sob a trava e identidade Compose já conferidas.
+
+O catálogo original em `ESTADO_DIR/recibos` não é apagado para ocultar ausência de arquivos. Cada conjunto remoto selecionado recebe um registro privado em `ESTADO_DIR/expurgos`, com cópia e SHA-256 do recibo, intenção pendente e sequência de exclusões confirmadas. O registro não confirma um backup novo nem altera o recibo versão 1. Antes de selecionar ou retomar um conjunto, a rotina confere ownership, escopo completo, bytes dos recibos e artefatos presentes, checksums associados, ausências já confirmadas e mínimo de outros conjuntos íntegros pertinentes. Um conjunto em expurgo não conta nesse mínimo.
+
+Falha parcial retorna erro e preserva catálogo, registro e membros restantes. A próxima execução configurada pode retomar somente o mesmo conjunto se todas as conferências voltarem a passar. O registro concluído só deixa de ocupar o catálogo ativo após nova prova de ausência de todos os seus membros exatos; a evidência original continua preservada. Ausência sem exclusão previamente confirmada, reaparecimento, alteração do recibo, erro de listagem ou estado desconhecido suspendem a limpeza para diagnóstico. Não há garantia de transação remota ou de execução exatamente uma vez: uma exclusão efetivada sem confirmação persistida exige reconciliação externa, não adoção automática da ausência.
+
+O expurgo local mantém o comportamento conservador anterior: erro interrompe a operação e preserva o recibo restante; este registro de retomada não cobre falhas locais. O leitor CLI `recibos.mjs` continua recusando um catálogo remoto inconsistente quando usado isoladamente; a reconciliação dos expurgos próprios pertence ao consumidor remoto acima, sem baixar ou reconstruir recibos do provedor.
 
 ## Restauração
 
@@ -275,7 +286,9 @@ age --decrypt -i backup-age.txt backup.dump.age |
   scripts/servidor/restaurar.sh --entrada - --confirmar --sem-copia
 ```
 
-O script aceita `--entrada -` e não grava o dump em texto puro no servidor.
+O script aceita `--entrada -` e materializa o dump em texto claro num diretório temporário privado. Não é um fluxo sem texto claro em disco. A área é removida em sucesso, erro e sinais tratáveis; `SIGKILL` exige diagnóstico de resíduos.
+
+A decifra nativa GPG exige chave privada explícita e usa `--batch --pinentry-mode error`, sem desbloquear chave protegida nem depender de cache pessoal. Para chave protegida, usar decifra externa em estação autorizada e entregar somente o dump via `--entrada -`. Não remover a passphrase, transferir a chave privada por conveniência ou colocar passphrase em argumentos, ambiente ou logs.
 
 ### Depois da restauração
 
