@@ -148,6 +148,7 @@ model Usuario {
   preferenciaNotificacoes  PreferenciaNotificacoes?
   notificacoesAtualizadas  ConfiguracaoNotificacoes[] @relation("NotificacoesAtualizadasPor")
   paineisAtualizados       PainelIndicadores[]        @relation("PainelAtualizadoPor")
+  confirmacoesHistoricas   ConfirmacaoHistorica[]     @relation("ConfirmacaoHistoricaAutor")
 
   @@index([papel])
   @@map("usuarios")
@@ -253,18 +254,19 @@ model Serie {
 // Turma de uma série (por exemplo, "1º ano A"). A exclusão é barrada
 // enquanto houver alunos ou frequências vinculadas.
 model Turma {
-  id                  String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  serieId             String                  @map("serie_id") @db.Uuid
-  nome                String
-  criadoEm            DateTime                @default(now()) @map("criado_em") @db.Timestamptz
-  serie               Serie                   @relation(fields: [serieId], references: [id], onDelete: Restrict)
-  alunos              Aluno[]                 @relation("AlunoTurma")
-  origemDe            Aluno[]                 @relation("AlunoTurmaOriginal")
-  frequencias         Frequencia[]
-  horarios            Horario[]
-  sincronizacoes      SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
-  entradas            EntradaAtrasada[]
-  frequenciasParciais FrequenciaParcial[]
+  id                     String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  serieId                String                  @map("serie_id") @db.Uuid
+  nome                   String
+  criadoEm               DateTime                @default(now()) @map("criado_em") @db.Timestamptz
+  serie                  Serie                   @relation(fields: [serieId], references: [id], onDelete: Restrict)
+  alunos                 Aluno[]                 @relation("AlunoTurma")
+  origemDe               Aluno[]                 @relation("AlunoTurmaOriginal")
+  frequencias            Frequencia[]
+  horarios               Horario[]
+  sincronizacoes         SincronizacaoPlanilha[] @relation("SincronizacaoTurma")
+  entradas               EntradaAtrasada[]
+  frequenciasParciais    FrequenciaParcial[]
+  confirmacoesHistoricas ConfirmacaoHistorica[]
 
   vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
   configuracoesOrigem ConfiguracaoOrigemTurma[]
@@ -325,20 +327,21 @@ model Horario {
 // primeiro salvamento e crescimento a cada atualização bem-sucedida; a autoria
 // fica anulável para o histórico não depender da conta.
 model Frequencia {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  turmaId         String           @map("turma_id") @db.Uuid
-  dia             DateTime         @db.Date
-  revisao         Int              @default(1)
-  criadoEm        DateTime         @default(now()) @map("criado_em") @db.Timestamptz
-  criadoPorId     String?          @map("criado_por_id") @db.Uuid
-  atualizadoPorId String?          @map("atualizado_por_id") @db.Uuid
-  atualizadoEm    DateTime         @updatedAt @map("atualizado_em") @db.Timestamptz
-  turma           Turma            @relation(fields: [turmaId], references: [id], onDelete: Restrict)
-  criadoPor       Usuario?         @relation("FrequenciaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
-  atualizadoPor   Usuario?         @relation("FrequenciaAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
-  faltas          Falta[]
-  alunos          AlunoDaChamada[]
-  aulas           AulaDaChamada[]
+  id                     String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId                String                 @map("turma_id") @db.Uuid
+  dia                    DateTime               @db.Date
+  revisao                Int                    @default(1)
+  criadoEm               DateTime               @default(now()) @map("criado_em") @db.Timestamptz
+  criadoPorId            String?                @map("criado_por_id") @db.Uuid
+  atualizadoPorId        String?                @map("atualizado_por_id") @db.Uuid
+  atualizadoEm           DateTime               @updatedAt @map("atualizado_em") @db.Timestamptz
+  turma                  Turma                  @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  criadoPor              Usuario?               @relation("FrequenciaCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  atualizadoPor          Usuario?               @relation("FrequenciaAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  faltas                 Falta[]
+  alunos                 AlunoDaChamada[]
+  aulas                  AulaDaChamada[]
+  confirmacoesHistoricas ConfirmacaoHistorica[]
 
   @@unique([turmaId, dia])
   @@index([dia])
@@ -681,6 +684,35 @@ model Auditoria {
   @@index([criadoEm])
   @@index([usuarioId])
   @@map("auditoria")
+}
+
+// Tipo de confirmação que introduziu histórico sem retrato na chamada.
+enum TipoConfirmacaoHistorica {
+  CHAMADA_RETROATIVA
+
+  @@map("tipo_confirmacao_historica")
+}
+
+// Confirmação explícita de uma chamada retroativa sem composição comprovada.
+// Guarda o motivo e o retrato da lista usada, sem nomes de alunos.
+model ConfirmacaoHistorica {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  frequenciaId   String                   @map("frequencia_id") @db.Uuid
+  tipo           TipoConfirmacaoHistorica @default(CHAMADA_RETROATIVA)
+  dia            DateTime                 @db.Date
+  turmaId        String                   @map("turma_id") @db.Uuid
+  autorId        String?                  @map("autor_id") @db.Uuid
+  autorNome      String                   @map("autor_nome") @db.VarChar(100)
+  motivo         String                   @db.VarChar(200)
+  alunosSnapshot Json                     @map("alunos_snapshot")
+  criadoEm       DateTime                 @default(now()) @map("criado_em") @db.Timestamptz
+  frequencia     Frequencia               @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
+  turma          Turma                    @relation(fields: [turmaId], references: [id], onDelete: Restrict)
+  autor          Usuario?                 @relation("ConfirmacaoHistoricaAutor", fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@unique([frequenciaId, tipo])
+  @@index([dia, turmaId])
+  @@map("confirmacoes_historicas")
 }
 
 // Tipo de envio automático à planilha que a fila processa.
