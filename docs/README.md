@@ -76,3 +76,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-064](adr/064-auto-hospedagem-servidor.md): contrato portátil, proxy TLS, backup, agenda e atualização em servidor próprio.
 - [ADR-065](adr/065-atualizacao-e-recuperacao-verificaveis.md): atualização em worktree, backup obrigatório, retenção mínima e restauração com validação e banco anterior.
 - [ADR-066](adr/066-politica-retroativa.md): chamada retroativa com composição comprovada ou confirmação explícita, auditoria e retrato de aulas.
+- [ADR-069](adr/069-referencia-historica-saidas.md): turma e aulas históricas nas saídas, com confirmação explícita quando a referência não pode ser comprovada.

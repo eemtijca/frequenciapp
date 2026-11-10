@@ -302,6 +302,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As saídas antecipadas passam a guardar a turma e o retrato de aulas do momento, com confirmação explícita e auditoria quando a referência histórica não pode ser comprovada. A Chamada Parcial e os relatórios usam a turma histórica, e a conferência é recusada sem retrato confiável. A decisão está na [ADR-069](docs/adr/069-referencia-historica-saidas.md).
+
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
 
 - As abas mensais da chamada mantêm os dias em ordem cronológica após envios retroativos, inclusive datas liberadas depois de feriado. Preparar o mês novamente corrige colunas já fora de ordem, preservando registros, fórmulas, notas e posições finais das colunas manuais.
