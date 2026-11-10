@@ -112,6 +112,7 @@ test("reabre o retrato offline e apaga os dados quando a chave é revogada", asy
     }, personalizacao);
     await page.goto("/bi");
     await aguardarHidratacao(page, "#chave-bi");
+    await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
     await page.getByLabel("Chave de acesso", { exact: true }).fill(chave);
     await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
     await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();

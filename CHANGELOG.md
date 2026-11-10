@@ -415,6 +415,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Segurança
 
 - O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
+- O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.
 - A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
 - Atualiza `fast-uri` para 3.1.9 e `minimatch` 10 para 11.0.1 por override do pnpm, corrigindo os alertas do Dependabot sem alterar as APIs consumidas pelo projeto.
 - A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
