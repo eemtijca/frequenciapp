@@ -313,6 +313,8 @@ scripts/servidor/atualizar.sh --permitir-migracoes
 scripts/servidor/atualizar.sh --registrar
 ```
 
+A simulação não executa `git fetch`, não altera refs nem tags e não aplica backup, build ou migração. Ela usa as referências locais; para considerar o remoto mais recente, execute `git fetch` manualmente e repita a simulação.
+
 A primeira instalação pode ser registrada com `--registrar` depois da subida manual e da adoção da identidade. O modo `auto` usa o estado em `/var/lib/frequenciapp/estado.json`.
 
 O Kubernetes e as plataformas gerenciadas usam o próprio rollout. O contrato da aplicação e a imagem publicada são os mesmos.

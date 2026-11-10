@@ -304,8 +304,16 @@ if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
   erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de atualizar."
 fi
 
-log "Buscando referências em $ATUALIZAR_REMOTO."
-git -C "$APP_DIR" fetch --tags --prune --force "$ATUALIZAR_REMOTO"
+if [ "$simular" = true ]; then
+  # A simulação não busca referências: o fetch com tags, prune e force altera
+  # refs locais. Quem quiser considerar o remoto atualizado busca antes, de
+  # forma explícita, e repete a simulação.
+  log "Simulação sem buscar referências: usando as refs locais em $APP_DIR."
+  log "Execute git fetch manualmente se precisar considerar o remoto atualizado."
+else
+  log "Buscando referências em $ATUALIZAR_REMOTO."
+  git -C "$APP_DIR" fetch --tags --prune --force "$ATUALIZAR_REMOTO"
+fi
 
 tag_estavel=$(git -C "$APP_DIR" tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname |
   grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)

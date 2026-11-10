@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
+
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
 
 - A agenda permite selecionar notificações, planilhas e indicadores de forma independente, com timeout validado em cada chamada. O chart Helm recusa backup do banco em `emptyDir` sem destino remoto explícito e exige PVC quando a cópia local está habilitada.
