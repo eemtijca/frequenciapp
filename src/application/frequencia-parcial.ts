@@ -3,6 +3,7 @@
 import { aplicarJustificativaEmChamadasSalvas } from "@/application/justificativas-antecipadas";
 import { conferirBaseSaida, esquemaBaseSaida, invalidarConfirmacaoSaida } from "./saidas-parciais";
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { Prisma, FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -376,7 +377,7 @@ export async function salvarFrequenciaParcial(
       if (base) {
         const vigente = await tx.frequencia.findFirst({
           where: { dia, alunos: { some: { alunoId: dados.data.alunoId } } },
-          orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+          orderBy: ORDEM_BASE_CHAMADA,
           select: { id: true },
         });
         if (vigente?.id !== base.id)

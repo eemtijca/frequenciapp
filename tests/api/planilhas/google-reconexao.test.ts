@@ -137,6 +137,8 @@ beforeAll(async () => {
         dia: DIA,
         faltas: nome === "A" ? [aluno.id] : [],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético da reconexão Google",
       }),
     );
   }

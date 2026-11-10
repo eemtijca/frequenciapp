@@ -1,6 +1,7 @@
 // Projeta saídas na conferência parcial e confirma somente as aulas que foram exibidas.
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { Prisma } from "../../generated/prisma/client";
 import { ehDomingo, horariosDaChamada, rotuloMomento } from "@/domain/frequencia";
 import type { FrequenciaDaSaida } from "@/domain/frequencia-personalizada";
@@ -28,7 +29,7 @@ export async function consultarSaidasParciais(
       alunos: { select: { alunoId: true } },
       faltas: { select: { alunoId: true, horarioId: true } },
     },
-    orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+    orderBy: ORDEM_BASE_CHAMADA,
   });
   const feriados = new Set(
     (await tx.feriado.findMany({ where: { dia: periodo }, select: { dia: true } })).map((f) =>
