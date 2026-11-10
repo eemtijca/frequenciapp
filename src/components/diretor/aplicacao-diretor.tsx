@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Bell, Info, KeyRound, LoaderCircle, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { pedir } from "@/lib/api-cliente";
+import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
 import { avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
@@ -42,6 +43,11 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
     } catch {
       toast.error("Não foi possível sair. Tente novamente.");
       return;
+    }
+    try {
+      await expurgarBiNoLogout();
+    } catch {
+      // A sessão encerra mesmo quando o navegador bloqueia o armazenamento local.
     }
     avisarSucesso("Sessão encerrada.");
     router.refresh();
