@@ -51,7 +51,15 @@ async function listar(ano = 1990): Promise<Feriado[]> {
 }
 
 function chamada(data = dia, turma = turmaId, extras: Record<string, unknown> = {}) {
-  return { dia: data, turmaId: turma, faltas: [], revisao: 0, ...extras };
+  return {
+    dia: data,
+    turmaId: turma,
+    faltas: [],
+    revisao: 0,
+    confirmarHistorico: true,
+    motivo: "Teste sintético do calendário letivo",
+    ...extras,
+  };
 }
 
 function parcial(data = dia) {
