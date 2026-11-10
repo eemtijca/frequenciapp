@@ -72,7 +72,6 @@ if [ -z "$arquivo" ] && [ -z "$entrada" ]; then
 fi
 
 carregar_ambiente
-travar restauracao 0
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_DATABASE_URL="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}"
@@ -104,6 +103,9 @@ case "$BACKUP_MODO" in
     erro "BACKUP_MODO inválido: $BACKUP_MODO."
     ;;
 esac
+
+if [ "$BACKUP_MODO" = url ]; then SERVIDOR_ALVO_CHAVE=url-conservador; fi
+travar restauracao 0
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-restauracao.XXXXXX")
 umask 077

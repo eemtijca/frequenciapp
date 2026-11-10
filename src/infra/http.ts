@@ -104,11 +104,29 @@ export function corpoJson(requisicao: Request): Promise<unknown> {
 
 /** Corpo JSON com limite próprio, para rotas de importação de cópia. */
 export async function corpoJsonComLimite(requisicao: Request, limite: number): Promise<unknown> {
-  const texto = await requisicao.text();
-  if (!texto) return null;
-  if (Buffer.byteLength(texto, "utf8") > limite) {
-    throw new ErroHttp("O conteúdo enviado é grande demais para processar.", 413);
+  if (!requisicao.body) return null;
+  const leitor = requisicao.body.getReader();
+  const decodificador = new TextDecoder();
+  const partes: string[] = [];
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await leitor.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > limite) {
+        // A falha de cancelamento não pode esconder a recusa por tamanho.
+        await leitor.cancel().catch(() => undefined);
+        throw new ErroHttp("O conteúdo enviado é grande demais para processar.", 413);
+      }
+      partes.push(decodificador.decode(value, { stream: true }));
+    }
+    partes.push(decodificador.decode());
+  } finally {
+    leitor.releaseLock();
   }
+  const texto = partes.join("");
+  if (!texto) return null;
   try {
     return JSON.parse(texto) as unknown;
   } catch {

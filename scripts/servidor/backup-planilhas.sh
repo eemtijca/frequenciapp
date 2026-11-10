@@ -7,5 +7,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/comum.sh"
 
 carregar_ambiente
-montar_compose
-exec "${COMPOSE[@]}" --profile backup run --rm backup-planilhas
+verificar_instalacao
+travar backup-planilhas 0
+exec "${COMPOSE[@]}" --profile backup run --rm "$SERVIDOR_SERVICO_BACKUP_PLANILHAS"

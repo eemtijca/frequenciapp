@@ -26,6 +26,7 @@ async function limparMassa() {
   if (!conexao || !conexao.startsWith("postgresql://")) return;
   banco = new pg.Client({ connectionString: conexao });
   await banco.connect();
+  await banco.query("delete from tentativas_entrada where chave like 'entrada:%'");
   await banco.query("delete from frequencias where dia = any($1::date[])", [DIAS_TESTE]);
   await banco.query("delete from alunos where nome like 'QA%'");
   await banco.query("delete from liberadores where codigo like 'QA%'");
@@ -164,6 +165,39 @@ afterAll(async () => {
 });
 
 describe("autenticação", () => {
+  it("recusa stream de entrada acima do limite sem Content-Length", async () => {
+    let enviados = 0;
+    const fluxo = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (enviados++ < 4) c.enqueue(new Uint8Array(60_000).fill(32));
+        else c.close();
+      },
+    });
+    const opcoes: RequestInit & { duplex: "half" } = {
+      method: "POST",
+      body: fluxo,
+      duplex: "half",
+      headers: { Origin: APP_URL, "Content-Type": "application/json" },
+    };
+    const resposta = await fetch(`${APP_URL}/api/auth/entrar`, opcoes);
+    expect(resposta.status).toBe(413);
+    expect(await resposta.json()).toMatchObject({
+      error: "O conteúdo enviado é grande demais para processar.",
+    });
+  });
+
+  it("logout confirmado invalida o token anterior e aceita repetição", async () => {
+    const sessao = await entrar(EMAIL_ADMIN, SENHA_ADMIN);
+    expect(sessao.status).toBe(200);
+    const saida = await autenticado(sessao.cookie, "/api/auth/sair", { method: "POST" });
+    expect(saida.status).toBe(200);
+    expect(await saida.json()).toEqual({ ok: true });
+    expect(saida.headers.get("set-cookie")).toContain("Max-Age=0");
+    expect((await autenticado(sessao.cookie, "/api/turmas")).status).toBe(401);
+    expect((await autenticado(sessao.cookie, "/api/auth/sair", { method: "POST" })).status).toBe(
+      200,
+    );
+  });
   it("recusa credenciais erradas com mensagem genérica", async () => {
     const resposta = await requisicao("/api/auth/entrar", {
       method: "POST",
@@ -221,6 +255,42 @@ describe("autenticação", () => {
     const validade = await validadeDaSessaoDoCookie(bruto);
     expect(validade).toBeGreaterThan(11 * 60 * 60 * 1000);
     expect(validade).toBeLessThan(13 * 60 * 60 * 1000);
+  });
+
+  it("não deixa sessão sobreviver à desativação concorrente", async () => {
+    const email = "qa-corrida@escola.exemplo";
+    const senha = "CorridaFrequencia2026";
+    const criado = await autenticado(cookieAdmin, "/api/usuarios", {
+      method: "POST",
+      body: JSON.stringify({ nome: "QA Corrida", email, senha, papel: "COORDENACAO" }),
+    });
+    expect(criado.status).toBe(201);
+    const { usuario } = (await criado.json()) as { usuario: UsuarioApi };
+    const login = requisicao("/api/auth/entrar", {
+      method: "POST",
+      body: JSON.stringify({ login: email, senha }),
+    });
+    await new Promise((resolver) => setTimeout(resolver, 5));
+    let desativar: Response | null = null;
+    for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+      desativar = await autenticado(cookieAdmin, `/api/usuarios/${usuario.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ ativo: false }),
+      });
+      if (desativar.status === 200) break;
+      expect(desativar.status).toBe(409);
+    }
+    if (!desativar) throw new Error("Desativação não executada.");
+    expect(desativar.status).toBe(200);
+    const respostaLogin = await login;
+    if (respostaLogin.status === 200) {
+      const cookie = (respostaLogin.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+      const sessao = await autenticado(cookie, "/api/auth/sessao");
+      const dados = (await sessao.json()) as { usuario: UsuarioApi | null };
+      expect(dados.usuario).toBeNull();
+    } else {
+      expect([401, 403, 409]).toContain(respostaLogin.status);
+    }
   });
 
   it("exige sessão para listar turmas", async () => {
@@ -2035,13 +2105,18 @@ describe("trilha de auditoria", () => {
 });
 
 describe("limite de tentativas de entrada", () => {
-  it("bloqueia após excesso de erros no mesmo e-mail", async () => {
+  it("bloqueia após excesso de erros de logins distintos na mesma origem", async () => {
+    const origem = `qa-rate-${Date.now()}`;
     let ultima = 0;
     for (let tentativa = 0; tentativa < 12; tentativa += 1) {
       const resposta = await fetch(`${APP_URL}/api/auth/entrar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: APP_URL },
-        body: JSON.stringify({ email: "qa-rate@escola.exemplo", senha: "errada" }),
+        headers: {
+          "Content-Type": "application/json",
+          Origin: APP_URL,
+          "X-Forwarded-For": origem,
+        },
+        body: JSON.stringify({ email: `qa-rate-${tentativa}@escola.exemplo`, senha: "errada" }),
       });
       ultima = resposta.status;
     }

@@ -74,8 +74,15 @@ async function json<T>(resposta: Response): Promise<T> {
   return (await resposta.json()) as T;
 }
 
-async function entrar(corpo: Record<string, unknown>): Promise<Response> {
-  return chamar("/api/auth/entrar", { method: "POST", body: JSON.stringify(corpo) });
+async function entrar(
+  corpo: Record<string, unknown>,
+  cabecalhos: HeadersInit = {},
+): Promise<Response> {
+  return chamar("/api/auth/entrar", {
+    method: "POST",
+    body: JSON.stringify(corpo),
+    headers: cabecalhos,
+  });
 }
 
 function hojeNaEscola(): string {
@@ -539,23 +546,30 @@ describe("parâmetros de acesso", () => {
     expect(parametros.categoriasDiretor).toEqual(["faltas", "saidas"]);
   });
 
-  it("limita as tentativas de entrada pelo parâmetro, com contagem no banco", async () => {
+  it("limita tentativas de logins distintos pela mesma origem", async () => {
     await chamar(
       "/api/parametros-acesso",
       { method: "PATCH", body: JSON.stringify({ tentativasPorOrigem: 2 }) },
       cookieAdmin,
     );
+    const origem = "qd-origem-limite";
     const statuses: number[] = [];
     for (let tentativa = 0; tentativa < 3; tentativa += 1) {
-      statuses.push((await entrar({ login: "qd-inexistente", senha: "errada-123" })).status);
+      statuses.push(
+        (
+          await entrar(
+            { login: `qd-inexistente-${tentativa}`, senha: "errada-123" },
+            { "X-Forwarded-For": origem },
+          )
+        ).status,
+      );
     }
     expect(statuses).toEqual([401, 401, 429]);
-    {
-      if (!banco) throw new Error("Banco de diretores não inicializado.");
-      const linhas = await banco.query(
-        "select contagem from tentativas_entrada where chave like '%qd-inexistente'",
-      );
-      expect(linhas.rowCount).toBeGreaterThan(0);
-    }
+    if (!banco) throw new Error("Banco de diretores não inicializado.");
+    const linhas = await banco.query<{ contagem: number }>(
+      "select contagem from tentativas_entrada where chave = $1",
+      [`entrada:ip:${origem}`],
+    );
+    expect(linhas.rows[0]?.contagem).toBe(3);
   });
 });
