@@ -216,10 +216,12 @@ it("uma mudança da referência histórica exige outra prévia antes de preparar
   const periodo = { de: dia, ate: dia };
   const previa = await simularEnvioSaidas(usuario, periodo);
   const saidas = await dubl.saidas();
-  dubl.saidas.mockResolvedValue(saidas.map((saida: Record<string, unknown>) => ({
-    ...saida,
-    turmaHistoricaNome: "QA Ano B",
-  })));
+  dubl.saidas.mockResolvedValue(
+    saidas.map((saida: Record<string, unknown>) => ({
+      ...saida,
+      turmaHistoricaNome: "QA Ano B",
+    })),
+  );
   await expect(
     aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }),
   ).rejects.toMatchObject({ status: 409 });
@@ -234,11 +236,16 @@ it("transferência e renomeação atuais preservam a prévia histórica e seu en
   dubl.alunos.mockResolvedValue([{ id: "qa-aluno", nome: "QA Aluno", turmaId: "qa-turma-b" }]);
   dubl.turmas.mockResolvedValue([{ id: "qa-turma-b", rotulo: "QA Renomeada" }]);
   expect(await simularEnvioSaidas(usuario, periodo)).toEqual(previa);
-  expect(await aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }))
-    .toMatchObject({ resultado: "sucesso" });
-  const operacoes = dubl.chamar.mock.calls.find((args) => args[1].acao === "aplicar")?.[1].operacoes;
+  expect(
+    await aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }),
+  ).toMatchObject({ resultado: "sucesso" });
+  const operacoes = dubl.chamar.mock.calls.find((args) => args[1].acao === "aplicar")?.[1]
+    .operacoes;
   expect(operacoes).toEqual([
-    { tipo: "criarLinhas", itens: previa.criar.map((linha) => ({ linha: linha.linha, celulas: linha.celulas })) },
+    {
+      tipo: "criarLinhas",
+      itens: previa.criar.map((linha) => ({ linha: linha.linha, celulas: linha.celulas })),
+    },
     expect.objectContaining({ tipo: "ordenarSaidas", turmas: ["QA Ano A"] }),
   ]);
   expect(dubl.turmas).not.toHaveBeenCalled();
@@ -246,26 +253,44 @@ it("transferência e renomeação atuais preservam a prévia histórica e seu en
 
 it("deriva os rótulos únicos somente das linhas históricas enviáveis, incluindo desconhecidos", async () => {
   const [base] = await dubl.saidas();
-  dubl.alunos.mockResolvedValue(["a", "b", "c", "d"].map((id) => ({ id, nome: `QA ${id}`, turmaId: "qa-atual" })));
+  dubl.alunos.mockResolvedValue(
+    ["a", "b", "c", "d"].map((id) => ({ id, nome: `QA ${id}`, turmaId: "qa-atual" })),
+  );
   dubl.saidas.mockResolvedValue([
     { ...base, id: "s-a", alunoId: "a", turmaHistoricaNome: "QA Z" },
     { ...base, id: "s-b", alunoId: "b", turmaHistoricaNome: "QA A" },
     { ...base, id: "s-c", alunoId: "c", turmaHistoricaNome: "QA Z" },
-    { ...base, id: "s-d", alunoId: "d", turmaHistoricaId: null, turmaHistoricaNome: null, origemReferencia: "DESCONHECIDA" },
+    {
+      ...base,
+      id: "s-d",
+      alunoId: "d",
+      turmaHistoricaId: null,
+      turmaHistoricaNome: null,
+      origemReferencia: "DESCONHECIDA",
+    },
     { ...base, id: "s-sem-aluno", alunoId: "ausente", turmaHistoricaNome: "Não enviada" },
   ]);
   const periodo = { de: dia, ate: dia };
   const previa = await simularEnvioSaidas(usuario, periodo);
   expect(previa.resumo.criar).toBe(4);
   const original = dubl.chamar.getMockImplementation();
-  dubl.chamar.mockImplementation(async (...args) => args[1].acao === "aplicar"
-    ? { linhasCriadas: 4, preenchidas: 0, substituidas: 0, removidasLinhas: 0 }
-    : original?.(...args));
-  expect(await aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }))
-    .toMatchObject({ resultado: "sucesso" });
-  const operacoes = dubl.chamar.mock.calls.find((args) => args[1].acao === "aplicar")?.[1].operacoes;
-  expect(operacoes.at(-1)).toMatchObject({ tipo: "ordenarSaidas", turmas: ["QA A", "QA Z", "Turma histórica desconhecida"] });
-  expect(operacoes[0]?.itens).toEqual(previa.criar.map((linha) => ({ linha: linha.linha, celulas: linha.celulas })));
+  dubl.chamar.mockImplementation(async (...args) =>
+    args[1].acao === "aplicar"
+      ? { linhasCriadas: 4, preenchidas: 0, substituidas: 0, removidasLinhas: 0 }
+      : original?.(...args),
+  );
+  expect(
+    await aplicarEnvioSaidas(usuario, { ...periodo, planoHash: previa.planoHash }),
+  ).toMatchObject({ resultado: "sucesso" });
+  const operacoes = dubl.chamar.mock.calls.find((args) => args[1].acao === "aplicar")?.[1]
+    .operacoes;
+  expect(operacoes.at(-1)).toMatchObject({
+    tipo: "ordenarSaidas",
+    turmas: ["QA A", "QA Z", "Turma histórica desconhecida"],
+  });
+  expect(operacoes[0]?.itens).toEqual(
+    previa.criar.map((linha) => ({ linha: linha.linha, celulas: linha.celulas })),
+  );
 });
 
 it("a conferência manual de saídas ordena a aba mesmo sem novos registros", async () => {
