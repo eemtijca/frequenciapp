@@ -3100,7 +3100,7 @@
             "$ref": "#/components/responses/Erro404"
           },
           "409": {
-            "description": "Revisão obsoleta com a versão vigente, ou propostas alteradas com codigo JUSTIFICATIVAS_ALTERADAS, sem gravação.",
+            "description": "Revisão obsoleta com a versão vigente, propostas alteradas com codigo JUSTIFICATIVAS_ALTERADAS ou composição histórica não comprovada com codigo CONFIRMACAO_HISTORICA_NECESSARIA, sem gravação.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3121,6 +3121,13 @@
                         "faltas": [],
                         "alunos": []
                       }
+                    }
+                  },
+                  "Confirmacao historica": {
+                    "summary": "Confirmacao historica necessaria",
+                    "value": {
+                      "error": "A composição desta turma na data não pode ser comprovada. Confirme o lançamento histórico e informe o motivo.",
+                      "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"
                     }
                   }
                 }
@@ -12648,7 +12655,7 @@
           },
           "codigo": {
             "type": "string",
-            "description": "Código estável dos erros da integração ou JUSTIFICATIVAS_ALTERADAS quando as propostas da primeira Chamada mudaram.",
+            "description": "Código estável dos erros da integração, JUSTIFICATIVAS_ALTERADAS quando as propostas da primeira Chamada mudaram ou CONFIRMACAO_HISTORICA_NECESSARIA quando a composição histórica não pode ser comprovada.",
             "example": "GOOGLE_RECONECTAR"
           },
           "conflito": {
@@ -14193,7 +14200,7 @@
           "dia": {
             "type": "string",
             "format": "date",
-            "description": "Dia civil da chamada, nunca futuro.",
+            "description": "Dia civil da chamada. Datas futuras são recusadas; datas passadas podem exigir confirmação histórica.",
             "example": "2026-10-13"
           },
           "turmaId": {
@@ -14210,6 +14217,18 @@
             "type": "boolean",
             "description": "Libera o sábado com aula. Só é aceito no sábado.",
             "example": false
+          },
+          "confirmarHistorico": {
+            "type": "boolean",
+            "description": "Confirma a chamada em data passada quando a composição da turma não pode ser comprovada. Exige motivo.",
+            "example": true
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Motivo da confirmação histórica. Obrigatório com confirmarHistorico.",
+            "example": "Chamada do diário de papel"
           },
           "faltas": {
             "type": "array",

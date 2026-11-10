@@ -186,8 +186,10 @@ export default function VistaHistorico({
                 const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
                 const turma = turmas.find((item) => item.id === frequencia.turmaId);
                 const aulasDoDia = horariosDaChamada(turma?.horarios ?? [], frequencia.dia, true);
+                const totalAulas = frequencia.aulas?.length ?? aulasDoDia.length;
+                const estimativaAulas = frequencia.faltas.length > 0 && !frequencia.aulas?.length;
                 const parciais = frequencia.faltas.filter(
-                  (falta) => aulasDoDia.length > 0 && falta.horarios.length < aulasDoDia.length,
+                  (falta) => totalAulas > 0 && falta.horarios.length < totalAulas,
                 ).length;
                 const justificadas = frequencia.faltas.filter(
                   (falta) => falta.justificativa,
@@ -242,6 +244,11 @@ export default function VistaHistorico({
                           {resumo}
                           {autoria}
                         </span>
+                        {estimativaAulas && (
+                          <span className="text-muted-foreground block text-xs">
+                            Aulas estimadas pela grade atual.
+                          </span>
+                        )}
                       </span>
                       <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />
                     </button>

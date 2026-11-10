@@ -121,6 +121,8 @@ beforeAll(async () => {
       dia: DIA,
       turmaId: turmaAId,
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da integração com a planilha",
       faltas: [{ alunoId: alunoBId, horarios: [aulaId] }],
     }),
   });

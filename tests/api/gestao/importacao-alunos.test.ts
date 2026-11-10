@@ -122,7 +122,14 @@ beforeAll(async () => {
     "/api/frequencias",
     {
       method: "POST",
-      body: JSON.stringify({ dia: DIA, turmaId: turmaA, faltas: [ids.carla], revisao: 0 }),
+      body: JSON.stringify({
+        dia: DIA,
+        turmaId: turmaA,
+        faltas: [ids.carla],
+        revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético da importação de alunos",
+      }),
     },
     cookieCoord,
   );

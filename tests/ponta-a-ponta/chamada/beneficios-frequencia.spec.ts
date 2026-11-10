@@ -51,13 +51,13 @@ test.beforeAll(async () => {
     turmaId =
       (
         await banco.query<{ id: string }>(
-          "insert into turmas (nome,serie_id) values ('A',$1) returning id",
+          "insert into turmas (nome,serie_id,criado_em) values ('A',$1,'2020-01-01T12:00:00Z') returning id",
           [serie],
         )
       ).rows[0]?.id ?? "";
     for (const [i, nome] of ["Muitas faltas", "Uma falta"].entries()) {
       const r = await banco.query<{ id: string }>(
-        "insert into alunos (nome,turma_id,turma_original_id,ordem) values ($1,$2,$2,$3) returning id",
+        "insert into alunos (nome,turma_id,turma_original_id,ordem,criado_em) values ($1,$2,$2,$3,'2020-01-01T12:00:00Z') returning id",
         [`${prefixo} ${nome}`, turmaId, i + 1],
       );
       ids.push(r.rows[0]?.id ?? "");

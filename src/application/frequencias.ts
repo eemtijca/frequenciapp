@@ -2,6 +2,7 @@
 // com faltas por aula, proteção de duplicata e conflito por revisão.
 import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
 import { mesmasJustificativasAntecipadas } from "@/domain/justificativas-antecipadas";
+import { avaliarComposicaoHistorica } from "@/domain/listas-historicas";
 import { z } from "zod";
 import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
@@ -38,21 +39,47 @@ const faltaEntrada = z.object({
     .nullish(),
 });
 
-export const esquemaSalvarFrequencia = z.object({
-  dia: z.string().refine(ehDiaValido, "Data inválida."),
-  turmaId: z.string().uuid("Turma inválida."),
-  // Lista simples de alunos significa falta em todas as aulas do dia.
-  faltas: z.union([
-    z.array(z.string().uuid()).max(500, "Lista de faltas grande demais."),
-    z.array(faltaEntrada).max(500, "Lista de faltas grande demais."),
-  ]),
-  revisao: z.number().int().min(0, "Revisão inválida.").max(999999),
-  sabadoLetivo: z.boolean().optional(),
-  justificativasAntecipadas: z
-    .array(z.object({ id: z.uuid(), revisao: z.number().int().min(1) }).strict())
-    .max(500)
-    .optional(),
-});
+export const esquemaSalvarFrequencia = z
+  .object({
+    dia: z.string().refine(ehDiaValido, "Data inválida."),
+    turmaId: z.string().uuid("Turma inválida."),
+    // Lista simples de alunos significa falta em todas as aulas do dia.
+    faltas: z.union([
+      z.array(z.string().uuid()).max(500, "Lista de faltas grande demais."),
+      z.array(faltaEntrada).max(500, "Lista de faltas grande demais."),
+    ]),
+    revisao: z.number().int().min(0, "Revisão inválida.").max(999999),
+    sabadoLetivo: z.boolean().optional(),
+    justificativasAntecipadas: z
+      .array(z.object({ id: z.uuid(), revisao: z.number().int().min(1) }).strict())
+      .max(500)
+      .optional(),
+    // A chamada retroativa sem composição comprovada exige confirmação
+    // explícita. O motivo fica no registro de auditoria da mesma transação.
+    confirmarHistorico: z.boolean().optional(),
+    motivo: z
+      .string()
+      .trim()
+      .min(3, "Informe o motivo da confirmação histórica.")
+      .max(200, "O motivo deve ter no máximo 200 caracteres.")
+      .optional(),
+  })
+  .superRefine((dados, contexto) => {
+    if (dados.confirmarHistorico && !dados.motivo) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["motivo"],
+        message: "Informe o motivo da confirmação histórica.",
+      });
+    }
+    if (!dados.confirmarHistorico && dados.motivo) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["motivo"],
+        message: "O motivo só vale com a confirmação histórica.",
+      });
+    }
+  });
 
 interface LinhaFrequencia {
   dia: Date;
@@ -281,6 +308,8 @@ export async function salvarFrequencia(
     throw new ErroHttp(dados.error.issues[0]?.message ?? "Dados inválidos.", 400);
   }
   const { dia, turmaId, revisao } = dados.data;
+  const confirmarHistorico = dados.data.confirmarHistorico === true;
+  const motivoHistorico = dados.data.motivo ?? null;
 
   if (ehDomingo(dia)) {
     throw new ErroHttp("Domingo não tem aula nem chamada.", 400);
@@ -397,6 +426,38 @@ export async function salvarFrequencia(
         where: { turmaId_dia: filtroFrequencia },
         ...COMPLEMENTO,
       });
+
+      // A chamada existente manda: sua lista gravada é o retrato da data.
+      // Sem retrato, só uma composição atual compatível dispensa confirmação.
+      if (!existente && dia < hoje) {
+        const candidatos = await tx.aluno.findMany({
+          where: { OR: [{ turmaId }, { turmaOriginalId: turmaId }] },
+          select: {
+            id: true,
+            turmaId: true,
+            turmaOriginalId: true,
+            ativo: true,
+            criadoEm: true,
+            desistenteEm: true,
+          },
+        });
+        const composicao = avaliarComposicaoHistorica(
+          { id: turma.id, criadoEm: diaLocal(turma.criadoEm, ambiente.fuso) },
+          candidatos.map((aluno) => ({
+            ...aluno,
+            criadoEm: diaLocal(aluno.criadoEm, ambiente.fuso),
+            desistenteEm: aluno.desistenteEm?.toISOString().slice(0, 10) ?? null,
+          })),
+          dia,
+        );
+        if (!composicao.compativel && !confirmarHistorico) {
+          throw new ErroHttp(
+            "A composição desta turma na data não pode ser comprovada. Confirme o lançamento histórico e informe o motivo.",
+            409,
+            "CONFIRMACAO_HISTORICA_NECESSARIA",
+          );
+        }
+      }
 
       // Aulas ativas do dia mais as que já tinham falta registrada: uma aula
       // desativada depois do registro continua aceita na edição.
@@ -553,6 +614,20 @@ export async function salvarFrequencia(
           turmaId,
           autorId: identidade.id,
         });
+        if (dia < hoje && confirmarHistorico && motivoHistorico) {
+          await tx.confirmacaoHistorica.create({
+            data: {
+              frequenciaId: criada.id,
+              tipo: "CHAMADA_RETROATIVA",
+              dia: diaUtc,
+              turmaId,
+              autorId: identidade.id,
+              autorNome: identidade.nome,
+              motivo: motivoHistorico,
+              alunosSnapshot: [...lista].sort(),
+            },
+          });
+        }
         return { situacao: "salvo" as const, frequencia: paraFrequencia(criada) };
       }
 
@@ -577,14 +652,7 @@ export async function salvarFrequencia(
         data: [...lista].map((alunoId) => ({ frequenciaId: linha.id, alunoId })),
         skipDuplicates: true,
       });
-      // O retrato das aulas é congelado na criação: edições não o reescrevem.
-      // Um retrato vazio (chamada gravada antes desta versão) é curado agora.
-      if ((existente?.aulas.length ?? 0) === 0) {
-        await tx.aulaDaChamada.createMany({
-          data: idsDeAulaAtiva.map((horarioId) => ({ frequenciaId: linha.id, horarioId })),
-          skipDuplicates: true,
-        });
-      }
+      // Retrato ausente em registro legado continua desconhecido. A grade atual não o reconstrói.
       // Só uma mudança efetiva na frequência do aluno desfaz sua confirmação.
       const assinatura = (faltas: LinhaFrequencia["faltas"], alunoId: string) =>
         JSON.stringify(

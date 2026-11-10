@@ -77,6 +77,7 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-063](adr/063-indice-chamadas-google-docs.md): índice das chamadas em Google Docs com links para as abas mensais.
 - [ADR-064](adr/064-auto-hospedagem-servidor.md): contrato portátil, proxy TLS, backup, agenda e atualização em servidor próprio.
 - [ADR-065](adr/065-atualizacao-e-recuperacao-verificaveis.md): atualização em worktree, backup obrigatório, retenção mínima e restauração com validação e banco anterior.
+- [ADR-066](adr/066-politica-retroativa.md): chamada retroativa com composição comprovada ou confirmação explícita, auditoria e retrato de aulas.
 - [ADR-067](adr/067-identidade-operacional-e-travas.md): identidade explícita do projeto Compose, bootstrap, trava por projeto e confirmação remota booleana.
 - [ADR-068](adr/068-kubernetes-backup-e-rollout.md): backup confirmado antes do upgrade, rollout por checksum, PVCs separados e fuso dos CronJobs.
 - [ADR-070](adr/070-catalogo-e-recibos-de-backup.md): catálogo independente, recibos versionados, retenção por cópias confirmadas e expurgo remoto por membros exatos.
