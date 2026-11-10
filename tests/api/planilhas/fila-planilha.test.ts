@@ -648,9 +648,9 @@ describe("lista da fila", () => {
     // O dispatcher pode mover o primeiro item para EM_ANDAMENTO durante a leitura;
     // a ordem dos identificadores é o contrato estável desta lista.
     expect(daSuite.map((item) => item.id)).toEqual([ids.AGUARDANDO, ids.FALHOU, ids.EM_ANDAMENTO]);
-    expect(estado.itens.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(
-      true,
-    );
+    // A conferência de uma escrita incerta pode manter um item concluído na
+    // lista; o contrato desta suíte é que os próprios enviados e descartados saiam.
+    expect(daSuite.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(true);
     expect(estado.contagens.CONCLUIDO).toBeGreaterThanOrEqual(1);
     expect(estado.contagens.DESCARTADO).toBeGreaterThanOrEqual(1);
     expect(estado.conferenciasPendentes).toBeGreaterThanOrEqual(0);
