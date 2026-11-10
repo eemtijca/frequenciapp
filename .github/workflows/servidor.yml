@@ -41,14 +41,14 @@ jobs:
       - name: Validar chart Helm
         run: |
           mkdir -p "$RUNNER_TEMP/helm"
-          docker run --rm -v "$PWD:/repo" -w /repo alpine/helm:latest \
+          docker run --rm -v "$PWD:/repo" -w /repo alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
             lint infra/kubernetes/frequenciapp \
             --set existingSecret=frequenciapp-segredos
           docker run --rm \
             -v "$PWD:/repo" \
             -v "$RUNNER_TEMP/helm:/out" \
             -w /repo \
-            alpine/helm:latest \
+            alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
             template frequenciapp infra/kubernetes/frequenciapp \
             --namespace frequenciapp \
             --set existingSecret=frequenciapp-segredos \
@@ -61,7 +61,7 @@ jobs:
             --output-dir /out
           docker run --rm \
             -v "$RUNNER_TEMP/helm:/out" \
-            ghcr.io/yannh/kubeconform:latest \
+            ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
             -strict -summary /out
 
       - name: Ensaiar chart Kubernetes
@@ -72,12 +72,12 @@ jobs:
           bash tests/kubernetes/validar.sh
 
       - name: Validar workflows
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest -color
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
 
       - name: Instalar ferramentas dos ensaios
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck rclone age postgresql-common
+          sudo apt-get install -y shellcheck jq rclone age postgresql-common
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
             -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc

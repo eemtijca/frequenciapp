@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
+
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
@@ -81,6 +83,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - A Chamada mostra somente o nome da justificativa, sem sigla ou repetição. Após salvar, a linha exibe o nome; ao desbloquear, o seletor e a observação voltam a ficar disponíveis.
 
 ### Adicionado
+
+- O repositório passa a ter wrappers e guardas do Floci para AWS, Azure, GCP e Terraform, além de uma guarda de banco descartável e da imagem de ferramentas dos ensaios locais.
 
 - O repositório passa a ter uma referência de auto-hospedagem para VPS, servidor dedicado e máquina on-premises. O Compose de produção remove a publicação das portas da aplicação e do banco, aceita credenciais próprias e oferece Caddy ou Nginx, com TLS público por ACME ou CA interna. A aplicação aceita `MIGRAR_NA_PARTIDA=false` para plataformas que executam a migração em Job separado. O backup do banco usa `pg_dump`, GPG de chave pública ou age, rclone, conferência por SHA-256 e restauração com script. A agenda, a atualização e a renovação do certificado do Nginx são agendadas por cron. A decisão está na [ADR-064](docs/adr/064-auto-hospedagem-servidor.md).
 
@@ -300,6 +304,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
+- As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).
 
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
@@ -407,6 +413,11 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - Leitura dos marcadores nativos de linha e coluna da Sheets API, preservando identificação do aluno e das dimensões criadas pela integração.
 
 ### Segurança
+
+- O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
+- A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
+- Atualiza `fast-uri` para 3.1.9 e `minimatch` 10 para 11.0.1 por override do pnpm, corrigindo os alertas do Dependabot sem alterar as APIs consumidas pelo projeto.
+- A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
 
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.
 

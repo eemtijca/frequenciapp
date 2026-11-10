@@ -7,6 +7,8 @@ allowBuilds:
   # Telemetria transitiva do Redocly: o script não é necessário e fica negado.
   "@scarf/scarf": false
   "@swc/core": true
+  # O postinstall confere o binário da plataforma, exigido por Vite, Vitest e Vercel.
+  esbuild: true
   prisma: true
   sharp: true
   unrs-resolver: true
