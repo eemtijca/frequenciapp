@@ -53,6 +53,7 @@ services:
       BACKUP_DESTINO: ${BACKUP_DESTINO:-}
       BACKUP_PLANILHAS_LOCAL: ${BACKUP_PLANILHAS_LOCAL:-true}
       BACKUP_PLANILHAS_DIR: /backups/planilhas
+    user: "${BACKUP_PLANILHAS_UID:-1000}:${BACKUP_PLANILHAS_GID:-1000}"
     volumes:
       - ${SERVIDOR_CONFIG_DIR:-/etc/frequenciapp}:/etc/frequenciapp:ro
       - ${BACKUP_HOST_DIR:-/var/backups/frequenciapp}:/backups

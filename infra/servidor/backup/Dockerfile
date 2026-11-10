@@ -25,3 +25,5 @@ RUN apt-get update \
 USER node
 # Fora do Compose, a imagem não tem acesso ao serviço db. O modo URL é o padrão.
 ENV BACKUP_MODO=url
+# Sem comando explícito, a imagem executa o backup das planilhas.
+ENTRYPOINT ["/bin/bash", "scripts/servidor/backup-planilhas-interno.sh"]

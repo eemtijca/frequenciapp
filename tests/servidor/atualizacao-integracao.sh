@@ -125,6 +125,7 @@ export POSTGRES_USER=frequencia
 export POSTGRES_PASSWORD=frequencia
 export POSTGRES_DB=frequencia
 export ATUALIZAR_MODO=main
+export ATUALIZAR_PERMITIR_BACKUP_LOCAL=true
 export ATUALIZAR_REF=origin/main
 export ATUALIZAR_REMOTO=origin
 export ATUALIZAR_VERIFICAR_SAUDE_PUBLICA=false

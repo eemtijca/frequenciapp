@@ -47,6 +47,19 @@ export function schemaDaConexao(url) {
   return schemaDaUrl(enderecoDaConexao(url));
 }
 
+/** Identidade canônica usada para comparar runtime, migração e backup. */
+export function identidadeDaConexao(url) {
+  const endereco = enderecoDaConexao(url);
+  const database = decodeURIComponent(endereco.pathname.replace(/^\//, ""));
+  if (!database) throw new Error("A URL de conexão PostgreSQL não informa o banco.");
+  return {
+    host: endereco.hostname.toLowerCase(),
+    port: endereco.port || "5432",
+    database,
+    schema: schemaDaUrl(endereco),
+  };
+}
+
 /**
  * Resolve o schema efetivo. A variável DATABASE_SCHEMA, quando definida, vence
  * o parâmetro schema da URL, para a plataforma de deploy escolher o schema do
