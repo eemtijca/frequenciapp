@@ -224,7 +224,9 @@ export function VistaResumoMovimentacoes({
                     {resumo.total} {resumo.total === 1 ? singular : plural}
                   </Selo>
                   <Selo>{resumo.totalAlunos} alunos</Selo>
-                  <Selo>{resumo.totalTurmas} turmas</Selo>
+                  <Selo>
+                    {resumo.totalTurmas} {tipo === "saida" ? "turmas conhecidas" : "turmas"}
+                  </Selo>
                 </>
               }
             >
@@ -232,7 +234,7 @@ export function VistaResumoMovimentacoes({
                 {[
                   [tipo === "saida" ? "Saídas" : "Entradas", resumo.total],
                   ["Alunos", resumo.totalAlunos],
-                  ["Turmas", resumo.totalTurmas],
+                  [tipo === "saida" ? "Turmas conhecidas" : "Turmas", resumo.totalTurmas],
                 ].map(([rotulo, valor]) => (
                   <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2 py-3">
                     <dt className="text-muted-foreground text-xs font-medium">{rotulo}</dt>
@@ -271,11 +273,19 @@ export function VistaResumoMovimentacoes({
             <SecaoResumo
               id="movimentacoes-turmas"
               titulo="Turmas"
-              descricao="Total por turma na semana."
+              descricao={
+                tipo === "saida"
+                  ? "Total por referência histórica; turma desconhecida separada."
+                  : "Total por turma na semana."
+              }
               icone={CalendarDays}
               aberto={aberta("turmas")}
               onAbertoChange={(valor) => alternar("turmas", valor)}
-              resumo={<Selo>{resumo.turmas.length} turmas</Selo>}
+              resumo={
+                <Selo>
+                  {resumo.totalTurmas} {tipo === "saida" ? "turmas conhecidas" : "turmas"}
+                </Selo>
+              }
             >
               {resumo.turmas.length === 0 ? (
                 <ResumoVazio texto="Nenhuma movimentação nesta semana." />
@@ -283,7 +293,11 @@ export function VistaResumoMovimentacoes({
                 <ul className="divide-y">
                   {resumo.turmas.map((turma) => (
                     <li
-                      key={turma.turmaId}
+                      key={
+                        tipo === "saida"
+                          ? JSON.stringify([turma.turmaId, turma.rotulo])
+                          : turma.turmaId
+                      }
                       className="flex items-center justify-between gap-3 py-2"
                     >
                       <span className="min-w-0 text-sm break-words">{turma.rotulo}</span>

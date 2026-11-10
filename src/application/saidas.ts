@@ -1,6 +1,9 @@
 // Saídas antecipadas: registro separado da chamada, com momento,
 // justificativa (tipo ou texto) e o liberador do catálogo da Gestão.
 import { z } from "zod";
+import { esquemaAulasReferencia } from "@/application/referencia-saida";
+import { horariosDaChamada } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
@@ -61,6 +64,10 @@ export interface FiltrosSaidas {
 }
 
 interface LinhaSaida {
+  turmaHistoricaId?: string | null;
+  turmaHistoricaNome?: string | null;
+  aulasReferencia?: unknown;
+  origemReferencia?: string;
   id: string;
   alunoId: string;
   dia: Date;
@@ -81,6 +88,11 @@ function paraSaida(
 ): SaidaAntecipada {
   return {
     id: linha.id,
+    turmaHistoricaId: linha.turmaHistoricaId ?? null,
+    turmaHistoricaNome: linha.turmaHistoricaNome ?? null,
+    aulasReferencia: esquemaAulasReferencia.safeParse(linha.aulasReferencia).data ?? null,
+    origemReferencia:
+      linha.origemReferencia === "MATRICULA_VIGENTE" ? "MATRICULA_VIGENTE" : "DESCONHECIDA",
     alunoId: linha.alunoId,
     dia: linha.dia.toISOString().slice(0, 10),
     momento: linha.momento,
@@ -117,7 +129,7 @@ export async function listarSaidas(filtros: FiltrosSaidas = {}): Promise<SaidaAn
               }
             : {}),
         ...(filtros.alunoId ? { alunoId: filtros.alunoId } : {}),
-        ...(filtros.turmaId ? { aluno: { turmaId: filtros.turmaId } } : {}),
+        ...(filtros.turmaId ? { turmaHistoricaId: filtros.turmaId } : {}),
       },
       orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
       ...COMPLEMENTO,
@@ -182,9 +194,38 @@ export async function criarSaida(
 
   try {
     return await comTransacao(async (tx) => {
+      const hoje = diaLocal(new Date(), ambiente.fuso);
+      // IDs de aulas salvas não congelam horários: não se inventa referência retroativa.
+      if (dia !== hoje)
+        throw new ErroHttp(
+          "A referência histórica da saída é desconhecida. É necessária conferência antes do lançamento retroativo.",
+          409,
+          "REFERENCIA_HISTORICA_DESCONHECIDA",
+        );
+      const vigente = await tx.aluno.findUnique({
+        where: { id: alunoId },
+        include: { turma: { include: { serie: true, horarios: true } } },
+      });
+      if (!vigente || !vigente.ativo)
+        throw new ErroHttp("Confira o cadastro ativo do aluno antes de registrar a saída.", 409);
+      const aulasReferencia = esquemaAulasReferencia.parse({
+        versao: 1,
+        aulas: horariosDaChamada(
+          vigente.turma.horarios.map((h) => ({
+            ...h,
+            disciplinas: disciplinasDoHorario(h.disciplinas),
+          })),
+          dia,
+          true,
+        ).map((h) => ({ id: h.id, ordem: h.ordem, inicio: h.inicio, fim: h.fim })),
+      });
       const criada = await tx.saidaAntecipada.create({
         data: {
           alunoId,
+          turmaHistoricaId: vigente.turmaId,
+          turmaHistoricaNome: `${vigente.turma.serie.nome} ${vigente.turma.nome}`,
+          origemReferencia: "MATRICULA_VIGENTE",
+          aulasReferencia,
           dia: new Date(`${dia}T12:00:00Z`),
           momento,
           horario,

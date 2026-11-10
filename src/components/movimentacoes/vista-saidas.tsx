@@ -501,7 +501,10 @@ export default function VistaSaidas({
                     <div className="min-w-0">
                       <p className="text-sm font-medium break-words">{aluno?.nome ?? "Aluno"}</p>
                       <CaixasDeInfo
-                        partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaId ?? ""))}
+                        partes={partesDaSaida(
+                          saida,
+                          saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
+                        )}
                         className="mt-1"
                       />
                     </div>
@@ -631,7 +634,10 @@ export default function VistaSaidas({
                           <div className="min-w-0">
                             <p className="font-semibold break-words">{nome}</p>
                             <CaixasDeInfo
-                              partes={partesDaSaida(saida, rotuloTurma(aluno?.turmaId ?? ""))}
+                              partes={partesDaSaida(
+                                saida,
+                                saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
+                              )}
                               className="mt-1"
                             />
                             <p className="text-muted-foreground mt-1 text-xs">

@@ -20,7 +20,11 @@ export async function DELETE(
     if (!sessao.ok) return sessao.resposta;
     const { id } = await contexto.params;
     if (!ehUuid(id)) return erroApi("Registro parcial inválido.", 400);
-    await removerFrequenciaParcial(sessao.usuario, id, await corpoJson(requisicao));
-    return json({ ok: true });
+    const resultado = await removerFrequenciaParcial(
+      sessao.usuario,
+      id,
+      await corpoJson(requisicao),
+    );
+    return json({ ok: true, ...resultado });
   });
 }

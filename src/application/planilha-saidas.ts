@@ -10,7 +10,6 @@ import { ambiente } from "@/infra/ambiente";
 import { mensagemParaRegistro } from "@/infra/google/planilha-erros";
 import { ErroGoogle } from "@/infra/google/planilhas-escrita";
 import { listarTodosAlunos } from "@/application/alunos";
-import { listarTodasTurmas } from "@/application/turmas";
 import { listarSaidas } from "@/application/saidas";
 import { listarJustificativas } from "@/application/justificativas";
 import { ABA_ENTRADAS } from "@/domain/planilha-entradas";
@@ -378,14 +377,12 @@ async function montarSimulacaoSaidas(
   }
   const esquemaAba = salvo.abas.find((aba) => aba.nome === salvo.aba);
   if (!esquemaAba) throw new ErroHttp(`A aba ${salvo.aba} não está mais na estrutura salva.`, 409);
-  const [alunos, turmas, saidas, justificativas] = await Promise.all([
+  const [alunos, saidas, justificativas] = await Promise.all([
     listarTodosAlunos(),
-    listarTodasTurmas(),
     listarSaidas({ de: entrada.de, ate: entrada.ate }),
     listarJustificativas(),
   ]);
   const alunosPorId = new Map(alunos.map((aluno) => [aluno.id, aluno]));
-  const turmasPorId = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
   const linhas: SaidaPlanilha[] = [];
   for (const saida of saidas) {
     const aluno = alunosPorId.get(saida.alunoId);
@@ -395,7 +392,7 @@ async function montarSimulacaoSaidas(
       id: saida.id,
       alunoId: aluno.id,
       nome: aluno.nome,
-      turma: turmasPorId.get(aluno.turmaId) ?? "",
+      turma: saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
       dia: saida.dia,
       momento: saida.horario
         ? `${saida.horario} · ${rotuloMomento(saida.momento)}`
@@ -439,9 +436,9 @@ async function montarSimulacaoSaidas(
     anoReferencia: new Date().getFullYear(),
     removerLinhas: completo ? (entrada.removerLinhas ?? []) : [],
   });
-  const rotulosTurmas = turmas
-    .map((turma) => turma.rotulo)
-    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const rotulosTurmas = [...new Set(linhas.map((linha) => linha.turma))].sort((a, b) =>
+    a.localeCompare(b, "pt-BR"),
+  );
   plano.planoHash = hashTexto(
     JSON.stringify([linha.googlePlanilhaId, plano.planoHash, rotulosTurmas]),
   );
