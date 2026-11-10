@@ -123,9 +123,14 @@ persistence:
 
 agenda:
   enabled: true
+  notifications: true
+  spreadsheets: true
+  indicators: true
   schedule: "*/5 * * * *"
   # Fuso IANA do CronJob, sempre renderizado. Exige Kubernetes 1.27 ou superior.
   timeZone: America/Fortaleza
+  # Tempo máximo, em segundos, de cada chamada da agenda.
+  timeoutSeconds: 300
   appUrl: ""
   existingSecret: ""
   concurrencyPolicy: Forbid

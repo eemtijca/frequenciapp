@@ -1,4 +1,12 @@
 {{- if .Values.agenda.enabled }}
+{{- $timeoutBruto := .Values.agenda.timeoutSeconds }}
+{{- if not (or (kindIs "int" $timeoutBruto) (kindIs "int64" $timeoutBruto) (kindIs "float64" $timeoutBruto)) }}
+{{- fail "agenda.timeoutSeconds deve ser um inteiro entre 1 e 2147483" }}
+{{- end }}
+{{- $timeout := int64 $timeoutBruto }}
+{{- if or (lt $timeout 1) (gt $timeout 2147483) (and (kindIs "float64" $timeoutBruto) (ne $timeoutBruto (float64 $timeout))) }}
+{{- fail "agenda.timeoutSeconds deve ser um inteiro entre 1 e 2147483" }}
+{{- end }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -34,10 +42,17 @@ spec:
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               command: ["node", "scripts/servidor/agenda.mjs"]
               env:
+                {{- range $nome, $valor := dict "AGENDA_NOTIFICACOES" .Values.agenda.notifications "AGENDA_PLANILHAS" .Values.agenda.spreadsheets "AGENDA_INDICADORES" .Values.agenda.indicators }}
+                {{- if not (kindIs "bool" $valor) }}
+                {{- fail (printf "%s deve ser booleano" $nome) }}
+                {{- end }}
+                - name: {{ $nome }}
+                  value: {{ $valor | quote }}
+                {{- end }}
                 - name: AGENDA_URL
                   value: {{ include "frequenciapp.appUrl" . | quote }}
                 - name: AGENDA_TIMEOUT
-                  value: "300"
+                  value: {{ $timeout | quote }}
                 - name: CRON_SECRET
                   valueFrom:
                     secretKeyRef:
