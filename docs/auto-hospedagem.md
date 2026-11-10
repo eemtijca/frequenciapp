@@ -26,7 +26,7 @@ Caddy, Nginx, cron, rclone, GPG e age são escolhas de referência. Outra infrae
 ## Pré-requisitos
 
 - Linux com utilitários GNU, Bash 4 ou superior, Docker Engine e Docker Compose v2.24 ou superior. A sobreposição usa `!reset`.
-- `git`, `flock`, `curl`, `openssl`, `gnupg`, `age`, `rclone` e `sha256sum` no host para as rotinas de operação.
+- `git`, `flock`, `curl`, `openssl`, `gnupg`, `age`, `rclone`, `sha256sum`, `node` e `jq` no host para as rotinas de operação.
 - `pg_restore` 17 e `psql` no host apenas para o modo de backup e restauração por URL. No modo Compose, o cliente roda dentro do contêiner do banco.
 - Cron compatível com o fuso do daemon. O cronie do RHEL e derivados aceita `CRON_TZ`; o cron do Debian e do Ubuntu não aceita. O instalador confere essa condição.
 - Domínio público com registros A e AAAA, portas 80 e 443 liberadas, para TLS público.
@@ -60,6 +60,8 @@ infra/servidor/
 scripts/servidor/
   comum.sh
   compose.sh
+  identidade.sh
+  identidade.mjs
   agenda.sh
   backup-banco.sh
   backup-planilhas.sh
@@ -84,8 +86,10 @@ A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e
 8. Configurar o `rclone.conf` em `/etc/frequenciapp/rclone.conf`, com permissão 600.
 9. Importar a chave pública de backup ou criar a chave age.
 10. Configurar o proxy e o TLS.
-11. Subir a pilha e conferir a saúde.
-12. Instalar o cron e testar backup e restauração.
+11. Conferir a identidade inicial com `scripts/servidor/identidade.sh --iniciar`.
+12. Subir a pilha e conferir a saúde.
+13. Adotar a identidade com `scripts/servidor/identidade.sh --adotar --confirmar`.
+14. Instalar o cron e testar backup e restauração.
 
 Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, credenciais do banco e opcionais do Google, push e feriados. O `ops.env` contém domínio, TLS, backup e atualização.
 
@@ -123,14 +127,16 @@ Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, c
 
 ### Instalação Compose e serviços
 
-| Variável                            | Padrão                 | Uso                                     |
-| ----------------------------------- | ---------------------- | --------------------------------------- |
-| `COMPOSE_PROJECT_NAME`              | nome do `compose.yml`  | Nome do projeto Compose                 |
-| `COMPOSE_ARQUIVOS`                  | arquivos de referência | Lista separada por `:`                  |
-| `SERVIDOR_SERVICO_APP`              | `app`                  | Serviço da aplicação                    |
-| `SERVIDOR_SERVICO_DB`               | `db`                   | Serviço do banco                        |
-| `SERVIDOR_SERVICO_PROXY`            | `caddy` ou `nginx`     | Serviço do proxy                        |
-| `SERVIDOR_SERVICO_BACKUP_PLANILHAS` | `backup-planilhas`     | Serviço opcional de backup de planilhas |
+| Variável                            | Padrão                                 | Uso                                     |
+| ----------------------------------- | -------------------------------------- | --------------------------------------- |
+| `COMPOSE_PROJECT_NAME`              | obrigatório                            | Nome explícito do projeto Compose       |
+| `SERVIDOR_IDENTIDADE_ARQUIVO`       | `$SERVIDOR_CONFIG_DIR/identidade.json` | Registro privado da identidade adotada  |
+| `SERVIDOR_LOCK_DIR`                 | `/var/lock/frequenciapp`               | Diretório 0700 das travas por projeto   |
+| `COMPOSE_ARQUIVOS`                  | arquivos de referência                 | Lista separada por `:`                  |
+| `SERVIDOR_SERVICO_APP`              | `app`                                  | Serviço da aplicação                    |
+| `SERVIDOR_SERVICO_DB`               | `db`                                   | Serviço do banco                        |
+| `SERVIDOR_SERVICO_PROXY`            | `caddy` ou `nginx`                     | Serviço do proxy                        |
+| `SERVIDOR_SERVICO_BACKUP_PLANILHAS` | `backup-planilhas`                     | Serviço opcional de backup de planilhas |
 
 ### Backup e atualização
 
@@ -295,7 +301,7 @@ scripts/servidor/atualizar.sh --permitir-migracoes
 scripts/servidor/atualizar.sh --registrar
 ```
 
-A primeira instalação pode ser registrada com `--registrar` depois da subida manual. O modo `auto` usa o estado em `/var/lib/frequenciapp/estado.json`.
+A primeira instalação pode ser registrada com `--registrar` depois da subida manual e da adoção da identidade. O modo `auto` usa o estado em `/var/lib/frequenciapp/estado.json`.
 
 O Kubernetes e as plataformas gerenciadas usam o próprio rollout. O contrato da aplicação e a imagem publicada são os mesmos.
 
@@ -428,4 +434,24 @@ O chart Helm aceita `agenda.timeZone`, `backup.database.timeZone` e `backup.spre
 
 ## Identidade operacional
 
-As rotinas exigem Node disponível no host e `jq` para leitura tipada de estado. Definir `COMPOSE_PROJECT_NAME` explicitamente e revisar projeto, daemon, serviços e mounts antes de executar `scripts/servidor/identidade.sh --adotar --confirmar`. O arquivo `SERVIDOR_IDENTIDADE_ARQUIVO` não é sobrescrito automaticamente; mudanças de identidade exigem nova revisão. `SERVIDOR_LOCK_DIR` deve ser compartilhado pelas cópias da instalação, pertencer ao operador e ter modo 0700. A trava é local ao host, não distribuída.
+As rotinas exigem Node.js e `jq` no host. O `COMPOSE_PROJECT_NAME` é obrigatório e deve ser definido em `/etc/frequenciapp/ops.env`; sem ele, as rotinas recusam a operação. A identidade reúne o ID do daemon, o projeto, os serviços `app` e `db`, os labels do Compose e as montagens persistentes do banco.
+
+O fluxo tem dois modos:
+
+1. Antes da primeira subida, o modo inicial confere projeto, daemon, serviços e volumes declarados sem exigir containers:
+
+   ```bash
+   scripts/servidor/identidade.sh --iniciar
+   ```
+
+2. Depois da subida e antes de backup, restauração, atualização, agenda ou cron, a adoção grava a identidade dos recursos existentes:
+
+   ```bash
+   scripts/servidor/identidade.sh --adotar --confirmar
+   ```
+
+O arquivo `SERVIDOR_IDENTIDADE_ARQUIVO`, padrão `/etc/frequenciapp/identidade.json`, guarda a identidade adotada com modo 600. Ele não é sobrescrito automaticamente. Divergência de projeto, daemon, serviço ou montagem é recusada; a correção exige revisão manual do registro. O modo `scripts/servidor/identidade.sh --conferir` apenas compara o registro com os recursos atuais.
+
+A trava deriva da chave da identidade. Operações do mesmo projeto são serializadas, inclusive backup, restauração, atualização, agenda e cron. Projetos independentes usam arquivos de trava diferentes e progridem em paralelo. No modo URL, sem identidade de projeto verificável, backup e restauração usam uma trava conservadora compartilhada entre operações de URL. `SERVIDOR_LOCK_DIR` deve pertencer ao operador e ter modo 0700. O descritor 9 pode ser herdado por um processo filho legítimo, e a revalidação confere se ele aponta para a trava do mesmo projeto. A trava é local ao host, não distribuída.
+
+A atualização só aceita backup remoto confirmado quando `verificadoRemoto` é o booleano `true`. `false`, campo ausente, texto, nulo ou JSON truncado bloqueiam a atualização.
