@@ -408,7 +408,7 @@ model AulaDaChamada {
   frequenciaId String     @map("frequencia_id") @db.Uuid
   horarioId    String     @map("horario_id") @db.Uuid
   frequencia   Frequencia @relation(fields: [frequenciaId], references: [id], onDelete: Cascade)
-  horario      Horario    @relation(fields: [horarioId], references: [id], onDelete: Cascade)
+  horario      Horario    @relation(fields: [horarioId], references: [id], onDelete: Restrict)
 
   @@id([frequenciaId, horarioId])
   @@index([horarioId])
