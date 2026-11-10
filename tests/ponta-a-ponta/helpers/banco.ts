@@ -3,6 +3,7 @@
 import pg from "pg";
 import { hashearSenha } from "../../../src/infra/auth/hash";
 import { selecionarSchema } from "../../../src/infra/schema-postgres.mjs";
+import { exigirAmbienteE2E } from "./isolamento";
 
 /** Papel de quem faz a frequência; acompanha o enum do schema. */
 const PAPEL_COORDENACAO = "COORDENACAO";
@@ -20,15 +21,13 @@ export const COORD_E2E = {
 };
 
 function urlDoBanco(): string {
-  return (
-    process.env.DIRECT_URL ??
-    process.env.DATABASE_URL ??
-    "postgresql://frequencia:frequencia@localhost:5432/frequencia"
-  );
+  return process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "";
 }
 
 /** Abre uma conexão, executa a operação e fecha, mesmo em falha. */
 export async function comBanco<T>(operacao: (cliente: pg.Client) => Promise<T>): Promise<T> {
+  // A guarda roda antes de abrir a conexão e vale para toda a suíte.
+  exigirAmbienteE2E();
   const cliente = new pg.Client({ connectionString: urlDoBanco() });
   let erroOperacao: unknown;
   let falhou = false;

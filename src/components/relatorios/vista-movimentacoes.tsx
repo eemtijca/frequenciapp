@@ -474,7 +474,7 @@ export default function VistaMovimentacoes({
             <p className="text-muted-foreground text-xs">
               {agrupamento === "aluno"
                 ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
-                : "Entradas agrupadas pela turma no registro; saídas pela turma atual do aluno."}
+                : "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida."}
             </p>
           </>
         )

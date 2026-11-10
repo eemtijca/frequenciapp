@@ -109,6 +109,8 @@ beforeAll(async () => {
       dia,
       turmaId,
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético dos benefícios de frequência",
       faltas: [
         // Uma falta justificada e cinco sem justificativa.
         { alunoId, justificativa: dia === DIAS[0] ? "O" : null },
@@ -438,6 +440,8 @@ it("distingue dias de falta do resumo e aulas perdidas do alerta, preservando o 
         dia,
         turmaId: turma,
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético dos benefícios por aula",
         faltas: [
           indice < 4
             ? { alunoId: aluno }

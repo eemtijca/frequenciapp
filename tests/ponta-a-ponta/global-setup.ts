@@ -9,6 +9,7 @@ import {
   garantirContasDeTeste,
   massaDeDemonstracaoPresente,
 } from "./helpers/banco";
+import { exigirAmbienteE2E } from "./helpers/isolamento";
 
 const baseURL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 const PASTA_ESTADO = path.resolve("tests/ponta-a-ponta/.auth");
@@ -37,6 +38,8 @@ async function guardarEstado(conta: Conta, arquivo: string): Promise<void> {
 }
 
 export default async function globalSetup(): Promise<void> {
+  // Antes de qualquer conexão ou escrita: banco e aplicação precisam ser sintéticos.
+  exigirAmbienteE2E();
   // As capturas do README rodam com a semente aplicada; as suítes, sem ela.
   const capturas = process.env.CAPTURAS === "1";
   if (!capturas && (await massaDeDemonstracaoPresente())) {

@@ -177,12 +177,15 @@ beforeAll(async () => {
       dia: "2026-06-23",
       faltas: [ids.Davi],
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da restauração de origens",
     }),
   );
-  // Saída registrada durante o remanejamento: o relatório agrupa pela turma atual do aluno.
+  // Saída registrada durante o remanejamento: a referência histórica guarda a
+  // turma da data e não muda quando a origem do aluno é restaurada.
   await banco.query(
-    "insert into saidas_antecipadas (aluno_id, dia, momento, horario, texto) values ($1, '2026-06-23', 'aula_2', '09:00', 'QA Restaurar')",
-    [ids.Davi],
+    "insert into saidas_antecipadas (aluno_id, dia, momento, horario, texto, turma_historica_id, turma_historica_nome) values ($1, '2026-06-23', 'aula_2', '09:00', 'QA Restaurar', $2, 'QA Restaurar A')",
+    [ids.Davi, turmas.A],
   );
 });
 
@@ -266,8 +269,8 @@ describe("restauração das turmas de origem", () => {
       turma_original_id: turmas.X,
     });
     expect(await historico()).toEqual(registros);
-    // A saída não tem turma gravada: passa a aparecer na turma de origem do aluno.
-    expect((await saidasPorTurma()).get(ids.Davi ?? "")).toBe(turmas.B);
+    // A saída guarda a turma histórica da data e não acompanha a turma de origem restaurada.
+    expect((await saidasPorTurma()).get(ids.Davi ?? "")).toBe(turmas.A);
     const resumo = await banco.query(
       "select alvo from auditoria where acao = 'aluno.restaurar_origens' and alvo like $1",
       [`serie:${serieId}:%`],

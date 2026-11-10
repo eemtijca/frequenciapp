@@ -4,6 +4,13 @@ modo_local          = false
 localizacao         = "brazilsouth"
 ambiente            = "prod"
 imagem_aplicacao    = "frequenciappprodacr.azurecr.io/frequenciapp-prod:versao"
+revisao_aplicacao   = "0000000000000000000000000000000000000000"
+migracao_confirmada_sha = "0000000000000000000000000000000000000000"
+schema_aplicacao    = "frequenciapp"
+runtime_provisionado = true
+url_runtime         = "postgresql://papel_runtime:senha@host:5432/frequencia?sslmode=require"
+url_migracao        = "postgresql://papel_migracao:senha@host:5432/frequencia?sslmode=require"
+ambiente_job_migracao_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg/providers/Microsoft.App/managedEnvironments/migracao"
 dominio             = "frequencia.exemplo.br"
 sku_app_service     = "P1v3"
 sku_banco           = "GP_Standard_D2ds_v5"

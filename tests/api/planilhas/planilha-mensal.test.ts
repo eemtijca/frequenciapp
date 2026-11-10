@@ -149,6 +149,8 @@ async function salvar(dia: string, faltas: string[], turmaId = turmas.A) {
         dia,
         faltas,
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético da planilha mensal",
       })
     ).status,
   ).toBe(200);

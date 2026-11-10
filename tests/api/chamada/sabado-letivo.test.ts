@@ -53,7 +53,16 @@ async function chamar(caminho: string, metodo = "GET", corpo?: unknown, sessao =
 }
 
 function dadosDaChamada(alteracoes: Record<string, unknown> = {}) {
-  return { dia: sabado, turmaId, faltas: [], revisao: 0, sabadoLetivo: true, ...alteracoes };
+  return {
+    dia: sabado,
+    turmaId,
+    faltas: [],
+    revisao: 0,
+    sabadoLetivo: true,
+    confirmarHistorico: true,
+    motivo: "Teste sintético do sábado letivo",
+    ...alteracoes,
+  };
 }
 
 async function salvar(alteracoes: Record<string, unknown> = {}): Promise<Frequencia> {

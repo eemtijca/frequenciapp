@@ -3,6 +3,7 @@
 import { aplicarJustificativaEmChamadasSalvas } from "@/application/justificativas-antecipadas";
 import { conferirBaseSaida, esquemaBaseSaida, invalidarConfirmacaoSaida } from "./saidas-parciais";
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { Prisma, FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -376,7 +377,7 @@ export async function salvarFrequenciaParcial(
       if (base) {
         const vigente = await tx.frequencia.findFirst({
           where: { dia, alunos: { some: { alunoId: dados.data.alunoId } } },
-          orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+          orderBy: ORDEM_BASE_CHAMADA,
           select: { id: true },
         });
         if (vigente?.id !== base.id)
@@ -402,22 +403,17 @@ export async function salvarFrequenciaParcial(
           "Este aluno mudou de turma. Recarregue a lista antes de registrar.",
           409,
         );
-      const turma =
-        base?.turma ??
-        (saidaBase
-          ? await tx.turma.findUniqueOrThrow({
-              where: { id: saidaBase.turmaId },
-              include: { serie: true },
-            })
-          : aluno.turma);
+      if (saidaBase && !saidaBase.turmaId)
+        throw new ErroHttp("A turma histórica da saída é desconhecida.", 409);
+      const turma = base?.turma ?? aluno.turma;
       const criada = await tx.frequenciaParcial.create({
         data: {
           ...valores,
           alunoId: aluno.id,
           dia,
-          turmaId: turma.id,
+          turmaId: saidaBase?.turmaId ?? turma.id,
           alunoNome: aluno.nome,
-          turmaNome: `${turma.serie.nome} ${turma.nome}`,
+          turmaNome: saidaBase ? saidaBase.turmaNome : `${turma.serie.nome} ${turma.nome}`,
           criadoPorId: identidade.id,
           atualizadoPorId: identidade.id,
         },
@@ -491,13 +487,13 @@ export async function removerFrequenciaParcial(
   identidade: Identidade,
   id: string,
   entrada: unknown,
-): Promise<void> {
+): Promise<{ revisarChamada: { dia: string; turmaId: string } | null }> {
   const dados = z
     .object({ revisao: z.number().int().min(1) })
     .strict()
     .safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Recarregue a lista antes de remover.", 400);
-  await comTransacao(async (tx) => {
+  return comTransacao(async (tx) => {
     const existente = await tx.frequenciaParcial.findUnique({ where: { id } });
     if (!existente) throw new ErroHttp("Registro parcial não encontrado.", 404);
     if (existente.revisao !== dados.data.revisao)
@@ -519,5 +515,18 @@ export async function removerFrequenciaParcial(
       },
     });
     await auditar(tx, identidade.id, "parcial.remover", `parcial:${id}`);
+    const base =
+      existente.tipo === "JUSTIFICADA"
+        ? await tx.frequencia.findFirst({
+            where: { dia: existente.dia, alunos: { some: { alunoId: existente.alunoId } } },
+            orderBy: ORDEM_BASE_CHAMADA,
+            select: { turmaId: true },
+          })
+        : null;
+    return {
+      revisarChamada: base
+        ? { dia: existente.dia.toISOString().slice(0, 10), turmaId: base.turmaId }
+        : null,
+    };
   });
 }

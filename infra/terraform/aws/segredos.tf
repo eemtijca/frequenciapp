@@ -1,6 +1,6 @@
 # Segredos da aplicação. Em produção os valores nascem efêmeros e só chegam ao
 # Secrets Manager; no modo local valem os valores de desenvolvimento. A
-# DATABASE_URL e a DIRECT_URL usam o mesmo administrador do schema.
+# DATABASE_URL e a DIRECT_URL recebem valores distintos já provisionados em produção.
 
 ephemeral "random_password" "banco" {
   length  = 32
@@ -26,8 +26,8 @@ resource "aws_secretsmanager_secret" "database_url" {
 
 resource "aws_secretsmanager_secret_version" "database_url" {
   secret_id                = aws_secretsmanager_secret.database_url.id
-  secret_string            = var.modo_local ? local.url_banco_local : null
-  secret_string_wo         = var.modo_local ? null : local.url_banco_producao
+  secret_string            = var.modo_local ? local.url_runtime_efetiva : null
+  secret_string_wo         = var.modo_local ? null : local.url_runtime_efetiva
   secret_string_wo_version = var.modo_local ? null : var.versao_segredos
 }
 
@@ -40,8 +40,8 @@ resource "aws_secretsmanager_secret" "direct_url" {
 
 resource "aws_secretsmanager_secret_version" "direct_url" {
   secret_id                = aws_secretsmanager_secret.direct_url.id
-  secret_string            = var.modo_local ? local.url_banco_local : null
-  secret_string_wo         = var.modo_local ? null : local.url_banco_producao
+  secret_string            = var.modo_local ? local.url_migracao_efetiva : null
+  secret_string_wo         = var.modo_local ? null : local.url_migracao_efetiva
   secret_string_wo_version = var.modo_local ? null : var.versao_segredos
 }
 

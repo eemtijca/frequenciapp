@@ -86,6 +86,7 @@ resource "aws_ecs_task_definition" "api" {
       name      = "api"
       image     = var.imagem_aplicacao
       essential = true
+      dependsOn = [{ containerName = "migrar", condition = "SUCCESS" }]
 
       portMappings = [{
         containerPort = 3000
@@ -96,14 +97,16 @@ resource "aws_ecs_task_definition" "api" {
       environment = concat(
         [
           { name = "NODE_ENV", value = "production" },
+          { name = "MIGRAR_NA_PARTIDA", value = "false" },
+          { name = "DATABASE_SCHEMA", value = local.schema_aplicacao_efetiva },
+          { name = "COMMIT_SHA", value = var.revisao_aplicacao },
           { name = "PORT", value = "3000" },
           { name = "HOST", value = "0.0.0.0" },
           { name = "TZ_APP", value = var.tz_app },
           { name = "PERMITIR_HTTP", value = var.modo_local ? "true" : "false" },
         ],
         var.modo_local ? [
-          { name = "DATABASE_URL", value = local.url_banco_local },
-          { name = "DIRECT_URL", value = local.url_banco_local },
+          { name = "DATABASE_URL", value = local.url_runtime_efetiva },
           { name = "AUTH_SECRET", value = var.auth_secret_local },
           { name = "CRON_SECRET", value = var.cron_secret_local },
         ] : [],
@@ -111,7 +114,6 @@ resource "aws_ecs_task_definition" "api" {
 
       secrets = var.modo_local ? [] : [
         { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
-        { name = "DIRECT_URL", valueFrom = aws_secretsmanager_secret.direct_url.arn },
         { name = "AUTH_SECRET", valueFrom = aws_secretsmanager_secret.auth_secret.arn },
         { name = "CRON_SECRET", valueFrom = aws_secretsmanager_secret.cron.arn },
       ]
@@ -124,8 +126,35 @@ resource "aws_ecs_task_definition" "api" {
           awslogs-stream-prefix = "api"
         }
       }
+    },
+    {
+      name       = "migrar"
+      image      = var.imagem_aplicacao
+      essential  = false
+      entryPoint = ["node"]
+      command    = ["docker/app/migrar.mjs"]
+      environment = concat([
+        { name = "DATABASE_SCHEMA", value = local.schema_aplicacao_efetiva },
+        { name = "COMMIT_SHA", value = var.revisao_aplicacao },
+      ], var.modo_local ? [{ name = "DIRECT_URL", value = local.url_migracao_efetiva }] : [])
+      secrets = var.modo_local ? [] : [{ name = "DIRECT_URL", valueFrom = aws_secretsmanager_secret.direct_url.arn }]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.api.name
+          awslogs-region        = var.regiao
+          awslogs-stream-prefix = "migrar"
+        }
+      }
     }
   ])
+
+  lifecycle {
+    precondition {
+      condition     = local.runtime_configurado
+      error_message = "Provisionar e atestar papéis separados, schema e revisão antes de iniciar o ECS."
+    }
+  }
 
   tags = merge(local.tags, { Name = local.nome_base })
 }

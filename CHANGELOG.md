@@ -12,6 +12,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
 
+- A publicação passa a conciliar versão, tag, commit, ancestralidade na `main` e `package.json` antes do registry, e o canal `latest` só avança. `implantacao.yml` centraliza a sequência de produção, `migracoes.yml` delega a mesma ordem e a trava impede migração e implantação simultâneas. A decisão está na [ADR-072](docs/adr/072-publicacao-e-implantacao-coordenadas.md).
+
+- As implantações em nuvem separam as credenciais de runtime e de migração. O serviço principal deixa de receber `DIRECT_URL` e a conta administrativa, os jobs de migração têm identidade própria e o SQL de provisionamento concede apenas DML no schema exclusivo. A decisão está na [ADR-073](docs/adr/073-papeis-de-runtime-separados.md).
+
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
@@ -90,7 +94,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- O repositório passa a ter wrappers e guardas do Floci para AWS, Azure, GCP e Terraform, além de uma guarda de banco descartável e da imagem de ferramentas dos ensaios locais.
+- A chamada retroativa passa a ser permitida com confirmação explícita e auditoria quando a composição da turma não pode ser comprovada. A ordem das listas históricas fica estável, o retrato de aulas é usado na classificação e a exclusão de aula com histórico é recusada. A decisão está na [ADR-066](docs/adr/066-politica-retroativa.md).
 
 - O repositório passa a ter uma referência de auto-hospedagem para VPS, servidor dedicado e máquina on-premises. O Compose de produção remove a publicação das portas da aplicação e do banco, aceita credenciais próprias e oferece Caddy ou Nginx, com TLS público por ACME ou CA interna. A aplicação aceita `MIGRAR_NA_PARTIDA=false` para plataformas que executam a migração em Job separado. O backup do banco usa `pg_dump`, GPG de chave pública ou age, rclone, conferência por SHA-256 e restauração com script. A agenda, a atualização e a renovação do certificado do Nginx são agendadas por cron. A decisão está na [ADR-064](docs/adr/064-auto-hospedagem-servidor.md).
 
@@ -310,6 +314,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As saídas antecipadas passam a guardar a turma e o retrato de aulas do momento, com confirmação explícita e auditoria quando a referência histórica não pode ser comprovada. A Chamada Parcial e os relatórios usam a turma histórica, e a conferência é recusada sem retrato confiável. A decisão está na [ADR-069](docs/adr/069-referencia-historica-saidas.md).
 - O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
 - As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).
@@ -421,6 +426,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Segurança
 
 - O backup do banco passa a usar catálogo independente e recibos versionados, contando apenas cópias confirmadas na retenção e excluindo o remoto por membros exatos. A cifra valida o fingerprint do destinatário, usa home GPG curto e privado e cifra o dump em fluxo. A decisão está na [ADR-070](docs/adr/070-catalogo-e-recibos-de-backup.md).
+
+- A suíte de ponta a ponta exige confirmação explícita e recusa banco ou aplicação fora dos hosts sintéticos antes de qualquer conexão.
 
 - O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
 - O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.

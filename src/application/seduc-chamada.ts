@@ -1,6 +1,7 @@
 // Confirma o lançamento manual de um aluno na Seduc sem alterar a chamada,
 // protegendo a revisão da frequência e a confirmação contra concorrência.
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
@@ -47,7 +48,7 @@ export async function confirmarSeducChamada(
     if (!aluno) throw new ErroHttp("O aluno não faz parte desta chamada salva.", 400);
     const baseVigente = await tx.frequencia.findFirst({
       where: { dia: new Date(`${dia}T12:00:00Z`), alunos: { some: { alunoId } } },
-      orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+      orderBy: ORDEM_BASE_CHAMADA,
       select: { id: true },
     });
     if (baseVigente?.id !== chamada.id)

@@ -379,7 +379,7 @@ Período inclusivo, com `turmaId` opcional.
 
 ### POST /api/frequencias
 
-Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean }`.
+Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean, "confirmarHistorico"?: boolean, "motivo"?: string }`.
 
 Três formas de faltas:
 
@@ -397,6 +397,8 @@ Domingo não tem aula nem chamada: a rota responde 400 ("Domingo não tem aula n
 
 Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes. O salvamento e o cadastro de feriado travam a tabela de feriados antes de ler, então, se os dois acontecem ao mesmo tempo para a mesma data, um deles sempre vê o outro: a chamada responde 400 ou o feriado responde 409, nunca os dois aceitos (ver `docs/banco.md`).
 
+Chamada em data passada: quando a composição da turma na data não pode ser comprovada, a rota responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`. O cliente reenvia a mesma chamada com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A confirmação é gravada na mesma transação em `confirmacoes_historicas`, com autor, motivo e a lista usada ([ADR-066](adr/066-politica-retroativa.md)). Quando a composição é compatível, a gravação segue sem confirmação. A chamada existente prevalece e não consulta a composição atual.
+
 Semântica da `revisao`:
 
 - `0` cria a primeira versão. Se já existe frequência do dia e turma, responde 409 com a versão vigente.
@@ -409,7 +411,7 @@ Validações: o dia não pode ser futuro (fuso da escola); as aulas precisam per
 Respostas:
 
 - 200 `{"frequencia": Frequencia}` com a revisão incrementada.
-- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta, inclusive quando a corrida é detectada pelo banco.
+- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta; `{"error", "codigo": "JUSTIFICATIVAS_ALTERADAS"}` quando as propostas mudaram; `{"error", "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"}` quando a composição histórica não pode ser comprovada.
 - 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, quando a justificativa não pertence ao catálogo, ou quando outra validação falha.
 - 401 sem sessão; 403 sem capacidade de operação; 404 turma inexistente.
 
@@ -514,19 +516,19 @@ A chave confirma manualmente que a revisão corrente foi lançada no sistema da 
 
 Corpo: `{ "revisao": number }`.
 
-- 200 `{ "ok": true }`, com auditoria. Remove a personalização e limpa as confirmações da base desse aluno no dia, incrementando todas as revisões `revisaoSeduc` correspondentes, mesmo quando a chave já estava desligada. A próxima consulta volta à chamada salva, quando disponível; as faltas diárias permanecem intactas.
+- 200 `{ "ok": true, "revisarChamada": { "dia": "YYYY-MM-DD", "turmaId": uuid } | null }`, com auditoria. Remove a personalização e limpa as confirmações da base desse aluno no dia, incrementando todas as revisões `revisaoSeduc` correspondentes, mesmo quando a chave já estava desligada. A próxima consulta volta à chamada salva, quando disponível; as faltas diárias permanecem intactas.
 - 400 corpo ou identificador inválido; 404 inexistente; 409 revisão obsoleta.
 
 ## Saídas antecipadas
 
 ### GET /api/saidas
 
-Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma atual do aluno). É preciso informar ao menos um.
+Filtros: `dia`, `de` e `ate` (período inclusivo), `alunoId` e `turmaId` (turma histórica da saída). É preciso informar ao menos um.
 
 - 200 `{"saidas": Saida[]}` em ordem de dia e registro.
 - 400 quando algum parâmetro é inválido ou o período está invertido.
 
-Saida: `{ id, alunoId, dia, momento, horario, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta.
+Saida: `{ id, alunoId, dia, momento, horario, justificativa, observacao, texto, liberadoPorId, liberadoPorCodigo, liberadoPorNome, turmaHistoricaId, turmaHistoricaNome, aulasReferencia, origemReferencia, criadoEm }`. `justificativa` é nula quando o motivo foi escrito. `liberadoPorNome` resolve o rótulo atual do catálogo de quem libera ou, nos registros antigos, o nome da conta. `turmaHistoricaId` e `turmaHistoricaNome` preservam a turma do momento; `aulasReferencia` guarda versão e aulas com identificador, ordem, início e fim; `origemReferencia` é `MATRICULA_VIGENTE`, `CHAMADA_HISTORICA` ou `DESCONHECIDA`.
 
 ### POST /api/saidas/{id}/seduc
 
@@ -534,13 +536,15 @@ Sessão da operação e origem confiável. Corpo `{ "registrado": true, "revisao
 
 ### POST /api/saidas
 
-Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": "HH:MM", "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string }`.
+Corpo: `{ "alunoId": string, "dia": "YYYY-MM-DD", "momento": string, "horario": "HH:MM", "justificativa"?: string, "texto"?: string, "observacao"?: string, "liberadoPorCodigo": string, "confirmarHistorico"?: boolean, "motivo"?: string }`.
 
 A justificativa é um código do catálogo ou um `texto` de até 100 caracteres. Sem código, o texto é o motivo e vale em qualquer momento. Com código, o `texto` é opcional e só vale na aula; a `observacao` vale para intervalos e almoço. `liberadoPorCodigo` é um código do catálogo de quem libera.
 
+No dia corrente, a turma e as aulas vêm da matrícula e da grade vigentes. Em data passada, a rota usa a chamada salva do aluno naquele dia quando ela tem retrato de aulas. Sem esse retrato, responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`; o cliente reenvia com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A saída fica com referência `DESCONHECIDA`, a auditoria registra o motivo e a Chamada Parcial usa a chamada salva ou a grade atual como estimativa sinalizada ([ADR-069](adr/069-referencia-historica-saidas.md)).
+
 - 201 `{"saida": Saida}`.
 - 400 para momento inválido, horário ausente ou fora de `HH:MM`, justificativa fora do catálogo, texto e tipo ausentes, aluno inválido, dia inválido, domingo, data futura ou responsável fora do catálogo. Domingo responde com a mensagem Domingo não tem aula. Escolha um dia de segunda a sábado.
-- 404 aluno inexistente; 409 quando o aluno desativado ou já tem saída no dia.
+- 404 aluno inexistente; 409 quando o aluno desativado, já tem saída no dia ou a referência histórica exige confirmação.
 
 ### DELETE /api/saidas/{id}
 
@@ -556,7 +560,7 @@ Exige capacidade `operar` (administração ou coordenação). Consulta somente o
 
 Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo traz `turmaId`, `turmaRotulo`, `saidas`, `entradas`, `total` e `movimentacoes`. Cada movimentação traz `id`, `tipo` (`SAIDA` ou `ENTRADA`), `alunoId`, `alunoNome`, `dia`, `horario`, `momento`, `motivo` e `responsavel`; horário, momento e responsável podem ser nulos. Motivos incluem complementos e os rótulos dos catálogos, mesmo desativados. Entradas usam o responsável pelo registro, com fallback para a autoria legada; saídas usam o nome do liberador, com fallback para o usuário que liberou.
 
-Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma atual do aluno. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
+Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma histórica gravada no registro. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
 
 ## Configurações
 

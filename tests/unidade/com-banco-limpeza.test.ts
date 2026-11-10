@@ -13,6 +13,8 @@ it("não mascara erro da operação quando fechamento da conexão falha", async 
   cliente.query = vi.fn(async (sql: string) =>
     sql.includes("has_schema_privilege") ? { rows: [{ uso: true }] } : { rows: [] },
   ) as unknown as typeof cliente.query;
+  vi.stubEnv("E2E_BANCO_SINTETICO", "true");
+  vi.stubEnv("TEST_BASE_URL", "http://localhost:3000");
   vi.stubEnv("DATABASE_URL", "postgresql://teste:senha@localhost/sintetico");
   vi.stubEnv("DIRECT_URL", "postgresql://teste:senha@localhost/sintetico");
   vi.spyOn(pg, "Client").mockImplementation(function () {

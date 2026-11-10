@@ -18,7 +18,7 @@ O [ADR-036](adr/036-implantacao-multinuvem.md) registra a decisão.
 | Observabilidade     | CloudWatch Logs e alarmes             | Log Analytics e alertas                              | Cloud Logging e alerta de 5xx  |
 | Rede                | VPC com sub-redes públicas e privadas | VNet com sub-redes delegadas                         | VPC com Private Service Access |
 
-O banco é sempre PostgreSQL gerenciado e o dono do schema é a própria conexão de runtime: `DATABASE_URL` e `DIRECT_URL` usam o mesmo usuário administrador em cada nuvem. Não existe papel de runtime separado, cache externo nem armazenamento de anexos.
+O PostgreSQL de bootstrap é separado das credenciais de aplicação. `url_runtime` e `url_migracao` são entradas sensíveis distintas e previamente provisionadas. Em produção, a aplicação não recebe a conta administrativa nem `DIRECT_URL`. O modo local é sintético: ele usa a credencial descartável do emulador e não atesta grants, IAM ou RBAC gerenciados. O contrato está preparado em código e o caminho de produção exige o aceite explícito descrito abaixo. Não há cache externo nem armazenamento de anexos.
 
 O agendador continua sendo o GitHub Actions. O workflow `notificacoes.yml` chama `GET /api/notificacoes/agenda` a cada cinco minutos com `Authorization: Bearer CRON_SECRET`, e `fila-planilha.yml` faz o mesmo em `GET /api/planilha/fila/agenda` para esvaziar a fila de envios às planilhas; nenhuma nuvem cria EventBridge Scheduler, jobs do Container Apps ou Cloud Scheduler para isso.
 
@@ -57,7 +57,7 @@ pnpm run infra:floci:azure
 pnpm run infra:floci:gcp
 ```
 
-O script `infra/floci/testar.sh` constrói a imagem `frequenciapp:local` quando necessário, sobe os emuladores quando as portas padrão não respondem, aplica o Terraform, confere `GET /api/saude` e destrói os recursos. Use `MANTER=true` para preservar o ambiente após o teste.
+O script `infra/floci/testar.sh` constrói a imagem `frequenciapp:local` quando necessário, sobe os emuladores quando as portas padrão não respondem, aplica o Terraform, confere `GET /api/saude` e destrói os recursos. Use `MANTER=true` para preservar o ambiente após o teste. O ciclo local usa o schema `public` do emulador e não cria os jobs de migração da Azure e do GCP, que não existem nas versões fixadas do Floci.
 
 ## Modo de produção
 
@@ -66,29 +66,41 @@ O script `infra/floci/testar.sh` constrói a imagem `frequenciapp:local` quando 
 3. Configure o backend remoto. Cada nuvem tem um exemplo em `backend.hcl.example`: na AWS com bucket versionado, criptografia e lockfile; no Azure com conta de armazenamento e autenticação do Entra ID; no GCP com bucket versionado.
 4. Rode `terraform init` e `terraform plan` e revise o plano antes de aplicar. O repositório não aplica em produção por conta própria.
 
-O `AUTH_SECRET` nasce de um valor efêmero e chega ao cofre por argumento write-only, sem registro no state. O caminho de produção de cada nuvem foi validado por `terraform validate`; os testes automatizados cobrem o modo local.
+O `AUTH_SECRET` nasce de valor efêmero e usa argumento write-only no cofre. As entradas de credenciais são sensíveis, mas o plano, o modo local e o state exigem proteção própria; sensibilidade não elimina persistência. A separação foi validada por `terraform fmt -check`, `terraform validate` e pelo ciclo de apply, saúde e destroy do Floci nas três nuvens. Esses ensaios não comprovam grants, IAM ou RBAC de serviços gerenciados.
 
 ### Variáveis da aplicação
 
-| Variável        | Uso na nuvem                                                                            |
-| --------------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`  | Conexão de runtime e dono do schema, com o administrador do banco.                      |
-| `DIRECT_URL`    | Conexão do Prisma CLI, do migrador e dos scripts administrativos; mesmo administrador.  |
-| `AUTH_SECRET`   | Segredo das sessões, com 32 caracteres ou mais; gerado pelo Terraform em produção.      |
-| `TZ_APP`        | Fuso usado para resolver o dia corrente; padrão `America/Fortaleza`.                    |
-| `PERMITIR_HTTP` | `false` em produção e `true` no modo local.                                             |
-| `CRON_SECRET`   | Segredo opcional da agenda, gerado pelo Terraform em produção.                          |
-| `GOOGLE_*`      | Integração opcional com OAuth e Sheets API, configurada no serviço.                     |
-| `PUSH_VAPID_*`  | Notificações Web Push opcionais, configuradas no serviço.                               |
-| `ADMIN_*`       | Bootstrap opcional do administrador inicial no entrypoint, sem alterar conta existente. |
+| Variável                  | Uso na nuvem                                                                            |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `DATABASE_URL`            | Conexão do papel de DML, sem ownership nem atributos administrativos.                   |
+| `DIRECT_URL`              | Conexão apenas do job migrador, com owner dedicado ao schema.                           |
+| `AUTH_SECRET`             | Segredo das sessões, com 32 caracteres ou mais; gerado pelo Terraform em produção.      |
+| `TZ_APP`                  | Fuso usado para resolver o dia corrente; padrão `America/Fortaleza`.                    |
+| `PERMITIR_HTTP`           | `false` em produção e `true` no modo local.                                             |
+| `CRON_SECRET`             | Segredo opcional da agenda, gerado pelo Terraform em produção.                          |
+| `GOOGLE_*`                | Integração opcional com OAuth e Sheets API, configurada no serviço.                     |
+| `PUSH_VAPID_*`            | Notificações Web Push opcionais, configuradas no serviço.                               |
+| `ADMIN_*`                 | Bootstrap opcional do administrador inicial no entrypoint, sem alterar conta existente. |
+| `url_runtime`             | Entrada sensível do módulo com a conexão de DML do runtime.                             |
+| `url_migracao`            | Entrada sensível do módulo com a conexão do owner do schema.                            |
+| `runtime_provisionado`    | Aceite explícito após o ensaio de privilégios; padrão falso.                            |
+| `revisao_aplicacao`       | SHA completo da imagem e do migrador, exigido em produção.                              |
+| `migracao_confirmada_sha` | Recibo do job concluído, igual a `revisao_aplicacao` antes de promover o serviço.       |
+| `schema_aplicacao`        | Schema exclusivo já migrado; não pode ser `public` em produção.                         |
 
-O entrypoint usa `DIRECT_URL` e cai para `DATABASE_URL` quando ela não existe. O migrador aplica cada arquivo de `prisma/migrations` uma única vez, com trava consultiva e conferência de checksum.
+O serviço principal define `MIGRAR_NA_PARTIDA=false`, `DATABASE_SCHEMA` e `COMMIT_SHA`. Jobs e o container lateral são os únicos consumidores de `DIRECT_URL`. Na Azure e no GCP, a identidade do serviço não lê o segredo de migração; na AWS, a referência existe apenas no container lateral e a API não recebe a variável. A conta administrativa gerenciada fica reservada ao bootstrap.
 
-### Migrações
+### Bootstrap, migração e aceite
 
-O entrypoint do contêiner aguarda o banco, aplica as migrações e sobe a API. Em mais de uma réplica as migrações podem competir; o Prisma e a trava consultiva protegem a aplicação, mas o primeiro deploy deve acontecer com uma réplica antes de escalar.
+O provisionamento de papéis é uma operação separada. Criar logins sem privilégios administrativos, aplicar as migrações iniciais como owner dedicado e executar `scripts/banco/provisionar-runtime.sql` no schema exclusivo, nunca em `public`. O SQL recebe `app_schema`, `papel_runtime` e `papel_migracao` via psql, não cria senhas e não aplica grants a schemas alheios. Falha se memberships, PUBLIC, ownership ou atributos administrativos impedirem o contrato; não captura a recusa como proteção nem revoga PUBLIC globalmente. Antes da execução, o banco dedicado precisa remover `TEMP` e `USAGE` públicos que dariam ao runtime privilégio efetivo fora do schema.
 
-Em produção, o workflow `migracoes.yml` aplica as migrações na `main` com o segredo `DIRECT_URL_PROD`, que deve conter a conexão de administrador do banco da nuvem. O build da Vercel apenas gera o cliente Prisma; o caminho em nuvem segue o mesmo desenho.
+Depois do ensaio de privilégios efetivos, `runtime_provisionado` é um aceite explícito, com padrão falso. Informar `url_runtime`, `url_migracao`, `schema_aplicacao` e SHA em `revisao_aplicacao`. Isso não é efetuado automaticamente pela alteração de código. O SQL foi exercitado em PostgreSQL 17 descartável: DML permitido, DDL, `SET ROLE`, leitura de `_prisma_migrations` e schema externo recusados. O ensaio `tests/servidor/privilegios-runtime.sh` permanece preparado para a pilha exclusiva da issue #423-C.
+
+Na AWS, um container migrador não essencial encerra com sucesso antes de liberar o container API por `dependsOn: SUCCESS`; a trava do migrador é preservada. Na Azure, um Container Apps Job manual tem identidade própria e acesso somente ao segredo migrador. Em produção exige `ambiente_job_migracao_id` de environment com rede aprovada, sem criar topologia ou custo implicitamente. No GCP, um Cloud Run Job manual tem service account própria e conexão privada. Os jobs não repetem mutações automaticamente e não são criados no modo local da Azure e do GCP, porque as versões fixadas do Floci não implementam esses recursos.
+
+Azure e GCP exigem `migracao_confirmada_sha` igual à revisão da imagem antes de liberar o serviço. Criar o job por Terraform não comprova execução: o operador ou futuro adaptador precisa executá-lo, verificar seu término e registrar o recibo sob exclusão por destino. Nenhum recibo de produção foi produzido nesta frente. `implantacao.yml` recusa destinos sem adaptador aprovado, e não aplica uma migração cloud paralela em silêncio.
+
+Floci não comprova grants ou RBAC de serviços gerenciados. Permanecem obrigatórios: PostgreSQL 17 sintético, providers do lock, `terraform fmt -check`, init sem backend e sem credenciais cloud, validação dos módulos, conclusão dos jobs, IAM/RBAC e saúde por revisão. Nenhuma conexão pública de banco é aberta para fazer validação. O ciclo local de apply, saúde e destroy passou com AWS 2.4.0, Azure 0.13.0 e GCP 0.9.0; a integração com o orquestrador comum, o custo e a rede do job Azure continuam exigindo aceite operacional antes da ativação.
 
 ### Agenda de notificações
 
@@ -107,6 +119,8 @@ As chaves `PUSH_VAPID_*` seguem a mesma lógica: são opcionais, não geram recu
 - O Key Vault e o Log Analytics ficam restritos à produção no Azure: o emulador não responde ao data plane de certificados nem à listagem de workspaces excluídos.
 - O Container Apps emulado exige `FLOCI_AZ_SERVICES_CONTAINER_APPS_MOCKED=false` e TLS, configuração já presente em `compose.floci.yml`.
 - O PostgreSQL emulado do Azure registra o recurso no ARM sem criar o banco no motor; o script de teste cria com `createdb` quando ainda não existe.
+- Os jobs de migração da Azure e do GCP existem apenas em produção. O Floci 0.13.0 não implementa Container Apps Jobs e o 0.9.0 não implementa Cloud Run Jobs; no modo local a saúde confere a conexão e a revisão, não o schema migrado.
+- O modo local da AWS aplica as migrações no schema `public` com a credencial descartável do emulador. Ele não comprova a separação de papéis exigida em produção.
 - O proxy de ingress do floci-az e do floci-gcp usa o cliente HTTP do JDK, que tenta o upgrade h2c na primeira requisição; o servidor standalone do Next encerra a conexão sem responder e o proxy devolve 502. Por isso o script confere a saúde na réplica real, pela porta publicada do contêiner, e não pelo FQDN emulado.
 - O Secrets Manager emulado mantém a janela de recuperação; no modo local o módulo usa `recovery_window_in_days = 0` para que o ciclo de teste possa recriar os segredos.
 - O Cloud Run emulado usa a imagem local; o Artifact Registry existe apenas em produção.

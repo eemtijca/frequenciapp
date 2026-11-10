@@ -1,12 +1,14 @@
 // Projeta saídas na conferência parcial e confirma somente as aulas que foram exibidas.
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { Prisma } from "../../generated/prisma/client";
 import { ehDomingo, horariosDaChamada, rotuloMomento } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import type { FrequenciaDaSaida } from "@/domain/frequencia-personalizada";
 import { aulasConcluidasNaSaida } from "@/domain/saida-parcial";
 import type { Identidade } from "@/domain/usuarios";
-import { disciplinasDoHorario } from "@/domain/horarios-semanais";
+import { esquemaAulasReferencia } from "@/application/referencia-saida";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import { comTransacao } from "@/infra/transacoes";
@@ -28,7 +30,7 @@ export async function consultarSaidasParciais(
       alunos: { select: { alunoId: true } },
       faltas: { select: { alunoId: true, horarioId: true } },
     },
-    orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+    orderBy: ORDEM_BASE_CHAMADA,
   });
   const feriados = new Set(
     (await tx.feriado.findMany({ where: { dia: periodo }, select: { dia: true } })).map((f) =>
@@ -40,26 +42,46 @@ export async function consultarSaidasParciais(
     const chamada = chamadas.find(
       (c) =>
         c.dia.getTime() === saida.dia.getTime() &&
-        c.alunos.some((a) => a.alunoId === saida.alunoId),
+        c.alunos.some((a) => a.alunoId === saida.alunoId) &&
+        (!saida.turmaHistoricaId || c.turmaId === saida.turmaHistoricaId),
     );
+    const referencia = esquemaAulasReferencia.safeParse(saida.aulasReferencia);
+    const retrato =
+      saida.origemReferencia !== "DESCONHECIDA" &&
+      referencia.success &&
+      Boolean(saida.turmaHistoricaId) &&
+      Boolean(saida.turmaHistoricaNome);
     const turma = chamada?.turma ?? saida.aluno.turma;
-    const grade = horariosDaChamada(
-      turma.horarios.map((h) => ({ ...h, disciplinas: disciplinasDoHorario(h.disciplinas) })),
-      dia,
-      Boolean(chamada),
-    );
-    const aulas = chamada?.aulas.length ? chamada.aulas.map((a) => a.horario) : grade;
+    const aulas = retrato
+      ? referencia.data.aulas
+      : chamada?.aulas.length
+        ? chamada.aulas.map((aula) => aula.horario)
+        : horariosDaChamada(
+            turma.horarios.map((horario) => ({
+              ...horario,
+              disciplinas: disciplinasDoHorario(horario.disciplinas),
+            })),
+            dia,
+            Boolean(chamada),
+          );
     const ausentes =
       chamada?.faltas.filter((f) => f.alunoId === saida.alunoId).map((f) => f.horarioId) ?? [];
     const concluidas =
-      feriados.has(dia) || ehDomingo(dia)
-        ? null
+      feriados.has(dia) || ehDomingo(dia) || aulas.length === 0
+        ? feriados.has(dia) || ehDomingo(dia)
+          ? null
+          : []
         : aulasConcluidasNaSaida(saida.horario, aulas, ausentes);
-    const turmaNome = `${turma.serie.nome} ${turma.nome}`;
+    const turmaId = retrato ? saida.turmaHistoricaId : (chamada?.turmaId ?? turma.id);
+    const turmaNome = retrato
+      ? (saida.turmaHistoricaNome ?? "Turma histórica")
+      : `${turma.serie.nome} ${turma.nome}`;
+    const estimativa = !retrato;
     const observacao = [
       saida.horario ? `Saída às ${saida.horario}` : "Saída sem horário registrado",
       rotuloMomento(saida.momento),
       saida.texto ?? saida.observacao ?? saida.justificativa,
+      estimativa ? "Aulas estimadas pela chamada salva ou pela grade atual." : null,
     ]
       .filter(Boolean)
       .join(" · ")
@@ -70,7 +92,7 @@ export async function consultarSaidasParciais(
           id: saida.id,
           alunoId: saida.alunoId,
           dia,
-          turmaId: turma.id,
+          turmaId,
           alunoNome: saida.aluno.nome,
           turmaNome,
           horario: saida.horario,
@@ -88,7 +110,7 @@ export async function consultarSaidasParciais(
       id: saida.id,
       alunoId: saida.alunoId,
       dia,
-      turmaId: turma.id,
+      turmaId,
       alunoNome: saida.aluno.nome,
       turmaNome,
       horario: saida.horario,
@@ -145,6 +167,8 @@ export async function conferirBaseSaida(
   );
   if (!registro || registro.assinatura !== base.assinatura)
     throw new ErroHttp("As aulas da saída mudaram. Recarregue a lista antes de continuar.", 409);
+  if (!registro.aulasConferiveis || !registro.turmaId)
+    throw new ErroHttp("A referência histórica da saída precisa de conferência.", 409);
   return registro;
 }
 

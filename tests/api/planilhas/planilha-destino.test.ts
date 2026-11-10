@@ -123,7 +123,16 @@ async function estado() {
 }
 
 async function salvar(dia = DIA, revisao = 0) {
-  await dados(await chamar("/api/frequencias", { turmaId, dia, revisao, faltas: [] }));
+  await dados(
+    await chamar("/api/frequencias", {
+      turmaId,
+      dia,
+      revisao,
+      faltas: [],
+      confirmarHistorico: true,
+      motivo: "Teste sintético do destino da planilha",
+    }),
+  );
 }
 
 async function esperarFila(dia: string, resultado: string) {
