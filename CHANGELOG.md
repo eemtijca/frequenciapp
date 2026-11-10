@@ -20,6 +20,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A troca de banco da restauração passa a ser transacional e a recuperação reconhece troca parcial, preservando o banco anterior e religando a aplicação.
 
+- A restauração em Compose recusa um banco com schemas fora de `DATABASE_SCHEMA`, porque o dump cobre apenas esse schema e a troca do banco inteiro perderia os demais.
+
 - O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
 
 - O instalador das rotinas valida o fuso do daemon do cron e só grava `CRON_TZ` quando a implementação comprova suporte. Os CronJobs do Helm aceitam `timeZone`.

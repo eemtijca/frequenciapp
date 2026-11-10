@@ -66,6 +66,19 @@ else
   printf 'Aviso: age ausente; ensaio com age não executado.\n'
 fi
 
+# O dump cobre apenas DATABASE_SCHEMA; a troca do banco inteiro precisa recusar outros schemas.
+executar_sql "$POSTGRES_DB" 'create schema extra_qa' >/dev/null
+if "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump" --confirmar --sem-copia \
+  >"$TMP_RAIZ/escopo.log" 2>&1; then
+  falhar "a restauração aceitou um banco com schema fora do dump."
+fi
+grep -q 'schemas fora de' "$TMP_RAIZ/escopo.log" ||
+  falhar "a recusa de schema fora do dump não apareceu."
+esperar_aplicacao || falhar "a aplicação ficou parada após a recusa de escopo."
+[ "$(executar_sql "$POSTGRES_DB" 'select count(*) from alunos')" = "1" ] ||
+  falhar "a recusa de escopo alterou o banco em uso."
+executar_sql "$POSTGRES_DB" 'drop schema extra_qa' >/dev/null
+
 # Falha de saúde depois da troca precisa voltar ao banco anterior e religar a aplicação.
 if RESTAURAR_SAUDE_URL='http://127.0.0.1:1/api/saude' RESTAURAR_SAUDE_TENTATIVAS=0 \
   "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump" --confirmar --sem-copia; then
