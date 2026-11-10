@@ -114,7 +114,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const [prontoLocal, setProntoLocal] = useState(false);
   const [armazenar, setArmazenar] = useState(true);
   const [chave, setChave] = useState("");
-  const [persistirDados, setPersistirDados] = useState(true);
+  const [persistirDados, setPersistirDados] = useState(false);
   const [erro, setErro] = useState("");
   const [apresentacao, setApresentacao] = useState(false);
   const [prepararImpressao, setPrepararImpressao] = useState(false);
@@ -750,10 +750,11 @@ export default function VistaBi({ fuso }: { fuso: string }) {
               </Button>
             </form>
             <p className="text-muted-foreground text-xs">
-              Ao guardar, a chave e os dados pessoais ficam disponíveis neste navegador, inclusive
-              offline. Em dispositivo compartilhado, desmarque a opção para consultar apenas nesta
-              aba. Esquecer a chave tenta remover também as consultas guardadas; bloqueios do
-              navegador podem impedir a remoção.
+              Sem a opção, a consulta fica apenas nesta aba e some ao recarregar. Ao guardar, a
+              chave e os dados pessoais ficam disponíveis neste navegador por até sete dias,
+              inclusive offline. Em dispositivo compartilhado, mantenha desmarcado. Sair do
+              FrequenciApp também remove a chave e as consultas guardadas; bloqueios do navegador
+              podem impedir a remoção.
             </p>
             {fonte.erro && (
               <p role="alert" className="text-falta-texto text-sm">

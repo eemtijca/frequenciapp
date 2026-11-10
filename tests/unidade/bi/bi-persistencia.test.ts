@@ -12,6 +12,9 @@ const h = vi.hoisted(() => ({
   cache: vi.fn(),
   segredo: vi.fn(),
   esquecer: vi.fn(),
+  consumirExpirado: vi.fn(),
+  expurgarChave: vi.fn(),
+  chaveDoValor: vi.fn(),
   guardados: new Map<string, unknown>(),
 }));
 vi.mock("react", () => ({
@@ -36,11 +39,15 @@ vi.mock("@/lib/api-cliente", async (original) => ({
   pedir: h.rede,
 }));
 vi.mock("@/lib/bi-armazenamento", () => ({
+  CHAVE_SEGREDO_BI: "frequencibi:chave",
   cacheBi: h.cache,
+  chaveDoValorSegredoBi: h.chaveDoValor,
+  consumirSegredoBiExpirado: h.consumirExpirado,
   identificadorCacheBi: h.identificar,
   lerSegredoBi: h.lerSegredo,
   guardarSegredoBi: h.segredo,
   esquecerSegredoBi: h.esquecer,
+  expurgarRetratosDaChave: h.expurgarChave,
 }));
 import { useDadosBi } from "@/lib/use-dados-bi";
 import { ErroApi } from "@/lib/api-cliente";
@@ -111,6 +118,9 @@ beforeEach(() => {
   h.rede.mockResolvedValue(pagina);
   h.esquecer.mockReset();
   h.segredo.mockReset();
+  h.consumirExpirado.mockReset().mockReturnValue(null);
+  h.expurgarChave.mockReset().mockResolvedValue(undefined);
+  h.chaveDoValor.mockReset().mockImplementation((valor: string | null) => valor ?? "");
   h.cache.mockImplementation(
     async (acao: string, id: string, valor?: unknown, valido?: () => boolean) => {
       if (valido && !valido()) return undefined;
@@ -143,7 +153,7 @@ describe("contratos já existentes de acesso do BI", () => {
     h.rede.mockRejectedValueOnce(new TypeError("Sem rede"));
     vi.stubGlobal("navigator", { onLine: false });
     const fonte = useDadosBi();
-    await fonte.entrar("atual");
+    await fonte.entrar("atual", true);
     expect(h.estados[0]).toMatchObject({ chave: "atual", pagina });
     expect(h.estados[6]).toBe(true);
   });
@@ -152,7 +162,7 @@ describe("contratos já existentes de acesso do BI", () => {
     h.guardados.set("id-atual:turmas", { linhas: [{ id: "antiga" }] });
     h.rede.mockResolvedValueOnce({ ...pagina, escopo: { turmas: [] } });
     const fonte = useDadosBi();
-    await fonte.entrar("atual");
+    await fonte.entrar("atual", true);
     expect(h.guardados.has("id-atual:turmas")).toBe(false);
     expect(h.guardados.get("id-atual:acesso")).toMatchObject({ escopo: { turmas: [] } });
   });
@@ -251,7 +261,7 @@ describe("esquecimento durante o hash pendente", () => {
         vi.stubGlobal("window", janela);
         const fonte = useDadosBi();
         if (origem === "reconferência pelo botão") {
-          await fonte.entrar("atual");
+          await fonte.entrar("atual", true);
           await fonte.carregar("turmas", { inicio: "", fim: "" });
         } else h.lerSegredo.mockReturnValue("atual");
         h.guardados.set(`${id}:acesso`, pagina);
@@ -328,7 +338,7 @@ describe("esquecimento do BI", () => {
     const pausa = promessa<typeof pagina>();
     h.rede.mockReturnValueOnce(pausa.valor);
     const fonte = useDadosBi();
-    const entrada = fonte.entrar("atual");
+    const entrada = fonte.entrar("atual", true);
     await vi.waitFor(() => expect(h.rede).toHaveBeenCalledOnce());
     await fonte.esquecer();
     pausa.liberar(pagina);
@@ -366,7 +376,7 @@ describe("esquecimento do BI", () => {
       },
     );
     const fonte = useDadosBi();
-    const entrada = fonte.entrar("antiga");
+    const entrada = fonte.entrar("antiga", true);
     await vi.waitFor(() => expect(chegou).toBe(true));
     await fonte.esquecer();
     pausa.liberar();
@@ -377,7 +387,7 @@ describe("esquecimento do BI", () => {
   });
   it("falha ao remover chave não impede tentativa de expurgar retratos", async () => {
     const fonte = useDadosBi();
-    await fonte.entrar("atual");
+    await fonte.entrar("atual", true);
     h.esquecer.mockImplementation(() => {
       throw new DOMException("Bloqueado", "SecurityError");
     });
@@ -395,9 +405,9 @@ describe("esquecimento do BI", () => {
       })
       .mockResolvedValue(pagina);
     const fonte = useDadosBi();
-    const anterior = fonte.entrar("antiga");
+    const anterior = fonte.entrar("antiga", true);
     await vi.waitFor(() => expect(h.rede).toHaveBeenCalledOnce());
-    await fonte.entrar("atual");
+    await fonte.entrar("atual", true);
     pausa.liberar(pagina);
     await anterior;
     expect(h.estados[0]).toMatchObject({ chave: "atual" });
@@ -510,7 +520,7 @@ describe("expurgo concorrente por chave no cache real", () => {
     const idA = await cache.identificar("chave-a");
     const idB = await cache.identificar("chave-b");
     const fonte = useDadosBi();
-    await fonte.entrar("chave-a");
+    await fonte.entrar("chave-a", true);
     await fonte.carregar("turmas", { inicio: "", fim: "" });
     const anteriores = [...cache.dados.keys()];
     expect(anteriores).toHaveLength(2);
@@ -524,7 +534,7 @@ describe("expurgo concorrente por chave no cache real", () => {
       expect(cache.local.has("frequencibi:chave")).toBe(false);
       expect(h.estados[0]).toBeNull();
       expect(h.estados[1]).toEqual({});
-      await fonte.entrar("chave-b");
+      await fonte.entrar("chave-b", true);
       const retratoB = await fonte.carregar("turmas", { inicio: "", fim: "" });
       const dadosB = [...cache.dados.entries()].filter(([id]) => id.startsWith(`${idB}:`));
       expect(dadosB).toHaveLength(2);
@@ -534,7 +544,9 @@ describe("expurgo concorrente por chave no cache real", () => {
       expect.soft(anteriores.filter((id) => cache.dados.has(id))).toEqual([]);
       expect.soft(cache.excluidos).toEqual(anteriores);
       expect([...cache.dados.entries()]).toEqual(dadosB);
-      expect(cache.local.get("frequencibi:chave")).toBe("chave-b");
+      expect(JSON.parse(cache.local.get("frequencibi:chave") ?? "{}")).toMatchObject({
+        chave: "chave-b",
+      });
       expect(h.estados[0]).toMatchObject({ chave: "chave-b", persistir: true });
       expect(h.estados[1]).toEqual({ turmas: retratoB });
     } finally {
@@ -546,7 +558,7 @@ describe("expurgo concorrente por chave no cache real", () => {
   it("falha da outra chave não cancela o expurgo nem repõe o segredo esquecido", async () => {
     const cache = await usarCacheReal();
     const fonte = useDadosBi();
-    await fonte.entrar("chave-a");
+    await fonte.entrar("chave-a", true);
     await fonte.carregar("turmas", { inicio: "", fim: "" });
     const anteriores = [...cache.dados.keys()];
     const pausa = cache.segurarAbertura();
@@ -554,7 +566,7 @@ describe("expurgo concorrente por chave no cache real", () => {
     await pausa.chegou;
     try {
       h.rede.mockRejectedValueOnce(new ErroApi("Entrada recusada", 400));
-      await fonte.entrar("chave-b");
+      await fonte.entrar("chave-b", true);
       expect(h.estados[0]).toBeNull();
       expect(h.estados[4]).toBe("Entrada recusada");
       expect(cache.dados.size).toBe(2);
@@ -577,7 +589,7 @@ describe("expurgo concorrente por chave no cache real", () => {
     it(`reentrada da mesma chave com sucesso=${sucesso} espera o expurgo sem perder dados novos`, async () => {
       const cache = await usarCacheReal();
       const fonte = useDadosBi();
-      await fonte.entrar("chave-a");
+      await fonte.entrar("chave-a", true);
       await fonte.carregar("turmas", { inicio: "", fim: "" });
       const anteriores = [...cache.dados.keys()];
       const pausa = cache.segurarAbertura();
@@ -593,7 +605,7 @@ describe("expurgo concorrente por chave no cache real", () => {
       const nova = { ...pagina, linhas: [{ id: "nova" }], consultadoEm: "2026-02-01T00:00:00Z" };
       if (sucesso) h.rede.mockResolvedValue(nova);
       else h.rede.mockRejectedValueOnce(new ErroApi("Reentrada recusada", 400));
-      const entrada = fonte.entrar("chave-a");
+      const entrada = fonte.entrar("chave-a", true);
       try {
         await identificou.valor;
         await Promise.resolve();
@@ -609,7 +621,9 @@ describe("expurgo concorrente por chave no cache real", () => {
           expect(retrato.linhas).toEqual(nova.linhas);
           expect(cache.dados.size).toBe(2);
           expect([...cache.dados.values()]).toEqual([nova, retrato]);
-          expect(cache.local.get("frequencibi:chave")).toBe("chave-a");
+          expect(JSON.parse(cache.local.get("frequencibi:chave") ?? "{}")).toMatchObject({
+            chave: "chave-a",
+          });
           expect(h.estados[0]).toMatchObject({ chave: "chave-a", pagina: nova });
           expect(h.estados[1]).toEqual({ turmas: retrato });
         } else {
@@ -630,15 +644,15 @@ describe("expurgo concorrente por chave no cache real", () => {
   it("dois expurgos pendentes mantêm a espera por identidade sem bloquear a outra chave", async () => {
     const cache = await usarCacheReal();
     const fonte = useDadosBi();
-    await fonte.entrar("chave-a");
+    await fonte.entrar("chave-a", true);
     const pausaA = cache.segurarAbertura();
     const expurgoA = fonte.esquecer();
     await pausaA.chegou;
-    await fonte.entrar("chave-b");
+    await fonte.entrar("chave-b", true);
     const pausaB = cache.segurarAbertura();
     const expurgoB = fonte.esquecer();
     await pausaB.chegou;
-    const entradaA = fonte.entrar("chave-a");
+    const entradaA = fonte.entrar("chave-a", true);
     try {
       pausaA.liberar();
       await expurgoA;
@@ -649,7 +663,9 @@ describe("expurgo concorrente por chave no cache real", () => {
       pausaB.liberar();
       await expurgoB;
       expect(cache.dados.size).toBe(2);
-      expect(cache.local.get("frequencibi:chave")).toBe("chave-a");
+      expect(JSON.parse(cache.local.get("frequencibi:chave") ?? "{}")).toMatchObject({
+        chave: "chave-a",
+      });
       expect(h.estados[1]).toEqual({ turmas: retratoA });
       expect([...cache.dados.values()]).toEqual([pagina, retratoA]);
     } finally {

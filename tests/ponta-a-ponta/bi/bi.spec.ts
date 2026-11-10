@@ -136,6 +136,7 @@ async function preparar(page: Page, dados = massa) {
 }
 async function abrir(page: Page) {
   await preparar(page);
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
@@ -189,7 +190,9 @@ test("opção sem persistência mantém consultas só na aba e preserva personal
   page,
 }) => {
   await preparar(page);
-  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").uncheck();
+  await expect(
+    page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo"),
+  ).not.toBeChecked();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
@@ -217,6 +220,7 @@ test("resposta de conjunto atrasada não repõe dados depois de esquecer chave",
     await espera;
     await rota.fallback();
   });
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect.poll(() => pendente).toBe(true);
@@ -448,6 +452,7 @@ test("armazenamento bloqueado avisa e mantém a leitura; importação incompatí
   });
   await page.reload();
   await aguardarHidratacao(page, "#chave-bi");
+  await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(CHAVE_FALSA);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");

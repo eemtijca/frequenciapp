@@ -4,8 +4,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pedir, ErroApi } from "./api-cliente";
 import {
+  CHAVE_SEGREDO_BI,
   cacheBi,
+  chaveDoValorSegredoBi,
+  consumirSegredoBiExpirado,
   esquecerSegredoBi,
+  expurgarRetratosDaChave,
   guardarSegredoBi,
   identificadorCacheBi,
   lerSegredoBi,
@@ -90,7 +94,7 @@ export function useDadosBi() {
     }
   }, [armazenamentoFalhou]);
   const entrar = useCallback(
-    async (chave: string, persistir = true, manterTela = false) => {
+    async (chave: string, persistir = false, manterTela = false) => {
       controlador.current?.abort();
       const anterior = acessoRef.current;
       if (!manterTela) {
@@ -230,11 +234,13 @@ export function useDadosBi() {
   );
   useEffect(() => {
     try {
+      const expirada = consumirSegredoBiExpirado();
+      if (expirada) void expurgarRetratosDaChave(expirada).catch(armazenamentoFalhou);
       const chave = lerSegredoBi();
       // A abertura com a chave guardada é assíncrona e só toca no estado depois
       // do await; a regra set-state-in-effect não distingue o caso (ADR 047).
       // eslint-disable-next-line react-hooks/set-state-in-effect -- abertura assíncrona (ADR 047)
-      if (chave) void entrar(chave);
+      if (chave) void entrar(chave, true);
     } catch {
       armazenamentoFalhou();
     }
@@ -246,12 +252,14 @@ export function useDadosBi() {
     const perder = () => setOffline(true);
     const aoArmazenar = (evento: StorageEvent) => {
       const atual = acessoRef.current ?? consultaRef.current;
+      if (!atual) return;
+      const chaveAnterior = chaveDoValorSegredoBi(evento.oldValue);
+      const chaveNova = chaveDoValorSegredoBi(evento.newValue);
       if (
-        atual &&
-        (evento.key === null ||
-          (evento.key === "frequencibi:chave" &&
-            evento.oldValue === atual.chave &&
-            evento.newValue !== atual.chave))
+        evento.key === null ||
+        (evento.key === CHAVE_SEGREDO_BI &&
+          chaveAnterior === atual.chave &&
+          chaveNova !== atual.chave)
       )
         void esquecer();
     };
