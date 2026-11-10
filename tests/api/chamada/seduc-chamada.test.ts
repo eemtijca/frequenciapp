@@ -31,7 +31,14 @@ async function carregar(): Promise<Frequencia> {
   return ((await resposta.json()) as { frequencia: Frequencia }).frequencia;
 }
 async function salvar(faltas: unknown[] = [], revisao = 0): Promise<Frequencia> {
-  const resposta = await chamar("/api/frequencias", { dia, turmaId, faltas, revisao });
+  const resposta = await chamar("/api/frequencias", {
+    dia,
+    turmaId,
+    faltas,
+    revisao,
+    confirmarHistorico: true,
+    motivo: "Teste sintético da confirmação da Seduc",
+  });
   expect(resposta.status).toBe(200);
   return ((await resposta.json()) as { frequencia: Frequencia }).frequencia;
 }

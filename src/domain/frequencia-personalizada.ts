@@ -13,6 +13,7 @@ export interface FrequenciaDaChamada {
   /** D: aluno desistente no dia, que continua na lista gravada da chamada. */
   marca: Marca | "D";
   descricao: string;
+  estimado?: boolean;
   justificativas: string[];
   justificativa?: string | null;
   observacao?: string | null;
@@ -56,5 +57,7 @@ export function rotuloFrequenciaPersonalizada(registro: RegistroPersonalizado): 
     if (registro.aulas.length === 0) return "Saída · nenhuma aula concluída";
     return `Presente · ${rotuloFrequenciaParcial({ ...registro, tipo: "AULAS", turno: null })}`;
   }
-  return registro.tipo === "CHAMADA" ? registro.descricao : rotuloFrequenciaParcial(registro);
+  return registro.tipo === "CHAMADA"
+    ? `${registro.descricao}${registro.estimado ? " (estimativa pela grade atual)" : ""}`
+    : rotuloFrequenciaParcial(registro);
 }

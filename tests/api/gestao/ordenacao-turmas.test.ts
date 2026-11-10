@@ -123,6 +123,8 @@ beforeAll(async () => {
       dia: "2026-06-23",
       faltas: [ids.Zoé],
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da ordenação de turmas",
     }),
   );
   await ler(await chamar(`/api/alunos/${ids.Ana}`, "PATCH", { turmaId: turmaB }));
