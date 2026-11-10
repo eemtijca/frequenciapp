@@ -126,23 +126,21 @@ export function VistaResumoMovimentacoes({
     carregar,
   });
 
-  const resumo = useMemo(
-    () =>
-      carga.dados
-        ? tipo === "saida"
-          ? resumirMovimentacoes("saida", {
-              saidas: carga.dados.saidas,
-              alunos,
-              turmas,
-              dias,
-            })
-          : resumirMovimentacoes("entrada", {
-              entradas: carga.dados.entradas,
-              dias,
-            })
-        : null,
-    [alunos, carga.dados, dias, tipo, turmas],
-  );
+  const resumo = useMemo(() => {
+    if (!carga.dados) return null;
+    if (tipo === "saida") {
+      return resumirMovimentacoes("saida", {
+        saidas: carga.dados.saidas,
+        alunos,
+        turmas,
+        dias,
+      });
+    }
+    return resumirMovimentacoes("entrada", {
+      entradas: carga.dados.entradas,
+      dias,
+    });
+  }, [alunos, carga.dados, dias, tipo, turmas]);
 
   function aberta(chave: string) {
     return abertas[chave] ?? false;
