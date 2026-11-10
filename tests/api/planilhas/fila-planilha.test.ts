@@ -24,6 +24,7 @@ const CABECALHO = [
 let cookieAdmin = "";
 let cookieCoordenacao = "";
 let adminId = "";
+let turmaId = "";
 let banco: pg.Client | null = null;
 let google: GoogleFalso | null = null;
 const alunos: string[] = [];
@@ -52,6 +53,9 @@ function sql(): pg.Client {
 async function limparMassa() {
   if (!banco) return;
   await banco.query("delete from fila_planilha where tipo = 'SAIDAS'");
+  await banco.query("delete from intencoes_envio_escolar where tipo = 'SAIDAS'");
+  await banco.query("delete from fila_planilha where tipo = 'FREQUENCIA'");
+  await banco.query("delete from intencoes_envio_escolar where tipo = 'FREQUENCIA'");
   // Os envios consomem o limitador do autor; a massa de teste o zera antes e depois.
   await banco.query("delete from tentativas_entrada where chave like 'planilha-saidas:%'");
   await banco.query("delete from sincronizacoes_planilha where finalidade = 'SAIDAS'");
@@ -66,6 +70,13 @@ async function limparMassa() {
        esquema = null, assinatura_esquema = null, esquema_em = null,
        modo = 'CONSERVADOR', modo_completo_ate = null, envio_automatico = false,
        atualizado_em = now()`,
+  );
+  await banco.query(
+    `insert into integracoes_planilha (id, finalidade, ativa, modo, atualizado_em)
+     values ('principal', 'FREQUENCIA', false, 'CONSERVADOR', now())
+     on conflict (id) do update set
+       ativa = false, modo = 'CONSERVADOR', modo_completo_ate = null,
+       envio_automatico = false, atualizado_em = now()`,
   );
   await banco.query("delete from alunos where nome like 'QF %'");
   await banco.query(
@@ -199,6 +210,7 @@ beforeAll(async () => {
   const turma = await json<{ turma: { id: string } }>(
     await chamar("/api/turmas", "POST", { serieId: serie.serie.id, nome: "A" }),
   );
+  turmaId = turma.turma.id;
   for (const nome of [
     "QF Ana",
     "QF Bia",
@@ -331,6 +343,7 @@ describe("falhas e retentativas", () => {
       }),
     ).toBe(true);
     await registrar(3, "2026-09-07");
+    expect(await esperar(async () => (await fila()).length === 2)).toBe(true);
     const [frente, atras] = await fila();
     expect(frente).toMatchObject({ resultado: "falhou", tentativas: 1, dia: "2026-09-05" });
     // O item de trás não passa à frente enquanto o da frente espera a nova tentativa.
@@ -355,6 +368,7 @@ describe("falhas e retentativas", () => {
     await registrar(6, "2026-09-10");
     await esperar(async () => (await fila())[0]?.tentativas === 1);
     await registrar(7, "2026-09-11");
+    expect(await esperar(async () => (await fila()).length === 2)).toBe(true);
     const [condenado, seguinte] = await fila();
     await sql().query("update fila_planilha set tentativas = 4 where id = $1", [condenado?.id]);
     await vencerEspera(condenado?.id ?? "");
@@ -461,6 +475,156 @@ describe("agenda com segredo", () => {
   });
 });
 
+describe("intenção e conferência", () => {
+  it("grava a intenção no mesmo commit do registro e o dispatcher a coloca na fila", async () => {
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+    await sql().query("delete from intencoes_envio_escolar where tipo = 'SAIDAS'");
+    // Uma reserva viva na frente impede o processamento durante a conferência.
+    const frente = await inserirItem("2026-08-01");
+    await sql().query(
+      "update fila_planilha set estado = 'EM_ANDAMENTO', reservado_ate = now() + interval '5 minutes' where id = $1",
+      [frente],
+    );
+    await registrar(0, "2026-08-03");
+    const intencao = await sql().query<{ despachado_em: Date | null }>(
+      `select despachado_em from intencoes_envio_escolar
+        where tipo = 'SAIDAS' and dia = '2026-08-03' order by sequencia desc limit 1`,
+    );
+    expect(intencao.rows).toHaveLength(1);
+    expect(
+      await esperar(async () => {
+        const linha = await sql().query<{ despachado_em: Date | null }>(
+          `select despachado_em from intencoes_envio_escolar
+            where tipo = 'SAIDAS' and dia = '2026-08-03' order by sequencia desc limit 1`,
+        );
+        const itens = await fila();
+        return (
+          Boolean(linha.rows[0]?.despachado_em) && itens.some((item) => item.dia === "2026-08-03")
+        );
+      }),
+    ).toBe(true);
+    expect((await fila()).find((item) => item.dia === "2026-08-03")?.estado).toBe("AGUARDANDO");
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+  });
+
+  it("grava a intenção da frequência no mesmo commit da chamada", async () => {
+    await sql().query("delete from fila_planilha where tipo = 'FREQUENCIA'");
+    await sql().query("delete from intencoes_envio_escolar where tipo = 'FREQUENCIA'");
+    await sql().query(
+      `insert into integracoes_planilha (id, finalidade, ativa, envio_automatico, modo, atualizado_em)
+       values ('principal', 'FREQUENCIA', true, true, 'CONSERVADOR', now())
+       on conflict (id) do update set
+         finalidade = 'FREQUENCIA', ativa = true, envio_automatico = true,
+         modo = 'CONSERVADOR', modo_completo_ate = null, atualizado_em = now()`,
+    );
+    const chamada = await chamar("/api/frequencias", "POST", {
+      dia: "2026-08-04",
+      turmaId,
+      faltas: [],
+      revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da fila",
+    });
+    expect(chamada.status).toBe(200);
+    const intencao = await sql().query<{ evento_id: string; revisao_evento: number }>(
+      `select evento_id, revisao_evento from intencoes_envio_escolar
+        where tipo = 'FREQUENCIA' and dia = '2026-08-04' order by sequencia desc limit 1`,
+    );
+    expect(intencao.rows).toHaveLength(1);
+    expect(intencao.rows[0]?.revisao_evento).toBe(1);
+    await sql().query("delete from fila_planilha where tipo = 'FREQUENCIA'");
+    await sql().query("delete from intencoes_envio_escolar where tipo = 'FREQUENCIA'");
+    await sql().query("delete from frequencias where turma_id = $1 and dia = '2026-08-04'", [
+      turmaId,
+    ]);
+    await sql().query(
+      "update integracoes_planilha set ativa = false, envio_automatico = false where id = 'principal'",
+    );
+  });
+
+  it("resolve escrita incerta somente com evidência do mesmo destino e período", async () => {
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+    await sql().query("delete from sincronizacoes_planilha where finalidade = 'SAIDAS'");
+    const id = await inserirItem("2026-08-10");
+    await sql().query(
+      `update fila_planilha set estado = 'CONCLUIDO', resultado = 'sem_confirmacao',
+         requer_conferencia = true, concluido_em = now(), atualizado_em = now(), detalhes = $2::jsonb
+       where id = $1`,
+      [
+        id,
+        JSON.stringify({
+          versao: 1,
+          tipo: "SAIDAS",
+          completo: true,
+          iniciadoEm: "2026-08-10T12:00:00.000Z",
+          escopos: [{ origemId: null, destino: "movimentacao:qa" }],
+        }),
+      ],
+    );
+    const semProva = await chamar(`/api/planilha/fila/${id}/resolver`, "POST", {
+      confirmado: true,
+    });
+    expect(semProva.status).toBe(409);
+    await sql().query(
+      `insert into sincronizacoes_planilha
+         (finalidade, destino, de, ate, modalidade, plano_hash, resultado, puladas_ocupadas, puladas_formula, criado_em)
+       values ('SAIDAS', 'movimentacao:qa', $1, $1, 'CONSERVADOR', 'qa', 'SUCESSO', 0, 0, now())`,
+      ["2026-08-10"],
+    );
+    const comProva = await chamar(`/api/planilha/fila/${id}/resolver`, "POST", {
+      confirmado: true,
+    });
+    const corpo = await comProva.json().catch(() => null);
+    expect(corpo).toMatchObject({ ok: true });
+    const item = await sql().query<{ requer_conferencia: boolean; resolvido_em: Date | null }>(
+      "select requer_conferencia, resolvido_em from fila_planilha where id = $1",
+      [id],
+    );
+    expect(item.rows[0]?.requer_conferencia).toBe(false);
+    expect(item.rows[0]?.resolvido_em).not.toBeNull();
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+    await sql().query("delete from sincronizacoes_planilha where finalidade = 'SAIDAS'");
+  });
+
+  it("devolve pendência sem mapa à fila e bloqueia reenvio de escrita incerta", async () => {
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+    const semMapa = await inserirItem("2026-08-11");
+    await sql().query(
+      `update fila_planilha set estado = 'CONCLUIDO', resultado = 'sem_mapa',
+         requer_conferencia = true, concluido_em = now(), atualizado_em = now(), detalhes = $2::jsonb
+       where id = $1`,
+      [
+        semMapa,
+        JSON.stringify({
+          versao: 1,
+          tipo: "SAIDAS",
+          completo: false,
+          escopos: [{ origemId: null, destino: null }],
+        }),
+      ],
+    );
+    const reenviado = await chamar(`/api/planilha/fila/${semMapa}/reenfileirar`, "POST", {});
+    expect(reenviado.status).toBe(200);
+    const antigo = await sql().query<{ resolvido_em: Date | null }>(
+      "select resolvido_em from fila_planilha where id = $1",
+      [semMapa],
+    );
+    expect(antigo.rows[0]?.resolvido_em).not.toBeNull();
+    expect((await fila()).some((item) => item.dia === "2026-08-11")).toBe(true);
+
+    const incerta = await inserirItem("2026-08-12");
+    await sql().query(
+      `update fila_planilha set estado = 'CONCLUIDO', resultado = 'sem_confirmacao',
+         requer_conferencia = true, concluido_em = now(), atualizado_em = now()
+       where id = $1`,
+      [incerta],
+    );
+    const recusado = await chamar(`/api/planilha/fila/${incerta}/reenfileirar`, "POST", {});
+    expect(recusado.status).toBe(409);
+    await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
+  });
+});
+
 describe("lista da fila", () => {
   it("mostra só os envios pendentes e os que falharam, na ordem de processamento", async () => {
     await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
@@ -479,17 +643,22 @@ describe("lista da fila", () => {
     const resposta = await chamar("/api/planilha/fila", "GET");
     expect(resposta.status).toBe(200);
     const estado = await json<{
+      conferenciasPendentes: number;
       contagens: Record<string, number>;
-      itens: { id: string; estado: string }[];
+      itens: { id: string; estado: string; classe: string }[];
     }>(resposta);
     const daSuite = estado.itens.filter((item) => Object.values(ids).includes(item.id));
     // Enviados e descartados saem da lista, mas continuam nas contagens.
-    expect(daSuite.map((item) => item.estado)).toEqual(["AGUARDANDO", "FALHOU", "EM_ANDAMENTO"]);
-    expect(estado.itens.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(
-      true,
-    );
+    // O dispatcher pode mover o primeiro item para EM_ANDAMENTO durante a leitura;
+    // a ordem dos identificadores é o contrato estável desta lista.
+    expect(daSuite.map((item) => item.id)).toEqual([ids.AGUARDANDO, ids.FALHOU, ids.EM_ANDAMENTO]);
+    // A conferência de uma escrita incerta pode manter um item concluído na
+    // lista; o contrato desta suíte é que os próprios enviados e descartados saiam.
+    expect(daSuite.every((item) => !["CONCLUIDO", "DESCARTADO"].includes(item.estado))).toBe(true);
     expect(estado.contagens.CONCLUIDO).toBeGreaterThanOrEqual(1);
     expect(estado.contagens.DESCARTADO).toBeGreaterThanOrEqual(1);
+    expect(estado.conferenciasPendentes).toBeGreaterThanOrEqual(0);
+    expect(daSuite.every((item) => typeof item.classe === "string")).toBe(true);
     await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
   });
 });

@@ -1,11 +1,14 @@
-// Fila FIFO dos envios à planilha: ordem, espera, reserva vencida e desfecho dos itens.
+// Fila FIFO dos envios à planilha: ordem, espera, reserva vencida, desfecho e classes de item.
 import { describe, expect, it } from "vitest";
 import {
+  classeDoItem,
   desfechoDoItem,
   esperaDaTentativa,
   MAXIMO_TENTATIVAS_FILA,
   proximoDaFila,
+  requerConferencia,
   resumirSituacoes,
+  retrySeguro,
   type ItemParaOrdem,
 } from "@/domain/fila-planilha";
 
@@ -90,52 +93,96 @@ describe("esperaDaTentativa", () => {
 });
 
 describe("desfechoDoItem", () => {
-  it("falha confirmada agenda nova tentativa até o limite", () => {
-    expect(desfechoDoItem("falhou", 1, AGORA)).toEqual({
-      estado: "AGUARDANDO",
-      resultado: "falhou",
-      proximaTentativaEm: depois(30_000),
-    });
-    expect(desfechoDoItem("falhou", MAXIMO_TENTATIVAS_FILA, AGORA)).toEqual({
-      estado: "FALHOU",
-      resultado: "falhou",
-      proximaTentativaEm: null,
-    });
-    expect(desfechoDoItem("limite", 1, AGORA)).toEqual({
-      estado: "AGUARDANDO",
-      resultado: "limite",
-      proximaTentativaEm: depois(30_000),
-    });
-    expect(desfechoDoItem("limite", MAXIMO_TENTATIVAS_FILA, AGORA)).toEqual({
-      estado: "FALHOU",
-      resultado: "limite",
-      proximaTentativaEm: null,
-    });
-  });
+  it.each(["falhou", "limite", "nao_processado", "falha_preparo"])(
+    "resultado repetível agenda nova tentativa até o limite: %s",
+    (situacao) => {
+      expect(desfechoDoItem(situacao, 1, AGORA)).toEqual({
+        estado: "AGUARDANDO",
+        requerConferencia: false,
+        resultado: situacao,
+        proximaTentativaEm: depois(30_000),
+      });
+      expect(desfechoDoItem(situacao, MAXIMO_TENTATIVAS_FILA, AGORA)).toEqual({
+        estado: "FALHOU",
+        requerConferencia: false,
+        resultado: situacao,
+        proximaTentativaEm: null,
+      });
+    },
+  );
 
-  it("qualquer outra situação encerra o item sem repetir", () => {
-    for (const situacao of [
-      "enviado",
-      "desligado",
-      "sem_mapa",
-      "pendente_manual",
-      "sem_confirmacao",
-    ]) {
+  it("pendência segura encerra e pede ação do operador", () => {
+    for (const situacao of ["sem_mapa", "pendente_manual", "sem_autor"]) {
       expect(desfechoDoItem(situacao, 1, AGORA)).toEqual({
         estado: "CONCLUIDO",
         resultado: situacao,
+        requerConferencia: true,
         proximaTentativaEm: null,
       });
     }
   });
+
+  it("sucesso e escrita incerta encerram como sucesso ou conferência", () => {
+    for (const situacao of ["enviado", "desligado", "sem_trabalho"]) {
+      expect(desfechoDoItem(situacao, 1, AGORA)).toEqual({
+        estado: "CONCLUIDO",
+        resultado: situacao,
+        requerConferencia: false,
+        proximaTentativaEm: null,
+      });
+    }
+    expect(desfechoDoItem("sem_confirmacao", 1, AGORA)).toEqual({
+      estado: "CONCLUIDO",
+      resultado: "sem_confirmacao",
+      requerConferencia: true,
+      proximaTentativaEm: null,
+    });
+  });
 });
 
 describe("resumirSituacoes", () => {
-  it("a pior situação resume o envio de várias turmas", () => {
-    expect(resumirSituacoes(["enviado", "falhou", "sem_mapa"])).toBe("falhou");
-    expect(resumirSituacoes(["enviado", "sem_confirmacao"])).toBe("sem_confirmacao");
+  it("mantém separados sucesso, preparo e origem não processada", () => {
+    expect(resumirSituacoes(["enviado", "nao_processado"])).toBe("nao_processado");
+    expect(resumirSituacoes(["enviado", "falha_preparo"])).toBe("falha_preparo");
+    expect(resumirSituacoes(["enviado", "falhou"])).toBe("falhou");
+    expect(resumirSituacoes(["enviado", "sem_mapa"])).toBe("sem_mapa");
     expect(resumirSituacoes(["enviado", "pendente_manual"])).toBe("pendente_manual");
+  });
+
+  it("escrita possível em qualquer origem força conferência", () => {
+    expect(resumirSituacoes(["enviado", "sem_confirmacao"])).toBe("sem_confirmacao");
+    expect(resumirSituacoes(["sem_mapa", "sem_confirmacao"])).toBe("sem_confirmacao");
+  });
+
+  it("preserva o desligado e a ausência de origens", () => {
     expect(resumirSituacoes(["desligado", "enviado"])).toBe("enviado");
     expect(resumirSituacoes([])).toBe("desligado");
+  });
+});
+
+describe("conferência e reprocessamento", () => {
+  it("separa o que exige conferência do que apenas pede nova tentativa", () => {
+    expect(requerConferencia("sem_confirmacao")).toBe(true);
+    expect(requerConferencia("sem_mapa")).toBe(true);
+    expect(requerConferencia("falha_preparo")).toBe(false);
+    expect(requerConferencia("nao_processado")).toBe(false);
+    expect(retrySeguro("sem_mapa")).toBe(true);
+    expect(retrySeguro("falha_preparo")).toBe(true);
+    expect(retrySeguro("sem_confirmacao")).toBe(false);
+    expect(retrySeguro(null)).toBe(false);
+  });
+
+  it("classifica o item para a interface e a API", () => {
+    expect(classeDoItem({ estado: "AGUARDANDO", resultado: null })).toBe("aberto");
+    expect(classeDoItem({ estado: "CONCLUIDO", resultado: "enviado" })).toBe("sucesso");
+    expect(classeDoItem({ estado: "FALHOU", resultado: "falha_preparo" })).toBe("preparo");
+    expect(classeDoItem({ estado: "CONCLUIDO", resultado: "nao_processado" })).toBe(
+      "origem_nao_processada",
+    );
+    expect(classeDoItem({ estado: "CONCLUIDO", resultado: "sem_mapa" })).toBe(
+      "origem_nao_processada",
+    );
+    expect(classeDoItem({ estado: "CONCLUIDO", resultado: "sem_confirmacao" })).toBe("conferencia");
+    expect(classeDoItem({ estado: "FALHOU", resultado: "falhou" })).toBe("falha");
   });
 });

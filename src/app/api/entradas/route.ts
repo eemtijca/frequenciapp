@@ -1,7 +1,7 @@
 // Consulta e registro de entradas atrasadas pela equipe escolar.
 import { after } from "next/server";
 import { criarEntrada, esquemaFiltroEntradas, listarEntradas } from "@/application/entradas";
-import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
+import { processarFilaDaAgenda } from "@/application/fila-planilha";
 import {
   corpoJson,
   erroApi,
@@ -31,11 +31,8 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
-    const entrada = await criarEntrada(sessao.usuario, await corpoJson(requisicao));
-    // A resposta sai antes; o envio à planilha nunca atrasa nem derruba o registro.
-    if (await enfileirarSeLigado("ENTRADAS", { autorId: sessao.usuario.id, dia: entrada.dia })) {
-      after(() => processarFila());
-    }
+    await criarEntrada(sessao.usuario, await corpoJson(requisicao));
+    after(() => processarFilaDaAgenda());
     return json({ ok: true }, 201);
   });
 }

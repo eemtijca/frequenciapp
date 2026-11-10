@@ -2,6 +2,7 @@
 // justificativa (tipo ou texto) e o liberador do catálogo da Gestão.
 import { z } from "zod";
 import { esquemaAulasReferencia } from "@/application/referencia-saida";
+import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { horariosDaChamada } from "@/domain/frequencia";
 import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import { banco } from "@/infra/banco";
@@ -319,6 +320,13 @@ export async function criarSaida(
           criadoPorId: identidade.id,
         },
         ...COMPLEMENTO,
+      });
+      await registrarIntencaoEscolar(tx, {
+        tipo: "SAIDAS",
+        eventoId: criada.id,
+        revisaoEvento: 1,
+        dia: criada.dia,
+        autorId: identidade.id,
       });
       await auditar(
         tx,

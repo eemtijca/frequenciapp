@@ -46,10 +46,13 @@ const VARIANTE_ESTADO: Record<EstadoItemFila, VarianteSelo> = {
 
 const ROTULO_RESULTADO: Record<string, string> = {
   enviado: "Enviado",
+  sem_trabalho: "Sem participantes para envio",
   desligado: "Envio automático desligado",
   sem_mapa: "Sem aba vinculada",
   pendente_manual: "Conferir no envio manual",
   sem_confirmacao: "Sem confirmação do Google",
+  falha_preparo: "Falha no preparo do envio",
+  nao_processado: "Origem não processada",
   limite: "Limite do Google, nova tentativa",
   falhou: "Falha no envio",
   sem_autor: "Autor removido",
@@ -68,6 +71,7 @@ function partesDoItem(item: ItemDaFila): string[] {
       ? `${item.tentativas} ${item.tentativas === 1 ? "tentativa" : "tentativas"}`
       : "",
     item.resultado ? (ROTULO_RESULTADO[item.resultado] ?? item.resultado) : "",
+    item.falhaPreparo ? `Preparo: ${item.falhaPreparo}` : "",
     item.estado === "AGUARDANDO" && item.proximaTentativaEm
       ? `Nova tentativa às ${horaLocal(item.proximaTentativaEm)}`
       : "",
@@ -105,6 +109,7 @@ export default function SecaoFilaPlanilha() {
 
   const abertos = (estado?.contagens.AGUARDANDO ?? 0) + (estado?.contagens.EM_ANDAMENTO ?? 0);
   const falhos = estado?.contagens.FALHOU ?? 0;
+  const conferencias = estado?.conferenciasPendentes ?? 0;
 
   function processarAgora() {
     void executar("processar", async () => {
@@ -126,11 +131,20 @@ export default function SecaoFilaPlanilha() {
     });
   }
 
-  function agir(item: ItemDaFila, acao: "reenfileirar" | "descartar") {
+  function agir(item: ItemDaFila, acao: "reenfileirar" | "descartar" | "resolver") {
     void executar(`${acao}:${item.id}`, async () => {
       try {
-        await pedir(`/api/planilha/fila/${item.id}/${acao}`, corpoJson({}));
-        avisarSucesso(acao === "reenfileirar" ? "Item voltou ao fim da fila." : "Item descartado.");
+        await pedir(
+          `/api/planilha/fila/${item.id}/${acao}`,
+          corpoJson(acao === "resolver" ? { confirmado: true } : {}),
+        );
+        avisarSucesso(
+          acao === "reenfileirar"
+            ? "Item voltou ao fim da fila."
+            : acao === "resolver"
+              ? "Conferência registrada para este item."
+              : "Item descartado.",
+        );
         carregar();
       } catch (excecao) {
         avisarErro(excecao, { contexto: "Não foi possível concluir a ação." });
@@ -148,7 +162,15 @@ export default function SecaoFilaPlanilha() {
       resumo={
         <>
           <Selo
-            variante={erro ? "perigo" : !estado ? "neutro" : abertos > 0 ? "atencao" : "sucesso"}
+            variante={
+              erro
+                ? "perigo"
+                : !estado
+                  ? "neutro"
+                  : abertos + conferencias > 0
+                    ? "atencao"
+                    : "sucesso"
+            }
           >
             {erro
               ? "Falha ao consultar"
@@ -156,8 +178,11 @@ export default function SecaoFilaPlanilha() {
                 ? "Conferindo..."
                 : abertos > 0
                   ? `${abertos} na fila`
-                  : "Fila vazia"}
+                  : conferencias > 0
+                    ? `${conferencias} para conferir`
+                    : "Fila vazia"}
           </Selo>
+          {conferencias > 0 && <Selo variante="atencao">{conferencias} para conferir</Selo>}
           {falhos > 0 && <Selo variante="perigo">{falhos} com falha</Selo>}
         </>
       }
@@ -194,8 +219,8 @@ export default function SecaoFilaPlanilha() {
           </summary>
           <p className="mb-3">
             Envios processados por ordem de chegada, com até cinco tentativas automáticas. A lista
-            mostra só os pendentes e os que falharam; os enviados e descartados entram apenas nas
-            contagens.
+            mostra os pendentes, as falhas de preparo, as origens não processadas e as conferências
+            de escrita incerta. Os resolvidos entram nas contagens.
           </p>
           {estado && (
             <CaixasDeInfo
@@ -215,14 +240,47 @@ export default function SecaoFilaPlanilha() {
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <div>
                     <Selo variante={VARIANTE_ESTADO[item.estado]}>
-                      {ROTULO_ESTADO[item.estado]}
+                      {item.requerConferencia
+                        ? item.podeResolver
+                          ? "Conferência necessária"
+                          : "Ação necessária"
+                        : ROTULO_ESTADO[item.estado]}
                     </Selo>
                   </div>
                   <p className="text-muted-foreground text-xs wrap-anywhere">
                     {partesDoItem(item).join(" · ")}
+                    {item.escopos.map((alvo, indice) => (
+                      <span key={indice} className="block">
+                        Origem {alvo.origemRotulo ?? alvo.origemId ?? "movimentação"} ·{" "}
+                        {alvo.destino ?? "Destino desconhecido"}
+                      </span>
+                    ))}
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  {item.podeResolver && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      disabled={chaveAtiva === `resolver:${item.id}`}
+                      onClick={() => agir(item, "resolver")}
+                    >
+                      Registrar conferência
+                    </Button>
+                  )}
+                  {item.podeReprocessar && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11"
+                      disabled={chaveAtiva === `reenfileirar:${item.id}`}
+                      onClick={() => agir(item, "reenfileirar")}
+                    >
+                      <RotateCcw size={16} aria-hidden="true" />
+                      Tentar novamente
+                    </Button>
+                  )}
                   {item.estado === "AGUARDANDO" && (
                     <Button
                       type="button"
@@ -233,18 +291,6 @@ export default function SecaoFilaPlanilha() {
                     >
                       <X size={16} aria-hidden="true" />
                       Descartar
-                    </Button>
-                  )}
-                  {item.estado === "FALHOU" && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11"
-                      disabled={chaveAtiva === `reenfileirar:${item.id}`}
-                      onClick={() => agir(item, "reenfileirar")}
-                    >
-                      <RotateCcw size={16} aria-hidden="true" />
-                      Tentar novamente
                     </Button>
                   )}
                 </div>

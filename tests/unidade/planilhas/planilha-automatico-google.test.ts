@@ -23,10 +23,21 @@ const dubl = vi.hoisted(() => ({
   acesso: vi.fn(),
   feriados: vi.fn(),
   feriado: vi.fn(),
+  filaBusca: vi.fn(),
+  filaAtualiza: vi.fn(),
+  filaConta: vi.fn(),
+  filaLimpa: vi.fn(),
+  liberacao: vi.fn(),
 }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
     $transaction: dubl.transacao,
+    filaPlanilha: {
+      findMany: dubl.filaBusca,
+      updateMany: dubl.filaAtualiza,
+      count: dubl.filaConta,
+      deleteMany: dubl.filaLimpa,
+    },
     integracaoPlanilha: {
       findUnique: dubl.integracao,
       update: dubl.atualizarIntegracao,
@@ -58,11 +69,24 @@ vi.mock("@/application/calendario-letivo", () => ({
   feriadoDoDia: dubl.feriado,
 }));
 vi.mock("@/infra/trava-planilha-frequencia", () => ({
-  comTravaPlanilhaFrequencia: <T>(tarefa: () => Promise<T>) => tarefa(),
+  comTravaPlanilhaFrequencia: async <T>(tarefa: () => Promise<T>) => {
+    const resultado = await tarefa();
+    await dubl.liberacao();
+    return resultado;
+  },
   controleTravaPlanilhaFrequencia: () => undefined,
 }));
 
-import { reiniciarOrcamentoDeLeituraGoogle } from "@/infra/google/planilhas-limites";
+vi.mock("@/infra/auditoria", () => ({ auditar: async () => undefined }));
+vi.mock("@/application/planilha-entradas", () => ({ enviarEntradasAposRegistro: vi.fn() }));
+vi.mock("@/application/planilha-saidas", () => ({ enviarSaidasAposRegistro: vi.fn() }));
+import { processarFila } from "@/application/fila-planilha";
+import { desfechoDoItem, resumirSituacoes } from "@/domain/fila-planilha";
+import { ErroGoogle } from "@/infra/google/planilhas-escrita";
+import {
+  ehLimiteGoogle,
+  reiniciarOrcamentoDeLeituraGoogle,
+} from "@/infra/google/planilhas-limites";
 import { atualizarEsquemaDaAba, enviarAposSalvar, simularEnvio } from "@/application/planilha";
 
 const turmaId = "00000000-0000-4000-8000-000000000101";
@@ -262,6 +286,7 @@ beforeEach(() => {
   formula = false;
   respostaPerdida = false;
   antesDaReleitura = null;
+  dubl.liberacao.mockReset();
   registros = [];
   lotes = [];
   mensal = false;
@@ -478,6 +503,127 @@ describe("enviar ao salvar com a conta Google", () => {
   });
 });
 
+describe("certeza do efeito e persistência de conclusão", () => {
+  // Caracterização da precedência já implementada, não um novo RED do produto.
+  it.each(["O Google limitou as leituras.", "O Google limitou o envio."])(
+    "caracteriza limite reconhecido após escrita sem liberar reenvio: %s",
+    async (mensagem) => {
+      const erro = new Error(mensagem);
+      expect(ehLimiteGoogle(erro)).toBe(true);
+      expect(ehLimiteGoogle(new Error("Quota exceeded 429"))).toBe(false);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      dubl.concluirEnvio.mockImplementation(async () => {
+        expect(celula).toBe("P");
+        expect(lotes).toHaveLength(1);
+        throw erro;
+      });
+      dubl.filaBusca.mockResolvedValue([
+        {
+          id: "fila-qa",
+          tipo: "FREQUENCIA",
+          estado: "AGUARDANDO",
+          tentativas: 0,
+          sequencia: 1n,
+          turmaId,
+          dia: new Date(`${dia}T12:00:00Z`),
+          autorId: "qa",
+          proximaTentativaEm: null,
+          reservadoAte: null,
+        },
+      ]);
+      dubl.filaAtualiza.mockResolvedValue({ count: 1 });
+      dubl.filaConta.mockResolvedValue(0);
+      await processarFila({ limite: 1 });
+      expect(dubl.concluirEnvio).toHaveBeenCalledTimes(2);
+      expect(registros).toMatchObject([{ resultado: "PARCIAL" }]);
+      expect(celula).toBe("P");
+      expect(lotes).toHaveLength(1);
+      expect(dubl.filaAtualiza).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            resultado: "sem_confirmacao",
+            estado: "CONCLUIDO",
+            requerConferencia: true,
+            proximaTentativaEm: null,
+            detalhes: expect.objectContaining({
+              resultados: [{ origemId: turmaId, situacao: "sem_confirmacao" }],
+            }),
+          }),
+        }),
+      );
+    },
+  );
+
+  it.each(["Error", "limite", "recusa fora do transporte"])(
+    "retém conferência na fila após escrita e duas conclusões falhas: %s",
+    async (falha) => {
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      dubl.concluirEnvio.mockImplementation(async () => {
+        expect(celula).toBe("P");
+        expect(lotes).toHaveLength(1);
+        if (falha === "recusa fora do transporte") throw new ErroGoogle("QA_RECIBO_RECUSADO", true);
+        throw new Error(falha === "limite" ? "Quota exceeded 429" : "QA_RECIBO_INDISPONIVEL");
+      });
+      dubl.filaBusca.mockResolvedValue([
+        {
+          id: "fila-qa",
+          tipo: "FREQUENCIA",
+          estado: "AGUARDANDO",
+          tentativas: 0,
+          sequencia: 1n,
+          turmaId,
+          dia: new Date(`${dia}T12:00:00Z`),
+          autorId: "qa",
+          proximaTentativaEm: null,
+          reservadoAte: null,
+        },
+      ]);
+      dubl.filaAtualiza.mockResolvedValue({ count: 1 });
+      dubl.filaConta.mockResolvedValue(0);
+      await processarFila({ limite: 1 });
+      expect(dubl.concluirEnvio).toHaveBeenCalledTimes(2);
+      expect(registros).toMatchObject([{ resultado: "PARCIAL" }]);
+      expect(celula).toBe("P");
+      expect(lotes).toHaveLength(1);
+      expect(dubl.filaAtualiza).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            resultado: "sem_confirmacao",
+            estado: "CONCLUIDO",
+            requerConferencia: true,
+            proximaTentativaEm: null,
+            detalhes: expect.objectContaining({
+              resultados: [{ origemId: turmaId, situacao: "sem_confirmacao" }],
+            }),
+          }),
+        }),
+      );
+    },
+  );
+  it("retém incerteza quando a liberação falha depois da escrita", async () => {
+    dubl.liberacao.mockRejectedValue(new Error("QA_LIBERACAO"));
+    const resultado = await enviarAposSalvar({ id: "qa" }, turmaId, dia);
+    expect(celula).toBe("P");
+    expect(lotes).toHaveLength(1);
+    expect(resultado.get(turmaId)).toBe("sem_confirmacao");
+    expect(desfechoDoItem(resumirSituacoes([...resultado.values()]), 1, new Date())).toMatchObject({
+      requerConferencia: true,
+      proximaTentativaEm: null,
+    });
+  });
+  it("mantém falha confirmada antes do transporte reenviável", async () => {
+    dubl.criarEnvio.mockRejectedValueOnce(new Error("QA_PRE_EFEITO"));
+    const resultado = await enviarAposSalvar({ id: "qa" }, turmaId, dia);
+    expect(resultado.get(turmaId)).toBe("falhou");
+    expect(lotes).toHaveLength(0);
+    expect(celula).toBe("");
+    expect(desfechoDoItem(resumirSituacoes([...resultado.values()]), 1, new Date())).toMatchObject({
+      estado: "AGUARDANDO",
+      requerConferencia: false,
+    });
+  });
+});
+
 describe("envio mensal com sábados letivos registrados", () => {
   it.each([false, true])("não envia feriados ao salvar em aba mensal %s", async (mensal) => {
     if (mensal) usarAbaMensal();
@@ -643,6 +789,37 @@ describe("envio mensal com sábados letivos registrados", () => {
       { turmaOriginalId: turmaId, de: "2026-10-03", ate: "2026-10-04", somenteAlteradas: false },
     );
     expect(previa.planos).toMatchObject([{ dias: [], semEnvio: true }]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("distingue ausência da chamada de chamada sem participantes", async () => {
+    dubl.frequencia.mockResolvedValueOnce(null);
+    expect(await enviarAposSalvar({ id: "qa" }, turmaId, dia)).toMatchObject({
+      completo: false,
+      falhaPreparo: "FREQUENCIA_AUSENTE",
+    });
+    dubl.frequencia.mockResolvedValueOnce({ alunos: [] });
+    expect(await enviarAposSalvar({ id: "qa" }, turmaId, dia)).toMatchObject({
+      completo: true,
+      semTrabalho: true,
+    });
+  });
+
+  it("preserva falha de preparo antes de descobrir origens", async () => {
+    dubl.integracao.mockRejectedValueOnce(new Error("QA_PREPARO"));
+    const resultado = await enviarAposSalvar({ id: "qa" }, turmaId, dia);
+    expect(resultado).toMatchObject({ completo: false, falhaPreparo: "Error" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("identifica origens não processadas quando o preparo posterior falha", async () => {
+    dubl.frequencia.mockResolvedValueOnce({
+      alunos: [{ aluno: { turmaOriginalId: turmaId } }, { aluno: { turmaOriginalId: "outra" } }],
+    });
+    dubl.feriado.mockRejectedValueOnce(new Error("QA_CALENDARIO"));
+    const resultado = await enviarAposSalvar({ id: "qa" }, turmaId, dia);
+    expect(resultado).toMatchObject({ completo: false });
+    expect([...resultado.values()]).toEqual(["nao_processado", "nao_processado"]);
     expect(fetch).not.toHaveBeenCalled();
   });
 

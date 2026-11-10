@@ -1,5 +1,6 @@
 // Entradas atrasadas: validação, consulta e correção auditada sem alterar faltas.
 import { z } from "zod";
+import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
@@ -141,6 +142,13 @@ export async function criarEntrada(
           registradoPorNome: identidade.nome,
           criadoPorId: identidade.id,
         },
+      });
+      await registrarIntencaoEscolar(tx, {
+        tipo: "ENTRADAS",
+        eventoId: criada.id,
+        revisaoEvento: 1,
+        dia: new Date(`${dados.data.dia}T12:00:00Z`),
+        autorId: identidade.id,
       });
       await auditar(tx, identidade.id, "entrada.criar", `entrada:${criada.id}`);
     });

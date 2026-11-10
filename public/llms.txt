@@ -33,6 +33,8 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 
 - A Chamada Parcial inclui saídas antecipadas como itens `SAIDA` de `/api/frequencias-personalizadas`. Apenas aulas concluídas antes do horário contam; ajustes manuais prevalecem. A confirmação manual usa `POST /api/saidas/{id}/seduc` com assinatura e revisão vigentes. Ausência de grade ou horário exige conferência. Itens `CHAMADA` trazem `marca` P, F, FJ, S ou D; D é o aluno desistente no dia que segue na lista gravada da chamada, com a descrição Desistente.
 
+- A fila de envios automáticos grava a intenção escolar no mesmo commit da frequência, da justificativa aplicada à chamada, da saída e da entrada. `GET /api/planilha/fila` mostra a classe de cada item, `conferenciasPendentes` e as ações disponíveis. Resultado `sem_confirmacao` não é reenviado sozinho; a conferência usa `POST /api/planilha/fila/{id}/resolver`, que exige evidência de sucesso no mesmo destino, turma e período ou confirmação explícita para recorte antigo ou incompleto. Pendências seguras, como `sem_mapa` e `falha_preparo`, usam `POST /api/planilha/fila/{id}/reenfileirar`; não repetir uma escrita incerta.
+
 ## Optional
 
 - [Arquitetura](https://github.com/eemtijca/frequenciapp/blob/main/docs/arquitetura.md) e [planilha](https://github.com/eemtijca/frequenciapp/blob/main/docs/planilha.md).
