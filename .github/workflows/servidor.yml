@@ -92,6 +92,9 @@ jobs:
       - name: Ensaio de backup e restauração em Compose
         run: bash tests/servidor/backup-restauracao.sh
 
+      - name: Ensaio do desafio ACME no Nginx
+        run: bash tests/servidor/nginx-acme.sh
+
       - name: Ensaio de restauração por URL
         run: bash tests/servidor/restauracao-url.sh
 
