@@ -131,6 +131,18 @@ agenda:
   resources: {}
   extraEnv: []
 
+# Bloqueio de migração e rollout sem backup confirmado. O gate é sempre
+# renderizado; o modo de ensaio é a única exceção explícita.
+backupGate:
+  # Idade máxima do recibo do último backup do banco.
+  maxAgeHours: 36
+  # Exige que o recibo confirme a verificação da cópia remota.
+  requireRemoteVerification: false
+  # Ensaio explícito sem backup confirmado. Não há proteção nem promessa de
+  # recuperação enquanto este valor for true.
+  ensaioSemProtecao: false
+  resources: {}
+
 backup:
   enabled: false
   retentionDays: 30
