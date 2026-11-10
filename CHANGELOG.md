@@ -14,6 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
 
+- O modo URL da restauração confere a identidade do servidor e do banco de validação e do destino, recusando a mesma base mesmo quando as URLs usam grafias diferentes.
+
 - O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
 
 - O instalador das rotinas valida o fuso do daemon do cron e só grava `CRON_TZ` quando a implementação comprova suporte. Os CronJobs do Helm aceitam `timeZone`.
@@ -303,6 +305,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - A fila de envios automáticos passa a gravar a intenção escolar na mesma transação da frequência, da justificativa aplicada à chamada, da saída e da entrada. Um dispatcher separado retoma intenções pendentes, distingue sucesso, falha de preparo, origem não processada e conferência de escrita incerta, mostra as pendências com ação e impede que uma reserva vencida finalize o item do novo dono. A decisão está na [ADR-074](docs/adr/074-outbox-escolar-e-conferencia-da-fila.md).
+- As saídas antecipadas passam a guardar a turma e o retrato de aulas do momento, com confirmação explícita e auditoria quando a referência histórica não pode ser comprovada. A Chamada Parcial e os relatórios usam a turma histórica, e a conferência é recusada sem retrato confiável. A decisão está na [ADR-069](docs/adr/069-referencia-historica-saidas.md).
 - O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
 - As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).

@@ -76,6 +76,8 @@ async function registrar(indice: number, dia: string) {
     momento: "aula_2",
     justificativa: "C",
     liberadoPorCodigo: "QGLIB",
+    confirmarHistorico: true,
+    motivo: "Teste sintético do envio automático",
   });
   expect(resposta.status).toBe(201);
 }

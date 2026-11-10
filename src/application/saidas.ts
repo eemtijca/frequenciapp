@@ -1,12 +1,16 @@
 // Saídas antecipadas: registro separado da chamada, com momento,
 // justificativa (tipo ou texto) e o liberador do catálogo da Gestão.
 import { z } from "zod";
+import { esquemaAulasReferencia } from "@/application/referencia-saida";
 import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
+import { horariosDaChamada } from "@/domain/frequencia";
+import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ehDuplicidade, ErroHttp } from "@/infra/erros";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import {
   camposJustificativaSaida,
   diaLocal,
@@ -20,38 +24,62 @@ import {
 import { ehHorarioEntrada } from "@/domain/entradas";
 import type { Identidade } from "@/domain/usuarios";
 
-export const esquemaCriarSaida = z.object({
-  alunoId: z.string().uuid("Aluno inválido."),
-  dia: z.string().refine(ehDiaValido, "Data inválida."),
-  momento: z
-    .string()
-    .trim()
-    .max(20, "Momento da saída inválido.")
-    .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
-  horario: z.string().refine(ehHorarioEntrada, "Horário inválido. Informe hora e minuto."),
-  justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
-  texto: z
-    .string()
-    .trim()
-    .max(
-      LIMITE_TEXTO_SAIDA,
-      `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
-    )
-    .nullish(),
-  observacao: z
-    .string()
-    .trim()
-    .max(200, "A observação deve ter no máximo 200 caracteres.")
-    .nullish(),
-  liberadoPorCodigo: z.preprocess(
-    (valor) => (typeof valor === "string" ? valor : ""),
-    z
+export const esquemaCriarSaida = z
+  .object({
+    alunoId: z.string().uuid("Aluno inválido."),
+    dia: z.string().refine(ehDiaValido, "Data inválida."),
+    momento: z
       .string()
       .trim()
-      .min(1, "Escolha quem liberou o estudante.")
-      .max(20, "Responsável pela liberação inválido."),
-  ),
-});
+      .max(20, "Momento da saída inválido.")
+      .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+    horario: z.string().refine(ehHorarioEntrada, "Horário inválido. Informe hora e minuto."),
+    justificativa: z.string().trim().max(10, "Justificativa inválida.").nullish(),
+    texto: z
+      .string()
+      .trim()
+      .max(
+        LIMITE_TEXTO_SAIDA,
+        `O texto da justificativa deve ter no máximo ${LIMITE_TEXTO_SAIDA} caracteres.`,
+      )
+      .nullish(),
+    observacao: z
+      .string()
+      .trim()
+      .max(200, "A observação deve ter no máximo 200 caracteres.")
+      .nullish(),
+    liberadoPorCodigo: z.preprocess(
+      (valor) => (typeof valor === "string" ? valor : ""),
+      z
+        .string()
+        .trim()
+        .min(1, "Escolha quem liberou o estudante.")
+        .max(20, "Responsável pela liberação inválido."),
+    ),
+    confirmarHistorico: z.boolean().optional(),
+    motivo: z
+      .string()
+      .trim()
+      .min(3, "Informe o motivo da confirmação histórica.")
+      .max(200, "O motivo deve ter no máximo 200 caracteres.")
+      .optional(),
+  })
+  .superRefine((dados, contexto) => {
+    if (dados.confirmarHistorico && !dados.motivo) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["motivo"],
+        message: "Informe o motivo da confirmação histórica.",
+      });
+    }
+    if (!dados.confirmarHistorico && dados.motivo) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["motivo"],
+        message: "O motivo só vale com a confirmação histórica.",
+      });
+    }
+  });
 
 export interface FiltrosSaidas {
   dia?: string;
@@ -62,6 +90,10 @@ export interface FiltrosSaidas {
 }
 
 interface LinhaSaida {
+  turmaHistoricaId?: string | null;
+  turmaHistoricaNome?: string | null;
+  aulasReferencia?: unknown;
+  origemReferencia?: string;
   id: string;
   alunoId: string;
   dia: Date;
@@ -82,6 +114,14 @@ function paraSaida(
 ): SaidaAntecipada {
   return {
     id: linha.id,
+    turmaHistoricaId: linha.turmaHistoricaId ?? null,
+    turmaHistoricaNome: linha.turmaHistoricaNome ?? null,
+    aulasReferencia: esquemaAulasReferencia.safeParse(linha.aulasReferencia).data ?? null,
+    origemReferencia:
+      linha.origemReferencia === "MATRICULA_VIGENTE" ||
+      linha.origemReferencia === "CHAMADA_HISTORICA"
+        ? linha.origemReferencia
+        : "DESCONHECIDA",
     alunoId: linha.alunoId,
     dia: linha.dia.toISOString().slice(0, 10),
     momento: linha.momento,
@@ -118,7 +158,7 @@ export async function listarSaidas(filtros: FiltrosSaidas = {}): Promise<SaidaAn
               }
             : {}),
         ...(filtros.alunoId ? { alunoId: filtros.alunoId } : {}),
-        ...(filtros.turmaId ? { aluno: { turmaId: filtros.turmaId } } : {}),
+        ...(filtros.turmaId ? { turmaHistoricaId: filtros.turmaId } : {}),
       },
       orderBy: [{ dia: "asc" }, { criadoEm: "asc" }],
       ...COMPLEMENTO,
@@ -183,9 +223,93 @@ export async function criarSaida(
 
   try {
     return await comTransacao(async (tx) => {
+      const hoje = diaLocal(new Date(), ambiente.fuso);
+      let referencia: {
+        turmaHistoricaId: string | null;
+        turmaHistoricaNome: string | null;
+        origemReferencia: "MATRICULA_VIGENTE" | "CHAMADA_HISTORICA" | "DESCONHECIDA";
+        aulasReferencia: {
+          versao: 1;
+          aulas: { id: string; ordem: number; inicio: string; fim: string }[];
+        } | null;
+      };
+      if (dia === hoje) {
+        const vigente = await tx.aluno.findUnique({
+          where: { id: alunoId },
+          include: { turma: { include: { serie: true, horarios: true } } },
+        });
+        if (!vigente || !vigente.ativo)
+          throw new ErroHttp("Confira o cadastro ativo do aluno antes de registrar a saída.", 409);
+        referencia = {
+          turmaHistoricaId: vigente.turmaId,
+          turmaHistoricaNome: `${vigente.turma.serie.nome} ${vigente.turma.nome}`,
+          origemReferencia: "MATRICULA_VIGENTE",
+          aulasReferencia: esquemaAulasReferencia.parse({
+            versao: 1,
+            aulas: horariosDaChamada(
+              vigente.turma.horarios.map((h) => ({
+                ...h,
+                disciplinas: disciplinasDoHorario(h.disciplinas),
+              })),
+              dia,
+              true,
+            ).map((h) => ({ id: h.id, ordem: h.ordem, inicio: h.inicio, fim: h.fim })),
+          }),
+        };
+      } else {
+        const turmasDoAluno = [aluno.turmaId, aluno.turmaOriginalId].filter((id): id is string =>
+          Boolean(id),
+        );
+        const chamada = await tx.frequencia.findFirst({
+          where: {
+            dia: new Date(`${dia}T12:00:00Z`),
+            turmaId: { in: turmasDoAluno },
+            alunos: { some: { alunoId } },
+          },
+          include: {
+            turma: { include: { serie: true } },
+            aulas: { include: { horario: true } },
+          },
+          orderBy: ORDEM_BASE_CHAMADA,
+        });
+        if (chamada && chamada.aulas.length > 0) {
+          referencia = {
+            turmaHistoricaId: chamada.turmaId,
+            turmaHistoricaNome: `${chamada.turma.serie.nome} ${chamada.turma.nome}`,
+            origemReferencia: "CHAMADA_HISTORICA",
+            aulasReferencia: esquemaAulasReferencia.parse({
+              versao: 1,
+              aulas: chamada.aulas.map((aula) => ({
+                id: aula.horario.id,
+                ordem: aula.horario.ordem,
+                inicio: aula.horario.inicio,
+                fim: aula.horario.fim,
+              })),
+            }),
+          };
+        } else {
+          if (!dados.data.confirmarHistorico || !dados.data.motivo) {
+            throw new ErroHttp(
+              "A referência histórica da saída não pôde ser comprovada. Confirme o lançamento e informe o motivo.",
+              409,
+              "CONFIRMACAO_HISTORICA_NECESSARIA",
+            );
+          }
+          referencia = {
+            turmaHistoricaId: null,
+            turmaHistoricaNome: null,
+            origemReferencia: "DESCONHECIDA",
+            aulasReferencia: null,
+          };
+        }
+      }
       const criada = await tx.saidaAntecipada.create({
         data: {
           alunoId,
+          turmaHistoricaId: referencia.turmaHistoricaId,
+          turmaHistoricaNome: referencia.turmaHistoricaNome,
+          origemReferencia: referencia.origemReferencia,
+          ...(referencia.aulasReferencia ? { aulasReferencia: referencia.aulasReferencia } : {}),
           dia: new Date(`${dia}T12:00:00Z`),
           momento,
           horario,
@@ -204,7 +328,14 @@ export async function criarSaida(
         dia: criada.dia,
         autorId: identidade.id,
       });
-      await auditar(tx, identidade.id, "saida.criar", `saida:${criada.id}`);
+      await auditar(
+        tx,
+        identidade.id,
+        "saida.criar",
+        `saida:${criada.id}${
+          referencia.origemReferencia === "DESCONHECIDA" ? `:motivo:${dados.data.motivo ?? ""}` : ""
+        }`,
+      );
       return paraSaida(criada, rotulosLiberador);
     });
   } catch (erro) {

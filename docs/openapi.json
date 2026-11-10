@@ -4006,17 +4006,18 @@
         },
         "responses": {
           "200": {
-            "description": "Registro removido.",
+            "description": "Registro removido. `revisarChamada` indica a chamada que deve ser recarregada quando havia base diária.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Ok"
+                  "$ref": "#/components/schemas/RemocaoFrequenciaParcial"
                 },
                 "examples": {
                   "Exemplo": {
                     "summary": "Exemplo",
                     "value": {
-                      "ok": true
+                      "ok": true,
+                      "revisarChamada": null
                     }
                   }
                 }
@@ -4210,7 +4211,29 @@
             "$ref": "#/components/responses/Erro404"
           },
           "409": {
-            "$ref": "#/components/responses/Erro409"
+            "description": "Referência histórica desconhecida sem confirmação ou saída já existente para o aluno e o dia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Confirmacao historica": {
+                    "summary": "Confirmacao historica necessaria",
+                    "value": {
+                      "error": "A referência histórica da saída não pôde ser comprovada. Confirme o lançamento e informe o motivo.",
+                      "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"
+                    }
+                  },
+                  "Saida duplicada": {
+                    "summary": "Saida duplicada",
+                    "value": {
+                      "error": "Este aluno já tem uma saída nesta data. Remova o registro anterior para corrigir."
+                    }
+                  }
+                }
+              }
+            }
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -15130,6 +15153,48 @@
             "type": "string",
             "format": "date-time",
             "example": "2026-10-13T17:30:00.000Z"
+          },
+          "turmaHistoricaId": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Turma do momento da saída; nula quando a referência é desconhecida.",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "turmaHistoricaNome": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rótulo histórico da turma no momento da saída.",
+            "example": "1º ano A"
+          },
+          "aulasReferencia": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AulasReferenciaSaida"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Retrato das aulas usado para calcular as aulas concluídas."
+          },
+          "origemReferencia": {
+            "type": "string",
+            "enum": ["MATRICULA_VIGENTE", "CHAMADA_HISTORICA", "DESCONHECIDA"],
+            "description": "Origem da referência: matrícula vigente no dia corrente, chamada salva com retrato ou confirmação sem referência.",
+            "example": "MATRICULA_VIGENTE"
           }
         }
       },
@@ -15180,6 +15245,18 @@
             "type": "string",
             "description": "Código do catálogo de quem libera.",
             "example": "PORT"
+          },
+          "confirmarHistorico": {
+            "type": "boolean",
+            "description": "Confirma uma saída em data passada quando a referência histórica não pode ser comprovada. Exige motivo.",
+            "example": true
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Motivo da confirmação histórica. Obrigatório com confirmarHistorico.",
+            "example": "Saída do diário de papel"
           }
         }
       },
@@ -19957,8 +20034,16 @@
             "example": "2026-10-13"
           },
           "turmaId": {
-            "type": "string",
-            "format": "uuid",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Turma histórica da saída; nula quando a referência é desconhecida e exige conferência.",
             "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
           },
           "alunoNome": {
@@ -20190,6 +20275,83 @@
             "type": "boolean",
             "description": "Verdadeiro quando a mesma prévia já tinha sido aplicada; nada foi gravado e as contagens são zero.",
             "example": false
+          }
+        }
+      },
+      "AulasReferenciaSaida": {
+        "type": "object",
+        "title": "Aulas de referência da saída",
+        "description": "Retrato versionado das aulas usadas para calcular o que já tinha terminado na saída.",
+        "required": ["versao", "aulas"],
+        "properties": {
+          "versao": {
+            "const": 1,
+            "example": 1
+          },
+          "aulas": {
+            "type": "array",
+            "maxItems": 99,
+            "items": {
+              "type": "object",
+              "required": ["id", "ordem", "inicio", "fim"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ordem": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99,
+                  "example": 1
+                },
+                "inicio": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                  "example": "07:00"
+                },
+                "fim": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                  "example": "07:50"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RemocaoFrequenciaParcial": {
+        "type": "object",
+        "title": "Remoção da frequência parcial",
+        "required": ["ok"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "example": true
+          },
+          "revisarChamada": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["dia", "turmaId"],
+                "properties": {
+                  "dia": {
+                    "type": "string",
+                    "format": "date",
+                    "example": "2026-10-13"
+                  },
+                  "turmaId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chamada que precisa ser recarregada após remover a personalização, se havia base."
           }
         }
       }
