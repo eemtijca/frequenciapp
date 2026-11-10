@@ -304,6 +304,14 @@ fi
 validar_dump
 
 if [ "$BACKUP_MODO" = "compose" ]; then
+  esquemas_extras=$(consultar_alvo "$banco" \
+    "select nspname from pg_namespace where nspname !~ '^pg_' and nspname <> 'information_schema' and nspname <> :'schema' order by 1")
+  if [ -n "$esquemas_extras" ]; then
+    erro "O banco em uso tem schemas fora de $DATABASE_SCHEMA: $esquemas_extras. O dump restaura apenas esse schema e a troca do banco inteiro perderia os demais. Gere um dump integral em outro fluxo ou remova esses schemas antes da restauração."
+  fi
+fi
+
+if [ "$BACKUP_MODO" = "compose" ]; then
   banco_temp="${banco}_restauracao_$(date -u +%Y%m%dT%H%M%SZ)_$$"
   banco_anterior="${banco}_anterior_$(date -u +%Y%m%dT%H%M%SZ)_$$"
   log "Criando o banco descartável $banco_temp."
