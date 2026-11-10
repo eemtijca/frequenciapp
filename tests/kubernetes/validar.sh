@@ -8,9 +8,9 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-k8s.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 DOCKER_BIN="${DOCKER_BIN:-docker}"
-HELM_IMAGE="${HELM_IMAGE:-alpine/helm:3.19.0}"
-KUBECONFORM_IMAGE="${KUBECONFORM_IMAGE:-ghcr.io/yannh/kubeconform:v0.6.7}"
-NODE_IMAGE="${NODE_IMAGE:-node:24-bookworm-slim}"
+HELM_IMAGE="${HELM_IMAGE:-alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e}"
+KUBECONFORM_IMAGE="${KUBECONFORM_IMAGE:-ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e}"
+NODE_IMAGE="${NODE_IMAGE:-node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9}"
 REPO_HOST="${REPO_HOST:-$REPO}"
 
 converter=false

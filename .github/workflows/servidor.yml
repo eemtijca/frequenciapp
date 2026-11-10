@@ -11,6 +11,7 @@ on:
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "tests/servidor/**"
+      - "tests/kubernetes/**"
       - "package.json"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
