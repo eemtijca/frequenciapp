@@ -1,6 +1,7 @@
 // Consulta a chamada salva como base de conferência, sem criar ou alterar registros.
 // A personalização prevalece por aluno e dia, inclusive após uma transferência.
 import { z } from "zod";
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/client";
 import { esquemaFiltrosParciais } from "./frequencia-parcial";
 import { consultarSaidasParciais } from "./saidas-parciais";
@@ -107,8 +108,9 @@ export async function listarFrequenciasPersonalizadas(
         },
         alunos: { include: { aluno: { select: { nome: true, desistenteEm: true } } } },
       },
-      // Se o aluno integrou mais de uma lista no dia, a chamada mais recente é a base.
-      orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+      // Se o aluno integrou mais de uma lista no dia, a chamada criada por
+      // último é a base; a edição de outro aluno não muda a precedência.
+      orderBy: ORDEM_BASE_CHAMADA,
     });
     const catalogo = new Map(
       (await tx.justificativa.findMany({ select: { codigo: true, rotulo: true } })).map((item) => [
