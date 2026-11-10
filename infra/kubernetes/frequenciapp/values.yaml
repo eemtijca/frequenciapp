@@ -79,6 +79,11 @@ config:
 # e os opcionais GOOGLE_*, PUSH_VAPID_*, FERIADOS_* e ADMIN_*.
 existingSecret: ""
 
+# Revisão explícita do existingSecret usada no checksum do Pod quando o Helm
+# não consegue consultar o cluster, como em helm template offline. Troque o
+# valor ao alterar o Secret fora do Helm para provocar o rollout.
+existingSecretRevision: "1"
+
 # Alternativa de desenvolvimento. Para produção, prefira existingSecret.
 secrets:
   create: false
@@ -119,8 +124,8 @@ persistence:
 agenda:
   enabled: true
   schedule: "*/5 * * * *"
-  # Fuso IANA do CronJob. Exige Kubernetes 1.27 ou superior quando preenchido.
-  timeZone: ""
+  # Fuso IANA do CronJob, sempre renderizado. Exige Kubernetes 1.27 ou superior.
+  timeZone: America/Fortaleza
   appUrl: ""
   existingSecret: ""
   concurrencyPolicy: Forbid
@@ -130,6 +135,18 @@ agenda:
   failedJobsHistoryLimit: 3
   resources: {}
   extraEnv: []
+
+# Bloqueio de migração e rollout sem backup confirmado. O gate é sempre
+# renderizado; o modo de ensaio é a única exceção explícita.
+backupGate:
+  # Idade máxima do recibo do último backup do banco.
+  maxAgeHours: 36
+  # Exige que o recibo confirme a verificação da cópia remota.
+  requireRemoteVerification: false
+  # Ensaio explícito sem backup confirmado. Não há proteção nem promessa de
+  # recuperação enquanto este valor for true.
+  ensaioSemProtecao: false
+  resources: {}
 
 backup:
   enabled: false
@@ -144,11 +161,11 @@ backup:
   database:
     enabled: true
     schedule: "30 2 * * *"
-    timeZone: ""
+    timeZone: America/Fortaleza
     existingSecret: ""
     local: true
     persistence:
-      enabled: false
+      enabled: true
       size: 20Gi
       storageClass: ""
       accessModes:
@@ -157,9 +174,15 @@ backup:
   spreadsheets:
     enabled: true
     schedule: "0 3 * * *"
-    timeZone: ""
+    timeZone: America/Fortaleza
     existingSecret: ""
     local: true
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
   concurrencyPolicy: Forbid
   backoffLimit: 3
   activeDeadlineSeconds: 3600

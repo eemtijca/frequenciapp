@@ -11,6 +11,7 @@ on:
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "tests/servidor/**"
+      - "tests/kubernetes/**"
       - "package.json"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
@@ -62,6 +63,13 @@ jobs:
             -v "$RUNNER_TEMP/helm:/out" \
             ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
             -strict -summary /out
+
+      - name: Ensaiar chart Kubernetes
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:stable \
+            -x tests/kubernetes/validar.sh \
+            infra/kubernetes/frequenciapp/files/verificar-backup.sh
+          bash tests/kubernetes/validar.sh
 
       - name: Validar workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
