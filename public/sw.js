@@ -1,6 +1,6 @@
 // Service worker: casca offline e avisos push sem dados de estudantes.
 // A API nunca é cacheada; a navegação tenta a rede antes da página offline.
-const VERSAO = "frequenciapp-10";
+const VERSAO = "frequenciapp-11";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",
@@ -24,7 +24,11 @@ self.addEventListener("activate", (evento) => {
   evento.waitUntil(
     (async () => {
       const nomes = await caches.keys();
-      await Promise.all(nomes.filter((nome) => nome !== CACHE).map((nome) => caches.delete(nome)));
+      await Promise.all(
+        nomes
+          .filter((nome) => /^frequenciapp-\d+-estatico$/.test(nome) && nome !== CACHE)
+          .map((nome) => caches.delete(nome)),
+      );
       await self.clients.claim();
     })(),
   );
