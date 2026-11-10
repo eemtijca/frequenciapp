@@ -1,7 +1,16 @@
 // Verifica o exemplo de ambiente e o recorte de regras do contexto Docker.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -27,7 +36,7 @@ function incluído(caminho, regras) {
     assert.ok(!regra.includes("**") && !/[\[\]\\]/.test(regra), `Regra não suportada: ${linha}`);
     const regex = new RegExp(
       `^${regra
-        .replace(/[.+^${}()|]/g, "\\$&")
+        .replace(/[\\.+^${}()|]/g, "\\$&")
         .replace(/\*/g, "[^/]*")
         .replace(/\?/g, "[^/]")}$`,
     );
@@ -42,6 +51,12 @@ function incluído(caminho, regras) {
   return incluido;
 }
 
+test("padrões literais não permitem escape ou metacaracteres de regex", () => {
+  assert.equal(incluído("dados/arquivoXpem", "dados/arquivo.pem"), true);
+  assert.equal(incluído("dados/arquivo.pem", "dados/arquivo.pem"), false);
+  assert.throws(() => incluído("dados/chave.pem", "dados/\\\\*.pem"), /Regra não suportada/);
+});
+
 test("o contexto isolado do Nginx exclui certificados", () => {
   const regras = ler("infra/servidor/nginx/.dockerignore");
   assert.equal(incluído("certificados/live/exemplo/privkey.pem", regras), false);
@@ -49,6 +64,73 @@ test("o contexto isolado do Nginx exclui certificados", () => {
   assert.equal(incluído("outro-diretorio/chave.pem", regras), false);
   assert.equal(incluído("config/ops.env", regras), false);
   assert.equal(incluído("frequenciapp-http.conf", regras), true);
+});
+
+// Aceita somente comentários e atribuições literais, antes de iniciar o shell.
+function validarEnv(conteudo) {
+  assert.ok(!/[\r\0]/.test(conteudo), "Linha de ambiente insegura");
+  for (const linha of conteudo.split("\n")) {
+    assert.ok(
+      /^(?:#[^\x00-\x1f\x7f\\]*|[A-Z_][A-Z0-9_]*=(?:[A-Za-z0-9_./:@%+-]*|'[A-Za-z0-9_./:@%+* -]*'))?$/.test(
+        linha,
+      ),
+      "Linha de ambiente insegura",
+    );
+  }
+  return conteudo;
+}
+
+function carregarEnv(conteudo) {
+  const entrada = validarEnv(conteudo);
+  const diretorio = mkdtempSync(join(tmpdir(), "env-validado-"));
+  try {
+    const arquivo = join(diretorio, "ambiente");
+    writeFileSync(arquivo, entrada, { mode: 0o600, flag: "wx" });
+    const fd = openSync(arquivo, "r");
+    try {
+      return spawnSync(
+        "/bin/sh",
+        [
+          "-eu",
+          "-c",
+          '. /dev/fd/3; printf "%s\\n" "$AGENDA_HORARIO" "$BACKUP_HORARIO" "$BACKUP_PLANILHAS_HORARIO" "$ATUALIZAR_HORARIO" "$CERTBOT_RENOVAR_HORARIO"',
+        ],
+        {
+          stdio: ["ignore", "pipe", "pipe", fd],
+          cwd: tmpdir(),
+          env: { PATH: "/usr/bin:/bin", HOME: tmpdir() },
+          encoding: "utf8",
+        },
+      );
+    } finally {
+      closeSync(fd);
+    }
+  } finally {
+    rmSync(diretorio, { recursive: true, force: true });
+  }
+}
+
+test("a validação recusa comandos, substituições e quebras de linha escapadas", () => {
+  const diretorio = mkdtempSync(join(tmpdir(), "env-inseguro-"));
+  const marcador = join(diretorio, "marcador");
+  try {
+    const entradas = [
+      `AGENDA_HORARIO='*/5 * * * *'\ntouch ${marcador}\n`,
+      `AGENDA_HORARIO=$(touch ${marcador})\n`,
+      `AGENDA_HORARIO=\`touch ${marcador}\`\n`,
+      `AGENDA_HORARIO='*/5 * * * *'; touch ${marcador}\n`,
+      `# comentário\\\ntouch ${marcador}\n`,
+      `AGENDA_HORARIO='*/5 * * * *'\rtouch ${marcador}\n`,
+      "AGENDA_HORARIO='*/5 * * * *'\r\n",
+      "AGENDA_HORARIO='*/5 * * * *'\u0000\n",
+    ];
+    for (const entrada of entradas) {
+      assert.throws(() => carregarEnv(entrada), /Linha de ambiente insegura/);
+      assert.equal(existsSync(marcador), false);
+    }
+  } finally {
+    rmSync(diretorio, { recursive: true, force: true });
+  }
 });
 
 test("o shell carrega todos os horários sem executá-los como comandos", () => {
@@ -59,17 +141,9 @@ test("o shell carrega todos os horários sem executá-los como comandos", () => 
     ATUALIZAR_HORARIO: "30 4 * * *",
     CERTBOT_RENOVAR_HORARIO: "15 2 * * *",
   };
-  const comando =
-    '. "$1"; printf "%s\\n" "$AGENDA_HORARIO" "$BACKUP_HORARIO" "$BACKUP_PLANILHAS_HORARIO" "$ATUALIZAR_HORARIO" "$CERTBOT_RENOVAR_HORARIO"';
-  const resultado = spawnSync(
-    "/bin/sh",
-    ["-eu", "-c", comando, "teste", join(raiz, "infra/servidor/servidor.env.example")],
-    {
-      cwd: tmpdir(),
-      env: { PATH: "/usr/bin:/bin", HOME: tmpdir() },
-      encoding: "utf8",
-    },
-  );
+  const resultado = carregarEnv(ler("infra/servidor/servidor.env.example"));
+  assert.ifError(resultado.error);
+  assert.equal(resultado.signal, null);
   assert.equal(resultado.status, 0, resultado.stderr);
   assert.deepEqual(resultado.stdout.trimEnd().split("\n"), Object.values(esperado));
 });
