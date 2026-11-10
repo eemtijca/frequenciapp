@@ -154,6 +154,8 @@ beforeAll(async () => {
         momento: "aula_1",
         justificativa: "C",
         liberadoPorCodigo: "QPS1",
+        confirmarHistorico: true,
+        motivo: "Teste sintético da planilha de saídas",
       }),
     }),
   );
@@ -697,6 +699,8 @@ describe("planilha de saídas", () => {
           justificativa: "O",
           texto: "Liberada mais cedo",
           liberadoPorCodigo: "QPS2",
+          confirmarHistorico: true,
+          motivo: "Teste sintético da correção da planilha",
         }),
       }),
     );
