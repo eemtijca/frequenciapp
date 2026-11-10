@@ -27,7 +27,8 @@ export interface FrequenciaDaChamada {
 }
 
 /** Saída projetada para conferência; a assinatura protege as aulas exibidas. */
-export interface FrequenciaDaSaida extends Omit<FrequenciaParcial, "tipo" | "turno"> {
+export interface FrequenciaDaSaida extends Omit<FrequenciaParcial, "tipo" | "turno" | "turmaId"> {
+  turmaId: string | null;
   tipo: "SAIDA";
   horario: string | null;
   aulasConferiveis: boolean;

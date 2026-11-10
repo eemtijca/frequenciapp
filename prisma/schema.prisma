@@ -439,6 +439,10 @@ model Falta {
 // Quem libera é um código do catálogo de liberadores; a conta antiga fica em
 // liberadoPor.
 model SaidaAntecipada {
+  turmaHistoricaId String? @map("turma_historica_id") @db.Uuid
+  turmaHistoricaNome String? @map("turma_historica_nome") @db.VarChar(200)
+  aulasReferencia Json? @map("aulas_referencia")
+  origemReferencia String @default("DESCONHECIDA") @map("origem_referencia") @db.VarChar(40)
   id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   alunoId                String    @map("aluno_id") @db.Uuid
   dia                    DateTime  @db.Date

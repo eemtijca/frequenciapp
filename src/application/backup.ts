@@ -1,6 +1,7 @@
 // Cópia de segurança em JSON: exporta cadastro, frequências regulares e parciais e
 // importa mesclando sem sobrescrever, com resultado e auditoria.
 import { z } from "zod";
+import { camposReferenciaSaida, referenciaSaidaCoerente } from "@/application/referencia-saida";
 import { banco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
@@ -206,6 +207,7 @@ const esquemaCopia = z.object({
             .trim()
             .max(20)
             .refine((codigo) => ehMomentoValido(codigo), "Momento da saída inválido."),
+          ...camposReferenciaSaida,
           horario: z.string().refine(ehHorarioEntrada, "Horário da saída inválido.").nullish(),
           justificativa: z.string().trim().min(1).max(10).nullish(),
           observacao: z.string().trim().max(200).nullish(),
@@ -220,6 +222,7 @@ const esquemaCopia = z.object({
           registradoSeducPorNome: z.string().trim().min(1).max(200).nullish(),
           revisaoSeduc: z.number().int().min(0).max(999999).optional(),
         })
+        .refine(referenciaSaidaCoerente, "Referência histórica da saída incoerente.")
         .refine(
           (saida) =>
             saida.assinaturaSeduc != null
@@ -470,6 +473,10 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
         texto: true,
         liberadoPorId: true,
         liberadoPorCodigo: true,
+        turmaHistoricaId: true,
+        turmaHistoricaNome: true,
+        aulasReferencia: true,
+        origemReferencia: true,
         assinaturaSeduc: true,
         registradoSeducEm: true,
         registradoSeducPorNome: true,
@@ -549,11 +556,20 @@ export async function exportarCopia(admin: { id: string }): Promise<CopiaFrequen
       criadoEm: parcial.criadoEm.toISOString(),
       atualizadoEm: parcial.atualizadoEm.toISOString(),
     })),
-    saidas: saidas.map((saida) => ({
-      ...saida,
-      dia: saida.dia.toISOString().slice(0, 10),
-      registradoSeducEm: saida.registradoSeducEm?.toISOString() ?? null,
-    })),
+    saidas: saidas.map((saida) => {
+      // O mesmo contrato da importação refina JsonValue e a origem persistida.
+      const serializada = esquemaCopia.shape.saidas.element.safeParse({
+        ...saida,
+        dia: saida.dia.toISOString().slice(0, 10),
+        registradoSeducEm: saida.registradoSeducEm?.toISOString() ?? null,
+      });
+      if (!serializada.success)
+        throw new ErroHttp(
+          "A referência da saída não permite gerar uma cópia válida. Confira o registro antes de exportar.",
+          409,
+        );
+      return serializada.data;
+    }),
     entradas: entradas.map((entrada) => ({
       ...entrada,
       dia: entrada.dia.toISOString().slice(0, 10),
@@ -1183,6 +1199,10 @@ async function mesclarCopia(
           observacao: true,
           texto: true,
           liberadoPorCodigo: true,
+          turmaHistoricaId: true,
+          turmaHistoricaNome: true,
+          aulasReferencia: true,
+          origemReferencia: true,
           assinaturaSeduc: true,
           registradoSeducEm: true,
           registradoSeducPorNome: true,
@@ -1191,6 +1211,12 @@ async function mesclarCopia(
       });
       if (atual) {
         const igual =
+          (saida.origemReferencia === undefined ||
+            ((atual.origemReferencia ?? "DESCONHECIDA") === saida.origemReferencia &&
+              (atual.turmaHistoricaId ?? null) === (saida.turmaHistoricaId ?? null) &&
+              (atual.turmaHistoricaNome ?? null) === (saida.turmaHistoricaNome ?? null) &&
+              JSON.stringify(atual.aulasReferencia ?? null) ===
+                JSON.stringify(saida.aulasReferencia ?? null))) &&
           atual.momento === saida.momento &&
           (atual.horario ?? null) === (saida.horario ?? null) &&
           atual.justificativa === codigo &&
@@ -1215,6 +1241,10 @@ async function mesclarCopia(
       await tx.saidaAntecipada.create({
         data: {
           id: saida.id,
+          turmaHistoricaId: saida.turmaHistoricaId ?? null,
+          turmaHistoricaNome: saida.turmaHistoricaNome ?? null,
+          origemReferencia: saida.origemReferencia ?? "DESCONHECIDA",
+          ...(saida.aulasReferencia ? { aulasReferencia: saida.aulasReferencia } : {}),
           assinaturaSeduc: saida.assinaturaSeduc ?? null,
           registradoSeducEm: saida.registradoSeducEm ? new Date(saida.registradoSeducEm) : null,
           registradoSeducPorNome: saida.registradoSeducPorNome ?? null,

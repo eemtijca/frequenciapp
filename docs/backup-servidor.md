@@ -34,7 +34,7 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A imagem de backup já inclui o cliente.
 - Usar uma role somente leitura com `pg_read_all_data` quando possível.
 - A Transaction pooler do Supabase não é adequada para `pg_dump`.
-- A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. A opção `--sem-validacao` é uma decisão explícita de risco.
+- A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. O script confere a identidade do servidor e do banco nas duas URLs e recusa quando ambas apontam para a mesma base, mesmo com grafias diferentes. A opção `--sem-validacao` é uma decisão explícita de risco.
 
 ## Imagem de backup
 
@@ -277,7 +277,7 @@ BACKUP_RESTAURACAO_URL_VALIDACAO='postgresql://usuario:senha@host:5432/frequenci
   --sem-copia
 ```
 
-No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo. A URL de validação precisa apontar para um banco descartável e ser diferente da URL de destino. A opção `--sem-validacao` substitui o banco sem o ensaio prévio e deve ser usada somente com uma decisão registrada.
+No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo. A URL de validação precisa apontar para um banco descartável e o script confere a identidade do servidor e do banco antes do ensaio; grafias equivalentes da mesma base são recusadas. A opção `--sem-validacao` substitui o banco sem o ensaio prévio e deve ser usada somente com uma decisão registrada.
 
 ### Restauração com chave offline
 

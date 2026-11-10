@@ -5,6 +5,8 @@ set -Eeuo pipefail
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-url.XXXXXX")
 BANCO="frequenciapp-url-$$"
+HOST_URL="${HOST_URL:-127.0.0.1}"
+BIND="${BIND:-127.0.0.1}"
 
 limpar() {
   docker rm -f "$BANCO" >/dev/null 2>&1 || true
@@ -15,7 +17,7 @@ trap 'limpar' EXIT
 command -v pg_restore >/dev/null 2>&1 ||
   { echo "Aviso: pg_restore ausente; ensaio URL não executado." >&2; exit 0; }
 
-docker run -d --name "$BANCO" -p 127.0.0.1::5432 \
+docker run -d --name "$BANCO" -p "$BIND::5432" \
   -e POSTGRES_USER=frequencia -e POSTGRES_PASSWORD=frequencia -e POSTGRES_DB=origem \
   postgres:17-alpine >/dev/null
 
@@ -47,6 +49,20 @@ if [ -z "$PORTA" ]; then
 fi
 echo "PostgreSQL descartável publicado na porta $PORTA."
 
+for _tentativa in $(seq 1 30); do
+  if psql "postgresql://frequencia:frequencia@$HOST_URL:$PORTA/origem" -X -tAc 'select 1' \
+    >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+if ! psql "postgresql://frequencia:frequencia@$HOST_URL:$PORTA/origem" -X -tAc 'select 1' \
+  >/dev/null 2>&1; then
+  echo "FALHOU: a porta publicada do PostgreSQL não aceitou a conexão." >&2
+  docker logs "$BANCO" >&2 || true
+  exit 1
+fi
+
 docker exec -i "$BANCO" psql -U frequencia -d origem -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 create table alunos (id integer primary key, nome text not null);
 insert into alunos values (1, 'Aluno Sintetico');
@@ -73,8 +89,8 @@ export APP_DIR="$RAIZ"
 export ESTADO_DIR="$TMP/estado"
 export SERVIDOR_LOCK_DIR="$TMP/locks"
 export BACKUP_MODO=url
-export BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@127.0.0.1:$PORTA/destino"
-export BACKUP_RESTAURACAO_URL_VALIDACAO="postgresql://frequencia:frequencia@127.0.0.1:$PORTA/validacao"
+export BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/destino"
+export BACKUP_RESTAURACAO_URL_VALIDACAO="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/validacao"
 export DATABASE_SCHEMA=public
 mkdir -p "$ESTADO_DIR"
 
@@ -87,9 +103,20 @@ mkdir -p "$ESTADO_DIR"
 [ "$(docker exec "$BANCO" psql -U frequencia -d validacao -tAc 'select count(*) from alunos')" = "1" ] ||
   { echo "FALHOU: o banco descartável de validação não recebeu o dump." >&2; exit 1; }
 
+# URLs diferentes que apontam para o mesmo banco não são isolamento.
+if BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/destino?application_name=destino" \
+  BACKUP_RESTAURACAO_URL_VALIDACAO="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/%64estino?application_name=validacao" \
+  "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$TMP/dump" --confirmar --sem-copia \
+  >"$TMP/equivalente.log" 2>&1; then
+  echo "FALHOU: o modo URL aceitou a mesma base por URLs equivalentes." >&2
+  exit 1
+fi
+grep -q 'mesmo banco' "$TMP/equivalente.log" ||
+  { cat "$TMP/equivalente.log" >&2; echo "FALHOU: a recusa de mesma base não apareceu." >&2; exit 1; }
+
 # Sem a URL de validação, a operação destrutiva precisa ser recusada.
 docker exec "$BANCO" createdb -U frequencia outro_destino
-if BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@127.0.0.1:$PORTA/outro_destino" \
+if BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@$HOST_URL:$PORTA/outro_destino" \
   BACKUP_RESTAURACAO_URL_VALIDACAO="" \
   "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$TMP/dump" --confirmar --sem-copia; then
   echo "FALHOU: o modo URL aceitou restauração sem banco de validação." >&2

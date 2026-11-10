@@ -57,17 +57,26 @@ resource "azurerm_linux_web_app" "api" {
     }
   }
 
+  lifecycle {
+    precondition {
+      condition     = local.migracao_confirmada
+      error_message = "Executar o job da mesma revisão e registrar o recibo antes de promover o runtime."
+    }
+  }
+
   app_settings = {
-    WEBSITES_PORT = "3000"
-    NODE_ENV      = "production"
-    PORT          = "3000"
-    HOST          = "0.0.0.0"
-    TZ_APP        = var.tz_app
-    PERMITIR_HTTP = "false"
-    DATABASE_URL  = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.database_url[0].versionless_id})"
-    DIRECT_URL    = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.direct_url[0].versionless_id})"
-    AUTH_SECRET   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.auth_secret[0].versionless_id})"
-    CRON_SECRET   = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.cron_secret[0].versionless_id})"
+    MIGRAR_NA_PARTIDA = "false"
+    DATABASE_SCHEMA   = local.schema_aplicacao_efetiva
+    COMMIT_SHA        = var.revisao_aplicacao
+    WEBSITES_PORT     = "3000"
+    NODE_ENV          = "production"
+    PORT              = "3000"
+    HOST              = "0.0.0.0"
+    TZ_APP            = var.tz_app
+    PERMITIR_HTTP     = "false"
+    DATABASE_URL      = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.database_url[0].versionless_id})"
+    AUTH_SECRET       = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.auth_secret[0].versionless_id})"
+    CRON_SECRET       = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.cron_secret[0].versionless_id})"
   }
 
   tags = local.tags
@@ -82,9 +91,12 @@ resource "azurerm_role_assignment" "app_acr_pull" {
 }
 
 resource "azurerm_role_assignment" "app_kv_secrets" {
-  count = var.modo_local ? 0 : 1
-
-  scope                = azurerm_key_vault.principal[0].id
+  for_each = var.modo_local ? {} : {
+    banco = azurerm_key_vault_secret.database_url[0].resource_versionless_id
+    auth  = azurerm_key_vault_secret.auth_secret[0].resource_versionless_id
+    cron  = azurerm_key_vault_secret.cron_secret[0].resource_versionless_id
+  }
+  scope                = each.value
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_web_app.api[0].identity[0].principal_id
 }
@@ -107,6 +119,12 @@ resource "azurerm_container_app" "local" {
   resource_group_name          = azurerm_resource_group.principal.name
   container_app_environment_id = azurerm_container_app_environment.local[0].id
   revision_mode                = "Single"
+  lifecycle {
+    precondition {
+      condition     = local.migracao_confirmada
+      error_message = "O serviço exige o contrato de runtime e a revisão confirmada."
+    }
+  }
 
   template {
     min_replicas    = 1
@@ -119,6 +137,18 @@ resource "azurerm_container_app" "local" {
       cpu    = var.cpu_container_local
       memory = var.memoria_container_local
 
+      env {
+        name  = "MIGRAR_NA_PARTIDA"
+        value = "false"
+      }
+      env {
+        name  = "DATABASE_SCHEMA"
+        value = local.schema_aplicacao_efetiva
+      }
+      env {
+        name  = "COMMIT_SHA"
+        value = var.revisao_aplicacao
+      }
       env {
         name  = "NODE_ENV"
         value = "production"
@@ -146,12 +176,7 @@ resource "azurerm_container_app" "local" {
 
       env {
         name  = "DATABASE_URL"
-        value = local.url_banco_local
-      }
-
-      env {
-        name  = "DIRECT_URL"
-        value = local.url_banco_local
+        value = local.url_runtime_efetiva
       }
 
       env {

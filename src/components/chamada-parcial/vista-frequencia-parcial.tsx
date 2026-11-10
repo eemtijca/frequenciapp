@@ -201,6 +201,9 @@ export default function VistaFrequenciaParcial({
   const [erroEdicao, setErroEdicao] = useState("");
   const [conflito, setConflito] = useState(false);
   const [descartarAberto, setDescartarAberto] = useState(false);
+  const [revisarChamada, setRevisarChamada] = useState<{ dia: string; turmaId: string } | null>(
+    null,
+  );
   const [registroRemover, setRegistroRemover] = useState<FrequenciaParcial | null>(null);
   const [estadoPlanilha, setEstadoPlanilha] = useState<EstadoPlanilha | null>(null);
   const [envioAberto, setEnvioAberto] = useState(false);
@@ -509,13 +512,22 @@ export default function VistaFrequenciaParcial({
   const { executando: removendo, executar: remover } = useAcaoUnica(async () => {
     if (!registroRemover) return;
     try {
-      await pedir(`/api/frequencias-parciais/${registroRemover.id}`, {
-        ...corpoJson({ revisao: registroRemover.revisao }),
-        method: "DELETE",
-      });
+      const resultado = await pedir<{ revisarChamada: { dia: string; turmaId: string } | null }>(
+        `/api/frequencias-parciais/${registroRemover.id}`,
+        {
+          ...corpoJson({ revisao: registroRemover.revisao }),
+          method: "DELETE",
+        },
+      );
       setRecarregar((valor) => valor + 1);
       setRegistroRemover(null);
-      avisarSucesso("Frequência parcial removida.");
+      setRevisarChamada(resultado.revisarChamada);
+      avisarSucesso(
+        "Frequência parcial removida.",
+        registroRemover.tipo === "JUSTIFICADA"
+          ? "As marcas da chamada foram preservadas. A revisão precisa ser feita na chamada de origem."
+          : undefined,
+      );
     } catch (excecao) {
       avisarErro(excecao, { contexto: "Não foi possível remover a frequência parcial." });
       if (excecao instanceof ErroApi && excecao.status === 409) {
@@ -885,6 +897,21 @@ export default function VistaFrequenciaParcial({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {revisarChamada && onAbrirChamada && (
+        <div role="status" className="rounded-lg border p-3">
+          <p>
+            As marcas consolidadas foram preservadas. Abrir a chamada não altera as faltas nem
+            recupera confirmações anteriores.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onAbrirChamada(revisarChamada.dia, revisarChamada.turmaId)}
+          >
+            Revisar chamada de origem
+          </Button>
+        </div>
+      )}
       <AlertDialog
         open={ativa && registroRemover !== null}
         onOpenChange={(aberto) => !aberto && !removendo && setRegistroRemover(null)}
