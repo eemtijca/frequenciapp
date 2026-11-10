@@ -160,6 +160,8 @@ Regras:
 | `BACKUP_RCLONE_CONFIG`             | vazio                                 | Configuração do rclone             |
 | `RCLONE_CONFIG_PASS`               | vazio                                 | Senha da configuração do rclone    |
 | `BACKUP_VERIFICAR_REMOTO`          | `true`                                | Confere o arquivo remoto           |
+| `BACKUP_EXIGIR_REMOTO`             | `false`                               | Exige destino e verificação remota |
+| `BACKUP_CATALOGO_PERSISTENTE`      | `true`                                | Exige catálogo persistente         |
 | `BACKUP_INCLUIR_AMBIENTE`          | `true` no Compose                     | Cifra o `app.env` junto            |
 | `BACKUP_AMBIENTE_ARQUIVO`          | `/etc/frequenciapp/app.env`           | Arquivo de ambiente                |
 | `BACKUP_PLANILHAS_LOCAL`           | `true`                                | Copia o ZIP confirmado para o host |
@@ -413,3 +415,14 @@ Os comandos estão em `tests/servidor/README.md`. O fluxo `Servidor` do GitHub A
 - Conferir `BACKUP_RESTAURACAO_URL_VALIDACAO` no modo URL.
 - Conferir se a aplicação voltou após o rollback e se o banco anterior permanece.
 - Conferir `ultima-restauracao.json` em `/var/lib/frequenciapp`.
+
+## Backup no Kubernetes
+
+O chart aceita duas formas de durabilidade para o backup do banco:
+
+- PVC em `backup.database.persistence.enabled=true`, que mantém o dump, o recibo `ultimo-backup.json` e o catálogo em `/backups`;
+- destino remoto em `backup.database.remote.enabled=true`, com `backup.database.local=false` quando não há PVC.
+
+Com PVC, o chart define `BACKUP_CATALOGO_PERSISTENTE=true` e `BACKUP_EXIGIR_REMOTO=false`. Sem PVC, define `BACKUP_EXIGIR_REMOTO=true`; a rotina então recusa `BACKUP_REMOTO` vazio e exige `BACKUP_VERIFICAR_REMOTO=true`. A declaração do chart não comprova transporte nem recuperação: a prova vem do upload, da comparação do hash e do recibo gravado pela rotina.
+
+O gate de upgrade lê o recibo no PVC do banco. Uma instalação somente remota, sem PVC, não tem onde gravar esse recibo e o gate falha por padrão; para manter upgrade protegido, use o PVC do banco mesmo quando o destino remoto estiver habilitado. O modo `backupGate.ensaioSemProtecao=true` continua sendo a única exceção explícita e não oferece proteção.

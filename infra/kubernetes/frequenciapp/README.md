@@ -157,11 +157,17 @@ A URL interna padrão é `http://<release>:3000`. O segredo vem de `CRON_SECRET`
 ```yaml
 agenda:
   enabled: true
+  notifications: true
+  spreadsheets: true
+  indicators: true
   schedule: "*/5 * * * *"
   timeZone: "America/Fortaleza"
+  timeoutSeconds: 300
   appUrl: ""
   existingSecret: ""
 ```
+
+Cada seletor liga ou desliga uma chamada independente. Uma falha em uma rotina não impede as seguintes. `timeoutSeconds` é validado entre 1 e 2147483 e vale para cada requisição.
 
 O campo `timeZone` é sempre renderizado e exige Kubernetes 1.27 ou superior. O padrão é `America/Fortaleza` e pode ser sobrescrito em `agenda.timeZone`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`.
 
@@ -270,7 +276,7 @@ O ensaio reproduzível roda em contêiner e não usa cluster:
 bash tests/kubernetes/validar.sh
 ```
 
-Ele executa `helm lint`, `helm template`, `kubeconform -strict` e confere o gate de backup, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente e o `timeZone`.
+Ele executa `helm lint`, `helm template`, `kubeconform -strict` e confere o gate de backup, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente, o `timeZone`, a recusa de backup sem persistência, o modo somente remoto e as oito combinações da agenda.
 
 Validação manual:
 
@@ -305,3 +311,11 @@ Os PVCs de backup não são removidos automaticamente por causa da anotação `h
 - O `values.exemplo.yaml` é ilustrativo e não contém segredos reais.
 - A primeira instalação deve usar uma réplica. O aumento de réplicas depende de migração concluída e do limite de tentativas compartilhado no banco.
 - O teste `helm test` depende de a imagem estar acessível ao cluster.
+
+## Contratos operacionais
+
+A agenda expõe `agenda.notifications`, `agenda.spreadsheets` e `agenda.indicators`, todos booleanos com padrão `true`, além de `agenda.timeoutSeconds`. Valores desligados não geram chamadas. Manter apenas uma agenda ativa de indicadores entre plataformas.
+
+O backup do banco precisa de PVC (`backup.database.persistence.enabled=true`) ou de `backup.database.remote.enabled=true`. `backup.database.local=true` exige persistência; para somente remoto, usar `local=false` e `persistence.enabled=false`. Sem PVC, o chart injeta `BACKUP_EXIGIR_REMOTO=true` e a rotina recusa remoto vazio ou verificação desligada. O estado usa `/backups/estado`, persistindo junto com os dumps quando o PVC está habilitado.
+
+O gate de upgrade lê o recibo no PVC do banco. Instalação somente remota não grava esse recibo e falha no gate por padrão; manter o PVC ou usar `backupGate.ensaioSemProtecao=true` de forma explícita. Declarar um destino no Secret não comprova transporte nem recuperação.

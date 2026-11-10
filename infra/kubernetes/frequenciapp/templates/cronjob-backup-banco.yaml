@@ -1,4 +1,19 @@
 {{- if and .Values.backup.enabled .Values.backup.database.enabled }}
+{{- if not (kindIs "bool" .Values.backup.database.local) }}
+{{- fail "backup.database.local deve ser booleano" }}
+{{- end }}
+{{- if not (kindIs "bool" .Values.backup.database.persistence.enabled) }}
+{{- fail "backup.database.persistence.enabled deve ser booleano" }}
+{{- end }}
+{{- if not (kindIs "bool" .Values.backup.database.remote.enabled) }}
+{{- fail "backup.database.remote.enabled deve ser booleano" }}
+{{- end }}
+{{- if and (not .Values.backup.database.persistence.enabled) (not .Values.backup.database.remote.enabled) }}
+{{- fail "Backup de banco exige PVC ou remoto explicitamente habilitado" }}
+{{- end }}
+{{- if and .Values.backup.database.local (not .Values.backup.database.persistence.enabled) }}
+{{- fail "backup.database.local exige persistência habilitada" }}
+{{- end }}
 {{- $segredoBanco := required "Defina backup.database.existingSecret" .Values.backup.database.existingSecret -}}
 apiVersion: batch/v1
 kind: CronJob
@@ -40,6 +55,10 @@ spec:
               env:
                 - name: BACKUP_MODO
                   value: url
+                - name: BACKUP_EXIGIR_REMOTO
+                  value: {{ not .Values.backup.database.persistence.enabled | quote }}
+                - name: BACKUP_CATALOGO_PERSISTENTE
+                  value: {{ .Values.backup.database.persistence.enabled | quote }}
                 - name: SERVIDOR_AMBIENTE_INJETADO
                   value: "true"
                 - name: BACKUP_INCLUIR_AMBIENTE

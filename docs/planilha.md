@@ -337,3 +337,9 @@ Falha do envio nunca desfaz o registro. A consulta de saídas por período tamb�
 ## Fontes externas de indicadores
 
 A análise estatística fica no FrequenciBI, acessível pela barra lateral. A seção Painel externo foi retirada da Gestão. As fontes externas preparadas anteriormente mantêm a referência histórica em [looker-studio.md](looker-studio.md); as APIs legadas e as configurações existentes permanecem compatíveis.
+
+## Seletores da agenda
+
+`AGENDA_PLANILHAS=false` impede o processamento da fila pela agenda agrupada sem impedir notificações ou indicadores habilitados. `AGENDA_INDICADORES` controla separadamente os indicadores, inclusive no passo do Actions com `always()`. Os valores textuais aceitos são `true` e `false`, com padrão compatível `true`; desligar uma função não remove seus dados ou itens de fila.
+
+No GitHub Actions, `FILA_APP_URL` define o endereço da fila e usa `NOTIFICACOES_APP_URL` como alternativa. A agenda do servidor e o CronJob do Helm usam `AGENDA_URL` e `AGENDA_TIMEOUT`, com timeout próprio por requisição. Backup de planilhas usa seu próprio controle e não é afetado por esses seletores.

@@ -40,12 +40,15 @@ O cenário é estático e foi reproduzido com `helm template`, `helm lint` e `ku
 - O estado do banco fica em `/backups/estado/ultimo-backup.json`, no PVC do banco. O backup das planilhas mantém o arquivo confirmado e o `.confirmado.json` em `/backups/planilhas`, no PVC das planilhas.
 - Os dois PVCs usam `helm.sh/resource-policy: keep` para sobreviver ao `helm uninstall`.
 - `backup.database.persistence.enabled` e `backup.spreadsheets.persistence.enabled` são `true` por padrão. Sem o PVC do banco, o gate falha; sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado.
+- O backup do banco habilitado exige PVC ou `backup.database.remote.enabled=true`. `backup.database.local=true` exige PVC, porque `emptyDir` não representa durabilidade. No modo somente remoto, o chart injeta `BACKUP_EXIGIR_REMOTO=true` e a rotina recusa destino vazio ou verificação desligada.
+- O gate continua lendo o recibo no PVC do banco. Uma instalação somente remota não grava esse recibo e falha no gate por padrão; a operação deve manter o PVC ou declarar `backupGate.ensaioSemProtecao=true`.
 - `agenda.timeZone`, `backup.database.timeZone` e `backup.spreadsheets.timeZone` são sempre renderizados e usam `America/Fortaleza` como padrão. Os três valores continuam sobrescrevíveis.
 
 ### Testes
 
 - `tests/kubernetes/validar.sh` roda em contêiner e não usa cluster.
 - O ensaio cobre `helm lint`, `helm template`, `kubeconform -strict`, a presença do hook e a recusa sem recibo, o modo de ensaio, a mudança dos checksums, os dois PVCs, o estado persistente e o `timeZone`.
+- O mesmo ensaio recusa backup sem PVC e sem remoto, aceita o modo somente remoto com `BACKUP_EXIGIR_REMOTO=true` e percorre as oito combinações da agenda e o timeout.
 - O workflow `Servidor` executa o ensaio em passo próprio.
 
 ## Alternativas consideradas

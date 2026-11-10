@@ -19,6 +19,11 @@ services:
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
       CRON_SECRET: segredo-ficticio-da-agenda-para-testes-0000
+      AGENDA_URL: ${AGENDA_URL:-http://127.0.0.1:3000}
+      AGENDA_TIMEOUT: ${AGENDA_TIMEOUT:-300}
+      AGENDA_NOTIFICACOES: ${AGENDA_NOTIFICACOES-true}
+      AGENDA_PLANILHAS: ${AGENDA_PLANILHAS-true}
+      AGENDA_INDICADORES: ${AGENDA_INDICADORES-true}
       # O CI usa dublês da Sheets API; a cota real por minuto não se aplica.
       GOOGLE_LEITURAS_POR_MINUTO: "100000"
       # O CI usa dublês da Sheets API; não acessa uma conta Google real.
