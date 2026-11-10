@@ -3,6 +3,17 @@
 	admin off
 	persist_config off
 	grace_period 10s
+	log {
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
+	}
 }
 
 {$DOMINIO} {
@@ -19,6 +30,14 @@
 
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
 	}
 }

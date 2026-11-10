@@ -37,13 +37,15 @@ Respostas:
 - 400 quando o corpo é inválido.
 - 401 com mensagem genérica ("E-mail, identificador ou senha incorretos.") quando credenciais não conferem.
 - 403 quando a conta está desativada, quando a palavra-chave do diretor venceu ou foi revogada (só depois de a palavra conferir) ou quando a origem não é confiável.
-- 429 após excesso de tentativas por dispositivo e login ou por login, com limites e janela dos parâmetros de acesso.
+- 429 após excesso de tentativas por origem ou por login, com limites e janela dos parâmetros de acesso. O contador por origem agrega logins distintos do mesmo dispositivo na janela.
 
 ### POST /api/auth/sair
 
 Encerra a sessão corrente e limpa o cookie.
 
 - 200 `{"ok": true}`.
+- 403 quando a origem da requisição não confere com o destino.
+- 500 quando a revogação da sessão não puder ser confirmada no banco. O cookie não é limpo e a sessão continua válida para nova tentativa.
 
 ### GET /api/auth/sessao
 
