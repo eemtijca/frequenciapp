@@ -1,0 +1,190 @@
+{
+  "descricao": "Inventário dos pins de ferramentas, actions e scripts de instalação. O scanner confere os consumidores sem baixar imagens nem provisionar recursos.",
+  "ferramentas": {
+    "node": {
+      "versao": "24.22.2",
+      "serie": "24",
+      "imagem": "node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9",
+      "estado": "pinado",
+      "fontes": ["https://hub.docker.com/_/node", "https://github.com/nodejs/docker-node"]
+    },
+    "pnpm": {
+      "versao": "12.11.2",
+      "origem": "packageManager do package.json",
+      "estado": "pinado"
+    }
+  },
+  "builds": {
+    "@parcel/watcher": {
+      "permitido": true,
+      "motivo": "Compila o binário nativo usado pelo watcher do Next."
+    },
+    "@prisma/engines": {
+      "permitido": true,
+      "motivo": "Baixa e valida os motores do Prisma."
+    },
+    "@scarf/scarf": {
+      "permitido": false,
+      "motivo": "Telemetria transitiva do Redocly, dispensável para o build."
+    },
+    "@swc/core": {
+      "permitido": true,
+      "motivo": "Instala o binário nativo usado pela compilação do Next."
+    },
+    "esbuild": {
+      "permitido": true,
+      "motivo": "O postinstall valida o binário da plataforma, exigido por Vite, Vitest e pela CLI da Vercel."
+    },
+    "prisma": {
+      "permitido": true,
+      "motivo": "Executa o preinstall oficial do Prisma."
+    },
+    "sharp": {
+      "permitido": true,
+      "motivo": "Instala as bibliotecas de imagem usadas pelo Next."
+    },
+    "unrs-resolver": {
+      "permitido": true,
+      "motivo": "Confere o binário nativo do resolvedor usado pelo ESLint."
+    }
+  },
+  "actions": [
+    {
+      "referencia": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "versao": "v4"
+    },
+    {
+      "referencia": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "versao": "v7"
+    },
+    {
+      "referencia": "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3",
+      "versao": "v9.0.0"
+    },
+    {
+      "referencia": "actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13",
+      "versao": "v7.0.0"
+    },
+    {
+      "referencia": "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "versao": "v4"
+    },
+    {
+      "referencia": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "versao": "v4"
+    },
+    {
+      "referencia": "docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8",
+      "versao": "v6"
+    },
+    {
+      "referencia": "docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+      "versao": "v3"
+    },
+    {
+      "referencia": "docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302",
+      "versao": "v6"
+    },
+    {
+      "referencia": "docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+      "versao": "v3"
+    },
+    {
+      "referencia": "docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130",
+      "versao": "v3"
+    },
+    {
+      "referencia": "github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+      "versao": "v4"
+    },
+    {
+      "referencia": "github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+      "versao": "v4"
+    },
+    {
+      "referencia": "pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115",
+      "versao": "v6.1.1"
+    }
+  ],
+  "pendencias": [
+    {
+      "tipo": "action",
+      "arquivo": ".github/workflows/infra.yml",
+      "referencia": "actions/cache@v4",
+      "motivo": "O workflow pertence ao integrador; a pinagem exige editar o arquivo fora desta lane."
+    },
+    {
+      "tipo": "action",
+      "arquivo": ".github/workflows/infra.yml",
+      "referencia": "hashicorp/setup-terraform@v3",
+      "motivo": "O workflow pertence ao integrador; a pinagem exige editar o arquivo fora desta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": ".github/workflows/servidor.yml",
+      "referencia": "alpine/helm:latest",
+      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": ".github/workflows/servidor.yml",
+      "referencia": "ghcr.io/yannh/kubeconform:latest",
+      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": ".github/workflows/servidor.yml",
+      "referencia": "rhysd/actionlint:latest",
+      "motivo": "Workflow do integrador; a imagem ainda não tem digest no inventário."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "compose.servidor-caddy.yml",
+      "referencia": "caddy:2.11-alpine",
+      "motivo": "O Compose de servidor não pertence a esta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "infra/servidor/nginx/Dockerfile",
+      "referencia": "FROM nginx:1.30-alpine",
+      "motivo": "O Dockerfile do proxy não pertence a esta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "infra/servidor/validar.sh",
+      "referencia": "alpine/openssl",
+      "motivo": "O script de validação não pertence a esta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "infra/servidor/validar.sh",
+      "referencia": "caddy:2.11-alpine",
+      "motivo": "O script de validação não pertence a esta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "infra/servidor/validar.sh",
+      "referencia": "koalaman/shellcheck:stable",
+      "motivo": "O script de validação não pertence a esta lane."
+    },
+    {
+      "tipo": "imagem",
+      "arquivo": "tests/playwright-container.sh",
+      "referencia": "mcr.microsoft.com/playwright:v1.63.0-noble",
+      "motivo": "A imagem diverge do Playwright 1.64.1 do lock e o script não pertence a esta lane."
+    }
+  ],
+  "usos": [
+    {
+      "arquivo": "Dockerfile",
+      "trecho": "FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base",
+      "estado": "pinado"
+    }
+  ],
+  "dependabot": {
+    "diretoriosDocker": ["/", "/infra/servidor/nginx", "/infra/servidor/backup"]
+  },
+  "kubernetes": {
+    "segredoExistente": "frequenciapp-segredos"
+  }
+}
