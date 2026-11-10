@@ -8,6 +8,10 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 carregar_ambiente
 
+if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
+  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+fi
+
 if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
   [ "${ATUALIZAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
   ATUALIZAR_SAUDE_URL="https://${DOMINIO}/api/saude"
@@ -18,8 +22,11 @@ ATUALIZAR_REF="${ATUALIZAR_REF:-origin/main}"
 ATUALIZAR_REMOTO="${ATUALIZAR_REMOTO:-origin}"
 ATUALIZAR_BACKUP_ANTES="${ATUALIZAR_BACKUP_ANTES:-true}"
 ATUALIZAR_PERMITIR_MIGRACOES="${ATUALIZAR_PERMITIR_MIGRACOES:-false}"
+MIGRAR_NA_PARTIDA="${MIGRAR_NA_PARTIDA:-true}"
+ATUALIZAR_MIGRACAO_EXTERNA="${ATUALIZAR_MIGRACAO_EXTERNA:-false}"
 ATUALIZAR_VERIFICAR_IMAGEM="${ATUALIZAR_VERIFICAR_IMAGEM:-true}"
 ATUALIZAR_TIMEOUT_SAUDE="${ATUALIZAR_TIMEOUT_SAUDE:-180}"
+ATUALIZAR_SAUDE_CA="${ATUALIZAR_SAUDE_CA:-}"
 ATUALIZAR_ESPACO_MINIMO_MB="${ATUALIZAR_ESPACO_MINIMO_MB:-2048}"
 APP_IMAGEM_REPOSITORIO="${APP_IMAGEM_REPOSITORIO:-ghcr.io/eemtijca/frequenciapp}"
 APP_IMAGEM_BACKUP_REPOSITORIO="${APP_IMAGEM_BACKUP_REPOSITORIO:-${APP_IMAGEM_REPOSITORIO}-backup}"
@@ -158,6 +165,8 @@ validar_backup_obrigatorio() {
   if [ -n "${BACKUP_REMOTO:-}" ] && [ "${BACKUP_VERIFICAR_REMOTO:-true}" = "true" ]; then
     backup_remoto_confirmado "$estado_backup" ||
       erro "O backup remoto não foi verificado."
+  elif [ "${ATUALIZAR_PERMITIR_BACKUP_LOCAL:-false}" != "true" ]; then
+    erro "A atualização exige backup remoto confirmado. Configure BACKUP_REMOTO ou defina ATUALIZAR_PERMITIR_BACKUP_LOCAL=true com decisão explícita."
   fi
 }
 
@@ -442,6 +451,12 @@ if [ "$migracoes_novas" = true ] && [ "$permitir_migracoes" != "true" ]; then
   erro "Há migrações novas. Revise e repita com --permitir-migracoes ou defina ATUALIZAR_PERMITIR_MIGRACOES=true."
 fi
 
+if [ "$migracoes_novas" = true ] && [ "$MIGRAR_NA_PARTIDA" != "true" ]; then
+  [ "$ATUALIZAR_MIGRACAO_EXTERNA" = "true" ] ||
+    erro "Há migrações novas e MIGRAR_NA_PARTIDA=false. Aplique a migração explicitamente e defina ATUALIZAR_MIGRACAO_EXTERNA=true antes de atualizar."
+  log "Migrações externas confirmadas por ATUALIZAR_MIGRACAO_EXTERNA=true."
+fi
+
 livre=$(espaco_livre_mb "$APP_DIR")
 if [ "${livre:-0}" -lt "$ATUALIZAR_ESPACO_MINIMO_MB" ]; then
   erro "Espaço insuficiente em $APP_DIR: ${livre:-0} MB livres."
@@ -505,7 +520,12 @@ fi
 
 if [ -n "${ATUALIZAR_SAUDE_URL:-}" ]; then
   log "Conferindo $ATUALIZAR_SAUDE_URL."
-  if ! curl -fsS --retry 12 --retry-delay 5 --retry-all-errors --max-time 15 "$ATUALIZAR_SAUDE_URL" >/dev/null; then
+  curl_args=(-fsS --retry 12 --retry-delay 5 --retry-all-errors --max-time 15)
+  if [ -n "$ATUALIZAR_SAUDE_CA" ]; then
+    [ -f "$ATUALIZAR_SAUDE_CA" ] || erro "CA de saúde não encontrada: $ATUALIZAR_SAUDE_CA."
+    curl_args+=(--cacert "$ATUALIZAR_SAUDE_CA")
+  fi
+  if ! curl "${curl_args[@]}" "$ATUALIZAR_SAUDE_URL" >/dev/null; then
     falhar_atualizacao "Falha na saúde pública após a atualização." "$migracoes_novas"
   fi
 fi

@@ -80,6 +80,21 @@ carregar_ambiente() {
   set +a
 }
 
+# Restauração e backup usam a imagem registrada pelo último update, a menos
+# que o processo já tenha uma imagem explícita no ambiente.
+carregar_imagens_do_estado() {
+  local arquivo="$ESTADO_DIR/estado.json"
+  [ -f "$arquivo" ] || return 0
+  if [ -z "${APP_IMAGEM:-}" ]; then
+    APP_IMAGEM=$(ler_campo_json "$arquivo" "imagem")
+    export APP_IMAGEM
+  fi
+  if [ -z "${APP_IMAGEM_BACKUP:-}" ]; then
+    APP_IMAGEM_BACKUP=$(ler_campo_json "$arquivo" "imagemBackup")
+    export APP_IMAGEM_BACKUP
+  fi
+}
+
 montar_compose_em() {
   local raiz="$1"
   [[ "${COMPOSE_PROJECT_NAME:-}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || erro "Defina COMPOSE_PROJECT_NAME explicitamente."

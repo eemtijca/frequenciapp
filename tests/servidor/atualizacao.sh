@@ -20,6 +20,7 @@ export SERVIDOR_IDENTIDADE_ARQUIVO="$SERVIDOR_CONFIG_DIR/identidade.json"
 export SERVIDOR_LOCK_DIR="$TMP_RAIZ/locks"
 export COMPOSE_ARQUIVOS=compose.yml
 export ATUALIZAR_MODO=main
+export ATUALIZAR_PERMITIR_BACKUP_LOCAL=true
 export ATUALIZAR_REF=origin/main
 export ATUALIZAR_REMOTO=origin
 export ATUALIZAR_VERIFICAR_SAUDE_PUBLICA=false
@@ -388,6 +389,36 @@ exigir_falha "$status" "a migração nova foi aceita sem opção explícita."
 status=$(executar_atualizacao --permitir-migracoes)
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração liberada falhou."; }
 [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] || falhar "a migração liberada não foi aplicada."
+
+# MIGRAR_NA_PARTIDA=false não pode trocar a imagem sem confirmação externa.
+preparar_instalacao
+git -C "$REPO" reset -q --hard "$COMMIT_ALVO"
+mkdir -p "$REPO/prisma/migrations/0003_externa"
+printf 'select 1;\n' >"$REPO/prisma/migrations/0003_externa/migration.sql"
+git -C "$REPO" add prisma
+git -C "$REPO" commit -qm "migracao externa"
+git -C "$REPO" push -q origin main
+COMMIT_EXTERNO=$(git -C "$REPO" rev-parse HEAD)
+git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
+export DOCKER_REVISAO_IMAGEM="$COMMIT_EXTERNO"
+export MIGRAR_NA_PARTIDA=false
+unset ATUALIZAR_MIGRACAO_EXTERNA
+status=$(executar_atualizacao --permitir-migracoes)
+exigir_falha "$status" "a atualização aceitou migração implícita com MIGRAR_NA_PARTIDA=false."
+grep -q 'MIGRAR_NA_PARTIDA' "$TMP_RAIZ/saida.log" || falhar "a recusa de migração implícita não apareceu."
+export ATUALIZAR_MIGRACAO_EXTERNA=true
+status=$(executar_atualizacao --permitir-migracoes)
+unset ATUALIZAR_MIGRACAO_EXTERNA MIGRAR_NA_PARTIDA
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração externa não foi aceita."; }
+
+# Sem backup remoto, a atualização exige opt-in explícito para a cópia local.
+preparar_instalacao
+export ATUALIZAR_PERMITIR_BACKUP_LOCAL=false
+status=$(executar_atualizacao)
+unset ATUALIZAR_PERMITIR_BACKUP_LOCAL
+exigir_falha "$status" "a atualização aceitou backup apenas local sem opt-in."
+grep -q 'backup remoto confirmado' "$TMP_RAIZ/saida.log" || falhar "a recusa de backup local não apareceu."
+export ATUALIZAR_PERMITIR_BACKUP_LOCAL=true
 
 # Backup de planilhas desabilitado não constrói a imagem opcional.
 preparar_instalacao
