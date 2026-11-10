@@ -7,7 +7,9 @@ tmp=$(mktemp -d)
 trap 'limpar_home_gpg; rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/bin" "$tmp/curto" "$tmp/caminho longo com espacos/$(printf 'x%.0s' {1..110})"
 chmod 700 "$tmp/curto"
-export GPG_BASE_CURTA="$tmp/curto" TMPDIR="$tmp/caminho longo com espacos/$(printf 'x%.0s' {1..110})"
+GPG_BASE_CURTA="$tmp/curto"
+TMPDIR="$tmp/caminho longo com espacos/$(printf 'x%.0s' {1..110})"
+export GPG_BASE_CURTA TMPDIR
 cat >"$tmp/bin/pg_dump" <<'CLIENTE'
 #!/usr/bin/env bash
 printf 'conteudo sintetico sem banco\n'
@@ -59,7 +61,9 @@ else
 fi
 [ ! -s "$CLIENTE_LOG" ] || erro "A falha de decifra chegou ao cliente de banco."
 grep -q 'estação autorizada' "$tmp/protegida.log"
-! grep -q 'marcador-sintetico-nao-real' "$tmp/protegida.log"
+if grep -q 'marcador-sintetico-nao-real' "$tmp/protegida.log"; then
+  erro "Marcador sensível apareceu no log da decifra."
+fi
 # O fluxo externo entrega somente o dump decifrado; ainda usa temporário privado.
 printf 'marcador-sintetico-nao-real\n' | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --output "$tmp/decifrado" --decrypt "$tmp/protegido.gpg" >/dev/null 2>&1
 bash "$raiz/scripts/servidor/restaurar.sh" --entrada - --confirmar --sem-copia --sem-validacao <"$tmp/decifrado"

@@ -6,7 +6,8 @@ raiz="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp=$(mktemp -d)
 trap 'limpar_home_gpg; rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/temporarios muito longos/$(printf 'a%.0s' {1..120})"
-export TMPDIR="$tmp/temporarios muito longos/$(printf 'a%.0s' {1..120})"
+TMPDIR="$tmp/temporarios muito longos/$(printf 'a%.0s' {1..120})"
+export TMPDIR
 export GPG_BASE_CURTA="$tmp/curto"
 mkdir -m700 "$GPG_BASE_CURTA"
 iniciar_home_gpg
