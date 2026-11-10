@@ -407,6 +407,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Segurança
 
 - O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.
+- A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
 
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.
 
