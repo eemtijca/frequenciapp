@@ -414,6 +414,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Segurança
 
+- O backup do banco passa a usar catálogo independente e recibos versionados, contando apenas cópias confirmadas na retenção e excluindo o remoto por membros exatos. A cifra valida o fingerprint do destinatário, usa home GPG curto e privado e cifra o dump em fluxo. A decisão está na [ADR-070](docs/adr/070-catalogo-e-recibos-de-backup.md).
+
 - O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
 - A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
 - Atualiza `fast-uri` para 3.1.9 e `minimatch` 10 para 11.0.1 por override do pnpm, corrigindo os alertas do Dependabot sem alterar as APIs consumidas pelo projeto.
