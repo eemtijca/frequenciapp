@@ -105,7 +105,7 @@ pnpm run test:e2e:docker:chromium   # só o Chromium
 pnpm run capturas:readme            # capturas do README em docs/imagens
 ```
 
-O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.63.0-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test` (a imagem não expõe um binário global). Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
+O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.64.1-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test` (a imagem não expõe um binário global). Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
 
 Como alternativa, instale os navegadores no host e mantenha a configuração já presente no repositório:
 
