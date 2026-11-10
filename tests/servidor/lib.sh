@@ -57,9 +57,13 @@ preparar_ambiente() {
   mkdir -m 700 "$GNUPGHOME"
   gpg --batch --passphrase '' --quick-generate-key \
     'Backup Teste <backup@teste.local>' rsa2048 encr 0 >/dev/null 2>&1
-  gpg --batch --armor --export backup@teste.local >"$TMP_RAIZ/backup-publica.asc"
-  gpg --batch --armor --export-secret-keys backup@teste.local >"$TMP_RAIZ/backup-privada.asc"
-  export BACKUP_GPG_DESTINATARIO=backup@teste.local
+  fingerprint=$(gpg --batch --with-colons --with-fingerprint --list-keys |
+    awk -F: '$1 == "fpr" { print $10; exit }')
+  [ -n "$fingerprint" ] || falhar "não foi possível identificar a chave GPG sintética."
+  gpg --batch --armor --export "$fingerprint" >"$TMP_RAIZ/backup-publica.asc"
+  gpg --batch --armor --export-secret-keys "$fingerprint" >"$TMP_RAIZ/backup-privada.asc"
+  export BACKUP_GPG_DESTINATARIO="$fingerprint"
+  export BACKUP_GPG_FINGERPRINT="$fingerprint"
   export BACKUP_GPG_CHAVE_PUBLICA="$TMP_RAIZ/backup-publica.asc"
   export BACKUP_GPG_CHAVE_PRIVADA="$TMP_RAIZ/backup-privada.asc"
 }

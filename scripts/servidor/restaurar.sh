@@ -15,6 +15,9 @@ Uso:
 No modo URL, informe BACKUP_RESTAURACAO_URL_VALIDACAO para validar em um banco
 descartável. A opção --sem-validacao só é aceita nesse modo e assume o risco de
 substituir o banco sem o ensaio prévio.
+A entrada padrão materializa texto claro em diretório temporário privado.
+Chave GPG protegida deve ser decifrada externamente em estação autorizada;
+--entrada - recebe esse dump, sem enviar chave privada ou passphrase ao servidor.
 TEXTO
 }
 
@@ -222,6 +225,7 @@ SQL
     compose exec -T "$SERVIDOR_SERVICO_DB" dropdb -U "$usuario" --force "$banco_temp" \
       >/dev/null 2>&1 || true
   fi
+  limpar_home_gpg
   rm -rf "$tmp"
   if [ "$status" -ne 0 ]; then
     escrever_estado_restauracao "falha" "Restauração interrompida." ||
@@ -230,6 +234,8 @@ SQL
   fi
 }
 trap 'limpar_restauracao' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if [ -n "$entrada" ] && [ "$entrada" = "-" ]; then
   log "Lendo dump decifrado da entrada padrão."
@@ -247,13 +253,14 @@ else
       log "Decifrando com GPG."
       if [ -n "$GPG_CHAVE_PRIVADA" ]; then
         [ -f "$GPG_CHAVE_PRIVADA" ] || erro "Chave privada GPG não encontrada."
-        export GNUPGHOME="$tmp/gnupg"
-        mkdir -m 700 "$GNUPGHOME"
+        iniciar_home_gpg
         gpg --batch --import "$GPG_CHAVE_PRIVADA" >/dev/null ||
           erro "Não foi possível importar a chave privada GPG."
+      else
+        erro "A decifra nativa exige BACKUP_GPG_CHAVE_PRIVADA explícita; não usa agente pessoal herdado."
       fi
-      gpg --batch --yes --output "$dump" --decrypt "$arquivo" ||
-        erro "Não foi possível decifrar o dump com GPG."
+      gpg --batch --yes --pinentry-mode error --output "$dump" --decrypt "$arquivo" ||
+        erro "Decifra GPG não interativa falhou. Para chave protegida, decifrar externamente em estação autorizada e usar --entrada -. Não enviar passphrase em argumentos ou ambiente."
       ;;
     *.age)
       log "Decifrando com age."

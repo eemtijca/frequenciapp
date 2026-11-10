@@ -17,13 +17,13 @@ while [ "$#" -gt 0 ]; do
       cat <<'TEXTO'
 Uso: backup-banco.sh [--verificar]
 
-Sem opções, gera um novo backup. Com --verificar, confere o último backup
-local e, quando configurado, a cópia remota.
+Sem opÃ§Ãµes, gera um novo backup. Com --verificar, confere o Ãºltimo backup
+local e, quando configurado, a cÃ³pia remota.
 TEXTO
       exit 0
       ;;
     *)
-      erro "Opção desconhecida: $1"
+      erro "OpÃ§Ã£o desconhecida: $1"
       ;;
   esac
 done
@@ -40,37 +40,41 @@ BACKUP_INCLUIR_AMBIENTE="${BACKUP_INCLUIR_AMBIENTE:-true}"
 BACKUP_AMBIENTE_ARQUIVO="${BACKUP_AMBIENTE_ARQUIVO:-$APP_ENV_FILE}"
 BACKUP_VERIFICAR_REMOTO="${BACKUP_VERIFICAR_REMOTO:-true}"
 BACKUP_RETER_REMOTO="${BACKUP_RETER_REMOTO:-false}"
+BACKUP_CATALOGO_PERSISTENTE="${BACKUP_CATALOGO_PERSISTENTE:-true}"
+export BACKUP_MODO BACKUP_CRIPTOGRAFIA BACKUP_RETER_DIAS BACKUP_RETER_MINIMO BACKUP_CATALOGO_PERSISTENTE
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
+export DATABASE_SCHEMA
 
 case "$BACKUP_MODO" in
   compose | url) ;;
-  *) erro "BACKUP_MODO inválido: $BACKUP_MODO. Use compose ou url." ;;
+  *) erro "BACKUP_MODO invÃ¡lido: $BACKUP_MODO. Use compose ou url." ;;
 esac
 
 case "$BACKUP_CRIPTOGRAFIA" in
   gpg | age) ;;
-  *) erro "BACKUP_CRIPTOGRAFIA inválida: $BACKUP_CRIPTOGRAFIA. Use gpg ou age." ;;
+  *) erro "BACKUP_CRIPTOGRAFIA invÃ¡lida: $BACKUP_CRIPTOGRAFIA. Use gpg ou age." ;;
 esac
 
 case "$BACKUP_RETER_MINIMO" in
-  '' | *[!0-9]*) erro "BACKUP_RETER_MINIMO deve ser um número inteiro maior ou igual a zero." ;;
+  '' | *[!0-9]*) erro "BACKUP_RETER_MINIMO deve ser um nÃºmero inteiro maior ou igual a zero." ;;
 esac
 case "$BACKUP_RETER_DIAS" in
-  '' | *[!0-9]*) erro "BACKUP_RETER_DIAS deve ser um número inteiro maior ou igual a zero." ;;
+  '' | *[!0-9]*) erro "BACKUP_RETER_DIAS deve ser um nÃºmero inteiro maior ou igual a zero." ;;
 esac
 case "$BACKUP_RETER_REMOTO" in
   true | false) ;;
-  *) erro "BACKUP_RETER_REMOTO inválido: $BACKUP_RETER_REMOTO. Use true ou false." ;;
+  *) erro "BACKUP_RETER_REMOTO invÃ¡lido: $BACKUP_RETER_REMOTO. Use true ou false." ;;
 esac
 
 if [ "$BACKUP_MODO" = compose ]; then
   verificar_instalacao
 else
-  # Conservador: aliases de URL não fornecem identidade de banco verificável.
+  # Conservador: aliases de URL nÃ£o fornecem identidade de banco verificÃ¡vel.
   SERVIDOR_ALVO_CHAVE=url-conservador
 fi
 export SERVIDOR_ALVO_CHAVE
 travar backup-banco 0
+unset BACKUP_BANCO_VERIFICADO
 estado="$ESTADO_DIR/ultimo-backup.json"
 
 mkdir -p "$BACKUP_BANCO_DIR"
@@ -79,7 +83,9 @@ mkdir -p "$ESTADO_DIR"
 chmod 700 "$ESTADO_DIR" 2>/dev/null || true
 
 tmp=$(mktemp -d "$BACKUP_BANCO_DIR/.tmp.XXXXXX")
-trap 'status=$?; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
+trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 umask 077
 
 definir_extensao() {
@@ -94,12 +100,19 @@ preparar_criptografia() {
   if [ "$BACKUP_CRIPTOGRAFIA" = "gpg" ]; then
     [ -n "${BACKUP_GPG_DESTINATARIO:-}" ] || erro "Defina BACKUP_GPG_DESTINATARIO."
     [ -f "${BACKUP_GPG_CHAVE_PUBLICA:-}" ] || erro "Defina BACKUP_GPG_CHAVE_PUBLICA."
-    export GNUPGHOME="$tmp/gnupg"
-    mkdir -m 700 "$GNUPGHOME"
+    iniciar_home_gpg
     gpg --batch --import "$BACKUP_GPG_CHAVE_PUBLICA" >/dev/null ||
-      erro "Não foi possível importar a chave pública GPG."
+      erro "NÃ£o foi possÃ­vel importar a chave pÃºblica GPG."
+    validar_destinatario_gpg
   else
     [ -f "${BACKUP_AGE_DESTINATARIOS:-}" ] || erro "Defina BACKUP_AGE_DESTINATARIOS."
+    [[ "${BACKUP_AGE_DESTINATARIOS_SHA256:-}" =~ ^[a-f0-9]{64}$ ]] || erro "Defina pin independente BACKUP_AGE_DESTINATARIOS_SHA256."
+    cp -- "$BACKUP_AGE_DESTINATARIOS" "$tmp/destinatarios.age"
+    chmod 600 "$tmp/destinatarios.age"
+    BACKUP_AGE_DESTINATARIOS="$tmp/destinatarios.age"
+    BACKUP_DESTINATARIO_VERIFICADO=$(sha256sum "$BACKUP_AGE_DESTINATARIOS" | cut -d' ' -f1)
+    [ "$BACKUP_DESTINATARIO_VERIFICADO" = "$BACKUP_AGE_DESTINATARIOS_SHA256" ] || erro "DestinatÃ¡rios age divergem do pin independente."
+    export BACKUP_DESTINATARIO_VERIFICADO
   fi
 }
 
@@ -108,7 +121,7 @@ cifrar_fluxo() {
   case "$BACKUP_CRIPTOGRAFIA" in
     gpg)
       gpg --batch --yes --trust-model always \
-        --recipient "$BACKUP_GPG_DESTINATARIO" \
+        --recipient "${BACKUP_DESTINATARIO_VERIFICADO}!" \
         --output "$destino" --encrypt
       ;;
     age)
@@ -122,8 +135,8 @@ preparar_rclone() {
   [ -n "${BACKUP_REMOTO:-}" ] || return 0
   [ -n "${BACKUP_RCLONE_CONFIG:-}" ] || erro "Defina BACKUP_RCLONE_CONFIG."
   verificar_permissao_arquivo "$BACKUP_RCLONE_CONFIG"
-  # Em Kubernetes o Secret é montado com dono e modo do volume. A cópia
-  # privada garante a permissão 600 exigida pelo processo de transporte.
+  # Em Kubernetes o Secret Ã© montado com dono e modo do volume. A cÃ³pia
+  # privada garante a permissÃ£o 600 exigida pelo processo de transporte.
   cp "$BACKUP_RCLONE_CONFIG" "$tmp/rclone.conf"
   chmod 600 "$tmp/rclone.conf"
   BACKUP_RCLONE_CONFIG="$tmp/rclone.conf"
@@ -141,10 +154,10 @@ verificar_arquivo_local() {
   local arquivo="$1"
   local esperado="$2"
   local calculado
-  [ -f "$arquivo" ] || erro "Arquivo de backup não encontrado: $arquivo."
+  [ -f "$arquivo" ] || erro "Arquivo de backup nÃ£o encontrado: $arquivo."
   calculado=$(sha256sum "$arquivo" | cut -d' ' -f1)
   [ "$calculado" = "$esperado" ] ||
-    erro "O checksum local de $(basename "$arquivo") não confere."
+    erro "O checksum local de $(basename "$arquivo") nÃ£o confere."
 }
 
 verificar_item_remoto() {
@@ -153,15 +166,19 @@ verificar_item_remoto() {
   local destino="$tmp/verificacao/$nome"
   mkdir -p "$(dirname "$destino")"
   rclone_limpo copyto "${BACKUP_REMOTO%/}/$nome" "$destino" ||
-    erro "Não foi possível baixar $nome do destino remoto."
+    erro "NÃ£o foi possÃ­vel baixar $nome do destino remoto."
   local calculado
   calculado=$(sha256sum "$destino" | cut -d' ' -f1)
   [ "$calculado" = "$esperado" ] ||
-    erro "A cópia remota de $nome diverge do hash local."
+    erro "A cÃ³pia remota de $nome diverge do hash local."
 }
 
 verificar_ultimo_backup() {
-  [ -f "$estado" ] || erro "Não há estado de backup em $estado."
+  [ -f "$estado" ] || erro "NÃ£o hÃ¡ estado de backup em $estado."
+  local recibo
+  recibo=$(ler_campo_json "$estado" recibo)
+  [[ "$recibo" =~ ^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}\.confirmado\.json$ ]] || erro "Backup legado exige adoÃ§Ã£o/verificaÃ§Ã£o explÃ­cita."
+  node "$DIR/recibos.mjs" conferir-estado "$BACKUP_BANCO_DIR" "$estado" || erro "Recibo, escopo ou artefatos invÃ¡lidos."
   local arquivo
   local sha
   local ambiente
@@ -170,12 +187,12 @@ verificar_ultimo_backup() {
   sha=$(ler_campo_json "$estado" "sha256")
   ambiente=$(ler_campo_json "$estado" "ambiente")
   ambiente_sha=$(ler_campo_json "$estado" "ambienteSha256")
-  [ -n "$arquivo" ] || erro "O estado do backup não informa o arquivo."
-  [ -n "$sha" ] || erro "O estado do backup não informa o checksum."
+  [ -n "$arquivo" ] || erro "O estado do backup nÃ£o informa o arquivo."
+  [ -n "$sha" ] || erro "O estado do backup nÃ£o informa o checksum."
 
   verificar_arquivo_local "$BACKUP_BANCO_DIR/$arquivo" "$sha"
   if [ -n "$ambiente" ]; then
-    [ -n "$ambiente_sha" ] || erro "O estado do backup não informa o checksum do ambiente."
+    [ -n "$ambiente_sha" ] || erro "O estado do backup nÃ£o informa o checksum do ambiente."
     verificar_arquivo_local "$BACKUP_BANCO_DIR/$ambiente" "$ambiente_sha"
   fi
 
@@ -185,7 +202,7 @@ verificar_ultimo_backup() {
     if [ -n "$ambiente" ]; then
       verificar_item_remoto "$ambiente" "$ambiente_sha"
     fi
-    log "A cópia remota confere com o hash local original."
+    log "A cÃ³pia remota confere com o hash local original."
   fi
   log "Backup confirmado: $arquivo."
 }
@@ -195,13 +212,17 @@ if [ "$verificar_somente" = true ]; then
   exit 0
 fi
 
+if [ "$BACKUP_MODO" = "compose" ]; then
+  conferir_banco_compose
+fi
+
 preparar_criptografia
 preparar_rclone
 definir_extensao
 
 livre=$(espaco_livre_mb "$BACKUP_BANCO_DIR")
 if [ "${livre:-0}" -lt "$BACKUP_ESPACO_MINIMO_MB" ]; then
-  erro "Espaço insuficiente em $BACKUP_BANCO_DIR: ${livre:-0} MB livres."
+  erro "EspaÃ§o insuficiente em $BACKUP_BANCO_DIR: ${livre:-0} MB livres."
 fi
 
 argumentos_dump=(
@@ -222,14 +243,18 @@ gerar_dump_cifrado() {
   rm -f "$fifo"
   mkfifo "$fifo"
   chmod 600 "$fifo"
+  # Abre leitura e escrita no mesmo descritor para o leitor nÃ£o bloquear
+  # esperando o primeiro escritor e para o fechamento ser explÃ­cito.
+  exec 8<>"$fifo"
 
   (
+    exec 8>&-
     if [ "$BACKUP_MODO" = "compose" ]; then
       compose exec -T "$SERVIDOR_SERVICO_DB" pg_restore -l
     else
       pg_restore -l
-    fi <"$fifo" >/dev/null
-  ) &
+    fi
+  ) <"$fifo" >/dev/null &
   pid=$!
 
   if [ "$BACKUP_MODO" = "compose" ]; then
@@ -252,13 +277,14 @@ gerar_dump_cifrado() {
     fi
   fi
 
+  exec 8>&-
   if wait "$pid"; then
     status_validacao=true
   fi
   rm -f "$fifo"
 
   [ "$status_pipeline" -eq 0 ] || erro "Falha ao gerar ou cifrar o dump."
-  [ "$status_validacao" = true ] || erro "O dump não passou na validação do pg_restore."
+  [ "$status_validacao" = true ] || erro "O dump nÃ£o passou na validaÃ§Ã£o do pg_restore."
 }
 
 log "Gerando dump do schema $DATABASE_SCHEMA em modo $BACKUP_MODO, com cifra em fluxo."
@@ -279,7 +305,7 @@ hashes["$nome_arquivo.sha256"]=$(sha256sum "$arquivo.sha256" | cut -d' ' -f1)
 ambiente_arquivo=""
 ambiente_sha=""
 if [ "$BACKUP_INCLUIR_AMBIENTE" = "true" ]; then
-  [ -f "$BACKUP_AMBIENTE_ARQUIVO" ] || erro "Arquivo de ambiente não encontrado: $BACKUP_AMBIENTE_ARQUIVO."
+  [ -f "$BACKUP_AMBIENTE_ARQUIVO" ] || erro "Arquivo de ambiente nÃ£o encontrado: $BACKUP_AMBIENTE_ARQUIVO."
   ambiente_arquivo="$tmp/${base}-ambiente.env.${extensao}"
   cifrar_fluxo "$ambiente_arquivo" <"$BACKUP_AMBIENTE_ARQUIVO"
   ambiente_sha=$(sha256sum "$ambiente_arquivo" | cut -d' ' -f1)
@@ -306,7 +332,7 @@ if [ -n "${BACKUP_REMOTO:-}" ]; then
     nome=$(basename "$item")
     cp "$BACKUP_BANCO_DIR/$nome" "$publicar/"
   done
-  log "Enviando a cópia para $remoto."
+  log "Enviando a cÃ³pia para $remoto."
   rclone_limpo copy "$publicar" "$remoto" --immutable --checksum
   if [ "$BACKUP_VERIFICAR_REMOTO" = "true" ]; then
     for item in "${final[@]}"; do
@@ -314,97 +340,63 @@ if [ -n "${BACKUP_REMOTO:-}" ]; then
       verificar_item_remoto "$nome" "${hashes[$nome]}"
     done
     verificado_remoto=true
-    log "A cópia remota confere com os hashes locais."
+    log "A cÃ³pia remota confere com os hashes locais."
   fi
 fi
 
 aplicar_retencao_local() {
-  [ "$BACKUP_RETER_DIAS" -gt 0 ] || return 0
-  local dumps=()
-  local total
-  local i
-  local nome
-  local prefixo
-  local arquivo_antigo
-  mapfile -t dumps < <(
-    find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f \
-      \( -name 'frequenciapp-*.dump.gpg' -o -name 'frequenciapp-*.dump.age' \) \
-      -printf '%T@ %p\n' 2>/dev/null | sort -rn | cut -d' ' -f2- || true
-  )
-  total=${#dumps[@]}
-  log "Retenção local: $total cópia(s), mínimo de $BACKUP_RETER_MINIMO."
-  for ((i = BACKUP_RETER_MINIMO; i < total; i++)); do
-    arquivo_antigo="${dumps[$i]}"
-    if [ -z "$(find "$arquivo_antigo" -maxdepth 0 -mtime +"$BACKUP_RETER_DIAS" -print 2>/dev/null)" ]; then
-      continue
-    fi
-    nome=$(basename "$arquivo_antigo")
-    prefixo="${nome%%.dump.*}"
-    log "Removendo o backup antigo $prefixo."
-    if ! find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name "$prefixo*" -delete 2>/dev/null; then
-      log "Aviso: não foi possível remover o backup antigo $prefixo."
-    fi
-  done
+  if [ "$BACKUP_MODO" = url ]; then
+    log "RetenÃ§Ã£o local conservadora: identidade do banco URL nÃ£o demonstrada; nenhum expurgo."
+    return 0
+  fi
+  node "$DIR/recibos.mjs" planejar-local "$BACKUP_BANCO_DIR" >"$tmp/plano-local" || erro "Plano local invÃ¡lido."
+  local conjunto nome
+  while IFS=$'\t' read -r conjunto nome; do
+    [ -n "$nome" ] || continue
+    rm -- "$BACKUP_BANCO_DIR/$nome" || erro "Expurgo local parcial; preservar recibo e revisar o conjunto $conjunto."
+  done <"$tmp/plano-local"
 }
 
 aplicar_retencao_remota() {
-  [ "$BACKUP_RETER_REMOTO" = "true" ] || return 0
-  [ "$BACKUP_RETER_DIAS" -gt 0 ] || return 0
+  [ "$BACKUP_RETER_REMOTO" = true ] || return 0
   [ -n "${BACKUP_REMOTO:-}" ] || return 0
-  local nomes=()
-  local total
-  local i
-  local nome
-  local base_remota
-  local data
-  local epoca
-  local agora
-  local idade
-  agora=$(date -u +%s)
-  mapfile -t nomes < <(
-    rclone_limpo lsf "${BACKUP_REMOTO%/}" --files-only --include 'frequenciapp-*.dump.*' 2>/dev/null |
-      grep -v '\.sha256$' | sort -r || true
-  )
-  total=${#nomes[@]}
-  for ((i = BACKUP_RETER_MINIMO; i < total; i++)); do
-    nome="${nomes[$i]}"
-    data="${nome#frequenciapp-}"
-    data="${data%%-*}"
-    case "$data" in
-      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]T[0-9][0-9][0-9][0-9][0-9][0-9]Z) ;;
-      *) continue ;;
-    esac
-    epoca=$(date -u -d "${data:0:4}-${data:4:2}-${data:6:2} ${data:9:2}:${data:11:2}:${data:13:2}" +%s 2>/dev/null || true)
-    [ -n "$epoca" ] || continue
-    idade=$((agora - epoca))
-    [ "$idade" -gt $((BACKUP_RETER_DIAS * 86400)) ] || continue
-    base_remota="${nome%%.dump.*}"
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/$nome" >/dev/null 2>&1 || true
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/$nome.sha256" >/dev/null 2>&1 || true
-    rclone_limpo deletefile "${BACKUP_REMOTO%/}/${base_remota}-ambiente.env.${extensao}" >/dev/null 2>&1 || true
-  done
+  if [ "$BACKUP_CATALOGO_PERSISTENTE" != true ] || [ "$BACKUP_MODO" = url ]; then
+    log "Expurgo remoto suspenso: catÃ¡logo persistente e identidade do alvo precisam ser demonstrados."
+    return 0
+  fi
+  RCLONE_CONFIG="$BACKUP_RCLONE_CONFIG" node "$DIR/backup-recibos.mjs" expurgar-remoto \
+    "$ESTADO_DIR/recibos" "$ESTADO_DIR/expurgos" ||
+    erro "Expurgo remoto parcial ou nÃ£o comprovado; catÃ¡logo e registro preservados."
 }
 
-mkdir -p "$ESTADO_DIR"
-printf '{"em":"%s","modo":"%s","criptografia":"%s","arquivo":"%s","sha256":"%s","tamanho":%s,"schema":"%s","retencaoDias":%s,"retencaoMinima":%s,"ambiente":"%s","ambienteSha256":"%s","remoto":"%s","verificadoRemoto":%s}\n' \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  "$BACKUP_MODO" \
-  "$BACKUP_CRIPTOGRAFIA" \
-  "$(basename "$arquivo")" \
-  "$sha" \
-  "$tamanho" \
-  "$DATABASE_SCHEMA" \
-  "$BACKUP_RETER_DIAS" \
-  "$BACKUP_RETER_MINIMO" \
-  "${ambiente_arquivo##*/}" \
-  "$ambiente_sha" \
-  "${BACKUP_REMOTO:-}" \
-  "$verificado_remoto" >"$estado.tmp"
+# O catÃ¡logo independente nÃ£o Ã© baixado do provedor e sobrevive ao expurgo local.
+recibo="${base}.confirmado.json"
+RECIBO_REMOTO_VERIFICADO="$verificado_remoto" node "$DIR/recibos.mjs" criar "$BACKUP_BANCO_DIR" "$base" >"$tmp/$recibo" ||
+  erro "NÃ£o foi possÃ­vel confirmar o conjunto."
+if [ -n "${BACKUP_REMOTO:-}" ]; then
+  rclone_limpo copyto "$tmp/$recibo" "${BACKUP_REMOTO%/}/$recibo" || erro "PublicaÃ§Ã£o remota do recibo falhou."
+  verificar_item_remoto "$recibo" "$(sha256sum "$tmp/$recibo" | cut -d' ' -f1)"
+fi
+mkdir -p "$ESTADO_DIR/recibos"
+chmod 700 "$ESTADO_DIR/recibos"
+cp "$tmp/$recibo" "$ESTADO_DIR/recibos/$recibo.tmp"
+chmod 600 "$ESTADO_DIR/recibos/$recibo.tmp"
+mv "$ESTADO_DIR/recibos/$recibo.tmp" "$ESTADO_DIR/recibos/$recibo"
+cp "$tmp/$recibo" "$BACKUP_BANCO_DIR/$recibo.tmp"
+chmod 600 "$BACKUP_BANCO_DIR/$recibo.tmp"
+mv "$BACKUP_BANCO_DIR/$recibo.tmp" "$BACKUP_BANCO_DIR/$recibo"
+node --input-type=module - "$tmp/$recibo" "$BACKUP_MODO" <<'NODE' >"$estado.tmp"
+import fs from 'node:fs';
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+const arquivo = r.artefatos.find(a => a.nome.includes('.dump.') && !a.nome.endsWith('.sha256'));
+const ambiente = r.artefatos.find(a => a.nome.includes('-ambiente.env.') && !a.nome.endsWith('.sha256'));
+process.stdout.write(JSON.stringify({em:r.em,modo:process.argv[3],criptografia:r.criptografia,arquivo:arquivo.nome,sha256:arquivo.sha256,schema:r.escopo.schema,ambiente:ambiente?.nome??'',ambienteSha256:ambiente?.sha256??'',remoto:r.remoto,verificadoRemoto:r.etapas.remotoVerificado,recibo:r.base+'.confirmado.json'})+'\n');
+NODE
+chmod 600 "$estado.tmp"
 mv "$estado.tmp" "$estado"
-chmod 600 "$estado"
 
-aplicar_retencao_local
 aplicar_retencao_remota
+aplicar_retencao_local
 
-notificar sucesso "Backup do banco concluído."
-log "Backup concluído: $nome_arquivo (${tamanho} bytes)."
+notificar sucesso "Backup do banco concluÃ­do."
+log "Backup concluÃ­do: $nome_arquivo (${tamanho} bytes)."

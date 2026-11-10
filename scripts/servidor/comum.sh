@@ -243,6 +243,57 @@ travar() {
   fi
 }
 
+conferir_banco_compose() {
+  local banco="${POSTGRES_DB:-frequencia}" observado
+  observado=$(compose exec -T "$SERVIDOR_SERVICO_DB" psql -X \
+    -U "${POSTGRES_USER:-frequencia}" -d "$banco" -v ON_ERROR_STOP=1 -tAc 'SELECT current_database();') ||
+    erro "Não foi possível comprovar o banco selecionado."
+  [ "$observado" = "$banco" ] || erro "Banco efetivo diverge do banco solicitado."
+  export BACKUP_BANCO_VERIFICADO="$observado"
+}
+
+iniciar_home_gpg() {
+  local base="${GPG_BASE_CURTA:-/tmp}"
+  [ -d "$base" ] || erro "GPG_BASE_CURTA precisa ser diretório existente e curto."
+  GPG_HOME_ANTERIOR="${GNUPGHOME:-}"
+  GPG_HOME_OPERACAO=$(mktemp -d "$base/gpg.XXXXXXXX") || erro "Não foi possível criar home GPG privado."
+  chmod 700 "$GPG_HOME_OPERACAO"
+  [ "$(stat -c %u "$GPG_HOME_OPERACAO")" = "$(id -u)" ] &&
+    [ "$(stat -c %a "$GPG_HOME_OPERACAO")" = 700 ] || erro "Home GPG não é privado."
+  GPG_HOME_INODE=$(stat -c '%d:%i' "$GPG_HOME_OPERACAO")
+  export GNUPGHOME="$GPG_HOME_OPERACAO"
+  local socket
+  socket=$(gpgconf --homedir "$GNUPGHOME" --list-dirs agent-socket) || {
+    limpar_home_gpg; erro "Não foi possível identificar socket GPG.";
+  }
+  if [ "$(LC_ALL=C printf '%s' "$socket" | wc -c)" -gt 100 ]; then
+    limpar_home_gpg
+    erro "Socket GPG excede limite portátil; definir GPG_BASE_CURTA em base privada mais curta."
+  fi
+}
+
+limpar_home_gpg() {
+  [ -n "${GPG_HOME_OPERACAO:-}" ] || return 0
+  if [ ! -L "$GPG_HOME_OPERACAO" ] && [ -d "$GPG_HOME_OPERACAO" ] &&
+    [ "$(stat -c '%d:%i' "$GPG_HOME_OPERACAO")" = "${GPG_HOME_INODE:-}" ]; then
+    gpgconf --homedir "$GPG_HOME_OPERACAO" --kill gpg-agent >/dev/null 2>&1 || true
+    rm -rf -- "$GPG_HOME_OPERACAO"
+  fi
+  GPG_HOME_OPERACAO=""
+  if [ -n "${GPG_HOME_ANTERIOR:-}" ]; then export GNUPGHOME="$GPG_HOME_ANTERIOR"; else unset GNUPGHOME; fi
+}
+
+validar_destinatario_gpg() {
+  [[ "${BACKUP_GPG_DESTINATARIO:-}" =~ ^([A-F0-9]{40}|[A-F0-9]{64})$ ]] || erro "Destinatário GPG exige fingerprint completo."
+  local chaves
+  chaves=$(gpg --batch --with-colons --with-fingerprint --with-subkey-fingerprint --list-keys "$BACKUP_GPG_DESTINATARIO") ||
+    erro "Não foi possível listar o destinatário GPG."
+  BACKUP_DESTINATARIO_VERIFICADO=$(printf '%s\n' "$chaves" | node "$APP_DIR/scripts/servidor/destinatario.mjs") ||
+    erro "Identidade do destinatário GPG não conferida."
+  export BACKUP_DESTINATARIO_VERIFICADO
+}
+
+
 espaco_livre_mb() {
   df -Pm "$1" | awk 'NR == 2 { print $4 }'
 }
