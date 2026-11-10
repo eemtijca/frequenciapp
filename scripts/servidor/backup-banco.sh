@@ -51,6 +51,10 @@ export BACKUP_MODO BACKUP_CRIPTOGRAFIA BACKUP_RETER_DIAS BACKUP_RETER_MINIMO BAC
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
 export DATABASE_SCHEMA
 
+if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
+  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+fi
+
 case "$BACKUP_MODO" in
   compose | url) ;;
   *) erro "BACKUP_MODO invÃ¡lido: $BACKUP_MODO. Use compose ou url." ;;

@@ -432,6 +432,14 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A suíte de ponta a ponta exige confirmação explícita e recusa banco ou aplicação fora dos hosts sintéticos antes de qualquer conexão.
 
+- A atualização automática pelo cron fica desligada por padrão. A atualização exige backup remoto confirmado, aceita CA interna no healthcheck e confirma a migração externa quando `MIGRAR_NA_PARTIDA=false`.
+
+- A restauração exige checksum, recusa migrações divergentes, recupera o destino no modo URL e usa a imagem registrada no estado.
+
+- O backup das planilhas usa UID e GID configuráveis, aplica retenção e a imagem executa a rotina sem comando.
+
+- Runtime, migração e backup conferem a identidade do banco e do schema antes de operar.
+
 - O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
 - O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.
 - A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.

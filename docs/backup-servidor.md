@@ -330,7 +330,7 @@ O contêiner precisa de:
 - `BACKUP_RCLONE_CONFIG`;
 - `RCLONE_CONFIG_PASS`, quando a configuração estiver cifrada.
 
-O ZIP usa AES-256, manifesto e `.confirmado.json`. A cópia local é opcional e fica em `BACKUP_PLANILHAS_DIR`.
+O ZIP usa AES-256, manifesto e `.confirmado.json`. A cópia local é opcional e fica em `BACKUP_PLANILHAS_DIR`. O contêiner usa `BACKUP_PLANILHAS_UID` e `BACKUP_PLANILHAS_GID` para gravar no volume com o dono da conta de implantação. A retenção local usa `BACKUP_RETER_DIAS` e preserva no mínimo `BACKUP_RETER_MINIMO` conjuntos confirmados.
 
 A exportação para xlsx não preserva todos os recursos do Google Planilhas. Não há garantia de retrato transacional. O banco continua sendo a fonte de verdade.
 

@@ -1,5 +1,11 @@
 // Contrato do schema PostgreSQL compartilhado pelo runtime e pelos scripts.
 export function schemaDaConexao(url: string): string;
+export function identidadeDaConexao(url: string): {
+  host: string;
+  port: string;
+  database: string;
+  schema: string;
+};
 export function resolverSchema(opcoes: { url: string; schemaExplicito?: string | null }): string;
 export function identificadorPostgres(nome: string): string;
 export function selecionarSchema(

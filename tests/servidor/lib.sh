@@ -111,7 +111,7 @@ SQL
 
 ultimo_arquivo_backup() {
   find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name 'frequenciapp-*.dump.gpg' \
-    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-
+    -exec stat -c '%Y %n' {} \; 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-
 }
 
 esperar_aplicacao() {

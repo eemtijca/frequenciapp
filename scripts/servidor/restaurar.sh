@@ -9,8 +9,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 uso() {
   cat <<'TEXTO'
 Uso:
-  restaurar.sh --arquivo CAMINHO --confirmar [--sem-copia] [--aplicacao-parada]
-  restaurar.sh --entrada - --confirmar [--sem-copia] [--aplicacao-parada]
+  restaurar.sh --arquivo CAMINHO --confirmar [--checksum SHA256] [--sem-copia] [--aplicacao-parada]
+  restaurar.sh --entrada - --checksum SHA256 --confirmar [--sem-copia] [--aplicacao-parada]
+
+O checksum é obrigatório: use o arquivo .sha256 ao lado do dump ou informe
+--checksum com o SHA-256 do arquivo ou do dump recebido na entrada padrão.
 
 No modo URL, informe BACKUP_RESTAURACAO_URL_VALIDACAO para validar em um banco
 descartável. A opção --sem-validacao só é aceita nesse modo e assume o risco de
@@ -23,6 +26,7 @@ TEXTO
 
 arquivo=""
 entrada=""
+checksum_esperado=""
 confirmar=false
 fazer_copia=true
 aplicacao_parada=false
@@ -36,6 +40,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --entrada)
       entrada="${2:-}"
+      shift 2
+      ;;
+    --checksum)
+      checksum_esperado="${2:-}"
       shift 2
       ;;
     --confirmar)
@@ -75,6 +83,7 @@ if [ -z "$arquivo" ] && [ -z "$entrada" ]; then
 fi
 
 carregar_ambiente
+carregar_imagens_do_estado
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_DATABASE_URL="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}"
@@ -83,8 +92,14 @@ GPG_CHAVE_PRIVADA="${BACKUP_GPG_CHAVE_PRIVADA:-}"
 AGE_CHAVE_PRIVADA="${BACKUP_AGE_CHAVE_PRIVADA:-}"
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
 RESTAURAR_TIMEOUT_SAUDE="${RESTAURAR_TIMEOUT_SAUDE:-180}"
+
+if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
+  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+fi
 RESTAURAR_SAUDE_TENTATIVAS="${RESTAURAR_SAUDE_TENTATIVAS:-12}"
+RESTAURAR_SAUDE_CA="${RESTAURAR_SAUDE_CA:-}"
 RESTAURAR_MANTER_ANTERIOR="${RESTAURAR_MANTER_ANTERIOR:-true}"
+RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES="${RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES:-false}"
 
 if [ -z "${RESTAURAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
   [ "${RESTAURAR_VERIFICAR_SAUDE_PUBLICA:-true}" = "true" ]; then
@@ -114,6 +129,9 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-restauracao.XXXXXX")
 umask 077
 dump="$tmp/dump"
 estado_restauracao="$ESTADO_DIR/ultima-restauracao.json"
+estado_backup="$ESTADO_DIR/ultimo-backup.json"
+BACKUP_BANCO_DIR="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
+backup_seguranca=""
 usuario="${POSTGRES_USER:-frequencia}"
 banco="${POSTGRES_DB:-frequencia}"
 temp_criado=false
@@ -186,12 +204,21 @@ validar_banco_restaurado() {
     erro "O banco restaurado não contém tabelas no schema $DATABASE_SCHEMA."
 
   esperadas=$(find "$APP_DIR/prisma/migrations" -mindepth 1 -maxdepth 1 -type d \
-    -printf '%f\n' 2>/dev/null | sort || true)
+    -exec basename {} \; 2>/dev/null | sort || true)
   restauradas=$(consultar_alvo "$alvo" \
     'select migration_name from :"schema"._prisma_migrations where rolled_back_at is null order by migration_name' \
     2>/dev/null | sed '/^[[:space:]]*$/d' | sort || true)
   if [ -n "$esperadas" ] && [ "$esperadas" != "$restauradas" ]; then
-    log "Aviso: as migrações do dump diferem das migrações do checkout."
+    if [ "$RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES" = "true" ]; then
+      log "Aviso: as migrações do dump diferem das migrações do checkout; divergência permitida explicitamente."
+    else
+      quantidade=$(printf '%s\n' "$restauradas" | sed '/^[[:space:]]*$/d' | wc -l | tr -d '[:space:]')
+      prefixo=$(printf '%s\n' "$esperadas" | head -n "$quantidade")
+      if [ "$prefixo" != "$restauradas" ]; then
+        erro "As migrações do dump divergem do checkout. A restauração exige um dump compatível ou RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true com decisão explícita."
+      fi
+      log "O dump está em uma revisão anterior; as migrações pendentes serão aplicadas na subida."
+    fi
   fi
   log "Banco validado com $migracoes migração(ões) e $tabelas tabela(s)."
 }
@@ -248,6 +275,15 @@ SQL
     compose up -d --wait --no-build --wait-timeout "$RESTAURAR_TIMEOUT_SAUDE" \
       "$SERVIDOR_SERVICO_APP" || log "Não foi possível religar a aplicação."
   fi
+  if [ "$status" -ne 0 ] && [ "$BACKUP_MODO" = "url" ] &&
+    [ -n "$backup_seguranca" ] && [ "${RESTAURAR_EM_RECUPERACAO:-false}" != "true" ]; then
+    log "Falha na restauração URL; tentando recuperar o banco de destino com $backup_seguranca."
+    if RESTAURAR_EM_RECUPERACAO=true "$0" --arquivo "$backup_seguranca" --confirmar --sem-copia --sem-validacao; then
+      log "Banco de destino recuperado a partir da cópia de segurança."
+    else
+      log "A recuperação automática da URL também falhou; intervenção manual necessária."
+    fi
+  fi
   if [ "$temp_criado" = true ] && [ "$banco_trocado" = false ]; then
     compose exec -T "$SERVIDOR_SERVICO_DB" dropdb -U "$usuario" --force "$banco_temp" \
       >/dev/null 2>&1 || true
@@ -265,8 +301,17 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 if [ -n "$entrada" ] && [ "$entrada" = "-" ]; then
+  if [ -z "$checksum_esperado" ]; then
+    erro "A entrada padrão exige --checksum SHA256."
+  fi
+  case "$checksum_esperado" in
+    *[!0-9a-f]* | "") erro "O checksum deve ter 64 caracteres hexadecimais." ;;
+  esac
+  [ "${#checksum_esperado}" -eq 64 ] || erro "O checksum deve ter 64 caracteres hexadecimais."
   log "Lendo dump decifrado da entrada padrão."
   cat >"$dump"
+  calculado=$(sha256sum "$dump" | cut -d' ' -f1)
+  [ "$calculado" = "$checksum_esperado" ] || erro "O checksum da entrada padrão não confere."
 else
   [ -f "$arquivo" ] || erro "Arquivo não encontrado: $arquivo"
   nome_dump=$(basename "$arquivo")
@@ -274,6 +319,15 @@ else
     log "Conferindo o checksum do arquivo."
     (cd "$(dirname "$arquivo")" && sha256sum -c "$(basename "$arquivo").sha256" >/dev/null) ||
       erro "O checksum não confere."
+  elif [ -n "$checksum_esperado" ]; then
+    case "$checksum_esperado" in
+      *[!0-9a-f]* | "") erro "O checksum deve ter 64 caracteres hexadecimais." ;;
+    esac
+    [ "${#checksum_esperado}" -eq 64 ] || erro "O checksum deve ter 64 caracteres hexadecimais."
+    calculado=$(sha256sum "$arquivo" | cut -d' ' -f1)
+    [ "$calculado" = "$checksum_esperado" ] || erro "O checksum do arquivo não confere."
+  else
+    erro "Checksum não encontrado. Informe --checksum SHA256 ou mantenha o arquivo .sha256 ao lado do dump."
   fi
   case "$arquivo" in
     *.gpg)
@@ -359,8 +413,13 @@ SQL
 
   if [ -n "${RESTAURAR_SAUDE_URL:-}" ]; then
     log "Conferindo $RESTAURAR_SAUDE_URL."
-    curl -fsS --retry "$RESTAURAR_SAUDE_TENTATIVAS" --retry-delay 5 --retry-all-errors \
-      --max-time 15 "$RESTAURAR_SAUDE_URL" >/dev/null ||
+    curl_args=(-fsS --retry "$RESTAURAR_SAUDE_TENTATIVAS" --retry-delay 5 --retry-all-errors \
+      --max-time 15)
+    if [ -n "$RESTAURAR_SAUDE_CA" ]; then
+      [ -f "$RESTAURAR_SAUDE_CA" ] || erro "CA de saúde não encontrada: $RESTAURAR_SAUDE_CA."
+      curl_args+=(--cacert "$RESTAURAR_SAUDE_CA")
+    fi
+    curl "${curl_args[@]}" "$RESTAURAR_SAUDE_URL" >/dev/null ||
       erro "A saúde pública não respondeu após a restauração."
   fi
   app_parada=false
@@ -384,6 +443,10 @@ else
     log "Criando uma cópia de segurança antes da restauração."
     if ! BACKUP_MODO="$BACKUP_MODO" "$DIR/backup-banco.sh"; then
       erro "A cópia de segurança falhou. Use --sem-copia apenas com decisão explícita."
+    fi
+    if [ -f "$estado_backup" ]; then
+      arquivo_backup=$(ler_campo_json "$estado_backup" "arquivo")
+      [ -n "$arquivo_backup" ] && backup_seguranca="$BACKUP_BANCO_DIR/$arquivo_backup"
     fi
   fi
 
