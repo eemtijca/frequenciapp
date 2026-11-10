@@ -107,6 +107,8 @@ pnpm run capturas:readme            # capturas do README em docs/imagens
 
 O script `tests/playwright-container.sh` monta o repositório em `mcr.microsoft.com/playwright:v1.64.1-noble`, usa a rede do host para alcançar o aplicativo e o banco em `localhost`, e repassa os argumentos extras ao `npx playwright test` (a imagem não expõe um binário global). Ajuste com `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. Em sistemas sem rede de host (Docker Desktop), escolha a rede e aponte `TEST_BASE_URL` para o host.
 
+A suíte exige `E2E_BANCO_SINTETICO=true`, `DATABASE_URL` e `DIRECT_URL` idênticas e um dos hosts `localhost`, `127.0.0.1`, `::1` ou `db`. O `globalSetup` e o helper de banco recusam qualquer outro destino antes de abrir a conexão. `TEST_BASE_URL` também precisa usar `localhost`, `127.0.0.1`, `::1` ou o serviço `app`. O CI define a confirmação e as duas URLs no passo do Playwright.
+
 Como alternativa, instale os navegadores no host e mantenha a configuração já presente no repositório:
 
 ```bash
