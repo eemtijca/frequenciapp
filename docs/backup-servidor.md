@@ -258,7 +258,7 @@ O script:
 6. Confere o histórico de migrações, as tabelas e os dados no banco validado.
 7. Cria uma cópia de segurança antes da troca, salvo `--sem-copia`.
 8. Para a aplicação.
-9. Renomeia o banco em uso para um nome de recuperação e o banco validado para o nome de produção.
+9. Renomeia o banco em uso para um nome de recuperação e o banco validado para o nome de produção em uma única transação. Uma falha entre as renomeações desfaz a troca parcial; a recuperação reconhece tanto a troca completa quanto a ausência de troca.
 10. Sobe a aplicação e aguarda a saúde.
 11. Em falha, mantém ou volta ao banco anterior e tenta religar a aplicação.
 12. Preserva o banco anterior até a conferência, salvo `RESTAURAR_MANTER_ANTERIOR=false`.
