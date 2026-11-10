@@ -32,7 +32,7 @@ export const camposReferenciaSaida = {
   turmaHistoricaId: z.uuid().nullish(),
   turmaHistoricaNome: z.string().trim().min(1).max(200).nullish(),
   aulasReferencia: esquemaAulasReferencia.nullish(),
-  origemReferencia: z.enum(["MATRICULA_VIGENTE", "DESCONHECIDA"]).optional(),
+  origemReferencia: z.enum(["MATRICULA_VIGENTE", "CHAMADA_HISTORICA", "DESCONHECIDA"]).optional(),
 };
 export function referenciaSaidaCoerente(dados: {
   turmaHistoricaId?: string | null;
@@ -41,7 +41,7 @@ export function referenciaSaidaCoerente(dados: {
   origemReferencia?: string;
 }): boolean {
   if (Boolean(dados.turmaHistoricaId) !== Boolean(dados.turmaHistoricaNome)) return false;
-  return dados.origemReferencia === "MATRICULA_VIGENTE"
-    ? Boolean(dados.turmaHistoricaId && dados.turmaHistoricaNome && dados.aulasReferencia)
-    : dados.aulasReferencia == null;
+  if (dados.origemReferencia === "DESCONHECIDA" || dados.origemReferencia === undefined)
+    return dados.aulasReferencia == null;
+  return Boolean(dados.turmaHistoricaId && dados.turmaHistoricaNome && dados.aulasReferencia);
 }

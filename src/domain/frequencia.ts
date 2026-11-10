@@ -273,7 +273,7 @@ export interface SaidaAntecipada {
     versao: 1;
     aulas: { id: string; ordem: number; inicio: string; fim: string }[];
   } | null;
-  origemReferencia?: "MATRICULA_VIGENTE" | "DESCONHECIDA";
+  origemReferencia?: "MATRICULA_VIGENTE" | "CHAMADA_HISTORICA" | "DESCONHECIDA";
   id: string;
   alunoId: string;
   dia: string;

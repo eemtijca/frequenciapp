@@ -20,6 +20,23 @@ it("distingue referência vazia explícita de desconhecida", () => {
     }),
   ).toBe(true);
 });
+it("aceita referência de chamada histórica somente com retrato completo", () => {
+  expect(
+    referenciaSaidaCoerente({
+      origemReferencia: "CHAMADA_HISTORICA",
+      turmaHistoricaId: id,
+      turmaHistoricaNome: "QA Ano A",
+      aulasReferencia: { versao: 1, aulas: [] },
+    }),
+  ).toBe(true);
+  expect(
+    referenciaSaidaCoerente({
+      origemReferencia: "CHAMADA_HISTORICA",
+      turmaHistoricaId: id,
+      turmaHistoricaNome: "QA Ano A",
+    }),
+  ).toBe(false);
+});
 it.each(
   [
     [{ id, ordem: 1, inicio: "08:00", fim: "07:00" }],

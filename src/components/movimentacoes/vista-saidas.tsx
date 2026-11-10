@@ -4,7 +4,7 @@
 // remoção para corrigir um registro. A lista abre bloqueada, sem o botão de
 // remover, e só o botão Desbloquear a libera. Separado da chamada. O relatório
 // por aluno fica em Relatórios, Saídas e entradas.
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -41,6 +41,8 @@ import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atuali
 import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -114,6 +116,13 @@ export default function VistaSaidas({
   const [responsavelCodigo, setResponsavelCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
+  const confirmacaoHistoricaRef = useRef<{ confirmar: boolean; motivo: string }>({
+    confirmar: false,
+    motivo: "",
+  });
+  const [confirmacaoHistoricaAberta, setConfirmacaoHistoricaAberta] = useState(false);
+  const [motivoHistorico, setMotivoHistorico] = useState("");
+  const [erroHistorico, setErroHistorico] = useState("");
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
@@ -305,6 +314,12 @@ export default function VistaSaidas({
               ? observacao
               : undefined,
           liberadoPorCodigo: responsavelCodigo,
+          ...(confirmacaoHistoricaRef.current.confirmar
+            ? {
+                confirmarHistorico: true,
+                motivo: confirmacaoHistoricaRef.current.motivo,
+              }
+            : {}),
         }),
       );
       avisarSucesso(
@@ -318,12 +333,26 @@ export default function VistaSaidas({
       setTexto("");
       setObservacao("");
       setResponsavelCodigo("");
+      confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+      setMotivoHistorico("");
+      setErroHistorico("");
       if (compartilhado) {
         await onSaidasMudaram(dia.slice(0, 7));
       } else {
         setRecarregarDia((valor) => valor + 1);
       }
     } catch (excecao) {
+      const falha = excecao instanceof ErroApi ? excecao : null;
+      const precisaConfirmar =
+        (falha?.corpo as { codigo?: string } | undefined)?.codigo ===
+        "CONFIRMACAO_HISTORICA_NECESSARIA";
+      if (precisaConfirmar && !confirmacaoHistoricaRef.current.confirmar) {
+        setConfirmacaoHistoricaAberta(true);
+        setErroHistorico("");
+        setErro("");
+        setErroVariante("indisponivel");
+        return;
+      }
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
       setErro(mensagem);
@@ -716,6 +745,64 @@ export default function VistaSaidas({
               disabled={saidaRemover !== null && removendoId === saidaRemover.id}
             >
               Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmacaoHistoricaAberta} onOpenChange={setConfirmacaoHistoricaAberta}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar saída histórica?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A referência da turma e das aulas nesta data não pôde ser comprovada. Confirme o
+              lançamento e informe o motivo. A confirmação fica registrada na auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-saida-historica">Motivo</Label>
+            <Input
+              id="motivo-saida-historica"
+              value={motivoHistorico}
+              onChange={(evento) => setMotivoHistorico(evento.target.value)}
+              maxLength={200}
+              placeholder="Ex.: saída do diário de papel"
+            />
+            {erroHistorico && (
+              <p role="alert" className="text-falta-texto text-sm">
+                {erroHistorico}
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+                setMotivoHistorico("");
+                setErroHistorico("");
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(evento) => {
+                const motivo = motivoHistorico.trim();
+                if (motivo.length < 3 || motivo.length > 200) {
+                  evento.preventDefault();
+                  setErroHistorico(
+                    motivo.length < 3
+                      ? "Informe um motivo com pelo menos 3 caracteres."
+                      : "O motivo deve ter no máximo 200 caracteres.",
+                  );
+                  return;
+                }
+                confirmacaoHistoricaRef.current = { confirmar: true, motivo };
+                setConfirmacaoHistoricaAberta(false);
+                setErroHistorico("");
+                void registrar();
+              }}
+            >
+              Confirmar e registrar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

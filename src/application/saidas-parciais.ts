@@ -46,7 +46,7 @@ export async function consultarSaidasParciais(
     );
     const referencia = esquemaAulasReferencia.safeParse(saida.aulasReferencia);
     const aulas =
-      saida.origemReferencia === "MATRICULA_VIGENTE" &&
+      saida.origemReferencia !== "DESCONHECIDA" &&
       referencia.success &&
       saida.turmaHistoricaId &&
       saida.turmaHistoricaNome
