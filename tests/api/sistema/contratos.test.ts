@@ -767,6 +767,8 @@ describe("frequências (uma por turma e dia)", () => {
         turmaId: turmaQA?.id,
         faltas: [alunoQA?.id],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(200);
@@ -796,6 +798,8 @@ describe("frequências (uma por turma e dia)", () => {
       turmaId: turmaQA?.id,
       faltas: [],
       revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste de contrato concorrente com dados sintéticos",
     });
     const [primeira, segunda] = await Promise.all([
       fetch(`${APP_URL}/api/frequencias`, {
@@ -843,6 +847,8 @@ describe("frequências (uma por turma e dia)", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, horarios: [aulaQA?.id] }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(200);
@@ -859,6 +865,8 @@ describe("frequências (uma por turma e dia)", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeFora] }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(400);
@@ -884,6 +892,8 @@ describe("frequências (uma por turma e dia)", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, horarios: [aulaDeSabado.id] }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(400);
@@ -969,6 +979,8 @@ describe("frequências (uma por turma e dia)", () => {
         turmaId: turmaQA?.id,
         faltas: [inativo.id],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(400);
@@ -1135,6 +1147,8 @@ describe("chamada com justificativa, período e acumulado", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, justificativa: "D", observacao: null }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(200);
@@ -1150,6 +1164,8 @@ describe("chamada com justificativa, período e acumulado", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, justificativa: "X" }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(resposta.status).toBe(400);
@@ -1839,6 +1855,8 @@ describe("catálogo de justificativas", () => {
         turmaId: turmaQA?.id,
         faltas: [{ alunoId: alunoQA?.id, justificativa: "ZZZ" }],
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste de contrato com dados sintéticos",
       }),
     });
     expect(chamada.status).toBe(400);

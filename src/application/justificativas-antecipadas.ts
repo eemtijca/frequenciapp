@@ -1,4 +1,5 @@
 // Lê propostas de justificativa sem criar chamadas ou presenças antes do salvamento.
+import { ORDEM_BASE_CHAMADA } from "@/domain/base-chamada";
 import type { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -67,7 +68,7 @@ export async function aplicarJustificativaEmChamadasSalvas(
       faltas: { where: { alunoId } },
       turma: { include: { horarios: true } },
     },
-    orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+    orderBy: ORDEM_BASE_CHAMADA,
   });
   const tratadas = new Set<string>();
   for (const chamada of chamadas) {
@@ -133,7 +134,7 @@ export async function chamadasDaJustificativa(alunoId: string, dias: string[]) {
       alunos: { some: { alunoId } },
     },
     select: { dia: true, turmaId: true },
-    orderBy: [{ atualizadoEm: "desc" }, { id: "asc" }],
+    orderBy: ORDEM_BASE_CHAMADA,
   });
   const porDia = new Map<string, { dia: string; turmaId: string }>();
   for (const c of chamadas) {

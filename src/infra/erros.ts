@@ -55,7 +55,10 @@ const TABELAS_EM_USO: Record<string, string> = {
   frequencias_turma_id_fkey: "Esta turma tem frequências registradas.",
   faltas_frequencia_id_fkey: "A frequência não existe mais.",
   faltas_aluno_id_fkey: "O aluno não existe mais.",
-  faltas_horario_id_fkey: "Esta aula tem faltas registradas.",
+  faltas_horario_id_fkey:
+    "Esta aula tem faltas registradas. Desative-a para preservar o histórico.",
+  aulas_chamada_horario_id_fkey:
+    "Esta aula integra chamadas salvas. Desative-a para preservar o histórico.",
   sessoes_usuario_id_fkey: "A conta não existe mais.",
   auditoria_usuario_id_fkey: "A conta não existe mais.",
 };

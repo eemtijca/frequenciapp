@@ -61,6 +61,8 @@ beforeAll(async () => {
         dia,
         turmaId,
         revisao: 0,
+        confirmarHistorico: true,
+        motivo: "Teste sintético do resumo mensal",
         faltas: [{ alunoId, justificativa, observacao: justificativa ? "QA Motivo mensal" : null }],
       }),
     });

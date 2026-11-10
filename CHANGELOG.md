@@ -86,7 +86,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- O repositório passa a ter wrappers e guardas do Floci para AWS, Azure, GCP e Terraform, além de uma guarda de banco descartável e da imagem de ferramentas dos ensaios locais.
+- A chamada retroativa passa a ser permitida com confirmação explícita e auditoria quando a composição da turma não pode ser comprovada. A ordem das listas históricas fica estável, o retrato de aulas é usado na classificação e a exclusão de aula com histórico é recusada. A decisão está na [ADR-066](docs/adr/066-politica-retroativa.md).
 
 - O repositório passa a ter uma referência de auto-hospedagem para VPS, servidor dedicado e máquina on-premises. O Compose de produção remove a publicação das portas da aplicação e do banco, aceita credenciais próprias e oferece Caddy ou Nginx, com TLS público por ACME ou CA interna. A aplicação aceita `MIGRAR_NA_PARTIDA=false` para plataformas que executam a migração em Job separado. O backup do banco usa `pg_dump`, GPG de chave pública ou age, rclone, conferência por SHA-256 e restauração com script. A agenda, a atualização e a renovação do certificado do Nginx são agendadas por cron. A decisão está na [ADR-064](docs/adr/064-auto-hospedagem-servidor.md).
 

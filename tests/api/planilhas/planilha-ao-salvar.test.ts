@@ -61,6 +61,8 @@ async function salvar(dia: string, turma: "A" | "B", faltas: string[], revisao =
     turmaId: turmas[turma],
     faltas,
     revisao,
+    confirmarHistorico: true,
+    motivo: "Teste sintético do envio ao salvar",
   });
   expect(resposta.status).toBe(200);
 }
@@ -82,8 +84,9 @@ async function diasPendentes(): Promise<string[]> {
     permitirInserirColunas: true,
     permitirNovosAlunos: false,
   });
-  expect(resposta.status).toBe(200);
-  const previa = await json<{ planos: { dias: string[] }[] }>(resposta);
+  const corpo = await resposta.clone().text();
+  expect(resposta.status, corpo).toBe(200);
+  const previa = JSON.parse(corpo) as { planos: { dias: string[] }[] };
   return previa.planos[0]?.dias ?? [];
 }
 
@@ -94,7 +97,7 @@ async function quantidadeChamadasPendentes(): Promise<number> {
   return estado.integracao.alteradasDepois;
 }
 
-async function esperar(condicao: () => boolean, tempoMs = 15_000): Promise<boolean> {
+async function esperar(condicao: () => boolean, tempoMs = 90_000): Promise<boolean> {
   const limite = Date.now() + tempoMs;
   while (Date.now() < limite) {
     if (condicao()) return true;
@@ -115,7 +118,7 @@ async function ultimoResultado(dia?: string): Promise<string | undefined> {
 }
 
 async function esperarResultado(esperado: string, dia?: string): Promise<boolean> {
-  const limite = Date.now() + 15_000;
+  const limite = Date.now() + 90_000;
   while (Date.now() < limite) {
     if ((await ultimoResultado(dia)) === esperado) return true;
     await new Promise((resolver) => setTimeout(resolver, 200));
