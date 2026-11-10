@@ -225,13 +225,16 @@ docker run -d --name "$BANCO" \
   -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres \
   postgres:17-alpine >/dev/null
 
-for _tentativa in $(seq 1 60); do
-  if docker exec "$BANCO" psql -X -U postgres -d postgres -tAc 'select 1' >/dev/null 2>&1; then
+for _tentativa in $(seq 1 120); do
+  if docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
     break
   fi
+  estado=$(docker inspect -f '{{.State.Status}}' "$BANCO" 2>/dev/null || true)
+  [ "$estado" = "running" ] || break
   sleep 1
 done
-if ! docker exec "$BANCO" psql -X -U postgres -d postgres -tAc 'select 1' >/dev/null 2>&1; then
+if ! docker exec "$BANCO" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+  docker inspect -f 'status={{.State.Status}} exit={{.State.ExitCode}}' "$BANCO" >&2 || true
   docker logs "$BANCO" >&2 || true
   falhar "o PostgreSQL descartável não ficou pronto."
 fi
