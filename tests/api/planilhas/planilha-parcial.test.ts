@@ -344,7 +344,9 @@ describe("planilha de chamada parcial", () => {
       linhasCriadas: 1,
       linhasAtualizadas: 0,
     });
-    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro");
+    // A frequência sintética foi inserida sem retrato de aulas. O rótulo
+    // distingue a estimativa pela grade atual de uma chamada com retrato.
+    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro (estimativa pela grade atual)");
     expect(google.valor("Chamada Parcial", 4, 8)).toBe(`chamada:${aluno}:${diaBase}`);
     expect(google.valor("Chamada Parcial", 4, 9)).toBe("chamada:1:seduc:0");
     await banco.query(
@@ -384,7 +386,7 @@ describe("planilha de chamada parcial", () => {
       linhasCriadas: 0,
       linhasAtualizadas: 1,
     });
-    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro");
+    expect(google.valor("Chamada Parcial", 4, 4)).toBe("Dia inteiro (estimativa pela grade atual)");
     expect(google.valor("Chamada Parcial", 4, 5)).toBe("Sim");
     expect(google.valor("Chamada Parcial", 4, 8)).toBe(`chamada:${aluno}:${diaBase}`);
     expect(google.valor("Chamada Parcial", 4, 9)).toBe("chamada:1:seduc:1");

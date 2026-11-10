@@ -358,6 +358,8 @@ describe("palavra-chave e entrada do diretor", () => {
           turmaId,
           faltas: [alunoRiscoId],
           revisao: 0,
+          confirmarHistorico: true,
+          motivo: "Teste sintético das estatísticas do diretor",
         }),
       },
       cookieCoord,
