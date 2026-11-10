@@ -79,5 +79,5 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-065](adr/065-atualizacao-e-recuperacao-verificaveis.md): atualização em worktree, backup obrigatório, retenção mínima e restauração com validação e banco anterior.
 - [ADR-067](adr/067-identidade-operacional-e-travas.md): identidade explícita do projeto Compose, bootstrap, trava por projeto e confirmação remota booleana.
 - [ADR-068](adr/068-kubernetes-backup-e-rollout.md): backup confirmado antes do upgrade, rollout por checksum, PVCs separados e fuso dos CronJobs.
-- [ADR-069](adr/069-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação, identidade de publicação por tag, SHA e pacote, e `latest` monotônico.
-- [ADR-070](adr/070-papeis-de-runtime-separados.md): conexões distintas para runtime e migração, jobs de migração por nuvem e SQL de grants sem privilégios administrativos.
+- [ADR-072](adr/072-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação, identidade de publicação por tag, SHA e pacote, e `latest` monotônico.
+- [ADR-073](adr/073-papeis-de-runtime-separados.md): conexões distintas para runtime e migração, jobs de migração por nuvem e SQL de grants sem privilégios administrativos.

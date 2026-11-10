@@ -1,4 +1,4 @@
-# ADR-070: papéis de runtime separados nas implantações em nuvem
+# ADR-073: papéis de runtime separados nas implantações em nuvem
 
 ## Estado
 

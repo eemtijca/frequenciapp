@@ -1,4 +1,4 @@
-# ADR-069: publicação e implantação coordenadas pela mesma revisão
+# ADR-072: publicação e implantação coordenadas pela mesma revisão
 
 ## Estado
 
