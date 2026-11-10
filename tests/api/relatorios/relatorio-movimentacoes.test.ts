@@ -151,14 +151,17 @@ beforeAll(async () => {
     );
     await banco.query(
       `insert into saidas_antecipadas
-         (aluno_id, dia, horario, momento, justificativa, observacao, liberado_por_codigo, liberado_por_id)
-       values ($1, $2::date, $3, 'almoco', 'QARM', 'Retorno agendado', $4, $5)`,
+         (aluno_id, dia, horario, momento, justificativa, observacao, liberado_por_codigo,
+          liberado_por_id, turma_historica_id, turma_historica_nome)
+       values ($1, $2::date, $3, 'almoco', 'QARM', 'Retorno agendado', $4, $5, $6, $7)`,
       [
         registro.aluno,
         registro.dia,
         registro.aluno === alunos.bea ? null : "12:05",
         registro.aluno === alunos.bea ? null : "QARMRESP",
         registro.aluno === alunos.bea ? diretorId : null,
+        registro.turma,
+        registro.rotulo,
       ],
     );
   }
@@ -232,25 +235,25 @@ describe("relatório de saídas e entradas", () => {
     });
   });
 
-  it("preserva desativados, entrada na turma histórica e saída na turma atual", async () => {
+  it("preserva desativados e mantém entrada e saída na turma histórica", async () => {
     const resultadoA = await relatorio(turmas.A);
     const movimentosA = resultadoA.turmas.flatMap((turma) => turma.movimentacoes);
-    expect(resultadoA.totais).toEqual({ entradas: 3, saidas: 2, total: 5 });
+    expect(resultadoA.totais).toEqual({ entradas: 3, saidas: 3, total: 6 });
     expect(movimentosA.filter((item) => item.alunoId === alunos.inativo)).toHaveLength(2);
     expect(
       movimentosA.filter((item) => item.alunoId === alunos.transferido).map((item) => item.tipo),
-    ).toEqual(["ENTRADA"]);
+    ).toEqual(["ENTRADA", "SAIDA"]);
     expect(
       resultadoA.turmas.find((turma) => turma.turmaRotulo === "QA Turma Histórica")?.turmaId,
     ).toBe(turmas.A);
     const resultadoB = await relatorio(turmas.B);
-    expect(resultadoB.totais).toEqual({ entradas: 1, saidas: 2, total: 3 });
+    expect(resultadoB.totais).toEqual({ entradas: 1, saidas: 1, total: 2 });
     expect(
       resultadoB.turmas
         .flatMap((turma) => turma.movimentacoes)
         .filter((item) => item.alunoId === alunos.transferido)
         .map((item) => item.tipo),
-    ).toEqual(["SAIDA"]);
+    ).toEqual([]);
   });
 
   it("mantém motivos, complementos e responsáveis históricos ou do catálogo desativado", async () => {
