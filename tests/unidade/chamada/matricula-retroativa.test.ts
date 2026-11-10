@@ -10,6 +10,8 @@ const d = vi.hoisted(() => ({
   ativos: vi.fn(),
   confirmacao: vi.fn(),
   curar: vi.fn(),
+  integracao: vi.fn(),
+  intencao: vi.fn(),
 }));
 const tx = vi.hoisted(() => ({
   frequencia: {
@@ -22,6 +24,8 @@ const tx = vi.hoisted(() => ({
   aulaDaChamada: { createMany: d.curar },
   falta: { deleteMany: vi.fn(), createMany: vi.fn() },
   confirmacaoHistorica: { create: d.confirmacao },
+  integracaoPlanilha: { findUnique: d.integracao },
+  intencaoEnvioEscolar: { create: d.intencao },
 }));
 vi.mock("@/infra/ambiente", () => ({ ambiente: { fuso: "America/Fortaleza" } }));
 vi.mock("@/infra/banco", () => ({
@@ -103,6 +107,8 @@ beforeEach(() => {
   );
   d.criar.mockImplementation(async () => linha());
   d.confirmacao.mockResolvedValue({ id: "confirmacao" });
+  d.integracao.mockResolvedValue(null);
+  d.intencao.mockResolvedValue({});
 });
 afterEach(() => {
   vi.useRealTimers();
