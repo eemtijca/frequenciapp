@@ -3,7 +3,7 @@
 import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
 import { after } from "next/server";
 import { feriadoDoDia } from "@/application/calendario-letivo";
-import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
+import { processarFilaDaAgenda } from "@/application/fila-planilha";
 import {
   carregarFrequencia,
   diaValidoOuParametro,
@@ -110,11 +110,7 @@ export async function POST(requisicao: Request): Promise<Response> {
         { conflito: true, frequencia: resultado.frequencia },
       );
     }
-    // A resposta sai antes; o envio à planilha nunca atrasa nem derruba o salvamento.
-    const { turmaId, dia } = resultado.frequencia;
-    if (await enfileirarSeLigado("FREQUENCIA", { autorId: sessao.usuario.id, turmaId, dia })) {
-      after(() => processarFila());
-    }
+    after(() => processarFilaDaAgenda());
     return json({ frequencia: resultado.frequencia });
   });
 }

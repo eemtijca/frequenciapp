@@ -1,6 +1,7 @@
 // Saídas antecipadas: registro separado da chamada, com momento,
 // justificativa (tipo ou texto) e o liberador do catálogo da Gestão.
 import { z } from "zod";
+import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
@@ -195,6 +196,13 @@ export async function criarSaida(
           criadoPorId: identidade.id,
         },
         ...COMPLEMENTO,
+      });
+      await registrarIntencaoEscolar(tx, {
+        tipo: "SAIDAS",
+        eventoId: criada.id,
+        revisaoEvento: 1,
+        dia: criada.dia,
+        autorId: identidade.id,
       });
       await auditar(tx, identidade.id, "saida.criar", `saida:${criada.id}`);
       return paraSaida(criada, rotulosLiberador);

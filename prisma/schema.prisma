@@ -777,6 +777,25 @@ model SincronizacaoPlanilha {
   @@map("sincronizacoes_planilha")
 }
 
+// Intenção mínima no mesmo commit escolar; não inclui conteúdo da planilha nem nomes.
+model IntencaoEnvioEscolar {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo TipoEnvioFila
+  dia DateTime @db.Date
+  turmaId String? @map("turma_id") @db.Uuid
+  autorId String? @map("autor_id") @db.Uuid
+  eventoId String @map("evento_id") @db.Uuid
+  revisaoEvento Int @map("revisao_evento")
+  sequencia BigInt @unique @default(autoincrement())
+  politica String @db.VarChar(40)
+  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  despachadoEm DateTime? @map("despachado_em") @db.Timestamptz
+
+  @@unique([tipo, eventoId, revisaoEvento])
+  @@index([despachadoEm, sequencia])
+  @@map("intencoes_envio_escolar")
+}
+
 // Fila FIFO durável dos envios automáticos à planilha. A sequência define a
 // ordem; a reserva com prazo garante um consumidor por vez entre instâncias.
 // Guarda só identificadores e o dia: nenhum nome de aluno nem dado da planilha.
@@ -792,6 +811,9 @@ model FilaPlanilha {
   proximaTentativaEm DateTime?     @map("proxima_tentativa_em") @db.Timestamptz
   reservadoAte       DateTime?     @map("reservado_ate") @db.Timestamptz
   resultado          String?       @db.VarChar(40)
+  requerConferencia  Boolean       @default(false) @map("requer_conferencia")
+  detalhes           Json?
+  resolvidoEm        DateTime?     @map("resolvido_em") @db.Timestamptz
   erro               String?       @db.VarChar(300)
   criadoEm           DateTime      @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm       DateTime      @updatedAt @map("atualizado_em") @db.Timestamptz

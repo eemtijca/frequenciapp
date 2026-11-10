@@ -4,6 +4,7 @@ import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
+import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { disciplinasDoHorario } from "@/domain/horarios-semanais";
 import { diaLocal, horariosDaChamada } from "@/domain/frequencia";
 import type { JustificativaAntecipada } from "@/domain/justificativas-antecipadas";
@@ -97,9 +98,17 @@ export async function aplicarJustificativaEmChamadasSalvas(
       )
     )
       continue;
-    await tx.frequencia.update({
+    const atualizada = await tx.frequencia.update({
       where: { id: chamada.id, revisao: chamada.revisao },
       data: { revisao: { increment: 1 }, atualizadoPorId: autorId },
+    });
+    await registrarIntencaoEscolar(tx, {
+      tipo: "FREQUENCIA",
+      eventoId: atualizada.id,
+      revisaoEvento: atualizada.revisao,
+      dia: chamada.dia,
+      turmaId: chamada.turmaId,
+      autorId,
     });
     await tx.falta.deleteMany({ where: { frequenciaId: chamada.id, alunoId } });
     await tx.falta.createMany({

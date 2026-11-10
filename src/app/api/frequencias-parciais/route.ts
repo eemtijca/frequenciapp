@@ -1,7 +1,6 @@
 // Registra presenças personalizadas e justificativas por período, com atualização da chamada.
 import { after } from "next/server";
-import { chamadasDaJustificativa } from "@/application/justificativas-antecipadas";
-import { enfileirarSeLigado, processarFila } from "@/application/fila-planilha";
+import { processarFilaDaAgenda } from "@/application/fila-planilha";
 import { listarFrequenciasParciais, salvarPeriodoParcial } from "@/application/frequencia-parcial";
 import {
   corpoJson,
@@ -34,28 +33,9 @@ export async function POST(requisicao: Request): Promise<Response> {
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
     const registros = await salvarPeriodoParcial(sessao.usuario, await corpoJson(requisicao));
-    const justificadas = registros.filter((r) => r.tipo === "JUSTIFICADA");
-    let aviso: string | undefined;
-    try {
-      if (justificadas[0]) {
-        const chamadas = await chamadasDaJustificativa(
-          justificadas[0].alunoId,
-          justificadas.map((r) => r.dia),
-        );
-        let enfileirada = false;
-        for (const chamada of chamadas)
-          enfileirada =
-            (await enfileirarSeLigado("FREQUENCIA", { ...chamada, autorId: sessao.usuario.id })) ||
-            enfileirada;
-        if (enfileirada) after(() => processarFila());
-      }
-    } catch {
-      console.error(
-        "[planilha] justificativa salva; falha ao preparar a atualização da frequência.",
-      );
-      aviso =
-        "Justificativa salva. Confira o envio automático em Gestão e reenvie pela prévia se necessário.";
-    }
-    return json({ registro: registros[0], registros, ...(aviso ? { aviso } : {}) });
+    // A intenção foi gravada no mesmo commit da chamada; a agenda apenas acelera o envio.
+    if (registros.some((registro) => registro.tipo === "JUSTIFICADA"))
+      after(() => processarFilaDaAgenda());
+    return json({ registro: registros[0], registros });
   });
 }

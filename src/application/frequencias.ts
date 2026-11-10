@@ -3,6 +3,7 @@
 import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
 import { mesmasJustificativasAntecipadas } from "@/domain/justificativas-antecipadas";
 import { z } from "zod";
+import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao } from "@/infra/transacoes";
@@ -544,6 +545,14 @@ export async function salvarFrequencia(
           },
           ...COMPLEMENTO,
         });
+        await registrarIntencaoEscolar(tx, {
+          tipo: "FREQUENCIA",
+          eventoId: criada.id,
+          revisaoEvento: criada.revisao,
+          dia: diaUtc,
+          turmaId,
+          autorId: identidade.id,
+        });
         return { situacao: "salvo" as const, frequencia: paraFrequencia(criada) };
       }
 
@@ -610,6 +619,14 @@ export async function salvarFrequencia(
         ...COMPLEMENTO,
       });
       if (!resultado) throw new ErroHttp("Frequência não encontrada para atualizar.", 404);
+      await registrarIntencaoEscolar(tx, {
+        tipo: "FREQUENCIA",
+        eventoId: resultado.id,
+        revisaoEvento: resultado.revisao,
+        dia: diaUtc,
+        turmaId,
+        autorId: identidade.id,
+      });
       return {
         situacao: "salvo" as const,
         frequencia: {

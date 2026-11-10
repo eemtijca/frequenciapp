@@ -1088,7 +1088,16 @@ function hashDoEnvio(
   );
 }
 
+export interface ResultadoEnvioAutomatico extends Map<string, SituacaoEnvioAutomatico> {
+  completo: boolean;
+  semTrabalho: boolean;
+  falhaPreparo: string | null;
+  escopos: { origemId: string; destino: string | null }[];
+}
+
 export type SituacaoEnvioAutomatico =
+  | "nao_processado"
+  | "falha_preparo"
   | "enviado"
   | "desligado"
   | "sem_mapa"
@@ -1109,8 +1118,16 @@ export async function enviarAposSalvar(
   usuario: { id: string },
   turmaId: string,
   dia: string,
-): Promise<Map<string, SituacaoEnvioAutomatico>> {
-  const situacoes = new Map<string, SituacaoEnvioAutomatico>();
+): Promise<ResultadoEnvioAutomatico> {
+  const situacoes: ResultadoEnvioAutomatico = Object.assign(
+    new Map<string, SituacaoEnvioAutomatico>(),
+    {
+      completo: true,
+      semTrabalho: false,
+      falhaPreparo: null as string | null,
+      escopos: [] as { origemId: string; destino: string | null }[],
+    },
+  );
   try {
     const linha = await lerLinha(FINALIDADE);
     if (!linha.ativa || !linha.envioAutomatico || modoCompletoAtivo(linha)) {
@@ -1122,7 +1139,28 @@ export async function enviarAposSalvar(
       where: { turmaId, dia: new Date(`${dia}T12:00:00Z`) },
       select: { alunos: { select: { aluno: { select: { turmaOriginalId: true } } } } },
     });
-    const origens = new Set((frequencia?.alunos ?? []).map((item) => item.aluno.turmaOriginalId));
+    if (!frequencia) {
+      situacoes.completo = false;
+      situacoes.falhaPreparo = "FREQUENCIA_AUSENTE";
+      return situacoes;
+    }
+    if (frequencia.alunos.length === 0) {
+      situacoes.semTrabalho = true;
+      return situacoes;
+    }
+    const origens = new Set(frequencia.alunos.map((item) => item.aluno.turmaOriginalId));
+    for (const origem of origens) {
+      situacoes.set(origem, "nao_processado");
+      const vinculos =
+        salvo?.mapa.filter(
+          (p) => p.turmaOriginalId === origem && (!p.mes || p.mes === dia.slice(0, 7)),
+        ) ?? [];
+      // Sem destino ou com mais de um, a conferência precisa da confirmação do operador.
+      if (vinculos.length !== 1) situacoes.completo = false;
+      if (!vinculos.length) situacoes.escopos.push({ origemId: origem, destino: null });
+      for (const vinculo of vinculos)
+        situacoes.escopos.push({ origemId: origem, destino: destinoDoVinculo(linha, vinculo) });
+    }
     const feriado = await feriadoDoDia(dia);
     for (const origem of origens) {
       const vinculos = salvo?.mapa.filter((par) => par.turmaOriginalId === origem) ?? [];
@@ -1145,6 +1183,8 @@ export async function enviarAposSalvar(
       situacoes.set(origem, await enviarTurmaAutomatico(usuario, origem, dia));
     }
   } catch (erro) {
+    situacoes.completo = false;
+    situacoes.falhaPreparo = erro instanceof Error ? erro.name.slice(0, 120) : "Erro";
     console.error(
       "Envio automático à planilha não concluído.",
       erro instanceof Error ? erro.name : "",
@@ -1153,17 +1193,22 @@ export async function enviarAposSalvar(
   return situacoes;
 }
 
+interface CertezaDoEnvio {
+  efeitoPossivel: boolean;
+}
+
 async function enviarTurmaAutomatico(
   usuario: { id: string },
   turmaOriginalId: string,
   dia: string,
 ): Promise<SituacaoEnvioAutomatico> {
+  const certeza: CertezaDoEnvio = { efeitoPossivel: false };
   try {
     return await comEnvioProtegido(() =>
-      enviarTurmaAutomaticoProtegido(usuario, turmaOriginalId, dia),
+      enviarTurmaAutomaticoProtegido(usuario, turmaOriginalId, dia, certeza),
     );
   } catch (erro) {
-    return ehLimiteGoogle(erro) ? "limite" : "falhou";
+    return certeza.efeitoPossivel ? "sem_confirmacao" : ehLimiteGoogle(erro) ? "limite" : "falhou";
   }
 }
 
@@ -1176,6 +1221,7 @@ async function enviarTurmaAutomaticoProtegido(
   usuario: { id: string },
   turmaOriginalId: string,
   dia: string,
+  certeza: CertezaDoEnvio,
 ): Promise<SituacaoEnvioAutomatico> {
   try {
     const inicio = Date.now();
@@ -1218,7 +1264,7 @@ async function enviarTurmaAutomaticoProtegido(
     if (naoSeguro) return "pendente_manual";
     if (!(await limiteDeTentativas(`planilha:envio:${usuario.id}`, 60))) return "falhou";
     // Mesmo sem escrita, a conferência confirma a revisão recém-salva.
-    const resposta = await aplicarSimulacao(usuario, linha, simulacao, inicio);
+    const resposta = await aplicarSimulacao(usuario, linha, simulacao, inicio, certeza);
     const envio = resposta.resultados[0];
     const resultado = envio?.resultado;
     if (resultado === "sucesso" || resultado === "sem_envio") {
@@ -1231,7 +1277,7 @@ async function enviarTurmaAutomaticoProtegido(
     if (resultado === "falha" && ehLimiteGoogle(new Error(envio?.erro ?? ""))) return "limite";
     return resultado === "parcial" ? "sem_confirmacao" : "falhou";
   } catch (erro) {
-    return ehLimiteGoogle(erro) ? "limite" : "falhou";
+    return certeza.efeitoPossivel ? "sem_confirmacao" : ehLimiteGoogle(erro) ? "limite" : "falhou";
   }
 }
 
@@ -1365,6 +1411,7 @@ async function aplicarSimulacao(
   linha: LinhaIntegracao,
   simulacao: SimulacaoInterna,
   inicio: number,
+  certeza: CertezaDoEnvio = { efeitoPossivel: false },
 ) {
   const resultados: ResultadoTurma[] = [];
   for (const item of simulacao.planos) {
@@ -1408,7 +1455,10 @@ async function aplicarSimulacao(
       });
       continue;
     }
+    const efeitoAnterior = certeza.efeitoPossivel;
+    let transporteConcluido = false;
     try {
+      certeza.efeitoPossivel = true;
       const contagens = await chamarIntegracao<Record<string, unknown>>(linha, {
         acao: "aplicar",
         aba: plano.aba,
@@ -1419,6 +1469,7 @@ async function aplicarSimulacao(
         modoCompleto: destrutiva,
         operacoes,
       });
+      transporteConcluido = true;
       await concluirRegistro(registro, plano, "SUCESSO", contagens);
       await registrarDiasReconciliados(
         usuario.id,
@@ -1444,15 +1495,25 @@ async function aplicarSimulacao(
       const aviso = avisoDaConferencia(plano, contagens);
       resultados.push({ ...base, resultado: "sucesso", contagens, ...(aviso ? { aviso } : {}) });
     } catch (erro) {
-      const recusado = erro instanceof ErroGoogle && erro.recusado;
+      // Só a recusa do próprio transporte prova ausência de efeito.
+      const recusado = !transporteConcluido && erro instanceof ErroGoogle && erro.recusado;
+      if (recusado) certeza.efeitoPossivel = efeitoAnterior;
       const mensagem = recusado ? erro.message : ERRO_SEM_CONFIRMACAO;
-      await concluirRegistro(
-        registro,
-        plano,
-        recusado ? "FALHA" : "PARCIAL",
-        {},
-        mensagemParaRegistro(erro, mensagem),
-      );
+      try {
+        await concluirRegistro(
+          registro,
+          plano,
+          recusado ? "FALHA" : "PARCIAL",
+          {},
+          mensagemParaRegistro(erro, mensagem),
+        );
+      } catch (falhaRegistro) {
+        // A fila precisa receber a incerteza mesmo sem conseguir atualizar o recibo.
+        console.error(
+          "Conclusão do envio não registrada.",
+          falhaRegistro instanceof Error ? falhaRegistro.name : "",
+        );
+      }
       resultados.push({ ...base, resultado: recusado ? "falha" : "parcial", erro: mensagem });
     }
   }
