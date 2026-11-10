@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # Simula UID/ownership para o protocolo root-cron; não é ensaio multi-UID real.
 set -Eeuo pipefail
-raiz="$(pwd)"
+raiz="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 p=$(mktemp -d)
 trap 'rm -rf "$p"' EXIT
+STAT_REAL=$(command -v stat)
+export STAT_REAL
 mkdir -m 700 "$p/locks" "$p/bin"
-: >"$p/locks/operacoes.lock"
-chmod 600 "$p/locks/operacoes.lock"
+: >"$p/locks/operacoes-sintetico.lock"
+chmod 600 "$p/locks/operacoes-sintetico.lock"
 cat >"$p/bin/id" <<'ID'
 #!/bin/bash
 if [ "${2:-}" = operador ]; then printf '2000\n'; else printf '%s\n' "$UID_SIMULADO"; fi
 ID
 cat >"$p/bin/stat" <<'STAT'
 #!/bin/bash
-if [ "$1" = -c ] && [ "$2" = %u ]; then printf '2000\n'; else exec /usr/bin/stat "$@"; fi
+if [ "$1" = -c ] && [ "$2" = %u ]; then printf '2000\n'; else exec "$STAT_REAL" "$@"; fi
 STAT
 chmod +x "$p/bin/id" "$p/bin/stat"
 export PATH="$p/bin:$PATH" SERVIDOR_LOCK_DIR="$p/locks" SERVIDOR_ALVO_CHAVE=sintetico SERVIDOR_USUARIO=operador
@@ -24,5 +26,8 @@ UID_SIMULADO=2000 bash -c '. "$COMUM"; travar cron; stat -Lc "%d:%i" /proc/self/
 [ "$(sort -u "$p/root.log")" = "$(cat "$p/cron.log")" ]
 [ "$(wc -l <"$p/root.log")" = 2 ]
 # O root não reatribui ownership nem concede privilégios ao cron.
-! grep -Eq 'sudo' "$COMUM"
+if grep -Eq 'sudo' "$COMUM"; then
+  printf 'O script comum usa sudo.\n' >&2
+  exit 1
+fi
 printf 'PASS OP-02/UID-ownership-simulados mesmo inode e FD herdado\n'

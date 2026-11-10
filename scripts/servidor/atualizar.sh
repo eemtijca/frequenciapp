@@ -195,7 +195,7 @@ construir_app_na_worktree() {
   local commit="$2"
   (
     montar_compose_em "$worktree"
-    APP_IMAGEM="$imagem" COMMIT_SHA="$commit" conferir_identidade conferir
+    APP_IMAGEM="$imagem" COMMIT_SHA="$commit" conferir_identidade auto
     APP_IMAGEM="$imagem" COMMIT_SHA="$commit" compose build "$SERVIDOR_SERVICO_APP"
   )
 }
@@ -206,7 +206,7 @@ construir_backup_na_worktree() {
   local commit="$3"
   (
     montar_compose_em "$worktree"
-    APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade conferir
+    APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade auto
     APP_IMAGEM="$imagem_app" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
       compose --profile backup build "$SERVIDOR_SERVICO_BACKUP_PLANILHAS"
   )
@@ -218,7 +218,7 @@ validar_compose_na_worktree() {
   local commit="$3"
   (
     montar_compose_em "$worktree"
-    APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade conferir
+    APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" conferir_identidade auto
     APP_IMAGEM="$imagem" APP_IMAGEM_BACKUP="$imagem_backup" COMMIT_SHA="$commit" \
       compose config --quiet
   )
@@ -266,7 +266,7 @@ falhar_atualizacao() {
   log "$motivo Iniciando rollback."
   git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
   APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
-    COMMIT_SHA="$ANTERIOR_COMMIT" conferir_identidade conferir
+    COMMIT_SHA="$ANTERIOR_COMMIT" conferir_identidade auto
   if ! APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
     COMMIT_SHA="$ANTERIOR_COMMIT" compose up -d --wait --no-build \
     --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
@@ -482,7 +482,7 @@ log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"
 
 APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-  COMMIT_SHA="$alvo_commit" conferir_identidade conferir
+  COMMIT_SHA="$alvo_commit" conferir_identidade auto
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose config --quiet; then

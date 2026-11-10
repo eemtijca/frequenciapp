@@ -9,6 +9,7 @@ ESTADO_DIR="${ESTADO_DIR:-/var/lib/frequenciapp}"
 LOG_DIR="${LOG_DIR:-/var/log/frequenciapp}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/frequenciapp}"
 SERVIDOR_CONFIG_DIR="${SERVIDOR_CONFIG_DIR:-/etc/frequenciapp}"
+SERVIDOR_LOCK_DIR="${SERVIDOR_LOCK_DIR:-/var/lock/frequenciapp}"
 
 # Nomes dos serviços usados pelas rotinas. Instalações que usam outro nome de
 # serviço no Compose podem sobrescrever sem alterar os scripts.
@@ -144,14 +145,15 @@ verificar_instalacao() {
       erro "O serviço $SERVIDOR_SERVICO_BACKUP_PLANILHAS não existe na instalação Compose."
   fi
 
-  conferir_identidade conferir
+  conferir_identidade auto
   log "Instalação Compose conferida: projeto $COMPOSE_PROJECT_NAME, app $SERVIDOR_SERVICO_APP, banco $SERVIDOR_SERVICO_DB."
 }
 
 conferir_identidade() {
-  local acao="${1:-conferir}"
+  local acao="${1:-auto}"
   local registro="${SERVIDOR_IDENTIDADE_ARQUIVO:-$SERVIDOR_CONFIG_DIR/identidade.json}"
   local captura
+  command -v node >/dev/null || erro "Instale Node.js para conferir a identidade operacional."
   captura=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-identidade.XXXXXX")
   chmod 700 "$captura"
   # A captura privada não deve aparecer em logs: config contém ambiente resolvido.
@@ -163,8 +165,11 @@ conferir_identidade() {
     docker info --format '{{json .}}' >"$captura/daemon.json" || exit 1
     compose ps -aq >"$captura/ids" || exit 1
     mapfile -t ids <"$captura/ids"
-    [ "${#ids[@]}" -gt 0 ] || erro "Nenhum recurso existente para conferir ou adotar."
-    docker inspect "${ids[@]}" >"$captura/containers.json" || exit 1
+    if [ "${#ids[@]}" -gt 0 ]; then
+      docker inspect "${ids[@]}" >"$captura/containers.json" || exit 1
+    else
+      printf '[]\n' >"$captura/containers.json"
+    fi
     node --input-type=module -e '
       import fs from "node:fs";
       const [p, projeto, app, db] = process.argv.slice(1);
@@ -175,17 +180,17 @@ conferir_identidade() {
     cat "$captura/chave"
   ) >"$captura.chave"; then
     rm -rf "$captura" "$captura.chave"
-    erro "Identidade não conferida; use adoção explícita após revisar os recursos."
+    erro "Identidade não conferida; use a adoção explícita após revisar os recursos."
   fi
   SERVIDOR_ALVO_CHAVE=$(cat "$captura.chave")
-  rm -f "$captura.chave"
+  rm -rf "$captura" "$captura.chave"
   export SERVIDOR_ALVO_CHAVE
 }
 
 travar() {
   local nome="$1"
   local espera="${2:-0}"
-  local base="${SERVIDOR_LOCK_DIR:-/var/lock/frequenciapp}"
+  local base="$SERVIDOR_LOCK_DIR"
   local chave="${SERVIDOR_ALVO_CHAVE:-}"
   [[ "$chave" =~ ^[a-zA-Z0-9_-]+$ ]] || erro "A identidade do alvo precisa ser validada antes da trava."
   local uid_operador uid_atual
@@ -205,8 +210,8 @@ travar() {
   fi
   [ ! -L "$base" ] && [ "$(stat -c %u "$base")" = "$uid_operador" ] &&
     [ "$(stat -c %a "$base")" = 700 ] || erro "Diretório de locks deve pertencer ao operador e ter modo 700."
-  # Domínio único conservador: nenhum alias URL comprova distinção do Compose.
-  local arquivo="$base/operacoes.lock"
+  # O nome do lock deriva da identidade do projeto, não do tipo de operação.
+  local arquivo="$base/operacoes-$chave.lock"
   [ ! -L "$arquivo" ] || erro "Lock não pode ser um link."
   if [ "$uid_atual" = 0 ] && [ "$uid_operador" != 0 ] && [ ! -e "$arquivo" ]; then
     # Somente root reduz a identidade para criar; o cron não recebe privilégios.
@@ -233,7 +238,7 @@ travar() {
   export SERVIDOR_LOCK_HERDADO="$arquivo"
   # A espera pode atravessar uma alteração externa de recursos ou configuração.
   if [ "${#COMPOSE[@]}" -gt 0 ]; then
-    conferir_identidade conferir
+    conferir_identidade auto
     [ "$SERVIDOR_ALVO_CHAVE" = "$chave" ] || erro "A identidade mudou enquanto a trava era adquirida."
   fi
 }
