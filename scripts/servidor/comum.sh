@@ -210,7 +210,9 @@ travar() {
   [ ! -L "$arquivo" ] || erro "Lock não pode ser um link."
   if [ "$uid_atual" = 0 ] && [ "$uid_operador" != 0 ] && [ ! -e "$arquivo" ]; then
     # Somente root reduz a identidade para criar; o cron não recebe privilégios.
-    runuser -u "$SERVIDOR_USUARIO" -- bash -c 'umask 077; set -o noclobber; : >"$1"' bash "$arquivo" ||
+    local comando
+    printf -v comando 'umask 077; set -o noclobber; : >%q' "$arquivo"
+    runuser -u "$SERVIDOR_USUARIO" -- bash -c "$comando" ||
       [ -f "$arquivo" ] || erro "Não foi possível provisionar a trava do operador."
   fi
   if [ -n "${SERVIDOR_LOCK_HERDADO:-}" ]; then
