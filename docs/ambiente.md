@@ -141,6 +141,16 @@ As credenciais do banco no Compose são configuráveis por `POSTGRES_USER`, `POS
 
 VPS, servidor dedicado e máquina on-premises usam o mesmo contrato de ambiente. A aplicação e o banco ficam sem portas publicadas; Caddy ou Nginx termina o TLS. O guia completo está em [auto-hospedagem.md](auto-hospedagem.md), o backup em [backup-servidor.md](backup-servidor.md) e a decisão na [ADR-064](adr/064-auto-hospedagem-servidor.md).
 
+As rotinas operacionais exigem Node.js e `jq` no host e um projeto Compose explícito. Antes da primeira subida, `scripts/servidor/identidade.sh --iniciar` confere a configuração sem exigir containers. Depois da subida, `scripts/servidor/identidade.sh --adotar --confirmar` grava a identidade dos recursos existentes. A conferência recusa projeto, daemon, serviço ou montagem divergente sem impedir a instalação inicial.
+
+| Variável                      | Padrão                                 | Uso                                               |
+| ----------------------------- | -------------------------------------- | ------------------------------------------------- |
+| `COMPOSE_PROJECT_NAME`        | obrigatório                            | Nome explícito do projeto Compose                 |
+| `SERVIDOR_IDENTIDADE_ARQUIVO` | `$SERVIDOR_CONFIG_DIR/identidade.json` | Registro privado da identidade adotada            |
+| `SERVIDOR_LOCK_DIR`           | `/var/lock/frequenciapp`               | Diretório 0700 das travas derivadas da identidade |
+
+A trava é derivada do projeto: operações do mesmo projeto são serializadas, enquanto projetos independentes progridem em paralelo. O diretório de travas pertence ao operador, usa modo 0700 e permanece local ao host, sem coordenação distribuída.
+
 ## Conexão do PostgreSQL
 
 A aplicação aceita qualquer PostgreSQL padrão pela connection string:
