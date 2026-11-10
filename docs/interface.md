@@ -144,7 +144,7 @@ Gestão, Configurações, Acesso inclui seção FrequenciBI carregada sob demand
 
 ## FrequenciBI
 
-A área independente `/bi` mantém tipografia, tema, controles e superfícies planas. O portão não depende da sessão. Administração e coordenação têm link na barra lateral; o login tem acesso público ao portão. O aplicativo do diretor não ganha esse item.
+A área independente `/bi` mantém tipografia, tema, controles e superfícies planas. O portão não depende da sessão e começa com Guardar chave e consultas para uso offline neste dispositivo desmarcada, limitando a consulta à memória da aba; a opção guarda a chave e os retratos por até sete dias e é removida no logout do aplicativo. Administração e coordenação têm link na barra lateral; o login tem acesso público ao portão. O aplicativo do diretor não ganha esse item.
 
 Filtros têm aplicação explícita de período, recortes adicionais recolhidos e data dos retratos. Painéis usam puxadores específicos com `touch-action: none`, preservando a rolagem do restante do cartão. Ordem e tamanho também respondem às setas do teclado. Gráficos carregam próximos da área visível, com cálculo em worker e tabela acessível, ordenável e paginada. Exportações pessoais abrem confirmação, enquanto importações inválidas preservam a personalização vigente. O [guia do BI](frequencibi.md) descreve fórmulas, cache, limites e operação.
 
