@@ -300,6 +300,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
+
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
 
 - As abas mensais da chamada mantêm os dias em ordem cronológica após envios retroativos, inclusive datas liberadas depois de feriado. Preparar o mês novamente corrige colunas já fora de ordem, preservando registros, fórmulas, notas e posições finais das colunas manuais.
