@@ -343,6 +343,16 @@
               }
             }
           },
+          "500": {
+            "description": "Falha ao confirmar a revogação da sessão no banco; o cookie não é limpo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "503": {
             "$ref": "#/components/responses/Erro503"
           }

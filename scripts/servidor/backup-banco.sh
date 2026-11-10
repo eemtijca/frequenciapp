@@ -29,7 +29,6 @@ TEXTO
 done
 
 carregar_ambiente
-travar backup-banco 0
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_CRIPTOGRAFIA="${BACKUP_CRIPTOGRAFIA:-gpg}"
@@ -64,6 +63,14 @@ case "$BACKUP_RETER_REMOTO" in
   *) erro "BACKUP_RETER_REMOTO inválido: $BACKUP_RETER_REMOTO. Use true ou false." ;;
 esac
 
+if [ "$BACKUP_MODO" = compose ]; then
+  verificar_instalacao
+else
+  # Conservador: aliases de URL não fornecem identidade de banco verificável.
+  SERVIDOR_ALVO_CHAVE=url-conservador
+fi
+export SERVIDOR_ALVO_CHAVE
+travar backup-banco 0
 estado="$ESTADO_DIR/ultimo-backup.json"
 
 mkdir -p "$BACKUP_BANCO_DIR"
@@ -186,10 +193,6 @@ verificar_ultimo_backup() {
 if [ "$verificar_somente" = true ]; then
   verificar_ultimo_backup
   exit 0
-fi
-
-if [ "$BACKUP_MODO" = "compose" ]; then
-  verificar_instalacao
 fi
 
 preparar_criptografia
