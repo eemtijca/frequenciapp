@@ -95,6 +95,9 @@ jobs:
       - name: Ensaio de restauração por URL
         run: bash tests/servidor/restauracao-url.sh
 
+      - name: Ensaio de privilégios do schema de preview
+        run: bash tests/servidor/privilegios-preview.sh
+
       - name: Ensaio de atualização em Compose descartável
         run: bash tests/servidor/atualizacao-integracao.sh
 
