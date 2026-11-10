@@ -22,10 +22,10 @@ done
 dump=$(ultimo_arquivo_backup)
 [ -n "$dump" ] || falhar "o backup não gerou um arquivo cifrado."
 quantidade_dumps=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name 'frequenciapp-*.dump.gpg' | wc -l)
-[ "$quantidade_dumps" -eq 5 ] ||
-  falhar "a retenção mínima não preservou cinco cópias (encontradas $quantidade_dumps)."
-grep -q '"retencaoMinima":5' "$ESTADO_DIR/ultimo-backup.json" ||
-  falhar "o estado não registrou a retenção mínima."
+[ "$quantidade_dumps" -eq 6 ] ||
+  falhar "a retenção preservou as cinco cópias sem recibo e a nova cópia confirmada (encontradas $quantidade_dumps)."
+grep -q '"recibo":"frequenciapp-[0-9TZ-]*-[a-f0-9]*\.confirmado\.json"' "$ESTADO_DIR/ultimo-backup.json" ||
+  falhar "o estado não apontou para o recibo confirmado."
 if find "$BACKUP_BANCO_DIR" -maxdepth 1 -name '*.dump' -print -quit | grep -q .; then
   falhar "há dump em texto claro no diretório de backup."
 fi
@@ -50,6 +50,8 @@ if command -v age-keygen >/dev/null 2>&1 && command -v age >/dev/null 2>&1; then
   age-keygen -y "$TMP_RAIZ/age.txt" >"$TMP_RAIZ/age-destinatarios.txt"
   export BACKUP_CRIPTOGRAFIA=age
   export BACKUP_AGE_DESTINATARIOS="$TMP_RAIZ/age-destinatarios.txt"
+  BACKUP_AGE_DESTINATARIOS_SHA256="$(sha256sum "$TMP_RAIZ/age-destinatarios.txt" | cut -d' ' -f1)"
+  export BACKUP_AGE_DESTINATARIOS_SHA256
   export BACKUP_AGE_CHAVE_PRIVADA="$TMP_RAIZ/age.txt"
   "$RAIZ/scripts/servidor/backup-banco.sh"
   dump_age=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name '*.dump.age' \
