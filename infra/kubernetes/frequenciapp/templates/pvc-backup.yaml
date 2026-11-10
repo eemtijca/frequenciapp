@@ -1,10 +1,12 @@
-{{- if and .Values.backup.enabled .Values.backup.database.persistence.enabled }}
+{{- if and .Values.backup.enabled .Values.backup.database.enabled .Values.backup.database.persistence.enabled }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "frequenciapp.fullname" . }}-backup
+  name: {{ include "frequenciapp.fullname" . }}-backup-banco
   labels:
     {{- include "frequenciapp.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   accessModes:
     {{- toYaml .Values.backup.database.persistence.accessModes | nindent 4 }}
@@ -14,4 +16,24 @@ spec:
   resources:
     requests:
       storage: {{ .Values.backup.database.persistence.size }}
+{{- end }}
+{{- if and .Values.backup.enabled .Values.backup.spreadsheets.enabled .Values.backup.spreadsheets.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-backup-planilhas
+  labels:
+    {{- include "frequenciapp.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.backup.spreadsheets.persistence.accessModes | nindent 4 }}
+  {{- with .Values.backup.spreadsheets.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.spreadsheets.persistence.size }}
 {{- end }}

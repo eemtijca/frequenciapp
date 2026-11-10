@@ -302,6 +302,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
+- As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
+- O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).
+
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
 
 - As abas mensais da chamada mantêm os dias em ordem cronológica após envios retroativos, inclusive datas liberadas depois de feriado. Preparar o mês novamente corrige colunas já fora de ordem, preservando registros, fórmulas, notas e posições finais das colunas manuais.
@@ -408,7 +412,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Segurança
 
+- O provisionamento do schema de preview deixa de usar senha padrão, separa as roles de migração e runtime e revoga PUBLIC dos objetos do preview.
 - O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.
+- A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
+- Atualiza `fast-uri` para 3.1.9 e `minimatch` 10 para 11.0.1 por override do pnpm, corrigindo os alertas do Dependabot sem alterar as APIs consumidas pelo projeto.
 - A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
 
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.

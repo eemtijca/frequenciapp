@@ -16,6 +16,11 @@ O Ingress está desativado. Configure a exposição externa para usar HTTPS.
 
 Agenda: {{ ternary "ativa" "desativada" .Values.agenda.enabled }}
 Backup: {{ ternary "ativo" "desativado" .Values.backup.enabled }}
+{{- if .Values.backupGate.ensaioSemProtecao }}
+
+AVISO: backupGate.ensaioSemProtecao está ativo. O upgrade e o rollback
+prosseguem sem backup confirmado e não há proteção de recuperação.
+{{- end }}
 
 As migrações rodam no initContainer com a mesma imagem da aplicação.
 O contêiner principal usa MIGRAR_NA_PARTIDA=false.

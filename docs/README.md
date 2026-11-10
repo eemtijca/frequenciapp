@@ -21,6 +21,7 @@
 | [backup-servidor.md](backup-servidor.md)             | Dump do banco, cifra, rclone, retenção e restauração.      |
 | [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
 | [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
+| [seguranca-preview.md](seguranca-preview.md)         | Roles, PUBLIC e privilégios do schema de preview.          |
 | [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
 | [beneficios-frequencia.md](beneficios-frequencia.md) | Regras de frequência mínima dos benefícios e alerta.       |
 | [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
@@ -77,3 +78,5 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-064](adr/064-auto-hospedagem-servidor.md): contrato portátil, proxy TLS, backup, agenda e atualização em servidor próprio.
 - [ADR-065](adr/065-atualizacao-e-recuperacao-verificaveis.md): atualização em worktree, backup obrigatório, retenção mínima e restauração com validação e banco anterior.
 - [ADR-066](adr/066-politica-retroativa.md): chamada retroativa com composição comprovada ou confirmação explícita, auditoria e retrato de aulas.
+- [ADR-067](adr/067-identidade-operacional-e-travas.md): identidade explícita do projeto Compose, bootstrap, trava por projeto e confirmação remota booleana.
+- [ADR-068](adr/068-kubernetes-backup-e-rollout.md): backup confirmado antes do upgrade, rollout por checksum, PVCs separados e fuso dos CronJobs.

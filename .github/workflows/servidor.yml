@@ -11,6 +11,7 @@ on:
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "tests/servidor/**"
+      - "tests/kubernetes/**"
       - "package.json"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
@@ -63,6 +64,13 @@ jobs:
             ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e \
             -strict -summary /out
 
+      - name: Ensaiar chart Kubernetes
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:stable \
+            -x tests/kubernetes/validar.sh \
+            infra/kubernetes/frequenciapp/files/verificar-backup.sh
+          bash tests/kubernetes/validar.sh
+
       - name: Validar workflows
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
 
@@ -92,8 +100,14 @@ jobs:
       - name: Ensaio de backup e restauração em Compose
         run: bash tests/servidor/backup-restauracao.sh
 
+      - name: Ensaio do desafio ACME no Nginx
+        run: bash tests/servidor/nginx-acme.sh
+
       - name: Ensaio de restauração por URL
         run: bash tests/servidor/restauracao-url.sh
+
+      - name: Ensaio de privilégios do schema de preview
+        run: bash tests/servidor/privilegios-preview.sh
 
       - name: Ensaio de atualização em Compose descartável
         run: bash tests/servidor/atualizacao-integracao.sh
