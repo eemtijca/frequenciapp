@@ -22,8 +22,8 @@ done
 dump=$(ultimo_arquivo_backup)
 [ -n "$dump" ] || falhar "o backup não gerou um arquivo cifrado."
 quantidade_dumps=$(find "$BACKUP_BANCO_DIR" -maxdepth 1 -type f -name 'frequenciapp-*.dump.gpg' | wc -l)
-[ "$quantidade_dumps" -eq 5 ] ||
-  falhar "a retenção mínima não preservou cinco cópias (encontradas $quantidade_dumps)."
+[ "$quantidade_dumps" -eq 6 ] ||
+  falhar "a retenção preservou as cinco cópias sem recibo e a nova cópia confirmada (encontradas $quantidade_dumps)."
 grep -q '"retencaoMinima":5' "$ESTADO_DIR/ultimo-backup.json" ||
   falhar "o estado não registrou a retenção mínima."
 if find "$BACKUP_BANCO_DIR" -maxdepth 1 -name '*.dump' -print -quit | grep -q .; then
