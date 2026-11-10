@@ -29,6 +29,8 @@ preparar_ambiente() {
   export BACKUP_DIR="$TMP_RAIZ/backups"
   export BACKUP_BANCO_DIR="$TMP_RAIZ/backups/banco"
   export SERVIDOR_CONFIG_DIR="$TMP_RAIZ/config"
+  export SERVIDOR_IDENTIDADE_ARQUIVO="$SERVIDOR_CONFIG_DIR/identidade.json"
+  export SERVIDOR_LOCK_DIR="$TMP_RAIZ/locks"
   export SERVIDOR_AMBIENTE_INJETADO=true
   export COMPOSE_ARQUIVOS="tests/servidor/compose.yml"
   export PROXY_TIPO=caddy
@@ -67,8 +69,13 @@ compose_teste() {
     -f "$TESTE_DIR/compose.yml" "$@"
 }
 
+adotar_identidade() {
+  "$RAIZ/scripts/servidor/identidade.sh" --adotar --confirmar
+}
+
 iniciar_compose_teste() {
   compose_teste up -d --wait
+  adotar_identidade
 }
 
 executar_sql() {

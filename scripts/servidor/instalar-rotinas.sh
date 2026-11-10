@@ -9,8 +9,10 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 [ "$(id -u)" -eq 0 ] || erro "Execute este instalador como root."
 
 carregar_ambiente
-
 SERVIDOR_USUARIO="${SERVIDOR_USUARIO:-frequenciapp}"
+verificar_instalacao
+travar instalar-rotinas 0
+
 AGENDA_HABILITADA="${AGENDA_HABILITADA:-true}"
 BACKUP_HABILITADO="${BACKUP_HABILITADO:-true}"
 BACKUP_PLANILHAS_HABILITADO="${BACKUP_PLANILHAS_HABILITADO:-true}"

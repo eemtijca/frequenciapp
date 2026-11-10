@@ -1,6 +1,7 @@
 // Limitador de tentativas por chave, guardado no banco para valer entre
 // instâncias (Vercel e várias réplicas). A contagem e a janela avançam num
 // único upsert atômico; linhas vencidas são expurgadas de tempos em tempos.
+import type { Prisma } from "../../../generated/prisma/client";
 import { banco, objetoDoBanco } from "@/infra/banco";
 
 /** Janela usada pelos limites operacionais que não têm parâmetro próprio. */
@@ -39,9 +40,15 @@ export async function limiteDeTentativas(
   return (linhas[0]?.contagem ?? 1) <= maximo;
 }
 
+/** Cliente mínimo para limpar tentativas dentro da transação de entrada. */
+type ClienteDeTentativas = Pick<Prisma.TransactionClient, "tentativaEntrada">;
+
 /** Limpa as tentativas de uma chave após sucesso. */
-export async function limparTentativas(chave: string): Promise<void> {
-  await banco().tentativaEntrada.deleteMany({ where: { chave: chave.slice(0, 300) } });
+export async function limparTentativas(
+  chave: string,
+  cliente: ClienteDeTentativas = banco(),
+): Promise<void> {
+  await cliente.tentativaEntrada.deleteMany({ where: { chave: chave.slice(0, 300) } });
 }
 
 /** Remove chaves paradas; também roda na rotina de operação. */

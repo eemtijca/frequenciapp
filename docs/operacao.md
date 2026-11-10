@@ -56,7 +56,7 @@ select a.criado_em, a.acao, a.alvo
 ```
 
 3. Gere uma palavra nova e entregue como no cadastro.
-4. Se houver sinal de tentativa por força bruta, veja as contagens da entrada. As chaves seguem os formatos `entrada:email:<login>` e `entrada:ip:<origem>:<login>`:
+4. Se houver sinal de tentativa por força bruta, veja as contagens da entrada. As chaves seguem os formatos `entrada:email:<login>` e `entrada:ip:<origem>`:
 
 ```sql
 select chave, contagem, janela_inicio from tentativas_entrada order by janela_inicio desc limit 50;
@@ -77,7 +77,7 @@ Revogue a palavra-chave com o motivo e retire as turmas do diretor. Vínculo ini
 
 ### Tentativas de entrada
 
-As tentativas ficam na tabela `tentativas_entrada`, contadas por dispositivo e login e por login, com os limites e a janela dos parâmetros. A entrada bem-sucedida zera as chaves daquela entrada, e chaves paradas há mais de um dia saem sozinhas numa fração das tentativas. Expurgo manual e desbloqueio de um login antes do fim da janela:
+As tentativas ficam na tabela `tentativas_entrada`, contadas por origem e por login, com os limites e a janela dos parâmetros. A entrada bem-sucedida zera as duas chaves daquela tentativa, e chaves paradas há mais de um dia saem sozinhas numa fração das tentativas. Expurgo manual e desbloqueio de um login antes do fim da janela:
 
 ```sql
 delete from tentativas_entrada where janela_inicio < now() - interval '1 day';
