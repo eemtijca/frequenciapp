@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
+
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
@@ -300,6 +302,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
+
 - O botão do menu lateral deixa de manter o contorno verde ao fechar por toque ou clique. O foco retorna ao botão, com destaque preservado ao navegar ou fechar pelo teclado.
 
 - As abas mensais da chamada mantêm os dias em ordem cronológica após envios retroativos, inclusive datas liberadas depois de feriado. Preparar o mês novamente corrige colunas já fora de ordem, preservando registros, fórmulas, notas e posições finais das colunas manuais.
@@ -407,6 +411,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Segurança
 
 - O FrequenciBI deixa de guardar a chave e os retratos por padrão. A persistência offline passa a ser opt-in, com validade de sete dias, expurgo no logout do aplicativo e limpeza restrita aos caches versionados do service worker. A Chamada mantém o rascunho quando a gravação ou o armazenamento local falham.
+- A entrada HTTP passa a limitar o corpo JSON em leitura progressiva, agregar tentativas por origem, revalidar a conta na transação da sessão e redigir `code` e `state` do OAuth nos logs do Caddy. O logout só limpa o cookie depois do commit.
 - A validação de schema em pull request deixa de executar código com segredos de preview. A manutenção passa a ser manual, na main, com SHA ancestral confirmado e environment próprio.
 
 - A administração não redefine mais a própria senha pela Gestão, o que dispensava a senha atual e permitia a quem tivesse só a sessão abrir a cópia completa, criar chaves do FrequenciBI e destravar o modo completo. A própria senha muda pela troca com a senha atual.

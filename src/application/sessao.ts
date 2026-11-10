@@ -6,9 +6,10 @@ import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { conferirSenha, hashearSenha } from "@/infra/auth/hash";
 import {
-  criarSessao,
   encerrarSessao,
   encerrarOutrasSessoes,
+  gravarCookieSessao,
+  registrarSessao,
   sessaoAtual,
 } from "@/infra/auth/sessao";
 import { limiteDeTentativas, limparTentativas } from "@/infra/auth/limite";
@@ -76,7 +77,11 @@ export async function entrar(
   }
   const parametros = await lerParametrosAcesso();
   const janelaMs = parametros.janelaMinutos * MINUTO_MS;
-  const chaveOrigem = `entrada:ip:${origem}:${dados.data.login}`;
+  // A origem não leva o login: tentativas contra contas diferentes no mesmo
+  // dispositivo precisam consumir o mesmo teto. O login continua com chave
+  // própria para uma conta não ser bloqueada por tentativas feitas em outros
+  // dispositivos.
+  const chaveOrigem = `entrada:ip:${origem}`;
   const chaveEmail = `entrada:email:${dados.data.login}`;
   if (
     !(await limiteDeTentativas(chaveOrigem, parametros.tentativasPorOrigem, janelaMs)) ||
@@ -103,38 +108,77 @@ export async function entrar(
       status: 403,
     };
   }
-  // O estado da palavra-chave só é revelado a quem acertou a palavra.
-  let expiraAte: Date | undefined;
-  if (usuario.papel === "DIRETOR_TURMA") {
-    const credencial = await banco().credencialDiretor.findUnique({
-      where: { usuarioId: usuario.id },
+  // A senha é conferida fora da transação para não prender a conexão durante
+  // o scrypt. A transação serializável relê a conta e a credencial e grava a
+  // sessão no mesmo instante: desativação ou revogação concorrente não deixa
+  // uma sessão nova válida. O cookie só sai depois do commit.
+  const resultado = await comTransacao(async (tx) => {
+    const atual = await tx.usuario.findUnique({
+      where: { id: usuario.id },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        papel: true,
+        ativo: true,
+        senhaHash: true,
+      },
     });
-    const estado = estadoDaCredencial(credencial, new Date());
-    if (!credencial || !credencialPermiteEntrada(estado)) {
-      return { ok: false, erro: mensagemDeCredencialRecusada(estado), status: 403 };
+    if (!atual || !atual.ativo) {
+      return {
+        ok: false as const,
+        erro: "Esta conta está desativada. Procure o administrador da escola.",
+        status: 403,
+      };
     }
-    const limiteDaSessao = Date.now() + parametros.sessaoDiretorHoras * HORA_MS;
-    expiraAte = new Date(Math.min(limiteDaSessao, credencial.expiraEm.getTime()));
-    if (!credencial.primeiroUsoEm) {
-      await banco().credencialDiretor.update({
-        where: { usuarioId: usuario.id },
-        data: { primeiroUsoEm: new Date() },
+    if (atual.senhaHash !== usuario.senhaHash) {
+      return {
+        ok: false as const,
+        erro: "E-mail, identificador ou senha incorretos.",
+        status: 401,
+      };
+    }
+    // O estado da palavra-chave só é revelado a quem acertou a palavra.
+    let expiraAte: Date | undefined;
+    if (atual.papel === "DIRETOR_TURMA") {
+      const credencial = await tx.credencialDiretor.findUnique({
+        where: { usuarioId: atual.id },
       });
+      const estado = estadoDaCredencial(credencial, new Date());
+      if (!credencial || !credencialPermiteEntrada(estado)) {
+        return {
+          ok: false as const,
+          erro: mensagemDeCredencialRecusada(estado),
+          status: 403,
+        };
+      }
+      const limiteDaSessao = Date.now() + parametros.sessaoDiretorHoras * HORA_MS;
+      expiraAte = new Date(Math.min(limiteDaSessao, credencial.expiraEm.getTime()));
+      if (!credencial.primeiroUsoEm) {
+        await tx.credencialDiretor.update({
+          where: { usuarioId: atual.id },
+          data: { primeiroUsoEm: new Date() },
+        });
+      }
     }
-  }
-  await limparTentativas(chaveOrigem);
-  await limparTentativas(chaveEmail);
-  await criarSessao(usuario.id, segredo, cookiesSeguros, dados.data.lembrar, expiraAte);
-  return {
-    ok: true,
-    usuario: {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      papel: usuario.papel,
-      ativo: usuario.ativo,
-    },
-  };
+    const sessao = await registrarSessao(tx, atual.id, dados.data.lembrar, expiraAte);
+    await limparTentativas(chaveOrigem, tx);
+    await limparTentativas(chaveEmail, tx);
+    return {
+      ok: true as const,
+      sessao,
+      usuario: {
+        id: atual.id,
+        nome: atual.nome,
+        email: atual.email,
+        papel: atual.papel,
+        ativo: atual.ativo,
+      },
+    };
+  });
+  if (!resultado.ok) return resultado;
+  await gravarCookieSessao(resultado.sessao, segredo, cookiesSeguros);
+  return { ok: true, usuario: resultado.usuario };
 }
 
 export async function sair(segredo: string, cookiesSeguros: boolean): Promise<void> {

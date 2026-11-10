@@ -18,7 +18,8 @@ trap 'limpar' EXIT
 command -v docker >/dev/null 2>&1 || { echo "Aviso: Docker ausente; ensaio de atualização não executado." >&2; exit 0; }
 
 mkdir -p "$REPO/scripts/servidor"
-cp "$RAIZ/scripts/servidor/atualizar.sh" "$RAIZ/scripts/servidor/comum.sh" "$REPO/scripts/servidor/"
+cp "$RAIZ/scripts/servidor/atualizar.sh" "$RAIZ/scripts/servidor/comum.sh" \
+  "$RAIZ/scripts/servidor/identidade.mjs" "$REPO/scripts/servidor/"
 cat >"$REPO/scripts/servidor/backup-banco.sh" <<'BACKUP'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -113,6 +114,9 @@ export ESTADO_DIR="$TMP/estado"
 export LOG_DIR="$TMP/log"
 export BACKUP_DIR="$TMP/backups"
 export BACKUP_BANCO_DIR="$TMP/backups/banco"
+export SERVIDOR_CONFIG_DIR="$TMP/config"
+export SERVIDOR_IDENTIDADE_ARQUIVO="$SERVIDOR_CONFIG_DIR/identidade.json"
+export SERVIDOR_LOCK_DIR="$TMP/locks"
 export SERVIDOR_AMBIENTE_INJETADO=true
 export COMPOSE_ARQUIVOS=compose.yml
 export PROXY_TIPO=caddy
@@ -130,7 +134,7 @@ export APP_IMAGEM_REPOSITORIO=teste/app
 export APP_IMAGEM_BACKUP_REPOSITORIO=teste/backup
 export APP_IMAGEM="teste/app:local"
 export COMMIT_SHA="$COMMIT_ANTERIOR"
-mkdir -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR"
+mkdir -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR" "$SERVIDOR_CONFIG_DIR"
 printf 'POSTGRES_USER=frequencia\nPOSTGRES_PASSWORD=frequencia\nPOSTGRES_DB=frequencia\n' >"$APP_ENV_FILE"
 : >"$OPS_ENV_FILE"
 chmod 600 "$APP_ENV_FILE" "$OPS_ENV_FILE"
@@ -138,6 +142,11 @@ chmod 600 "$APP_ENV_FILE" "$OPS_ENV_FILE"
 docker compose --project-directory "$REPO" --project-name "$PROJETO" \
   --env-file "$APP_ENV_FILE" --env-file "$OPS_ENV_FILE" -f "$REPO/compose.yml" \
   up -d --build --wait
+
+adotar_identidade() {
+  APP_DIR="$REPO" "$RAIZ/scripts/servidor/identidade.sh" --adotar --confirmar
+}
+adotar_identidade
 
 docker compose --project-directory "$REPO" --project-name "$PROJETO" \
   --env-file "$APP_ENV_FILE" --env-file "$OPS_ENV_FILE" -f "$REPO/compose.yml" \
