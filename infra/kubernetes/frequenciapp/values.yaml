@@ -168,7 +168,11 @@ backup:
     schedule: "30 2 * * *"
     timeZone: America/Fortaleza
     existingSecret: ""
+    # Cópia local em PVC. Exige persistence.enabled=true.
     local: true
+    # Destino remoto efetivo, declarado no Secret e conferido pelo script.
+    remote:
+      enabled: false
     persistence:
       enabled: true
       size: 20Gi
