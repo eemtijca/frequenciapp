@@ -41,6 +41,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 
 - GitHub: opere issues, pull requests, execuções de workflow e releases pelo GitHub CLI (`gh`), não pela interface web. Antes de operar, confirme a sessão com `gh auth status` (ou `gh status`) e, se não houver conexão, rode `gh auth login`. Exemplos: `gh issue create`, `gh pr create`, `gh pr checks --watch`, `gh run watch` e `gh release create`. Nunca inclua segredos ou dados de alunos em comandos, títulos ou corpos.
 - Playwright: rode a suíte de ponta a ponta na imagem oficial da Microsoft, sem instalar navegadores no host, com o aplicativo no ar. Use `pnpm run test:e2e:docker` (ou `pnpm run test:e2e:docker:chromium`) ou o comando direto `docker run --rm --ipc=host --network host -v "$PWD":/work -w /work -e HOME=/tmp -e PLAYWRIGHT_SKIP_WEBSERVER=1 -e TEST_BASE_URL=http://localhost:3000 mcr.microsoft.com/playwright:v1.63.0-noble npx playwright test --project=chromium` (a imagem não expõe um binário global; npx resolve o pacote embutido). O script `tests/playwright-container.sh` monta o repositório e aceita `PLAYWRIGHT_IMAGE`, `PLAYWRIGHT_DOCKER_NETWORK` e `PLAYWRIGHT_DOCKER_USER`. A instalação de navegadores no host (`pnpm exec playwright install --with-deps chromium webkit`) fica como alternativa.
+- Floci: todo comando de AWS, Azure, GCP e Terraform usa os wrappers de `scripts/cloud/` e endpoints locais. Nunca use credencial ou endpoint real. O guia está em `docs/floci.md`. Para os ensaios de Terraform, use as versões pinadas de `infra/floci/compose.floci.yml`; o Floci Azure precisa de Container Apps real e o GCP validado é 0.9.0.
 
 ## Fluxo de issues e pull requests
 
@@ -63,6 +64,7 @@ Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). 
 
 ## Armadilhas
 
+- A validação local de formatação, lint, tipos, unidade, API, E2E e PWA roda em contêiner Linux com worktree de terminações LF. O checkout Windows com CRLF reprova `format:check` e os testes de symlink por motivo de ambiente, não por regressão.
 - O estágio `execucao` do Dockerfile usa as dependências de produção do pnpm, que cobrem o migrador e os scripts administrativos fora da árvore do standalone. Dependência nova usada por esses scripts precisa ser declarada em `dependencies`.
 - Ao adicionar variável de ambiente, atualize o `.env.example`, o `compose.yml` e espelhe no `compose.ci.yml` e nos blocos `env:` dos workflows quando fizer sentido.
 - Migrações em produção são aplicadas pelo workflow `migracoes.yml` quando algo em `prisma/` muda na `main`, com o segredo `DIRECT_URL_PROD`, e pelo entrypoint do contêiner na partida (`docker/app/migrar.mjs`, com trava consultiva e conferência de checksum). O build da Vercel só roda `prisma generate`; não aplica migração.
