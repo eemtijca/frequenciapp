@@ -6,6 +6,7 @@
 | ---------------------------------------------------- | ---------------------------------------------------------- |
 | [arquitetura.md](arquitetura.md)                     | Camadas, fluxo de requisição e organização do código.      |
 | [ambiente.md](ambiente.md)                           | Variáveis de ambiente e execução local.                    |
+| [floci.md](floci.md)                                 | Uso exclusivo do Floci para AWS, Azure e GCP, com guardas. |
 | [banco.md](banco.md)                                 | Esquema, migrações e rotinas de banco.                     |
 | [modelo-de-dados.md](modelo-de-dados.md)             | Entidades, regras de frequência e derivações.              |
 | [api.md](api.md)                                     | Contratos das rotas HTTP e Swagger UI em /api/docs.        |
