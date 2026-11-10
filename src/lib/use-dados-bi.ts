@@ -4,8 +4,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pedir, ErroApi } from "./api-cliente";
 import {
+  CHAVE_SEGREDO_BI,
   cacheBi,
+  chaveDoValorSegredoBi,
+  consumirSegredoBiExpirado,
   esquecerSegredoBi,
+  expurgarRetratosDaChave,
   guardarSegredoBi,
   identificadorCacheBi,
   lerSegredoBi,
@@ -17,6 +21,7 @@ export interface ConsultaBi {
   fim: string;
 }
 interface AcessoBi {
+  persistir: boolean;
   chave: string;
   id: string;
   pagina: PaginaBi;
@@ -30,7 +35,9 @@ export function useDadosBi() {
   const [aviso, setAviso] = useState("");
   const [offline, setOffline] = useState(false);
   const acessoRef = useRef<AcessoBi | null>(null);
+  const consultaRef = useRef<{ chave: string; id: Promise<string> } | null>(null);
   const controlador = useRef<AbortController | null>(null);
+  const expurgos = useRef(new Map<string, Promise<void>>());
   const tarefas = useRef(new Map<string, Promise<RetratoBi>>());
   const geracoes = useRef(new Map<string, object>());
   const rede = useCallback(
@@ -50,31 +57,80 @@ export function useDadosBi() {
     [],
   );
   const esquecer = useCallback(async () => {
-    controlador.current?.abort();
-    const anterior = acessoRef.current;
+    const ctrl = controlador.current;
+    ctrl?.abort();
+    const anterior = acessoRef.current ?? consultaRef.current;
     acessoRef.current = null;
+    consultaRef.current = null;
     setAcesso(null);
     setRetratos({});
     tarefas.current.clear();
     geracoes.current.clear();
     setProgresso("");
     try {
-      esquecerSegredoBi();
-      if (anterior) await cacheBi("limpar", `${anterior.id}:`);
+      esquecerSegredoBi(anterior?.chave);
     } catch {
       armazenamentoFalhou();
     }
+    if (anterior) {
+      // Outra chave não cancela o expurgo; a mesma chave espera antes de ler ou gravar.
+      const pendente = expurgos.current.get(anterior.chave);
+      const expurgo = (async () => {
+        await pendente;
+        try {
+          const id = await anterior.id;
+          await cacheBi("limpar", `${id}:`);
+        } catch {
+          armazenamentoFalhou();
+        }
+      })();
+      expurgos.current.set(anterior.chave, expurgo);
+      try {
+        await expurgo;
+      } finally {
+        if (expurgos.current.get(anterior.chave) === expurgo)
+          expurgos.current.delete(anterior.chave);
+      }
+    }
   }, [armazenamentoFalhou]);
   const entrar = useCallback(
-    async (chave: string) => {
+    async (chave: string, persistir = false, manterTela = false) => {
       controlador.current?.abort();
+      const anterior = acessoRef.current;
+      if (!manterTela) {
+        consultaRef.current = null;
+        acessoRef.current = null;
+        setAcesso(null);
+        setRetratos({});
+        tarefas.current.clear();
+        geracoes.current.clear();
+      }
       const ctrl = new AbortController();
       controlador.current = ctrl;
+      const aindaValido = () => controlador.current === ctrl && !ctrl.signal.aborted;
       setOcupado(true);
       setErro("");
       setProgresso("Conferindo a chave");
       try {
-        const id = await identificadorCacheBi(chave);
+        // Publica a identidade antes do primeiro await para receber esquecimento durante o hash.
+        const identificador = identificadorCacheBi(chave);
+        consultaRef.current = { chave, id: identificador };
+        const id = await identificador;
+        await expurgos.current.get(chave);
+        if (!aindaValido()) return;
+        if (!persistir) {
+          try {
+            esquecerSegredoBi(chave);
+          } catch {
+            armazenamentoFalhou();
+          }
+          try {
+            await cacheBi("limpar", `${id}:`, undefined, aindaValido);
+          } catch {
+            armazenamentoFalhou();
+          }
+          if (!aindaValido()) return;
+        }
         let pagina: PaginaBi;
         try {
           let tentativas = 0;
@@ -102,43 +158,65 @@ export function useDadosBi() {
               });
             }
           }
+          if (!aindaValido()) return;
           setOffline(false);
           try {
-            const antiga = await cacheBi<PaginaBi>("ler", `${id}:acesso`);
+            const antiga = persistir
+              ? await cacheBi<PaginaBi>("ler", `${id}:acesso`, undefined, aindaValido)
+              : undefined;
+            if (!aindaValido()) return;
             if (antiga && JSON.stringify(antiga.escopo) !== JSON.stringify(pagina.escopo))
-              await cacheBi("limpar", `${id}:`);
-            await cacheBi("gravar", `${id}:acesso`, pagina);
+              await cacheBi("limpar", `${id}:`, undefined, aindaValido);
+            if (persistir) await cacheBi("gravar", `${id}:acesso`, pagina, aindaValido);
           } catch {
             armazenamentoFalhou();
           }
         } catch (e) {
+          if (!aindaValido()) return;
           if (e instanceof ErroApi && (e.status === 401 || e.status === 403)) {
             try {
-              await cacheBi("limpar", `${id}:`);
-              esquecerSegredoBi();
+              await cacheBi("limpar", `${id}:`, undefined, aindaValido);
+            } catch {
+              armazenamentoFalhou();
+            }
+            if (!aindaValido()) return;
+            try {
+              esquecerSegredoBi(chave);
             } catch {
               armazenamentoFalhou();
             }
             acessoRef.current = null;
+            consultaRef.current = null;
             setAcesso(null);
             setRetratos({});
+            tarefas.current.clear();
+            geracoes.current.clear();
             throw new Error("A chave não autoriza o acesso. Peça uma nova chave à Gestão.");
           }
           if (ctrl.signal.aborted || (e instanceof ErroApi && e.status !== 503)) throw e;
-          const antiga = await cacheBi<PaginaBi>("ler", `${id}:acesso`);
+          const antiga = persistir
+            ? await cacheBi<PaginaBi>("ler", `${id}:acesso`, undefined, aindaValido)
+            : undefined;
+          if (!aindaValido()) return;
           if (!antiga) throw new Error("Sem conexão e sem consulta guardada neste navegador.");
           pagina = antiga;
           setOffline(true);
         }
-        if (ctrl.signal.aborted) return;
-        const novo = { chave, id, pagina };
+        if (!aindaValido()) return;
+        const novo = { chave, id, pagina, persistir };
+        const mesmoAcesso =
+          anterior?.chave === chave &&
+          JSON.stringify(anterior.pagina.escopo) === JSON.stringify(pagina.escopo) &&
+          JSON.stringify(anterior.pagina.recursos) === JSON.stringify(pagina.recursos);
         acessoRef.current = novo;
         setAcesso(novo);
-        setRetratos({});
-        tarefas.current.clear();
-        geracoes.current.clear();
+        if (!mesmoAcesso) {
+          setRetratos({});
+          tarefas.current.clear();
+          geracoes.current.clear();
+        }
         try {
-          guardarSegredoBi(chave);
+          if (persistir) guardarSegredoBi(chave);
         } catch {
           armazenamentoFalhou();
         }
@@ -156,27 +234,45 @@ export function useDadosBi() {
   );
   useEffect(() => {
     try {
+      const expirada = consumirSegredoBiExpirado();
+      if (expirada) void expurgarRetratosDaChave(expirada).catch(armazenamentoFalhou);
       const chave = lerSegredoBi();
       // A abertura com a chave guardada é assíncrona e só toca no estado depois
       // do await; a regra set-state-in-effect não distingue o caso (ADR 047).
       // eslint-disable-next-line react-hooks/set-state-in-effect -- abertura assíncrona (ADR 047)
-      if (chave) void entrar(chave);
+      if (chave) void entrar(chave, true);
     } catch {
       armazenamentoFalhou();
     }
     const voltar = () => {
       const atual = acessoRef.current;
-      if (atual) void entrar(atual.chave);
+      // A reconexão confere a chave sem desmontar a tela que já está aberta.
+      if (atual) void entrar(atual.chave, atual.persistir, true);
     };
     const perder = () => setOffline(true);
+    const aoArmazenar = (evento: StorageEvent) => {
+      const atual = acessoRef.current ?? consultaRef.current;
+      if (!atual) return;
+      const chaveAnterior = chaveDoValorSegredoBi(evento.oldValue);
+      const chaveNova = chaveDoValorSegredoBi(evento.newValue);
+      if (
+        evento.key === null ||
+        (evento.key === CHAVE_SEGREDO_BI &&
+          chaveAnterior === atual.chave &&
+          chaveNova !== atual.chave)
+      )
+        void esquecer();
+    };
+    window.addEventListener("storage", aoArmazenar);
     window.addEventListener("online", voltar);
     window.addEventListener("offline", perder);
     return () => {
       controlador.current?.abort();
+      window.removeEventListener("storage", aoArmazenar);
       window.removeEventListener("online", voltar);
       window.removeEventListener("offline", perder);
     };
-  }, [entrar, armazenamentoFalhou]);
+  }, [entrar, esquecer, armazenamentoFalhou]);
   const carregar = useCallback(
     (recurso: RecursoBi, consulta: ConsultaBi, atualizar = false): Promise<RetratoBi> => {
       const atual = acessoRef.current;
@@ -204,7 +300,7 @@ export function useDadosBi() {
       const tarefa: Promise<RetratoBi> = (async () => {
         let antigo: RetratoBi | undefined;
         try {
-          antigo = await cacheBi<RetratoBi>("ler", id);
+          if (atual.persistir) antigo = await cacheBi<RetratoBi>("ler", id);
           // Retratos anteriores não registravam as datas de todas as páginas.
           if (antigo && !antigo.datasCompletas) antigo = { ...antigo, consultadoEm: "" };
         } catch {
@@ -313,15 +409,16 @@ export function useDadosBi() {
           datasCompletas: !dataInvalida && Boolean(consultadoEm),
         };
         try {
-          await cacheBi(
-            "gravar",
-            id,
-            retrato,
-            () =>
-              geracoes.current.get(id) === geracao &&
-              acessoRef.current === atual &&
-              !signal?.aborted,
-          );
+          if (atual.persistir)
+            await cacheBi(
+              "gravar",
+              id,
+              retrato,
+              () =>
+                geracoes.current.get(id) === geracao &&
+                acessoRef.current === atual &&
+                !signal?.aborted,
+            );
         } catch {
           armazenamentoFalhou();
         }
