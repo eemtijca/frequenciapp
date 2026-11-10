@@ -6,6 +6,7 @@ import type { FrequenciaParcial as LinhaParcial } from "../../generated/prisma/c
 import { esquemaFiltrosParciais } from "./frequencia-parcial";
 import { consultarSaidasParciais } from "./saidas-parciais";
 import {
+  classificarFaltasPorAulas,
   diaLocal,
   horariosDaChamada,
   JUSTIFICATIVA_OUTROS,
@@ -51,15 +52,37 @@ function descreverChamada(
   faltas: { horarioId: string; justificativa: string | null }[],
   horarios: Horario[],
   dia: string,
+  retrato: { horarioId: string }[],
 ): { marca: Marca; descricao: string } {
   if (faltas.length === 0) return { marca: "P", descricao: "Dia inteiro" };
-  const aulasDoDia = horariosDaChamada(horarios, dia, true);
   const idsAusentes = new Set(faltas.map((falta) => falta.horarioId));
+  // O retrato manda no denominador. Se algum ID antigo não estiver mais na
+  // grade, a classificação continua pelos IDs e a descrição detalhada é
+  // substituída pela genérica, sem inventar a ordem da aula removida.
+  const aulasDoDia =
+    retrato.length > 0
+      ? retrato
+          .flatMap((item) => horarios.filter((horario) => horario.id === item.horarioId))
+          .sort((a, b) => a.ordem - b.ordem)
+      : horariosDaChamada(horarios, dia, true);
   const aulasAusentes = aulasDoDia.filter((aula) => idsAusentes.has(aula.id));
-  if (aulasAusentes.length > 0 && aulasAusentes.length < aulasDoDia.length) {
-    const todasMapeadas = aulasAusentes.length === idsAusentes.size;
+  const marca =
+    retrato.length > 0
+      ? classificarFaltasPorAulas(
+          new Map(faltas.map((falta) => [falta.horarioId, Boolean(falta.justificativa)])),
+          new Set(retrato.map((item) => item.horarioId)),
+        )
+      : aulasAusentes.length > 0 && aulasAusentes.length < aulasDoDia.length
+        ? "S"
+        : faltas.every((falta) => Boolean(falta.justificativa))
+          ? "FJ"
+          : "F";
+  if (marca === "S") {
+    const todasMapeadas =
+      aulasAusentes.length === idsAusentes.size &&
+      (retrato.length === 0 || aulasDoDia.length === retrato.length);
     return {
-      marca: "S",
+      marca,
       descricao: todasMapeadas
         ? aulasAusentes.length === 1
           ? `Falta na ${aulasAusentes[0]?.ordem}ª aula da Chamada`
@@ -67,8 +90,8 @@ function descreverChamada(
         : "Falta em parte das aulas na Chamada",
     };
   }
-  return faltas.every((falta) => Boolean(falta.justificativa))
-    ? { marca: "FJ", descricao: "Falta justificada na Chamada" }
+  return marca === "FJ"
+    ? { marca, descricao: "Falta justificada na Chamada" }
     : { marca: "F", descricao: "Falta na Chamada" };
 }
 
@@ -102,6 +125,7 @@ export async function listarFrequenciasPersonalizadas(
     const chamadas = await tx.frequencia.findMany({
       where: { dia: periodo },
       include: {
+        aulas: { select: { horarioId: true } },
         turma: { include: { serie: true, horarios: true } },
         faltas: {
           select: { alunoId: true, horarioId: true, justificativa: true, observacao: true },
@@ -153,7 +177,9 @@ export async function listarFrequenciasPersonalizadas(
                   disciplinas: disciplinasDoHorario(horario.disciplinas),
                 })),
                 dia,
+                chamada.aulas,
               )),
+          ...(chamada.aulas.length === 0 ? { estimado: true } : {}),
           justificativas: motivosDasFaltas(faltas, catalogo),
           justificativa:
             new Set(faltas.map((f) => f.justificativa)).size === 1
