@@ -158,6 +158,26 @@ describe("contratos já existentes de acesso do BI", () => {
   });
 });
 
+describe("reconexão automática", () => {
+  it("preserva acesso e retratos enquanto a conferência falha", async () => {
+    const janela = new EventTarget();
+    vi.stubGlobal("window", janela);
+    h.lerSegredo.mockReturnValue("atual");
+    const fonte = useDadosBi();
+    h.efeitos[0]?.();
+    await vi.waitFor(() => expect(h.estados[0]).toMatchObject({ chave: "atual" }));
+    const retrato = await fonte.carregar("turmas", { inicio: "", fim: "" });
+    const acessoAntes = h.estados[0];
+    const retratosAntes = h.estados[1];
+    h.rede.mockRejectedValueOnce(new ErroApi("Muitas consultas. Aguarde um minuto.", 429));
+    janela.dispatchEvent(new Event("online"));
+    await vi.waitFor(() => expect(h.estados[4]).toBe("Muitas consultas. Aguarde um minuto."));
+    expect(h.estados[0]).toBe(acessoAntes);
+    expect(h.estados[1]).toBe(retratosAntes);
+    expect(h.estados[1]).toEqual({ turmas: retrato });
+  });
+});
+
 describe("persistência opcional do BI", () => {
   for (const persistir of [false, true]) {
     it(`botão real de reconferência mantém persistir=${persistir} nos novos retratos`, async () => {

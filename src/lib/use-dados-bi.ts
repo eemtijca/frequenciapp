@@ -90,14 +90,17 @@ export function useDadosBi() {
     }
   }, [armazenamentoFalhou]);
   const entrar = useCallback(
-    async (chave: string, persistir = true) => {
+    async (chave: string, persistir = true, manterTela = false) => {
       controlador.current?.abort();
-      consultaRef.current = null;
-      acessoRef.current = null;
-      setAcesso(null);
-      setRetratos({});
-      tarefas.current.clear();
-      geracoes.current.clear();
+      const anterior = acessoRef.current;
+      if (!manterTela) {
+        consultaRef.current = null;
+        acessoRef.current = null;
+        setAcesso(null);
+        setRetratos({});
+        tarefas.current.clear();
+        geracoes.current.clear();
+      }
       const ctrl = new AbortController();
       controlador.current = ctrl;
       const aindaValido = () => controlador.current === ctrl && !ctrl.signal.aborted;
@@ -179,8 +182,11 @@ export function useDadosBi() {
               armazenamentoFalhou();
             }
             acessoRef.current = null;
+            consultaRef.current = null;
             setAcesso(null);
             setRetratos({});
+            tarefas.current.clear();
+            geracoes.current.clear();
             throw new Error("A chave não autoriza o acesso. Peça uma nova chave à Gestão.");
           }
           if (ctrl.signal.aborted || (e instanceof ErroApi && e.status !== 503)) throw e;
@@ -194,11 +200,17 @@ export function useDadosBi() {
         }
         if (!aindaValido()) return;
         const novo = { chave, id, pagina, persistir };
+        const mesmoAcesso =
+          anterior?.chave === chave &&
+          JSON.stringify(anterior.pagina.escopo) === JSON.stringify(pagina.escopo) &&
+          JSON.stringify(anterior.pagina.recursos) === JSON.stringify(pagina.recursos);
         acessoRef.current = novo;
         setAcesso(novo);
-        setRetratos({});
-        tarefas.current.clear();
-        geracoes.current.clear();
+        if (!mesmoAcesso) {
+          setRetratos({});
+          tarefas.current.clear();
+          geracoes.current.clear();
+        }
         try {
           if (persistir) guardarSegredoBi(chave);
         } catch {
@@ -228,7 +240,8 @@ export function useDadosBi() {
     }
     const voltar = () => {
       const atual = acessoRef.current;
-      if (atual) void entrar(atual.chave, atual.persistir);
+      // A reconexão confere a chave sem desmontar a tela que já está aberta.
+      if (atual) void entrar(atual.chave, atual.persistir, true);
     };
     const perder = () => setOffline(true);
     const aoArmazenar = (evento: StorageEvent) => {
