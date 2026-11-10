@@ -8,17 +8,28 @@ const padraoBase = /^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$/;
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 function mesmoEscopo(r, opcoes) {
-  return typeof opcoes.banco === "string" && !!opcoes.banco &&
-    typeof opcoes.schema === "string" && !!opcoes.schema &&
-    typeof opcoes.alvo === "string" && !!opcoes.alvo &&
+  return (
+    typeof opcoes.banco === "string" &&
+    !!opcoes.banco &&
+    typeof opcoes.schema === "string" &&
+    !!opcoes.schema &&
+    typeof opcoes.alvo === "string" &&
+    !!opcoes.alvo &&
     typeof opcoes.destino === "string" &&
-    r.escopo.banco === opcoes.banco && r.escopo.schema === opcoes.schema &&
-    r.escopo.alvo === opcoes.alvo && r.remoto === opcoes.destino;
+    r.escopo.banco === opcoes.banco &&
+    r.escopo.schema === opcoes.schema &&
+    r.escopo.alvo === opcoes.alvo &&
+    r.remoto === opcoes.destino
+  );
 }
 
 function escopoAmbiente(e) {
-  return {alvo:e.SERVIDOR_ALVO_CHAVE, banco:e.BACKUP_BANCO_VERIFICADO,
-    schema:e.DATABASE_SCHEMA ?? "public", destino:e.BACKUP_REMOTO ?? ""};
+  return {
+    alvo: e.SERVIDOR_ALVO_CHAVE,
+    banco: e.BACKUP_BANCO_VERIFICADO,
+    schema: e.DATABASE_SCHEMA ?? "public",
+    destino: e.BACKUP_REMOTO ?? "",
+  };
 }
 
 export function validarRecibo(r) {
@@ -124,8 +135,7 @@ export function planejarRetencao(recibos, opcoes) {
       if (bases.has(r.base)) throw new Error("Catálogo duplicado.");
       bases.add(r.base);
       return (
-        mesmoEscopo(r, opcoes) &&
-        (!remoto || (r.etapas.remotoVerificado && r.remoto === destino))
+        mesmoEscopo(r, opcoes) && (!remoto || (r.etapas.remotoVerificado && r.remoto === destino))
       );
     })
     .sort((a, b) => b.em.localeCompare(a.em) || b.base.localeCompare(a.base));
