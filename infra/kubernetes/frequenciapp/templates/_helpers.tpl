@@ -70,3 +70,20 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- define "frequenciapp.backupFilesSecret" -}}
 {{- required "Defina backup.filesSecret para habilitar o backup" .Values.backup.filesSecret -}}
 {{- end -}}
+
+{{/* Checksum do Secret que entra no Pod. existingSecret usa o lookup do
+cluster e, sem cluster, a revisão explícita dos values. */}}
+{{- define "frequenciapp.secretChecksum" -}}
+{{- if .Values.existingSecret -}}
+{{- $segredo := lookup "v1" "Secret" .Release.Namespace .Values.existingSecret -}}
+{{- if $segredo -}}
+{{- toYaml $segredo.data | sha256sum -}}
+{{- else -}}
+{{- printf "revisao:%s" (toString .Values.existingSecretRevision) | sha256sum -}}
+{{- end -}}
+{{- else if .Values.secrets.create -}}
+{{- include (print .Template.BasePath "/secret.yaml") . | sha256sum -}}
+{{- else -}}
+{{- required "Defina existingSecret ou secrets.create" "" -}}
+{{- end -}}
+{{- end -}}

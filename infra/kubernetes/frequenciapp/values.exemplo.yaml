@@ -10,6 +10,9 @@ backupImage:
   tag: "1.2.3"
 
 existingSecret: frequenciapp-segredos
+# Troque ao atualizar o Secret fora do Helm. Com cluster, o checksum usa o
+# conteúdo real; sem cluster, este valor é o sinal de revisão.
+existingSecretRevision: "1"
 
 ingress:
   enabled: true

@@ -79,6 +79,11 @@ config:
 # e os opcionais GOOGLE_*, PUSH_VAPID_*, FERIADOS_* e ADMIN_*.
 existingSecret: ""
 
+# Revisão explícita do existingSecret usada no checksum do Pod quando o Helm
+# não consegue consultar o cluster, como em helm template offline. Troque o
+# valor ao alterar o Secret fora do Helm para provocar o rollout.
+existingSecretRevision: "1"
+
 # Alternativa de desenvolvimento. Para produção, prefira existingSecret.
 secrets:
   create: false
