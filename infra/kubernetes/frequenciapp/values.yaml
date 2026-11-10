@@ -124,8 +124,8 @@ persistence:
 agenda:
   enabled: true
   schedule: "*/5 * * * *"
-  # Fuso IANA do CronJob. Exige Kubernetes 1.27 ou superior quando preenchido.
-  timeZone: ""
+  # Fuso IANA do CronJob, sempre renderizado. Exige Kubernetes 1.27 ou superior.
+  timeZone: America/Fortaleza
   appUrl: ""
   existingSecret: ""
   concurrencyPolicy: Forbid
@@ -161,11 +161,11 @@ backup:
   database:
     enabled: true
     schedule: "30 2 * * *"
-    timeZone: ""
+    timeZone: America/Fortaleza
     existingSecret: ""
     local: true
     persistence:
-      enabled: false
+      enabled: true
       size: 20Gi
       storageClass: ""
       accessModes:
@@ -174,9 +174,15 @@ backup:
   spreadsheets:
     enabled: true
     schedule: "0 3 * * *"
-    timeZone: ""
+    timeZone: America/Fortaleza
     existingSecret: ""
     local: true
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
   concurrencyPolicy: Forbid
   backoffLimit: 3
   activeDeadlineSeconds: 3600

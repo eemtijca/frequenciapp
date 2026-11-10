@@ -71,6 +71,11 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- required "Defina backup.filesSecret para habilitar o backup" .Values.backup.filesSecret -}}
 {{- end -}}
 
+{{/* Fuso IANA dos CronJobs, com America/Fortaleza como padrão. */}}
+{{- define "frequenciapp.timeZone" -}}
+{{- default "America/Fortaleza" . -}}
+{{- end -}}
+
 {{/* Checksum do Secret que entra no Pod. existingSecret usa o lookup do
 cluster e, sem cluster, a revisão explícita dos values. */}}
 {{- define "frequenciapp.secretChecksum" -}}

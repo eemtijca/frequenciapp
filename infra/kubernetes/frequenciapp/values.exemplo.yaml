@@ -41,3 +41,6 @@ backup:
   spreadsheets:
     enabled: true
     existingSecret: frequenciapp-backup-planilhas
+    persistence:
+      enabled: true
+      size: 10Gi

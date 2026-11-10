@@ -8,9 +8,7 @@ metadata:
     {{- include "frequenciapp.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.backup.spreadsheets.schedule | quote }}
-  {{- with .Values.backup.spreadsheets.timeZone }}
-  timeZone: {{ . | quote }}
-  {{- end }}
+  timeZone: {{ include "frequenciapp.timeZone" .Values.backup.spreadsheets.timeZone | quote }}
   concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
   successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
@@ -43,7 +41,7 @@ spec:
                 - name: BACKUP_RCLONE_CONFIG
                   value: /etc/frequenciapp/rclone.conf
                 - name: BACKUP_PLANILHAS_LOCAL
-                  value: {{ and .Values.backup.spreadsheets.local .Values.backup.database.persistence.enabled | quote }}
+                  value: {{ and .Values.backup.spreadsheets.local .Values.backup.spreadsheets.persistence.enabled | quote }}
                 - name: BACKUP_PLANILHAS_DIR
                   value: /backups/planilhas
                 - name: HOME
@@ -66,9 +64,9 @@ spec:
                 secretName: {{ include "frequenciapp.backupFilesSecret" . }}
                 defaultMode: 0440
             - name: backups
-              {{- if .Values.backup.database.persistence.enabled }}
+              {{- if .Values.backup.spreadsheets.persistence.enabled }}
               persistentVolumeClaim:
-                claimName: {{ include "frequenciapp.fullname" . }}-backup
+                claimName: {{ include "frequenciapp.fullname" . }}-backup-planilhas
               {{- else }}
               emptyDir: {}
               {{- end }}

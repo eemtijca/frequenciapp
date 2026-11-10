@@ -8,9 +8,7 @@ metadata:
     {{- include "frequenciapp.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.backup.database.schedule | quote }}
-  {{- with .Values.backup.database.timeZone }}
-  timeZone: {{ . | quote }}
-  {{- end }}
+  timeZone: {{ include "frequenciapp.timeZone" .Values.backup.database.timeZone | quote }}
   concurrencyPolicy: {{ .Values.backup.concurrencyPolicy }}
   successfulJobsHistoryLimit: {{ .Values.backup.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.backup.failedJobsHistoryLimit }}
@@ -51,7 +49,7 @@ spec:
                 - name: BACKUP_BANCO_DIR
                   value: /backups/banco
                 - name: ESTADO_DIR
-                  value: /state
+                  value: /backups/estado
                 - name: BACKUP_RCLONE_CONFIG
                   value: /etc/frequenciapp/rclone.conf
                 - name: BACKUP_GPG_CHAVE_PUBLICA
@@ -78,8 +76,6 @@ spec:
                   readOnly: true
                 - name: backups
                   mountPath: /backups
-                - name: estado
-                  mountPath: /state
                 - name: tmp
                   mountPath: /tmp
           volumes:
@@ -90,12 +86,10 @@ spec:
             - name: backups
               {{- if .Values.backup.database.persistence.enabled }}
               persistentVolumeClaim:
-                claimName: {{ include "frequenciapp.fullname" . }}-backup
+                claimName: {{ include "frequenciapp.fullname" . }}-backup-banco
               {{- else }}
               emptyDir: {}
               {{- end }}
-            - name: estado
-              emptyDir: {}
             - name: tmp
               emptyDir: {}
 {{- end }}
