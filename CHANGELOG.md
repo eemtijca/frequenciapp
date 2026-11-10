@@ -14,9 +14,15 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
 
+- A publicação passa a conciliar versão, tag, commit, ancestralidade na `main` e `package.json` antes do registry, e o canal `latest` só avança. `implantacao.yml` centraliza a sequência de produção, `migracoes.yml` delega a mesma ordem e a trava impede migração e implantação simultâneas. A decisão está na [ADR-072](docs/adr/072-publicacao-e-implantacao-coordenadas.md).
+
+- As implantações em nuvem separam as credenciais de runtime e de migração. O serviço principal deixa de receber `DIRECT_URL` e a conta administrativa, os jobs de migração têm identidade própria e o SQL de provisionamento concede apenas DML no schema exclusivo. A decisão está na [ADR-073](docs/adr/073-papeis-de-runtime-separados.md).
+
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
+
+- O modo URL da restauração confere a identidade do servidor e do banco de validação e do destino, recusando a mesma base mesmo quando as URLs usam grafias diferentes.
 
 - O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
 
@@ -306,6 +312,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- As saídas antecipadas passam a guardar a turma e o retrato de aulas do momento, com confirmação explícita e auditoria quando a referência histórica não pode ser comprovada. A Chamada Parcial e os relatórios usam a turma histórica, e a conferência é recusada sem retrato confiável. A decisão está na [ADR-069](docs/adr/069-referencia-historica-saidas.md).
 - O Nginx em modo HTTPS mantém a porta 80 para o desafio HTTP-01 do Certbot e redireciona as demais requisições para HTTPS, para a renovação continuar funcionando depois da troca de configuração.
 - As rotinas da auto-hospedagem passam a exigir um projeto Compose explícito, conferir a identidade do daemon, do projeto, dos serviços e das montagens persistentes e serializar operações do mesmo projeto por uma trava derivada dessa identidade. A instalação inicial é conferida antes da primeira subida e adotada explicitamente depois dela. A atualização só aceita backup remoto com `verificadoRemoto` booleano `true`. A decisão está na [ADR-067](docs/adr/067-identidade-operacional-e-travas.md).
 - O chart Helm passa a exigir backup confirmado antes de upgrade e rollback, reinicia os Pods quando ConfigMap ou Secret mudam, separa os PVCs do backup do banco e das planilhas e define o fuso dos CronJobs. A decisão está na [ADR-068](docs/adr/068-kubernetes-backup-e-rollout.md).

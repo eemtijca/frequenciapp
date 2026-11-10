@@ -254,12 +254,13 @@ export function VistaResumoSemana({
       const idsVisiveis = new Set(turmas.map((turma) => turma.id));
       const dados: DadosSemana = {
         frequencias: frequenciasResultado.value.frequencias,
-        saidas: saidas.filter((saida) => {
-          const aluno = alunos.find((item) => item.id === saida.alunoId);
-          return !aluno || idsVisiveis.has(aluno.turmaId);
-        }),
+        saidas: saidas.filter(
+          (saida) => !saida.turmaHistoricaId || idsVisiveis.has(saida.turmaHistoricaId),
+        ),
         entradas: entradas.filter((entrada) => idsVisiveis.has(entrada.turmaId)),
-        parciais: parciais.filter((registro) => idsVisiveis.has(registro.turmaId)),
+        parciais: parciais.filter(
+          (registro) => registro.turmaId !== null && idsVisiveis.has(registro.turmaId),
+        ),
         avisoSaidas:
           mostrarSaidas && saidasResultado.status === "rejected"
             ? "Não foi possível carregar as saídas."
@@ -275,7 +276,7 @@ export function VistaResumoSemana({
       };
       return { dados, assinatura: JSON.stringify(dados) };
     },
-    [alunos, ate, de, mostrarSaidas, onRecarregarConfiguracoes, painel, turmas],
+    [ate, de, mostrarSaidas, onRecarregarConfiguracoes, painel, turmas],
   );
 
   const resumo = useResumoSemanal<DadosSemana>({
@@ -338,7 +339,6 @@ export function VistaResumoSemana({
   const movimentacoes = useMemo(() => {
     if (!dados || !mostrarSaidas) return [];
     const alunosPorId = new Map(alunos.map((aluno) => [aluno.id, aluno]));
-    const turmasPorId = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
     const lista = [
       ...dados.saidas.flatMap((saida) => {
         const aluno = alunosPorId.get(saida.alunoId);
@@ -348,7 +348,7 @@ export function VistaResumoSemana({
             id: `saida:${saida.id}`,
             tipo: "Saída" as const,
             nome: aluno.nome,
-            turma: turmasPorId.get(aluno.turmaId) ?? "Sem turma",
+            turma: saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
             dia: saida.dia,
             horario: saida.horario,
             momento: rotuloMomento(saida.momento),

@@ -345,10 +345,19 @@ else
   fi
 
   if [ "$sem_validacao" = false ]; then
-    log "Validando o dump no banco descartável configurado."
-    if [ "$BACKUP_RESTAURACAO_URL_VALIDACAO" = "$BACKUP_DATABASE_URL" ]; then
-      erro "A URL de validação precisa ser diferente da URL de destino."
+    log "Conferindo a identidade do banco de validação e do destino."
+    identidade_banco() {
+      psql "$1" -X -tA -v ON_ERROR_STOP=1 \
+        -c "select current_database(), coalesce(inet_server_addr()::text, ''), coalesce(inet_server_port()::text, ''), pg_postmaster_start_time()"
+    }
+    identidade_destino=$(identidade_banco "$BACKUP_DATABASE_URL") ||
+      erro "Não foi possível conferir a identidade do banco de destino."
+    identidade_validacao=$(identidade_banco "$BACKUP_RESTAURACAO_URL_VALIDACAO") ||
+      erro "Não foi possível conferir a identidade do banco de validação."
+    if [ "$identidade_destino" = "$identidade_validacao" ]; then
+      erro "A URL de validação aponta para o mesmo banco do destino. Use um banco descartável diferente; URLs equivalentes não são prova de isolamento."
     fi
+    log "Validando o dump no banco descartável configurado."
     restaurar_url="$BACKUP_RESTAURACAO_URL_VALIDACAO"
     pg_restore -d "$restaurar_url" --clean --if-exists --no-owner --no-acl \
       --single-transaction --exit-on-error <"$dump"

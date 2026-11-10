@@ -63,6 +63,9 @@ async function limparMassa() {
   );
   await banco.query("delete from alunos where nome like 'QS %'");
   await banco.query(
+    "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'QS Ano'))",
+  );
+  await banco.query(
     "delete from turmas where serie_id in (select id from series where nome = 'QS Ano')",
   );
   await banco.query("delete from series where nome = 'QS Ano'");
@@ -144,6 +147,19 @@ beforeAll(async () => {
     body: JSON.stringify({ nome: "QS Bruno", turmaId }),
   });
 
+  const chamada = await autenticado("/api/frequencias", {
+    method: "POST",
+    body: JSON.stringify({
+      dia: DIA,
+      turmaId,
+      faltas: [],
+      revisao: 0,
+      confirmarHistorico: true,
+      motivo: "Teste sintético da planilha de saídas",
+    }),
+  });
+  expect(chamada.status).toBe(200);
+
   const saida = await json<{ saida: { id: string } }>(
     await autenticado("/api/saidas", {
       method: "POST",
@@ -154,6 +170,8 @@ beforeAll(async () => {
         momento: "aula_1",
         justificativa: "C",
         liberadoPorCodigo: "QPS1",
+        confirmarHistorico: true,
+        motivo: "Teste sintético da planilha de saídas",
       }),
     }),
   );
@@ -697,6 +715,8 @@ describe("planilha de saídas", () => {
           justificativa: "O",
           texto: "Liberada mais cedo",
           liberadoPorCodigo: "QPS2",
+          confirmarHistorico: true,
+          motivo: "Teste sintético da correção da planilha",
         }),
       }),
     );

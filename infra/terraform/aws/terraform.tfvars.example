@@ -3,6 +3,11 @@
 modo_local          = false
 ambiente            = "prod"
 imagem_aplicacao    = "000000000000.dkr.ecr.us-east-1.amazonaws.com/frequenciapp-prod:versao"
+revisao_aplicacao   = "0000000000000000000000000000000000000000"
+schema_aplicacao    = "frequenciapp"
+runtime_provisionado = true
+url_runtime         = "postgresql://papel_runtime:senha@host:5432/frequencia?sslmode=require"
+url_migracao        = "postgresql://papel_migracao:senha@host:5432/frequencia?sslmode=require"
 dominio             = "frequencia.exemplo.br"
 zona_hospedada_id   = "Z00000000000000000000"
 certificado_arn     = "arn:aws:acm:us-east-1:000000000000:certificate/00000000-0000-0000-0000-000000000000"

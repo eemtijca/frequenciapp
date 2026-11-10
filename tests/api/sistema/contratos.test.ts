@@ -1235,6 +1235,8 @@ describe("saídas antecipadas", () => {
         momento: "aula_2",
         justificativa: "CM",
         liberadoPorCodigo: "QADIR",
+        confirmarHistorico: true,
+        motivo: "Teste sintético de saída no sábado",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1251,6 +1253,8 @@ describe("saídas antecipadas", () => {
         justificativa: "CM",
         observacao: null,
         liberadoPorCodigo: "QADIR",
+        confirmarHistorico: true,
+        motivo: "Teste sintético de saída histórica",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1281,6 +1285,8 @@ describe("saídas antecipadas", () => {
         momento: "aula_3",
         justificativa: "D",
         liberadoPorCodigo: "QACOR1",
+        confirmarHistorico: true,
+        motivo: "Teste sintético de saída repetida",
       }),
     });
     expect(resposta.status).toBe(409);
@@ -1425,6 +1431,8 @@ describe("saídas antecipadas", () => {
         justificativa: "D",
         texto: "Saiu para a coordenação",
         liberadoPorCodigo: "QACOR1",
+        confirmarHistorico: true,
+        motivo: "Teste sintético de saída durante a aula",
       }),
     });
     expect(resposta.status).toBe(201);
@@ -1453,6 +1461,8 @@ describe("saídas antecipadas", () => {
         momento: "aula_3",
         justificativa: "O",
         liberadoPorCodigo: "QADIR",
+        confirmarHistorico: true,
+        motivo: "Teste sintético de saída sem texto",
       }),
     });
     expect(semTexto.status).toBe(201);
@@ -2006,6 +2016,8 @@ describe("catálogo de quem libera as saídas", () => {
         momento: "aula_1",
         justificativa: "D",
         liberadoPorCodigo: "QAL",
+        confirmarHistorico: true,
+        motivo: "Teste sintético do catálogo de liberadores",
       }),
     });
     expect(saida.status).toBe(201);

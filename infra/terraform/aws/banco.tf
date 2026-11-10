@@ -1,6 +1,6 @@
 # PostgreSQL gerenciado. Em produção a senha é efêmera e gravada apenas no
 # Secrets Manager; no modo local vale a senha de desenvolvimento do tfvars.
-# O dono do schema é a própria conexão de runtime, sem papel separado.
+# A conta de bootstrap não é entregue ao runtime; papéis de aplicação são provisionados separadamente.
 
 resource "aws_db_subnet_group" "banco" {
   name       = "${local.nome_base}-banco"

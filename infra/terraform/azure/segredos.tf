@@ -25,7 +25,7 @@ resource "azurerm_key_vault_secret" "database_url" {
 
   name             = "database-url"
   key_vault_id     = azurerm_key_vault.principal[0].id
-  value_wo         = local.url_banco_producao
+  value_wo         = local.url_runtime_efetiva
   value_wo_version = var.versao_segredos
 }
 
@@ -34,7 +34,7 @@ resource "azurerm_key_vault_secret" "direct_url" {
 
   name             = "direct-url"
   key_vault_id     = azurerm_key_vault.principal[0].id
-  value_wo         = local.url_banco_producao
+  value_wo         = local.url_migracao_efetiva
   value_wo_version = var.versao_segredos
 }
 

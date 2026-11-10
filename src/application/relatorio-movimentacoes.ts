@@ -36,10 +36,12 @@ export async function consultarRelatorioMovimentacoes(
   const dia = { gte: new Date(`${de}T12:00:00Z`), lte: new Date(`${ate}T12:00:00Z`) };
   const [saidas, entradas, justificativas, liberadores] = await Promise.all([
     banco().saidaAntecipada.findMany({
-      where: { dia, ...(turmaId ? { aluno: { turmaId } } : {}) },
+      where: { dia, ...(turmaId ? { turmaHistoricaId: turmaId } : {}) },
       select: {
         id: true,
         alunoId: true,
+        turmaHistoricaId: true,
+        turmaHistoricaNome: true,
         dia: true,
         horario: true,
         momento: true,
@@ -101,21 +103,24 @@ export async function consultarRelatorioMovimentacoes(
   const rotulosLiberadores = new Map(liberadores.map((item) => [item.codigo, item.rotulo]));
   for (const saida of saidas) {
     const justificativa = partesJustificativaSaida(saida, justificativas);
-    // Saídas não têm retrato da turma no banco; a consulta acompanha a turma atual.
-    adicionar(saida.aluno.turmaId, `${saida.aluno.turma.serie.nome} ${saida.aluno.turma.nome}`, {
-      id: saida.id,
-      tipo: "SAIDA",
-      alunoId: saida.alunoId,
-      alunoNome: saida.aluno.nome,
-      dia: saida.dia.toISOString().slice(0, 10),
-      horario: saida.horario,
-      momento: saida.momento,
-      motivo: [justificativa.motivo, justificativa.complemento].filter(Boolean).join(" · "),
-      responsavel:
-        (saida.liberadoPorCodigo ? rotulosLiberadores.get(saida.liberadoPorCodigo) : null) ??
-        saida.liberadoPor?.nome ??
-        null,
-    });
+    adicionar(
+      saida.turmaHistoricaId ?? "desconhecida",
+      saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
+      {
+        id: saida.id,
+        tipo: "SAIDA",
+        alunoId: saida.alunoId,
+        alunoNome: saida.aluno.nome,
+        dia: saida.dia.toISOString().slice(0, 10),
+        horario: saida.horario,
+        momento: saida.momento,
+        motivo: [justificativa.motivo, justificativa.complemento].filter(Boolean).join(" · "),
+        responsavel:
+          (saida.liberadoPorCodigo ? rotulosLiberadores.get(saida.liberadoPorCodigo) : null) ??
+          saida.liberadoPor?.nome ??
+          null,
+      },
+    );
   }
   for (const entrada of entradas) {
     adicionar(entrada.turmaId, entrada.turmaRotulo, {
