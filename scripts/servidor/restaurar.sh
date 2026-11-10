@@ -205,14 +205,41 @@ limpar_restauracao() {
     if compose exec -T "$SERVIDOR_SERVICO_DB" psql -U "$usuario" -d postgres \
       -v ON_ERROR_STOP=1 -v banco="$banco" -v anterior="$banco_anterior" \
       -v falha="$banco_falha" <<'SQL'
-select pg_terminate_backend(pid) from pg_stat_activity
- where datname in (:'banco', :'anterior') and pid <> pg_backend_pid();
-alter database :"banco" rename to :"falha";
-alter database :"anterior" rename to :"banco";
+select set_config('restauracao.banco', :'banco', false),
+       set_config('restauracao.anterior', :'anterior', false),
+       set_config('restauracao.falha', :'falha', false);
+do $$
+declare
+  v_banco text := current_setting('restauracao.banco');
+  v_anterior text := current_setting('restauracao.anterior');
+  v_falha text := current_setting('restauracao.falha');
+  v_tem_banco boolean;
+  v_tem_anterior boolean;
+  v_tem_falha boolean;
+begin
+  select exists(select 1 from pg_database where datname = v_banco) into v_tem_banco;
+  select exists(select 1 from pg_database where datname = v_anterior) into v_tem_anterior;
+  select exists(select 1 from pg_database where datname = v_falha) into v_tem_falha;
+  if v_tem_falha then
+    raise exception 'O banco de falha % já existe.', v_falha;
+  end if;
+  if not v_tem_banco and not v_tem_anterior then
+    raise exception 'Nem o banco % nem o anterior % existem.', v_banco, v_anterior;
+  end if;
+  perform pg_terminate_backend(pid) from pg_stat_activity
+   where datname in (v_banco, v_anterior) and pid <> pg_backend_pid();
+  if not v_tem_banco and v_tem_anterior then
+    execute format('alter database %I rename to %I', v_anterior, v_banco);
+  elsif v_tem_banco and v_tem_anterior then
+    execute format('alter database %I rename to %I', v_banco, v_falha);
+    execute format('alter database %I rename to %I', v_anterior, v_banco);
+  end if;
+end $$;
 SQL
     then
       banco_trocado=false
-      banco_anterior="$banco_falha"
+      banco_anterior=""
+      log "O banco anterior voltou ao nome $banco. A cópia restaurada, se existir, é $banco_falha."
     else
       log "A volta ao banco anterior também falhou."
     fi
@@ -301,14 +328,22 @@ if [ "$BACKUP_MODO" = "compose" ]; then
   app_parada=true
 
   log "Trocando o banco validado pelo banco em uso."
+  banco_trocado=true
+  falha_entre_renomeacoes=""
+  if [ "${RESTAURAR_FALHA_ENTRE_RENOMEACOES:-false}" = true ]; then
+    falha_entre_renomeacoes="select 1/0;"
+  fi
   compose exec -T "$SERVIDOR_SERVICO_DB" psql -U "$usuario" -d postgres \
-    -v ON_ERROR_STOP=1 -v banco="$banco" -v temp="$banco_temp" -v anterior="$banco_anterior" <<'SQL'
+    -v ON_ERROR_STOP=1 -v banco="$banco" -v temp="$banco_temp" -v anterior="$banco_anterior" \
+    -v falha_entre="$falha_entre_renomeacoes" <<'SQL'
+begin;
 select pg_terminate_backend(pid) from pg_stat_activity
  where datname in (:'banco', :'temp') and pid <> pg_backend_pid();
 alter database :"banco" rename to :"anterior";
+:falha_entre
 alter database :"temp" rename to :"banco";
+commit;
 SQL
-  banco_trocado=true
   temp_criado=false
 
   log "Subindo a aplicação."

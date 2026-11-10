@@ -77,6 +77,17 @@ esperar_aplicacao || falhar "a aplicação não voltou após o rollback da resta
 [ "$(grep -o '"status":"[^"]*"' "$ESTADO_DIR/ultima-restauracao.json" | cut -d'"' -f4)" = "falha" ] ||
   falhar "a falha de restauração não foi registrada."
 
+# Falha entre as renomeações precisa desfazer a troca parcial e manter o banco original.
+if RESTAURAR_FALHA_ENTRE_RENOMEACOES=true \
+  "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump" --confirmar --sem-copia; then
+  falhar "a falha entre renomeações foi ignorada."
+fi
+esperar_aplicacao || falhar "a aplicação não voltou após a falha entre renomeações."
+[ "$(executar_sql "$POSTGRES_DB" 'select count(*) from alunos')" = "1" ] ||
+  falhar "a falha entre renomeações deixou o banco em uso indisponível."
+[ "$(grep -o '"status":"[^"]*"' "$ESTADO_DIR/ultima-restauracao.json" | cut -d'"' -f4)" = "falha" ] ||
+  falhar "a falha entre renomeações não foi registrada."
+
 # Um dump corrompido com checksum válido precisa falhar antes de parar a aplicação.
 corrompido="$TMP_RAIZ/corrompido.dump.gpg"
 cp "$dump" "$corrompido"
