@@ -216,7 +216,7 @@ Para TLS interno, não usar Certbot. Colocar `fullchain.pem` e `privkey.pem` em:
 infra/servidor/nginx/certificados/live/frequenciapp/
 ```
 
-O diretório é ignorado pelo Git. O Nginx escolhe HTTPS quando os dois arquivos existem. A renovação do certificado interno é responsabilidade da CA da escola.
+O diretório padrão é ignorado pelo Git e pelos contextos de build. Para outro `CERTBOT_CERTS_DIR`, prefira um diretório absoluto fora do checkout e dos contextos de build; as regras de exclusão cobrem nomes e extensões comuns, não todos os possíveis segredos. O Nginx escolhe HTTPS quando os dois arquivos existem. A renovação do certificado interno é responsabilidade da CA da escola.
 
 ## Escolher entre Caddy e Nginx
 
@@ -359,12 +359,14 @@ O instalador grava:
 Horários configuráveis:
 
 ```text
-AGENDA_HORARIO=*/5 * * * *
-BACKUP_HORARIO=30 2 * * *
-BACKUP_PLANILHAS_HORARIO=0 3 * * *
-ATUALIZAR_HORARIO=30 4 * * *
-CERTBOT_RENOVAR_HORARIO=15 2 * * *
+AGENDA_HORARIO='*/5 * * * *'
+BACKUP_HORARIO='30 2 * * *'
+BACKUP_PLANILHAS_HORARIO='0 3 * * *'
+ATUALIZAR_HORARIO='30 4 * * *'
+CERTBOT_RENOVAR_HORARIO='15 2 * * *'
 ```
+
+No arquivo `ops.env`, mantenha as aspas nos valores com espaços. Corrija os horários sem aspas em instalações existentes antes de carregar as rotinas.
 
 O cron agenda no fuso do daemon. O fuso da aplicação continua em `TZ_APP`.
 

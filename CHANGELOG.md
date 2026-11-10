@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A inicialização auto-hospedada recusa registros de migração não revertidos com `finished_at` nulo, orienta a revisão do histórico sem apagar dados, corrige os horários do exemplo e exclui certificados no caminho padrão e arquivos sensíveis comuns dos contextos de build.
+
 - A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
 
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.

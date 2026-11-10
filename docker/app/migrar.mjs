@@ -116,13 +116,20 @@ async function main() {
      )`,
   );
 
-  const aplicadas = new Map(
-    (
-      await cliente.query(
-        "select migration_name, checksum from _prisma_migrations where rolled_back_at is null",
-      )
-    ).rows.map((linha) => [linha.migration_name, linha.checksum]),
-  );
+  const registros = (
+    await cliente.query(
+      "select migration_name, checksum, finished_at from _prisma_migrations where rolled_back_at is null",
+    )
+  ).rows;
+  const incompleta = registros.find((linha) => linha.finished_at == null);
+  if (incompleta) {
+    console.error(
+      `[migrar] A migração ${incompleta.migration_name} está incompleta e não foi revertida. ` +
+        "A aplicação de migrações foi interrompida. Analise o histórico antes de continuar.",
+    );
+    process.exit(4);
+  }
+  const aplicadas = new Map(registros.map((linha) => [linha.migration_name, linha.checksum]));
 
   const pastas = await listar();
   if (pastas.length === 0) {
@@ -139,7 +146,7 @@ async function main() {
     if (aplicadas.get(nome) !== checksum) {
       console.error(
         `[migrar] A migração ${nome} já aplicada teve o conteúdo alterado. ` +
-          "Recrie o banco (migrate reset ou docker compose down -v) antes de continuar.",
+          "A aplicação de migrações foi interrompida. Investigue o histórico e use um plano seguro de recuperação antes de continuar.",
       );
       process.exit(4);
     }

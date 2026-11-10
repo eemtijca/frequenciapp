@@ -1,0 +1,9 @@
+certificados/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/app.env
+**/ops.env
+**/rclone.conf
+**/rclone.conf.*
