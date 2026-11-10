@@ -13,7 +13,7 @@ const TIMEOUT_CONEXAO_MS = 8000;
 /** Nome do schema do pull request, validado para uso como identificador. */
 export function nomeDoSchema(pr) {
   const numero = Number(pr);
-  if (!Number.isInteger(numero) || numero < 1) {
+  if (!Number.isSafeInteger(numero) || numero < 1) {
     throw new Error("O número do pull request é inválido para o schema de preview.");
   }
   return `${PREFIXO}${numero}`;
@@ -28,7 +28,7 @@ export function emailDaConta(pr) {
 export function schemasParaRemover(existentes, abertos) {
   const numerosAbertos = new Set(abertos.map(Number));
   return existentes.filter((nome) => {
-    const encontrado = /^preview_pr_(\d+)$/.exec(nome);
+    const encontrado = /^preview_pr_([1-9]\d*)$/.exec(nome);
     return encontrado ? !numerosAbertos.has(Number(encontrado[1])) : false;
   });
 }
@@ -122,37 +122,63 @@ async function listarSchemas(cliente) {
   return rows.map((linha) => linha.nspname);
 }
 
-async function prsAbertos() {
-  const repositorio = process.env.GITHUB_REPOSITORY;
-  const token = process.env.GITHUB_TOKEN;
-  if (!repositorio || !token) {
+export async function prsAbertos({
+  repositorio = process.env.GITHUB_REPOSITORY,
+  token = process.env.GITHUB_TOKEN,
+  buscar = fetch,
+} = {}) {
+  const partes = String(repositorio ?? "").split("/");
+  const repositorioValido =
+    partes.length === 2 &&
+    partes.every((parte) => /^[A-Za-z0-9_.-]+$/.test(parte) && parte !== "." && parte !== "..");
+  if (!repositorioValido || !token) {
     throw new Error("GITHUB_REPOSITORY e GITHUB_TOKEN são necessários na faxina.");
   }
-  const resposta = await fetch(
-    `https://api.github.com/repos/${repositorio}/pulls?state=open&per_page=100`,
-    { headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token}` } },
-  );
-  if (!resposta.ok) {
-    throw new Error(
-      `A API do GitHub respondeu HTTP ${resposta.status} ao listar os pull requests.`,
+  const numeros = new Set();
+  for (let pagina = 1; pagina <= 10000; pagina++) {
+    // URLs construídas localmente; nunca encaminhar token para um Link da resposta.
+    const resposta = await buscar(
+      `https://api.github.com/repos/${repositorio}/pulls?state=open&per_page=100&sort=created&direction=asc&page=${pagina}`,
+      {
+        redirect: "error",
+        headers: { accept: "application/vnd.github+json", authorization: `Bearer ${token}` },
+      },
     );
+    if (!resposta.ok) {
+      throw new Error(`Falha HTTP ${resposta.status} na listagem de pull requests.`);
+    }
+    let lista;
+    try {
+      lista = await resposta.json();
+    } catch {
+      throw new Error("JSON inválido na listagem de pull requests.");
+    }
+    if (!Array.isArray(lista) || lista.length > 100) {
+      throw new Error("Página de pull requests inválida.");
+    }
+    for (const item of lista) {
+      if (!Number.isSafeInteger(item?.number) || item.number < 1 || numeros.has(item.number)) {
+        throw new Error("Paginação inconsistente ou número de pull request inválido.");
+      }
+      numeros.add(item.number);
+    }
+    if (lista.length < 100) return [...numeros];
   }
-  const lista = await resposta.json();
-  return lista.map((item) => item.number);
+  throw new Error("Paginação de pull requests não concluída.");
 }
 
-async function faxina() {
-  const cliente = await conectar();
+export async function faxina({ conectar: abrir = conectar, lerPrs = prsAbertos } = {}) {
+  const cliente = await abrir();
   try {
     const existentes = await listarSchemas(cliente);
-    const abertos = await prsAbertos();
+    const abertos = await lerPrs();
     const remover = schemasParaRemover(existentes, abertos);
     for (const nome of remover) {
       await cliente.query("set lock_timeout = '5s'");
       await cliente.query(`drop schema if exists ${identificadorPostgres(nome)} cascade`);
       console.log(`[preview] Órfão removido: ${nome}`);
     }
-    console.log(`[preview] Faxina concluída: ${remover.length} schema(s) removido(s).`);
+    console.log(`[preview] Faxina concluída: ${remover.length} schemas removidos.`);
   } finally {
     await cliente.end();
   }
