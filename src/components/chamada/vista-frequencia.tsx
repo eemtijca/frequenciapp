@@ -65,6 +65,7 @@ import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { Button } from "@/components/ui/button";
 import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
 import { Selecionar } from "@/components/ui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
@@ -207,6 +208,13 @@ export default function VistaFrequencia({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
   const falhaRascunho = useRef("");
+  const confirmacaoHistoricaRef = useRef<{ confirmar: boolean; motivo: string }>({
+    confirmar: false,
+    motivo: "",
+  });
+  const [confirmacaoHistoricaAberta, setConfirmacaoHistoricaAberta] = useState(false);
+  const [motivoHistorico, setMotivoHistorico] = useState("");
+  const [erroHistorico, setErroHistorico] = useState("");
   const semMovimento = useReducedMotion() ?? false;
 
   const atualizarTela = useCallback(() => {
@@ -752,6 +760,12 @@ export default function VistaFrequencia({
           revisao: revisaoSalva,
           justificativasAntecipadas: justificativasAntecipadasRef.current,
           ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
+          ...(confirmacaoHistoricaRef.current.confirmar
+            ? {
+                confirmarHistorico: true,
+                motivo: confirmacaoHistoricaRef.current.motivo,
+              }
+            : {}),
         }),
       );
       setFrequenciasDoDia((atual) => {
@@ -774,6 +788,9 @@ export default function VistaFrequencia({
       setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);
       setConflito(false);
+      confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+      setMotivoHistorico("");
+      setErroHistorico("");
       try {
         sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
       } catch {
@@ -798,6 +815,16 @@ export default function VistaFrequencia({
       const falha = excecao instanceof ErroApi ? excecao : null;
       const agendasMudaram =
         (falha?.corpo as { codigo?: string } | undefined)?.codigo === "JUSTIFICATIVAS_ALTERADAS";
+      const precisaConfirmarHistorico =
+        (falha?.corpo as { codigo?: string } | undefined)?.codigo ===
+        "CONFIRMACAO_HISTORICA_NECESSARIA";
+      if (precisaConfirmarHistorico && !confirmacaoHistoricaRef.current.confirmar) {
+        setConfirmacaoHistoricaAberta(true);
+        setErroHistorico("");
+        setErro("");
+        setErroVariante("indisponivel");
+        return;
+      }
       if (falha?.conflito || agendasMudaram) {
         const vigente = (falha?.corpo as { frequencia?: Frequencia } | undefined)?.frequencia;
         if (vigente) {
@@ -832,6 +859,12 @@ export default function VistaFrequencia({
     toast("Rascunho descartado.", {
       description: "As marcações voltaram para a última versão salva.",
     });
+  }
+
+  function cancelarHistorico(): void {
+    confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+    setMotivoHistorico("");
+    setErroHistorico("");
   }
 
   function confirmarDesbloqueio(): void {
@@ -1023,6 +1056,11 @@ export default function VistaFrequencia({
                     </span>
                   ))}
                 </div>
+              )}
+              {revisaoSalva > 0 && !aulasRegistradas && !carregando && (
+                <p className="text-muted-foreground text-xs">
+                  Aulas estimadas pela grade atual; esta chamada não guardou o retrato das aulas.
+                </p>
               )}
               {!carregando && contagemParciais > 0 && (
                 <p className="text-muted-foreground text-xs">
@@ -1717,6 +1755,56 @@ export default function VistaFrequencia({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmarDesbloqueio}>Desbloquear</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmacaoHistoricaAberta} onOpenChange={setConfirmacaoHistoricaAberta}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar chamada histórica?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A composição desta turma em {rotuloDia} não pôde ser comprovada. Confirme o lançamento
+              e informe o motivo. A confirmação fica registrada na auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="motivo-historico">Motivo</Label>
+            <Input
+              id="motivo-historico"
+              value={motivoHistorico}
+              onChange={(evento) => setMotivoHistorico(evento.target.value)}
+              maxLength={200}
+              placeholder="Ex.: chamada do diário de papel"
+            />
+            {erroHistorico && (
+              <p role="alert" className="text-falta-texto text-sm">
+                {erroHistorico}
+              </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelarHistorico}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(evento) => {
+                const motivo = motivoHistorico.trim();
+                if (motivo.length < 3 || motivo.length > 200) {
+                  evento.preventDefault();
+                  setErroHistorico(
+                    motivo.length < 3
+                      ? "Informe um motivo com pelo menos 3 caracteres."
+                      : "O motivo deve ter no máximo 200 caracteres.",
+                  );
+                  return;
+                }
+                confirmacaoHistoricaRef.current = { confirmar: true, motivo };
+                setConfirmacaoHistoricaAberta(false);
+                setErroHistorico("");
+                void salvar();
+              }}
+            >
+              Confirmar e salvar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
