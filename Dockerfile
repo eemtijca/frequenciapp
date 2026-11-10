@@ -2,7 +2,7 @@
 # Multi-estágio para manter a imagem final pequena.
 
 # Base comum: habilita o pnpm via Corepack em todos os estágios.
-FROM node:24-bookworm-slim AS base
+FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 
@@ -40,7 +40,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # 4. Execução (somente o necessário)
-FROM node:24-bookworm-slim AS execucao
+FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS execucao
 ARG COMMIT_SHA=local
 LABEL org.opencontainers.image.revision=$COMMIT_SHA
 WORKDIR /app

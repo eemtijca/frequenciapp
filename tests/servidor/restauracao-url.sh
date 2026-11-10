@@ -71,6 +71,7 @@ docker exec "$BANCO" createdb -U frequencia validacao
 export SERVIDOR_AMBIENTE_INJETADO=true
 export APP_DIR="$RAIZ"
 export ESTADO_DIR="$TMP/estado"
+export SERVIDOR_LOCK_DIR="$TMP/locks"
 export BACKUP_MODO=url
 export BACKUP_DATABASE_URL="postgresql://frequencia:frequencia@127.0.0.1:$PORTA/destino"
 export BACKUP_RESTAURACAO_URL_VALIDACAO="postgresql://frequencia:frequencia@127.0.0.1:$PORTA/validacao"
