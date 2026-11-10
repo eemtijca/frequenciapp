@@ -1,0 +1,70 @@
+# Manutenção explícita com código aprovado, nunca com revisão ou artefato de PR.
+name: Manutenção confiável de preview
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: Manutenção do banco existente; preparo de PR permanece suspenso
+        required: true
+        type: choice
+        options: [faxina, limpar, fallback]
+      pr:
+        description: Número do PR para limpeza manual
+        required: false
+        type: string
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: preview-manutencao
+  cancel-in-progress: false
+jobs:
+  manter:
+    if: github.ref == 'refs/heads/main' && vars.PREVIEW_MANUTENCAO_APROVADA == 'true'
+    environment: preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout da main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validar revisão aprovada na main
+        env:
+          REVISAO: ${{ vars.PREVIEW_TRUSTED_SHA }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$REVISAO" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "PREVIEW_TRUSTED_SHA precisa ter 40 caracteres hexadecimais minúsculos." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin +main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$REVISAO" origin/main; then
+            echo "PREVIEW_TRUSTED_SHA não é ancestral de origin/main." >&2
+            exit 1
+          fi
+      - name: Checkout da revisão aprovada
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ vars.PREVIEW_TRUSTED_SHA }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Executar manutenção aprovada
+        env:
+          ACAO: ${{ inputs.acao }}
+          PR: ${{ inputs.pr }}
+          DIRECT_URL_PREVIEW: ${{ secrets.DIRECT_URL_PREVIEW }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          case "$ACAO" in
+            faxina) node scripts/banco/preview-schema.mjs faxina ;;
+            limpar) node scripts/banco/preview-schema.mjs limpar --pr "$PR" ;;
+            fallback) DIRECT_URL="$DIRECT_URL_PREVIEW" DATABASE_SCHEMA=preview node docker/app/migrar.mjs ;;
+            *) exit 1 ;;
+          esac

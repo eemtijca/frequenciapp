@@ -133,64 +133,32 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 
 O build da Vercel não executa migrations. O workflow de CD usa `DIRECT_URL_PROD`, que deve conter a Session pooler.
 
-### Preview em schema do mesmo banco
+### Preview e manutenção
 
-O Preview pode usar um schema separado no mesmo database da produção. O exemplo abaixo usa `preview`; substitua pelo nome provisionado e mantenha as variáveis no escopo **Preview** da Vercel:
+`schema-preview.yml` valida PRs sem segredos de banco, sem credenciais de plataforma e sem provisionar schemas. Preparo automático e redeploy de PR ficam suspensos até o aceite de uma topologia própria para executar migrações não confiáveis. Branch interna não equivale a código revisado.
 
-```text
-DATABASE_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:6543/postgres?pgbouncer=true&sslmode=require&uselibpqcompat=true&schema=preview
-DIRECT_URL=postgresql://USUARIO.PROJECT_REF:SENHA@POOLER_HOST:5432/postgres?sslmode=require&uselibpqcompat=true&schema=preview
-```
+A manutenção do banco existente fica em `schema-preview-confiavel.yml`, por dispatch na `main`, com revisão completa em `PREVIEW_TRUSTED_SHA` e gate `PREVIEW_MANUTENCAO_APROVADA`. O SHA precisa ter 40 hexadecimais e ser ancestral de `origin/main`, conferido por `git fetch` e `git merge-base --is-ancestor` antes do checkout e do uso de `DIRECT_URL_PREVIEW`. O environment `preview`, suas aprovações e os grants precisam ser confirmados pelo mantenedor; não foram alterados nesta proposta. A manutenção aceita fallback, limpeza numérica e faxina, nunca artefatos ou migrações de PR não revisadas.
 
-As duas URLs devem indicar o mesmo database e schema, embora possam usar papéis com permissões diferentes. `USUARIO.PROJECT_REF` representa o usuário completo do pooler: copie o valor correspondente à role existente no projeto Supabase. Criar um schema não cria um usuário PostgreSQL. Sem `schema` na URL e sem `DATABASE_SCHEMA`, o destino padrão é `public`.
+Na faxina, todas as páginas de PRs abertos são validadas antes de calcular órfãos e iniciar DROP. A consulta usa origem fixa e não segue Link ou redirects com token. Resposta parcial, inválida ou repetida aborta sem remoções. Só nomes `preview_pr_<inteiro positivo>` são candidatos; a API é viva e não fornece snapshot transacional.
 
-O primeiro parâmetro da URL usa `?`; os seguintes usam `&`. Sem o `?`, o sufixo passa a fazer parte do nome do banco e a conexão falha com `P1003`.
+A proposta de banco descartável dedicado por preview ainda exige aceite de topologia, custo, retenção e operação. O provisionador legado e os grants reais não foram remediados por hipótese. A caracterização sintética de PUBLIC, funções, tipos, sequences e membership pertence ao executor de isolamento da issue #423-C e não foi executada nesta frente. A [ADR-038](adr/038-automacao-do-schema-de-preview.md) distingue esses estados.
 
-Em vez de repetir `schema` nas duas URLs, o escopo Preview pode definir `DATABASE_SCHEMA=preview` como variável de configuração: ela vence o parâmetro da URL e vale para o runtime, os scripts e o migrador. Use uma única forma de seleção por ambiente para evitar divergência.
-
-O provisionamento das roles, do schema e dos default privileges está em [`scripts/banco/provisionar-preview.sql`](../scripts/banco/provisionar-preview.sql), que é idempotente e não toca em produção. O PostgreSQL exige membership no papel de migração para definir default privileges de outro papel (erro 42501); o script concede isso antes dos `alter default privileges`.
-
-1. Crie o schema de Preview com uma conta administrativa do banco e conceda os privilégios necessários às roles de migração e runtime. Limite essas permissões ao ambiente correspondente.
-2. Em um terminal com as variáveis do Preview, aplique `pnpm exec prisma migrate deploy` e confira `pnpm exec prisma migrate status`. Esses comandos usam `DIRECT_URL` quando definida e respeitam `DATABASE_SCHEMA`.
-3. Configure `ADMIN_EMAIL`, `ADMIN_SENHA` e `ADMIN_NOME` para uma conta de teste e execute `pnpm run criar-admin` com a mesma conexão de Preview. As contas da produção não são copiadas.
-4. Publique novamente o Preview após salvar as variáveis na Vercel. Confirme o login e um salvamento com dados sintéticos no schema esperado.
-
-Mantenha as variáveis do escopo Production e `DIRECT_URL_PROD` intactas. O build da Vercel apenas gera o cliente Prisma; não aplica migrações no Preview. O migrador Docker e os scripts administrativos exigem o schema existente e não usam `public` como alternativa quando o schema explícito está ausente.
-
-Se o log apresentar `(EAUTHQUERY) user not found in the database`, confira o usuário completo do pooler, projeto, database e host configurados nas variáveis do Preview. Esse erro ocorre na autenticação PostgreSQL, antes de acessar o schema; ajustar `schema` não corrige uma role inexistente ou uma conexão de outro projeto. Não publique URLs, senhas ou valores completos das variáveis em logs ou issues.
-
-A API trata essa falha `P2039` com a assinatura `EAUTHQUERY` como indisponibilidade: responde HTTP 503 com mensagem genérica e registra um aviso operacional estático no tratamento de erros. A conexão externa ainda precisa ser corrigida.
-
-`/api/saude` executa `select 1`: o sucesso comprova conexão, mas não o acesso às tabelas do schema. A verificação inclui o login com a conta criada no Preview.
-
-No escopo Preview, mantenha as cinco variáveis `GOOGLE_*` fora do ambiente. Sem elas, o servidor recusa a integração com HTTP 503 antes de qualquer chamada de rede, e o preview não alcança nenhuma planilha real. Os URIs autorizados no Google Cloud devem apontar apenas para o domínio de produção.
-
-### Automação por pull request
-
-O workflow `schema-preview.yml` automatiza o ciclo do preview. Para pull requests do próprio repositório que mudam `prisma/**`, ele cria e migra `preview_pr_<número>`, concede os default privileges e cria a conta `preview-pr-<número>@escola.exemplo` com `ADMIN_SENHA_PREVIEW`. No fechamento, remove o schema; uma faxina semanal derruba órfãos; e um job em cada push na `main` mantém o schema de fallback `preview`.
-
-Configure no GitHub, no environment `preview`:
-
-- segredo `DIRECT_URL_PREVIEW`: Session pooler com `preview_migrador`, sem `schema`;
-- segredo `ADMIN_SENHA_PREVIEW`: senha da conta sintética de cada preview;
-- opcional para o apontamento automático: segredo `VERCEL_TOKEN` e variáveis `VERCEL_PROJECT_ID` e `VERCEL_TEAM_ID`. Sem eles, o schema é criado e migrado, mas a branch continua no fallback até o ajuste manual de `DATABASE_SCHEMA`.
-
-Pull requests sem mudança de banco, do Dependabot e de forks usam o fallback `preview`; o workflow não roda em forks, que não recebem segredos.
+Sem `DATABASE_SCHEMA` ou parâmetro de schema, o runtime usa `public`. A escolha de schema não cria login nem comprova privilégio. `/api/saude` comprova conexão e revisão, não DML sobre tabelas; o aceite inclui operação sintética de login e salvamento. Não configurar variáveis `GOOGLE_*` ou credenciais reais em ensaios de preview.
 
 ## GitHub Actions
 
 Os workflows ficam em `.github/workflows/`:
 
-| Workflow             | Responsabilidade                                                              |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `qualidade.yml`      | Formatação, lint, tipos e testes unitários                                    |
-| `build.yml`          | Build de produção do Next.js                                                  |
-| `testes.yml`         | Compose, migração, contas de teste e contratos de API                         |
-| `migracoes.yml`      | `prisma migrate deploy` na `main` e no ambiente `production`                  |
-| `schema-preview.yml` | Schema `preview_pr_<n>` por pull request, fallback na `main` e faxina semanal |
-| `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                               |
-| `publicacao.yml`     | Publicação da imagem no GHCR                                                  |
-| `servidor.yml`       | Validação de Compose, Caddy, Nginx, scripts e workflows de servidor           |
+| Workflow             | Responsabilidade                                                     |
+| -------------------- | -------------------------------------------------------------------- |
+| `qualidade.yml`      | Formatação, lint, tipos e testes unitários                           |
+| `build.yml`          | Build de produção do Next.js                                         |
+| `testes.yml`         | Compose, migração, contas de teste e contratos de API                |
+| `migracoes.yml`      | `prisma migrate deploy` na `main` e no ambiente `production`         |
+| `schema-preview.yml` | Validação sem segredos; manutenção privilegiada em workflow separado |
+| `codeql.yml`         | Análise de segurança de JavaScript e TypeScript                      |
+| `publicacao.yml`     | Publicação da imagem no GHCR                                         |
+| `servidor.yml`       | Validação de Compose, Caddy, Nginx, scripts e workflows de servidor  |
 
 ### Automação opcional por variável
 
