@@ -285,7 +285,7 @@ test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar 
     gravar(path.join(tmp, "age.txt"), "destinatario FALSO\n");
     const antigos = [];
     for (let i = 1; i <= 6; i++) {
-      const r = conjunto(local, i, i % 2 ? "gpg" : "age", { alvo: identidade.chave });
+      const r = conjunto(local, i, i % 2 ? "gpg" : "age", { alvo: identidade.trava });
       antigos.push(r);
       copiar(r, local, remoto);
       fs.copyFileSync(
@@ -293,7 +293,7 @@ test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar 
         path.join(catalogo, r.base + ".confirmado.json"),
       );
     }
-    const vizinho = conjunto(local, 7, "gpg", { alvo: identidade.chave, banco: "vizinho" });
+    const vizinho = conjunto(local, 7, "gpg", { alvo: identidade.trava, banco: "vizinho" });
     copiar(vizinho, local, remoto);
     fs.copyFileSync(
       path.join(local, vizinho.base + ".confirmado.json"),
@@ -404,7 +404,7 @@ test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar 
     assert.ok(lotesAtuais().length > 0, "o despacho de leitura em lote precisa ser atingido");
     assert.ok(lotesAtuais().every((e) => e.status === 0 && e.ausentes.length === 0));
     // Garante um candidato antigo para exigir reobservação antes de qualquer delete.
-    const adicional = conjunto(local, 8, "gpg", { alvo: identidade.chave });
+    const adicional = conjunto(local, 8, "gpg", { alvo: identidade.trava });
     copiar(adicional, local, remoto);
     fs.copyFileSync(
       path.join(local, adicional.base + ".confirmado.json"),
