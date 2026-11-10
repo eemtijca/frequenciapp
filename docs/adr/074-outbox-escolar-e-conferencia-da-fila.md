@@ -1,4 +1,4 @@
-# ADR-069: intenção escolar e conferência da fila
+# ADR-074: intenção escolar e conferência da fila
 
 Estado: aceita. Data: 2026-11-10.
 
