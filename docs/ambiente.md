@@ -109,6 +109,31 @@ pnpm run dev
 
 O aplicativo responde em http://localhost:3000. A página única é dinâmica: cada carregamento resolve a sessão e busca os dados correntes.
 
+## Testes em contêiner
+
+O executor `scripts/dev/executar-container.sh` roda as verificações em Docker, sem `pnpm`, `npx`, `vitest` ou `playwright` no host e sem WSL. Requer Docker com contêineres Linux e o worktree em LF. No Windows, use o Bash do Git; o Bash do WSL é recusado.
+
+| Subcomando           | Efeito                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `qualidade`          | Instala dependências e roda `format:check`, `lint`, `tsc`, `test:unit` e o teste do executor. |
+| `servidor`           | Monta o socket Docker e roda `pnpm run servidor:validar`.                                     |
+| `api`                | Sobe banco e aplicativo no projeto Compose e roda os contratos de API.                        |
+| `e2e`                | Sobe banco e aplicativo no projeto Compose e roda o Playwright.                               |
+| `pwa`                | Sobe banco e aplicativo no projeto Compose e roda a suíte PWA no build de produção.           |
+| `instalador-plano`   | Roda `instalar.sh planejar` na matriz de distribuições.                                       |
+| `instalador-aplicar` | Roda `instalar.sh aplicar` em um contêiner systemd descartável.                               |
+
+O nome do projeto e dos volumes vem de `--tarefa` (padrão `local`): `frequenciapp-plan-<tarefa>`. API, E2E e PWA usam a rede do projeto, com banco e aplicativo internos, sem publicar portas e sem `network_mode: host`; a suíte compartilha a pilha de rede do serviço `app` para alcançar `http://localhost:3000` e o Google falso. A trava fica em `$EXECUTOR_LOCK_DIR` (padrão `$TMPDIR/opencode/locks`) e impede duas suítes simultâneas. Os volumes de dependências permanecem entre execuções; o projeto Compose é removido com `down --volumes` ao final, salvo `--manter`.
+
+```bash
+bash scripts/dev/executar-container.sh qualidade
+bash scripts/dev/executar-container.sh qualidade --tarefa p1.2
+bash scripts/dev/executar-container.sh e2e --tarefa p6.1 -- --project=chromium
+bash scripts/dev/executar-container.sh servidor
+```
+
+As imagens Node e Playwright são fixas por digest. O subcomando `servidor` monta o socket Docker em um contêiner com Docker CLI, Buildx e Compose e usa a mesma árvore em caminhos idênticos para os ensaios que chamam Docker. Os subcomandos `instalador-*` exigem `instalar.sh`, criado na tarefa P4; o modo `aplicar` usa um contêiner systemd descartável e privilegiado, apenas para ensaio.
+
 ## Semente de demonstração
 
 `pnpm run seed` simula um ano letivo de uso para a conta de coordenação existente: nove turmas (1º ao 3º ano, A a C), 35 a 50 alunos por turma, grade de tempo integral com nove aulas, chamadas e faltas em cauda longa (com crônicos, episódios e justificativas), saídas, entradas, frequências parciais, feriados e recessos do calendário e dois diretores de turma de exemplo. É determinística, idempotente e usa apenas nomes sintéticos.
