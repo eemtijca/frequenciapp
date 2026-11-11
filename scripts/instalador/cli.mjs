@@ -1,18 +1,36 @@
-// CLI mínima do instalador: ajuda, versão, planejamento em modo detecção e esquema.
+// CLI do instalador: analisa flags,resolve configuração, despacha comandos e emite o contrato JSON.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectar, detectarBasico } from "./detectar.mjs";
-import { auditarPacotes, comandoInstalacao } from "./pacotes.mjs";
-import { redigir, redigirObjeto } from "./redigir.mjs";
+import { comandoExistePadrao, detectar, detectarBasico, executarPadrao } from "./detectar.mjs";
+import { auditarPacotes } from "./pacotes.mjs";
+import {
+  ErroInstalador,
+  SCHEMA_ESTADO,
+  SCHEMA_SAIDA,
+  aviso,
+  codigoSaida,
+  construirEsquema,
+  erroObjeto,
+  erroUso,
+  erroValidacao,
+} from "./json.mjs";
+import { caminhoTrava, gravarArquivoComTrava, lerEstado } from "./estado.mjs";
+import {
+  DOCUMENTACAO,
+  VERSAO_INSTALADOR,
+  agoraPadrao,
+  deduplicarAvisos,
+  montarDiagnostico,
+  montarDocumento,
+  montarPlano,
+  montarSituacao,
+} from "./plano.mjs";
+import { contemSegredo, redigir, redigirObjeto } from "./redigir.mjs";
 
-export const VERSAO_INSTALADOR = "1.0.0";
-export const SCHEMA_SAIDA = "frequenciapp.instalador/1";
-export const SCHEMA_ESTADO = "frequenciapp.instalacao/1";
-const DOCUMENTACAO = "docs/instalador.md";
+export { SCHEMA_ESTADO, SCHEMA_SAIDA, VERSAO_INSTALADOR };
+
 const CAMINHO_CONFIG_PADRAO = "/etc/frequenciapp/instalador.json";
-const RAIZ_INSTALADOR = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
-const CAMINHO_PACOTE = path.join(RAIZ_INSTALADOR, "package.json");
 const LIMITE_CONFIG = 1024 * 1024;
 
 const ALIASES = new Map([
@@ -104,6 +122,8 @@ const FLAGS_VALOR = new Map([
   ["--salvar-config", "salvarConfig"],
 ]);
 
+const FLAGS_VALOR_OPCIONAL = new Set(["--salvar-config"]);
+
 const CHAVES_CONFIG = new Map([
   ["perfil", "--perfil"],
   ["canal", "--canal"],
@@ -143,6 +163,7 @@ const CHAVES_CONFIG = new Map([
   ["portaHttp", "--porta-http"],
   ["portaHttps", "--porta-https"],
   ["tempoLimite", "--tempo-limite"],
+  ["acmeStaging", "--acme-staging"],
 ]);
 
 const VALORES_ACEITOS = new Map([
@@ -157,6 +178,90 @@ const VALORES_ACEITOS = new Map([
   ["--canal-atualizacao", ["release", "main"]],
 ]);
 
+const PADROES = {
+  perfil: "simples",
+  canal: "release",
+  tag: "",
+  ref: "",
+  diretorioFonte: "/opt/frequenciapp",
+  imagem: "ghcr.io/eemtijca/frequenciapp",
+  imagemDigest: "",
+  proxy: "caddy",
+  tls: "acme",
+  dominio: "",
+  emailAcme: "",
+  emailAdmin: "",
+  arquivoSenhaAdmin: "",
+  emailCoordenacao: "",
+  arquivoSenhaCoordenacao: "",
+  arquivoGoogle: "",
+  pularContas: false,
+  seed: false,
+  modoBackup: "compose",
+  criptografia: "gpg",
+  destinatarioGpg: "",
+  destinatariosAge: "",
+  configRclone: "",
+  destino: "",
+  retencaoDias: 30,
+  retencaoMinimo: 5,
+  configDropbox: "",
+  arquivoTokenDropbox: "",
+  agendador: "auto",
+  fuso: "America/Fortaleza",
+  habilitarAtualizacoes: false,
+  canalAtualizacao: "release",
+  refAtualizacao: "",
+  firewall: "nao",
+  portaSsh: 22,
+  portaHttp: 80,
+  portaHttps: 443,
+  tempoLimite: "7200",
+  acmeStaging: false,
+};
+
+const CAMPOS_CONFIG = [
+  "perfil",
+  "canal",
+  "tag",
+  "ref",
+  "diretorioFonte",
+  "imagem",
+  "imagemDigest",
+  "proxy",
+  "tls",
+  "dominio",
+  "emailAcme",
+  "emailAdmin",
+  "arquivoSenhaAdmin",
+  "emailCoordenacao",
+  "arquivoSenhaCoordenacao",
+  "arquivoGoogle",
+  "pularContas",
+  "seed",
+  "modoBackup",
+  "criptografia",
+  "destinatarioGpg",
+  "destinatariosAge",
+  "configRclone",
+  "destino",
+  "retencaoDias",
+  "retencaoMinimo",
+  "configDropbox",
+  "arquivoTokenDropbox",
+  "agendador",
+  "fuso",
+  "habilitarAtualizacoes",
+  "canalAtualizacao",
+  "refAtualizacao",
+  "firewall",
+  "portaSsh",
+  "portaHttp",
+  "portaHttps",
+  "tempoLimite",
+  "acmeStaging",
+];
+
 const COMANDOS_CONHECIDOS = new Set([
   "planejar",
   "aplicar",
@@ -166,59 +271,23 @@ const COMANDOS_CONHECIDOS = new Set([
   "backup",
   "restaurar",
   "desinstalar",
-  "canal",
+  "canal mostrar",
+  "canal definir",
   "versao",
   "esquema",
 ]);
 
-const COMANDOS_DISPONIVEIS = new Set(["planejar", "versao", "esquema"]);
+const COMANDOS_DISPONIVEIS = new Set(["planejar", "versao", "esquema", "situacao", "diagnosticar"]);
 
-const CODIGOS_ERRO = [
-  "E_USO",
-  "E_DISTRO",
-  "E_PACOTE",
-  "E_DOCKER",
-  "E_COMPOSE",
-  "E_REDE",
-  "E_VALIDACAO",
-  "E_SAUDE",
-  "E_BACKUP",
-  "E_RESTAURACAO",
-  "E_CONTROLADOR",
-  "E_DROPBOX",
-  "E_CANAL",
-];
-
-class ErroInstalador extends Error {
-  constructor(codigo, mensagem, opcoes = {}) {
-    super(mensagem);
-    this.name = "ErroInstalador";
-    this.codigo = codigo;
-    this.dica = opcoes.dica ?? "";
-    this.comando = opcoes.comando ?? null;
-    this.documentacao = opcoes.documentacao ?? `${DOCUMENTACAO}#códigos-de-erro`;
-    this.saida = opcoes.saida ?? 2;
-  }
-}
-
-function erroUso(mensagem, opcoes = {}) {
-  return new ErroInstalador("E_USO", mensagem, { saida: 2, ...opcoes });
-}
-
-function erroValidacao(mensagem, opcoes = {}) {
-  return new ErroInstalador("E_VALIDACAO", mensagem, { saida: 7, ...opcoes });
-}
-
-function lerVersaoProjeto() {
-  try {
-    const dados = JSON.parse(fs.readFileSync(CAMINHO_PACOTE, "utf8"));
-    return typeof dados.version === "string" ? dados.version : "desconhecida";
-  } catch {
-    return "desconhecida";
-  }
-}
-
-const VERSAO_PROJETO = lerVersaoProjeto();
+const COMANDOS_RECUSADOS = new Set([
+  "aplicar",
+  "atualizar",
+  "backup",
+  "restaurar",
+  "desinstalar",
+  "canal mostrar",
+  "canal definir",
+]);
 
 function validarValor(flag, valor) {
   const texto = String(valor);
@@ -247,10 +316,21 @@ function validarValor(flag, valor) {
   if (flag === "--imagem-digest" && !/^sha256:[a-f0-9]{64}$/.test(texto)) {
     throw erroUso("A opção --imagem-digest exige sha256: seguido de 64 hexadecimais.");
   }
+  if (contemSegredo(texto)) {
+    throw erroUso("A opção recebeu um valor que parece segredo. Use um arquivo com modo 600.");
+  }
   return texto;
 }
 
 function definirValor(opcoes, flag, valor) {
+  if (valor === null) {
+    if (opcoes.valores.has(flag) && opcoes.valores.get(flag) !== null) {
+      throw erroUso(`A opção ${flag} foi repetida com valores diferentes.`);
+    }
+    opcoes.valores.set(flag, null);
+    opcoes.origem.set(flag, "flag");
+    return;
+  }
   const texto = validarValor(flag, valor);
   if (opcoes.valores.has(flag)) {
     if (opcoes.valores.get(flag) !== texto) {
@@ -262,8 +342,9 @@ function definirValor(opcoes, flag, valor) {
   opcoes.origem.set(flag, "flag");
 }
 
-function definirBooleana(opcoes, flag) {
+function definirBooleana(opcoes, flag, valor = true) {
   opcoes.booleanas.add(flag);
+  opcoes.booleanos.set(flag, valor);
   opcoes.origem.set(flag, "flag");
 }
 
@@ -272,6 +353,7 @@ function analisarArgumentos(argv) {
     operandos: [],
     valores: new Map(),
     booleanas: new Set(),
+    booleanos: new Map(),
     origem: new Map(),
   };
   let indice = 0;
@@ -301,6 +383,22 @@ function analisarArgumentos(argv) {
       continue;
     }
     if (!FLAGS_VALOR.has(nome)) throw erroUso(`Opção desconhecida: ${nome}.`);
+    if (FLAGS_VALOR_OPCIONAL.has(nome)) {
+      if (valorInline !== null) {
+        definirValor(opcoes, nome, valorInline || null);
+        indice += 1;
+        continue;
+      }
+      const proximo = argv[indice + 1];
+      if (proximo !== undefined && !proximo.startsWith("-")) {
+        definirValor(opcoes, nome, proximo);
+        indice += 2;
+      } else {
+        definirValor(opcoes, nome, null);
+        indice += 1;
+      }
+      continue;
+    }
     let valor = valorInline;
     if (valor === null) {
       if (indice + 1 >= argv.length) throw erroUso(`A opção ${nome} exige um valor.`);
@@ -312,7 +410,7 @@ function analisarArgumentos(argv) {
     }
     definirValor(opcoes, nome, valor);
   }
-  if (opcoes.booleanas.has("--sem-firewall")) {
+  if (opcoes.booleanos.has("--sem-firewall")) {
     const firewallAtual = opcoes.valores.get("--firewall");
     if (firewallAtual && firewallAtual !== "nao" && opcoes.origem.get("--firewall") === "flag") {
       throw erroUso("As opções --firewall e --sem-firewall entram em conflito.");
@@ -334,11 +432,11 @@ function carregarConfig(opcoes) {
     if (erro.code === "ENOENT" && !explicitado) return [];
     if (erro.code === "EACCES" && !explicitado) {
       return [
-        {
-          codigo: "A_CONFIG_ILEGIVEL",
-          mensagem: "A configuração padrão existe, mas não pode ser lida.",
-          documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
-        },
+        aviso(
+          "A_CONFIG_ILEGIVEL",
+          "A configuração padrão existe, mas não pode ser lida.",
+          `${DOCUMENTACAO}#arquivo-de-configuração`,
+        ),
       ];
     }
     throw erroValidacao("Não foi possível ler o arquivo de configuração.", {
@@ -357,12 +455,37 @@ function carregarConfig(opcoes) {
       documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
     });
   }
+  let texto;
+  try {
+    texto = fs.readFileSync(caminho, "utf8");
+  } catch (erro) {
+    if (erro.code === "EACCES" && !explicitado) {
+      return [
+        aviso(
+          "A_CONFIG_ILEGIVEL",
+          "A configuração padrão existe, mas não pode ser lida.",
+          `${DOCUMENTACAO}#arquivo-de-configuração`,
+        ),
+      ];
+    }
+    if (erro.code === "EACCES") {
+      throw erroValidacao("Sem permissão para ler o arquivo de configuração.", {
+        dica: "Confira a permissão do caminho indicado em --config.",
+        documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+        saida: 5,
+      });
+    }
+    throw erroValidacao("Não foi possível ler o arquivo de configuração.", {
+      dica: "Confira o caminho indicado em --config.",
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
   let dados;
   try {
-    dados = JSON.parse(fs.readFileSync(caminho, "utf8"));
+    dados = JSON.parse(texto);
   } catch {
     throw erroValidacao("O arquivo de configuração não contém JSON válido.", {
-      dica: "Corrija o JSON e repita o planejamento.",
+      dica: "Corrija o JSON e repita o comando.",
       documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
     });
   }
@@ -378,11 +501,20 @@ function carregarConfig(opcoes) {
       if (typeof valor !== "boolean") {
         throw erroUso(`A chave ${chave} exige um valor booleano.`);
       }
-      if (!opcoes.booleanas.has(flag)) definirBooleana(opcoes, flag);
+      if (!opcoes.booleanos.has(flag)) {
+        opcoes.booleanos.set(flag, valor);
+        opcoes.origem.set(flag, "config");
+      }
       continue;
     }
     if (!["string", "number"].includes(typeof valor)) {
       throw erroUso(`A chave ${chave} exige texto ou número.`);
+    }
+    if (typeof valor === "string" && contemSegredo(valor)) {
+      throw erroUso("A configuração contém um valor que parece segredo.", {
+        dica: "Use os arquivos indicados pelas flags de senha, token e chave.",
+        documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+      });
     }
     if (!opcoes.valores.has(flag)) {
       const texto = validarValor(flag, valor);
@@ -393,289 +525,312 @@ function carregarConfig(opcoes) {
   return [];
 }
 
-function configuracaoPadrao() {
-  return { perfil: "simples", canal: "release", tag: "", commit: "", imagem: "", digest: "" };
-}
-
-function configuracaoEfetiva(opcoes) {
-  const valores = opcoes?.valores ?? new Map();
-  const ref = valores.get("--ref") ?? "";
-  return {
-    perfil: valores.get("--perfil") ?? "simples",
-    canal: valores.get("--canal") ?? "release",
-    tag: valores.get("--tag") ?? "",
-    commit: /^[a-f0-9]{7,64}$/.test(ref) ? ref : "",
-    imagem: valores.get("--imagem") ?? "",
-    digest: valores.get("--imagem-digest") ?? "",
-  };
-}
-
-function comandoParaErro(argv) {
-  if (argv.includes("--versao") || argv.includes("--version") || argv.includes("versao")) {
-    return "versao";
+function converterValor(chave, valor) {
+  if (["retencaoDias", "retencaoMinimo", "portaSsh", "portaHttp", "portaHttps"].includes(chave)) {
+    return Number(valor);
   }
-  if (argv.includes("esquema")) return "esquema";
-  if (argv.includes("--aplicar") || argv.includes("aplicar")) return "aplicar";
-  return "planejar";
+  return valor;
 }
 
-function agora() {
-  return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+function resolverConfiguracao(opcoes, estadoResultado) {
+  const valores = { ...PADROES };
+  const definidos = new Set();
+  for (const [chave, flag] of CHAVES_CONFIG) {
+    if (opcoes.booleanos.has(flag)) {
+      valores[chave] = Boolean(opcoes.booleanos.get(flag));
+      definidos.add(chave);
+      continue;
+    }
+    if (opcoes.valores.has(flag)) {
+      const bruto = opcoes.valores.get(flag);
+      valores[chave] = converterValor(chave, bruto);
+      definidos.add(chave);
+    }
+  }
+  if (valores.canal === "main" && !valores.ref) valores.ref = "main";
+  if (valores.imagemDigest) {
+    valores.digest = valores.imagemDigest;
+    definidos.add("digest");
+  }
+  if (/^[a-f0-9]{7,64}$/.test(String(valores.ref ?? ""))) {
+    valores.commit = valores.ref;
+    definidos.add("commit");
+  }
+  if (estadoResultado?.presente && estadoResultado.estado) {
+    for (const campo of ["perfil", "canal", "tag", "commit", "imagem", "digest"]) {
+      if (!definidos.has(campo) && estadoResultado.estado[campo]) {
+        valores[campo] = estadoResultado.estado[campo];
+      }
+    }
+  }
+  return { valores, definidos };
 }
 
-function aviso(codigo, mensagem, documentacao = DOCUMENTACAO) {
-  return { codigo, mensagem, documentacao };
+function configuracaoParaArquivo(configuracao) {
+  const saida = {};
+  for (const chave of CAMPOS_CONFIG) {
+    const valor = configuracao[chave];
+    if (valor === undefined || valor === null || valor === "") continue;
+    if (typeof valor === "string" && contemSegredo(valor)) {
+      throw erroUso("A configuração efetiva contém um valor que parece segredo.");
+    }
+    saida[chave] = valor;
+  }
+  return saida;
 }
 
-function erroObjeto(erro) {
-  return {
-    codigo: erro.codigo,
-    mensagem: erro.message,
-    dica: erro.dica,
-    comando: erro.comando,
-    documentacao: erro.documentacao,
-  };
+function lerEstadoSeguro(deps) {
+  try {
+    return deps.lerEstado({ raiz: deps.raiz });
+  } catch (erro) {
+    if (erro instanceof ErroInstalador) {
+      return { presente: false, estado: null, avisos: [], erro };
+    }
+    throw erro;
+  }
 }
 
-function documento(comando, configuracao, deteccao, dados) {
-  return redigirObjeto({
-    schema: SCHEMA_SAIDA,
-    comando,
-    ok: dados.erros.length === 0,
-    codigo: dados.erros[0]?.codigo ?? null,
-    dry_run: dados.dryRun,
-    distro: deteccao.distro ?? "desconhecida",
-    versao: { instalador: VERSAO_INSTALADOR, projeto: VERSAO_PROJETO },
-    codename: deteccao.codename ?? "",
-    familia: deteccao.familia ?? "desconhecida",
-    tier: deteccao.tier ?? 3,
-    arquitetura: deteccao.arquitetura ?? "desconhecida",
-    gerenciador: deteccao.gerenciador ?? "desconhecido",
-    iniciador: deteccao.iniciador ?? "desconhecido",
-    firewall: deteccao.firewall ?? "nenhum",
-    selinux: deteccao.selinux ?? "ausente",
-    apparmor: deteccao.apparmor ?? "ausente",
-    canal: configuracao.canal,
-    perfil: configuracao.perfil,
-    tag: configuracao.tag,
-    commit: configuracao.commit,
-    imagem: configuracao.imagem,
-    digest: configuracao.digest,
-    etapas: dados.etapas,
-    avisos: dados.avisos,
-    erros: dados.erros,
-    proximos: dados.proximos,
-    relatorio: dados.relatorio ?? null,
+function auditarSeguro(deps, deteccao) {
+  if (deteccao.tier === 3 || deteccao.gerenciador === "desconhecido") {
+    return { auditoria: null, avisos: [] };
+  }
+  try {
+    return {
+      auditoria: deps.auditarPacotes({
+        familia: deteccao.familia,
+        gerenciador: deteccao.gerenciador,
+        executar: deps.executar,
+        comandoExiste: deps.comandoExiste,
+      }),
+      avisos: [],
+    };
+  } catch {
+    return { auditoria: null, avisos: [] };
+  }
+}
+
+function salvarConfig(opcoes, configuracao, deps) {
+  const caminho = opcoes.valores.get("--salvar-config") || CAMINHO_CONFIG_PADRAO;
+  const absoluto = path.resolve(caminho);
+  const diretorio = path.dirname(absoluto);
+  let informacao;
+  try {
+    informacao = fs.statSync(diretorio);
+  } catch (erro) {
+    if (erro.code === "EACCES" || erro.code === "EPERM") {
+      throw erroValidacao("Sem permissão para preparar o diretório da configuração.", {
+        dica: "Confira a permissão do diretório indicado em --salvar-config.",
+        documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+        saida: 5,
+      });
+    }
+    throw erroValidacao("O diretório da configuração não existe.", {
+      dica: "Crie o diretório antes de repetir o comando.",
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
+  if (!informacao.isDirectory()) {
+    throw erroValidacao("O destino da configuração não é um diretório.", {
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
+  let existente = null;
+  try {
+    existente = fs.lstatSync(absoluto);
+  } catch {
+    existente = null;
+  }
+  if (existente?.isSymbolicLink() || (existente && !existente.isFile())) {
+    throw erroValidacao("O arquivo de configuração precisa ser um arquivo regular.", {
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
+  if (existente && !opcoes.booleanos.get("--forcar")) {
+    throw erroUso("O arquivo de configuração já existe. Use --forcar para sobrescrever.", {
+      dica: "Escolha outro caminho ou confirme a sobrescrita com --forcar.",
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
+  const conteudo = `${JSON.stringify(configuracaoParaArquivo(configuracao), null, 2)}\n`;
+  deps.gravarConfig(deps.caminhoTrava(), absoluto, conteudo, {
+    sobrescrever: Boolean(opcoes.booleanos.get("--forcar")),
   });
+  return absoluto;
 }
 
-function etapaPreflight(deteccao, avisosEtapa) {
-  const inicio = agora();
+function etapaVersao(deteccao, avisos, agora) {
   return {
-    id: "preflight",
+    id: "versao",
     estado: "concluida",
-    inicio,
-    fim: inicio,
+    inicio: agora,
+    fim: agora,
     codigo: null,
     acoes: [
       {
-        descricao: "Detecta distribuição, arquitetura, gerenciador e iniciador",
-        comando: null,
-        altera: false,
-      },
-      {
-        descricao: "Confere Docker, Compose, firewall e módulos de segurança",
-        comando: null,
-        altera: false,
-      },
-      {
-        descricao: "Lê a instalação existente sem alterar o host",
+        descricao: "Lê a versão do instalador, do projeto e a detecção básica",
         comando: null,
         altera: false,
       },
     ],
-    avisos: avisosEtapa,
+    avisos,
     detalhes: {
-      versaoDistro: deteccao.versaoDistro,
-      idLike: deteccao.idLike,
-      motivoTier: deteccao.motivoTier,
-      iniciadorOrigem: deteccao.iniciadorOrigem,
-      container: deteccao.container,
-      docker: deteccao.docker,
-      instalacao: deteccao.instalacao,
       schemaEstado: SCHEMA_ESTADO,
+      schemaSaida: SCHEMA_SAIDA,
+      versaoDistro: deteccao.versaoDistro,
     },
   };
 }
 
-function etapaPacotes(auditoria, bloqueio) {
-  const acoes = [];
-  if (!bloqueio) {
-    for (const pacote of auditoria.pacotes) {
-      if (pacote.acao === "instalar") {
-        acoes.push({
-          descricao: `Instala o pacote ${pacote.nome}`,
-          comando: comandoInstalacao(auditoria.gerenciador, [pacote.nome]),
-          altera: true,
-        });
-      } else if (pacote.acao === "atualizar") {
-        acoes.push({
-          descricao: `Atualiza o pacote ${pacote.nome} para a versão mínima ${pacote.versaoMinima}`,
-          comando: comandoInstalacao(auditoria.gerenciador, [pacote.nome]),
-          altera: true,
-        });
-      }
-    }
-  }
-  if (!acoes.length && !bloqueio) {
-    acoes.push({
-      descricao: "Nenhum pacote precisa ser instalado ou atualizado",
-      comando: null,
-      altera: false,
-    });
-  }
-  return {
-    id: "pacotes",
-    estado: bloqueio ? "bloqueada" : acoes.some((acao) => acao.altera) ? "pendente" : "concluida",
-    inicio: null,
-    fim: null,
-    codigo: bloqueio?.codigo ?? null,
-    acoes,
-    avisos: auditoria.avisos ?? [],
-    detalhes: {
-      gerenciador: auditoria.gerenciador,
-      resumo: auditoria.resumo,
-      pacotes: auditoria.pacotes,
-    },
-  };
-}
-
-function etapaDocker(docker) {
-  const acoes = [];
-  if (!docker.presente) {
-    acoes.push({
-      descricao: "Instala o Docker Engine e o plugin Compose",
-      comando: null,
-      altera: true,
-    });
-  } else {
-    if (docker.daemon !== "ativo") {
-      acoes.push({
-        descricao:
-          docker.daemon === "sem-permissao"
-            ? "Corrige o acesso ao daemon do Docker"
-            : "Inicia o serviço do Docker",
-        comando: null,
-        altera: true,
-      });
-    }
-    if (!docker.composePresente) {
-      acoes.push({
-        descricao: "Instala o plugin Docker Compose",
-        comando: null,
-        altera: true,
-      });
-    } else if (!docker.composeSuficiente) {
-      acoes.push({
-        descricao: "Atualiza o Docker Compose para 2.24 ou superior",
-        comando: null,
-        altera: true,
-      });
-    }
-    if (!docker.usuarioNoGrupo) {
-      acoes.push({
-        descricao: "Adiciona a conta ao grupo docker",
-        comando: null,
-        altera: true,
-      });
-    }
-  }
-  if (!acoes.length) {
-    acoes.push({
-      descricao: "Docker e Compose estão presentes e suficientes",
-      comando: null,
-      altera: false,
-    });
-  }
-  return {
-    id: "docker",
-    estado: acoes.some((acao) => acao.altera) ? "pendente" : "concluida",
-    inicio: null,
-    fim: null,
-    codigo: null,
-    acoes,
-    avisos: [],
-    detalhes: docker,
-  };
-}
-
-function avisosDocker(docker) {
-  const avisos = [];
-  if (!docker.presente) {
-    avisos.push(
-      aviso(
-        "A_DOCKER_AUSENTE",
-        "Docker não encontrado. O plano inclui a instalação.",
-        `${DOCUMENTACAO}#auditoria-de-pacotes`,
-      ),
-    );
-  } else {
-    if (docker.daemon === "parado") {
-      avisos.push(
-        aviso(
-          "A_DOCKER_PARADO",
-          "O daemon do Docker está parado. O plano inclui a partida do serviço.",
-          `${DOCUMENTACAO}#auditoria-de-pacotes`,
-        ),
-      );
-    }
-    if (docker.daemon === "sem-permissao") {
-      avisos.push(
-        aviso(
-          "A_DOCKER_PERMISSAO",
-          "A conta atual não pode consultar o daemon do Docker.",
-          `${DOCUMENTACAO}#segurança`,
-        ),
-      );
-    }
-    if (!docker.usuarioNoGrupo) {
-      avisos.push(
-        aviso(
-          "A_DOCKER_GRUPO",
-          "A conta atual não pertence ao grupo docker.",
-          `${DOCUMENTACAO}#segurança`,
-        ),
-      );
-    }
-    if (!docker.composePresente) {
-      avisos.push(
-        aviso(
-          "A_COMPOSE_AUSENTE",
-          "Docker Compose não encontrado. O plano inclui a instalação.",
-          `${DOCUMENTACAO}#auditoria-de-pacotes`,
-        ),
-      );
-    } else if (!docker.composeSuficiente) {
-      avisos.push(
-        aviso(
-          "A_COMPOSE_ANTIGO",
-          `Docker Compose ${docker.composeVersao} está abaixo da versão mínima 2.24.`,
-          `${DOCUMENTACAO}#auditoria-de-pacotes`,
-        ),
-      );
-    }
-  }
-  return avisos;
-}
-
-function deduplicarAvisos(avisos) {
-  const vistos = new Set();
-  return avisos.filter((item) => {
-    const chave = `${item.codigo ?? ""}\n${item.mensagem}`;
-    if (vistos.has(chave)) return false;
-    vistos.add(chave);
-    return true;
+function processarPlanejar(opcoes, io, deps) {
+  const avisosConfig = carregarConfig(opcoes);
+  const deteccao = deps.detectar({
+    raiz: deps.raiz,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
   });
+  const estadoResultado = lerEstadoSeguro(deps);
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const { auditoria } = auditarSeguro(deps, deteccao);
+  const documento = montarPlano({
+    configuracao: valores,
+    deteccao,
+    auditoria,
+    estadoResultado,
+    avisosConfig,
+    agora: deps.agora(),
+    permitirInstavel: Boolean(opcoes.booleanos.get("--permitir-instavel")),
+  });
+  if (opcoes.valores.has("--salvar-config")) {
+    const caminho = salvarConfig(opcoes, valores, deps);
+    documento.avisos = deduplicarAvisos([
+      ...documento.avisos,
+      aviso(
+        "A_CONFIG_SALVA",
+        `A configuração efetiva foi gravada em ${caminho}.`,
+        `${DOCUMENTACAO}#arquivo-de-configuração`,
+      ),
+    ]);
+    if (documento.ok) {
+      documento.proximos = [
+        `sudo ./instalar.sh aplicar --config ${caminho} --sim`,
+        ...documento.proximos.slice(1),
+      ];
+    }
+  }
+  return emitir(documento, opcoes, io);
+}
+
+function recusarSalvarConfig(opcoes) {
+  if (opcoes.valores.has("--salvar-config")) {
+    throw erroUso("A opção --salvar-config só se aplica ao comando planejar.", {
+      dica: "Use --salvar-config junto de planejar.",
+      documentacao: `${DOCUMENTACAO}#arquivo-de-configuração`,
+    });
+  }
+}
+
+function processarVersao(opcoes, io, deps) {
+  recusarSalvarConfig(opcoes);
+  const avisosConfig = carregarConfig(opcoes);
+  const deteccao = deps.detectarBasico(deps.raiz);
+  const estadoResultado = lerEstadoSeguro(deps);
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const avisos = [...avisosConfig, ...(estadoResultado.avisos ?? [])];
+  if (estadoResultado.erro) {
+    avisos.push(
+      aviso("A_ESTADO_INVALIDO", estadoResultado.erro.message, `${DOCUMENTACAO}#estado-durável`),
+    );
+  }
+  const documento = montarDocumento({
+    comando: "versao",
+    configuracao: valores,
+    estado: estadoResultado.estado,
+    deteccao,
+    dryRun: Boolean(opcoes.booleanos.get("--simular")),
+    etapas: [etapaVersao(deteccao, [], deps.agora())],
+    avisos,
+    erros: [],
+    proximos: ["sudo ./instalar.sh planejar --json --nao-interativo"],
+  });
+  return emitir(documento, opcoes, io);
+}
+
+function processarSituacao(opcoes, io, deps) {
+  if (opcoes.operandos.length > 1) {
+    throw erroUso("O comando situacao não aceita argumentos posicionais.");
+  }
+  recusarSalvarConfig(opcoes);
+  const avisosConfig = carregarConfig(opcoes);
+  const deteccao = deps.detectar({
+    raiz: deps.raiz,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
+  });
+  const estadoResultado = lerEstadoSeguro(deps);
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const documento = montarSituacao({
+    configuracao: valores,
+    deteccao,
+    estadoResultado,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
+    raiz: deps.raiz,
+    agora: deps.agora(),
+    dryRun: Boolean(opcoes.booleanos.get("--simular")),
+  });
+  documento.avisos = deduplicarAvisos([...avisosConfig, ...documento.avisos]);
+  return emitir(documento, opcoes, io);
+}
+
+function processarDiagnosticar(opcoes, io, deps) {
+  if (opcoes.operandos.length > 1) {
+    throw erroUso("O comando diagnosticar não aceita argumentos posicionais.");
+  }
+  recusarSalvarConfig(opcoes);
+  const avisosConfig = carregarConfig(opcoes);
+  const deteccao = deps.detectar({
+    raiz: deps.raiz,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
+  });
+  const estadoResultado = lerEstadoSeguro(deps);
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const { auditoria } = auditarSeguro(deps, deteccao);
+  const documento = montarDiagnostico({
+    configuracao: valores,
+    deteccao,
+    estadoResultado,
+    auditoria,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
+    raiz: deps.raiz,
+    agora: deps.agora(),
+    dryRun: Boolean(opcoes.booleanos.get("--simular")),
+  });
+  documento.avisos = deduplicarAvisos([...avisosConfig, ...documento.avisos]);
+  return emitir(documento, opcoes, io);
+}
+
+function processarEsquema(opcoes, io) {
+  if (opcoes.valores.has("--salvar-config")) {
+    throw erroUso("A opção --salvar-config não se aplica ao comando esquema.", {
+      dica: "Use --salvar-config apenas com planejar.",
+    });
+  }
+  const esquema = construirEsquema();
+  const conteudo = `${JSON.stringify(esquema, null, 2)}\n`;
+  if (opcoes.valores.has("--relatorio")) {
+    escreverArquivo(opcoes.valores.get("--relatorio"), conteudo, "esquema");
+  }
+  if (opcoes.valores.has("--arquivo-log")) {
+    escreverArquivo(
+      opcoes.valores.get("--arquivo-log"),
+      `${agoraPadrao()} comando=esquema ok=true\n`,
+      "log",
+    );
+  }
+  io.stdout.write(conteudo);
+  return 0;
 }
 
 function formatarTabelaPacotes(pacotes) {
@@ -692,7 +847,30 @@ function formatarTabelaPacotes(pacotes) {
   return linhas.join("\n");
 }
 
-function formatarHumano(documentoFinal) {
+function formatarVersaoHumana(documentoFinal) {
+  const etapa = documentoFinal.etapas.find((item) => item.id === "versao");
+  const detalhes = etapa?.detalhes ?? {};
+  return [
+    `instalador: ${documentoFinal.versao.instalador}`,
+    `projeto: ${documentoFinal.versao.projeto}`,
+    `schema de saída: ${SCHEMA_SAIDA}`,
+    `schema do estado: ${detalhes.schemaEstado ?? SCHEMA_ESTADO}`,
+    `distribuição: ${documentoFinal.distro} ${detalhes.versaoDistro ?? ""}`.trim(),
+    `codename: ${documentoFinal.codename}`,
+    `família: ${documentoFinal.familia}`,
+    `tier: ${documentoFinal.tier}`,
+    `arquitetura: ${documentoFinal.arquitetura}`,
+    `gerenciador: ${documentoFinal.gerenciador}`,
+    `iniciador: ${documentoFinal.iniciador}`,
+    `canal: ${documentoFinal.canal}`,
+    `tag: ${documentoFinal.tag}`,
+    `commit: ${documentoFinal.commit}`,
+    `imagem: ${documentoFinal.imagem}`,
+    `digest: ${documentoFinal.digest}`,
+  ].join("\n");
+}
+
+function formatarPlanoHumano(documentoFinal) {
   const linhas = [];
   const preflight = documentoFinal.etapas.find((etapa) => etapa.id === "preflight");
   const pacotes = documentoFinal.etapas.find((etapa) => etapa.id === "pacotes");
@@ -711,6 +889,8 @@ function formatarHumano(documentoFinal) {
   linhas.push(`Iniciador: ${documentoFinal.iniciador}`);
   linhas.push(`Firewall: ${documentoFinal.firewall}`);
   linhas.push(`SELinux: ${documentoFinal.selinux}  AppArmor: ${documentoFinal.apparmor}`);
+  linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
+  if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
   linhas.push("");
   linhas.push("Pacotes:");
   if (pacotes?.detalhes?.pacotes?.length) {
@@ -722,7 +902,7 @@ function formatarHumano(documentoFinal) {
     linhas.push("");
     linhas.push("Avisos:");
     for (const item of documentoFinal.avisos) {
-      linhas.push(`- ${item.mensagem}`);
+      linhas.push(`- ${item.codigo ? `${item.codigo}: ` : ""}${item.mensagem}`);
     }
   }
   if (documentoFinal.erros.length) {
@@ -743,27 +923,99 @@ function formatarHumano(documentoFinal) {
   return `${linhas.join("\n")}\n`;
 }
 
-function formatarVersaoHumana(documentoFinal) {
-  const preflight = documentoFinal.etapas.find((etapa) => etapa.id === "preflight");
-  const detalhes = preflight?.detalhes ?? {};
-  return [
-    `instalador: ${documentoFinal.versao.instalador}`,
-    `projeto: ${documentoFinal.versao.projeto}`,
-    `schema de saída: ${SCHEMA_SAIDA}`,
-    `schema do estado: ${detalhes.schemaEstado ?? SCHEMA_ESTADO}`,
-    `distribuição: ${documentoFinal.distro} ${detalhes.versaoDistro ?? ""}`.trim(),
-    `codename: ${documentoFinal.codename}`,
-    `família: ${documentoFinal.familia}`,
-    `tier: ${documentoFinal.tier}`,
-    `arquitetura: ${documentoFinal.arquitetura}`,
-    `gerenciador: ${documentoFinal.gerenciador}`,
-    `iniciador: ${documentoFinal.iniciador}`,
-    `canal: ${documentoFinal.canal}`,
-    `tag: ${documentoFinal.tag}`,
-    `commit: ${documentoFinal.commit}`,
-    `imagem: ${documentoFinal.imagem}`,
-    `digest: ${documentoFinal.digest}`,
-  ].join("\n");
+function formatarVerificacoes(documentoFinal) {
+  const etapa = documentoFinal.etapas[0];
+  const verificacoes = etapa?.detalhes?.verificacoes ?? [];
+  const linhas = [];
+  for (const item of verificacoes) {
+    const rotulo =
+      item.estado === "ok" ? "ok" : item.estado === "aviso" ? "aviso" : (item.codigo ?? "falha");
+    linhas.push(`- [${rotulo}] ${item.titulo}: ${item.mensagem}`);
+    if (item.estado !== "ok" && item.dica) linhas.push(`  Dica: ${item.dica}`);
+    if (item.estado !== "ok" && item.comando) linhas.push(`  Comando: ${item.comando}`);
+  }
+  return linhas;
+}
+
+function formatarLeituraHumana(documentoFinal, titulo) {
+  const linhas = [];
+  const etapa = documentoFinal.etapas[0];
+  const detalhes = etapa?.detalhes ?? {};
+  linhas.push(`FrequenciApp - ${titulo}`);
+  linhas.push("");
+  linhas.push(`Comando: ${documentoFinal.comando}`);
+  linhas.push(`Distribuição: ${documentoFinal.distro}  Tier: ${documentoFinal.tier}`);
+  linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
+  if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
+  if (documentoFinal.commit) linhas.push(`Commit: ${documentoFinal.commit}`);
+  if (documentoFinal.imagem) linhas.push(`Imagem: ${documentoFinal.imagem}`);
+  if (documentoFinal.digest) linhas.push(`Digest: ${documentoFinal.digest}`);
+  if (documentoFinal.comando === "situacao") {
+    const estado = detalhes.estado ?? {};
+    linhas.push(`Instalação: ${estado.presente ? "presente" : "ausente"}`);
+    const containers = detalhes.containers ?? [];
+    linhas.push(`Containers: ${containers.length}`);
+    for (const container of containers) {
+      linhas.push(`- ${container.nome}: ${container.status}`);
+    }
+    const backup = detalhes.backup ?? {};
+    if (backup.presente) {
+      linhas.push(
+        `Backup: ${backup.valido ? "válido" : "inválido"}${
+          backup.idadeDias !== null ? ` (${backup.idadeDias} dias)` : ""
+        }`,
+      );
+    } else {
+      linhas.push("Backup: ausente");
+    }
+    const disco = detalhes.disco;
+    if (disco) linhas.push(`Disco: ${disco.livreGiB} GiB livres`);
+    const timers = detalhes.timers ?? {};
+    if (timers.disponivel) linhas.push(`Timers: ${timers.quantidade}`);
+    const controlador = estado.controlador;
+    if (controlador?.adotado) {
+      linhas.push(
+        `Controlador: adotado${controlador.readocaoPendente ? ", readoção pendente" : ""}`,
+      );
+    }
+  }
+  linhas.push("");
+  linhas.push("Verificações:");
+  linhas.push(...formatarVerificacoes(documentoFinal));
+  if (documentoFinal.avisos.length) {
+    linhas.push("");
+    linhas.push("Avisos:");
+    for (const item of documentoFinal.avisos) {
+      linhas.push(`- ${item.codigo ? `${item.codigo}: ` : ""}${item.mensagem}`);
+    }
+  }
+  if (documentoFinal.erros.length) {
+    linhas.push("");
+    linhas.push("Erros:");
+    for (const item of documentoFinal.erros) {
+      linhas.push(`- ${item.codigo}: ${item.mensagem}`);
+      if (item.dica) linhas.push(`  Dica: ${item.dica}`);
+      if (item.comando) linhas.push(`  Comando: ${item.comando}`);
+    }
+  }
+  if (documentoFinal.proximos.length) {
+    linhas.push("");
+    linhas.push("Próximos passos:");
+    for (const item of documentoFinal.proximos) linhas.push(`- ${item}`);
+  }
+  linhas.push("");
+  linhas.push(`Resultado: ${documentoFinal.ok ? "ok" : documentoFinal.codigo}`);
+  return `${linhas.join("\n")}\n`;
+}
+
+function formatarHumano(documentoFinal) {
+  if (documentoFinal.comando === "situacao") {
+    return formatarLeituraHumana(documentoFinal, "situação");
+  }
+  if (documentoFinal.comando === "diagnosticar") {
+    return formatarLeituraHumana(documentoFinal, "diagnóstico");
+  }
+  return formatarPlanoHumano(documentoFinal);
 }
 
 function escreverArquivo(caminho, conteudo, descricao) {
@@ -805,147 +1057,35 @@ function escreverArquivo(caminho, conteudo, descricao) {
   return absoluto;
 }
 
-function escreverSaidas(documentoFinal, opcoes, io) {
+function emitir(documento, opcoes, io) {
   let relatorio = null;
-  if (opcoes.valores.has("--relatorio")) {
-    const caminho = opcoes.valores.get("--relatorio");
-    relatorio = path.resolve(caminho);
-    documentoFinal.relatorio = relatorio;
-    const conteudo = caminho.toLowerCase().endsWith(".json")
-      ? `${JSON.stringify(redigirObjeto(documentoFinal), null, 2)}\n`
-      : documentoFinal.comando === "versao"
-        ? `${formatarVersaoHumana(documentoFinal)}\n`
-        : formatarHumano(documentoFinal);
-    escreverArquivo(caminho, conteudo, "relatório");
-  }
-  if (opcoes.valores.has("--arquivo-log")) {
-    const conteudo = redigir(
-      `${agora()} comando=${documentoFinal.comando} ok=${documentoFinal.ok} codigo=${
-        documentoFinal.codigo ?? ""
-      } distro=${documentoFinal.distro} tier=${documentoFinal.tier} avisos=${
-        documentoFinal.avisos.length
-      } erros=${documentoFinal.erros.length}\n`,
-    );
-    escreverArquivo(opcoes.valores.get("--arquivo-log"), conteudo, "log");
-  }
-  if (opcoes.booleanas.has("--json")) {
-    io.stdout.write(`${JSON.stringify(redigirObjeto(documentoFinal), null, 2)}\n`);
-  } else if (documentoFinal.comando === "versao") {
-    io.stdout.write(`${formatarVersaoHumana(documentoFinal)}\n`);
-  } else {
-    io.stdout.write(formatarHumano(documentoFinal));
-  }
-}
-
-function planejar(opcoes, io) {
-  if (opcoes.operandos.length > 1) {
-    throw erroUso("O comando planejar não aceita argumentos posicionais.");
-  }
-  if (opcoes.valores.has("--salvar-config")) {
-    throw erroUso("A opção --salvar-config ainda não está disponível nesta versão.");
-  }
-  const avisosConfig = carregarConfig(opcoes);
-  const configuracao = configuracaoEfetiva(opcoes);
-  const deteccao = detectar();
-  const avisos = [...avisosConfig, ...deteccao.avisos];
-  const erros = [];
-
-  if (deteccao.tier === 3) {
-    erros.push({
-      codigo: "E_DISTRO",
-      mensagem:
-        `A distribuição ${deteccao.distro} ${deteccao.versaoDistro} não é suportada.`.trim(),
-      dica: "Use uma distribuição Tier 1 ou Tier 2 da matriz do instalador.",
-      comando: null,
-      documentacao: `${DOCUMENTACAO}#tiers`,
-    });
-  }
-
-  let auditoria = {
-    gerenciador: deteccao.gerenciador,
-    familia: deteccao.familia,
-    pacotes: [],
-    resumo: { total: 0, presentes: 0, faltantes: 0, desatualizados: 0 },
-    avisos: [],
-  };
-  let bloqueio = null;
-  if (!erros.length) {
-    if (deteccao.gerenciador === "desconhecido") {
-      erros.push({
-        codigo: "E_PACOTE",
-        mensagem: "Nenhum gerenciador de pacotes reconhecido foi encontrado.",
-        dica: "Confira a instalação do apt, dnf, pacman, zypper ou apk.",
-        comando: null,
-        documentacao: `${DOCUMENTACAO}#auditoria-de-pacotes`,
-      });
-      bloqueio = erros[erros.length - 1];
-    } else {
-      try {
-        auditoria = auditarPacotes({
-          familia: deteccao.familia,
-          gerenciador: deteccao.gerenciador,
-        });
-      } catch {
-        erros.push({
-          codigo: "E_PACOTE",
-          mensagem: "Falha ao auditar os pacotes do host.",
-          dica: "Confira o gerenciador de pacotes e repita o planejamento.",
-          comando: null,
-          documentacao: `${DOCUMENTACAO}#auditoria-de-pacotes`,
-        });
-        bloqueio = erros[erros.length - 1];
-      }
-    }
-  } else {
-    bloqueio = erros[0];
-  }
-
-  if (deteccao.instalacao.existente) {
-    avisos.push(
-      aviso(
-        "A_INSTALACAO_EXISTENTE",
-        "Uma instalação existente foi detectada. O plano preserva o estado atual.",
-        `${DOCUMENTACAO}#estado-durável`,
-      ),
-    );
-  }
-  if (configuracao.perfil !== "simples") {
-    avisos.push(
-      aviso(
-        "A_PERFIL_LIMITADO",
-        "Os perfis controlador, dropbox e completo ainda não alteram o plano nesta versão.",
-        `${DOCUMENTACAO}#perfis`,
-      ),
-    );
-  }
-  avisos.push(...avisosDocker(deteccao.docker));
-
-  const etapas = [
-    etapaPreflight(deteccao, deteccao.avisos),
-    etapaPacotes(auditoria, bloqueio),
-    etapaDocker(deteccao.docker),
-  ];
-  const proximos = erros.length
-    ? ["sudo ./instalar.sh planejar --json --nao-interativo"]
-    : ["sudo ./instalar.sh aplicar --config /etc/frequenciapp/instalador.json --sim"];
-  const documentoFinal = documento("planejar", configuracao, deteccao, {
-    dryRun: true,
-    etapas,
-    avisos: deduplicarAvisos(avisos),
-    erros,
-    proximos,
-    relatorio: null,
-  });
-
   try {
-    escreverSaidas(documentoFinal, opcoes, io);
+    if (opcoes.valores.has("--relatorio")) {
+      relatorio = path.resolve(opcoes.valores.get("--relatorio"));
+      documento.relatorio = relatorio;
+      const conteudo = relatorio.toLowerCase().endsWith(".json")
+        ? `${JSON.stringify(redigirObjeto(documento), null, 2)}\n`
+        : formatarHumano(documento);
+      escreverArquivo(relatorio, conteudo, "relatório");
+    }
+    if (opcoes.valores.has("--arquivo-log")) {
+      const conteudo = redigir(
+        `${agoraPadrao()} comando=${documento.comando} ok=${documento.ok} codigo=${
+          documento.codigo ?? ""
+        } distro=${documento.distro} tier=${documento.tier} avisos=${
+          documento.avisos.length
+        } erros=${documento.erros.length}\n`,
+      );
+      escreverArquivo(opcoes.valores.get("--arquivo-log"), conteudo, "log");
+    }
   } catch (erro) {
     if (erro instanceof ErroInstalador) {
-      documentoFinal.ok = false;
-      documentoFinal.codigo = erro.codigo;
-      documentoFinal.erros.push(erroObjeto(erro));
+      documento.relatorio = null;
+      documento.ok = false;
+      documento.codigo = erro.codigo;
+      documento.erros.push(erroObjeto(erro));
       if (opcoes.booleanas.has("--json")) {
-        io.stdout.write(`${JSON.stringify(redigirObjeto(documentoFinal), null, 2)}\n`);
+        io.stdout.write(`${JSON.stringify(redigirObjeto(documento), null, 2)}\n`);
       } else {
         io.stderr.write(`${erro.codigo}: ${redigir(erro.message)}\n`);
       }
@@ -953,85 +1093,21 @@ function planejar(opcoes, io) {
     }
     throw erro;
   }
-  return documentoFinal.ok ? 0 : codigoSaida(documentoFinal.codigo);
-}
-
-function codigoSaida(codigo) {
-  return (
-    {
-      E_USO: 2,
-      E_DISTRO: 3,
-      E_PACOTE: 8,
-      E_DOCKER: 8,
-      E_COMPOSE: 8,
-      E_REDE: 6,
-      E_VALIDACAO: 7,
-      E_SAUDE: 9,
-      E_BACKUP: 10,
-      E_RESTAURACAO: 10,
-      E_CONTROLADOR: 78,
-      E_DROPBOX: 10,
-      E_CANAL: 78,
-    }[codigo] ?? 1
-  );
-}
-
-function versao(opcoes, io) {
-  if (opcoes.operandos.length > 1) {
-    throw erroUso("O comando versao não aceita argumentos posicionais.");
+  if (opcoes.booleanas.has("--json")) {
+    io.stdout.write(`${JSON.stringify(redigirObjeto(documento), null, 2)}\n`);
+  } else if (documento.comando === "versao") {
+    io.stdout.write(`${formatarVersaoHumana(documento)}\n`);
+  } else {
+    io.stdout.write(formatarHumano(documento));
   }
-  const avisosConfig = carregarConfig(opcoes);
-  const configuracao = configuracaoEfetiva(opcoes);
-  const deteccao = detectarBasico();
-  const etapa = {
-    id: "preflight",
-    estado: "concluida",
-    inicio: agora(),
-    fim: agora(),
-    codigo: null,
-    acoes: [
-      {
-        descricao: "Lê a versão do instalador, do projeto e a detecção básica",
-        comando: null,
-        altera: false,
-      },
-    ],
-    avisos: [],
-    detalhes: {
-      schemaEstado: SCHEMA_ESTADO,
-      schemaSaida: SCHEMA_SAIDA,
-      versaoDistro: deteccao.versaoDistro,
-    },
-  };
-  const documentoFinal = documento("versao", configuracao, deteccao, {
-    dryRun: false,
-    etapas: [etapa],
-    avisos: avisosConfig,
-    erros: [],
-    proximos: ["sudo ./instalar.sh planejar --json --nao-interativo"],
-    relatorio: null,
-  });
-  escreverSaidas(documentoFinal, opcoes, io);
-  return 0;
-}
-
-function esquema(opcoes, io) {
-  if (opcoes.operandos.length > 1) {
-    throw erroUso("O comando esquema não aceita argumentos posicionais.");
+  if (
+    documento.comando === "situacao" &&
+    documento.codigo &&
+    !["E_DOCKER", "E_VALIDACAO", "E_USO"].includes(documento.codigo)
+  ) {
+    return 0;
   }
-  if (opcoes.valores.has("--relatorio")) {
-    const conteudo = `${JSON.stringify(construirEsquema(), null, 2)}\n`;
-    escreverArquivo(opcoes.valores.get("--relatorio"), conteudo, "esquema");
-  }
-  if (opcoes.valores.has("--arquivo-log")) {
-    escreverArquivo(
-      opcoes.valores.get("--arquivo-log"),
-      `${agora()} comando=esquema ok=true\n`,
-      "log",
-    );
-  }
-  io.stdout.write(`${JSON.stringify(construirEsquema(), null, 2)}\n`);
-  return 0;
+  return documento.ok ? 0 : codigoSaida(documento.codigo);
 }
 
 function determinarComando(opcoes) {
@@ -1041,16 +1117,61 @@ function determinarComando(opcoes) {
   if (opcoes.booleanas.has("--planejar")) return "planejar";
   if (opcoes.booleanas.has("--aplicar")) return "aplicar";
   const primeiro = opcoes.operandos[0];
-  if (!primeiro) throw erroUso("Comando ausente. Use planejar, versao ou esquema.");
+  if (!primeiro) {
+    if (opcoes.booleanas.has("--simular")) return "planejar";
+    throw erroUso("Comando ausente. Use planejar, situacao, diagnosticar, versao ou esquema.");
+  }
+  if (primeiro === "canal") {
+    const subcomando = opcoes.operandos[1];
+    if (subcomando !== "mostrar" && subcomando !== "definir") {
+      throw erroUso("O comando canal exige mostrar ou definir.", {
+        dica: "Use canal mostrar ou canal definir.",
+      });
+    }
+    return `canal ${subcomando}`;
+  }
   if (!COMANDOS_CONHECIDOS.has(primeiro)) {
     throw erroUso("Comando desconhecido.");
   }
+  if (COMANDOS_RECUSADOS.has(primeiro)) return primeiro;
   if (!COMANDOS_DISPONIVEIS.has(primeiro)) {
-    throw erroUso(`O comando ${primeiro} ainda não está disponível nesta versão.`, {
-      dica: "Use planejar, versao ou esquema.",
-    });
+    throw erroUso(`O comando ${primeiro} ainda não está disponível nesta versão.`);
   }
   return primeiro;
+}
+
+function comandoParaErro(argv) {
+  if (argv.includes("--versao") || argv.includes("--version") || argv.includes("versao")) {
+    return "versao";
+  }
+  if (argv.includes("esquema")) return "esquema";
+  if (argv.includes("situacao")) return "situacao";
+  if (argv.includes("diagnosticar")) return "diagnosticar";
+  if (argv.includes("--aplicar") || argv.includes("aplicar")) return "aplicar";
+  if (argv.includes("atualizar")) return "atualizar";
+  if (argv.includes("backup")) return "backup";
+  if (argv.includes("restaurar")) return "restaurar";
+  if (argv.includes("desinstalar")) return "desinstalar";
+  if (argv.includes("canal")) {
+    return argv.includes("definir") ? "canal definir" : "canal mostrar";
+  }
+  return "planejar";
+}
+
+function processarRecusa(comando) {
+  const mensagens = {
+    aplicar: "O comando aplicar ainda não está disponível nesta versão.",
+    atualizar: "O comando atualizar ainda não está disponível nesta versão.",
+    backup: "O comando backup ainda não está disponível nesta versão.",
+    restaurar: "O comando restaurar ainda não está disponível nesta versão.",
+    desinstalar: "O comando desinstalar ainda não está disponível nesta versão.",
+    "canal mostrar": "O comando canal ainda não está disponível nesta versão.",
+    "canal definir": "O comando canal ainda não está disponível nesta versão.",
+  };
+  throw erroUso(mensagens[comando] ?? "O comando ainda não está disponível nesta versão.", {
+    dica: "Use planejar, situacao, diagnosticar, versao ou esquema.",
+    documentacao: `${DOCUMENTACAO}#comandos`,
+  });
 }
 
 function textoAjuda() {
@@ -1061,9 +1182,11 @@ function textoAjuda() {
     "  ./instalar.sh <comando> [opcoes]",
     "",
     "Comandos:",
-    "  planejar    Lê o host e mostra o plano, sem alterar o sistema",
-    "  versao      Mostra a versão do instalador, do projeto e a detecção básica",
-    "  esquema     Mostra o JSON Schema da saída",
+    "  planejar      Lê o host e mostra o plano, sem alterar o sistema",
+    "  situacao      Mostra containers, saúde, versão, backup, timers e disco",
+    "  diagnosticar  Verifica dependências, portas, DNS, TLS, banco e backup",
+    "  versao        Mostra a versão do instalador, do projeto e a detecção básica",
+    "  esquema       Mostra o JSON Schema da saída",
     "",
     "Opções gerais:",
     "  --ajuda, -h, --help                 Mostra esta ajuda",
@@ -1071,14 +1194,19 @@ function textoAjuda() {
     "  --json                              Emite um único documento JSON no stdout",
     "  --nao-interativo, --non-interactive Não faz perguntas",
     "  --config <arquivo>                  Lê a configuração JSON",
+    "  --salvar-config [arquivo]           Grava a configuração efetiva com modo 600",
     "  --relatorio, --report <arquivo>     Grava o relatório com modo 600",
     "  --arquivo-log <arquivo>             Grava o log com modo 600",
+    "  --forcar                            Confirma a sobrescrita da configuração",
+    "  --permitir-instavel                 Confirma o uso do canal main",
     "  --simular, --dry-run                Não altera o host",
     "  --perfil, --profile <nome>          Perfil de instalação (padrão: simples)",
     "  --canal, --channel <nome>           Canal de atualização (padrão: release)",
     "",
     "Exemplos:",
     "  ./instalar.sh planejar --json --nao-interativo",
+    "  ./instalar.sh situacao --json",
+    "  ./instalar.sh diagnosticar --json",
     "  ./instalar.sh versao --json",
     "  ./instalar.sh esquema",
     "",
@@ -1088,170 +1216,10 @@ function textoAjuda() {
   ].join("\n");
 }
 
-function construirEsquema() {
-  const referencia = (nome) => ({ $ref: `#/$defs/${nome}` });
-  const codigoErro = { type: "string", enum: CODIGOS_ERRO };
-  const estadoEtapa = {
-    type: "string",
-    enum: ["pendente", "executando", "concluida", "pulada", "falhou", "bloqueada"],
-  };
-  return {
-    $schema: "https://json-schema.org/draft/2020-12/schema",
-    $id: "urn:frequenciapp:instalador:1",
-    title: "Saída do instalador do FrequenciApp",
-    description: "Contrato frequenciapp.instalador/1 para comandos e automação.",
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "schema",
-      "comando",
-      "ok",
-      "codigo",
-      "dry_run",
-      "distro",
-      "versao",
-      "codename",
-      "familia",
-      "tier",
-      "arquitetura",
-      "gerenciador",
-      "iniciador",
-      "firewall",
-      "selinux",
-      "apparmor",
-      "canal",
-      "perfil",
-      "tag",
-      "commit",
-      "imagem",
-      "digest",
-      "etapas",
-      "avisos",
-      "erros",
-      "proximos",
-      "relatorio",
-    ],
-    properties: {
-      schema: { const: SCHEMA_SAIDA },
-      comando: {
-        type: "string",
-        enum: [
-          "planejar",
-          "aplicar",
-          "situacao",
-          "diagnosticar",
-          "atualizar",
-          "backup",
-          "restaurar",
-          "desinstalar",
-          "canal mostrar",
-          "canal definir",
-          "versao",
-          "esquema",
-        ],
-      },
-      ok: { type: "boolean" },
-      codigo: { anyOf: [codigoErro, { type: "null" }] },
-      dry_run: { type: "boolean" },
-      distro: { type: "string" },
-      versao: referencia("versao"),
-      codename: { type: "string" },
-      familia: {
-        type: "string",
-        enum: ["debian", "rhel", "fedora", "arch", "suse", "alpine", "desconhecida"],
-      },
-      tier: { type: "integer", enum: [1, 2, 3] },
-      arquitetura: { type: "string" },
-      gerenciador: {
-        type: "string",
-        enum: ["apt", "dnf", "pacman", "zypper", "apk", "desconhecido"],
-      },
-      iniciador: { type: "string", enum: ["systemd", "openrc", "desconhecido"] },
-      firewall: { type: "string", enum: ["ufw", "firewalld", "nft", "nenhum"] },
-      selinux: { type: "string", enum: ["enforcing", "permissive", "disabled", "ausente"] },
-      apparmor: { type: "string", enum: ["enforcing", "complain", "disabled", "ausente"] },
-      canal: { type: "string", enum: ["release", "main"] },
-      perfil: { type: "string", enum: ["simples", "controlador", "dropbox", "completo"] },
-      tag: { type: "string", pattern: "^$|^v\\d+\\.\\d+\\.\\d+$" },
-      commit: { type: "string", pattern: "^$|^[a-f0-9]{7,64}$" },
-      imagem: { type: "string" },
-      digest: { type: "string", pattern: "^$|^sha256:[a-f0-9]{64}$" },
-      etapas: { type: "array", items: referencia("etapa") },
-      avisos: { type: "array", items: referencia("aviso") },
-      erros: { type: "array", items: referencia("erro") },
-      proximos: { type: "array", items: { type: "string" } },
-      relatorio: { type: ["string", "null"] },
-    },
-    $defs: {
-      versao: {
-        type: "object",
-        additionalProperties: false,
-        required: ["instalador", "projeto"],
-        properties: {
-          instalador: { type: "string" },
-          projeto: { type: "string" },
-        },
-      },
-      etapa: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "estado", "inicio", "fim", "codigo", "acoes", "avisos", "detalhes"],
-        properties: {
-          id: { type: "string", minLength: 1 },
-          estado: estadoEtapa,
-          inicio: { type: ["string", "null"], format: "date-time" },
-          fim: { type: ["string", "null"], format: "date-time" },
-          codigo: { anyOf: [codigoErro, { type: "null" }] },
-          acoes: { type: "array", items: referencia("acao") },
-          avisos: { type: "array", items: referencia("aviso") },
-          detalhes: {
-            type: "object",
-            additionalProperties: true,
-            description: "Dados estruturados da etapa, sempre redigidos.",
-          },
-        },
-      },
-      acao: {
-        type: "object",
-        additionalProperties: false,
-        required: ["descricao", "comando", "altera"],
-        properties: {
-          descricao: { type: "string" },
-          comando: { type: ["string", "null"] },
-          altera: { type: "boolean" },
-        },
-      },
-      erro: {
-        type: "object",
-        additionalProperties: false,
-        required: ["codigo", "mensagem", "dica", "comando", "documentacao"],
-        properties: {
-          codigo: codigoErro,
-          mensagem: { type: "string" },
-          dica: { type: "string" },
-          comando: { type: ["string", "null"] },
-          documentacao: { type: "string" },
-        },
-      },
-      aviso: {
-        type: "object",
-        additionalProperties: false,
-        required: ["mensagem", "documentacao"],
-        properties: {
-          codigo: { type: "string", pattern: "^A_[A-Z0-9_]+$" },
-          mensagem: { type: "string" },
-          documentacao: { type: "string" },
-        },
-      },
-    },
-  };
-}
-
-function documentoErro(erro, argv) {
-  const comando = comandoParaErro(argv);
+function documentoErro(erro, argv, deps) {
   let deteccao;
   try {
-    deteccao = detectarBasico();
+    deteccao = deps.detectarBasico(deps.raiz);
   } catch {
     deteccao = {
       distro: "desconhecida",
@@ -1267,20 +1235,26 @@ function documentoErro(erro, argv) {
       apparmor: "ausente",
     };
   }
-  return documento(comando, configuracaoPadrao(), deteccao, {
-    dryRun: comando === "planejar" || argv.includes("--simular") || argv.includes("--dry-run"),
+  return montarDocumento({
+    comando: comandoParaErro(argv),
+    configuracao: PADROES,
+    estado: null,
+    deteccao,
+    dryRun:
+      comandoParaErro(argv) === "planejar" ||
+      argv.includes("--simular") ||
+      argv.includes("--dry-run"),
     etapas: [],
     avisos: [],
     erros: [erroObjeto(erro)],
     proximos: [],
-    relatorio: null,
   });
 }
 
-function escreverErro(erro, argv, io) {
-  if (argv.includes("--json")) {
+function escreverErro(erro, argv, io, deps) {
+  if (argv.includes("--json") || argv.includes("--json=true")) {
     try {
-      const documentoFinal = documentoErro(erro, argv);
+      const documentoFinal = documentoErro(erro, argv, deps);
       io.stdout.write(`${JSON.stringify(redigirObjeto(documentoFinal), null, 2)}\n`);
       return;
     } catch {
@@ -1295,32 +1269,50 @@ function escreverErro(erro, argv, io) {
 export function principal(
   argv = process.argv.slice(2),
   io = { stdout: process.stdout, stderr: process.stderr },
+  dependencias = {},
 ) {
-  let opcoes;
+  const deps = {
+    detectar,
+    detectarBasico,
+    auditarPacotes,
+    lerEstado,
+    gravarConfig: gravarArquivoComTrava,
+    caminhoTrava: () => caminhoTrava(),
+    agora: agoraPadrao,
+    executar: executarPadrao,
+    comandoExiste: null,
+    raiz: "/",
+    ...dependencias,
+  };
+  deps.executar = deps.executar ?? executarPadrao;
+  deps.comandoExiste = deps.comandoExiste ?? ((nome) => comandoExistePadrao(nome, deps.executar));
   try {
-    opcoes = analisarArgumentos(argv);
+    const opcoes = analisarArgumentos(argv);
     if (opcoes.booleanas.has("--ajuda")) {
       io.stdout.write(`${textoAjuda()}\n`);
       return 0;
     }
     if (opcoes.booleanas.has("--versao")) {
-      return versao(opcoes, io);
+      return processarVersao(opcoes, io, deps);
     }
     if (opcoes.operandos.length === 0 && opcoes.booleanas.size === 0 && opcoes.valores.size === 0) {
       io.stdout.write(`${textoAjuda()}\n`);
       return 0;
     }
     const comando = determinarComando(opcoes);
-    if (comando === "planejar") return planejar(opcoes, io);
-    if (comando === "versao") return versao(opcoes, io);
-    if (comando === "esquema") return esquema(opcoes, io);
-    throw erroUso(`O comando ${comando} ainda não está disponível nesta versão.`);
+    if (COMANDOS_RECUSADOS.has(comando)) processarRecusa(comando);
+    if (comando === "planejar") return processarPlanejar(opcoes, io, deps);
+    if (comando === "versao") return processarVersao(opcoes, io, deps);
+    if (comando === "esquema") return processarEsquema(opcoes, io);
+    if (comando === "situacao") return processarSituacao(opcoes, io, deps);
+    if (comando === "diagnosticar") return processarDiagnosticar(opcoes, io, deps);
+    throw erroUso("Comando desconhecido.");
   } catch (erro) {
     if (erro instanceof ErroInstalador) {
-      escreverErro(erro, argv, io);
+      escreverErro(erro, argv, io, deps);
       return erro.saida;
     }
-    io.stderr.write(`Falha interna: ${redigir(String(erro?.message ?? "erro desconhecido"))}\n`);
+    io.stderr.write("Falha interna: não foi possível concluir o comando.\n");
     return 1;
   }
 }

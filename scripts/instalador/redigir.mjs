@@ -1,4 +1,4 @@
-// Redige segredos antes de imprimir, gravar relatório, log ou JSON.
+// Redige segredos antes de imprimir, gravar relatório, log, estado ou JSON.
 export const MARCADOR = "[REDIGIDO]";
 
 const PADROES = [
@@ -15,21 +15,29 @@ const PADROES = [
     substituir: MARCADOR,
   },
   {
-    regex:
-      /(\b[A-Za-z0-9_]*(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE)[A-Za-z0-9_]*\b\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/gi,
-    substituir: `$1${MARCADOR}`,
-  },
-  {
-    regex: /(\b[A-Z0-9_]*KEY\b\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/g,
-    substituir: `$1${MARCADOR}`,
+    regex: /\bsl\.[A-Za-z0-9_-]{20,}\b/g,
+    substituir: MARCADOR,
   },
   {
     regex:
-      /("(?:[^"]*(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE|KEY)[^"]*)"\s*:\s*)("[^"]*"|[^,}\s]+)/gi,
+      /(\b[A-Za-z0-9_]*(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE|KEY|AUTHORIZATION|COOKIE)[A-Za-z0-9_]*\b\s*[=:]\s*)("[^"]*"|'[^']*'|[^\s,;]+)/gi,
+    substituir: `$1${MARCADOR}`,
+  },
+  {
+    regex:
+      /("(?:[^"]*(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE|KEY|AUTHORIZATION|COOKIE)[^"]*)"\s*:\s*)("[^"]*"|[^,}\s]+)/gi,
     substituir: `$1${MARCADOR}`,
   },
   {
     regex: /([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi,
+    substituir: `$1${MARCADOR}@`,
+  },
+  {
+    regex: /((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp):\/\/)[^/\s@:]+@/gi,
+    substituir: `$1${MARCADOR}@`,
+  },
+  {
+    regex: /([a-z][a-z0-9+.-]*:\/\/)[^/\s@:]+@/gi,
     substituir: `$1${MARCADOR}@`,
   },
   {
@@ -52,6 +60,9 @@ export function redigir(texto) {
   return saida;
 }
 
+const CHAVE_SENSIVEL =
+  /^(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE|KEY|AUTHORIZATION|COOKIE|RCLONE)|(?:SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|PASS|CHAVE|KEY|AUTHORIZATION|COOKIE)$/i;
+
 // Percorre objetos e listas redigindo strings e valores de chaves sensíveis.
 export function redigirObjeto(valor) {
   if (typeof valor === "string") return redigir(valor);
@@ -59,14 +70,27 @@ export function redigirObjeto(valor) {
   if (valor && typeof valor === "object") {
     const saida = {};
     for (const [chave, item] of Object.entries(valor)) {
-      const sensivel =
-        /(SENHA|SEGREDO|SECRET|TOKEN|PASSWORD|PASSWD|CHAVE|KEY)$/i.test(chave) &&
-        (typeof item === "string" || typeof item === "number");
+      const sensivel = CHAVE_SENSIVEL.test(chave) && item !== null && item !== undefined;
       saida[chave] = sensivel ? MARCADOR : redigirObjeto(item);
     }
     return saida;
   }
   return valor;
+}
+
+// Indica se um objeto contém chave ou valor que precisa ser redigido.
+export function contemSegredo(valor) {
+  if (typeof valor === "string") return redigir(valor) !== valor;
+  if (Array.isArray(valor)) return valor.some((item) => contemSegredo(item));
+  if (valor && typeof valor === "object") {
+    for (const [chave, item] of Object.entries(valor)) {
+      if (CHAVE_SENSIVEL.test(chave) && item !== null && item !== undefined && item !== "") {
+        return true;
+      }
+      if (contemSegredo(item)) return true;
+    }
+  }
+  return false;
 }
 
 // Cria um redator que também remove valores conhecidos recebidos fora do texto.

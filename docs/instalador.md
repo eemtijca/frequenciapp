@@ -434,7 +434,7 @@ A saída 130 ou 143 preserva o estado da etapa em andamento. A próxima execuç�
 
 ## Canal release e main
 
-O canal `release` é o padrão de produção. Ele usa tag estável no formato `vX.Y.Z`, imagem publicada no GHCR e o perfil de migrador correspondente. O canal `main` é explícito, exige `--permitir-instavel` e é marcado como instável em `situacao` e `diagnosticar`. No canal `release`, `--tag` é obrigatório. No canal `main`, `--ref` aponta para branch ou commit, com padrão `main`, e `--tag` fica vazio.
+O canal `release` é o padrão de produção. Ele usa tag estável no formato `vX.Y.Z`, imagem publicada no GHCR e o perfil de migrador correspondente. O canal `main` é explícito, exige `--permitir-instavel` e é marcado como instável em `situacao` e `diagnosticar`. No canal `release`, `--tag` é obrigatório para aplicar; o planejamento sem tag registra aviso. No canal `main`, `--ref` aponta para branch ou commit, com padrão `main`, e `--tag` fica vazio.
 
 O estado grava `canal`, `tag`, `commit`, `imagem`, `digest`, `schema`, `migradorSha256`, `instaladoEm` e `atualizadoEm`. O `estado.json` do `atualizar.sh` continua sendo do atualizador; o `instalacao.json` é do instalador. O instalador não sobrescreve o estado do atualizador.
 
@@ -495,7 +495,7 @@ O `--forcar` não dispensa a readoção e não ignora journal incerto. O control
 
 ## Auditoria de pacotes
 
-O `planejar` e o `diagnosticar` verificam, sem alterar:
+O `planejar` usa a detecção e a auditoria de pacotes para montar as etapas `preflight`, `pacotes` e `docker`. O `diagnosticar` verifica, sem alterar:
 
 - `bash`, `curl`, `ca-certificates`, `git`, `jq`, `openssl`, `gpg`, `age`, `rclone`, `tar`, `gzip`, `flock` e `sha256sum`;
 - `docker`, `docker info`, `docker compose version`, serviço `docker` e grupo `docker`;
