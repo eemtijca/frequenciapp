@@ -26,6 +26,12 @@ infra/servidor/nginx/certificados/
 **/*.key
 **/*.p12
 **/*.pfx
+**/id_rsa
+**/id_ed25519
+**/*.jks
+**/*.keystore
+**/*.p8
+**/*.ppk
 **/*.dump
 **/*.dump.*
 **/rclone.conf
