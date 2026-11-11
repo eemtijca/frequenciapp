@@ -20,6 +20,7 @@
 | [controlador-manutencao.md](controlador-manutencao.md) | Controlador opt-in, journal, pins, limites e volta ao caminho simples. |
 | [kubernetes.md](kubernetes.md)                         | Chart Helm, Ingress, migração, agenda e backup.                        |
 | [backup-servidor.md](backup-servidor.md)               | Dump do banco, cifra, rclone, retenção e restauração.                  |
+| [dropbox-retencao.md](dropbox-retencao.md)             | Perfil Dropbox opt-in, token, pasta, journal e restauração.            |
 | [implantacao-nuvem.md](implantacao-nuvem.md)           | AWS, Azure e GCP com Terraform, modo local e produção.                 |
 | [seguranca.md](seguranca.md)                           | Autenticação, sessões, papéis, CSRF e cabeçalhos.                      |
 | [seguranca-preview.md](seguranca-preview.md)           | Roles, PUBLIC e privilégios do schema de preview.                      |
